@@ -1,0 +1,6 @@
+{
+  "name": "MelamiPro Studio - Software de Despiece y Optimización de Melamina",
+  "description": "Software integral para diseño de muebles modulares en melamina, generación automática de despiece, optimizador de corte 2D con veta y kerf, etiquetas imprimibles y presupuesto.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

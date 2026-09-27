@@ -1,0 +1,46 @@
+<div class="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+  <!-- Global Header & Tabs -->
+  <app-header 
+    [activeTab]="activeTab()"
+    (tabChanged)="onTabChanged($event)">
+  </app-header>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 pb-16">
+    @switch (activeTab()) {
+      @case ('modules') {
+        <app-module-designer></app-module-designer>
+      }
+      @case ('parts') {
+        <app-parts-list></app-parts-list>
+      }
+      @case ('optimizer') {
+        <app-cut-optimizer-view></app-cut-optimizer-view>
+      }
+      @case ('budget') {
+        <app-budget-view></app-budget-view>
+      }
+      @case ('labels') {
+        <app-labels-view></app-labels-view>
+      }
+    }
+  </main>
+
+  <!-- Global Footer -->
+  <footer class="bg-zinc-900/60 border-t border-zinc-800/80 py-4 text-center text-xs text-zinc-500 print:hidden">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-zinc-300">MelamiPro Studio</span>
+        <span>•</span>
+        <span>Software de Despiece, Optimización de Melamina y Presupuesto</span>
+      </div>
+      <div class="flex items-center gap-4 text-[11px] text-zinc-400">
+        <span>Cortes tipo Guillotina</span>
+        <span>•</span>
+        <span>Holguras Telescópicas -26mm</span>
+        <span>•</span>
+        <span>Guardado Local JSON</span>
+      </div>
+    </div>
+  </footer>
+</div>

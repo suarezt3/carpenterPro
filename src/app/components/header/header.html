@@ -1,0 +1,362 @@
+<header class="bg-zinc-900 border-b border-zinc-800 text-zinc-100 sticky top-0 z-40 print:hidden">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      
+      <!-- Brand & Project Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center text-white shadow-md shadow-amber-900/30">
+          <span class="material-icons text-2xl">carpenter</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold tracking-tight text-white text-lg">Melami<span class="text-amber-500">Pro</span></span>
+            <span class="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">v2.0 Taller</span>
+          </div>
+          <p class="text-xs text-zinc-400 font-medium truncate max-w-xs sm:max-w-sm">
+            {{ project().name }} 
+            @if (project().clientName) {
+              <span class="text-zinc-500">• {{ project().clientName }}</span>
+            }
+          </p>
+        </div>
+      </div>
+
+      <!-- Action Buttons (Save/Load/Settings) -->
+      <div class="flex items-center gap-2">
+        <button 
+          (click)="openNewProjectModal()"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition"
+          title="Crear un nuevo proyecto en blanco">
+          <span class="material-icons text-sm text-emerald-400">add</span>
+          <span class="hidden sm:inline">Nuevo</span>
+        </button>
+
+        <button 
+          (click)="showProjectsModal.set(true)"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition"
+          title="Gestionar proyectos guardados o importar/exportar">
+          <span class="material-icons text-sm text-amber-400">folder_open</span>
+          <span class="hidden sm:inline">Proyectos</span>
+        </button>
+
+        <button 
+          (click)="exportJson()"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition"
+          title="Descargar copia del proyecto en archivo JSON">
+          <span class="material-icons text-sm text-cyan-400">file_download</span>
+          <span class="hidden md:inline">Exportar JSON</span>
+        </button>
+
+        <button 
+          (click)="openSettings()"
+          class="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg border border-transparent hover:border-zinc-700 transition"
+          title="Configuración de Sierra (Kerf), Refilado y Costos">
+          <span class="material-icons text-base">settings</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="flex space-x-1 sm:space-x-3 overflow-x-auto py-2 border-t border-zinc-800/80 scrollbar-none text-sm">
+      <button 
+        (click)="selectTab('modules')"
+        [class]="activeTab() === 'modules' 
+          ? 'flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 font-semibold' 
+          : 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 font-medium transition'">
+        <span class="material-icons text-base">kitchen</span>
+        <span>1. Diseñador Modular</span>
+        <span class="text-xs px-1.5 py-0.2 rounded-full bg-zinc-800 text-zinc-300">{{ project().modules.length }}</span>
+      </button>
+
+      <button 
+        (click)="selectTab('parts')"
+        [class]="activeTab() === 'parts' 
+          ? 'flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 font-semibold' 
+          : 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 font-medium transition'">
+        <span class="material-icons text-base">format_list_numbered</span>
+        <span>2. Despiece & Cantos</span>
+        <span class="text-xs px-1.5 py-0.2 rounded-full bg-zinc-800 text-zinc-300">{{ partsCount() }}</span>
+      </button>
+
+      <button 
+        (click)="selectTab('optimizer')"
+        [class]="activeTab() === 'optimizer' 
+          ? 'flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 font-semibold' 
+          : 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 font-medium transition'">
+        <span class="material-icons text-base">grid_view</span>
+        <span>3. Optimizador 2D</span>
+        <span class="text-[10px] uppercase font-bold tracking-wider px-1 rounded bg-emerald-500/20 text-emerald-400">Sierra</span>
+      </button>
+
+      <button 
+        (click)="selectTab('budget')"
+        [class]="activeTab() === 'budget' 
+          ? 'flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 font-semibold' 
+          : 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 font-medium transition'">
+        <span class="material-icons text-base">monetization_on</span>
+        <span>4. Presupuesto & Costos</span>
+      </button>
+
+      <button 
+        (click)="selectTab('labels')"
+        [class]="activeTab() === 'labels' 
+          ? 'flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 font-semibold' 
+          : 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 font-medium transition'">
+        <span class="material-icons text-base">qr_code_2</span>
+        <span>5. Etiquetas Taller</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<!-- MODAL: PROYECTOS GUARDADOS / IMPORTAR / EXPORTAR -->
+@if (showProjectsModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-lg shadow-2xl p-6 text-zinc-100">
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800">
+        <div class="flex items-center gap-2">
+          <span class="material-icons text-amber-400">folder_special</span>
+          <h2 class="text-lg font-bold">Gestión de Proyectos</h2>
+        </div>
+        <button (click)="showProjectsModal.set(false)" class="text-zinc-400 hover:text-white">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+
+      <div class="mt-4 space-y-4">
+        <!-- Acciones rápidas -->
+        <div class="grid grid-cols-2 gap-3">
+          <label class="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-zinc-700 hover:border-amber-500/60 bg-zinc-800/40 hover:bg-zinc-800/70 cursor-pointer transition text-center">
+            <span class="material-icons text-amber-400 text-2xl mb-1">upload_file</span>
+            <span class="text-xs font-semibold text-zinc-200">Importar Archivo JSON</span>
+            <span class="text-[10px] text-zinc-400">Cargar proyecto previo</span>
+            <input type="file" accept=".json" (change)="onFileSelected($event)" class="hidden" />
+          </label>
+
+          <button 
+            (click)="exportJson()"
+            class="flex flex-col items-center justify-center p-3 rounded-xl border border-zinc-700 hover:border-cyan-500/60 bg-zinc-800/40 hover:bg-zinc-800/70 transition text-center">
+            <span class="material-icons text-cyan-400 text-2xl mb-1">download</span>
+            <span class="text-xs font-semibold text-zinc-200">Descargar Copia JSON</span>
+            <span class="text-[10px] text-zinc-400">Guardar en tu computadora</span>
+          </button>
+        </div>
+
+        <!-- Proyectos en este navegador -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Proyectos Guardados Localmente</span>
+            <button (click)="resetDemo()" class="text-xs text-amber-400 hover:underline flex items-center gap-1">
+              <span class="material-icons text-xs">restart_alt</span> Cargar Demo Cocina
+            </button>
+          </div>
+
+          <div class="max-h-56 overflow-y-auto space-y-2 pr-1">
+            @for (p of savedProjects(); track p.id) {
+              <div class="flex items-center justify-between p-3 rounded-xl bg-zinc-800/70 border border-zinc-700/60 hover:border-zinc-500 transition">
+                <div>
+                  <h4 class="text-sm font-semibold text-zinc-100">{{ p.name }}</h4>
+                  <p class="text-xs text-zinc-400">
+                    {{ p.clientName || 'Sin cliente' }} • {{ p.modulesCount }} módulos • {{ p.partsCount }} piezas
+                  </p>
+                </div>
+                <button 
+                  (click)="loadProject(p)"
+                  class="px-3 py-1 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 transition">
+                  Abrir
+                </button>
+              </div>
+            } @empty {
+              <div class="p-4 text-center text-xs text-zinc-500 bg-zinc-800/30 rounded-xl">
+                No hay otros proyectos guardados en memoria local.
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end">
+        <button 
+          (click)="showProjectsModal.set(false)"
+          class="px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-200 transition">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- MODAL: NUEVO PROYECTO -->
+@if (showNewProjectModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl p-6 text-zinc-100">
+      <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <h3 class="text-base font-bold flex items-center gap-2">
+          <span class="material-icons text-emerald-400">create_new_folder</span>
+          Crear Nuevo Proyecto
+        </h3>
+        <button (click)="showNewProjectModal.set(false)" class="text-zinc-400 hover:text-white">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+
+      <form [formGroup]="newProjectForm" (ngSubmit)="submitNewProject()" class="mt-4 space-y-4">
+        <div>
+          <span class="block text-xs font-medium text-zinc-300 mb-1">Nombre del Proyecto *</span>
+          <input 
+            type="text" 
+            formControlName="name" 
+            placeholder="ej. Mueble de Cocina o Vestidor"
+            class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500" />
+        </div>
+
+        <div>
+          <span class="block text-xs font-medium text-zinc-300 mb-1">Nombre del Cliente / Ubicación</span>
+          <input 
+            type="text" 
+            formControlName="clientName" 
+            placeholder="ej. Ing. Carlos Pérez - Apto 302"
+            class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500" />
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button 
+            type="button" 
+            (click)="showNewProjectModal.set(false)"
+            class="px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300">
+            Cancelar
+          </button>
+          <button 
+            type="submit" 
+            [disabled]="newProjectForm.invalid"
+            class="px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg transition">
+            Crear Proyecto
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- MODAL: CONFIGURACIÓN DE TALLER & SIERRA -->
+@if (showSettingsModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-lg shadow-2xl p-6 text-zinc-100">
+      <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <h3 class="text-base font-bold flex items-center gap-2">
+          <span class="material-icons text-amber-400">tune</span>
+          Parámetros de Taller y Corte
+        </h3>
+        <button (click)="showSettingsModal.set(false)" class="text-zinc-400 hover:text-white">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+
+      <form [formGroup]="settingsForm" (ngSubmit)="saveSettings()" class="mt-4 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <span class="block text-xs font-medium text-zinc-300 mb-1">
+              Grosor Sierra / Disco (Kerf)
+            </span>
+            <div class="relative">
+              <input 
+                type="number" 
+                step="0.5" 
+                formControlName="sawKerf"
+                class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500 pr-10" />
+              <span class="absolute right-3 top-2 text-xs text-zinc-400">mm</span>
+            </div>
+            <p class="text-[10px] text-zinc-500 mt-0.5">Espesor de corte consumido por el disco (típico: 3.5 a 4.4 mm)</p>
+          </div>
+
+          <div>
+            <span class="block text-xs font-medium text-zinc-300 mb-1">
+              Refilado Perimetral (Trim)
+            </span>
+            <div class="relative">
+              <input 
+                type="number" 
+                step="1" 
+                formControlName="trimMargin"
+                class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500 pr-10" />
+              <span class="absolute right-3 top-2 text-xs text-zinc-400">mm</span>
+            </div>
+            <p class="text-[10px] text-zinc-500 mt-0.5">Corte limpio de bordes del tablero crudo (típico: 10 mm)</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-800">
+          <div>
+            <span class="block text-xs font-medium text-zinc-300 mb-1">
+              Costo Canto Delgado (0.45mm)
+            </span>
+            <div class="relative">
+              <input 
+                type="number" 
+                step="0.05" 
+                formControlName="thinEdgeCostPerMeter"
+                class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500 pr-14" />
+              <span class="absolute right-3 top-2 text-xs text-zinc-400">/ metro</span>
+            </div>
+          </div>
+
+          <div>
+            <span class="block text-xs font-medium text-zinc-300 mb-1">
+              Costo Canto Grueso (2.0mm)
+            </span>
+            <div class="relative">
+              <input 
+                type="number" 
+                step="0.05" 
+                formControlName="thickEdgeCostPerMeter"
+                class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500 pr-14" />
+              <span class="absolute right-3 top-2 text-xs text-zinc-400">/ metro</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <span class="block text-xs font-medium text-zinc-300 mb-1">Moneda del Proyecto</span>
+            <select 
+              formControlName="currency"
+              class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500">
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="MXN">MXN ($)</option>
+              <option value="COP">COP ($)</option>
+              <option value="PEN">PEN (S/)</option>
+              <option value="ARS">ARS ($)</option>
+              <option value="CLP">CLP ($)</option>
+            </select>
+          </div>
+
+          <div>
+            <span class="block text-xs font-medium text-zinc-300 mb-1">Estrategia de Corte</span>
+            <select 
+              formControlName="optimizationPreference"
+              class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500">
+              <option value="best_fit">Mejor aprovechamiento (Recomendado)</option>
+              <option value="guillotine_length">Cortes longitudinales primero</option>
+              <option value="guillotine_width">Cortes transversales primero</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-3 flex justify-end gap-2">
+          <button 
+            type="button" 
+            (click)="showSettingsModal.set(false)"
+            class="px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300">
+            Cancelar
+          </button>
+          <button 
+            type="submit" 
+            class="px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 rounded-lg transition">
+            Guardar Parámetros
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

@@ -1,0 +1,203 @@
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+  <!-- Toolbar Controls (Hidden during print) -->
+  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="material-icons text-amber-500">qr_code_2</span>
+        <h2 class="text-xl font-bold text-white">Generador de Etiquetas para Taller</h2>
+      </div>
+      <p class="text-xs text-zinc-400 mt-1">
+        Imprime etiquetas adhesivas individuales para pegar en cada pieza cortada. Incluye cotas exactas, módulo de destino, flecha de veta y diagrama de cantos L1/L2/A1/A2.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Filter by Module -->
+      <select 
+        [value]="selectedModuleFilter()"
+        (change)="selectedModuleFilter.set($any($event.target).value)"
+        class="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-hidden focus:border-amber-500">
+        <option value="all">Todos los Módulos</option>
+        @for (m of modules(); track m.id) {
+          <option [value]="m.id">{{ m.name }}</option>
+        }
+      </select>
+
+      <!-- Filter by Material -->
+      <select 
+        [value]="selectedMaterialFilter()"
+        (change)="selectedMaterialFilter.set($any($event.target).value)"
+        class="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-hidden focus:border-amber-500">
+        <option value="all">Todos los Materiales</option>
+        @for (mat of materials(); track mat.id) {
+          <option [value]="mat.id">{{ mat.name }}</option>
+        }
+      </select>
+
+      <!-- Print Button -->
+      <button 
+        (click)="printLabels()"
+        class="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-2 shadow-md shadow-amber-900/20 transition">
+        <span class="material-icons text-sm">print</span>
+        <span>Imprimir Etiquetas ({{ flatLabels().length }})</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Legend & Print Instruction Notice -->
+  <div class="bg-zinc-950/70 border border-zinc-800 p-3 rounded-xl flex items-center justify-between text-xs text-zinc-400 print:hidden">
+    <div class="flex items-center gap-4">
+      <span class="font-semibold text-zinc-300">Convención de Cantos en Etiqueta:</span>
+      <span class="inline-flex items-center gap-1">
+        <span class="w-3 h-1 bg-zinc-300 inline-block"></span>
+        <span class="text-zinc-300">Sin Canto</span>
+      </span>
+      <span class="inline-flex items-center gap-1">
+        <span class="w-3 h-1 bg-cyan-600 inline-block"></span>
+        <span class="text-cyan-400 font-bold">Canto Delgado (0.45mm)</span>
+      </span>
+      <span class="inline-flex items-center gap-1">
+        <span class="w-3 h-1.5 bg-amber-600 inline-block"></span>
+        <span class="text-amber-400 font-bold">Canto Grueso (2.0mm)</span>
+      </span>
+    </div>
+    <div class="text-[11px] text-zinc-500">
+      Optimizado para hojas de etiquetas adhesivas A4 / Carta
+    </div>
+  </div>
+
+  <!-- LABELS GRID (Optimized for Screen & Print) -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 print:grid-cols-2 print:gap-3 print:m-0 print:p-0">
+    @for (label of flatLabels(); track label.labelId) {
+      <div class="bg-white text-zinc-900 border-2 border-zinc-800 rounded-xl p-3 shadow-md print:shadow-none print:rounded-none print:border-zinc-900 flex flex-col justify-between h-48 select-none print:break-inside-avoid">
+        
+        <!-- Top header: Module & Tag ID -->
+        <div>
+          <div class="flex items-center justify-between border-b border-zinc-300 pb-1.5 mb-1.5">
+            <span class="text-[10px] font-black uppercase tracking-wider text-amber-700 truncate max-w-[170px]">
+              {{ label.part.moduleName || project().name }}
+            </span>
+            <span class="font-mono text-[9px] font-bold px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-800 border border-zinc-300">
+              {{ label.labelId }} ({{ label.copyIndex }}/{{ label.totalCopies }})
+            </span>
+          </div>
+
+          <!-- Part Name & Notes -->
+          <div class="flex items-start justify-between gap-1">
+            <div>
+              <h4 class="text-sm font-black leading-tight text-zinc-950">{{ label.part.name }}</h4>
+              <p class="text-[10px] text-zinc-600 font-medium truncate max-w-[210px]">{{ label.part.materialName }}</p>
+            </div>
+            <!-- Grain indicator -->
+            <div class="text-center px-1 py-0.5 bg-zinc-100 rounded text-[9px] font-bold text-zinc-700">
+              @if (label.part.grain === 'length') {
+                <span>Veta ↔</span>
+              } @else if (label.part.grain === 'width') {
+                <span>Veta ↕</span>
+              } @else {
+                <span>Sin Veta</span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle: Big Cut Dimensions & Visual Edge Box -->
+        <div class="grid grid-cols-12 gap-2 items-center my-1 bg-zinc-50 p-1.5 rounded-lg border border-zinc-200">
+          
+          <!-- Dimensions Column (7 cols) -->
+          <div class="col-span-7">
+            <span class="text-[8px] font-bold uppercase tracking-wider text-zinc-500 block">Medida de Corte:</span>
+            <div class="font-mono text-base font-black text-zinc-950 tracking-tight">
+              {{ label.part.length }} × {{ label.part.width }}
+              <span class="text-xs font-normal text-zinc-600">mm</span>
+            </div>
+            <div class="text-[9px] text-zinc-600">
+              Espesor: <strong>{{ label.part.thickness }}mm</strong>
+            </div>
+          </div>
+
+          <!-- Visual Edge Banding Diagram (5 cols) -->
+          <div class="col-span-5 flex flex-col items-center">
+            <span class="text-[8px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">Cantos:</span>
+            
+            <!-- Schematic rectangle with 4 colored edges -->
+            <div class="relative w-20 h-12 bg-white border border-zinc-300 rounded flex items-center justify-center text-[8px] font-bold font-mono">
+              
+              <!-- L1 (Top) -->
+              <div 
+                [class]="label.part.edges.l1 === 'thick' ? 'h-1.5 bg-amber-500' : label.part.edges.l1 === 'thin' ? 'h-1 bg-cyan-500' : 'h-0.5 bg-zinc-200'"
+                class="absolute -top-0.5 left-0 right-0 rounded-t"
+                title="Largo 1"></div>
+              <span class="absolute top-0 text-[7px] text-zinc-500">L1:{{label.part.edges.l1}}</span>
+
+              <!-- L2 (Bottom) -->
+              <div 
+                [class]="label.part.edges.l2 === 'thick' ? 'h-1.5 bg-amber-500' : label.part.edges.l2 === 'thin' ? 'h-1 bg-cyan-500' : 'h-0.5 bg-zinc-200'"
+                class="absolute -bottom-0.5 left-0 right-0 rounded-b"
+                title="Largo 2"></div>
+              <span class="absolute bottom-0 text-[7px] text-zinc-500">L2:{{label.part.edges.l2}}</span>
+
+              <!-- A1 (Left) -->
+              <div 
+                [class]="label.part.edges.a1 === 'thick' ? 'w-1.5 bg-amber-500' : label.part.edges.a1 === 'thin' ? 'w-1 bg-cyan-500' : 'w-0.5 bg-zinc-200'"
+                class="absolute top-0 bottom-0 -left-0.5 rounded-l"
+                title="Ancho 1"></div>
+
+              <!-- A2 (Right) -->
+              <div 
+                [class]="label.part.edges.a2 === 'thick' ? 'w-1.5 bg-amber-500' : label.part.edges.a2 === 'thin' ? 'w-1 bg-cyan-500' : 'w-0.5 bg-zinc-200'"
+                class="absolute top-0 bottom-0 -right-0.5 rounded-r"
+                title="Ancho 2"></div>
+
+              <span class="text-zinc-400 font-sans text-[7px]">PIEZA</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Footer: Project & Barcode/QR representation -->
+        <div class="flex items-center justify-between pt-1 border-t border-zinc-200 text-[9px] text-zinc-600">
+          <div class="truncate max-w-[180px]">
+            <span class="font-bold text-zinc-900">{{ project().name }}</span>
+            @if (project().clientName) {
+              <span class="block text-[8px] text-zinc-500 truncate">{{ project().clientName }}</span>
+            }
+          </div>
+
+          <!-- Representative SVG Barcode -->
+          <svg class="h-6 w-20" viewBox="0 0 100 24">
+            <rect x="0" y="0" width="3" height="24" fill="#000" />
+            <rect x="5" y="0" width="2" height="24" fill="#000" />
+            <rect x="9" y="0" width="4" height="24" fill="#000" />
+            <rect x="15" y="0" width="1" height="24" fill="#000" />
+            <rect x="18" y="0" width="3" height="24" fill="#000" />
+            <rect x="23" y="0" width="2" height="24" fill="#000" />
+            <rect x="27" y="0" width="5" height="24" fill="#000" />
+            <rect x="34" y="0" width="1" height="24" fill="#000" />
+            <rect x="37" y="0" width="3" height="24" fill="#000" />
+            <rect x="42" y="0" width="4" height="24" fill="#000" />
+            <rect x="48" y="0" width="2" height="24" fill="#000" />
+            <rect x="52" y="0" width="1" height="24" fill="#000" />
+            <rect x="55" y="0" width="4" height="24" fill="#000" />
+            <rect x="61" y="0" width="2" height="24" fill="#000" />
+            <rect x="65" y="0" width="5" height="24" fill="#000" />
+            <rect x="72" y="0" width="2" height="24" fill="#000" />
+            <rect x="76" y="0" width="3" height="24" fill="#000" />
+            <rect x="81" y="0" width="1" height="24" fill="#000" />
+            <rect x="84" y="0" width="4" height="24" fill="#000" />
+            <rect x="90" y="0" width="2" height="24" fill="#000" />
+            <rect x="94" y="0" width="3" height="24" fill="#000" />
+          </svg>
+        </div>
+
+      </div>
+    } @empty {
+      <div class="col-span-full p-12 text-center bg-zinc-900 rounded-2xl border border-zinc-800">
+        <span class="material-icons text-zinc-600 text-4xl mb-2">label_off</span>
+        <h3 class="text-base font-bold text-zinc-300">No hay etiquetas disponibles</h3>
+        <p class="text-xs text-zinc-500 mt-1">Verifica los filtros seleccionados o añade módulos en el diseñador.</p>
+      </div>
+    }
+  </div>
+
+</div>

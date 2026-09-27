@@ -1,0 +1,448 @@
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+  <!-- Optimization Global Stats Banner -->
+  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="material-icons text-amber-500">auto_fix_high</span>
+          <h2 class="text-xl font-bold text-white">Optimizador de Corte 2D Guillotina</h2>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">
+            Algoritmo Activo
+          </span>
+        </div>
+        <p class="text-xs text-zinc-400 mt-1">
+          Cortes continuos de borde a borde para escuadradora / sierra de mesa. Respeto estricto de veta, ancho de disco ({{ settings().sawKerf }}mm) y refilado perimetral ({{ settings().trimMargin }}mm).
+        </p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button 
+          (click)="printCurrentSheet()"
+          class="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-xl flex items-center gap-2 transition">
+          <span class="material-icons text-sm text-amber-400">print</span>
+          <span>Imprimir Diagrama</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Metrics Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
+      
+      <!-- Placas Usadas -->
+      <div class="p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl">
+        <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Tableros Enteros</span>
+        <span class="text-lg font-bold text-white">{{ optimizationResult().totalSheetsUsed }} <span class="text-xs text-zinc-500 font-normal">placas</span></span>
+      </div>
+
+      <!-- Eficiencia General -->
+      <div class="p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl">
+        <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Aprovechamiento</span>
+        <div class="flex items-center gap-1.5">
+          <span class="text-lg font-bold text-emerald-400">{{ optimizationResult().overallEfficiency }}%</span>
+          <div class="w-12 h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div class="h-full bg-emerald-500 rounded-full" [style.width.%]="optimizationResult().overallEfficiency"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desperdicio / Merma -->
+      <div class="p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl">
+        <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Merma / Desecho</span>
+        <span class="text-lg font-bold text-rose-400">{{ optimizationResult().wasteAreaM2 }} <span class="text-xs text-zinc-500 font-normal">m²</span></span>
+      </div>
+
+      <!-- Piezas Colocadas -->
+      <div class="p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl">
+        <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Piezas Colocadas</span>
+        <span class="text-lg font-bold text-amber-400">{{ optimizationResult().totalPartsPlaced }} / {{ optimizationResult().totalPartsCount }}</span>
+      </div>
+
+      <!-- Sierra / Corte Metros -->
+      <div class="p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl">
+        <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Corte de Sierra</span>
+        <span class="text-lg font-bold text-cyan-400">{{ optimizationResult().totalCutMeters }} <span class="text-xs text-zinc-500 font-normal">ml</span></span>
+      </div>
+
+      <!-- Tapacanto total -->
+      <div class="p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl">
+        <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Total Tapacantos</span>
+        <span class="text-lg font-bold text-orange-400">{{ (optimizationResult().thinEdgeMeters + optimizationResult().thickEdgeMeters).toFixed(1) }} <span class="text-xs text-zinc-500 font-normal">ml</span></span>
+      </div>
+
+    </div>
+  </div>
+
+  @if (optimizationResult().sheets.length > 0) {
+    <!-- SHEET TABS SELECTOR -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+      @for (sheet of optimizationResult().sheets; track sheet.sheetIndex; let sIdx = $index) {
+        <button 
+          (click)="selectSheet(sIdx)"
+          [class]="selectedSheetIndex() === sIdx 
+            ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md font-bold' 
+            : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 font-medium'"
+          class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs whitespace-nowrap transition">
+          <span class="material-icons text-sm">dashboard</span>
+          <span>Tablero #{{ sheet.sheetIndex }}: {{ sheet.material.name }}</span>
+          <span [class]="selectedSheetIndex() === sIdx ? 'bg-zinc-950/20 text-zinc-950' : 'bg-zinc-800 text-zinc-400'" class="px-1.5 py-0.5 rounded text-[10px]">
+            {{ sheet.efficiencyPercent }}% útil
+          </span>
+        </button>
+      }
+    </div>
+
+    <!-- MAIN BOARD VIEWER -->
+    @if (currentSheet(); as sheet) {
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg space-y-4">
+        
+        <!-- Sheet Header Info & Zoom Controls -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-bold text-white">
+                Plano de Corte - Tablero #{{ sheet.sheetIndex }}
+              </h3>
+              <span class="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono">
+                {{ sheet.length }} × {{ sheet.width }} mm (Espesor: {{ sheet.material.thickness }}mm)
+              </span>
+            </div>
+            <p class="text-xs text-zinc-400 mt-0.5">
+              {{ sheet.placedParts.length }} piezas ubicadas • {{ sheet.cutLengthMeters }} ml de corte • {{ sheet.usedAreaM2 }} m² utilizados
+            </p>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex items-center gap-2">
+            <button 
+              (click)="zoomOut()" 
+              class="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700" 
+              title="Alejar">
+              <span class="material-icons text-sm">zoom_out</span>
+            </button>
+            <span class="text-xs text-zinc-400 font-mono px-1">{{ (zoomLevel() * 100).toFixed(0) }}%</span>
+            <button 
+              (click)="zoomIn()" 
+              class="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700" 
+              title="Acercar">
+              <span class="material-icons text-sm">zoom_in</span>
+            </button>
+            <button 
+              (click)="resetZoom()" 
+              class="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700 text-xs font-semibold px-2" 
+              title="Ajustar">
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- SVG SHEET CANVAS -->
+        <div class="w-full bg-zinc-950 rounded-xl border border-zinc-800 overflow-auto p-4 flex justify-center items-center min-h-[420px]">
+          
+          <div [style.transform]="'scale(' + zoomLevel() + ')'" class="origin-center transition-transform duration-200">
+            
+            <!-- Canvas with aspect ratio of the sheet (e.g. 2440 x 1830) -->
+            <!-- We will map to 1000 width x (1000 * sheet.width / sheet.length) -->
+            @let canvasW = 1000;
+            @let canvasH = (sheet.width / sheet.length) * 1000;
+            @let scaleFactor = canvasW / sheet.length;
+            @let trimPx = settings().trimMargin * scaleFactor;
+
+            <svg 
+              [attr.width]="canvasW" 
+              [attr.height]="canvasH" 
+              [attr.viewBox]="'0 0 ' + canvasW + ' ' + canvasH" 
+              class="shadow-2xl border-2 border-zinc-700 rounded select-none bg-zinc-900">
+              
+              <defs>
+                <!-- Wood grain texture for sheet pieces -->
+                <pattern id="sheetWoodTexture" width="60" height="60" patternUnits="userSpaceOnUse">
+                  <rect width="60" height="60" [attr.fill]="sheet.material.colorHex" />
+                  <path d="M 0 15 Q 30 18, 60 15 M 0 35 Q 30 32, 60 35 M 0 52 Q 30 55, 60 52" stroke="#000" stroke-width="0.8" opacity="0.12" fill="none" />
+                </pattern>
+                
+                <!-- Hatch pattern for leftover scraps -->
+                <pattern id="scrapHatch" width="12" height="12" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                  <line x1="0" y1="0" x2="0" y2="12" stroke="#475569" stroke-width="1.5" />
+                </pattern>
+              </defs>
+
+              <!-- Tablero Crudo (Fondo) -->
+              <rect x="0" y="0" [attr.width]="canvasW" [attr.height]="canvasH" fill="#27272a" />
+
+              <!-- Margen de refilado perimetral (Línea punteada) -->
+              @if (trimPx > 0) {
+                <rect 
+                  [attr.x]="trimPx" 
+                  [attr.y]="trimPx" 
+                  [attr.width]="canvasW - (2 * trimPx)" 
+                  [attr.height]="canvasH - (2 * trimPx)" 
+                  fill="#18181b" 
+                  stroke="#ef4444" 
+                  stroke-dasharray="4,4" 
+                  stroke-width="1" />
+                <text [attr.x]="trimPx + 4" [attr.y]="trimPx + 10" font-size="8" fill="#ef4444" font-weight="bold">
+                  Refilado {{ settings().trimMargin }}mm
+                </text>
+              }
+
+              <!-- Retazos / Scraps sobrantes -->
+              @for (scrap of sheet.leftovers; track scrap.id) {
+                @let sx = scrap.x * scaleFactor;
+                @let sy = scrap.y * scaleFactor;
+                @let sw = scrap.length * scaleFactor;
+                @let sh = scrap.width * scaleFactor;
+                @if (sw > 3 && sh > 3) {
+                  <rect 
+                    [attr.x]="sx" 
+                    [attr.y]="sy" 
+                    [attr.width]="sw" 
+                    [attr.height]="sh" 
+                    fill="url(#scrapHatch)" 
+                    stroke="#334155" 
+                    stroke-width="0.8" />
+                  @if (scrap.usable && sw > 50 && sh > 30) {
+                    <rect [attr.x]="sx + 4" [attr.y]="sy + 4" width="76" height="16" rx="2" fill="#0f172a" opacity="0.9" />
+                    <text [attr.x]="sx + 8" [attr.y]="sy + 15" font-size="8" font-weight="bold" fill="#38bdf8">
+                      Retazo: {{ scrap.length }}×{{ scrap.width }}
+                    </text>
+                  }
+                }
+              }
+
+              <!-- PIEZAS COLOCADAS -->
+              @for (placed of sheet.placedParts; track placed.tag; let pIdx = $index) {
+                @let px = placed.x * scaleFactor;
+                @let py = placed.y * scaleFactor;
+                @let pw = placed.length * scaleFactor;
+                @let ph = placed.width * scaleFactor;
+                
+                <g 
+                  class="cursor-pointer group"
+                  (mouseenter)="hoveredPart.set(placed)"
+                  (mouseleave)="hoveredPart.set(null)">
+                  
+                  <!-- Rectángulo de la pieza con textura -->
+                  <rect 
+                    [attr.x]="px" 
+                    [attr.y]="py" 
+                    [attr.width]="pw" 
+                    [attr.height]="ph" 
+                    fill="url(#sheetWoodTexture)" 
+                    stroke="#09090b" 
+                    stroke-width="1.2" />
+
+                  <!-- BORDES DE TAPACANTO (Líneas de colores sobre los lados enchapados) -->
+                  <!-- Largo 1 (Arriba) -->
+                  @if (placed.part.edges.l1 !== 'none') {
+                    <line 
+                      [attr.x1]="px" 
+                      [attr.y1]="py + 1" 
+                      [attr.x2]="px + pw" 
+                      [attr.y2]="py + 1" 
+                      [attr.stroke]="placed.part.edges.l1 === 'thick' ? '#f59e0b' : '#06b6d4'" 
+                      [attr.stroke-width]="placed.part.edges.l1 === 'thick' ? '3' : '1.8'" />
+                  }
+                  <!-- Largo 2 (Abajo) -->
+                  @if (placed.part.edges.l2 !== 'none') {
+                    <line 
+                      [attr.x1]="px" 
+                      [attr.y1]="py + ph - 1" 
+                      [attr.x2]="px + pw" 
+                      [attr.y2]="py + ph - 1" 
+                      [attr.stroke]="placed.part.edges.l2 === 'thick' ? '#f59e0b' : '#06b6d4'" 
+                      [attr.stroke-width]="placed.part.edges.l2 === 'thick' ? '3' : '1.8'" />
+                  }
+                  <!-- Ancho 1 (Izquierda) -->
+                  @if (placed.part.edges.a1 !== 'none') {
+                    <line 
+                      [attr.x1]="px + 1" 
+                      [attr.y1]="py" 
+                      [attr.x2]="px + 1" 
+                      [attr.y2]="py + ph" 
+                      [attr.stroke]="placed.part.edges.a1 === 'thick' ? '#f59e0b' : '#06b6d4'" 
+                      [attr.stroke-width]="placed.part.edges.a1 === 'thick' ? '3' : '1.8'" />
+                  }
+                  <!-- Ancho 2 (Derecha) -->
+                  @if (placed.part.edges.a2 !== 'none') {
+                    <line 
+                      [attr.x1]="px + pw - 1" 
+                      [attr.y1]="py" 
+                      [attr.x2]="px + pw - 1" 
+                      [attr.y2]="py + ph" 
+                      [attr.stroke]="placed.part.edges.a2 === 'thick' ? '#f59e0b' : '#06b6d4'" 
+                      [attr.stroke-width]="placed.part.edges.a2 === 'thick' ? '3' : '1.8'" />
+                  }
+
+                  <!-- ETIQUETAS INTERIORES DE LA PIEZA (Tag, Nombre, Medidas) -->
+                  @if (pw > 40 && ph > 25) {
+                    <!-- Tag badge P1, P2... -->
+                    <rect 
+                      [attr.x]="px + 3" 
+                      [attr.y]="py + 3" 
+                      width="20" 
+                      height="12" 
+                      rx="2" 
+                      fill="#09090b" 
+                      opacity="0.85" />
+                    <text 
+                      [attr.x]="px + 13" 
+                      [attr.y]="py + 11.5" 
+                      text-anchor="middle" 
+                      font-size="7.5" 
+                      font-weight="bold" 
+                      fill="#f59e0b">
+                      {{ placed.tag }}
+                    </text>
+
+                    <!-- Nombre de la pieza -->
+                    @if (pw > 70 && ph > 35) {
+                      <text 
+                        [attr.x]="px + (pw / 2)" 
+                        [attr.y]="py + (ph / 2) - 3" 
+                        text-anchor="middle" 
+                        font-size="8.5" 
+                        font-weight="bold" 
+                        fill="#ffffff">
+                        {{ placed.part.name }}
+                      </text>
+                    }
+
+                    <!-- Medidas exactas -->
+                    <text 
+                      [attr.x]="px + (pw / 2)" 
+                      [attr.y]="py + (ph / 2) + 8" 
+                      text-anchor="middle" 
+                      font-size="8" 
+                      font-family="monospace" 
+                      font-weight="bold" 
+                      fill="#fde68a">
+                      {{ placed.length }} × {{ placed.width }}
+                    </text>
+
+                    <!-- Flecha indicadora de veta -->
+                    @if (placed.part.grain !== 'none' && pw > 80 && ph > 45) {
+                      <text 
+                        [attr.x]="px + pw - 12" 
+                        [attr.y]="py + 12" 
+                        font-size="8" 
+                        fill="#cbd5e1" 
+                        font-weight="bold">
+                        {{ placed.rotated ? '↕' : '↔' }}
+                      </text>
+                    }
+                  }
+                </g>
+              }
+
+              <!-- LÍNEAS DE CORTE GUILLOTINA NUMERADAS -->
+              @for (line of sheet.cutLines; track line.stage) {
+                @let lx1 = line.x1 * scaleFactor;
+                @let ly1 = line.y1 * scaleFactor;
+                @let lx2 = line.x2 * scaleFactor;
+                @let ly2 = line.y2 * scaleFactor;
+                
+                <g opacity="0.85">
+                  <line 
+                    [attr.x1]="lx1" 
+                    [attr.y1]="ly1" 
+                    [attr.x2]="lx2" 
+                    [attr.y2]="ly2" 
+                    stroke="#ffffff" 
+                    stroke-width="1.2" 
+                    stroke-dasharray="3,2" />
+                  
+                  <!-- Badge con el número de corte -->
+                  @let midX = (lx1 + lx2) / 2;
+                  @let midY = (ly1 + ly2) / 2;
+                  <circle [attr.cx]="midX" [attr.cy]="midY" r="5" fill="#f59e0b" stroke="#000" stroke-width="0.5" />
+                  <text [attr.x]="midX" [attr.y]="midY + 2.5" text-anchor="middle" font-size="5.5" font-weight="bold" fill="#000">
+                    {{ line.stage }}
+                  </text>
+                </g>
+              }
+            </svg>
+
+          </div>
+        </div>
+
+        <!-- Active Hovered Part Details Tooltip -->
+        @if (hoveredPart(); as hp) {
+          <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-zinc-200">
+            <div class="flex items-center gap-3">
+              <span class="px-2 py-0.5 rounded bg-amber-500 text-zinc-950 font-bold font-mono">{{ hp.tag }}</span>
+              <div>
+                <span class="font-bold text-white">{{ hp.part.name }}</span>
+                <span class="text-zinc-400"> ({{ hp.part.moduleName || 'Manual' }})</span>
+              </div>
+              <span class="font-mono text-amber-400 font-bold">{{ hp.length }} × {{ hp.width }} × {{ hp.part.thickness }} mm</span>
+            </div>
+            <div class="flex items-center gap-3 text-[11px]">
+              <span>Veta: <strong class="text-zinc-100">{{ hp.part.grain === 'length' ? 'Longitudinal' : hp.part.grain === 'width' ? 'Transversal' : 'Libre' }}</strong></span>
+              <span>Cantos: <strong class="text-cyan-400">L1: {{ hp.part.edges.l1 }}, L2: {{ hp.part.edges.l2 }}, A1: {{ hp.part.edges.a1 }}, A2: {{ hp.part.edges.a2 }}</strong></span>
+            </div>
+          </div>
+        }
+
+        <!-- Parts in this sheet table for shop floor cut reference -->
+        <div class="pt-2">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span class="material-icons text-amber-400 text-sm">view_list</span>
+              Lista de Piezas en este Tablero ({{ sheet.placedParts.length }} piezas)
+            </h4>
+            <span class="text-[11px] text-zinc-500">Secuencia de corte guiada</span>
+          </div>
+
+          <div class="overflow-x-auto max-h-48 border border-zinc-800 rounded-xl">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold sticky top-0">
+                <tr>
+                  <th class="py-2 px-3">Etiqueta</th>
+                  <th class="py-2 px-3">Pieza</th>
+                  <th class="py-2 px-3">Módulo</th>
+                  <th class="py-2 px-3 text-right">Largo (mm)</th>
+                  <th class="py-2 px-3 text-right">Ancho (mm)</th>
+                  <th class="py-2 px-3 text-center">Rotada 90°</th>
+                  <th class="py-2 px-3 text-center">Tapacantos</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-800 text-zinc-200">
+                @for (p of sheet.placedParts; track p.tag) {
+                  <tr class="hover:bg-zinc-800/40">
+                    <td class="py-2 px-3 font-mono font-bold text-amber-400">{{ p.tag }}</td>
+                    <td class="py-2 px-3 font-medium text-white">{{ p.part.name }}</td>
+                    <td class="py-2 px-3 text-zinc-400">{{ p.part.moduleName || 'Manual' }}</td>
+                    <td class="py-2 px-3 text-right font-mono">{{ p.length }}</td>
+                    <td class="py-2 px-3 text-right font-mono">{{ p.width }}</td>
+                    <td class="py-2 px-3 text-center">
+                      @if (p.rotated) {
+                        <span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-[10px] font-bold">Sí (90°)</span>
+                      } @else {
+                        <span class="text-zinc-500 text-[10px]">No</span>
+                      }
+                    </td>
+                    <td class="py-2 px-3 text-center font-mono text-[10px]">
+                      <span class="text-cyan-400">L1:{{ p.part.edges.l1 }}</span>
+                      <span class="text-cyan-400"> L2:{{ p.part.edges.l2 }}</span>
+                      <span class="text-orange-400"> A1:{{ p.part.edges.a1 }}</span>
+                      <span class="text-orange-400"> A2:{{ p.part.edges.a2 }}</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    }
+  } @else {
+    <div class="p-12 text-center bg-zinc-900 rounded-2xl border border-zinc-800">
+      <span class="material-icons text-zinc-600 text-4xl mb-2">grid_view</span>
+      <h3 class="text-base font-bold text-zinc-300">No hay piezas para optimizar</h3>
+      <p class="text-xs text-zinc-500 mt-1">Agrega módulos en el Diseñador o piezas en la pestaña de Despiece para generar los diagramas de corte.</p>
+    </div>
+  }
+
+</div>
