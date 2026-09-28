@@ -1,53 +1,44 @@
-# Plan de Implementación: Visor 3D Interactivo con Three.js en MelamiPro Studio
+# Plan de Implementación: Guardado en la Nube con Supabase y Resaltado Técnico Azul Cobalt
 
-## Objetivo
-Transformar el visualizador de muebles en un **entorno 3D interactivo en tiempo real** utilizando **Three.js** y **OrbitControls** (estilo SketchUp / Flatma), solucionando la falta de reactividad al modificar anchos, altos y profundidades, y permitiendo rotar, hacer zoom, separar piezas en vista despiezada y abrir puertas/cajones con un clic.
-
----
-
-## 1. Tecnologías y Dependencias
-- **`three`**: Motor WebGL 3D estándar para renderizado de mallas, materiales, luces y sombras.
-- **`@types/three`**: Definiciones TypeScript para tipado estricto.
-- **`three/examples/jsm/controls/OrbitControls`**: Navegación 3D orbital fluida (rotación 360°, paneo con clic derecho/shift y zoom con rueda del ratón).
-
----
-
-## 2. Arquitectura y Componentes a Modificar
-
-### A. Servicio o Componente 3D (`ThreeViewportComponent` o integrado en `ModuleDesignerComponent`)
-1. **Inicialización Segura SSR (Angular 21)**:
-   - Instanciar Three.js únicamente en el navegador (`afterNextRender` / comprobación `typeof window !== 'undefined'`).
-   - `ResizeObserver` para adaptar el canvas 3D dinámicamente si el usuario colapsa o redimensiona paneles.
-2. **Escena 3D Profesional de Taller**:
-   - Cuadrícula milimétrica en el suelo (`GridHelper`) y plano con sombras suaves.
-   - Iluminación de estudio (Luz ambiental difusa + 2 luces direccionales para resaltar aristas y texturas de melamina).
-   - Generación de mallas con texturas de veta de madera procedurales o colores sólidos mates con biselado suave de cantos.
-3. **Mapeo Paramétrico Reactivo en Tiempo Real**:
-   - Cada pieza (lateral izquierdo, lateral derecho, piso, techo, repisas, fajas, puertas, fondos y cajones) se genera como un `Mesh` o `Group` 3D con sus coordenadas exactas en milímetros (escaladas a unidades de Three.js).
-   - **Solución al problema de actualización**: Suscripción reactiva inmediata a los cambios del formulario (`valueChanges` y `toSignal`), regenerando las geometrías en tiempo real mientras el usuario escribe o mueve el control deslizante, sin necesidad de guardar o recargar.
-
-### B. Interacciones Avanzadas 3D
-1. **Vista Despiezada (Exploded View Slider)**:
-   - Control deslizante interactivo de 0% a 100%:
-     - Los laterales se desplazan hacia los lados.
-     - La cubierta/techo sube y el piso baja.
-     - Las puertas y frentes de cajón se adelantan.
-     - El fondo trasero se desplaza hacia atrás.
-   - Permite visualizar con total claridad cómo encaja cada unión, ranura y tornillo.
-2. **Apertura Interactiva de Puertas y Cajones**:
-   - Raycasting con el ratón: al hacer clic en una puerta, rota sobre sus bisagras laterales (ángulo de 0° a 95°).
-   - Al hacer clic en un cajón, se desliza hacia afuera mostrando su caja interior y correderas.
-3. **Selección e Inspección de Piezas**:
-   - Al tocar cualquier pieza en 3D, se resalta con un borde iluminado y muestra un badge flotante con su nombre y medidas exactas (ej. "Lateral Izquierdo: 750 × 580 × 18 mm - Cantos: L1 delgado").
-
-### C. Controles de Cámara y Vistas Rápidas
-- Botones de cámara rápida: **Vista Isométrica**, **Vista Frontal**, **Vista Superior (Planta)** y **Vista Lateral**.
-- Botón **Centrar / Reset Cámara**.
+## 1. Contexto y Objetivos
+- **Resaltado 3D Profesional**: Reemplazar el color turquesa fluorescente por un **Azul Cobalt Blueprint Técnico (`#2563eb` / `#1d4ed8`)** con aristas y contornos nítidos (`#60a5fa`), ofreciendo una estética técnica de ingeniería de corte limpia y descansada para la vista.
+- **Persistencia en la Nube con Supabase**:
+  - URL: `https://umdcxcjrdyckpxomxlmi.supabase.co`
+  - Clave API: `sb_publishable_FYydWGY0juW6ajW5tLiQQQ_Stz1tMVD`
+  - Guardar proyectos directamente en Supabase (tabla `projects` / `furniture_projects`).
+  - Sincronización híbrida: Botón manual destacado de **"Guardar en la Nube"** + debounce de sincronización automática continua.
+  - En el modal **"Proyectos"**, mostrar la lista de proyectos en la nube con fecha, número de piezas, dimensiones, botón para **Cargar Proyecto**, **Duplicar** y **Eliminar**.
+  - Manejo resiliente con sincronización transparente.
 
 ---
 
-## 3. Plan de Verificación y Pruebas
-1. **Instalación limpia**: Instalar `three` y `@types/three`.
-2. **Compilación y SSR**: Ejecutar `compile_applet` para garantizar que la compilación AOT y el prerenderizado SSR se completen sin errores de `window` o `Canvas`.
-3. **Prueba de Reactividad**: Verificar que al cambiar Ancho (ej. de 800 a 1200 mm), Alto y Profundidad, el mueble 3D se redimensione de inmediato y las repisas/puertas se adapten automáticamente.
-4. **Verificación de Lint**: Ejecutar `lint_applet` para mantener el código 100% limpio y libre de advertencias.
+## 2. Cambios de Código Propuestos
+
+### A. Servicio Supabase Cloud Storage (`src/app/services/supabase.service.ts`)
+- Implementar cliente HTTP reactivo contra la API REST de Supabase con los headers de autorización estándar (`apikey`, `Authorization: Bearer <key>`).
+- Métodos:
+  - `getProjects()`: Obtiene todos los proyectos ordenados por fecha de modificación descendente.
+  - `saveProject(project)`: Inserta o actualiza (`upsert`) el proyecto con su despiece completo, materiales, tapacantos y configuración 3D.
+  - `deleteProject(id)`: Elimina un proyecto en la nube.
+- Manejo de estado (`Nube Conectada`, `Sincronizando...`, `Guardado en Supabase`).
+
+### B. Integración en `ProjectStorageService` y Modal de Proyectos
+- Añadir indicador visual de sincronización en la barra superior (ej: `☁️ Guardado en Nube`, `🔄 Sincronizando...`).
+- Actualizar el diálogo/modal de "Proyectos" para mostrar una pestaña principal **"En la Nube (Supabase)"** con todos los proyectos guardados, permitiendo:
+  - Cargar cualquiera con 1 clic para edición instantánea.
+  - Guardar el proyecto actual con nombre personalizado.
+  - Ver tamaño, fecha y total de piezas.
+  - Borrar proyectos antiguos de la nube.
+
+### C. Refinamiento Estético 3D en `furniture-3d-viewer.ts`
+- Actualizar los materiales de selección:
+  - Tono base seleccionado: **Azul Cobalt Blueprint Técnico (`0x1d4ed8` / `0x2563eb`)** con acabado semitransparente satinado (opacidad 0.88).
+  - Líneas de contorno / wireframe: Azul técnico de precisión (`0x60a5fa`) con grosor visible y nítido.
+  - Puntos de anclaje y badges HUD actualizados con acento Cobalt Blueprint elegante.
+
+---
+
+## 3. Plan de Verificación
+1. Validar compilación con `compile_applet` y linter con `lint_applet`.
+2. Probar en el visor 3D la selección de piezas para verificar el nuevo aspecto Azul Cobalt técnico.
+3. Probar el guardado manual y la sincronización en Supabase, así como la carga de proyectos desde el panel "Proyectos".

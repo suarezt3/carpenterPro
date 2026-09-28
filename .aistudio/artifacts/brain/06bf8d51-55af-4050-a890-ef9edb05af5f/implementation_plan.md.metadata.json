@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de integración de Three.js en ModuleDesignerComponent para visualizador 3D interactivo en tiempo real tipo SketchUp/Flatma, con controles de órbita, vista despiezada animada, apertura de puertas/cajones y sincronización reactiva instantánea de dimensiones.",
-  "updatedAt":  "2026-09-28T16:37:04.458624421Z",
+  "summary":  "Plan de implementación para la persistencia de proyectos en la nube con Supabase y el nuevo tono de selección Azul Cobalt Blueprint técnico.",
+  "updatedAt":  "2026-09-28T18:09:55.876232687Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

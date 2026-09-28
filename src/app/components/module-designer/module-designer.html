@@ -1,626 +1,713 @@
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+<div class="w-full px-2 sm:px-4 py-3 space-y-3">
 
-  <!-- Top Hero & Presets -->
-  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
-      <div>
-        <h2 class="text-xl font-bold text-white flex items-center gap-2">
-          <span class="material-icons text-amber-500">view_in_ar</span>
-          Estudio 3D Paramétrico de Muebles
-        </h2>
-        <p class="text-xs text-zinc-400 mt-1">
-          Visualiza, rota en 360°, realiza zoom y separa piezas en 3D en tiempo real tipo SketchUp / Flatma. Cada ajuste dimensional se refleja instantáneamente en el modelo y en la lista de corte.
-        </p>
+  <!-- TOP BAR: Title, 3D Stats & Workspace Templates -->
+  <div class="bg-zinc-900/90 border border-zinc-800 rounded-2xl px-4 py-3 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+    
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+        <span class="material-icons">view_in_ar</span>
       </div>
-
-      <!-- Plantillas / Presets rápidos -->
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider mr-1">Plantillas:</span>
-        <button 
-          (click)="applyPreset('base_2doors')"
-          class="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg border border-zinc-700 flex items-center gap-1.5 transition">
-          <span class="material-icons text-xs text-amber-400">countertops</span>
-          Bajo Mesada 2P
-        </button>
-        <button 
-          (click)="applyPreset('base_drawers')"
-          class="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg border border-zinc-700 flex items-center gap-1.5 transition">
-          <span class="material-icons text-xs text-cyan-400">view_day</span>
-          Cajonera 4C
-        </button>
-        <button 
-          (click)="applyPreset('wall_cabinet')"
-          class="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg border border-zinc-700 flex items-center gap-1.5 transition">
-          <span class="material-icons text-xs text-emerald-400">kitchen</span>
-          Alacena Aérea
-        </button>
-        <button 
-          (click)="applyPreset('closet_column')"
-          class="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg border border-zinc-700 flex items-center gap-1.5 transition">
-          <span class="material-icons text-xs text-purple-400">shelves</span>
-          Armario / Columna
-        </button>
+      <div>
+        <div class="flex items-center gap-2">
+          <h2 class="text-base font-bold text-white tracking-tight">Modelador 3D Paramétrico Pieza por Pieza</h2>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+            Estilo SketchUp / Flatma
+          </span>
+        </div>
+        <p class="text-xs text-zinc-400">
+          Haz clic en cualquier pieza para seleccionarla, editar sus medidas independientes (Largo × Ancho × Espesor) o posicionarla con precisión milimétrica.
+        </p>
       </div>
     </div>
 
-    <!-- Main Grid: Form Left, 3D Canvas Right -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+    <!-- Quick Stats & Actions -->
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Stats Badges -->
+      <div class="flex items-center gap-2 bg-zinc-950 px-3 py-1.5 rounded-xl border border-zinc-800 text-xs">
+        <div class="flex items-center gap-1 text-zinc-300">
+          <span class="material-icons text-xs text-cyan-400">layers</span>
+          <span>Piezas 3D:</span>
+          <strong class="text-white font-mono">{{ currentParts().length }}</strong>
+        </div>
+        <span class="text-zinc-700">•</span>
+        <div class="flex items-center gap-1 text-zinc-300">
+          <span class="material-icons text-xs text-amber-400">square_foot</span>
+          <span>Área:</span>
+          <strong class="text-white font-mono">{{ totalAreaM2() }} m²</strong>
+        </div>
+      </div>
+
+      <!-- Action: Iniciar en Blanco -->
+      <button 
+        type="button"
+        (click)="startBlank()"
+        class="px-3 py-1.5 text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl border border-zinc-700 flex items-center gap-1.5 transition shadow-sm"
+        title="Limpiar el lienzo 3D para construir un mueble desde cero pieza por pieza">
+        <span class="material-icons text-xs text-rose-400">delete_sweep</span>
+        <span>Nuevo en Blanco</span>
+      </button>
+
+      <!-- Action: Cargar Mueble Barra con Módulo (Reference Image) -->
+      <button 
+        type="button"
+        (click)="loadDeskBarTemplate()"
+        class="px-3 py-1.5 text-xs font-semibold bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 rounded-xl border border-cyan-500/40 flex items-center gap-1.5 transition shadow-sm"
+        title="Cargar la estructura de barra con techo de 1800x600 y módulo lateral (idéntica a la imagen de referencia)">
+        <span class="material-icons text-xs text-cyan-400">desk</span>
+        <span>Barra con Módulo</span>
+      </button>
+
+      <!-- Action: Cargar Bajo Mesada 2P -->
+      <button 
+        type="button"
+        (click)="loadStandardBaseCabinet()"
+        class="px-3 py-1.5 text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl border border-zinc-700 flex items-center gap-1.5 transition shadow-sm"
+        title="Cargar plantilla estándar de bajo mesada de cocina">
+        <span class="material-icons text-xs text-amber-400">countertops</span>
+        <span>Bajo Mesada</span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- MAIN 2-COLUMN FULL-WIDTH LAYOUT (Optimized for 1080p and widescreen displays) -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+    
+    <!-- LEFT COLUMN: Massive Three.js 3D Viewport (approx 75% width on desktop) -->
+    <div class="col-span-12 lg:col-span-8 xl:col-span-9 flex flex-col gap-2">
       
-      <!-- FORM COLUMN (5 cols) -->
-      <form [formGroup]="moduleForm" (ngSubmit)="saveModuleToProject()" class="lg:col-span-5 space-y-4">
-        
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="text-xs font-bold uppercase tracking-wider text-amber-500">
-              {{ isEditingModule() ? 'Editando Módulo en Proyecto' : 'Configurar Módulo en Tiempo Real' }}
-            </span>
-          </div>
-          @if (isEditingModule()) {
+      <!-- Three.js 3D Viewer Container -->
+      <app-furniture-3d-viewer
+        [parts]="currentParts()"
+        [selectedPartId]="selectedPartId()"
+        [materials]="materials()"
+        (partSelected)="onSelectPartFrom3D($event)"
+        (partModified)="onPartModifiedFromViewer($event)">
+      </app-furniture-3d-viewer>
+
+      <!-- BOTTOM PIECE CHIPS (Quick 1-Click selection & status of every piece in the 3D space) -->
+      <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-2.5 shadow-md flex items-center gap-2 overflow-x-auto">
+        <span class="text-[11px] font-bold text-zinc-400 whitespace-nowrap flex items-center gap-1 pl-1">
+          <span class="material-icons text-xs text-cyan-400">dns</span>
+          Piezas:
+        </span>
+
+        @if (currentParts().length === 0) {
+          <span class="text-xs text-zinc-500 italic pl-2">
+            Lienzo vacío. Haz clic en "+ Añadir Piezas" en el panel derecho para comenzar a construir.
+          </span>
+        }
+
+        <div class="flex items-center gap-1.5 flex-1 min-w-0">
+          @for (part of currentParts(); track part.id) {
             <button 
-              type="button" 
-              (click)="cancelEdit()" 
-              class="text-xs text-zinc-400 hover:text-white underline">
-              Cancelar edición
+              type="button"
+              (click)="selectPartById(part.id)"
+              [class]="selectedPartId() === part.id ? 'bg-cyan-500 text-zinc-950 font-bold border-cyan-400 shadow-md ring-2 ring-cyan-400/40' : 'bg-zinc-800/90 text-zinc-300 hover:text-white hover:bg-zinc-700/90 border-zinc-700'"
+              class="px-2.5 py-1 rounded-lg text-xs border flex items-center gap-1.5 whitespace-nowrap transition">
+              <span>{{ part.name }}</span>
+              <span class="font-mono text-[10px] opacity-75 font-semibold">
+                {{ part.length }}×{{ part.width }}
+              </span>
             </button>
           }
         </div>
 
-        <div>
-          <span class="block text-xs font-medium text-zinc-300 mb-1">Nombre o Ubicación del Módulo *</span>
-          <input 
-            type="text" 
-            formControlName="name"
-            class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500" />
-        </div>
-
-        <!-- Tipo & Material -->
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <span class="block text-xs font-medium text-zinc-300 mb-1">Tipo de Estructura</span>
-            <select 
-              formControlName="type"
-              class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700 rounded-lg text-xs text-white focus:outline-hidden focus:border-amber-500">
-              <option value="base_cabinet">Bajo Mesada / Mueble Piso</option>
-              <option value="wall_cabinet">Alacena / Mueble Colgado</option>
-              <option value="tall_cabinet">Ropero / Columna Alta</option>
-              <option value="drawer_unit">Cajonera Dedicada</option>
-            </select>
-          </div>
-
-          <div>
-            <span class="block text-xs font-medium text-zinc-300 mb-1">Melamina Principal</span>
-            <select 
-              formControlName="materialId"
-              class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700 rounded-lg text-xs text-white focus:outline-hidden focus:border-amber-500">
-              @for (mat of materials(); track mat.id) {
-                <option [value]="mat.id">{{ mat.name }} ({{ mat.thickness }}mm)</option>
-              }
-            </select>
-          </div>
-        </div>
-
-        <!-- Dimensiones (W, H, D, Thickness) with Live Step Adjusters -->
-        <div class="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-              <span class="material-icons text-xs text-amber-400">square_foot</span>
-              Dimensiones Exteriores (mm)
-            </span>
-            <span class="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-              <span class="material-icons text-[12px]">bolt</span> Sincronización en vivo
-            </span>
-          </div>
-
-          <!-- ANCHO (X) -->
-          <div class="space-y-1">
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-zinc-400">Ancho (X):</span>
-              <span class="font-mono font-bold text-amber-400 text-sm">{{ previewModule().width }} mm</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <button 
-                type="button" 
-                (click)="adjustDimension('width', -50)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                -50
-              </button>
-              <button 
-                type="button" 
-                (click)="adjustDimension('width', -10)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                -10
-              </button>
-              <input 
-                type="number" 
-                step="10" 
-                formControlName="width"
-                class="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold font-mono focus:border-amber-500" />
-              <button 
-                type="button" 
-                (click)="adjustDimension('width', 10)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                +10
-              </button>
-              <button 
-                type="button" 
-                (click)="adjustDimension('width', 50)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                +50
-              </button>
-            </div>
-          </div>
-
-          <!-- ALTO (Y) -->
-          <div class="space-y-1 pt-1">
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-zinc-400">Alto (Y):</span>
-              <span class="font-mono font-bold text-amber-400 text-sm">{{ previewModule().height }} mm</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <button 
-                type="button" 
-                (click)="adjustDimension('height', -50)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                -50
-              </button>
-              <button 
-                type="button" 
-                (click)="adjustDimension('height', -10)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                -10
-              </button>
-              <input 
-                type="number" 
-                step="10" 
-                formControlName="height"
-                class="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold font-mono focus:border-amber-500" />
-              <button 
-                type="button" 
-                (click)="adjustDimension('height', 10)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                +10
-              </button>
-              <button 
-                type="button" 
-                (click)="adjustDimension('height', 50)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                +50
-              </button>
-            </div>
-          </div>
-
-          <!-- PROFUNDIDAD (Z) -->
-          <div class="space-y-1 pt-1">
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-zinc-400">Profundidad (Z):</span>
-              <span class="font-mono font-bold text-amber-400 text-sm">{{ previewModule().depth }} mm</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <button 
-                type="button" 
-                (click)="adjustDimension('depth', -50)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                -50
-              </button>
-              <button 
-                type="button" 
-                (click)="adjustDimension('depth', -10)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                -10
-              </button>
-              <input 
-                type="number" 
-                step="10" 
-                formControlName="depth"
-                class="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold font-mono focus:border-amber-500" />
-              <button 
-                type="button" 
-                (click)="adjustDimension('depth', 10)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                +10
-              </button>
-              <button 
-                type="button" 
-                (click)="adjustDimension('depth', 50)" 
-                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
-                +50
-              </button>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-800/80">
-            <div>
-              <span class="block text-[11px] text-zinc-400 mb-1">Espesor de Placa</span>
-              <select 
-                formControlName="boardThickness"
-                class="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white">
-                <option [value]="18">18 mm (Estándar Profesional)</option>
-                <option [value]="15">15 mm (Económico)</option>
-              </select>
-            </div>
-
-            <div>
-              <span class="block text-[11px] text-zinc-400 mb-1">Fondo Posterior</span>
-              <select 
-                formControlName="backType"
-                class="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white">
-                <option value="groove">Ranurado (MDF 3mm oculto)</option>
-                <option value="overlay">Sobrepuesto / Clavado</option>
-                <option value="none">Sin fondo (Pared vista)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Distribución Interior: Puertas, Cajones, Repisas, Zócalo -->
-        <div class="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 space-y-3">
-          <span class="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-            <span class="material-icons text-xs text-amber-400">meeting_room</span>
-            Frentes y Distribución
-          </span>
-
-          <div class="grid grid-cols-3 gap-2">
-            <div>
-              <span class="block text-[11px] text-zinc-400 mb-1">Puertas</span>
-              <select 
-                formControlName="doorsCount"
-                class="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center">
-                <option [value]="0">0 (Abierto)</option>
-                <option [value]="1">1 Puerta</option>
-                <option [value]="2">2 Puertas</option>
-              </select>
-            </div>
-
-            <div>
-              <span class="block text-[11px] text-zinc-400 mb-1">Cajones</span>
-              <select 
-                formControlName="drawersCount"
-                class="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center">
-                <option [value]="0">0</option>
-                <option [value]="1">1 Cajón</option>
-                <option [value]="2">2 Cajones</option>
-                <option [value]="3">3 Cajones</option>
-                <option [value]="4">4 Cajones</option>
-              </select>
-            </div>
-
-            <div>
-              <span class="block text-[11px] text-zinc-400 mb-1">Repisas</span>
-              <input 
-                type="number" 
-                min="0" 
-                max="6" 
-                formControlName="shelvesCount"
-                class="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center" />
-            </div>
-          </div>
-
-          <!-- Zócalo -->
-          <div class="pt-2 border-t border-zinc-800/80 flex items-center justify-between">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input 
-                type="checkbox" 
-                formControlName="hasPlinth"
-                class="rounded bg-zinc-800 border-zinc-700 text-amber-500 focus:ring-0" />
-              <span class="text-xs text-zinc-300">Incluir Zócalo de piso</span>
-            </label>
-
-            @if (moduleForm.get('hasPlinth')?.value) {
-              <div class="flex items-center gap-1.5">
-                <span class="text-[11px] text-zinc-400">Altura:</span>
-                <input 
-                  type="number" 
-                  step="5" 
-                  formControlName="plinthHeight" 
-                  class="w-16 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-center" />
-                <span class="text-[10px] text-zinc-400">mm</span>
-              </div>
-            }
-          </div>
-        </div>
-
-        <!-- Botón Guardar -->
-        <div class="pt-2">
+        @if (selectedPartId()) {
           <button 
-            type="submit" 
-            [disabled]="moduleForm.invalid"
-            class="w-full py-2.5 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 shadow-md shadow-amber-900/20 disabled:opacity-50 flex items-center justify-center gap-2 transition">
-            <span class="material-icons text-base">save</span>
-            <span>{{ isEditingModule() ? 'Actualizar Módulo en Proyecto' : 'Agregar Módulo al Proyecto' }}</span>
+            type="button" 
+            (click)="deselectPart()" 
+            class="text-[11px] text-zinc-400 hover:text-white underline whitespace-nowrap px-1"
+            title="Deseleccionar pieza">
+            Deseleccionar
           </button>
-        </div>
-      </form>
-
-      <!-- VISUALIZER COLUMN (7 cols) -->
-      <div class="lg:col-span-7 flex flex-col space-y-4">
-        
-        <!-- Controls Bar with 3D vs 2D Mode Switcher -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-zinc-950 p-2.5 rounded-xl border border-zinc-800 gap-2">
-          
-          <!-- Mode Switcher: 3D Canvas vs 2D Technical Blueprint -->
-          <div class="flex items-center gap-1 text-xs">
-            <button 
-              type="button"
-              (click)="activeVisualizer.set('3d')"
-              [class]="activeVisualizer() === '3d' 
-                ? 'bg-amber-500 text-zinc-950 font-bold shadow-md' 
-                : 'text-zinc-400 hover:text-white bg-zinc-900'"
-              class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition">
-              <span class="material-icons text-sm">view_in_ar</span>
-              <span>Visor 3D Interactivo (Three.js)</span>
-            </button>
-            <button 
-              type="button"
-              (click)="activeVisualizer.set('2d')"
-              [class]="activeVisualizer() === '2d' 
-                ? 'bg-amber-500 text-zinc-950 font-bold shadow-md' 
-                : 'text-zinc-400 hover:text-white bg-zinc-900'"
-              class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition">
-              <span class="material-icons text-sm">architecture</span>
-              <span>Plano 2D con Cotas</span>
-            </button>
-          </div>
-
-          <div class="text-xs text-zinc-400 font-mono flex items-center gap-2">
-            <span class="px-2 py-0.5 rounded bg-zinc-800 text-amber-400 font-bold">
-              {{ previewModule().width }} × {{ previewModule().height }} × {{ previewModule().depth }} mm
-            </span>
-          </div>
-        </div>
-
-        <!-- 3D THREE.JS CANVAS VIEW -->
-        @if (activeVisualizer() === '3d') {
-          <app-furniture-3d-viewer
-            [module]="previewModule()"
-            [parts]="previewPartsAndHardware().parts"
-            [material]="selectedMaterial()">
-          </app-furniture-3d-viewer>
-        } @else {
-          <!-- 2D TECHNICAL BLUEPRINT CANVAS -->
-          <div class="relative w-full h-[460px] sm:h-[540px] bg-gradient-to-b from-zinc-950 to-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden flex items-center justify-center p-4">
-            
-            <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#d4a373_1px,transparent_1px)] [background-size:16px_16px]"></div>
-
-            <svg class="w-full h-full max-h-[480px] select-none" viewBox="0 0 500 400" preserveAspectRatio="xMidYMid meet">
-              <defs>
-                <pattern id="woodGrain2" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <rect width="40" height="40" [attr.fill]="selectedMaterial()?.colorHex || '#b48a60'" />
-                  <path d="M 0 10 Q 20 12, 40 10 M 0 25 Q 20 23, 40 25 M 0 38 Q 20 39, 40 38" stroke="#000" stroke-width="0.7" opacity="0.15" fill="none" />
-                </pattern>
-              </defs>
-
-              @let m = svgMetrics();
-              @let wMm = m.wMm;
-              @let hMm = m.hMm;
-              @let plinthMm = m.plinthMm;
-              @let svgW = m.svgW;
-              @let svgH = m.svgH;
-              @let svgPlinth = m.svgPlinth;
-              @let svgX = m.svgX;
-              @let svgY = m.svgY;
-              @let thick = m.thick;
-
-              <ellipse [attr.cx]="250" [attr.cy]="svgY + svgH + 10" [attr.rx]="(svgW / 2) + 20" ry="10" fill="#000" opacity="0.4" />
-
-              <rect 
-                [attr.x]="svgX" 
-                [attr.y]="svgY" 
-                [attr.width]="svgW" 
-                [attr.height]="svgH - svgPlinth" 
-                fill="#18181b" 
-                stroke="#3f3f46" 
-                stroke-width="1.5" />
-
-              @if (previewModule().hasPlinth) {
-                <rect 
-                  [attr.x]="svgX + 8" 
-                  [attr.y]="svgY + svgH - svgPlinth" 
-                  [attr.width]="svgW - 16" 
-                  [attr.height]="svgPlinth" 
-                  fill="#27272a" 
-                  stroke="#52525b" 
-                  stroke-width="1" />
-                <text [attr.x]="250" [attr.y]="svgY + svgH - (svgPlinth / 2) + 3" text-anchor="middle" font-size="9" fill="#a1a1aa">
-                  Zócalo {{ plinthMm }}mm
-                </text>
-              }
-
-              <!-- Laterales -->
-              <rect [attr.x]="svgX" [attr.y]="svgY" [attr.width]="thick" [attr.height]="svgH - svgPlinth" fill="url(#woodGrain2)" stroke="#713f12" stroke-width="1" />
-              <rect [attr.x]="svgX + svgW - thick" [attr.y]="svgY" [attr.width]="thick" [attr.height]="svgH - svgPlinth" fill="url(#woodGrain2)" stroke="#713f12" stroke-width="1" />
-
-              <!-- Piso -->
-              <rect [attr.x]="svgX" [attr.y]="svgY + svgH - svgPlinth - thick" [attr.width]="svgW" [attr.height]="thick" fill="url(#woodGrain2)" stroke="#713f12" stroke-width="1" />
-
-              <!-- Techo o Fajas -->
-              <rect [attr.x]="svgX" [attr.y]="svgY" [attr.width]="svgW" [attr.height]="thick" fill="url(#woodGrain2)" stroke="#713f12" stroke-width="1" />
-
-              <!-- Repisas interiores -->
-              @if (previewModule().shelvesCount > 0) {
-                @let carcassUsefulH = (svgH - svgPlinth) - (2 * thick);
-                @let shelfSpacing = carcassUsefulH / (previewModule().shelvesCount + 1);
-                
-                @for (i of [1, 2, 3, 4, 5]; track i) {
-                  @if (i <= previewModule().shelvesCount) {
-                    <g>
-                      <rect 
-                        [attr.x]="svgX + thick" 
-                        [attr.y]="svgY + thick + (shelfSpacing * i)" 
-                        [attr.width]="svgW - (2 * thick)" 
-                        [attr.height]="thick" 
-                        fill="url(#woodGrain2)" 
-                        stroke="#713f12" 
-                        stroke-width="0.8" />
-                      <circle [attr.cx]="svgX + thick + 4" [attr.cy]="svgY + thick + (shelfSpacing * i) + thick + 2" r="2" fill="#cbd5e1" />
-                      <circle [attr.cx]="svgX + svgW - thick - 4" [attr.cy]="svgY + thick + (shelfSpacing * i) + thick + 2" r="2" fill="#cbd5e1" />
-                    </g>
-                  }
-                }
-              }
-
-              <!-- Dimension guides -->
-              <g>
-                <line [attr.x1]="svgX" [attr.y1]="svgY - 14" [attr.x2]="svgX + svgW" [attr.y2]="svgY - 14" stroke="#38bdf8" stroke-width="1.2" />
-                <line [attr.x1]="svgX" [attr.y1]="svgY - 19" [attr.x2]="svgX" [attr.y2]="svgY - 9" stroke="#38bdf8" stroke-width="1.2" />
-                <line [attr.x1]="svgX + svgW" [attr.y1]="svgY - 19" [attr.x2]="svgX + svgW" [attr.y2]="svgY - 9" stroke="#38bdf8" stroke-width="1.2" />
-                <rect [attr.x]="250 - 24" [attr.y]="svgY - 22" width="48" height="14" rx="3" fill="#0f172a" />
-                <text [attr.x]="250" [attr.y]="svgY - 12" text-anchor="middle" font-size="10" font-weight="bold" fill="#38bdf8">
-                  {{ wMm }} mm
-                </text>
-              </g>
-
-              <g>
-                <line [attr.x1]="svgX - 16" [attr.y1]="svgY" [attr.x2]="svgX - 16" [attr.y2]="svgY + svgH" stroke="#38bdf8" stroke-width="1.2" />
-                <line [attr.x1]="svgX - 21" [attr.y1]="svgY" [attr.x2]="svgX - 11" [attr.y2]="svgY" stroke="#38bdf8" stroke-width="1.2" />
-                <line [attr.x1]="svgX - 21" [attr.y1]="svgY + svgH" [attr.x2]="svgX - 11" [attr.y2]="svgY + svgH" stroke="#38bdf8" stroke-width="1.2" />
-                <text 
-                  [attr.x]="-(svgY + (svgH / 2))" 
-                  [attr.y]="svgX - 22" 
-                  transform="rotate(-90)" 
-                  text-anchor="middle" 
-                  font-size="10" 
-                  font-weight="bold" 
-                  fill="#38bdf8">
-                  {{ hMm }} mm
-                </text>
-              </g>
-            </svg>
-          </div>
         }
-
-        <!-- LIVE PARTS PREVIEW FOR THIS MODULE -->
-        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="text-xs font-bold text-zinc-200 flex items-center gap-1.5 uppercase tracking-wider">
-              <span class="material-icons text-amber-500 text-sm">content_cut</span>
-              Despiece Automático en Vivo ({{ previewPartsAndHardware().parts.length }} piezas calculadas)
-            </h4>
-            <span class="text-[11px] text-zinc-400">Holguras telescópicas y cantos actualizados</span>
-          </div>
-
-          <div class="max-h-48 overflow-y-auto pr-1">
-            <table class="w-full text-left text-xs">
-              <thead class="text-[10px] uppercase font-bold text-zinc-400 bg-zinc-950/60 sticky top-0">
-                <tr>
-                  <th class="py-1.5 px-2">Pieza</th>
-                  <th class="py-1.5 px-2 text-center">Cant</th>
-                  <th class="py-1.5 px-2">Largo × Ancho (mm)</th>
-                  <th class="py-1.5 px-2">Cantos (L1/L2/A1/A2)</th>
-                  <th class="py-1.5 px-2">Detalle Técnico</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-zinc-800 text-zinc-300">
-                @for (part of previewPartsAndHardware().parts; track part.name + part.length + part.width) {
-                  <tr class="hover:bg-zinc-800/40">
-                    <td class="py-1.5 px-2 font-medium text-white flex items-center gap-1.5">
-                      <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                      {{ part.name }}
-                    </td>
-                    <td class="py-1.5 px-2 text-center font-bold text-amber-400">{{ part.quantity }}</td>
-                    <td class="py-1.5 px-2 font-mono text-zinc-200 font-bold">
-                      {{ part.length }} × {{ part.width }} × {{ part.thickness }}
-                    </td>
-                    <td class="py-1.5 px-2 font-mono text-[10px]">
-                      <span [class]="part.edges.l1 === 'thick' ? 'text-amber-400' : part.edges.l1 === 'thin' ? 'text-cyan-400' : 'text-zinc-500'">L1:{{part.edges.l1}}</span>
-                      <span [class]="part.edges.l2 === 'thick' ? 'text-amber-400' : part.edges.l2 === 'thin' ? 'text-cyan-400' : 'text-zinc-500'"> L2:{{part.edges.l2}}</span>
-                      <span [class]="part.edges.a1 === 'thick' ? 'text-amber-400' : part.edges.a1 === 'thin' ? 'text-cyan-400' : 'text-zinc-500'"> A1:{{part.edges.a1}}</span>
-                      <span [class]="part.edges.a2 === 'thick' ? 'text-amber-400' : part.edges.a2 === 'thin' ? 'text-cyan-400' : 'text-zinc-500'"> A2:{{part.edges.a2}}</span>
-                    </td>
-                    <td class="py-1.5 px-2 text-[11px] text-zinc-400 italic">
-                      {{ part.notes || '-' }}
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-
       </div>
-    </div>
-  </div>
 
-  <!-- CURRENT PROJECT MODULES LIST -->
-  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg">
-    <div class="flex items-center justify-between mb-4">
-      <div>
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-          <span class="material-icons text-amber-500">widgets</span>
-          Módulos Incluidos en este Proyecto ({{ modules().length }})
-        </h3>
-        <p class="text-xs text-zinc-400">Todos estos módulos conforman el proyecto y su despiece conjunto se optimizará en los tableros.</p>
-      </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      @for (mod of modules(); track mod.id) {
-        <div class="p-4 bg-zinc-950/80 border border-zinc-800 hover:border-zinc-700 rounded-xl flex flex-col justify-between transition group">
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
-                {{ mod.type === 'base_cabinet' ? 'Bajo' : mod.type === 'wall_cabinet' ? 'Aéreo' : mod.type === 'tall_cabinet' ? 'Columna' : 'Cajonera' }}
-              </span>
-              <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+    <!-- RIGHT COLUMN: Inspector & Tool Dock (approx 25% width on desktop) -->
+    <div class="col-span-12 lg:col-span-4 xl:col-span-3 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[820px]">
+      
+      <!-- Dock Tabs Header -->
+      <div class="flex items-center border-b border-zinc-800 bg-zinc-950/70 p-1">
+        <button 
+          type="button"
+          (click)="activeDockTab.set('piece')"
+          [class]="activeDockTab() === 'piece' ? 'bg-zinc-800 text-cyan-400 font-bold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'"
+          class="flex-1 py-2 text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
+          <span class="material-icons text-sm">tune</span>
+          <span>Propiedades de Pieza</span>
+          @if (selectedPart()) {
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          }
+        </button>
+
+        <button 
+          type="button"
+          (click)="activeDockTab.set('catalog')"
+          [class]="activeDockTab() === 'catalog' ? 'bg-zinc-800 text-amber-400 font-bold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'"
+          class="flex-1 py-2 text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
+          <span class="material-icons text-sm">add_circle</span>
+          <span>Catálogo & Estructura</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: INDIVIDUAL PIECE PROPERTIES (Edición Pieza por Pieza) -->
+      @if (activeDockTab() === 'piece') {
+        <div class="p-3.5 space-y-4 overflow-y-auto flex-1">
+          
+          @if (selectedPart(); as sel) {
+            
+            <!-- Header: Piece Name & Badges -->
+            <div class="pb-3 border-b border-zinc-800 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1">
+                  <span class="material-icons text-xs">extension</span>
+                  Pieza Seleccionada
+                </span>
                 <button 
-                  (click)="editExistingModule(mod)"
-                  class="p-1 text-zinc-400 hover:text-amber-400 transition"
-                  title="Editar dimensiones de este módulo en el visor 3D">
-                  <span class="material-icons text-sm">edit</span>
+                  type="button" 
+                  (click)="deselectPart()" 
+                  class="text-zinc-400 hover:text-white"
+                  title="Cerrar inspector">
+                  <span class="material-icons text-sm">close</span>
+                </button>
+              </div>
+
+              <!-- Editable Name -->
+              <input 
+                type="text" 
+                [value]="sel.name" 
+                (input)="updateSelectedPart({ name: $any($event.target).value })"
+                class="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-lg text-sm font-bold text-white focus:outline-hidden focus:border-cyan-400"
+                placeholder="Nombre de la pieza" />
+            </div>
+
+            <!-- SECTION 1: DIMENSIONES INDIVIDUALES (Largo × Ancho × Espesor) -->
+            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-3">
+              <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                <span class="material-icons text-xs text-cyan-400">square_foot</span>
+                Dimensiones de Corte (mm)
+              </span>
+
+              <!-- LARGO -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-zinc-400 font-medium">Largo (mm):</span>
+                  <span class="font-mono font-bold text-cyan-300">{{ sel.length }} mm</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button 
+                    type="button" 
+                    (click)="adjustPartProperty('length', -50)" 
+                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    -50
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="adjustPartProperty('length', -10)" 
+                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    -10
+                  </button>
+                  <input 
+                    type="number" 
+                    step="5"
+                    [value]="sel.length"
+                    (input)="updateSelectedPart({ length: +$any($event.target).value })"
+                    class="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-xs font-bold text-white focus:outline-hidden focus:border-cyan-400 font-mono" />
+                  <button 
+                    type="button" 
+                    (click)="adjustPartProperty('length', 10)" 
+                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    +10
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="adjustPartProperty('length', 50)" 
+                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    +50
+                  </button>
+                </div>
+              </div>
+
+              <!-- ANCHO -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-zinc-400 font-medium">Ancho (mm):</span>
+                  <span class="font-mono font-bold text-cyan-300">{{ sel.width }} mm</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button 
+                    type="button" 
+                    (click)="adjustPartProperty('width', -50)" 
+                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    -50
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="adjustPartProperty('width', -10)" 
+                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    -10
+                  </button>
+                  <input 
+                    type="number" 
+                    step="5"
+                    [value]="sel.width"
+                    (input)="updateSelectedPart({ width: +$any($event.target).value })"
+                    class="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-xs font-bold text-white focus:outline-hidden focus:border-cyan-400 font-mono" />
+                  <button 
+                    type="button" 
+                    (click)="adjustPartProperty('width', 10)" 
+                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    +10
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="adjustPartProperty('width', 50)" 
+                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    +50
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- SECTION 2: TABLERO & MELAMINA ASIGNADA (Espesor sincronizado al 100%) -->
+            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-amber-400">palette</span>
+                  Tablero & Espesor
+                </span>
+                <span class="text-xs font-mono font-bold text-cyan-300 bg-cyan-950/90 px-2 py-0.5 rounded border border-cyan-800/80">
+                  {{ sel.thickness }} mm
+                </span>
+              </div>
+
+              <!-- Selector de Material del Proyecto -->
+              <div class="space-y-1">
+                <span class="text-[10px] text-zinc-400 font-medium block">Melamina Asignada a esta Pieza:</span>
+                <select 
+                  [value]="sel.materialId"
+                  (change)="onMaterialChange($any($event.target).value)"
+                  class="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-white focus:outline-hidden focus:border-cyan-400">
+                  @for (mat of materials(); track mat.id) {
+                    <option [value]="mat.id">
+                      {{ mat.name }} ({{ mat.thickness }} mm)
+                    </option>
+                  }
+                </select>
+              </div>
+
+              <!-- Botones de Espesor Rápido -->
+              <div class="space-y-1 pt-1 border-t border-zinc-800/80">
+                <span class="text-[10px] text-zinc-400 font-medium block">Espesor Rápido de Taller:</span>
+                <div class="grid grid-cols-4 gap-1">
+                  <button 
+                    type="button" 
+                    (click)="onThicknessChange(18)"
+                    [class]="sel.thickness === 18 ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
+                    class="py-1 text-[11px] rounded transition">
+                    18 mm
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="onThicknessChange(15)"
+                    [class]="sel.thickness === 15 ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
+                    class="py-1 text-[11px] rounded transition">
+                    15 mm
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="onThicknessChange(3)"
+                    [class]="sel.thickness === 3 ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
+                    class="py-1 text-[11px] rounded transition">
+                    3 mm
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="onThicknessChange(36)"
+                    [class]="sel.thickness === 36 ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
+                    class="py-1 text-[11px] rounded transition">
+                    36 mm
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 3: POSICIÓN 3D MILIMÉTRICA (Ajuste Asistido) -->
+            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-3">
+              <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                <span class="material-icons text-xs text-amber-400">open_with</span>
+                Posición 3D en Milímetros
+              </span>
+
+              <!-- EJE X -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-zinc-400">Eje X (Izquierda / Derecha):</span>
+                  <span class="font-mono text-cyan-300 font-bold">{{ sel.posX ?? 0 }} mm</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button (click)="adjustPartProperty('posX', -50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-50</button>
+                  <button (click)="adjustPartProperty('posX', -10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-10</button>
+                  <input 
+                    type="number" 
+                    step="5"
+                    [value]="sel.posX ?? 0"
+                    (input)="updateSelectedPart({ posX: +$any($event.target).value })"
+                    class="flex-1 px-1.5 py-0.5 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-white font-mono" />
+                  <button (click)="adjustPartProperty('posX', 10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+10</button>
+                  <button (click)="adjustPartProperty('posX', 50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+50</button>
+                </div>
+              </div>
+
+              <!-- EJE Y (Altura desde suelo) -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-zinc-400">Eje Y (Elevación del Suelo):</span>
+                  <span class="font-mono text-cyan-300 font-bold">{{ sel.posY ?? 0 }} mm</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button (click)="adjustPartProperty('posY', -50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-50</button>
+                  <button (click)="adjustPartProperty('posY', -10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-10</button>
+                  <input 
+                    type="number" 
+                    step="5"
+                    [value]="sel.posY ?? 0"
+                    (input)="updateSelectedPart({ posY: +$any($event.target).value })"
+                    class="flex-1 px-1.5 py-0.5 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-white font-mono" />
+                  <button (click)="adjustPartProperty('posY', 10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+10</button>
+                  <button (click)="adjustPartProperty('posY', 50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+50</button>
+                </div>
+              </div>
+
+              <!-- EJE Z (Profundidad) -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-zinc-400">Eje Z (Profundidad adelante/atrás):</span>
+                  <span class="font-mono text-cyan-300 font-bold">{{ sel.posZ ?? 0 }} mm</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button (click)="adjustPartProperty('posZ', -50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-50</button>
+                  <button (click)="adjustPartProperty('posZ', -10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-10</button>
+                  <input 
+                    type="number" 
+                    step="5"
+                    [value]="sel.posZ ?? 0"
+                    (input)="updateSelectedPart({ posZ: +$any($event.target).value })"
+                    class="flex-1 px-1.5 py-0.5 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-white font-mono" />
+                  <button (click)="adjustPartProperty('posZ', 10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+10</button>
+                  <button (click)="adjustPartProperty('posZ', 50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+50</button>
+                </div>
+              </div>
+
+              <!-- Alineaciones rápidas de 1 clic -->
+              <div class="grid grid-cols-3 gap-1 pt-1 border-t border-zinc-800">
+                <button 
+                  type="button" 
+                  (click)="alignPart('floor')"
+                  class="py-1 px-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] text-center transition font-semibold">
+                  Al Suelo
                 </button>
                 <button 
-                  (click)="deleteModule(mod.id)"
-                  class="p-1 text-zinc-400 hover:text-rose-400 transition"
-                  title="Eliminar este módulo">
-                  <span class="material-icons text-sm">delete</span>
+                  type="button" 
+                  (click)="alignPart('centerX')"
+                  class="py-1 px-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] text-center transition font-semibold">
+                  Centrar X
+                </button>
+                <button 
+                  type="button" 
+                  (click)="alignPart('centerZ')"
+                  class="py-1 px-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] text-center transition font-semibold">
+                  Centrar Z
+                </button>
+              </div>
+
+            </div>
+
+            <!-- SECTION 3: ORIENTACIÓN ESPACIAL -->
+            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2">
+              <span class="text-xs font-bold text-zinc-300 block">Orientación de la Pieza:</span>
+              <div class="grid grid-cols-3 gap-1 text-[10px]">
+                <button 
+                  type="button"
+                  (click)="setPartOrientation('horizontal')"
+                  [class]="(sel.orientation || 'horizontal') === 'horizontal' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
+                  class="py-1.5 rounded transition text-center font-medium">
+                  Horizontal
+                </button>
+                <button 
+                  type="button"
+                  (click)="setPartOrientation('vertical_yz')"
+                  [class]="sel.orientation === 'vertical_yz' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
+                  class="py-1.5 rounded transition text-center font-medium">
+                  Lateral (YZ)
+                </button>
+                <button 
+                  type="button"
+                  (click)="setPartOrientation('vertical_xy')"
+                  [class]="sel.orientation === 'vertical_xy' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
+                  class="py-1.5 rounded transition text-center font-medium">
+                  Frontal (XY)
                 </button>
               </div>
             </div>
 
-            <h4 class="text-sm font-bold text-zinc-100 mb-1">{{ mod.name }}</h4>
-            <p class="text-xs text-zinc-400 font-mono">
-              {{ mod.width }} × {{ mod.height }} × {{ mod.depth }} mm (Placa {{ mod.boardThickness }}mm)
-            </p>
+            <!-- SECTION 4: TAPACANTOS INTELIGENTES (L1, L2, A1, A2) -->
+            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-zinc-300">Tapacantos (Bordes):</span>
+                <span class="text-[10px] text-zinc-500">Clic para cambiar</span>
+              </div>
+              
+              <div class="grid grid-cols-4 gap-1.5 text-center">
+                <!-- L1 -->
+                <button 
+                  type="button"
+                  (click)="togglePartEdge('l1')"
+                  [class]="sel.edges.l1 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : (sel.edges.l1 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400')"
+                  class="p-1.5 rounded-lg border border-zinc-700 transition flex flex-col items-center">
+                  <span class="text-[9px] uppercase font-mono">L1</span>
+                  <span class="text-[10px]">{{ sel.edges.l1 === 'thick' ? '2.0mm' : (sel.edges.l1 === 'thin' ? '0.45mm' : 'Sin') }}</span>
+                </button>
 
-            <div class="mt-3 flex flex-wrap gap-1.5 text-[11px] text-zinc-300">
-              @if (mod.doorsCount > 0) {
-                <span class="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">
-                  {{ mod.doorsCount }} Puerta(s)
-                </span>
-              }
-              @if (mod.drawersCount > 0) {
-                <span class="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">
-                  {{ mod.drawersCount }} Cajón(es)
-                </span>
-              }
-              @if (mod.shelvesCount > 0) {
-                <span class="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">
-                  {{ mod.shelvesCount }} Repisa(s)
-                </span>
-              }
-              @if (mod.hasPlinth) {
-                <span class="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">
-                  Zócalo {{ mod.plinthHeight }}mm
-                </span>
-              }
+                <!-- L2 -->
+                <button 
+                  type="button"
+                  (click)="togglePartEdge('l2')"
+                  [class]="sel.edges.l2 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : (sel.edges.l2 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400')"
+                  class="p-1.5 rounded-lg border border-zinc-700 transition flex flex-col items-center">
+                  <span class="text-[9px] uppercase font-mono">L2</span>
+                  <span class="text-[10px]">{{ sel.edges.l2 === 'thick' ? '2.0mm' : (sel.edges.l2 === 'thin' ? '0.45mm' : 'Sin') }}</span>
+                </button>
+
+                <!-- A1 -->
+                <button 
+                  type="button"
+                  (click)="togglePartEdge('a1')"
+                  [class]="sel.edges.a1 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : (sel.edges.a1 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400')"
+                  class="p-1.5 rounded-lg border border-zinc-700 transition flex flex-col items-center">
+                  <span class="text-[9px] uppercase font-mono">A1</span>
+                  <span class="text-[10px]">{{ sel.edges.a1 === 'thick' ? '2.0mm' : (sel.edges.a1 === 'thin' ? '0.45mm' : 'Sin') }}</span>
+                </button>
+
+                <!-- A2 -->
+                <button 
+                  type="button"
+                  (click)="togglePartEdge('a2')"
+                  [class]="sel.edges.a2 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : (sel.edges.a2 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400')"
+                  class="p-1.5 rounded-lg border border-zinc-700 transition flex flex-col items-center">
+                  <span class="text-[9px] uppercase font-mono">A2</span>
+                  <span class="text-[10px]">{{ sel.edges.a2 === 'thick' ? '2.0mm' : (sel.edges.a2 === 'thin' ? '0.45mm' : 'Sin') }}</span>
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div class="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500">
-            <span>Fondo: {{ mod.backType === 'groove' ? 'Ranurado 3mm' : mod.backType === 'overlay' ? 'Sobrepuesto' : 'Sin fondo' }}</span>
-            <button (click)="editExistingModule(mod)" class="text-amber-400 hover:underline">
-              Cargar en Visor 3D
-            </button>
-          </div>
-        </div>
-      } @empty {
-        <div class="col-span-full p-8 text-center bg-zinc-950/40 rounded-xl border border-dashed border-zinc-800">
-          <span class="material-icons text-zinc-600 text-3xl mb-2">kitchen</span>
-          <p class="text-sm text-zinc-400 font-medium">Aún no hay módulos en este proyecto.</p>
-          <p class="text-xs text-zinc-500 mt-1">Usa el formulario arriba o selecciona una plantilla para comenzar a diseñar.</p>
+            <!-- SECTION 5: ACTIONS (Duplicar / Eliminar) -->
+            <div class="pt-2 flex items-center gap-2">
+              <button 
+                type="button"
+                (click)="duplicateSelectedPart()"
+                class="flex-1 py-2 text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl border border-zinc-700 flex items-center justify-center gap-1.5 transition">
+                <span class="material-icons text-sm text-cyan-400">content_copy</span>
+                <span>Duplicar Pieza</span>
+              </button>
+
+              <button 
+                type="button"
+                (click)="deleteSelectedPart()"
+                class="flex-1 py-2 text-xs font-semibold bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 rounded-xl border border-rose-800/60 flex items-center justify-center gap-1.5 transition">
+                <span class="material-icons text-sm text-rose-400">delete</span>
+                <span>Eliminar Pieza</span>
+              </button>
+            </div>
+
+          } @else {
+            
+            <!-- Empty state when no piece is selected -->
+            <div class="p-8 text-center space-y-3">
+              <div class="w-12 h-12 rounded-2xl bg-zinc-800/80 border border-zinc-700 flex items-center justify-center mx-auto text-zinc-400">
+                <span class="material-icons text-2xl text-cyan-400">touch_app</span>
+              </div>
+              <div>
+                <h4 class="text-sm font-bold text-white">Ninguna pieza seleccionada</h4>
+                <p class="text-xs text-zinc-400 mt-1">
+                  Haz clic directamente sobre cualquier pieza en el lienzo 3D para editar sus medidas y posición de forma independiente.
+                </p>
+              </div>
+              <button 
+                type="button" 
+                (click)="activeDockTab.set('catalog')"
+                class="px-4 py-2 text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl transition shadow">
+                Abrir Catálogo de Piezas (+)
+              </button>
+            </div>
+
+          }
+
         </div>
       }
+
+      <!-- TAB 2: PIECE CATALOG & ASSEMBLY TREE -->
+      @if (activeDockTab() === 'catalog') {
+        <div class="p-3.5 space-y-4 overflow-y-auto flex-1">
+          
+          <!-- CATALOG OF COMPONENTS TO ADD -->
+          <div class="space-y-2">
+            <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+              <span class="material-icons text-xs text-amber-400">library_add</span>
+              Catálogo de Piezas (Añadir al Mueble)
+            </span>
+            <p class="text-[11px] text-zinc-400">
+              Selecciona una pieza para insertarla en el modelo 3D con medidas iniciales de taller:
+            </p>
+
+            <div class="grid grid-cols-2 gap-1.5 text-xs">
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('top')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-cyan-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-cyan-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ Techo / Barra</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('side_left')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-amber-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ Lateral Izq.</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('side_right')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-amber-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ Lateral Der.</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('bottom')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-orange-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-orange-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ Piso / Base</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('divider')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-yellow-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-yellow-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ División Vert.</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('shelf')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-emerald-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-emerald-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ Repisa Interior</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('back')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-purple-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-purple-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ Fondo Trasero</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('door')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-blue-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-blue-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ Puerta Batiente</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('drawer_front')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-indigo-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-indigo-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ Frente Cajón</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="addPieceFromCatalog('plinth')"
+                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-stone-500/50 rounded-xl text-left transition flex items-center gap-2 group">
+                <span class="w-2.5 h-2.5 rounded bg-stone-400 group-hover:scale-125 transition"></span>
+                <span class="text-zinc-200 font-medium">+ Zócalo Piso</span>
+              </button>
+            </div>
+
+            <!-- Free custom piece -->
+            <button 
+              type="button"
+              (click)="addPieceFromCatalog('free')"
+              class="w-full py-2 bg-zinc-950/80 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-cyan-400 rounded-xl text-xs font-semibold text-zinc-300 hover:text-white transition flex items-center justify-center gap-1.5">
+              <span class="material-icons text-sm text-cyan-400">add</span>
+              <span>+ Añadir Pieza Libre Personalizada</span>
+            </button>
+          </div>
+
+          <!-- ASSEMBLY STRUCTURE / PIECES LIST -->
+          <div class="space-y-2 pt-2 border-t border-zinc-800">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-zinc-300 flex items-center gap-1">
+                <span class="material-icons text-xs text-cyan-400">format_list_numbered</span>
+                Piezas Actuales ({{ currentParts().length }})
+              </span>
+              <span class="text-[10px] text-zinc-500 font-mono">L × A × E</span>
+            </div>
+
+            <div class="space-y-1 max-h-[300px] overflow-y-auto pr-1">
+              @for (part of currentParts(); track part.id) {
+                <div 
+                  [class]="selectedPartId() === part.id ? 'bg-cyan-500/20 border-cyan-400/80 text-white' : 'bg-zinc-950/60 border-zinc-800 text-zinc-300 hover:bg-zinc-800/80'"
+                  class="p-1.5 rounded-xl border flex items-center justify-between gap-2 transition text-xs">
+                  
+                  <button 
+                    type="button"
+                    (click)="selectPartById(part.id)"
+                    class="flex items-center gap-2 min-w-0 flex-1 text-left">
+                    <span 
+                      [class]="selectedPartId() === part.id ? 'bg-cyan-400 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400'"
+                      class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] shrink-0 font-mono">
+                      {{ $index + 1 }}
+                    </span>
+                    <div class="truncate">
+                      <p class="font-bold truncate text-[11px]">{{ part.name }}</p>
+                      <p class="font-mono text-[10px] text-zinc-400">
+                        {{ part.length }} × {{ part.width }} × {{ part.thickness }} mm
+                      </p>
+                    </div>
+                  </button>
+
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button 
+                      type="button"
+                      (click)="deletePartById(part.id, $event)"
+                      class="text-zinc-500 hover:text-rose-400 p-1 rounded transition"
+                      title="Eliminar esta pieza">
+                      <span class="material-icons text-xs">delete</span>
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+        </div>
+      }
+
     </div>
+
   </div>
 
 </div>

@@ -1,10 +1,37 @@
-<div #container3d class="relative w-full h-[460px] sm:h-[540px] bg-zinc-950 rounded-2xl border border-zinc-800 overflow-hidden shadow-2xl select-none group">
+<div #container3d 
+  [class]="isWhiteTheme() ? 'bg-slate-100/80 border-slate-300' : 'bg-zinc-950 border-zinc-800'"
+  class="relative w-full h-[540px] sm:h-[640px] lg:h-[720px] rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-300">
 
-  <!-- 3D Canvas -->
+  <!-- 3D WebGL Canvas -->
   <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
 
-  <!-- TOP TOOLBAR: View presets & visual modes -->
-  <div class="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+  <!-- TOP-LEFT HUD BADGE (Matching user reference image: TECHO: 1800 x 600 mm) -->
+  @if (selectedPart(); as sel) {
+    <div class="absolute top-4 left-4 z-20 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
+      <div class="flex items-center gap-3 bg-zinc-950/95 backdrop-blur-md px-4 py-2.5 rounded-xl border-2 border-cyan-400 shadow-[0_4px_25px_rgba(0,255,204,0.35)]">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+          <span class="text-xs font-black tracking-wider text-white uppercase">{{ sel.name }}:</span>
+        </div>
+        <span class="text-sm font-black text-cyan-300 font-mono tracking-tight">{{ sel.length }} x {{ sel.width }} mm</span>
+        <span class="text-xs font-semibold text-zinc-400 font-mono">({{ sel.thickness }}mm)</span>
+      </div>
+
+      <!-- Quick Drag & Stretch Helper Tag -->
+      <div class="hidden sm:flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-md px-3 py-1 rounded-lg border border-zinc-700/60 text-[11px] text-zinc-300 shadow">
+        <span class="material-icons text-xs text-amber-400">pan_tool</span>
+        <span>Arrastra las <strong>flechas 3D</strong> para mover o los <strong>cubos en los bordes</strong> para estirar</span>
+      </div>
+    </div>
+  } @else {
+    <div class="absolute top-4 left-4 z-10 hidden sm:flex items-center gap-2 bg-zinc-900/85 backdrop-blur-md px-3.5 py-2 rounded-xl border border-zinc-700/60 text-xs text-zinc-200 shadow-md">
+      <span class="material-icons text-cyan-400 text-sm">touch_app</span>
+      <span>Haz clic en cualquier pieza 3D para seleccionarla, moverla o estirarla con el Gizmo</span>
+    </div>
+  }
+
+  <!-- TOP RIGHT TOOLBAR: View presets, Cotas 3D, Rayos X, Theme Toggle, Reset -->
+  <div class="absolute top-4 right-4 flex flex-wrap items-center gap-2 pointer-events-none z-20">
     
     <!-- View Angle Buttons -->
     <div class="flex items-center gap-1 bg-zinc-900/90 backdrop-blur-md p-1 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto">
@@ -38,26 +65,38 @@
       </button>
     </div>
 
-    <!-- Toggles: Open frentes, X-Ray, Reset -->
+    <!-- Toggles: Theme, 3D Dimensions, Rayos X, Reset -->
     <div class="flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-md p-1 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto">
-      <!-- Open / Close doors & drawers -->
+      
+      <!-- Studio White / Dark Mode Toggle -->
       <button 
         type="button"
-        (click)="toggleOpenClose()"
-        [class]="isOpenFrentes() ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
+        (click)="toggleTheme()"
+        [class]="isWhiteTheme() ? 'bg-amber-400 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
+        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition shadow-xs"
+        [title]="isWhiteTheme() ? 'Cambiar a modo CAD oscuro' : 'Cambiar a fondo blanco de estudio técnico'">
+        <span class="material-icons text-sm">{{ isWhiteTheme() ? 'wb_sunny' : 'nightlight' }}</span>
+        <span class="hidden md:inline">{{ isWhiteTheme() ? 'Estudio Blanco' : 'Oscuro' }}</span>
+      </button>
+
+      <!-- 3D Dimensions Line Toggle -->
+      <button 
+        type="button"
+        (click)="toggleDimensions()"
+        [class]="show3dDimensions() ? 'bg-cyan-500 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
         class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
-        title="Abrir o cerrar puertas y cajones para ver el interior">
-        <span class="material-icons text-sm">{{ isOpenFrentes() ? 'door_open' : 'door_front' }}</span>
-        <span class="hidden sm:inline">{{ isOpenFrentes() ? 'Cerrar Frentes' : 'Abrir Frentes' }}</span>
+        title="Mostrar u ocultar cotas y medidas 3D directamente sobre el modelo">
+        <span class="material-icons text-sm">straighten</span>
+        <span class="hidden sm:inline">Cotas 3D</span>
       </button>
 
       <!-- Rayos X / Transparente -->
       <button 
         type="button"
         (click)="toggleXRay()"
-        [class]="isXRay() ? 'bg-cyan-500 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
+        [class]="isXRay() ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
         class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
-        title="Activar transparencia de paneles para inspeccionar armado">
+        title="Activar transparencia de paneles para inspeccionar ensambles interiores">
         <span class="material-icons text-sm">visibility</span>
         <span class="hidden sm:inline">Rayos X</span>
       </button>
@@ -73,31 +112,13 @@
     </div>
   </div>
 
-  <!-- SELECTED PIECE HUD BADGE (Appears when user clicks any piece in 3D) -->
-  @if (selectedPieceName()) {
-    <div class="absolute top-14 left-3 bg-zinc-900/95 backdrop-blur-md border border-amber-500/50 p-2.5 rounded-xl shadow-xl max-w-sm pointer-events-auto animate-in fade-in zoom-in-95 duration-150">
-      <div class="flex items-center justify-between gap-2 mb-0.5">
-        <span class="text-xs font-bold text-amber-400 flex items-center gap-1">
-          <span class="material-icons text-xs">extension</span>
-          {{ selectedPieceName() }}
-        </span>
-        <button (click)="selectedPieceName.set(null)" class="text-zinc-500 hover:text-white">
-          <span class="material-icons text-xs">close</span>
-        </button>
-      </div>
-      <p class="text-[11px] text-zinc-300 font-mono">
-        {{ selectedPieceDetails() }}
-      </p>
-    </div>
-  }
-
   <!-- BOTTOM TOOLBAR: Exploded View Slider & Navigation Help -->
-  <div class="absolute bottom-3 left-3 right-3 flex flex-col sm:flex-row items-center justify-between gap-2 pointer-events-none">
+  <div class="absolute bottom-4 left-4 right-4 flex flex-col sm:flex-row items-center justify-between gap-3 pointer-events-none z-20">
     
     <!-- Exploded view slider -->
-    <div class="flex items-center gap-2.5 bg-zinc-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto w-full sm:w-auto">
-      <span class="text-[11px] font-bold text-zinc-300 flex items-center gap-1 whitespace-nowrap">
-        <span class="material-icons text-xs text-amber-400">burst_mode</span>
+    <div class="flex items-center gap-2.5 bg-zinc-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto w-full sm:w-auto">
+      <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5 whitespace-nowrap">
+        <span class="material-icons text-sm text-cyan-400">burst_mode</span>
         Despiece 3D:
       </span>
       <input 
@@ -106,27 +127,29 @@
         max="100" 
         [value]="explodedPercent()"
         (input)="explodedPercent.set(+$any($event.target).value)"
-        class="w-32 sm:w-44 accent-amber-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
+        class="w-32 sm:w-48 accent-cyan-400 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
         title="Desliza para separar las piezas en el espacio 3D" />
-      <span class="text-[11px] font-mono font-bold text-amber-400 w-8 text-right">
+      <span class="text-xs font-mono font-bold text-cyan-400 w-9 text-right">
         {{ explodedPercent() }}%
       </span>
       @if (explodedPercent() > 0) {
         <button 
           (click)="explodedPercent.set(0)" 
-          class="text-[10px] text-zinc-400 hover:text-white underline ml-1">
+          class="text-xs text-zinc-400 hover:text-white underline ml-1">
           Unir
         </button>
       }
     </div>
 
-    <!-- Mouse Orbit Hint -->
-    <div class="hidden md:flex items-center gap-2 text-[10px] text-zinc-400 bg-zinc-950/80 px-2.5 py-1 rounded-lg border border-zinc-800/80 pointer-events-none">
-      <span>🖱️ Clic izquierdo: <strong>Rotar 360°</strong></span>
+    <!-- Mouse & Gizmo Controls Hint -->
+    <div class="hidden md:flex items-center gap-2.5 text-xs text-zinc-300 bg-zinc-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-zinc-800/80 shadow pointer-events-none">
+      <span>🖱️ <strong>Rotar:</strong> Clic izquierdo</span>
       <span>•</span>
-      <span>Clic derecho: <strong>Desplazar</strong></span>
+      <span><strong>Desplazar:</strong> Clic derecho</span>
       <span>•</span>
-      <span>Rueda: <strong>Zoom</strong></span>
+      <span><strong>Zoom:</strong> Rueda</span>
+      <span>•</span>
+      <span><strong class="text-cyan-400">Arrastrar Gizmo:</strong> Mueve o estira la pieza</span>
     </div>
 
   </div>

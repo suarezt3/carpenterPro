@@ -9,6 +9,21 @@ export interface PartEdges {
   a2: EdgeBandingType; // Ancho derecho / borde 2
 }
 
+export type PartOrientation = 'horizontal' | 'vertical_yz' | 'vertical_xy';
+
+export type ComponentRole = 
+  | 'top' 
+  | 'bottom' 
+  | 'side_left' 
+  | 'side_right' 
+  | 'divider' 
+  | 'shelf' 
+  | 'back' 
+  | 'door' 
+  | 'drawer_front' 
+  | 'plinth' 
+  | 'free';
+
 export interface Part {
   id: string;
   name: string;
@@ -25,6 +40,12 @@ export interface Part {
   colorHex?: string;
   notes?: string;
   deductEdgeBanding?: boolean; // si se descuenta el canto en la medida de corte
+  // Propiedades espaciales 3D (para modelado paramétrico individual)
+  posX?: number; // mm (posición en eje X)
+  posY?: number; // mm (elevación en eje Y desde el suelo)
+  posZ?: number; // mm (posición en eje Z profundidad)
+  orientation?: PartOrientation; // horizontal o vertical
+  componentRole?: ComponentRole;
 }
 
 export type FurnitureModuleType =

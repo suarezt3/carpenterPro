@@ -1,12 +1,14 @@
 import { ChangeDetectionStrategy, Component, inject, signal, output, input } from '@angular/core';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
+import { CloudProjectRecord } from '../../services/supabase.service';
 import { ProjectSettings } from '../../models/melamine.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { SlicePipe } from '@angular/common';
 
 @Component({
   selector: 'app-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, SlicePipe],
   templateUrl: './header.html'
 })
 export class HeaderComponent {
@@ -19,10 +21,20 @@ export class HeaderComponent {
   showProjectsModal = signal(false);
   showSettingsModal = signal(false);
   showNewProjectModal = signal(false);
+  showSqlModal = signal(false);
+  projectsTab = signal<'cloud' | 'local'>('cloud');
+  sqlCopied = signal(false);
+  toastMessage = signal<string | null>(null);
 
   readonly project = this.projectService.currentProject;
   readonly savedProjects = this.projectService.savedProjects;
   readonly partsCount = this.projectService.totalPartsCount;
+  readonly supabase = this.projectService.supabase;
+  readonly cloudProjects = this.supabase.cloudProjects;
+  readonly syncStatus = this.supabase.syncStatus;
+  readonly lastSyncTime = this.supabase.lastSyncTime;
+
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   newProjectForm: FormGroup = this.fb.group({
     name: ['Nuevo Mueble de Cocina', Validators.required],
@@ -81,9 +93,59 @@ export class HeaderComponent {
       this.projectService.createNewProject(name, clientName);
       this.showNewProjectModal.set(false);
       this.selectTab('modules');
+      this.showToast(`Proyecto "${name}" creado.`);
     }
   }
 
+  // --- CLOUD SUPABASE ACTIONS ---
+  async saveCurrentToCloud() {
+    this.showToast('Guardando en Supabase...');
+    const res = await this.projectService.saveCurrentToCloud();
+    if (res.success) {
+      this.showToast('☁️ ¡Proyecto guardado en la nube exitosamente!');
+    } else if (res.error === 'table_needed') {
+      this.showSqlModal.set(true);
+    } else {
+      this.showToast('Aviso: Guardado localmente. Supabase reportó: ' + (res.error || 'Verifica la tabla'));
+    }
+  }
+
+  loadCloudProject(item: CloudProjectRecord) {
+    this.projectService.loadCloudProject(item);
+    this.showProjectsModal.set(false);
+    this.showToast(`☁️ Proyecto "${item.name}" cargado desde Supabase`);
+  }
+
+  async deleteCloudProject(item: CloudProjectRecord, event: Event) {
+    event.stopPropagation();
+    if (confirm(`¿Eliminar definitivamente el proyecto "${item.name}" de Supabase?`)) {
+      const ok = await this.projectService.deleteCloudProject(item.id);
+      if (ok) {
+        this.showToast('Proyecto eliminado de la nube');
+      }
+    }
+  }
+
+  refreshCloud() {
+    this.supabase.refreshProjects();
+    this.showToast('Actualizando proyectos de Supabase...');
+  }
+
+  copySqlScript() {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(this.supabase.getSqlSetupScript());
+      this.sqlCopied.set(true);
+      setTimeout(() => this.sqlCopied.set(false), 3000);
+    }
+  }
+
+  showToast(msg: string) {
+    this.toastMessage.set(msg);
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.toastMessage.set(null), 3500);
+  }
+
+  // --- LOCAL ACTIONS ---
   loadProject(meta: ProjectMeta) {
     this.projectService.loadProjectById(meta.id);
     this.showProjectsModal.set(false);
@@ -110,10 +172,10 @@ export class HeaderComponent {
         if (content) {
           const success = this.projectService.importProjectFromJson(content);
           if (success) {
-            alert('¡Proyecto cargado exitosamente!');
+            this.showToast('¡Proyecto importado exitosamente!');
             this.showProjectsModal.set(false);
           } else {
-            alert('Error: El archivo seleccionado no tiene el formato válido de MelamiPro.');
+            this.showToast('Error: El archivo no tiene el formato válido de MelamiPro.');
           }
         }
       };

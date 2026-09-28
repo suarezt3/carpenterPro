@@ -8,6 +8,7 @@ import {
   ProjectSettings
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
+import { SupabaseService, CloudProjectRecord } from './supabase.service';
 
 const STORAGE_KEY = 'melamipro_current_project';
 const PROJECTS_LIST_KEY = 'melamipro_saved_projects_meta';
@@ -26,6 +27,9 @@ export interface ProjectMeta {
 })
 export class ProjectStorageService {
   private cabinetGen = inject(CabinetGeneratorService);
+  readonly supabase = inject(SupabaseService);
+
+  private autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
 
   readonly currentProject = signal<Project>(this.getInitialProject());
   readonly savedProjects = signal<ProjectMeta[]>(this.loadSavedProjectsList());
@@ -94,6 +98,18 @@ export class ProjectStorageService {
       textureType: 'solid'
     };
 
+    const matGris15: Material = {
+      id: 'mat_gris_15',
+      name: 'Melamina Gris Perla 15mm',
+      thickness: 15,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 32.00,
+      hasGrain: false,
+      colorHex: '#9ca3af',
+      textureType: 'solid'
+    };
+
     const matMdfFondo: Material = {
       id: 'mat_mdf_3',
       name: 'MDF / Durolac Blanco 3mm (Fondos)',
@@ -106,88 +122,138 @@ export class ProjectStorageService {
       textureType: 'solid'
     };
 
-    const defaultMaterials = [matRoble, matBlanco, matMdfFondo];
+    const defaultMaterials = [matRoble, matBlanco, matGris15, matMdfFondo];
 
-    // Módulo Bajo Mesada Cocina de 800mm de ancho x 850mm de alto x 580mm de profundidad
-    const modBajo: FurnitureModule = {
-      id: 'mod_bajo_800',
-      name: 'Bajo Mesada 800 (2 Puertas)',
-      type: 'base_cabinet',
-      width: 800,
-      height: 850,
-      depth: 580,
-      boardThickness: 18,
-      backThickness: 3,
-      backType: 'groove',
-      shelvesCount: 1,
-      doorsCount: 2,
-      doorsType: 'overlay',
-      drawersCount: 0,
-      hasPlinth: true,
-      plinthHeight: 100,
-      materialId: matBlanco.id,
-      backMaterialId: matMdfFondo.id,
-      defaultThinEdge: true,
-      defaultThickDoors: true
-    };
+    // Inicializar directamente con el modelo de barra/mueble de referencia (Techo 1800x600, laterales, base)
+    const initialParts: Part[] = [
+      {
+        id: 'desk_top',
+        name: 'TECHO',
+        length: 1800,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: matRoble.id,
+        materialName: matRoble.name,
+        grain: 'length',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: 0,
+        posY: 991,
+        posZ: 0,
+        orientation: 'horizontal',
+        componentRole: 'top',
+        notes: 'Cubierta superior barra'
+      },
+      {
+        id: 'desk_left_side',
+        name: 'LATERAL IZQUIERDO',
+        length: 1000,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: matRoble.id,
+        materialName: matRoble.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
+        posX: -891,
+        posY: 500,
+        posZ: 0,
+        orientation: 'vertical_yz',
+        componentRole: 'side_left',
+        notes: 'Pata / lateral izquierdo'
+      },
+      {
+        id: 'desk_center_divider',
+        name: 'DIVISIÓN CENTRAL',
+        length: 900,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: matRoble.id,
+        materialName: matRoble.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'thin' },
+        posX: 300,
+        posY: 450,
+        posZ: 0,
+        orientation: 'vertical_yz',
+        componentRole: 'divider',
+        notes: 'Separador interno'
+      },
+      {
+        id: 'desk_right_side',
+        name: 'LATERAL DERECHO',
+        length: 1000,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: matRoble.id,
+        materialName: matRoble.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
+        posX: 891,
+        posY: 500,
+        posZ: 0,
+        orientation: 'vertical_yz',
+        componentRole: 'side_right',
+        notes: 'Costado derecho'
+      },
+      {
+        id: 'desk_bottom',
+        name: 'PISO INFERIOR',
+        length: 573,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: matRoble.id,
+        materialName: matRoble.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: 595.5,
+        posY: 90,
+        posZ: 0,
+        orientation: 'horizontal',
+        componentRole: 'bottom',
+        notes: 'Base del módulo'
+      },
+      {
+        id: 'desk_plinth',
+        name: 'ZÓCALO',
+        length: 573,
+        width: 80,
+        thickness: 18,
+        quantity: 1,
+        materialId: matRoble.id,
+        materialName: matRoble.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: 595.5,
+        posY: 40,
+        posZ: 260,
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo frontal'
+      }
+    ];
 
-    // Módulo Cajonera de 500mm con 3 cajones telescópicos
-    const modCajonera: FurnitureModule = {
-      id: 'mod_cajonera_500',
-      name: 'Cajonera 500 (3 Cajones)',
-      type: 'base_cabinet',
-      width: 500,
-      height: 850,
-      depth: 580,
-      boardThickness: 18,
-      backThickness: 3,
-      backType: 'groove',
-      shelvesCount: 0,
-      doorsCount: 0,
-      doorsType: 'overlay',
-      drawersCount: 3,
-      hasPlinth: true,
-      plinthHeight: 100,
-      materialId: matRoble.id,
-      backMaterialId: matMdfFondo.id,
-      defaultThinEdge: true,
-      defaultThickDoors: true
-    };
-
-    // Módulo Alacena Alta de 800mm x 700mm x 320mm
-    const modAlacena: FurnitureModule = {
-      id: 'mod_alacena_800',
-      name: 'Alacena Superior 800 (2 Puertas)',
-      type: 'wall_cabinet',
-      width: 800,
-      height: 700,
-      depth: 320,
-      boardThickness: 18,
-      backThickness: 3,
-      backType: 'groove',
-      shelvesCount: 1,
-      doorsCount: 2,
-      doorsType: 'overlay',
-      drawersCount: 0,
-      hasPlinth: false,
-      plinthHeight: 0,
-      materialId: matBlanco.id,
-      backMaterialId: matMdfFondo.id,
-      defaultThinEdge: true,
-      defaultThickDoors: true
-    };
-
-    const modules = [modBajo, modCajonera, modAlacena];
-
-    // Generar despiece paramétrico inicial
-    let initialParts: Part[] = [];
-    let initialHardware: HardwareItem[] = [];
-
-    for (const mod of modules) {
-      const res = this.cabinetGen.generatePartsForModule(mod, defaultMaterials);
-      initialParts = [...initialParts, ...res.parts];
-      initialHardware = [...initialHardware, ...res.hardware];
-    }
+    const initialHardware: HardwareItem[] = [
+      {
+        id: 'hw_screws',
+        name: 'Tornillos Soberbios 4x50mm',
+        category: 'screw',
+        unit: 'caja',
+        quantity: 1,
+        unitCost: 6.50
+      },
+      {
+        id: 'hw_corners',
+        name: 'Escuadras de fijación metálicas',
+        category: 'support',
+        unit: 'und',
+        quantity: 8,
+        unitCost: 0.60
+      }
+    ];
 
     const settings: ProjectSettings = {
       sawKerf: 4,
@@ -201,17 +267,17 @@ export class ProjectStorageService {
     };
 
     return {
-      id: 'proj_demo_cocina',
-      name: 'Cocina Moderna Roble & Blanco',
-      clientName: 'Cliente Ejemplo - Residencia Las Palmas',
+      id: 'proj_mueble_estudio',
+      name: 'Mueble Barra con Módulo de Apoyo',
+      clientName: 'Cliente Ejemplo - Residencia',
       date: new Date().toISOString().split('T')[0],
-      notes: 'Proyecto modelo: Bajo mesada 2 puertas + cajonera 3 frentes + alacena aérea. Incluye optimización de corte y presupuesto de herrajes.',
+      notes: 'Estructura de barra con cubierta superior (1800x600 mm) y módulo de guardado lateral.',
       settings,
       materials: defaultMaterials,
-      modules,
+      modules: [],
       parts: initialParts,
       hardware: initialHardware,
-      laborCost: 150,
+      laborCost: 120,
       laborType: 'fixed',
       profitMarginPercent: 25,
       taxPercent: 0,
@@ -253,6 +319,37 @@ export class ProjectStorageService {
     localStorage.setItem(PROJECTS_LIST_KEY, JSON.stringify(list));
     localStorage.setItem(`melamipro_project_${project.id}`, JSON.stringify(project));
     this.savedProjects.set(list);
+
+    // Schedule background autosync to Supabase (debounce 1.5s)
+    this.scheduleCloudAutoSync(project);
+  }
+
+  private scheduleCloudAutoSync(project: Project) {
+    if (this.autoSyncTimeout) {
+      clearTimeout(this.autoSyncTimeout);
+    }
+    this.autoSyncTimeout = setTimeout(() => {
+      this.supabase.saveProject(project);
+    }, 1500);
+  }
+
+  async saveCurrentToCloud(): Promise<{ success: boolean; error?: string }> {
+    return this.supabase.saveProject(this.currentProject());
+  }
+
+  loadCloudProject(record: CloudProjectRecord) {
+    if (record && record.data) {
+      const proj = record.data;
+      this.currentProject.set(proj);
+      if (this.isBrowser()) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(proj));
+        localStorage.setItem(`melamipro_project_${proj.id}`, JSON.stringify(proj));
+      }
+    }
+  }
+
+  async deleteCloudProject(id: string): Promise<boolean> {
+    return this.supabase.deleteProject(id);
   }
 
   loadSavedProjectsList(): ProjectMeta[] {
@@ -340,6 +437,137 @@ export class ProjectStorageService {
     }));
   }
 
+  clearFurniture() {
+    this.updateProject(p => ({
+      ...p,
+      modules: [],
+      parts: []
+    }));
+  }
+
+  loadDeskBarFurniture() {
+    const mats = this.currentProject().materials;
+    const woodMat = mats.find(m => m.hasGrain) || mats[0];
+
+    // Reference model matching image.png (Desk / Counter with right cabinet)
+    const deskParts: Part[] = [
+      {
+        id: 'desk_top',
+        name: 'TECHO',
+        length: 1800,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: woodMat.id,
+        materialName: woodMat.name,
+        grain: 'length',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: 0,
+        posY: 991,
+        posZ: 0,
+        orientation: 'horizontal',
+        componentRole: 'top',
+        notes: 'Cubierta principal'
+      },
+      {
+        id: 'desk_left_side',
+        name: 'LATERAL IZQUIERDO',
+        length: 1000,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: woodMat.id,
+        materialName: woodMat.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
+        posX: -891,
+        posY: 500,
+        posZ: 0,
+        orientation: 'vertical_yz',
+        componentRole: 'side_left',
+        notes: 'Pata / lateral izquierdo'
+      },
+      {
+        id: 'desk_center_divider',
+        name: 'DIVISIÓN CENTRAL',
+        length: 900,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: woodMat.id,
+        materialName: woodMat.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'thin' },
+        posX: 300,
+        posY: 450,
+        posZ: 0,
+        orientation: 'vertical_yz',
+        componentRole: 'divider',
+        notes: 'Separador interno'
+      },
+      {
+        id: 'desk_right_side',
+        name: 'LATERAL DERECHO',
+        length: 1000,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: woodMat.id,
+        materialName: woodMat.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
+        posX: 891,
+        posY: 500,
+        posZ: 0,
+        orientation: 'vertical_yz',
+        componentRole: 'side_right',
+        notes: 'Costado derecho'
+      },
+      {
+        id: 'desk_bottom',
+        name: 'PISO INFERIOR',
+        length: 573,
+        width: 600,
+        thickness: 18,
+        quantity: 1,
+        materialId: woodMat.id,
+        materialName: woodMat.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: 595.5,
+        posY: 90,
+        posZ: 0,
+        orientation: 'horizontal',
+        componentRole: 'bottom',
+        notes: 'Base del módulo'
+      },
+      {
+        id: 'desk_plinth',
+        name: 'ZÓCALO',
+        length: 573,
+        width: 80,
+        thickness: 18,
+        quantity: 1,
+        materialId: woodMat.id,
+        materialName: woodMat.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: 595.5,
+        posY: 40,
+        posZ: 260,
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo frontal'
+      }
+    ];
+
+    this.updateProject(p => ({
+      ...p,
+      modules: [],
+      parts: deskParts
+    }));
+  }
+
   // --- PARTS ACTIONS ---
 
   addPart(part: Part) {
@@ -354,6 +582,21 @@ export class ProjectStorageService {
       ...p,
       parts: p.parts.map(pt => pt.id === part.id ? part : pt)
     }));
+  }
+
+  duplicatePart(partId: string): Part | null {
+    const part = this.currentProject().parts.find(p => p.id === partId);
+    if (!part) return null;
+    const clone: Part = {
+      ...part,
+      id: crypto.randomUUID(),
+      name: `${part.name} (Copia)`,
+      posX: (part.posX ?? 0) + 40,
+      posY: part.posY ?? 0,
+      posZ: (part.posZ ?? 0) + 20
+    };
+    this.addPart(clone);
+    return clone;
   }
 
   deletePart(partId: string) {

@@ -1,58 +1,74 @@
 import {
-  ChangeDetectionStrategy,
   Component,
   ElementRef,
-  OnDestroy,
+  viewChild,
+  input,
+  output,
+  signal,
+  computed,
+  ChangeDetectionStrategy,
   afterNextRender,
   effect,
-  input,
-  signal,
-  viewChild
+  OnDestroy
 } from '@angular/core';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { FurnitureModule, Material, Part } from '../../models/melamine.models';
+import { Part, Material } from '../../models/melamine.models';
 
-interface MeshPieceData {
-  mesh: THREE.Object3D;
+interface PieceMeshData {
   part: Part;
+  mesh: THREE.Mesh;
   originalPos: THREE.Vector3;
   explodedOffset: THREE.Vector3;
-  type: 'left_side' | 'right_side' | 'bottom' | 'top' | 'shelf' | 'back' | 'door_left' | 'door_right' | 'drawer' | 'plinth' | 'tie' | 'other';
-  openPivot?: THREE.Group;
-  initialRotationY?: number;
-  initialPosZ?: number;
+}
+
+interface GizmoHitData {
+  isGizmo: boolean;
+  type: 'axis' | 'handle';
+  axis?: 'x' | 'y' | 'z';
+  handleTarget?: 'length' | 'width';
+  dir: number;
 }
 
 @Component({
   selector: 'app-furniture-3d-viewer',
-  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [],
   templateUrl: './furniture-3d-viewer.html',
-  styles: [`
-    :host {
-      display: block;
-      width: 100%;
-      height: 100%;
-      position: relative;
-    }
-  `]
+  styleUrls: [],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'block w-full h-full'
+  }
 })
 export class Furniture3dViewerComponent implements OnDestroy {
+  // Inputs
+  parts = input<Part[]>([]);
+  selectedPartId = input<string | null>(null);
+  materials = input<Material[]>([]);
+
+  // Outputs
+  partSelected = output<Part | null>();
+  partModified = output<{ part: Part; updates: Partial<Part> }>();
+
+  // Canvas and Container refs
   canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas3d');
   containerRef = viewChild<ElementRef<HTMLDivElement>>('container3d');
 
-  // Inputs
-  module = input.required<FurnitureModule>();
-  parts = input.required<Part[]>();
-  material = input<Material | undefined>();
-
-  // Interactive 3D States
-  explodedPercent = signal<number>(0);
+  // Interactive View States
   isOpenFrentes = signal<boolean>(false);
   isXRay = signal<boolean>(false);
-  selectedPieceName = signal<string | null>(null);
-  selectedPieceDetails = signal<string | null>(null);
+  explodedPercent = signal<number>(0);
+  show3dDimensions = signal<boolean>(true);
+  isWhiteTheme = signal<boolean>(true); // Default to clean pure white studio background
 
+  // Active Selected Part computed
+  selectedPart = computed(() => {
+    const id = this.selectedPartId();
+    if (!id) return null;
+    return this.parts().find(p => p.id === id) || null;
+  });
+
+  // Three.js Core
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
@@ -60,41 +76,50 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private animationFrameId: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
+  // Scene Groups
   private furnitureGroup = new THREE.Group();
   private dimensionGroup = new THREE.Group();
-  private pieceObjects: MeshPieceData[] = [];
+  private gizmoGroup = new THREE.Group();
+  private gridHelper: THREE.GridHelper | null = null;
+  private floorMesh: THREE.Mesh | null = null;
+
+  // Mesh & Raycast Tracking
+  private pieceObjects: PieceMeshData[] = [];
+  private gizmoHitMeshes: THREE.Mesh[] = [];
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
+
+  // Dragging State
+  private isDragging = false;
+  private activeGizmoHit: GizmoHitData | null = null;
+  private dragStartPointer = { x: 0, y: 0 };
+  private dragInitialPart: Part | null = null;
+  private dragPlane = new THREE.Plane();
+  private dragPlaneIntersectionStart = new THREE.Vector3();
 
   constructor() {
     afterNextRender(() => {
       this.initThree();
     });
 
-    // Re-build 3D model whenever module, parts, or material changes
+    // Rebuild scene when pieces, selection, materials, or xRay change
     effect(() => {
-      const mod = this.module();
       const parts = this.parts();
-      const mat = this.material();
+      const selId = this.selectedPartId();
+      const mats = this.materials();
       const xRay = this.isXRay();
+      const showDims = this.show3dDimensions();
 
       if (this.scene) {
-        this.buildFurnitureModel(mod, parts, mat, xRay);
+        this.buildFurnitureScene(parts, selId, mats, xRay, showDims);
         this.updateExplodedOffsets(this.explodedPercent());
-        this.updateFrentesOpen(this.isOpenFrentes());
       }
     });
 
-    // Handle exploded slider changes
+    // Handle exploded view slider
     effect(() => {
       const exp = this.explodedPercent();
       this.updateExplodedOffsets(exp);
-    });
-
-    // Handle open/close frentes
-    effect(() => {
-      const open = this.isOpenFrentes();
-      this.updateFrentesOpen(open);
     });
   }
 
@@ -103,19 +128,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const container = this.containerRef()?.nativeElement;
     if (!canvas || !container) return;
 
-    const width = container.clientWidth || 600;
-    const height = container.clientHeight || 450;
+    const width = container.clientWidth || 900;
+    const height = container.clientHeight || 650;
 
     // 1. Scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x121215);
-
-    // Subtle studio fog for depth
-    this.scene.fog = new THREE.FogExp2(0x121215, 0.0004);
+    this.applyThemeColors();
 
     // 2. Camera
-    this.camera = new THREE.PerspectiveCamera(45, width / height, 10, 10000);
-    this.camera.position.set(1300, 1000, 1800);
+    this.camera = new THREE.PerspectiveCamera(45, width / height, 10, 15000);
+    this.camera.position.set(1500, 1100, 1900);
 
     // 3. Renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -133,28 +155,35 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.06;
-    this.controls.maxDistance = 6000;
-    this.controls.minDistance = 300;
-    this.controls.maxPolarAngle = Math.PI / 2 + 0.05; // don't go below floor
-    this.controls.target.set(0, 450, 0);
+    this.controls.maxDistance = 9000;
+    this.controls.minDistance = 150;
+    this.controls.maxPolarAngle = Math.PI / 2 + 0.08;
+    this.controls.target.set(0, 480, 0);
 
     // 5. Lighting
     this.setupLighting();
 
-    // 6. Floor Grid & Shadow receiver
+    // 6. Floor Grid & Shadow Plane
     this.setupFloorGrid();
 
-    // 7. Add root groups
+    // 7. Add Groups
     this.scene.add(this.furnitureGroup);
     this.scene.add(this.dimensionGroup);
+    this.scene.add(this.gizmoGroup);
 
-    // Initial build
-    this.buildFurnitureModel(this.module(), this.parts(), this.material(), this.isXRay());
+    // Initial Scene Build
+    this.buildFurnitureScene(
+      this.parts(),
+      this.selectedPartId(),
+      this.materials(),
+      this.isXRay(),
+      this.show3dDimensions()
+    );
 
-    // 8. Start loop
+    // 8. Animation Loop
     this.animate();
 
-    // 9. Resize listener
+    // 9. Resize Observer
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => {
         this.onResize();
@@ -162,64 +191,110 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.resizeObserver.observe(container);
     }
 
-    // 10. Click to pick piece
-    canvas.addEventListener('pointerdown', (e) => this.onCanvasClick(e));
+    // 10. Pointer Interactions (Selection, Gizmo Drag, Edge Handles)
+    canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+    window.addEventListener('pointermove', (e) => this.onPointerMove(e));
+    window.addEventListener('pointerup', () => this.onPointerUp());
+    window.addEventListener('pointercancel', () => this.onPointerUp());
+  }
+
+  private applyThemeColors() {
+    if (!this.scene) return;
+    const isWhite = this.isWhiteTheme();
+
+    if (isWhite) {
+      // Clean pure studio white with soft contrast
+      this.scene.background = new THREE.Color(0xfcfcfd);
+      this.scene.fog = new THREE.FogExp2(0xfcfcfd, 0.00012);
+      if (this.floorMesh) {
+        (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.09;
+      }
+      if (this.gridHelper) {
+        this.scene.remove(this.gridHelper);
+        this.gridHelper = new THREE.GridHelper(5000, 50, 0x0284c7, 0xe2e8f0);
+        this.gridHelper.position.y = 0;
+        this.scene.add(this.gridHelper);
+      }
+    } else {
+      // Dark CAD Mode
+      this.scene.background = new THREE.Color(0x0e0e11);
+      this.scene.fog = new THREE.FogExp2(0x0e0e11, 0.00035);
+      if (this.floorMesh) {
+        (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.35;
+      }
+      if (this.gridHelper) {
+        this.scene.remove(this.gridHelper);
+        this.gridHelper = new THREE.GridHelper(5000, 50, 0x06b6d4, 0x27272a);
+        this.gridHelper.position.y = 0;
+        this.scene.add(this.gridHelper);
+      }
+    }
+  }
+
+  toggleTheme() {
+    this.isWhiteTheme.update(v => !v);
+    this.applyThemeColors();
   }
 
   private setupLighting() {
-    // Ambient Light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    // Soft Ambient Light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
     this.scene.add(ambientLight);
 
-    // Hemisphere light for soft top-bottom warm bounce
-    const hemiLight = new THREE.HemisphereLight(0xfff6e5, 0x1f242d, 0.6);
+    // Warm Hemisphere Light
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xe2e8f0, 0.7);
     this.scene.add(hemiLight);
 
-    // Key Directional Light with Shadows
+    // Key Directional Light for Crisp Shadows
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
-    keyLight.position.set(1200, 2000, 1400);
+    keyLight.position.set(1600, 2600, 1800);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
     keyLight.shadow.mapSize.height = 2048;
     keyLight.shadow.camera.near = 200;
-    keyLight.shadow.camera.far = 5000;
-    const d = 1400;
+    keyLight.shadow.camera.far = 7000;
+    const d = 2200;
     keyLight.shadow.camera.left = -d;
     keyLight.shadow.camera.right = d;
     keyLight.shadow.camera.top = d;
     keyLight.shadow.camera.bottom = -d;
-    keyLight.shadow.bias = -0.0005;
+    keyLight.shadow.bias = -0.0003;
     this.scene.add(keyLight);
 
-    // Soft fill light from opposite angle
-    const fillLight = new THREE.DirectionalLight(0x90b4d4, 0.6);
-    fillLight.position.set(-1400, 1000, -1000);
+    // Soft Side & Back Fill Lights
+    const fillLight = new THREE.DirectionalLight(0xe0f2fe, 0.65);
+    fillLight.position.set(-1800, 1400, -1200);
     this.scene.add(fillLight);
+
+    const frontLight = new THREE.DirectionalLight(0xffffff, 0.45);
+    frontLight.position.set(0, 800, 2200);
+    this.scene.add(frontLight);
   }
 
   private setupFloorGrid() {
-    // Floor shadow receiver mesh
-    const floorGeo = new THREE.PlaneGeometry(6000, 6000);
-    const floorMat = new THREE.ShadowMaterial({ opacity: 0.35 });
-    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-    floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.y = -1;
-    floorMesh.receiveShadow = true;
-    this.scene.add(floorMesh);
+    // Soft shadow receiver plane
+    const floorGeo = new THREE.PlaneGeometry(8000, 8000);
+    const floorMat = new THREE.ShadowMaterial({ opacity: 0.09 });
+    this.floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    this.floorMesh.rotation.x = -Math.PI / 2;
+    this.floorMesh.position.y = -1;
+    this.floorMesh.receiveShadow = true;
+    this.scene.add(this.floorMesh);
 
-    // Floor Grid helper
-    const grid = new THREE.GridHelper(4000, 40, 0xf59e0b, 0x27272a);
-    grid.position.y = 0;
-    this.scene.add(grid);
+    // Millimetric Grid Helper
+    this.gridHelper = new THREE.GridHelper(5000, 50, 0x0284c7, 0xe2e8f0);
+    this.gridHelper.position.y = 0;
+    this.scene.add(this.gridHelper);
   }
 
-  private buildFurnitureModel(
-    mod: FurnitureModule,
+  private buildFurnitureScene(
     parts: Part[],
-    mat?: Material,
-    xRay = false
+    selectedId: string | null,
+    mats: Material[],
+    xRay: boolean,
+    showDims: boolean
   ) {
-    // Clear old pieces
+    // Clear previous furniture & dimensions & gizmo
     while (this.furnitureGroup.children.length > 0) {
       const obj = this.furnitureGroup.children[0];
       this.furnitureGroup.remove(obj);
@@ -228,461 +303,625 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const obj = this.dimensionGroup.children[0];
       this.dimensionGroup.remove(obj);
     }
+    while (this.gizmoGroup.children.length > 0) {
+      const obj = this.gizmoGroup.children[0];
+      this.gizmoGroup.remove(obj);
+    }
     this.pieceObjects = [];
+    this.gizmoHitMeshes = [];
 
-    const W = mod.width;
-    const H = mod.height;
-    const D = mod.depth;
-    const t = mod.boardThickness;
-    const plinth = mod.hasPlinth ? mod.plinthHeight : 0;
-    const carcassH = H - plinth;
-    const baseColor = mat?.colorHex || '#b48a60';
+    if (!parts || parts.length === 0) return;
 
-    // Center furniture so bottom sits at y = 0
-    // Center in X at 0, Z centered at 0
-    this.furnitureGroup.position.set(0, 0, 0);
-    this.controls.target.set(0, H / 2, 0);
+    let selectedPartData: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number } | null = null;
 
-    // Materials
-    const woodMaterial = this.createBoardMaterial(baseColor, xRay);
-    const interiorMaterial = this.createBoardMaterial(
-      mat?.textureType === 'wood' ? '#c79f74' : baseColor,
-      xRay
-    );
-    const backMaterial = this.createBoardMaterial('#222225', xRay);
-    const handleMaterial = new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0,
-      metalness: 0.9,
-      roughness: 0.15
-    });
+    for (const part of parts) {
+      const t = part.thickness || 18;
+      const L = part.length;
+      const W = part.width;
 
-    // 1. Zócalo
-    if (mod.hasPlinth) {
-      const plinthZ = D / 2 - 40;
-      const plinthMesh = this.createBoxMesh(W - (2 * t), plinth, t, woodMaterial);
-      plinthMesh.position.set(0, plinth / 2, plinthZ);
-      plinthMesh.castShadow = true;
-      plinthMesh.receiveShadow = true;
+      let sx = L;
+      let sy = t;
+      let sz = W;
 
-      const pPart = parts.find(p => p.name.includes('Zócalo')) || parts[0];
-      this.registerPiece(plinthMesh, pPart, new THREE.Vector3(0, 0, 80), 'plinth');
-    }
-
-    // 2. Lateral Izquierdo
-    const leftSideMesh = this.createBoxMesh(t, carcassH, D, woodMaterial);
-    const leftSideY = plinth + carcassH / 2;
-    const leftSideX = -W / 2 + t / 2;
-    leftSideMesh.position.set(leftSideX, leftSideY, 0);
-    leftSideMesh.castShadow = true;
-    leftSideMesh.receiveShadow = true;
-
-    const leftPart = parts.find(p => p.name.includes('Lateral')) || parts[0];
-    this.registerPiece(leftSideMesh, leftPart, new THREE.Vector3(-120, 0, 0), 'left_side');
-
-    // 3. Lateral Derecho
-    const rightSideMesh = this.createBoxMesh(t, carcassH, D, woodMaterial);
-    const rightSideX = W / 2 - t / 2;
-    rightSideMesh.position.set(rightSideX, leftSideY, 0);
-    rightSideMesh.castShadow = true;
-    rightSideMesh.receiveShadow = true;
-    this.registerPiece(rightSideMesh, leftPart, new THREE.Vector3(120, 0, 0), 'right_side');
-
-    // 4. Piso Inferior
-    const bottomMesh = this.createBoxMesh(W - 2 * t, t, D, woodMaterial);
-    const bottomY = plinth + t / 2;
-    bottomMesh.position.set(0, bottomY, 0);
-    bottomMesh.castShadow = true;
-    bottomMesh.receiveShadow = true;
-    const floorPart = parts.find(p => p.name.includes('Piso')) || parts[0];
-    this.registerPiece(bottomMesh, floorPart, new THREE.Vector3(0, -80, 0), 'bottom');
-
-    // 5. Techo o Fajas Superiores
-    if (mod.type === 'base_cabinet' || mod.type === 'drawer_unit') {
-      // 2 fajas superiores de 100mm de ancho
-      const tieFront = this.createBoxMesh(W - 2 * t, t, 100, woodMaterial);
-      tieFront.position.set(0, plinth + carcassH - t / 2, D / 2 - 50);
-      tieFront.castShadow = true;
-      this.registerPiece(tieFront, floorPart, new THREE.Vector3(0, 80, 0), 'tie');
-
-      const tieBack = this.createBoxMesh(W - 2 * t, t, 100, woodMaterial);
-      tieBack.position.set(0, plinth + carcassH - t / 2, -D / 2 + 50);
-      tieBack.castShadow = true;
-      this.registerPiece(tieBack, floorPart, new THREE.Vector3(0, 80, 0), 'tie');
-    } else {
-      // Techo completo (Alacena, Columna/Ropero)
-      const topMesh = this.createBoxMesh(W - 2 * t, t, D, woodMaterial);
-      topMesh.position.set(0, plinth + carcassH - t / 2, 0);
-      topMesh.castShadow = true;
-      topMesh.receiveShadow = true;
-      this.registerPiece(topMesh, floorPart, new THREE.Vector3(0, 80, 0), 'top');
-    }
-
-    // 6. Fondo (Back panel)
-    if (mod.backType !== 'none') {
-      const backMesh = this.createBoxMesh(W - 4, carcassH - 4, 3, backMaterial);
-      const backZ = -D / 2 + (mod.backType === 'groove' ? 18 : 1.5);
-      backMesh.position.set(0, plinth + carcassH / 2, backZ);
-      backMesh.castShadow = true;
-      const backPart = parts.find(p => p.thickness <= 3 || p.name.includes('Fondo')) || parts[0];
-      this.registerPiece(backMesh, backPart, new THREE.Vector3(0, 0, -140), 'back');
-    }
-
-    // 7. Repisas interiores
-    if (mod.shelvesCount > 0) {
-      const usefulH = carcassH - 2 * t;
-      const spacing = usefulH / (mod.shelvesCount + 1);
-      const shelfPart = parts.find(p => p.name.includes('Repisa') || p.name.includes('Estante')) || floorPart;
-
-      for (let i = 1; i <= mod.shelvesCount; i++) {
-        const shelfMesh = this.createBoxMesh(W - 2 * t - 2, t, D - 20, interiorMaterial);
-        const shelfY = plinth + t + spacing * i;
-        shelfMesh.position.set(0, shelfY, -10);
-        shelfMesh.castShadow = true;
-        shelfMesh.receiveShadow = true;
-        this.registerPiece(shelfMesh, shelfPart, new THREE.Vector3(0, (i - 1) * 20, 40), 'shelf');
+      const orient = part.orientation || 'horizontal';
+      if (orient === 'vertical_yz') {
+        sx = t;
+        sy = L;
+        sz = W;
+      } else if (orient === 'vertical_xy') {
+        sx = L;
+        sy = W;
+        sz = t;
       }
-    }
 
-    // 8. Puertas (con bisagras interactivas)
-    if (mod.doorsCount > 0) {
-      const doorH = carcassH - 4;
-      const doorPart = parts.find(p => p.name.includes('Puerta')) || parts[0];
-      const doorZ = D / 2 + t / 2 + 1;
+      const px = part.posX ?? 0;
+      const py = part.posY ?? (sy / 2);
+      const pz = part.posZ ?? 0;
 
-      if (mod.doorsCount === 1) {
-        // Puerta única (Bisagra en lateral izquierdo)
-        const doorW = W - 4;
-        const pivot = new THREE.Group();
-        pivot.position.set(-W / 2 + 2, plinth + carcassH / 2, doorZ);
-
-        const doorMesh = this.createBoxMesh(doorW, doorH, t, woodMaterial);
-        doorMesh.position.set(doorW / 2, 0, 0); // local to pivot
-        doorMesh.castShadow = true;
-        doorMesh.receiveShadow = true;
-
-        // Tirador metálico en el borde derecho
-        const handle = this.createHandleMesh(handleMaterial);
-        handle.position.set(doorW - 35, 0, t / 2 + 6);
-        doorMesh.add(handle);
-
-        pivot.add(doorMesh);
-        this.furnitureGroup.add(pivot);
-
-        this.pieceObjects.push({
-          mesh: doorMesh,
-          part: doorPart,
-          originalPos: pivot.position.clone(),
-          explodedOffset: new THREE.Vector3(0, 0, 160),
-          type: 'door_left',
-          openPivot: pivot,
-          initialRotationY: 0
-        });
-      } else if (mod.doorsCount === 2) {
-        // Dos puertas
-        const doorW = (W - 6) / 2;
-
-        // Puerta Izquierda
-        const pivotL = new THREE.Group();
-        pivotL.position.set(-W / 2 + 2, plinth + carcassH / 2, doorZ);
-
-        const doorMeshL = this.createBoxMesh(doorW, doorH, t, woodMaterial);
-        doorMeshL.position.set(doorW / 2, 0, 0);
-        doorMeshL.castShadow = true;
-        doorMeshL.receiveShadow = true;
-
-        const handleL = this.createHandleMesh(handleMaterial);
-        handleL.position.set(doorW - 25, 0, t / 2 + 6);
-        doorMeshL.add(handleL);
-
-        pivotL.add(doorMeshL);
-        this.furnitureGroup.add(pivotL);
-
-        this.pieceObjects.push({
-          mesh: doorMeshL,
-          part: doorPart,
-          originalPos: pivotL.position.clone(),
-          explodedOffset: new THREE.Vector3(-40, 0, 160),
-          type: 'door_left',
-          openPivot: pivotL,
-          initialRotationY: 0
-        });
-
-        // Puerta Derecha
-        const pivotR = new THREE.Group();
-        pivotR.position.set(W / 2 - 2, plinth + carcassH / 2, doorZ);
-
-        const doorMeshR = this.createBoxMesh(doorW, doorH, t, woodMaterial);
-        doorMeshR.position.set(-doorW / 2, 0, 0);
-        doorMeshR.castShadow = true;
-        doorMeshR.receiveShadow = true;
-
-        const handleR = this.createHandleMesh(handleMaterial);
-        handleR.position.set(-doorW + 25, 0, t / 2 + 6);
-        doorMeshR.add(handleR);
-
-        pivotR.add(doorMeshR);
-        this.furnitureGroup.add(pivotR);
-
-        this.pieceObjects.push({
-          mesh: doorMeshR,
-          part: doorPart,
-          originalPos: pivotR.position.clone(),
-          explodedOffset: new THREE.Vector3(40, 0, 160),
-          type: 'door_right',
-          openPivot: pivotR,
-          initialRotationY: 0
-        });
+      const isSelected = selectedId === part.id;
+      if (isSelected) {
+        selectedPartData = { part, px, py, pz, sx, sy, sz };
       }
+
+      // Geometry with bevel or box
+      const geometry = new THREE.BoxGeometry(sx, sy, sz);
+      const material = this.createPieceMaterial(part, isSelected, mats, xRay);
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(px, py, pz);
+      mesh.castShadow = !xRay;
+      mesh.receiveShadow = true;
+      mesh.userData = { part, isPiece: true };
+
+      // Edges geometry for crisp technical outline
+      const edges = new THREE.EdgesGeometry(geometry);
+      const edgeColor = isSelected ? 0x60a5fa : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46);
+      const edgeMat = new THREE.LineBasicMaterial({
+        color: edgeColor,
+        linewidth: isSelected ? 2.5 : 1
+      });
+      const edgeLines = new THREE.LineSegments(edges, edgeMat);
+      mesh.add(edgeLines);
+
+      // Exploded vector
+      const explodedOffset = new THREE.Vector3(
+        px * 0.45,
+        (py - 400) * 0.4,
+        pz * 0.45
+      );
+
+      this.furnitureGroup.add(mesh);
+      this.pieceObjects.push({
+        part,
+        mesh,
+        originalPos: mesh.position.clone(),
+        explodedOffset
+      });
     }
 
-    // 9. Cajones (Cajas completas + correderas + frentes)
-    if (mod.drawersCount > 0) {
-      const n = mod.drawersCount;
-      const frontH = (carcassH - (n * 3) - 2) / n;
-      const frontW = W - 4;
-      const slideL = D - 60;
-      const boxH = Math.min(frontH * 0.7, 180);
-      const innerW = W - (2 * t);
-      const boxW = innerW - 26; // -26mm holgura correderas telescópicas
-
-      const frontPart = parts.find(p => p.name.includes('Frente de Cajón')) || parts[0];
-
-      for (let d = 0; d < n; d++) {
-        const drawerGroup = new THREE.Group();
-        const drawerCenterY = plinth + carcassH - (frontH / 2) - 2 - (d * (frontH + 3));
-
-        drawerGroup.position.set(0, drawerCenterY, 0);
-
-        // Frente Visto
-        const frontMesh = this.createBoxMesh(frontW, frontH, t, woodMaterial);
-        frontMesh.position.set(0, 0, D / 2 + t / 2 + 1);
-        frontMesh.castShadow = true;
-
-        // Tirador de cajón horizontal
-        const handle = this.createDrawerHandleMesh(handleMaterial);
-        handle.position.set(0, 0, D / 2 + t + 6);
-        drawerGroup.add(handle);
-
-        drawerGroup.add(frontMesh);
-
-        // Caja Interior del Cajón
-        // Laterales de la caja
-        const boxSideL = this.createBoxMesh(t, boxH, slideL, interiorMaterial);
-        boxSideL.position.set(-boxW / 2 + t / 2, -frontH / 2 + boxH / 2 + 10, D / 2 - slideL / 2);
-        drawerGroup.add(boxSideL);
-
-        const boxSideR = this.createBoxMesh(t, boxH, slideL, interiorMaterial);
-        boxSideR.position.set(boxW / 2 - t / 2, -frontH / 2 + boxH / 2 + 10, D / 2 - slideL / 2);
-        drawerGroup.add(boxSideR);
-
-        // Testeras (Frontal y Trasera interior)
-        const boxBack = this.createBoxMesh(boxW - 2 * t, boxH, t, interiorMaterial);
-        boxBack.position.set(0, -frontH / 2 + boxH / 2 + 10, D / 2 - slideL + t / 2);
-        drawerGroup.add(boxBack);
-
-        // Fondo de cajón MDF
-        const boxBottom = this.createBoxMesh(boxW, 3, slideL, backMaterial);
-        boxBottom.position.set(0, -frontH / 2 + 10, D / 2 - slideL / 2);
-        drawerGroup.add(boxBottom);
-
-        this.furnitureGroup.add(drawerGroup);
-
-        this.pieceObjects.push({
-          mesh: drawerGroup,
-          part: frontPart,
-          originalPos: drawerGroup.position.clone(),
-          explodedOffset: new THREE.Vector3(0, 0, 140 + (d * 50)),
-          type: 'drawer',
-          initialPosZ: drawerGroup.position.z
-        });
+    // If there is an active selected piece, render 3D Dimensions and interactive 3D Gizmo
+    if (selectedPartData) {
+      if (showDims) {
+        this.renderPieceDimensions(
+          selectedPartData.part,
+          selectedPartData.px,
+          selectedPartData.py,
+          selectedPartData.pz,
+          selectedPartData.sx,
+          selectedPartData.sy,
+          selectedPartData.sz
+        );
       }
-    }
 
-    // 10. Dimension Lines in 3D Space
-    this.build3DDimensionGuides(W, H, D);
+      // Build Interactive Translation Arrows and Edge Stretch Handles
+      this.buildGizmo(
+        selectedPartData.part,
+        selectedPartData.px,
+        selectedPartData.py,
+        selectedPartData.pz,
+        selectedPartData.sx,
+        selectedPartData.sy,
+        selectedPartData.sz
+      );
+    }
   }
 
-  private build3DDimensionGuides(w: number, h: number, d: number) {
-    const guideMaterial = new THREE.LineBasicMaterial({
-      color: 0x38bdf8,
-      linewidth: 1.5,
-      transparent: true,
-      opacity: 0.75
-    });
-
-    // 1. Width Dimension line (at top front)
-    const yW = h + 60;
-    const zW = d / 2 + 40;
-    const wPoints = [
-      new THREE.Vector3(-w / 2, yW, zW),
-      new THREE.Vector3(w / 2, yW, zW)
-    ];
-    const wGeo = new THREE.BufferGeometry().setFromPoints(wPoints);
-    const wLine = new THREE.Line(wGeo, guideMaterial);
-    this.dimensionGroup.add(wLine);
-
-    // End ticks
-    const tickGeoW1 = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-w / 2, yW - 15, zW),
-      new THREE.Vector3(-w / 2, yW + 15, zW)
-    ]);
-    const tickGeoW2 = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(w / 2, yW - 15, zW),
-      new THREE.Vector3(w / 2, yW + 15, zW)
-    ]);
-    this.dimensionGroup.add(new THREE.Line(tickGeoW1, guideMaterial));
-    this.dimensionGroup.add(new THREE.Line(tickGeoW2, guideMaterial));
-
-    // 2. Height Dimension line (at left front)
-    const xH = -w / 2 - 60;
-    const zH = d / 2 + 40;
-    const hPoints = [
-      new THREE.Vector3(xH, 0, zH),
-      new THREE.Vector3(xH, h, zH)
-    ];
-    const hGeo = new THREE.BufferGeometry().setFromPoints(hPoints);
-    const hLine = new THREE.Line(hGeo, guideMaterial);
-    this.dimensionGroup.add(hLine);
-
-    // End ticks
-    const tickGeoH1 = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(xH - 15, 0, zH),
-      new THREE.Vector3(xH + 15, 0, zH)
-    ]);
-    const tickGeoH2 = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(xH - 15, h, zH),
-      new THREE.Vector3(xH + 15, h, zH)
-    ]);
-    this.dimensionGroup.add(new THREE.Line(tickGeoH1, guideMaterial));
-    this.dimensionGroup.add(new THREE.Line(tickGeoH2, guideMaterial));
-
-    // 3. Depth Dimension line (at bottom right)
-    const xD = w / 2 + 60;
-    const yD = 10;
-    const dPoints = [
-      new THREE.Vector3(xD, yD, -d / 2),
-      new THREE.Vector3(xD, yD, d / 2)
-    ];
-    const dGeo = new THREE.BufferGeometry().setFromPoints(dPoints);
-    const dLine = new THREE.Line(dGeo, guideMaterial);
-    this.dimensionGroup.add(dLine);
-  }
-
-  private registerPiece(
-    mesh: THREE.Object3D,
+  // Create Interactive 3D Gizmo: Translation Arrows (X, Y, Z) and Edge Stretch Handles
+  private buildGizmo(
     part: Part,
-    explodedOffset: THREE.Vector3,
-    type: MeshPieceData['type']
+    px: number,
+    py: number,
+    pz: number,
+    sx: number,
+    sy: number,
+    sz: number
   ) {
-    this.furnitureGroup.add(mesh);
-    this.pieceObjects.push({
-      mesh,
-      part,
-      originalPos: mesh.position.clone(),
-      explodedOffset,
-      type
-    });
+    const group = new THREE.Group();
+    group.position.set(px, py, pz);
+
+    const arrowLength = 160;
+    const coneRadius = 14;
+    const coneHeight = 36;
+    const cylRadius = 4;
+
+    // Helper to build translation axis arrow
+    const createAxisArrow = (
+      dirVector: THREE.Vector3,
+      colorHex: number,
+      axis: 'x' | 'y' | 'z',
+      dir: number
+    ) => {
+      const arrowGroup = new THREE.Group();
+
+      // Shaft
+      const shaftGeo = new THREE.CylinderGeometry(cylRadius, cylRadius, arrowLength, 12);
+      shaftGeo.translate(0, arrowLength / 2, 0);
+      const shaftMat = new THREE.MeshBasicMaterial({
+        color: colorHex,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.95
+      });
+      const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+
+      // Cone Head
+      const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 16);
+      coneGeo.translate(0, arrowLength + coneHeight / 2, 0);
+      const coneMat = new THREE.MeshBasicMaterial({
+        color: colorHex,
+        depthTest: false
+      });
+      const cone = new THREE.Mesh(coneGeo, coneMat);
+
+      // Hitbox for easy clicking
+      const hitGeo = new THREE.CylinderGeometry(coneRadius * 1.5, coneRadius * 1.5, arrowLength + coneHeight, 8);
+      hitGeo.translate(0, (arrowLength + coneHeight) / 2, 0);
+      const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+      const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+
+      arrowGroup.add(shaft);
+      arrowGroup.add(cone);
+      arrowGroup.add(hitMesh);
+
+      // Orient arrow towards direction
+      arrowGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirVector);
+
+      const gizmoData: GizmoHitData = {
+        isGizmo: true,
+        type: 'axis',
+        axis,
+        dir
+      };
+      hitMesh.userData = { ...gizmoData, parentArrow: arrowGroup };
+      cone.userData = { ...gizmoData, parentArrow: arrowGroup };
+      shaft.userData = { ...gizmoData, parentArrow: arrowGroup };
+
+      this.gizmoHitMeshes.push(hitMesh, cone);
+      return arrowGroup;
+    };
+
+    // 1. Translation Arrows:
+    // X (Red / Bright Coral)
+    const arrowX = createAxisArrow(new THREE.Vector3(1, 0, 0), 0xef4444, 'x', 1);
+    group.add(arrowX);
+
+    // Y (Green / Emerald)
+    const arrowY = createAxisArrow(new THREE.Vector3(0, 1, 0), 0x10b981, 'y', 1);
+    group.add(arrowY);
+
+    // Z (Blue / Sky)
+    const arrowZ = createAxisArrow(new THREE.Vector3(0, 0, 1), 0x3b82f6, 'z', 1);
+    group.add(arrowZ);
+
+    // 2. Edge Stretch Handles (Tiradores de borde interactivos)
+    // Cubos/esferas en los bordes para alargar o ensanchar la pieza arrastrando directamente
+    const createStretchHandle = (
+      pos: THREE.Vector3,
+      colorHex: number,
+      handleTarget: 'length' | 'width',
+      dir: number
+    ) => {
+      const handleSize = 24;
+      const geo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
+      const mat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        roughness: 0.2,
+        metalness: 0.3,
+        emissive: colorHex,
+        emissiveIntensity: 0.35,
+        depthTest: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(pos);
+
+      // Outline
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
+      );
+      mesh.add(edge);
+
+      const hitData: GizmoHitData = {
+        isGizmo: true,
+        type: 'handle',
+        handleTarget,
+        dir
+      };
+      mesh.userData = hitData;
+      this.gizmoHitMeshes.push(mesh);
+      return mesh;
+    };
+
+    // Determine dimensions orientation
+    const orient = part.orientation || 'horizontal';
+
+    if (orient === 'horizontal') {
+      // Length along X, Width along Z
+      const handleLPlus = createStretchHandle(new THREE.Vector3(sx / 2 + 16, 0, 0), 0x2563eb, 'length', 1);
+      const handleLMinus = createStretchHandle(new THREE.Vector3(-sx / 2 - 16, 0, 0), 0x2563eb, 'length', -1);
+      const handleWPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0xf59e0b, 'width', 1);
+      const handleWMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0xf59e0b, 'width', -1);
+
+      group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
+    } else if (orient === 'vertical_yz') {
+      // Length along Y (Height), Width along Z
+      const handleLPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16, 0), 0x2563eb, 'length', 1);
+      const handleLMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16, 0), 0x2563eb, 'length', -1);
+      const handleWPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0xf59e0b, 'width', 1);
+      const handleWMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0xf59e0b, 'width', -1);
+
+      group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
+    } else {
+      // Frontal (XY): Length along X, Width along Y
+      const handleLPlus = createStretchHandle(new THREE.Vector3(sx / 2 + 16, 0, 0), 0x2563eb, 'length', 1);
+      const handleLMinus = createStretchHandle(new THREE.Vector3(-sx / 2 - 16, 0, 0), 0x2563eb, 'length', -1);
+      const handleWPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16, 0), 0xf59e0b, 'width', 1);
+      const handleWMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16, 0), 0xf59e0b, 'width', -1);
+
+      group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
+    }
+
+    group.renderOrder = 999;
+    this.gizmoGroup.add(group);
   }
 
-  private createBoxMesh(
-    width: number,
-    height: number,
-    depth: number,
-    material: THREE.Material
-  ): THREE.Mesh {
-    const geo = new THREE.BoxGeometry(width, height, depth);
-    const mesh = new THREE.Mesh(geo, material);
+  private createPieceMaterial(
+    part: Part,
+    isSelected: boolean,
+    mats: Material[],
+    xRay: boolean
+  ): THREE.Material {
+    if (isSelected) {
+      // Technical Blueprint Cobalt Blue
+      return new THREE.MeshStandardMaterial({
+        color: 0x1d4ed8,
+        emissive: 0x1e3a8a,
+        emissiveIntensity: 0.28,
+        roughness: 0.32,
+        metalness: 0.12
+      });
+    }
 
-    // Add subtle darker bevel wireframe edges for high-definition CAD feel
-    const edges = new THREE.EdgesGeometry(geo);
-    const lineMat = new THREE.LineBasicMaterial({
-      color: 0x000000,
-      linewidth: 1,
-      transparent: true,
-      opacity: 0.25
-    });
-    const line = new THREE.LineSegments(edges, lineMat);
-    mesh.add(line);
-
-    return mesh;
-  }
-
-  private createBoardMaterial(colorHex: string, xRay: boolean): THREE.MeshStandardMaterial {
-    const color = new THREE.Color(colorHex);
+    // Material color resolution
+    const assignedMat = mats.find(m => m.id === part.materialId);
+    let colorHex = part.colorHex || assignedMat?.colorHex || '#b48a60';
+    if (part.name.toLowerCase().includes('fondo') || part.thickness <= 4) {
+      colorHex = '#e5e5e5';
+    }
 
     if (xRay) {
       return new THREE.MeshStandardMaterial({
-        color,
+        color: new THREE.Color(colorHex),
         transparent: true,
         opacity: 0.35,
-        roughness: 0.2,
-        metalness: 0.1,
-        depthWrite: false
+        roughness: 0.4
       });
     }
 
     return new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.45,
+      color: new THREE.Color(colorHex),
+      roughness: assignedMat?.textureType === 'wood' ? 0.65 : 0.4,
       metalness: 0.05
     });
   }
 
-  private createHandleMesh(material: THREE.Material): THREE.Mesh {
-    const geo = new THREE.CylinderGeometry(5, 5, 120, 16);
-    const mesh = new THREE.Mesh(geo, material);
-    return mesh;
+  // Draw 3D dimension lines and text sprites matching reference image
+  private renderPieceDimensions(
+    part: Part,
+    px: number,
+    py: number,
+    pz: number,
+    sx: number,
+    sy: number,
+    sz: number
+  ) {
+    const dimGroup = new THREE.Group();
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x2563eb, linewidth: 2 });
+
+    const offsetY = sy / 2 + 35;
+    const offsetZ = sz / 2 + 25;
+
+    // Horizontal dimension line along X
+    const p1 = new THREE.Vector3(px - sx / 2, py + offsetY, pz + offsetZ);
+    const p2 = new THREE.Vector3(px + sx / 2, py + offsetY, pz + offsetZ);
+
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+    const line = new THREE.Line(lineGeo, lineMat);
+    dimGroup.add(line);
+
+    const tickH = 15;
+    const t1 = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(p1.x, p1.y - tickH, p1.z),
+        new THREE.Vector3(p1.x, p1.y + tickH, p1.z)
+      ]),
+      lineMat
+    );
+    const t2 = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(p2.x, p2.y - tickH, p2.z),
+        new THREE.Vector3(p2.x, p2.y + tickH, p2.z)
+      ]),
+      lineMat
+    );
+    dimGroup.add(t1);
+    dimGroup.add(t2);
+
+    const lengthSprite = this.createTextSprite(`${part.length} mm`);
+    lengthSprite.position.set((p1.x + p2.x) / 2, py + offsetY + 25, (p1.z + p2.z) / 2);
+    dimGroup.add(lengthSprite);
+
+    // Width / Depth dimension line
+    const p3 = new THREE.Vector3(px + sx / 2 + 30, py, pz - sz / 2);
+    const p4 = new THREE.Vector3(px + sx / 2 + 30, py, pz + sz / 2);
+    const widthLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([p3, p4]),
+      lineMat
+    );
+    dimGroup.add(widthLine);
+
+    const widthSprite = this.createTextSprite(`${part.width} mm`);
+    widthSprite.position.set(px + sx / 2 + 45, py + 20, (p3.z + p4.z) / 2);
+    dimGroup.add(widthSprite);
+
+    this.dimensionGroup.add(dimGroup);
   }
 
-  private createDrawerHandleMesh(material: THREE.Material): THREE.Mesh {
-    const geo = new THREE.BoxGeometry(140, 10, 18);
-    const mesh = new THREE.Mesh(geo, material);
-    return mesh;
+  // Generates 3D billboard sprite with high-res text
+  private createTextSprite(text: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 80;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 3;
+      const r = 16;
+      ctx.beginPath();
+      ctx.moveTo(r, 4);
+      ctx.lineTo(256 - r, 4);
+      ctx.quadraticCurveTo(256 - 4, 4, 256 - 4, r);
+      ctx.lineTo(256 - 4, 80 - r);
+      ctx.quadraticCurveTo(256 - 4, 80 - 4, 256 - r, 80 - 4);
+      ctx.lineTo(r, 80 - 4);
+      ctx.quadraticCurveTo(4, 80 - 4, 4, 80 - r);
+      ctx.lineTo(4, r);
+      ctx.quadraticCurveTo(4, 4, r, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 30px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 128, 42);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(130, 42, 1);
+    return sprite;
   }
 
   private updateExplodedOffsets(percent: number) {
     const factor = percent / 100;
+    for (const item of this.pieceObjects) {
+      const targetPos = item.originalPos
+        .clone()
+        .addScaledVector(item.explodedOffset, factor);
+      item.mesh.position.copy(targetPos);
+    }
+  }
 
-    for (const p of this.pieceObjects) {
-      if (p.openPivot) {
-        // Pivot for doors
-        p.openPivot.position.copy(p.originalPos).addScaledVector(p.explodedOffset, factor);
-      } else {
-        p.mesh.position.copy(p.originalPos).addScaledVector(p.explodedOffset, factor);
+  // Pointer Down: Detect clicks on Gizmo controls vs Pieces vs Empty space
+  private onPointerDown(e: PointerEvent) {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas || !this.camera) return;
+
+    const rect = canvas.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    // 1. Check if clicking on Gizmo translation arrow or stretch handle
+    if (this.gizmoHitMeshes.length > 0) {
+      const gizmoIntersects = this.raycaster.intersectObjects(this.gizmoHitMeshes, true);
+      if (gizmoIntersects.length > 0) {
+        const hit = gizmoIntersects[0].object;
+        const hitData = hit.userData as GizmoHitData;
+        const selPart = this.selectedPart();
+
+        if (hitData && hitData.isGizmo && selPart) {
+          this.isDragging = true;
+          this.activeGizmoHit = hitData;
+          this.dragStartPointer = { x: e.clientX, y: e.clientY };
+          this.dragInitialPart = { ...selPart };
+
+          // Disable camera rotation while dragging gizmo
+          this.controls.enabled = false;
+
+          // Set up a raycasting plane facing the camera or orthogonal to axis
+          const piecePos = new THREE.Vector3(selPart.posX ?? 0, selPart.posY ?? 0, selPart.posZ ?? 0);
+          const camDir = new THREE.Vector3();
+          this.camera.getWorldDirection(camDir);
+          this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), piecePos);
+
+          const intersectPoint = new THREE.Vector3();
+          if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
+            this.dragPlaneIntersectionStart.copy(intersectPoint);
+          }
+
+          canvas.style.cursor = 'grabbing';
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
+
+    // 2. Normal Piece selection
+    const intersects = this.raycaster.intersectObjects(
+      this.pieceObjects.map(p => p.mesh),
+      false
+    );
+
+    if (intersects.length > 0) {
+      const topHit = intersects[0].object as THREE.Mesh;
+      const part = topHit.userData['part'] as Part;
+      if (part) {
+        this.partSelected.emit(part);
+      }
+    } else {
+      // Clicked background -> deselect
+      this.partSelected.emit(null);
+    }
+  }
+
+  // Pointer Move: Dragging Gizmo or Updating Hover Cursors
+  private onPointerMove(e: PointerEvent) {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas || !this.camera) return;
+
+    if (this.isDragging && this.activeGizmoHit && this.dragInitialPart) {
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+      const currentIntersection = new THREE.Vector3();
+
+      if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersection)) {
+        const deltaWorld = currentIntersection.clone().sub(this.dragPlaneIntersectionStart);
+        const hit = this.activeGizmoHit;
+        const part = this.dragInitialPart;
+        const snap = 5; // 5 mm snapping for high-precision carpentry
+
+        if (hit.type === 'axis') {
+          // Axis Translation: X, Y, or Z
+          const updates: Partial<Part> = {};
+
+          if (hit.axis === 'x') {
+            const rawDelta = deltaWorld.x;
+            const steppedDelta = Math.round(rawDelta / snap) * snap;
+            updates.posX = (part.posX ?? 0) + steppedDelta;
+          } else if (hit.axis === 'y') {
+            const rawDelta = deltaWorld.y;
+            const steppedDelta = Math.round(rawDelta / snap) * snap;
+            updates.posY = Math.max(0, (part.posY ?? 0) + steppedDelta);
+          } else if (hit.axis === 'z') {
+            const rawDelta = deltaWorld.z;
+            const steppedDelta = Math.round(rawDelta / snap) * snap;
+            updates.posZ = (part.posZ ?? 0) + steppedDelta;
+          }
+
+          this.partModified.emit({ part, updates });
+        } else if (hit.type === 'handle') {
+          // Edge Stretch Handle: Length or Width
+          const updates: Partial<Part> = {};
+          const orient = part.orientation || 'horizontal';
+
+          if (hit.handleTarget === 'length') {
+            let axisDelta = 0;
+            if (orient === 'horizontal' || orient === 'vertical_xy') {
+              axisDelta = deltaWorld.x * hit.dir;
+            } else {
+              axisDelta = deltaWorld.y * hit.dir;
+            }
+            const steppedDelta = Math.round(axisDelta / snap) * snap;
+            const newLength = Math.max(50, part.length + steppedDelta);
+            updates.length = newLength;
+          } else if (hit.handleTarget === 'width') {
+            let axisDelta = 0;
+            if (orient === 'horizontal' || orient === 'vertical_yz') {
+              axisDelta = deltaWorld.z * hit.dir;
+            } else {
+              axisDelta = deltaWorld.y * hit.dir;
+            }
+            const steppedDelta = Math.round(axisDelta / snap) * snap;
+            const newWidth = Math.max(50, part.width + steppedDelta);
+            updates.width = newWidth;
+          }
+
+          this.partModified.emit({ part, updates });
+        }
+      }
+      return;
+    }
+
+    // Hover cursor updates when not dragging
+    const rect = canvas.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    if (this.gizmoHitMeshes.length > 0) {
+      const gizmoIntersects = this.raycaster.intersectObjects(this.gizmoHitMeshes, true);
+      if (gizmoIntersects.length > 0) {
+        const hit = gizmoIntersects[0].object.userData as GizmoHitData;
+        if (hit.type === 'axis') {
+          canvas.style.cursor = 'grab';
+        } else {
+          canvas.style.cursor = hit.handleTarget === 'length' ? 'ew-resize' : 'ns-resize';
+        }
+        return;
+      }
+    }
+
+    const pieceIntersects = this.raycaster.intersectObjects(
+      this.pieceObjects.map(p => p.mesh),
+      false
+    );
+    if (pieceIntersects.length > 0) {
+      canvas.style.cursor = 'pointer';
+    } else {
+      canvas.style.cursor = 'default';
+    }
+  }
+
+  // Pointer Up: Release Dragging
+  private onPointerUp() {
+    if (this.isDragging) {
+      this.isDragging = false;
+      this.activeGizmoHit = null;
+      this.dragInitialPart = null;
+      this.controls.enabled = true;
+
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) {
+        canvas.style.cursor = 'default';
       }
     }
   }
 
-  private updateFrentesOpen(isOpen: boolean) {
-    for (const p of this.pieceObjects) {
-      if (p.type === 'door_left' && p.openPivot) {
-        p.openPivot.rotation.y = isOpen ? -Math.PI / 2 + 0.15 : 0;
-      } else if (p.type === 'door_right' && p.openPivot) {
-        p.openPivot.rotation.y = isOpen ? Math.PI / 2 - 0.15 : 0;
-      } else if (p.type === 'drawer') {
-        const slideOutZ = isOpen ? 320 : 0;
-        p.mesh.position.z = (p.initialPosZ || 0) + slideOutZ;
-      }
+  // Camera preset controls
+  setViewPreset(preset: 'iso' | 'front' | 'side' | 'top') {
+    if (!this.camera || !this.controls) return;
+
+    const target = this.controls.target.clone();
+    const distance = 2200;
+
+    switch (preset) {
+      case 'iso':
+        this.camera.position.set(target.x + 1400, target.y + 1100, target.z + 1800);
+        break;
+      case 'front':
+        this.camera.position.set(target.x, target.y, target.z + distance);
+        break;
+      case 'side':
+        this.camera.position.set(target.x + distance, target.y, target.z);
+        break;
+      case 'top':
+        this.camera.position.set(target.x, target.y + distance, target.z + 1);
+        break;
     }
-  }
-
-  // --- View Controls ---
-
-  setViewPreset(view: 'iso' | 'front' | 'side' | 'top') {
-    const h = this.module().height;
-    const targetY = h / 2;
-    this.controls.target.set(0, targetY, 0);
-
-    if (view === 'iso') {
-      this.camera.position.set(1300, 1100, 1700);
-    } else if (view === 'front') {
-      this.camera.position.set(0, targetY, 2100);
-    } else if (view === 'side') {
-      this.camera.position.set(2100, targetY, 0);
-    } else if (view === 'top') {
-      this.camera.position.set(0, 2200, 0.1);
-    }
-
+    this.camera.lookAt(target);
     this.controls.update();
   }
 
@@ -694,40 +933,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.isXRay.update(v => !v);
   }
 
-  resetCamera() {
-    this.setViewPreset('iso');
+  toggleDimensions() {
+    this.show3dDimensions.update(v => !v);
   }
 
-  private onCanvasClick(event: MouseEvent) {
-    const canvas = this.canvasRef()?.nativeElement;
-    if (!canvas || !this.camera) return;
-
-    const rect = canvas.getBoundingClientRect();
-    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.furnitureGroup.children, true);
-
-    if (intersects.length > 0) {
-      let hitMesh: THREE.Object3D | null = intersects[0].object;
-      let matchedPiece: MeshPieceData | undefined;
-
-      while (hitMesh && !matchedPiece && hitMesh !== this.furnitureGroup) {
-        matchedPiece = this.pieceObjects.find(p => p.mesh === hitMesh || (p.openPivot && p.openPivot === hitMesh));
-        hitMesh = hitMesh.parent;
-      }
-
-      if (matchedPiece) {
-        this.selectedPieceName.set(matchedPiece.part.name);
-        this.selectedPieceDetails.set(
-          `${matchedPiece.part.length} × ${matchedPiece.part.width} × ${matchedPiece.part.thickness} mm • Canto L1:${matchedPiece.part.edges.l1} L2:${matchedPiece.part.edges.l2}`
-        );
-      }
-    } else {
-      this.selectedPieceName.set(null);
-      this.selectedPieceDetails.set(null);
-    }
+  resetCamera() {
+    if (!this.controls || !this.camera) return;
+    this.setViewPreset('iso');
   }
 
   private onResize() {
@@ -737,22 +949,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    if (width > 0 && height > 0) {
-      this.camera.aspect = width / height;
-      this.camera.updateProjectionMatrix();
-      this.renderer.setSize(width, height);
-    }
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
   }
 
-  private animate = () => {
-    this.animationFrameId = requestAnimationFrame(this.animate);
+  private animate() {
+    this.animationFrameId = requestAnimationFrame(() => this.animate());
     if (this.controls) {
       this.controls.update();
     }
     if (this.renderer && this.scene && this.camera) {
       this.renderer.render(this.scene, this.camera);
     }
-  };
+  }
 
   ngOnDestroy() {
     if (this.animationFrameId !== null) {
@@ -760,9 +970,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
-    }
-    if (this.controls) {
-      this.controls.dispose();
     }
     if (this.renderer) {
       this.renderer.dispose();
