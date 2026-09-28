@@ -3,11 +3,12 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { FurnitureModule, FurnitureModuleType, Material } from '../../models/melamine.models';
 import { CabinetGeneratorService } from '../../services/cabinet-generator.service';
+import { Furniture3dViewerComponent } from '../furniture-3d-viewer/furniture-3d-viewer';
 
 @Component({
   selector: 'app-module-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, Furniture3dViewerComponent],
   templateUrl: './module-designer.html'
 })
 export class ModuleDesignerComponent {
@@ -19,8 +20,9 @@ export class ModuleDesignerComponent {
   readonly materials = this.projectService.materialsList;
   readonly modules = this.projectService.modulesList;
 
-  // Visualizer mode
-  viewMode = signal<'exterior' | 'interior' | 'wireframe'>('exterior');
+  // Visualizer mode: '3d' (Three.js real 3D) or '2d' (SVG Technical Blueprint)
+  activeVisualizer = signal<'3d' | '2d'>('3d');
+  viewMode = signal<'exterior' | 'interior'>('exterior');
   isEditingModule = signal<string | null>(null);
 
   // Form for module
@@ -43,6 +45,9 @@ export class ModuleDesignerComponent {
     defaultThickDoors: [true]
   });
 
+  // Reactive Signal mirroring form values on every single keystroke / input event
+  readonly formValueSignal = signal(this.moduleForm.getRawValue());
+
   constructor() {
     // Set default material
     const mats = this.materials();
@@ -50,12 +55,18 @@ export class ModuleDesignerComponent {
       this.moduleForm.patchValue({
         materialId: mats[0].id
       });
+      this.formValueSignal.set(this.moduleForm.getRawValue());
     }
+
+    // Subscribe to form value changes to trigger immediate 60fps reactive updates
+    this.moduleForm.valueChanges.subscribe(() => {
+      this.formValueSignal.set(this.moduleForm.getRawValue());
+    });
   }
 
-  // Reactive preview parts
+  // Reactive preview module driven by formValueSignal
   readonly previewModule = computed<FurnitureModule>(() => {
-    const raw = this.moduleForm.value;
+    const raw = this.formValueSignal();
     const mats = this.materials();
     const fallbackMatId = mats[0]?.id || 'mat_default';
 
@@ -122,6 +133,12 @@ export class ModuleDesignerComponent {
       doorW
     };
   });
+
+  adjustDimension(field: 'width' | 'height' | 'depth', delta: number) {
+    const current = Number(this.moduleForm.get(field)?.value) || 0;
+    const next = Math.max(150, Math.min(3000, current + delta));
+    this.moduleForm.patchValue({ [field]: next });
+  }
 
   applyPreset(presetKey: string) {
     const mats = this.materials();

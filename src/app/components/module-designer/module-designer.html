@@ -5,11 +5,11 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
       <div>
         <h2 class="text-xl font-bold text-white flex items-center gap-2">
-          <span class="material-icons text-amber-500">grid_guides</span>
-          Diseñador Paramétrico de Muebles
+          <span class="material-icons text-amber-500">view_in_ar</span>
+          Estudio 3D Paramétrico de Muebles
         </h2>
         <p class="text-xs text-zinc-400 mt-1">
-          Configura las dimensiones exteriores en milímetros. El software deduce holguras telescópicas (-26mm), luz de puertas, ranuras de fondo y genera el despiece exacto.
+          Visualiza, rota en 360°, realiza zoom y separa piezas en 3D en tiempo real tipo SketchUp / Flatma. Cada ajuste dimensional se refleja instantáneamente en el modelo y en la lista de corte.
         </p>
       </div>
 
@@ -43,16 +43,19 @@
       </div>
     </div>
 
-    <!-- Main Grid: Form Left, Visualizer Right -->
+    <!-- Main Grid: Form Left, 3D Canvas Right -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
       
       <!-- FORM COLUMN (5 cols) -->
       <form [formGroup]="moduleForm" (ngSubmit)="saveModuleToProject()" class="lg:col-span-5 space-y-4">
         
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold uppercase tracking-wider text-amber-500">
-            {{ isEditingModule() ? 'Editando Módulo' : 'Configurar Nuevo Módulo' }}
-          </span>
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-xs font-bold uppercase tracking-wider text-amber-500">
+              {{ isEditingModule() ? 'Editando Módulo en Proyecto' : 'Configurar Módulo en Tiempo Real' }}
+            </span>
+          </div>
           @if (isEditingModule()) {
             <button 
               type="button" 
@@ -97,51 +100,132 @@
           </div>
         </div>
 
-        <!-- Dimensiones (W, H, D, Thickness) -->
+        <!-- Dimensiones (W, H, D, Thickness) with Live Step Adjusters -->
         <div class="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
               <span class="material-icons text-xs text-amber-400">square_foot</span>
               Dimensiones Exteriores (mm)
             </span>
-            <span class="text-[10px] text-zinc-500">Cotas de instalación</span>
+            <span class="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+              <span class="material-icons text-[12px]">bolt</span> Sincronización en vivo
+            </span>
           </div>
 
-          <div class="grid grid-cols-3 gap-2">
-            <div>
-              <span class="block text-[11px] text-zinc-400 mb-1">Ancho (X)</span>
-              <div class="relative">
-                <input 
-                  type="number" 
-                  step="10" 
-                  formControlName="width"
-                  class="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold" />
-                <span class="absolute right-2 top-2 text-[10px] text-zinc-400">mm</span>
-              </div>
+          <!-- ANCHO (X) -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-zinc-400">Ancho (X):</span>
+              <span class="font-mono font-bold text-amber-400 text-sm">{{ previewModule().width }} mm</span>
             </div>
-
-            <div>
-              <span class="block text-[11px] text-zinc-400 mb-1">Alto (Y)</span>
-              <div class="relative">
-                <input 
-                  type="number" 
-                  step="10" 
-                  formControlName="height"
-                  class="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold" />
-                <span class="absolute right-2 top-2 text-[10px] text-zinc-400">mm</span>
-              </div>
+            <div class="flex items-center gap-2">
+              <button 
+                type="button" 
+                (click)="adjustDimension('width', -50)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                -50
+              </button>
+              <button 
+                type="button" 
+                (click)="adjustDimension('width', -10)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                -10
+              </button>
+              <input 
+                type="number" 
+                step="10" 
+                formControlName="width"
+                class="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold font-mono focus:border-amber-500" />
+              <button 
+                type="button" 
+                (click)="adjustDimension('width', 10)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                +10
+              </button>
+              <button 
+                type="button" 
+                (click)="adjustDimension('width', 50)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                +50
+              </button>
             </div>
+          </div>
 
-            <div>
-              <span class="block text-[11px] text-zinc-400 mb-1">Profundidad (Z)</span>
-              <div class="relative">
-                <input 
-                  type="number" 
-                  step="10" 
-                  formControlName="depth"
-                  class="w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold" />
-                <span class="absolute right-2 top-2 text-[10px] text-zinc-400">mm</span>
-              </div>
+          <!-- ALTO (Y) -->
+          <div class="space-y-1 pt-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-zinc-400">Alto (Y):</span>
+              <span class="font-mono font-bold text-amber-400 text-sm">{{ previewModule().height }} mm</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button 
+                type="button" 
+                (click)="adjustDimension('height', -50)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                -50
+              </button>
+              <button 
+                type="button" 
+                (click)="adjustDimension('height', -10)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                -10
+              </button>
+              <input 
+                type="number" 
+                step="10" 
+                formControlName="height"
+                class="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold font-mono focus:border-amber-500" />
+              <button 
+                type="button" 
+                (click)="adjustDimension('height', 10)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                +10
+              </button>
+              <button 
+                type="button" 
+                (click)="adjustDimension('height', 50)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                +50
+              </button>
+            </div>
+          </div>
+
+          <!-- PROFUNDIDAD (Z) -->
+          <div class="space-y-1 pt-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-zinc-400">Profundidad (Z):</span>
+              <span class="font-mono font-bold text-amber-400 text-sm">{{ previewModule().depth }} mm</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button 
+                type="button" 
+                (click)="adjustDimension('depth', -50)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                -50
+              </button>
+              <button 
+                type="button" 
+                (click)="adjustDimension('depth', -10)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                -10
+              </button>
+              <input 
+                type="number" 
+                step="10" 
+                formControlName="depth"
+                class="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold font-mono focus:border-amber-500" />
+              <button 
+                type="button" 
+                (click)="adjustDimension('depth', 10)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                +10
+              </button>
+              <button 
+                type="button" 
+                (click)="adjustDimension('depth', 50)" 
+                class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold">
+                +50
+              </button>
             </div>
           </div>
 
@@ -251,105 +335,106 @@
       <!-- VISUALIZER COLUMN (7 cols) -->
       <div class="lg:col-span-7 flex flex-col space-y-4">
         
-        <!-- Controls Bar -->
-        <div class="flex items-center justify-between bg-zinc-950 p-2 rounded-xl border border-zinc-800">
+        <!-- Controls Bar with 3D vs 2D Mode Switcher -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-zinc-950 p-2.5 rounded-xl border border-zinc-800 gap-2">
+          
+          <!-- Mode Switcher: 3D Canvas vs 2D Technical Blueprint -->
           <div class="flex items-center gap-1 text-xs">
-            <span class="text-zinc-400 font-medium px-2">Vista del Mueble:</span>
             <button 
               type="button"
-              (click)="viewMode.set('exterior')"
-              [class]="viewMode() === 'exterior' ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white bg-zinc-900'"
-              class="px-2.5 py-1 rounded-lg text-xs transition">
-              Frontal / Puertas
+              (click)="activeVisualizer.set('3d')"
+              [class]="activeVisualizer() === '3d' 
+                ? 'bg-amber-500 text-zinc-950 font-bold shadow-md' 
+                : 'text-zinc-400 hover:text-white bg-zinc-900'"
+              class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition">
+              <span class="material-icons text-sm">view_in_ar</span>
+              <span>Visor 3D Interactivo (Three.js)</span>
             </button>
             <button 
               type="button"
-              (click)="viewMode.set('interior')"
-              [class]="viewMode() === 'interior' ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white bg-zinc-900'"
-              class="px-2.5 py-1 rounded-lg text-xs transition">
-              Estructura Abierta (Rayos X)
+              (click)="activeVisualizer.set('2d')"
+              [class]="activeVisualizer() === '2d' 
+                ? 'bg-amber-500 text-zinc-950 font-bold shadow-md' 
+                : 'text-zinc-400 hover:text-white bg-zinc-900'"
+              class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition">
+              <span class="material-icons text-sm">architecture</span>
+              <span>Plano 2D con Cotas</span>
             </button>
           </div>
 
-          <div class="text-[11px] text-zinc-400 flex items-center gap-2">
-            <span>{{ previewModule().width }} × {{ previewModule().height }} × {{ previewModule().depth }} mm</span>
+          <div class="text-xs text-zinc-400 font-mono flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded bg-zinc-800 text-amber-400 font-bold">
+              {{ previewModule().width }} × {{ previewModule().height }} × {{ previewModule().depth }} mm
+            </span>
           </div>
         </div>
 
-        <!-- SVG 2D/3D BLUEPRINT CANVAS -->
-        <div class="relative w-full h-80 sm:h-96 bg-gradient-to-b from-zinc-950 to-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden flex items-center justify-center p-4">
-          
-          <!-- Grid background pattern -->
-          <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#d4a373_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <!-- 3D THREE.JS CANVAS VIEW -->
+        @if (activeVisualizer() === '3d') {
+          <app-furniture-3d-viewer
+            [module]="previewModule()"
+            [parts]="previewPartsAndHardware().parts"
+            [material]="selectedMaterial()">
+          </app-furniture-3d-viewer>
+        } @else {
+          <!-- 2D TECHNICAL BLUEPRINT CANVAS -->
+          <div class="relative w-full h-[460px] sm:h-[540px] bg-gradient-to-b from-zinc-950 to-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden flex items-center justify-center p-4">
+            
+            <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#d4a373_1px,transparent_1px)] [background-size:16px_16px]"></div>
 
-          <!-- Dynamic SVG Blueprint -->
-          <svg class="w-full h-full max-h-84 select-none" viewBox="0 0 500 400" preserveAspectRatio="xMidYMid meet">
-            <defs>
-              <!-- Sombra para muebles -->
-              <filter id="boxShadow" x="-10%" y="-10%" width="120%" height="120%">
-                <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000000" flood-opacity="0.6"/>
-              </filter>
-              <!-- Textura de madera para melamina -->
-              <pattern id="woodGrain" width="40" height="40" patternUnits="userSpaceOnUse">
-                <rect width="40" height="40" [attr.fill]="selectedMaterial()?.colorHex || '#b48a60'" />
-                <path d="M 0 10 Q 20 12, 40 10 M 0 25 Q 20 23, 40 25 M 0 38 Q 20 39, 40 38" stroke="#000" stroke-width="0.7" opacity="0.15" fill="none" />
-              </pattern>
-            </defs>
+            <svg class="w-full h-full max-h-[480px] select-none" viewBox="0 0 500 400" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <pattern id="woodGrain2" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <rect width="40" height="40" [attr.fill]="selectedMaterial()?.colorHex || '#b48a60'" />
+                  <path d="M 0 10 Q 20 12, 40 10 M 0 25 Q 20 23, 40 25 M 0 38 Q 20 39, 40 38" stroke="#000" stroke-width="0.7" opacity="0.15" fill="none" />
+                </pattern>
+              </defs>
 
-            <!-- Dimension scaling helpers -->
-            <!-- Base canvas center: 250, 200. Max W: 300, Max H: 260 -->
-            <!-- Dimension scaling helpers computed in component -->
-            @let m = svgMetrics();
-            @let wMm = m.wMm;
-            @let hMm = m.hMm;
-            @let plinthMm = m.plinthMm;
-            @let svgW = m.svgW;
-            @let svgH = m.svgH;
-            @let svgPlinth = m.svgPlinth;
-            @let svgX = m.svgX;
-            @let svgY = m.svgY;
-            @let thick = m.thick;
+              @let m = svgMetrics();
+              @let wMm = m.wMm;
+              @let hMm = m.hMm;
+              @let plinthMm = m.plinthMm;
+              @let svgW = m.svgW;
+              @let svgH = m.svgH;
+              @let svgPlinth = m.svgPlinth;
+              @let svgX = m.svgX;
+              @let svgY = m.svgY;
+              @let thick = m.thick;
 
-            <!-- Sombra en suelo -->
-            <ellipse [attr.cx]="250" [attr.cy]="svgY + svgH + 10" [attr.rx]="(svgW / 2) + 20" ry="10" fill="#000" opacity="0.4" />
+              <ellipse [attr.cx]="250" [attr.cy]="svgY + svgH + 10" [attr.rx]="(svgW / 2) + 20" ry="10" fill="#000" opacity="0.4" />
 
-            <!-- CARCASA EXTERIOR (Laterales, Piso, Techo) -->
-            <!-- Fondo trasero -->
-            <rect 
-              [attr.x]="svgX" 
-              [attr.y]="svgY" 
-              [attr.width]="svgW" 
-              [attr.height]="svgH - svgPlinth" 
-              fill="#18181b" 
-              stroke="#3f3f46" 
-              stroke-width="1.5" />
-
-            <!-- Zócalo inferior si tiene -->
-            @if (previewModule().hasPlinth) {
               <rect 
-                [attr.x]="svgX + 8" 
-                [attr.y]="svgY + svgH - svgPlinth" 
-                [attr.width]="svgW - 16" 
-                [attr.height]="svgPlinth" 
-                fill="#27272a" 
-                stroke="#52525b" 
-                stroke-width="1" />
-              <text [attr.x]="250" [attr.y]="svgY + svgH - (svgPlinth / 2) + 3" text-anchor="middle" font-size="9" fill="#a1a1aa">
-                Zócalo {{ plinthMm }}mm
-              </text>
-            }
+                [attr.x]="svgX" 
+                [attr.y]="svgY" 
+                [attr.width]="svgW" 
+                [attr.height]="svgH - svgPlinth" 
+                fill="#18181b" 
+                stroke="#3f3f46" 
+                stroke-width="1.5" />
 
-            <!-- MODO INTERIOR / RAYOS X -->
-            @if (viewMode() === 'interior' || (previewModule().doorsCount === 0 && previewModule().drawersCount === 0)) {
+              @if (previewModule().hasPlinth) {
+                <rect 
+                  [attr.x]="svgX + 8" 
+                  [attr.y]="svgY + svgH - svgPlinth" 
+                  [attr.width]="svgW - 16" 
+                  [attr.height]="svgPlinth" 
+                  fill="#27272a" 
+                  stroke="#52525b" 
+                  stroke-width="1" />
+                <text [attr.x]="250" [attr.y]="svgY + svgH - (svgPlinth / 2) + 3" text-anchor="middle" font-size="9" fill="#a1a1aa">
+                  Zócalo {{ plinthMm }}mm
+                </text>
+              }
+
               <!-- Laterales -->
-              <rect [attr.x]="svgX" [attr.y]="svgY" [attr.width]="thick" [attr.height]="svgH - svgPlinth" fill="url(#woodGrain)" stroke="#713f12" stroke-width="1" />
-              <rect [attr.x]="svgX + svgW - thick" [attr.y]="svgY" [attr.width]="thick" [attr.height]="svgH - svgPlinth" fill="url(#woodGrain)" stroke="#713f12" stroke-width="1" />
+              <rect [attr.x]="svgX" [attr.y]="svgY" [attr.width]="thick" [attr.height]="svgH - svgPlinth" fill="url(#woodGrain2)" stroke="#713f12" stroke-width="1" />
+              <rect [attr.x]="svgX + svgW - thick" [attr.y]="svgY" [attr.width]="thick" [attr.height]="svgH - svgPlinth" fill="url(#woodGrain2)" stroke="#713f12" stroke-width="1" />
 
               <!-- Piso -->
-              <rect [attr.x]="svgX" [attr.y]="svgY + svgH - svgPlinth - thick" [attr.width]="svgW" [attr.height]="thick" fill="url(#woodGrain)" stroke="#713f12" stroke-width="1" />
+              <rect [attr.x]="svgX" [attr.y]="svgY + svgH - svgPlinth - thick" [attr.width]="svgW" [attr.height]="thick" fill="url(#woodGrain2)" stroke="#713f12" stroke-width="1" />
 
               <!-- Techo o Fajas -->
-              <rect [attr.x]="svgX" [attr.y]="svgY" [attr.width]="svgW" [attr.height]="thick" fill="url(#woodGrain)" stroke="#713f12" stroke-width="1" />
+              <rect [attr.x]="svgX" [attr.y]="svgY" [attr.width]="svgW" [attr.height]="thick" fill="url(#woodGrain2)" stroke="#713f12" stroke-width="1" />
 
               <!-- Repisas interiores -->
               @if (previewModule().shelvesCount > 0) {
@@ -364,10 +449,9 @@
                         [attr.y]="svgY + thick + (shelfSpacing * i)" 
                         [attr.width]="svgW - (2 * thick)" 
                         [attr.height]="thick" 
-                        fill="url(#woodGrain)" 
+                        fill="url(#woodGrain2)" 
                         stroke="#713f12" 
                         stroke-width="0.8" />
-                      <!-- Soportes de repisa -->
                       <circle [attr.cx]="svgX + thick + 4" [attr.cy]="svgY + thick + (shelfSpacing * i) + thick + 2" r="2" fill="#cbd5e1" />
                       <circle [attr.cx]="svgX + svgW - thick - 4" [attr.cy]="svgY + thick + (shelfSpacing * i) + thick + 2" r="2" fill="#cbd5e1" />
                     </g>
@@ -375,169 +459,44 @@
                 }
               }
 
-              <!-- Cajas de Cajones interiores si tiene -->
-              @if (previewModule().drawersCount > 0) {
-                @let dCount = previewModule().drawersCount;
-                @let boxH = ((svgH - svgPlinth - (2 * thick)) / dCount) - 4;
-                @for (d of [0, 1, 2, 3, 4]; track d) {
-                  @if (d < dCount) {
-                    @let boxY = svgY + thick + 2 + (d * (boxH + 4));
-                    <!-- Caja interior -->
-                    <rect 
-                      [attr.x]="svgX + thick + 6" 
-                      [attr.y]="boxY" 
-                      [attr.width]="svgW - (2 * thick) - 12" 
-                      [attr.height]="boxH" 
-                      fill="none" 
-                      stroke="#f59e0b" 
-                      stroke-dasharray="3,3" 
-                      stroke-width="1" />
-                    <!-- Corredera telescópica lateral -->
-                    <line [attr.x1]="svgX + thick + 1" [attr.y1]="boxY + (boxH / 2)" [attr.x2]="svgX + thick + 6" [attr.y2]="boxY + (boxH / 2)" stroke="#94a3b8" stroke-width="2" />
-                    <line [attr.x1]="svgX + svgW - thick - 6" [attr.y1]="boxY + (boxH / 2)" [attr.x2]="svgX + svgW - thick - 1" [attr.y2]="boxY + (boxH / 2)" stroke="#94a3b8" stroke-width="2" />
-                  }
-                }
-              }
-            } @else {
-              <!-- MODO EXTERIOR CON FRENTES (Puertas o Cajones vistos) -->
-              @let carcassH = svgH - svgPlinth;
+              <!-- Dimension guides -->
+              <g>
+                <line [attr.x1]="svgX" [attr.y1]="svgY - 14" [attr.x2]="svgX + svgW" [attr.y2]="svgY - 14" stroke="#38bdf8" stroke-width="1.2" />
+                <line [attr.x1]="svgX" [attr.y1]="svgY - 19" [attr.x2]="svgX" [attr.y2]="svgY - 9" stroke="#38bdf8" stroke-width="1.2" />
+                <line [attr.x1]="svgX + svgW" [attr.y1]="svgY - 19" [attr.x2]="svgX + svgW" [attr.y2]="svgY - 9" stroke="#38bdf8" stroke-width="1.2" />
+                <rect [attr.x]="250 - 24" [attr.y]="svgY - 22" width="48" height="14" rx="3" fill="#0f172a" />
+                <text [attr.x]="250" [attr.y]="svgY - 12" text-anchor="middle" font-size="10" font-weight="bold" fill="#38bdf8">
+                  {{ wMm }} mm
+                </text>
+              </g>
 
-              <!-- Si tiene cajones -->
-              @if (previewModule().drawersCount > 0) {
-                @let nD = previewModule().drawersCount;
-                @let dFrontH = (carcassH - (nD * 2)) / nD;
-                @for (d of [0, 1, 2, 3, 4]; track d) {
-                  @if (d < nD) {
-                    @let dFrontY = svgY + (d * (dFrontH + 2));
-                    <g>
-                      <!-- Frente cajón -->
-                      <rect 
-                        [attr.x]="svgX + 1" 
-                        [attr.y]="dFrontY" 
-                        [attr.width]="svgW - 2" 
-                        [attr.height]="dFrontH" 
-                        rx="2"
-                        fill="url(#woodGrain)" 
-                        stroke="#d97706" 
-                        stroke-width="1.2" />
-                      <!-- Tirador metálico centrado -->
-                      <rect 
-                        [attr.x]="250 - 18" 
-                        [attr.y]="dFrontY + (dFrontH / 2) - 3" 
-                        width="36" 
-                        height="6" 
-                        rx="2" 
-                        fill="#e2e8f0" 
-                        stroke="#475569" 
-                        stroke-width="1" />
-                    </g>
-                  }
-                }
-              } @else if (previewModule().doorsCount === 1) {
-                <!-- 1 Puerta grande -->
-                <rect 
-                  [attr.x]="svgX + 1.5" 
-                  [attr.y]="svgY + 1.5" 
-                  [attr.width]="svgW - 3" 
-                  [attr.height]="carcassH - 3" 
-                  rx="2"
-                  fill="url(#woodGrain)" 
-                  stroke="#d97706" 
-                  stroke-width="1.2" />
-                <!-- Tirador a la derecha -->
-                <rect 
-                  [attr.x]="svgX + svgW - 16" 
-                  [attr.y]="svgY + (carcassH / 2) - 18" 
-                  width="5" 
-                  height="36" 
-                  rx="1" 
-                  fill="#f8fafc" 
-                  stroke="#475569" 
-                  stroke-width="1" />
-              } @else if (previewModule().doorsCount === 2) {
-                <!-- 2 Puertas simétricas -->
-                @let doorW = (svgW - 4) / 2;
-                <!-- Puerta izquierda -->
-                <rect 
-                  [attr.x]="svgX + 1.5" 
-                  [attr.y]="svgY + 1.5" 
-                  [attr.width]="doorW" 
-                  [attr.height]="carcassH - 3" 
-                  rx="2"
-                  fill="url(#woodGrain)" 
-                  stroke="#d97706" 
-                  stroke-width="1.2" />
-                <!-- Puerta derecha -->
-                <rect 
-                  [attr.x]="svgX + 2.5 + doorW" 
-                  [attr.y]="svgY + 1.5" 
-                  [attr.width]="doorW" 
-                  [attr.height]="carcassH - 3" 
-                  rx="2"
-                  fill="url(#woodGrain)" 
-                  stroke="#d97706" 
-                  stroke-width="1.2" />
-                <!-- Tiradores en el centro -->
-                <rect 
-                  [attr.x]="svgX + doorW - 6" 
-                  [attr.y]="svgY + (carcassH / 2) - 18" 
-                  width="4" 
-                  height="36" 
-                  rx="1" 
-                  fill="#f8fafc" 
-                  stroke="#475569" 
-                  stroke-width="1" />
-                <rect 
-                  [attr.x]="svgX + 2.5 + doorW + 2" 
-                  [attr.y]="svgY + (carcassH / 2) - 18" 
-                  width="4" 
-                  height="36" 
-                  rx="1" 
-                  fill="#f8fafc" 
-                  stroke="#475569" 
-                  stroke-width="1" />
-              }
-            }
-
-            <!-- COTAS Y FLECHAS DE MEDICIÓN -->
-            <!-- Cota Ancho superior -->
-            <g>
-              <line [attr.x1]="svgX" [attr.y1]="svgY - 14" [attr.x2]="svgX + svgW" [attr.y2]="svgY - 14" stroke="#38bdf8" stroke-width="1.2" />
-              <line [attr.x1]="svgX" [attr.y1]="svgY - 19" [attr.x2]="svgX" [attr.y2]="svgY - 9" stroke="#38bdf8" stroke-width="1.2" />
-              <line [attr.x1]="svgX + svgW" [attr.y1]="svgY - 19" [attr.x2]="svgX + svgW" [attr.y2]="svgY - 9" stroke="#38bdf8" stroke-width="1.2" />
-              <rect [attr.x]="250 - 24" [attr.y]="svgY - 22" width="48" height="14" rx="3" fill="#0f172a" />
-              <text [attr.x]="250" [attr.y]="svgY - 12" text-anchor="middle" font-size="10" font-weight="bold" fill="#38bdf8">
-                {{ wMm }} mm
-              </text>
-            </g>
-
-            <!-- Cota Alto lateral izquierdo -->
-            <g>
-              <line [attr.x1]="svgX - 16" [attr.y1]="svgY" [attr.x2]="svgX - 16" [attr.y2]="svgY + svgH" stroke="#38bdf8" stroke-width="1.2" />
-              <line [attr.x1]="svgX - 21" [attr.y1]="svgY" [attr.x2]="svgX - 11" [attr.y2]="svgY" stroke="#38bdf8" stroke-width="1.2" />
-              <line [attr.x1]="svgX - 21" [attr.y1]="svgY + svgH" [attr.x2]="svgX - 11" [attr.y2]="svgY + svgH" stroke="#38bdf8" stroke-width="1.2" />
-              <text 
-                [attr.x]="-(svgY + (svgH / 2))" 
-                [attr.y]="svgX - 22" 
-                transform="rotate(-90)" 
-                text-anchor="middle" 
-                font-size="10" 
-                font-weight="bold" 
-                fill="#38bdf8">
-                {{ hMm }} mm
-              </text>
-            </g>
-          </svg>
-        </div>
+              <g>
+                <line [attr.x1]="svgX - 16" [attr.y1]="svgY" [attr.x2]="svgX - 16" [attr.y2]="svgY + svgH" stroke="#38bdf8" stroke-width="1.2" />
+                <line [attr.x1]="svgX - 21" [attr.y1]="svgY" [attr.x2]="svgX - 11" [attr.y2]="svgY" stroke="#38bdf8" stroke-width="1.2" />
+                <line [attr.x1]="svgX - 21" [attr.y1]="svgY + svgH" [attr.x2]="svgX - 11" [attr.y2]="svgY + svgH" stroke="#38bdf8" stroke-width="1.2" />
+                <text 
+                  [attr.x]="-(svgY + (svgH / 2))" 
+                  [attr.y]="svgX - 22" 
+                  transform="rotate(-90)" 
+                  text-anchor="middle" 
+                  font-size="10" 
+                  font-weight="bold" 
+                  fill="#38bdf8">
+                  {{ hMm }} mm
+                </text>
+              </g>
+            </svg>
+          </div>
+        }
 
         <!-- LIVE PARTS PREVIEW FOR THIS MODULE -->
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
           <div class="flex items-center justify-between mb-3">
             <h4 class="text-xs font-bold text-zinc-200 flex items-center gap-1.5 uppercase tracking-wider">
               <span class="material-icons text-amber-500 text-sm">content_cut</span>
-              Despiece Automático en Vivo ({{ previewPartsAndHardware().parts.length }} piezas generadas)
+              Despiece Automático en Vivo ({{ previewPartsAndHardware().parts.length }} piezas calculadas)
             </h4>
-            <span class="text-[11px] text-zinc-400">Holguras y cantos calculados</span>
+            <span class="text-[11px] text-zinc-400">Holguras telescópicas y cantos actualizados</span>
           </div>
 
           <div class="max-h-48 overflow-y-auto pr-1">
@@ -559,7 +518,7 @@
                       {{ part.name }}
                     </td>
                     <td class="py-1.5 px-2 text-center font-bold text-amber-400">{{ part.quantity }}</td>
-                    <td class="py-1.5 px-2 font-mono text-zinc-200">
+                    <td class="py-1.5 px-2 font-mono text-zinc-200 font-bold">
                       {{ part.length }} × {{ part.width }} × {{ part.thickness }}
                     </td>
                     <td class="py-1.5 px-2 font-mono text-[10px]">
@@ -606,7 +565,7 @@
                 <button 
                   (click)="editExistingModule(mod)"
                   class="p-1 text-zinc-400 hover:text-amber-400 transition"
-                  title="Editar dimensiones de este módulo">
+                  title="Editar dimensiones de este módulo en el visor 3D">
                   <span class="material-icons text-sm">edit</span>
                 </button>
                 <button 
@@ -650,7 +609,7 @@
           <div class="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500">
             <span>Fondo: {{ mod.backType === 'groove' ? 'Ranurado 3mm' : mod.backType === 'overlay' ? 'Sobrepuesto' : 'Sin fondo' }}</span>
             <button (click)="editExistingModule(mod)" class="text-amber-400 hover:underline">
-              Modificar
+              Cargar en Visor 3D
             </button>
           </div>
         </div>

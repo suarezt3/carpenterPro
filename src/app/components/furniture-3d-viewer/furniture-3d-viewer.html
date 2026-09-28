@@ -1,0 +1,134 @@
+<div #container3d class="relative w-full h-[460px] sm:h-[540px] bg-zinc-950 rounded-2xl border border-zinc-800 overflow-hidden shadow-2xl select-none group">
+
+  <!-- 3D Canvas -->
+  <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+
+  <!-- TOP TOOLBAR: View presets & visual modes -->
+  <div class="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    
+    <!-- View Angle Buttons -->
+    <div class="flex items-center gap-1 bg-zinc-900/90 backdrop-blur-md p-1 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto">
+      <button 
+        type="button"
+        (click)="setViewPreset('iso')" 
+        class="px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition"
+        title="Vista Isométrica 3D">
+        3D Iso
+      </button>
+      <button 
+        type="button"
+        (click)="setViewPreset('front')" 
+        class="px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition"
+        title="Vista Frontal / Alzada">
+        Frontal
+      </button>
+      <button 
+        type="button"
+        (click)="setViewPreset('side')" 
+        class="px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition"
+        title="Vista Lateral / Perfil">
+        Lateral
+      </button>
+      <button 
+        type="button"
+        (click)="setViewPreset('top')" 
+        class="px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition"
+        title="Vista Superior / Planta">
+        Planta
+      </button>
+    </div>
+
+    <!-- Toggles: Open frentes, X-Ray, Reset -->
+    <div class="flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-md p-1 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto">
+      <!-- Open / Close doors & drawers -->
+      <button 
+        type="button"
+        (click)="toggleOpenClose()"
+        [class]="isOpenFrentes() ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
+        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
+        title="Abrir o cerrar puertas y cajones para ver el interior">
+        <span class="material-icons text-sm">{{ isOpenFrentes() ? 'door_open' : 'door_front' }}</span>
+        <span class="hidden sm:inline">{{ isOpenFrentes() ? 'Cerrar Frentes' : 'Abrir Frentes' }}</span>
+      </button>
+
+      <!-- Rayos X / Transparente -->
+      <button 
+        type="button"
+        (click)="toggleXRay()"
+        [class]="isXRay() ? 'bg-cyan-500 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
+        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
+        title="Activar transparencia de paneles para inspeccionar armado">
+        <span class="material-icons text-sm">visibility</span>
+        <span class="hidden sm:inline">Rayos X</span>
+      </button>
+
+      <!-- Reset Camera -->
+      <button 
+        type="button"
+        (click)="resetCamera()"
+        class="p-1 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition"
+        title="Centrar y reiniciar cámara">
+        <span class="material-icons text-sm">filter_center_focus</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- SELECTED PIECE HUD BADGE (Appears when user clicks any piece in 3D) -->
+  @if (selectedPieceName()) {
+    <div class="absolute top-14 left-3 bg-zinc-900/95 backdrop-blur-md border border-amber-500/50 p-2.5 rounded-xl shadow-xl max-w-sm pointer-events-auto animate-in fade-in zoom-in-95 duration-150">
+      <div class="flex items-center justify-between gap-2 mb-0.5">
+        <span class="text-xs font-bold text-amber-400 flex items-center gap-1">
+          <span class="material-icons text-xs">extension</span>
+          {{ selectedPieceName() }}
+        </span>
+        <button (click)="selectedPieceName.set(null)" class="text-zinc-500 hover:text-white">
+          <span class="material-icons text-xs">close</span>
+        </button>
+      </div>
+      <p class="text-[11px] text-zinc-300 font-mono">
+        {{ selectedPieceDetails() }}
+      </p>
+    </div>
+  }
+
+  <!-- BOTTOM TOOLBAR: Exploded View Slider & Navigation Help -->
+  <div class="absolute bottom-3 left-3 right-3 flex flex-col sm:flex-row items-center justify-between gap-2 pointer-events-none">
+    
+    <!-- Exploded view slider -->
+    <div class="flex items-center gap-2.5 bg-zinc-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto w-full sm:w-auto">
+      <span class="text-[11px] font-bold text-zinc-300 flex items-center gap-1 whitespace-nowrap">
+        <span class="material-icons text-xs text-amber-400">burst_mode</span>
+        Despiece 3D:
+      </span>
+      <input 
+        type="range" 
+        min="0" 
+        max="100" 
+        [value]="explodedPercent()"
+        (input)="explodedPercent.set(+$any($event.target).value)"
+        class="w-32 sm:w-44 accent-amber-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
+        title="Desliza para separar las piezas en el espacio 3D" />
+      <span class="text-[11px] font-mono font-bold text-amber-400 w-8 text-right">
+        {{ explodedPercent() }}%
+      </span>
+      @if (explodedPercent() > 0) {
+        <button 
+          (click)="explodedPercent.set(0)" 
+          class="text-[10px] text-zinc-400 hover:text-white underline ml-1">
+          Unir
+        </button>
+      }
+    </div>
+
+    <!-- Mouse Orbit Hint -->
+    <div class="hidden md:flex items-center gap-2 text-[10px] text-zinc-400 bg-zinc-950/80 px-2.5 py-1 rounded-lg border border-zinc-800/80 pointer-events-none">
+      <span>🖱️ Clic izquierdo: <strong>Rotar 360°</strong></span>
+      <span>•</span>
+      <span>Clic derecho: <strong>Desplazar</strong></span>
+      <span>•</span>
+      <span>Rueda: <strong>Zoom</strong></span>
+    </div>
+
+  </div>
+
+</div>
