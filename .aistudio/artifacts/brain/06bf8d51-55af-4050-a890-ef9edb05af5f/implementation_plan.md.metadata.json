@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para la persistencia de proyectos en la nube con Supabase y el nuevo tono de selección Azul Cobalt Blueprint técnico.",
-  "updatedAt":  "2026-09-28T18:09:55.876232687Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Plan de implementación para corregir el estiramiento unidireccional de piezas en el visor 3D, agregar historial de Deshacer/Rehacer (Undo/Redo con Ctrl+Z y Ctrl+Y), y configurar el guardado manual en la nube con interruptor de auto-guardado opcional.",
+  "updatedAt": "2026-09-30T03:03:28.426749645Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

@@ -23,7 +23,49 @@
 
       <!-- Action Buttons (Save Cloud / Projects / Load / Settings) -->
       <div class="flex items-center gap-2">
-        <!-- Botón Guardar en la Nube con Supabase -->
+
+        <!-- Undo / Redo History Controls -->
+        <div class="flex items-center bg-zinc-950/80 border border-zinc-800 rounded-lg p-0.5 shadow-sm">
+          <button 
+            type="button"
+            (click)="undo()" 
+            [disabled]="!canUndo()"
+            class="p-1.5 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center gap-1 text-xs"
+            title="Deshacer cambio (Ctrl+Z)">
+            <span class="material-icons text-base">undo</span>
+            <span class="hidden xl:inline text-[11px] font-medium pr-1">Deshacer</span>
+          </button>
+          <div class="w-px h-4 bg-zinc-800 my-auto"></div>
+          <button 
+            type="button"
+            (click)="redo()" 
+            [disabled]="!canRedo()"
+            class="p-1.5 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center gap-1 text-xs"
+            title="Rehacer cambio (Ctrl+Y)">
+            <span class="material-icons text-base">redo</span>
+            <span class="hidden xl:inline text-[11px] font-medium pr-1">Rehacer</span>
+          </button>
+        </div>
+
+        <!-- Switch Opcional de Auto-guardado en Nube -->
+        <button
+          type="button"
+          (click)="toggleAutoSync()"
+          [class]="autoSyncEnabled() 
+            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/50' 
+            : 'bg-zinc-800/80 border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition shadow-sm"
+          [title]="autoSyncEnabled() ? 'Auto-guardado en nube ACTIVADO (haz clic para desactivar)' : 'Auto-guardado en nube DESACTIVADO. Pulsa para activar la sincronización periódica automática.'">
+          <span 
+            [class]="autoSyncEnabled() ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-zinc-500'" 
+            class="w-2 h-2 rounded-full transition-colors"></span>
+          <span class="text-[11px] font-semibold hidden sm:inline">Auto</span>
+          <span class="text-[10px] uppercase font-bold tracking-wider" [class.text-emerald-400]="autoSyncEnabled()">
+            {{ autoSyncEnabled() ? 'ON' : 'OFF' }}
+          </span>
+        </button>
+
+        <!-- Botón Guardar en la Nube con Supabase (Manual) -->
         <button 
           (click)="saveCurrentToCloud()"
           [class]="syncStatus() === 'syncing' 

@@ -49,6 +49,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   // Outputs
   partSelected = output<Part | null>();
   partModified = output<{ part: Part; updates: Partial<Part> }>();
+  dragStarted = output<void>();
 
   // Canvas and Container refs
   canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas3d');
@@ -743,6 +744,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
           this.dragStartPointer = { x: e.clientX, y: e.clientY };
           this.dragInitialPart = { ...selPart };
 
+          // Notify parent to capture history snapshot before starting continuous drag
+          this.dragStarted.emit();
+
           // Disable camera rotation while dragging gizmo
           this.controls.enabled = false;
 
@@ -823,29 +827,63 @@ export class Furniture3dViewerComponent implements OnDestroy {
           this.partModified.emit({ part, updates });
         } else if (hit.type === 'handle') {
           // Edge Stretch Handle: Length or Width
+          // Directional stretching: grows ONLY towards the pulled side, keeping the opposite edge anchored
           const updates: Partial<Part> = {};
           const orient = part.orientation || 'horizontal';
 
           if (hit.handleTarget === 'length') {
             let axisDelta = 0;
+            let posAxis: 'posX' | 'posY' | 'posZ' = 'posX';
+
             if (orient === 'horizontal' || orient === 'vertical_xy') {
+              // Length along X axis
               axisDelta = deltaWorld.x * hit.dir;
+              posAxis = 'posX';
             } else {
+              // vertical_yz: Length is along Y axis (height)
               axisDelta = deltaWorld.y * hit.dir;
+              posAxis = 'posY';
             }
+
             const steppedDelta = Math.round(axisDelta / snap) * snap;
             const newLength = Math.max(50, part.length + steppedDelta);
+            const actualDelta = newLength - part.length;
+
             updates.length = newLength;
+            const currentPos = part[posAxis] ?? 0;
+            // Shifting center position by half of delta in handle direction anchors the opposite side
+            let newPos = currentPos + (actualDelta / 2) * hit.dir;
+            if (posAxis === 'posY') {
+              newPos = Math.max(newLength / 2, newPos);
+            }
+            updates[posAxis] = newPos;
+
           } else if (hit.handleTarget === 'width') {
             let axisDelta = 0;
+            let posAxis: 'posX' | 'posY' | 'posZ' = 'posZ';
+
             if (orient === 'horizontal' || orient === 'vertical_yz') {
+              // Width along Z axis (depth)
               axisDelta = deltaWorld.z * hit.dir;
+              posAxis = 'posZ';
             } else {
+              // vertical_xy: Width is along Y axis (height)
               axisDelta = deltaWorld.y * hit.dir;
+              posAxis = 'posY';
             }
+
             const steppedDelta = Math.round(axisDelta / snap) * snap;
             const newWidth = Math.max(50, part.width + steppedDelta);
+            const actualDelta = newWidth - part.width;
+
             updates.width = newWidth;
+            const currentPos = part[posAxis] ?? 0;
+            // Shifting center position by half of delta in handle direction anchors the opposite side
+            let newPos = currentPos + (actualDelta / 2) * hit.dir;
+            if (posAxis === 'posY') {
+              newPos = Math.max(newWidth / 2, newPos);
+            }
+            updates[posAxis] = newPos;
           }
 
           this.partModified.emit({ part, updates });

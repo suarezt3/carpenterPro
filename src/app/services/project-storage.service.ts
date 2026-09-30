@@ -31,6 +31,15 @@ export class ProjectStorageService {
 
   private autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // Undo / Redo history stacks (deep cloned snapshots)
+  private undoStack: Project[] = [];
+  private redoStack: Project[] = [];
+  readonly canUndo = signal<boolean>(false);
+  readonly canRedo = signal<boolean>(false);
+
+  // Cloud auto-sync preference (default: false, manual save with button)
+  readonly autoSyncEnabled = signal<boolean>(this.loadAutoSyncPreference());
+
   readonly currentProject = signal<Project>(this.getInitialProject());
   readonly savedProjects = signal<ProjectMeta[]>(this.loadSavedProjectsList());
 
@@ -47,6 +56,27 @@ export class ProjectStorageService {
 
   private isBrowser(): boolean {
     return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  }
+
+  private loadAutoSyncPreference(): boolean {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      return localStorage.getItem('melamipro_auto_sync_cloud') === 'true';
+    }
+    return false;
+  }
+
+  toggleAutoSync() {
+    const next = !this.autoSyncEnabled();
+    this.autoSyncEnabled.set(next);
+    if (this.isBrowser()) {
+      localStorage.setItem('melamipro_auto_sync_cloud', next ? 'true' : 'false');
+    }
+    if (next) {
+      this.scheduleCloudAutoSync(this.currentProject());
+    } else if (this.autoSyncTimeout) {
+      clearTimeout(this.autoSyncTimeout);
+      this.autoSyncTimeout = null;
+    }
   }
 
   constructor() {
@@ -285,9 +315,59 @@ export class ProjectStorageService {
     };
   }
 
+  // --- HISTORY (UNDO / REDO) ---
+
+  pushSnapshot() {
+    try {
+      const snap = JSON.parse(JSON.stringify(this.currentProject()));
+      this.undoStack.push(snap);
+      if (this.undoStack.length > 35) {
+        this.undoStack.shift();
+      }
+      this.redoStack = [];
+      this.canUndo.set(this.undoStack.length > 0);
+      this.canRedo.set(false);
+    } catch {
+      // Fallback
+    }
+  }
+
+  undo() {
+    if (this.undoStack.length === 0) return;
+    try {
+      const currentSnap = JSON.parse(JSON.stringify(this.currentProject()));
+      this.redoStack.push(currentSnap);
+      const prev = this.undoStack.pop()!;
+      this.currentProject.set(prev);
+      this.saveToStorage(prev);
+      this.canUndo.set(this.undoStack.length > 0);
+      this.canRedo.set(true);
+    } catch {
+      // Fallback
+    }
+  }
+
+  redo() {
+    if (this.redoStack.length === 0) return;
+    try {
+      const currentSnap = JSON.parse(JSON.stringify(this.currentProject()));
+      this.undoStack.push(currentSnap);
+      const next = this.redoStack.pop()!;
+      this.currentProject.set(next);
+      this.saveToStorage(next);
+      this.canUndo.set(true);
+      this.canRedo.set(this.redoStack.length > 0);
+    } catch {
+      // Fallback
+    }
+  }
+
   // --- CRUD OPERACIONES ---
 
-  updateProject(mutator: (p: Project) => Project) {
+  updateProject(mutator: (p: Project) => Project, recordHistory = true) {
+    if (recordHistory) {
+      this.pushSnapshot();
+    }
     const updated = mutator({ ...this.currentProject() });
     updated.updatedAt = new Date().toISOString();
     this.currentProject.set(updated);
@@ -320,8 +400,13 @@ export class ProjectStorageService {
     localStorage.setItem(`melamipro_project_${project.id}`, JSON.stringify(project));
     this.savedProjects.set(list);
 
-    // Schedule background autosync to Supabase (debounce 1.5s)
-    this.scheduleCloudAutoSync(project);
+    // Only sync to Supabase automatically if user enabled auto-sync
+    if (this.autoSyncEnabled()) {
+      this.scheduleCloudAutoSync(project);
+    } else if (this.autoSyncTimeout) {
+      clearTimeout(this.autoSyncTimeout);
+      this.autoSyncTimeout = null;
+    }
   }
 
   private scheduleCloudAutoSync(project: Project) {
@@ -577,11 +662,11 @@ export class ProjectStorageService {
     }));
   }
 
-  updatePart(part: Part) {
+  updatePart(part: Part, recordHistory = true) {
     this.updateProject(p => ({
       ...p,
       parts: p.parts.map(pt => pt.id === part.id ? part : pt)
-    }));
+    }), recordHistory);
   }
 
   duplicatePart(partId: string): Part | null {

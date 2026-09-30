@@ -92,9 +92,22 @@ export class ModuleDesignerComponent {
     this.projectService.updatePart(updated);
   }
 
+  // Called when starting a 3D gizmo translation or stretch drag
+  onDragStarted() {
+    this.projectService.pushSnapshot();
+  }
+
   // Receives real-time 3D translation & stretch changes directly from the 3D Viewer Gizmo
   onPartModifiedFromViewer(event: { part: Part; updates: Partial<Part> }) {
-    this.updateSelectedPart(event.updates);
+    const current = this.selectedPart();
+    if (!current) return;
+
+    const updated: Part = {
+      ...current,
+      ...event.updates
+    };
+    // Do not flood undo stack on every 5ms mousemove; snapshot was taken on dragStarted
+    this.projectService.updatePart(updated, false);
   }
 
   // Sets material and automatically synchronizes the matching thickness & name

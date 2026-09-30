@@ -82,7 +82,8 @@
         [selectedPartId]="selectedPartId()"
         [materials]="materials()"
         (partSelected)="onSelectPartFrom3D($event)"
-        (partModified)="onPartModifiedFromViewer($event)">
+        (partModified)="onPartModifiedFromViewer($event)"
+        (dragStarted)="onDragStarted()">
       </app-furniture-3d-viewer>
 
       <!-- BOTTOM PIECE CHIPS (Quick 1-Click selection & status of every piece in the 3D space) -->

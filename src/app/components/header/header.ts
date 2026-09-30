@@ -9,6 +9,9 @@ import { SlicePipe } from '@angular/common';
   selector: 'app-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, SlicePipe],
+  host: {
+    '(window:keydown)': 'handleGlobalKeyDown($event)'
+  },
   templateUrl: './header.html'
 })
 export class HeaderComponent {
@@ -33,6 +36,11 @@ export class HeaderComponent {
   readonly cloudProjects = this.supabase.cloudProjects;
   readonly syncStatus = this.supabase.syncStatus;
   readonly lastSyncTime = this.supabase.lastSyncTime;
+
+  // History & cloud controls
+  readonly canUndo = this.projectService.canUndo;
+  readonly canRedo = this.projectService.canRedo;
+  readonly autoSyncEnabled = this.projectService.autoSyncEnabled;
 
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -94,6 +102,56 @@ export class HeaderComponent {
       this.showNewProjectModal.set(false);
       this.selectTab('modules');
       this.showToast(`Proyecto "${name}" creado.`);
+    }
+  }
+
+  // --- UNDO / REDO & SHORTCUTS ---
+  undo() {
+    if (this.canUndo()) {
+      this.projectService.undo();
+      this.showToast('↺ Acción deshecha');
+    }
+  }
+
+  redo() {
+    if (this.canRedo()) {
+      this.projectService.redo();
+      this.showToast('↻ Acción rehecha');
+    }
+  }
+
+  toggleAutoSync() {
+    this.projectService.toggleAutoSync();
+    if (this.autoSyncEnabled()) {
+      this.showToast('☁️ Auto-guardado en nube ACTIVADO');
+    } else {
+      this.showToast('💾 Auto-guardado DESACTIVADO (Solo guardado manual)');
+    }
+  }
+
+  handleGlobalKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      if (e.shiftKey) {
+        if (this.canRedo()) {
+          e.preventDefault();
+          this.redo();
+        }
+      } else {
+        if (this.canUndo()) {
+          e.preventDefault();
+          this.undo();
+        }
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      if (this.canRedo()) {
+        e.preventDefault();
+        this.redo();
+      }
     }
   }
 
