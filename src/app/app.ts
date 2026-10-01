@@ -5,6 +5,7 @@ import { PartsListComponent } from './components/parts-list/parts-list';
 import { CutOptimizerViewComponent } from './components/cut-optimizer-view/cut-optimizer-view';
 import { BudgetViewComponent } from './components/budget-view/budget-view';
 import { LabelsViewComponent } from './components/labels-view/labels-view';
+import { ConfirmDialog } from './components/confirm-dialog/confirm-dialog';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -15,7 +16,8 @@ import { LabelsViewComponent } from './components/labels-view/labels-view';
     PartsListComponent,
     CutOptimizerViewComponent,
     BudgetViewComponent,
-    LabelsViewComponent
+    LabelsViewComponent,
+    ConfirmDialog
   ],
   templateUrl: './app.html',
   styleUrl: './app.css',

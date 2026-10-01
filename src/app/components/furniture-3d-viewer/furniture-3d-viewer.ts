@@ -30,6 +30,17 @@ interface GizmoHitData {
   dir: number;
 }
 
+export interface ClearanceInfo {
+  topClearance: number | null;
+  bottomClearance: number | null;
+  leftClearance: number | null;
+  rightClearance: number | null;
+  topNeighborName: string | null;
+  bottomNeighborName: string | null;
+  leftNeighborName: string | null;
+  rightNeighborName: string | null;
+}
+
 @Component({
   selector: 'app-furniture-3d-viewer',
   imports: [],
@@ -54,6 +65,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   partModified = output<{ part: Part; updates: Partial<Part> }>();
   multiplePartsModified = output<{ updates: { part: Part; updates: Partial<Part> }[] }>();
   dragStarted = output<void>();
+  clearanceCalculated = output<ClearanceInfo | null>();
 
   // Canvas and Container refs
   canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas3d');
@@ -64,6 +76,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   isXRay = signal<boolean>(false);
   explodedPercent = signal<number>(0);
   show3dDimensions = signal<boolean>(true);
+  showClearances = signal<boolean>(true);
   isWhiteTheme = signal<boolean>(true); // Default to clean pure white studio background
 
   // Precision Nudge & Magnetic Snapping
@@ -442,17 +455,25 @@ export class Furniture3dViewerComponent implements OnDestroy {
       });
     }
 
-    // Single piece selected -> Full Gizmo (Translation arrows + Edge Stretch handles) and 3D dimensions
+    // Single piece selected -> Full Gizmo (Translation arrows + Edge Stretch handles) and 3D dimensions & Clearances
     if (selectedDataList.length === 1) {
       const s = selectedDataList[0];
       if (showDims) {
         this.renderPieceDimensions(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
       }
+      if (this.showClearances()) {
+        this.renderClearanceDimensions(s.part, parts);
+      } else {
+        this.clearanceCalculated.emit(null);
+      }
       this.buildGizmo(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
-    } else if (selectedDataList.length > 1) {
-      // Multiple pieces selected (Group Assembly) -> Centered Group Translation Gizmo
-      const centroid = this.calculateCentroid(selectedDataList.map(d => d.part));
-      this.buildGroupGizmo(centroid.x, centroid.y, centroid.z);
+    } else {
+      this.clearanceCalculated.emit(null);
+      if (selectedDataList.length > 1) {
+        // Multiple pieces selected (Group Assembly) -> Centered Group Translation Gizmo
+        const centroid = this.calculateCentroid(selectedDataList.map(d => d.part));
+        this.buildGroupGizmo(centroid.x, centroid.y, centroid.z);
+      }
     }
   }
 
@@ -977,6 +998,256 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const sprite = new THREE.Sprite(spriteMat);
     sprite.scale.set(130, 42, 1);
     return sprite;
+  }
+
+  // Generates Emerald Green 3D billboard sprite for Clearance Dimensions (Luz Libre)
+  private createClearanceSprite(text: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    canvas.width = 280;
+    canvas.height = 80;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      ctx.fillStyle = 'rgba(6, 78, 59, 0.95)'; // emerald-900 glass
+      ctx.strokeStyle = '#10b981'; // emerald-500
+      ctx.lineWidth = 3.5;
+      const r = 16;
+      ctx.beginPath();
+      ctx.moveTo(r, 4);
+      ctx.lineTo(280 - r, 4);
+      ctx.quadraticCurveTo(280 - 4, 4, 280 - 4, r);
+      ctx.lineTo(280 - 4, 80 - r);
+      ctx.quadraticCurveTo(280 - 4, 80 - 4, 280 - r, 80 - 4);
+      ctx.lineTo(r, 80 - 4);
+      ctx.quadraticCurveTo(4, 80 - 4, 4, 80 - r);
+      ctx.lineTo(4, r);
+      ctx.quadraticCurveTo(4, 4, r, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ecfdf5'; // emerald-50
+      ctx.font = 'bold 30px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 140, 42);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(140, 42, 1);
+    return sprite;
+  }
+
+  // Dynamic Clearance Computation: Real-time useful internal clearances between shelves/sides/roof/floor
+  computeClearanceInfo(part: Part, allParts: Part[]): ClearanceInfo {
+    const selBounds = this.getPartBounds(part);
+    const others = allParts.filter(p => p.id !== part.id);
+
+    let topClearance: number | null = null;
+    let topNeighborName: string | null = null;
+    let bottomClearance: number | null = null;
+    let bottomNeighborName: string | null = null;
+    let leftClearance: number | null = null;
+    let leftNeighborName: string | null = null;
+    let rightClearance: number | null = null;
+    let rightNeighborName: string | null = null;
+
+    let minTopGap = Infinity;
+    let minBottomGap = Infinity;
+    let minLeftGap = Infinity;
+    let minRightGap = Infinity;
+
+    for (const o of others) {
+      const oBounds = this.getPartBounds(o);
+
+      // Overlap in X and Z (for vertical clearances: above & below)
+      const overlapX = Math.max(0, Math.min(selBounds.maxX, oBounds.maxX) - Math.max(selBounds.minX, oBounds.minX));
+      const overlapZ = Math.max(0, Math.min(selBounds.maxZ, oBounds.maxZ) - Math.max(selBounds.minZ, oBounds.minZ));
+
+      if (overlapX > 15 && overlapZ > 15) {
+        // Element directly above
+        if (oBounds.minY >= selBounds.maxY - 1) {
+          const gap = oBounds.minY - selBounds.maxY;
+          if (gap < minTopGap) {
+            minTopGap = gap;
+            topClearance = Math.round(gap);
+            topNeighborName = o.name;
+          }
+        }
+        // Element directly below
+        if (oBounds.maxY <= selBounds.minY + 1) {
+          const gap = selBounds.minY - oBounds.maxY;
+          if (gap < minBottomGap) {
+            minBottomGap = gap;
+            bottomClearance = Math.round(gap);
+            bottomNeighborName = o.name;
+          }
+        }
+      }
+
+      // Overlap in Y and Z (for horizontal clearances: left & right)
+      const overlapY = Math.max(0, Math.min(selBounds.maxY, oBounds.maxY) - Math.max(selBounds.minY, oBounds.minY));
+      if (overlapY > 15 && overlapZ > 15) {
+        // Element to the left
+        if (oBounds.maxX <= selBounds.minX + 1) {
+          const gap = selBounds.minX - oBounds.maxX;
+          if (gap < minLeftGap) {
+            minLeftGap = gap;
+            leftClearance = Math.round(gap);
+            leftNeighborName = o.name;
+          }
+        }
+        // Element to the right
+        if (oBounds.minX >= selBounds.maxX - 1) {
+          const gap = oBounds.minX - selBounds.maxX;
+          if (gap < minRightGap) {
+            minRightGap = gap;
+            rightClearance = Math.round(gap);
+            rightNeighborName = o.name;
+          }
+        }
+      }
+    }
+
+    return {
+      topClearance,
+      bottomClearance,
+      leftClearance,
+      rightClearance,
+      topNeighborName,
+      bottomNeighborName,
+      leftNeighborName,
+      rightNeighborName
+    };
+  }
+
+  // Draw 3D Technical Clearance Lines (Luz Libre)
+  private renderClearanceDimensions(part: Part, allParts: Part[]) {
+    const clr = this.computeClearanceInfo(part, allParts);
+    this.clearanceCalculated.emit(clr);
+
+    const selBounds = this.getPartBounds(part);
+    const lineMat = new THREE.LineDashedMaterial({
+      color: 0x10b981,
+      dashSize: 14,
+      gapSize: 7,
+      linewidth: 2,
+      depthTest: false
+    });
+    const tickMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2, depthTest: false });
+
+    // Render Vertical Top Clearance Line
+    if (clr.topClearance !== null && clr.topClearance > 5) {
+      const topY = selBounds.maxY + clr.topClearance;
+      const midY = (selBounds.maxY + topY) / 2;
+      const x = selBounds.px;
+      const z = selBounds.pz + selBounds.sz / 2 + 15;
+
+      const p1 = new THREE.Vector3(x, selBounds.maxY, z);
+      const p2 = new THREE.Vector3(x, topY, z);
+      const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      const dashedLine = new THREE.Line(geo, lineMat);
+      dashedLine.computeLineDistances();
+      this.dimensionGroup.add(dashedLine);
+
+      // Arrow ticks
+      const tickW = 18;
+      const t1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x - tickW, selBounds.maxY, z),
+        new THREE.Vector3(x + tickW, selBounds.maxY, z)
+      ]), tickMat);
+      const t2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x - tickW, topY, z),
+        new THREE.Vector3(x + tickW, topY, z)
+      ]), tickMat);
+      this.dimensionGroup.add(t1, t2);
+
+      const sprite = this.createClearanceSprite(`↕ Luz: ${clr.topClearance} mm`);
+      sprite.position.set(x, midY, z + 12);
+      this.dimensionGroup.add(sprite);
+    }
+
+    // Render Vertical Bottom Clearance Line
+    if (clr.bottomClearance !== null && clr.bottomClearance > 5) {
+      const botY = selBounds.minY - clr.bottomClearance;
+      const midY = (selBounds.minY + botY) / 2;
+      const x = selBounds.px;
+      const z = selBounds.pz + selBounds.sz / 2 + 15;
+
+      const p1 = new THREE.Vector3(x, botY, z);
+      const p2 = new THREE.Vector3(x, selBounds.minY, z);
+      const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      const dashedLine = new THREE.Line(geo, lineMat);
+      dashedLine.computeLineDistances();
+      this.dimensionGroup.add(dashedLine);
+
+      const tickW = 18;
+      const t1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x - tickW, botY, z),
+        new THREE.Vector3(x + tickW, botY, z)
+      ]), tickMat);
+      const t2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x - tickW, selBounds.minY, z),
+        new THREE.Vector3(x + tickW, selBounds.minY, z)
+      ]), tickMat);
+      this.dimensionGroup.add(t1, t2);
+
+      const sprite = this.createClearanceSprite(`↕ Luz: ${clr.bottomClearance} mm`);
+      sprite.position.set(x, midY, z + 12);
+      this.dimensionGroup.add(sprite);
+    }
+
+    // Render Horizontal Left Clearance Line
+    if (clr.leftClearance !== null && clr.leftClearance > 5) {
+      const leftX = selBounds.minX - clr.leftClearance;
+      const midX = (selBounds.minX + leftX) / 2;
+      const y = selBounds.py;
+      const z = selBounds.pz + selBounds.sz / 2 + 15;
+
+      const p1 = new THREE.Vector3(leftX, y, z);
+      const p2 = new THREE.Vector3(selBounds.minX, y, z);
+      const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      const dashedLine = new THREE.Line(geo, lineMat);
+      dashedLine.computeLineDistances();
+      this.dimensionGroup.add(dashedLine);
+
+      const sprite = this.createClearanceSprite(`↔ Luz: ${clr.leftClearance} mm`);
+      sprite.position.set(midX, y + 25, z + 12);
+      this.dimensionGroup.add(sprite);
+    }
+
+    // Render Horizontal Right Clearance Line
+    if (clr.rightClearance !== null && clr.rightClearance > 5) {
+      const rightX = selBounds.maxX + clr.rightClearance;
+      const midX = (selBounds.maxX + rightX) / 2;
+      const y = selBounds.py;
+      const z = selBounds.pz + selBounds.sz / 2 + 15;
+
+      const p1 = new THREE.Vector3(selBounds.maxX, y, z);
+      const p2 = new THREE.Vector3(rightX, y, z);
+      const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      const dashedLine = new THREE.Line(geo, lineMat);
+      dashedLine.computeLineDistances();
+      this.dimensionGroup.add(dashedLine);
+
+      const sprite = this.createClearanceSprite(`↔ Luz: ${clr.rightClearance} mm`);
+      sprite.position.set(midX, y + 25, z + 12);
+      this.dimensionGroup.add(sprite);
+    }
+  }
+
+  toggleClearances() {
+    this.showClearances.update(v => !v);
+    this.buildFurnitureScene(
+      this.parts(),
+      this.activeSelectedIds(),
+      this.materials(),
+      this.isXRay(),
+      this.show3dDimensions()
+    );
   }
 
   private updateExplodedOffsets(percent: number) {

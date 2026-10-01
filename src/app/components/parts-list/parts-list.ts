@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { EdgeBandingType, GrainDirection, Part } from '../../models/melamine.models';
+import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 
 @Component({
   selector: 'app-parts-list',
@@ -11,6 +12,7 @@ import { EdgeBandingType, GrainDirection, Part } from '../../models/melamine.mod
 })
 export class PartsListComponent {
   private projectService = inject(ProjectStorageService);
+  private confirmService = inject(ConfirmDialogService);
   private fb = inject(FormBuilder);
 
   readonly project = this.projectService.currentProject;
@@ -213,8 +215,18 @@ export class PartsListComponent {
     this.projectService.updatePart(updated);
   }
 
-  deletePart(partId: string) {
-    if (confirm('¿Eliminar esta pieza de la lista de corte?')) {
+  async deletePart(partId: string) {
+    const part = this.parts().find(p => p.id === partId);
+    const partName = part ? `"${part.name}"` : 'esta pieza';
+    const confirmed = await this.confirmService.ask({
+      title: '¿Eliminar pieza de la lista?',
+      message: `Se eliminará ${partName} del despiece y de todos los cálculos de corte.`,
+      confirmText: 'Eliminar Pieza',
+      cancelText: 'Cancelar',
+      severity: 'danger'
+    });
+
+    if (confirmed) {
       this.projectService.deletePart(partId);
     }
   }

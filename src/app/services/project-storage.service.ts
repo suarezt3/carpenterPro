@@ -22,6 +22,29 @@ export interface ProjectMeta {
   partsCount: number;
 }
 
+export function formatCurrencyValue(amount: number, currency = 'COP'): string {
+  const num = Number(amount) || 0;
+  const curr = (currency || 'COP').toUpperCase();
+
+  switch (curr) {
+    case 'COP':
+      return '$ ' + Math.round(num).toLocaleString('es-CO') + ' COP';
+    case 'CLP':
+      return '$ ' + Math.round(num).toLocaleString('es-CL') + ' CLP';
+    case 'ARS':
+      return '$ ' + Math.round(num).toLocaleString('es-AR') + ' ARS';
+    case 'MXN':
+      return '$ ' + num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' MXN';
+    case 'EUR':
+      return num.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' € EUR';
+    case 'PEN':
+      return 'S/ ' + num.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' PEN';
+    case 'USD':
+    default:
+      return '$ ' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + curr;
+  }
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -53,6 +76,20 @@ export class ProjectStorageService {
   readonly partsList = computed(() => this.currentProject().parts);
   readonly hardwareList = computed(() => this.currentProject().hardware);
   readonly projectSettings = computed(() => this.currentProject().settings);
+
+  formatCurrency(amount: number): string {
+    return formatCurrencyValue(amount, this.projectSettings().currency);
+  }
+
+  updateCurrency(currency: string) {
+    this.updateProject(p => ({
+      ...p,
+      settings: {
+        ...p.settings,
+        currency
+      }
+    }));
+  }
 
   private isBrowser(): boolean {
     return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -110,7 +147,7 @@ export class ProjectStorageService {
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
-      sheetCost: 48.50,
+      sheetCost: 195000,
       hasGrain: true,
       colorHex: '#b48a60',
       textureType: 'wood'
@@ -122,7 +159,7 @@ export class ProjectStorageService {
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
-      sheetCost: 36.00,
+      sheetCost: 145000,
       hasGrain: false,
       colorHex: '#f1f1f1',
       textureType: 'solid'
@@ -134,7 +171,7 @@ export class ProjectStorageService {
       thickness: 15,
       sheetLength: 2440,
       sheetWidth: 1830,
-      sheetCost: 32.00,
+      sheetCost: 130000,
       hasGrain: false,
       colorHex: '#9ca3af',
       textureType: 'solid'
@@ -146,7 +183,7 @@ export class ProjectStorageService {
       thickness: 3,
       sheetLength: 2440,
       sheetWidth: 1830,
-      sheetCost: 14.00,
+      sheetCost: 45000,
       hasGrain: false,
       colorHex: '#e5e5e5',
       textureType: 'solid'
@@ -273,7 +310,7 @@ export class ProjectStorageService {
         category: 'screw',
         unit: 'caja',
         quantity: 1,
-        unitCost: 6.50
+        unitCost: 18000
       },
       {
         id: 'hw_corners',
@@ -281,7 +318,7 @@ export class ProjectStorageService {
         category: 'support',
         unit: 'und',
         quantity: 8,
-        unitCost: 0.60
+        unitCost: 2500
       }
     ];
 
@@ -290,10 +327,10 @@ export class ProjectStorageService {
       trimMargin: 10,
       thinEdgeThickness: 0.45,
       thickEdgeThickness: 2.0,
-      thinEdgeCostPerMeter: 0.40,
-      thickEdgeCostPerMeter: 1.10,
+      thinEdgeCostPerMeter: 1800,
+      thickEdgeCostPerMeter: 4200,
       optimizationPreference: 'best_fit',
-      currency: 'USD'
+      currency: 'COP'
     };
 
     return {
@@ -307,7 +344,7 @@ export class ProjectStorageService {
       modules: [],
       parts: initialParts,
       hardware: initialHardware,
-      laborCost: 120,
+      laborCost: 350000,
       laborType: 'fixed',
       profitMarginPercent: 25,
       taxPercent: 0,
@@ -462,6 +499,14 @@ export class ProjectStorageService {
         console.error('Error loading project by ID', e);
       }
     }
+  }
+
+  deleteLocalProject(id: string) {
+    if (!this.isBrowser()) return;
+    localStorage.removeItem(`melamipro_project_${id}`);
+    const list = this.loadSavedProjectsList().filter(p => p.id !== id);
+    localStorage.setItem(PROJECTS_LIST_KEY, JSON.stringify(list));
+    this.savedProjects.set(list);
   }
 
   createNewProject(name = 'Nuevo Proyecto de Muebles', clientName = '') {

@@ -13,7 +13,8 @@ import {
   Part,
   PartOrientation
 } from '../../models/melamine.models';
-import { Furniture3dViewerComponent } from '../furniture-3d-viewer/furniture-3d-viewer';
+import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
+import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 
 @Component({
   selector: 'app-module-designer',
@@ -23,6 +24,7 @@ import { Furniture3dViewerComponent } from '../furniture-3d-viewer/furniture-3d-
 })
 export class ModuleDesignerComponent {
   private projectService = inject(ProjectStorageService);
+  private confirmService = inject(ConfirmDialogService);
 
   readonly project = this.projectService.currentProject;
   readonly materials = this.projectService.materialsList;
@@ -32,6 +34,8 @@ export class ModuleDesignerComponent {
   readonly selectedPartId = signal<string | null>(null);
   // Selected Multiple Part IDs in 3D (Shift-Click or Select All)
   readonly selectedPartIds = signal<string[]>([]);
+  // Dynamic Clearance Info from 3D (Luz libre a elementos adyacentes)
+  readonly clearanceInfo = signal<ClearanceInfo | null>(null);
 
   // Active dock tab: 'piece' (properties of selected part) or 'catalog' (add pieces & tree)
   readonly activeDockTab = signal<'piece' | 'catalog'>('catalog');
@@ -257,12 +261,41 @@ export class ModuleDesignerComponent {
     }
   }
 
-  deleteSelectedPart() {
+  async deleteSelectedPart() {
+    const selIds = this.selectedPartIds();
     const selId = this.selectedPartId();
+    if (selIds.length > 1) {
+      const confirmed = await this.confirmService.ask({
+        title: `¿Eliminar ${selIds.length} piezas seleccionadas?`,
+        message: 'Se eliminarán del modelo 3D todas las piezas seleccionadas actualmente en grupo. Puedes deshacer esta acción con el botón Deshacer o Ctrl+Z.',
+        confirmText: `Eliminar ${selIds.length} piezas`,
+        cancelText: 'Cancelar',
+        severity: 'danger'
+      });
+      if (!confirmed) return;
+      for (const id of selIds) {
+        this.projectService.deletePart(id);
+      }
+      this.selectedPartIds.set([]);
+      this.selectedPartId.set(null);
+      this.activeDockTab.set('catalog');
+      return;
+    }
+
     if (!selId) return;
+    const part = this.currentParts().find(p => p.id === selId);
+    const partName = part ? `"${part.name}"` : 'la pieza';
+    const confirmed = await this.confirmService.ask({
+      title: '¿Eliminar pieza del despiece?',
+      message: `Se eliminará ${partName} del modelo 3D y del listado de corte. Puedes deshacer esta acción si lo necesitas.`,
+      confirmText: 'Eliminar Pieza',
+      cancelText: 'Cancelar',
+      severity: 'danger'
+    });
+    if (!confirmed) return;
 
     this.projectService.deletePart(selId);
-    const remaining = this.currentParts();
+    const remaining = this.currentParts().filter(p => p.id !== selId);
     if (remaining.length > 0) {
       this.selectedPartId.set(remaining[0].id);
     } else {
@@ -271,10 +304,21 @@ export class ModuleDesignerComponent {
     }
   }
 
-  deletePartById(id: string, event?: Event) {
+  async deletePartById(id: string, event?: Event) {
     if (event) {
       event.stopPropagation();
     }
+    const part = this.currentParts().find(p => p.id === id);
+    const partName = part ? `"${part.name}"` : 'la pieza';
+    const confirmed = await this.confirmService.ask({
+      title: '¿Eliminar pieza del despiece?',
+      message: `Se eliminará ${partName} del modelo 3D y de los cálculos del mueble.`,
+      confirmText: 'Eliminar Pieza',
+      cancelText: 'Cancelar',
+      severity: 'danger'
+    });
+    if (!confirmed) return;
+
     this.projectService.deletePart(id);
     if (this.selectedPartId() === id) {
       this.selectedPartId.set(null);
@@ -524,11 +568,27 @@ export class ModuleDesignerComponent {
     this.activeDockTab.set('piece');
   }
 
+  onClearanceCalculated(info: ClearanceInfo | null) {
+    this.clearanceInfo.set(info);
+  }
+
   // --- ACTIONS: START BLANK OR LOAD TEMPLATES ---
 
-  startBlank() {
+  async startBlank() {
+    if (this.currentParts().length > 0) {
+      const confirmed = await this.confirmService.ask({
+        title: '¿Limpiar lienzo 3D?',
+        message: 'Se eliminarán todas las piezas del modelo actual para comenzar un mueble desde cero. Puedes deshacer esta acción inmediatamente con el botón Deshacer o Ctrl+Z.',
+        confirmText: 'Limpiar Todo',
+        cancelText: 'Cancelar',
+        severity: 'warning'
+      });
+      if (!confirmed) return;
+    }
     this.projectService.clearFurniture();
     this.selectedPartId.set(null);
+    this.selectedPartIds.set([]);
+    this.clearanceInfo.set(null);
     this.activeDockTab.set('catalog');
   }
 

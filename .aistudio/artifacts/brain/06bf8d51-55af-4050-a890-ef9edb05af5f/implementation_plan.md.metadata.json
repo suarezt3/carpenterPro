@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para rediseño visual y ergonómico UI/UX: tipografía Plus Jakarta Sans y JetBrains Mono, barra superior compacta sin desbordamiento (ocultando Etiquetas y optimizando el título y botones), y layout dinámico a pantalla completa (100vh) adaptable automáticamente a monitores 1080p y 2K sin scroll vertical molesto.",
-  "updatedAt":  "2026-10-01T01:13:21.174904149Z",
+  "summary":  "Plan de implementación para la integración de Pesos Colombianos (COP) por defecto con formateo numérico localizado y selector multimoneda, sistema de modales emergentes estilizados para confirmación de eliminación segura (reemplazando window.confirm), y herramienta CAD avanzada estilo SketchUp de cotas dinámicas de luz libre y distancias entre estantes y divisiones.",
+  "updatedAt":  "2026-10-01T01:31:38.391390902Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

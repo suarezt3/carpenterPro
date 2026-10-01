@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal, output, input } from '@angular/core';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
+import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { ProjectSettings } from '../../models/melamine.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SlicePipe } from '@angular/common';
@@ -16,6 +17,7 @@ import { SlicePipe } from '@angular/common';
 })
 export class HeaderComponent {
   private projectService = inject(ProjectStorageService);
+  private confirmService = inject(ConfirmDialogService);
   private fb = inject(FormBuilder);
 
   activeTab = input<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>('modules');
@@ -55,9 +57,9 @@ export class HeaderComponent {
     trimMargin: [10, [Validators.required, Validators.min(0)]],
     thinEdgeThickness: [0.45, [Validators.required, Validators.min(0)]],
     thickEdgeThickness: [2.0, [Validators.required, Validators.min(0)]],
-    thinEdgeCostPerMeter: [0.40, [Validators.required, Validators.min(0)]],
-    thickEdgeCostPerMeter: [1.10, [Validators.required, Validators.min(0)]],
-    currency: ['USD', Validators.required],
+    thinEdgeCostPerMeter: [1800, [Validators.required, Validators.min(0)]],
+    thickEdgeCostPerMeter: [4200, [Validators.required, Validators.min(0)]],
+    currency: ['COP', Validators.required],
     optimizationPreference: ['best_fit', Validators.required]
   });
 
@@ -177,7 +179,15 @@ export class HeaderComponent {
 
   async deleteCloudProject(item: CloudProjectRecord, event: Event) {
     event.stopPropagation();
-    if (confirm(`¿Eliminar definitivamente el proyecto "${item.name}" de Supabase?`)) {
+    const confirmed = await this.confirmService.ask({
+      title: '¿Eliminar proyecto de la nube?',
+      message: `El proyecto "${item.name}" se eliminará permanentemente de tu base de datos de Supabase. Esta acción no se puede deshacer.`,
+      confirmText: 'Eliminar de la nube',
+      cancelText: 'Cancelar',
+      severity: 'danger'
+    });
+
+    if (confirmed) {
       const ok = await this.projectService.deleteCloudProject(item.id);
       if (ok) {
         this.showToast('Proyecto eliminado de la nube');
@@ -210,10 +220,35 @@ export class HeaderComponent {
     this.showProjectsModal.set(false);
   }
 
-  resetDemo() {
-    if (confirm('¿Restablecer el proyecto de demostración (Cocina Roble & Blanco)? Los cambios no exportados se sobrescribirán.')) {
+  async deleteLocalProject(meta: ProjectMeta, event: Event) {
+    event.stopPropagation();
+    const confirmed = await this.confirmService.ask({
+      title: '¿Eliminar proyecto local?',
+      message: `El proyecto "${meta.name}" se eliminará permanentemente de la memoria local de tu navegador.`,
+      confirmText: 'Eliminar Proyecto',
+      cancelText: 'Cancelar',
+      severity: 'danger'
+    });
+
+    if (confirmed) {
+      this.projectService.deleteLocalProject(meta.id);
+      this.showToast('Proyecto eliminado de la memoria local');
+    }
+  }
+
+  async resetDemo() {
+    const confirmed = await this.confirmService.ask({
+      title: '¿Restablecer mueble demo?',
+      message: 'Se cargará el mueble demo de barra en Melamina Roble y Blanco con precios en Pesos Colombianos (COP). Cualquier cambio no guardado en la nube o exportado en JSON se sobrescribirá.',
+      confirmText: 'Restablecer Demo',
+      cancelText: 'Volver',
+      severity: 'warning'
+    });
+
+    if (confirmed) {
       this.projectService.resetToDemo();
       this.showProjectsModal.set(false);
+      this.showToast('Mueble demo restablecido');
     }
   }
 

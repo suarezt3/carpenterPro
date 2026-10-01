@@ -61,7 +61,8 @@
           (partsSelected)="onPartsSelectedFrom3D($event)"
           (partModified)="onPartModifiedFromViewer($event)"
           (multiplePartsModified)="onMultiplePartsModifiedFromViewer($event)"
-          (dragStarted)="onDragStarted()">
+          (dragStarted)="onDragStarted()"
+          (clearanceCalculated)="onClearanceCalculated($event)">
         </app-furniture-3d-viewer>
       </div>
 
@@ -266,6 +267,87 @@
 
             </div>
 
+            <!-- SECCIÓN CAD: LUZ LIBRE Y HUECOS ÚTILES (ESTILO SKETCHUP) -->
+            @if (clearanceInfo(); as clr) {
+              <div class="bg-emerald-950/20 border border-emerald-500/35 rounded-xl p-3 space-y-2.5 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                    <span class="material-icons text-sm">unfold_more</span>
+                    Luz Libre (Espacio Interior Útil)
+                  </span>
+                  <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
+                    CAD 3D
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <!-- Arriba -->
+                  <div class="p-2 bg-zinc-950/70 rounded-lg border border-zinc-800/90">
+                    <span class="text-[10px] text-zinc-400 flex items-center gap-1 mb-0.5">
+                      <span class="material-icons text-xs text-emerald-400">arrow_upward</span>
+                      Hacia Arriba:
+                    </span>
+                    @if (clr.topClearance !== null) {
+                      <p class="font-mono font-bold text-emerald-300 text-sm">{{ clr.topClearance }} mm</p>
+                      <p class="text-[9px] text-zinc-500 truncate" [title]="clr.topNeighborName || ''">
+                        hasta {{ clr.topNeighborName }}
+                      </p>
+                    } @else {
+                      <p class="font-mono text-zinc-500 text-xs italic">Espacio abierto</p>
+                    }
+                  </div>
+
+                  <!-- Abajo -->
+                  <div class="p-2 bg-zinc-950/70 rounded-lg border border-zinc-800/90">
+                    <span class="text-[10px] text-zinc-400 flex items-center gap-1 mb-0.5">
+                      <span class="material-icons text-xs text-emerald-400">arrow_downward</span>
+                      Hacia Abajo:
+                    </span>
+                    @if (clr.bottomClearance !== null) {
+                      <p class="font-mono font-bold text-emerald-300 text-sm">{{ clr.bottomClearance }} mm</p>
+                      <p class="text-[9px] text-zinc-500 truncate" [title]="clr.bottomNeighborName || ''">
+                        hasta {{ clr.bottomNeighborName }}
+                      </p>
+                    } @else {
+                      <p class="font-mono text-zinc-500 text-xs italic">Hasta el suelo</p>
+                    }
+                  </div>
+
+                  <!-- Izquierda -->
+                  <div class="p-2 bg-zinc-950/70 rounded-lg border border-zinc-800/90">
+                    <span class="text-[10px] text-zinc-400 flex items-center gap-1 mb-0.5">
+                      <span class="material-icons text-xs text-cyan-400">arrow_back</span>
+                      Hacia Izquierda:
+                    </span>
+                    @if (clr.leftClearance !== null) {
+                      <p class="font-mono font-bold text-cyan-300 text-sm">{{ clr.leftClearance }} mm</p>
+                      <p class="text-[9px] text-zinc-500 truncate" [title]="clr.leftNeighborName || ''">
+                        hasta {{ clr.leftNeighborName }}
+                      </p>
+                    } @else {
+                      <p class="font-mono text-zinc-500 text-xs italic">Espacio abierto</p>
+                    }
+                  </div>
+
+                  <!-- Derecha -->
+                  <div class="p-2 bg-zinc-950/70 rounded-lg border border-zinc-800/90">
+                    <span class="text-[10px] text-zinc-400 flex items-center gap-1 mb-0.5">
+                      <span class="material-icons text-xs text-cyan-400">arrow_forward</span>
+                      Hacia Derecha:
+                    </span>
+                    @if (clr.rightClearance !== null) {
+                      <p class="font-mono font-bold text-cyan-300 text-sm">{{ clr.rightClearance }} mm</p>
+                      <p class="text-[9px] text-zinc-500 truncate" [title]="clr.rightNeighborName || ''">
+                        hasta {{ clr.rightNeighborName }}
+                      </p>
+                    } @else {
+                      <p class="font-mono text-zinc-500 text-xs italic">Espacio abierto</p>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+
             <!-- SECTION 2: TABLERO & MELAMINA ASIGNADA (Espesor sincronizado al 100%) -->
             <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2.5">
               <div class="flex items-center justify-between">
@@ -419,6 +501,76 @@
               </div>
 
             </div>
+
+            <!-- SECTION CAD: COTAS DE LUZ LIBRE (HUECOS ÚTILES ENTRE PIEZAS) -->
+            @if (clearanceInfo(); as clr) {
+              @if (clr.topClearance !== null || clr.bottomClearance !== null || clr.leftClearance !== null || clr.rightClearance !== null) {
+                <div class="bg-emerald-950/30 p-3 rounded-xl border border-emerald-700/60 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                      <span class="material-icons text-xs text-emerald-400">straighten</span>
+                      Luz Libre Útil (CAD SketchUp)
+                    </span>
+                    <span class="text-[10px] font-mono font-bold bg-emerald-900/80 text-emerald-200 px-1.5 py-0.5 rounded border border-emerald-600/40">
+                      Hueco Neto
+                    </span>
+                  </div>
+                  <p class="text-[10px] text-emerald-200/70 leading-tight">
+                    Distancias interiores netas hasta las piezas adyacentes (descontando espesores):
+                  </p>
+                  <div class="grid grid-cols-2 gap-2 text-xs">
+                    @if (clr.topClearance !== null) {
+                      <div class="bg-zinc-900/90 p-2 rounded-lg border border-emerald-800/50">
+                        <span class="text-[10px] text-zinc-400 flex items-center gap-1">
+                          <span class="material-icons text-[12px] text-emerald-400">arrow_upward</span>
+                          Arriba:
+                        </span>
+                        <p class="text-sm font-bold text-emerald-300 font-mono mt-0.5">{{ clr.topClearance }} mm</p>
+                        @if (clr.topNeighborName) {
+                          <p class="text-[9px] text-zinc-500 truncate mt-0.5" [title]="clr.topNeighborName">Hasta {{ clr.topNeighborName }}</p>
+                        }
+                      </div>
+                    }
+                    @if (clr.bottomClearance !== null) {
+                      <div class="bg-zinc-900/90 p-2 rounded-lg border border-emerald-800/50">
+                        <span class="text-[10px] text-zinc-400 flex items-center gap-1">
+                          <span class="material-icons text-[12px] text-emerald-400">arrow_downward</span>
+                          Abajo:
+                        </span>
+                        <p class="text-sm font-bold text-emerald-300 font-mono mt-0.5">{{ clr.bottomClearance }} mm</p>
+                        @if (clr.bottomNeighborName) {
+                          <p class="text-[9px] text-zinc-500 truncate mt-0.5" [title]="clr.bottomNeighborName">Hasta {{ clr.bottomNeighborName }}</p>
+                        }
+                      </div>
+                    }
+                    @if (clr.leftClearance !== null) {
+                      <div class="bg-zinc-900/90 p-2 rounded-lg border border-emerald-800/50">
+                        <span class="text-[10px] text-zinc-400 flex items-center gap-1">
+                          <span class="material-icons text-[12px] text-emerald-400">arrow_back</span>
+                          Izquierda:
+                        </span>
+                        <p class="text-sm font-bold text-emerald-300 font-mono mt-0.5">{{ clr.leftClearance }} mm</p>
+                        @if (clr.leftNeighborName) {
+                          <p class="text-[9px] text-zinc-500 truncate mt-0.5" [title]="clr.leftNeighborName">Hasta {{ clr.leftNeighborName }}</p>
+                        }
+                      </div>
+                    }
+                    @if (clr.rightClearance !== null) {
+                      <div class="bg-zinc-900/90 p-2 rounded-lg border border-emerald-800/50">
+                        <span class="text-[10px] text-zinc-400 flex items-center gap-1">
+                          <span class="material-icons text-[12px] text-emerald-400">arrow_forward</span>
+                          Derecha:
+                        </span>
+                        <p class="text-sm font-bold text-emerald-300 font-mono mt-0.5">{{ clr.rightClearance }} mm</p>
+                        @if (clr.rightNeighborName) {
+                          <p class="text-[9px] text-zinc-500 truncate mt-0.5" [title]="clr.rightNeighborName">Hasta {{ clr.rightNeighborName }}</p>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            }
 
             <!-- SECTION 3: ORIENTACIÓN ESPACIAL -->
             <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2">

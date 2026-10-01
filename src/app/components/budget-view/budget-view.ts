@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ProjectStorageService } from '../../services/project-storage.service';
+import { ProjectStorageService, formatCurrencyValue } from '../../services/project-storage.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { HardwareItem, Material } from '../../models/melamine.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 
 @Component({
   selector: 'app-budget-view',
@@ -12,6 +13,7 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
 })
 export class BudgetViewComponent {
   private projectService = inject(ProjectStorageService);
+  private confirmService = inject(ConfirmDialogService);
   private optimizer = inject(CutOptimizerService);
   private fb = inject(FormBuilder);
 
@@ -180,8 +182,20 @@ export class BudgetViewComponent {
     });
   }
 
-  deleteHardwareItem(itemId: string) {
-    this.projectService.deleteHardware(itemId);
+  async deleteHardwareItem(itemId: string) {
+    const item = this.hardware().find(h => h.id === itemId);
+    const itemName = item ? `"${item.name}"` : 'este herraje';
+    const confirmed = await this.confirmService.ask({
+      title: '¿Eliminar herraje del presupuesto?',
+      message: `Se eliminará ${itemName} del listado de herrajes y costos adicionales.`,
+      confirmText: 'Eliminar Herraje',
+      cancelText: 'Cancelar',
+      severity: 'danger'
+    });
+
+    if (confirmed) {
+      this.projectService.deleteHardware(itemId);
+    }
   }
 
   openAddHardware() {
@@ -216,5 +230,16 @@ export class BudgetViewComponent {
 
   printQuote() {
     window.print();
+  }
+
+  format(amount: number): string {
+    return formatCurrencyValue(amount, this.settings().currency);
+  }
+
+  setCurrency(event: Event) {
+    const select = event.target as HTMLSelectElement;
+    if (select && select.value) {
+      this.projectService.updateCurrency(select.value);
+    }
   }
 }

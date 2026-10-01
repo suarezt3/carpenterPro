@@ -1,85 +1,106 @@
-# Rediseño UI/UX: Tipografía Técnica, Barra Superior Compacta y Adaptación Dinámica 1080p / 2K
+# Herramientas CAD Profesionales: Cotas Dinámicas de Luz Libre, Moneda COP y Modal de Confirmación Estilizado
 
-Transformación integral de la experiencia visual y ergonómica de MelamiPro Studio. Se integran las fuentes **Plus Jakarta Sans** (interfaz moderna, limpia y sin ruido) y **JetBrains Mono** (cotas, dimensiones y métricas técnicas); se rediseña la barra superior en formato ultra-compacto de alta densidad eliminando desbordamientos (ocultando la pestaña "Etiquetas" y compactando el título/cliente); y se adopta un layout dinámico a pantalla completa (`100vh`) donde el visor 3D y el panel lateral se adaptan automáticamente a monitores **1080p y 2K** sin provocar barras de scroll vertical innecesarias.
+Este plan detalla la incorporación de tres mejoras solicitadas para elevar MelamiPro Studio al nivel de herramientas profesionales como SketchUp y Polyboard:
+1. **Cotas Dinámicas de Luz Libre (Clearance Dimensions)**: Cálculo y renderizado 3D en tiempo real del espacio interior útil entre estantes, techos, bases y divisiones verticales (medida libre para carpintería sin sumar/restar grosores a mano).
+2. **Pesos Colombianos (COP) Predeterminado & Selector Multimoneda**: Formateo numérico regional estricto (miles con puntos `$ 1.450.000 COP`, sin decimales para COP/CLP) con selector accesible tanto en la barra de configuración como en la vista de presupuesto.
+3. **Sistema de Modales de Confirmación Estilizados**: Sustitución integral de los diálogos nativos `window.confirm` por un modal emergente con diseño de taller oscuro, animación suave, soporte de teclado (Escape/Enter) y advertencia visual de seguridad.
+
+---
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Decisiones y preferencias confirmadas por el usuario:
-> 1. **Tipografía**: Plus Jakarta Sans moderna para la interfaz y textos generales, combinada con JetBrains Mono para cotas milimétricas, coordenadas y números tabulares.
-> 2. **Adaptación de Pantalla (1080p y 2K)**: Ajuste dinámico a pantalla completa (`100vh`) sin scroll vertical en el navegador. En 1080p todos los controles caben a la vista; en 2K el visor 3D y el panel lateral se expanden automáticamente aprovechando cada píxel disponible.
-> 3. **Barra Superior**: Ocultar la sección "5. Etiquetas" para liberar espacio horizontal, remover o compactar el subtítulo largo de proyecto/cliente en el logo, y aplicar botones compactos de alta densidad para evitar cualquier desbordamiento lateral.
-> 4. **Reducción de Ruido Visual**: Limpieza de textos redundantes, tarjetas y bordes pesados, aplicando un diseño CAD refinado y profesional estilo software de ingeniería moderna.
+> Decisiones confirmadas por el usuario en la fase interactiva:
+> 1. **Moneda**: Pesos Colombianos (COP) como divisa principal predeterminada en el proyecto base y en nuevos proyectos, con formateo técnico localizado (separador de miles con punto, sin decimales molestos) y selector rápido entre COP, USD, EUR y MXN.
+> 2. **Herramienta CAD Avanzada**: Cotas dinámicas de huecos libres entre estantes y divisiones verticales (luz libre milimétrica), visualizadas tanto en el visor 3D como en el dock de inspección de piezas.
+> 3. **Seguridad y Eliminación**: Modal emergente personalizado estilizado en tema oscuro CAD con doble advertencia visual (icono de alerta ámbar/rojo, mensaje explicativo del impacto y botones "Cancelar" y "Eliminar definitivamente"), eliminando por completo los popups nativos del navegador.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **Ergonomía de Estudio CAD a Pantalla Completa**:
-  - Elimina el scroll vertical de la ventana en el Diseñador 3D. El espacio de trabajo se calcula dinámicamente (`h-[calc(100vh-56px)]`) para que el lienzo 3D y el panel de propiedades compartan el 100% de la altura útil de la pantalla.
-  - En **monitores 2K (1440p)**: El visor Three.js y el dock de inspección crecen verticalmente hasta llenar el monitor panorámico, sin huecos vacíos abajo.
-  - En **monitores 1080p (Full HD)**: El lienzo y la barra de fichas de piezas permanecen 100% dentro del marco visual sin requerir scroll hacia abajo para encontrar botones.
-- **Barra Superior Compacta de Alta Densidad (Zero Overflow)**:
-  - Ocultación discreta de la pestaña "5. Etiquetas" (preservando el componente en el código para reactivación futura).
-  - Zona de marca simplificada: `MelamiPro` con insignia `v2.0 Taller` y selector/indicador de proyecto compacto en una sola línea.
-  - Botones de acción en una hilera estilizada con anchos y espaciados calculados (`h-8.5`), etiquetas concisas y tooltips informativos para que nunca se desborden hacia la derecha.
-- **Sistema Tipográfico y Anti-Ruido Visual**:
-  - Carga optimizada de Google Fonts: **Plus Jakarta Sans** (400, 500, 600, 700) + **JetBrains Mono** (500, 600) con `tabular-nums`.
-  - Reemplazo de descripciones extensas y banners decorativos por micro-indicadores técnicos elegantes.
+- **Cotas Dinámicas de Luz Libre (Clearance & Bay Dimensions)**:
+  - En la carpintería modular, el dato más crítico durante el despiece es la *luz libre* (el espacio útil entre dos caras internas de melamina, por ejemplo entre el piso y el primer estante para alojar un electrodoméstico o archivador).
+  - El sistema detectará las piezas adyacentes en el eje vertical (Y) y horizontal (X) para calcular automáticamente el hueco libre exacto en milímetros.
+  - Se habilitará un botón toggle en el visor 3D: **"Luz Libre / Cotas Útiles"** que proyecta flechas de cota interna con textos flotantes legibles y una tarjeta en el dock con las distancias a piezas vecinas.
+
+- **Moneda Localizada (COP Predeterminado)**:
+  - Inicialización de proyectos con moneda `COP` y valores de referencia reales del mercado colombiano (tableros estándar de melamina ~$180.000 - $220.000 COP, canto $1.200 - $2.500 COP/m).
+  - Función de formateo centralizada: en `COP` formatea `$ 1.250.000 COP`; en `USD`/`EUR` preserva los centavos `$ 1,250.00 USD`.
+  - Selector directo de moneda en la vista de presupuesto sin necesidad de navegar a configuraciones avanzadas.
+
+- **Modal de Confirmación Estilizado (Dark CAD Confirmation Dialog)**:
+  - Reemplazo de todos los `window.confirm()` en el borrado de proyectos en la nube (Supabase), eliminación de proyectos locales, vaciado del lienzo o reseteo de demos.
+  - Diseño con fondo glassmorphism oscuro (`bg-black/75 backdrop-blur-sm`), tarjeta de borde rojo/ámbar, botón de acción primaria destructiva con estado de espera y cancelación rápida con la tecla `Escape`.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-### 1. Barra Superior Compacta y Equilibrada (Top Bar)
+### 1. Visualización 3D de Luz Libre entre Piezas
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ [MelamiPro · Cocina Moderna]     [1. Diseñador 3D] [2. Despiece] [3. Optimizador] [4. Presupuesto]               │
-│                                           [↺] [↻] [• Auto] [☁ Guardar] [+ Nuevo] [📁 Proyectos] [Exportar] [⚙]   │
-└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  [TECHO 1800x600] ─── (grosor 18mm)                              │
+│  │                                                            │  │
+│  │   ▲                                                        │  │
+│  │   │  ↕ Luz Libre: 420 mm (Espacio Útil)                    │  │
+│  │   ▼                                                        │  │
+│  ├────────────────────────────┤ [ESTANTE INTERMEDIO] (18mm)   │  │
+│  │   ▲                                                        │  │
+│  │   │  ↕ Luz Libre: 450 mm (Espacio Inferior)                │  │
+│  │   ▼                                                        │  │
+│  [BASE / PISO] ───────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-- **Zona Izquierda (Marca & Proyecto)**: Logotipo minimalista, insignia `v2.0 Taller` y nombre del proyecto en una sola línea compacta con truncado inteligente (`max-w-[200px] truncate`).
-- **Zona Central (Pestañas Navegación)**: 4 pestañas esenciales (1. Diseñador 3D, 2. Despiece, 3. Optimizador 2D, 4. Presupuesto). La pestaña "5. Etiquetas" queda oculta de la barra de navegación.
-- **Zona Derecha (Acciones Rápidas)**:
-  - Deshacer / Rehacer en bloque compacto (`Ctrl+Z` / `Ctrl+Y`).
-  - Toggle compacto `Auto ON/OFF`.
-  - Botón `Guardar` con icono de nube estilizado en altura regular.
-  - Botones de acción secundaria (`Nuevo`, `Proyectos`, `Exportar`, `Configuración`) con iconos nítidos y padding armónico.
+- En el visor 3D: Al activar el modo de cotas interiores o al seleccionar un estante/división, se generan líneas de cota de precisión en color cian/ámbar con la cota milimétrica nítida en fuente **JetBrains Mono**.
+- En el panel de propiedades (dock derecho): Se añade una sección plegable **"Huecos Libres Adyacentes"**:
+  - *Distancia al elemento superior*: `420 mm`
+  - *Distancia al elemento inferior*: `450 mm`
+  - *Luz libre lateral izquierda / derecha*: `564 mm`
 
-### 2. Layout Dinámico a Pantalla Completa (1080p & 2K)
+### 2. Modal de Confirmación Estilizado
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ HEADER FIJO (56px)                                                                                               │
-├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ SUB-BARRA DE HERRAMIENTAS Y PLANTILLAS (40px)                                                                    │
-├────────────────────────────────────────────────────────────────────────┬─────────────────────────────────────────┤
-│                                                                        │ DOCK DE PROPIEDADES & CATÁLOGO          │
-│                                                                        │ (h-full con scroll interno suave)       │
-│                      VISOR 3D THREE.JS                                 │                                         │
-│                 (h-full dinámico 100% de la altura útil)               │ • Propiedades de Pieza                  │
-│                                                                        │ • Edición Milimétrica                   │
-│                                                                        │ • Materiales & Cantos                   │
-│                                                                        │ • Añadir Piezas & Cajón                 │
-├────────────────────────────────────────────────────────────────────────┤                                         │
-│ BARRA DE FICHAS DE PIEZAS (36px) [Todo] [Techo] [Lateral] [Fondo] ...  │                                         │
-└────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  [!] ¿Eliminar proyecto de la nube?                              │
+│                                                                  │
+│  El proyecto "Cocina Moderna Roble" será eliminado               │
+│  permanentemente de la base de datos de Supabase.                │
+│  Esta acción no se puede deshacer.                               │
+│                                                                  │
+│                   [ Cancelar ]   [ Eliminar Definitivamente ]    │
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+- Componente modal reutilizable que emite `confirm` o `cancel` mediante Signals o Promesas limpias.
+- Soporte para variantes de severidad: `danger` (rojo para borrar proyectos/piezas) y `warning` (ámbar para restablecer demo).
+
+### 3. Presupuesto & Formateo Multimoneda
+
+- Cabecera de presupuesto con selector de divisa rápido:
+  `[ Moneda: COP ($) ▾ ]`
+- Selector sincronizado con `settings.currency` del proyecto y persistido automáticamente en local y en la nube.
+- Formateo inteligente con `Intl.NumberFormat`:
+  - `COP`: `$ 2.450.000 COP` (sin decimales `.00`, con punto de miles)
+  - `USD`: `$ 620.50 USD`
+  - `EUR`: `580,20 € EUR`
+  - `MXN`: `$ 11,400.00 MXN`
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Flex-1 con `min-h-0` y `overflow-hidden`**:
-  - *Enfoque*: En lugar de alturas fijas en píxeles (`h-[720px]`), el contenedor principal de la aplicación y el visor 3D usan `flex-1 min-h-0 h-full`. El `ResizeObserver` de Three.js ya existente detecta el tamaño exacto del contenedor y escala la cámara y el renderizador al milímetro.
-  - *Razón*: Garantiza que en 1080p (altura neta ~880px) todo encaje sin barra de scroll de ventana, y en 2K (altura neta ~1350px) el visor aproveche los ~1200px de espacio vertical disponible.
-- **Ocultamiento de Etiquetas sin Eliminación de Código**:
-  - *Enfoque*: Se oculta el botón de la barra de navegación en `header.html` y se mantiene la vista `<app-labels-view>` registrada en el switch de `app.html`.
-  - *Razón*: El usuario solicitó dejarla lista para reactivarse cuando se requiera sin perder lógica ni componentes.
-- **Tipografía Plus Jakarta Sans + JetBrains Mono**:
-  - *Enfoque*: Fuente sans-serif contemporánea con excelente legibilidad en monitores oscuros de taller, emparejada con JetBrains Mono para números milimétricos y alineación tabular estricta.
+- **Cálculo de Luz Libre en Tiempo Real (Raycasting AABB vs Bounds Geométricos)**:
+  - *Enfoque*: Cálculo matemático analítico usando las cajas de colisión (`BoundingBox`) y coordenadas `posY`, `posX`, `length`, `width` y `thickness` de las piezas en el mismo módulo o espacio cartesiano.
+  - *Razón*: Extremadamente rápido ($\le 1\text{ms}$), sin sobrecargar el renderizador Three.js ni depender de físicas complejas.
+- **Servicio Centralizado de Diálogos (`ConfirmDialogService`)**:
+  - *Enfoque*: Servicio singleton con señales reactivas que renderiza el modal en la raíz de la aplicación (`app-confirm-dialog` en `app.html`), accesible desde cualquier componente (`header`, `module-designer`, `parts-list`).
+  - *Razón*: Desacoplado, elimina por completo `window.confirm` sin ensuciar los componentes individuales con modales duplicados.
+- **Valores Iniciales del Proyecto Demo en COP**:
+  - *Enfoque*: Ajustar los costos unitarios del proyecto inicial a valores colombianos reales (tablero $195.000 COP, canto $1.800 COP/m, mano de obra $350.000 COP).
+  - *Razón*: Brinda una experiencia inmediata y realista desde el primer segundo sin ver cifras en dólares fuera de contexto local.
 
 ---
 
@@ -87,35 +108,39 @@ Transformación integral de la experiencia visual y ergonómica de MelamiPro Stu
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│                      index.html & styles.css                                   │
-│  - Google Fonts: Plus Jakarta Sans (400, 500, 600, 700)                        │
-│  - Google Fonts: JetBrains Mono (500, 600)                                     │
-│  - font-family global: 'Plus Jakarta Sans', system-ui, sans-serif             │
-│  - font-mono: 'JetBrains Mono', monospace                                      │
-└────────────────────────────────────────────────────────────────────────────────┘
+│                           ConfirmDialogService                                 │
+│  - isOpen = signal(false)                                                      │
+│  - options = signal<ConfirmDialogOptions | null>(null)                         │
+│  - ask(options): Promise<boolean>                                              │
+└──────────────────────────────────────┬─────────────────────────────────────────┘
                                        │
 ┌──────────────────────────────────────▼─────────────────────────────────────────┐
-│                        App Component (app.html)                                │
-│  - Container: h-screen flex flex-col overflow-hidden (0 window scrollbar)       │
-│  - Header: shrink-0 h-14                                                       │
-│  - Main: flex-1 min-h-0 flex flex-col overflow-hidden (o scroll en despiece)   │
+│                      App Root Component (app.html)                             │
+│  - <app-confirm-dialog /> (Renderizado global con backdrop oscuro y atajos)   │
 └────────────────────────────────────────────────────────────────────────────────┘
                                        │
-┌──────────────────────────────────────▼─────────────────────────────────────────┐
-│                    ModuleDesigner (module-designer.html)                       │
-│  - Top Toolbar: shrink-0 py-1.5 px-3 (Plantillas, piezas, m²)                  │
-│  - Grid: flex-1 min-h-0 grid grid-cols-12 h-full gap-2.5                       │
-│  - Left Column: flex flex-col h-full min-h-0 (col-span-9)                      │
-│    - 3D Viewer: flex-1 min-h-0 w-full h-full relative                          │
-│    - Bottom Chips: shrink-0 py-1 px-2                                          │
-│  - Right Column: h-full min-h-0 flex flex-col overflow-hidden (col-span-3)     │
-│    - Panel Body: flex-1 min-h-0 overflow-y-auto                                │
+      ┌────────────────────────────────┼────────────────────────────────┐
+      ▼                                ▼                                ▼
+┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────┐
+│ Header (header.ts)      │  │ ModuleDesigner          │  │ BudgetView          │
+│ - Delete cloud project  │  │ - Delete piece / clear   │  │ - COP formatting    │
+│ - Reset demo project    │  │ - Clearance dimensions   │  │ - Fast currency drop│
+└─────────────────────────┘  └─────────────────────────┘  └─────────────────────┘
+                                       │
+                                       ▼
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                   Furniture 3D Viewer (furniture-3d-viewer.ts)                 │
+│  - computeClearanceDimensions(parts, selectedPart)                             │
+│  - renderClearanceVisuals() -> dimensionGroup                                  │
+│  - Toggle UI: [Luz Libre / Cotas Interiores]                                   │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Archivos a Modificar:
-1. `src/styles.css` & `src/index.html`: Carga de fuentes Google Fonts (Plus Jakarta Sans y JetBrains Mono) y reglas de tipografía y números tabulares.
-2. `src/app/components/header/header.html` & `header.ts`: Ocultar pestaña "Etiquetas", compactar nombre de proyecto/cliente en una sola línea, y optimizar espaciados de botones para evitar desbordamientos.
-3. `src/app/app.html`: Layout raíz `h-screen flex flex-col overflow-hidden` para el modo diseñador 3D.
-4. `src/app/components/module-designer/module-designer.html`: Reemplazo de alturas fijas por `flex-1 min-h-0 h-full` tanto en el contenedor 3D como en el dock lateral.
-5. `src/app/components/furniture-3d-viewer/furniture-3d-viewer.html`: Contenedor adaptativo `w-full h-full min-h-[480px]` para que el WebGL canvas ocupe todo el espacio asignado por el flexbox.
+### Plan de Cambios Específicos:
+1. **`src/app/services/confirm-dialog.service.ts`**: Nuevo servicio reactivo para modales de confirmación con Promesas.
+2. **`src/app/components/confirm-dialog/confirm-dialog.ts` & `.html`**: Componente de modal oscuro con accesibilidad y diseño CAD.
+3. **`src/app/services/project-storage.service.ts` & `melamine.models.ts`**: Configuración de moneda predeterminada `COP`, valores base en pesos colombianos y formateador numérico regional `formatCurrency(amount, currency)`.
+4. **`src/app/components/budget-view/budget-view.html` & `.ts`**: Integración del selector rápido de moneda y formateo localizado en todas las tarjetas y tablas de cotización.
+5. **`src/app/components/header/header.ts` & `.html`**: Reemplazo de `confirm()` por `confirmService.ask(...)` en la eliminación de proyectos en la nube y restablecimiento de demos.
+6. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts` & `.html`**: Motor de cálculo de distancias libres (luz útil) entre piezas adyacentes, visualización 3D y toggle de visualización.
+7. **`src/app/components/module-designer/module-designer.html` & `.ts`**: Indicadores de luz libre superior, inferior y lateral en el dock de inspección de piezas.

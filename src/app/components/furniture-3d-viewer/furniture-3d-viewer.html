@@ -195,6 +195,17 @@
         <span class="hidden sm:inline">Cotas 3D</span>
       </button>
 
+      <!-- Luz Libre (Clearance Dimensions) Toggle -->
+      <button 
+        type="button"
+        (click)="toggleClearances()"
+        [class]="showClearances() ? 'bg-emerald-500 text-zinc-950 font-bold shadow-xs' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
+        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
+        title="Mostrar u ocultar cotas dinámicas de luz libre y huecos interiores entre piezas">
+        <span class="material-icons text-sm">unfold_more</span>
+        <span class="hidden sm:inline">Luz Libre</span>
+      </button>
+
       <!-- Rayos X / Transparente -->
       <button 
         type="button"
