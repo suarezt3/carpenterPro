@@ -1,96 +1,72 @@
-<div class="w-full px-2 sm:px-4 py-3 space-y-3">
+<div class="w-full h-full flex flex-col p-2 sm:p-2.5 gap-2 min-h-0 overflow-hidden">
 
-  <!-- TOP BAR: Title, 3D Stats & Workspace Templates -->
-  <div class="bg-zinc-900/90 border border-zinc-800 rounded-2xl px-4 py-3 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
-    
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-        <span class="material-icons">view_in_ar</span>
-      </div>
-      <div>
-        <div class="flex items-center gap-2">
-          <h2 class="text-base font-bold text-white tracking-tight">Modelador 3D Paramétrico Pieza por Pieza</h2>
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-            Estilo SketchUp / Flatma
-          </span>
-        </div>
-        <p class="text-xs text-zinc-400">
-          Haz clic en cualquier pieza para seleccionarla, editar sus medidas independientes (Largo × Ancho × Espesor) o posicionarla con precisión milimétrica.
-        </p>
+  <!-- SLIM TOP BAR: Workspace Title, 3D Stats & Model Templates (Anti-noise, Single Row) -->
+  <div class="h-10 px-3 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center justify-between gap-3 shrink-0 shadow-sm">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="material-icons text-cyan-400 text-lg">view_in_ar</span>
+      <span class="text-xs font-bold text-white tracking-tight whitespace-nowrap">Modelador 3D</span>
+      <span class="text-zinc-600 hidden sm:inline">|</span>
+      <div class="hidden sm:flex items-center gap-2 text-xs text-zinc-400 font-mono">
+        <span>Piezas: <strong class="text-cyan-300">{{ currentParts().length }}</strong></span>
+        <span>·</span>
+        <span>Área: <strong class="text-amber-300">{{ totalAreaM2() }} m²</strong></span>
       </div>
     </div>
 
-    <!-- Quick Stats & Actions -->
-    <div class="flex flex-wrap items-center gap-2">
-      <!-- Stats Badges -->
-      <div class="flex items-center gap-2 bg-zinc-950 px-3 py-1.5 rounded-xl border border-zinc-800 text-xs">
-        <div class="flex items-center gap-1 text-zinc-300">
-          <span class="material-icons text-xs text-cyan-400">layers</span>
-          <span>Piezas 3D:</span>
-          <strong class="text-white font-mono">{{ currentParts().length }}</strong>
-        </div>
-        <span class="text-zinc-700">•</span>
-        <div class="flex items-center gap-1 text-zinc-300">
-          <span class="material-icons text-xs text-amber-400">square_foot</span>
-          <span>Área:</span>
-          <strong class="text-white font-mono">{{ totalAreaM2() }} m²</strong>
-        </div>
-      </div>
-
-      <!-- Action: Iniciar en Blanco -->
+    <!-- Quick Templates & Actions -->
+    <div class="flex items-center gap-1.5 shrink-0">
       <button 
         type="button"
         (click)="startBlank()"
-        class="px-3 py-1.5 text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl border border-zinc-700 flex items-center gap-1.5 transition shadow-sm"
-        title="Limpiar el lienzo 3D para construir un mueble desde cero pieza por pieza">
+        class="h-7 px-2.5 text-[11px] font-semibold bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg border border-zinc-700 flex items-center gap-1 transition"
+        title="Limpiar el lienzo 3D para construir un mueble desde cero">
         <span class="material-icons text-xs text-rose-400">delete_sweep</span>
-        <span>Nuevo en Blanco</span>
+        <span class="hidden sm:inline">En Blanco</span>
       </button>
 
-      <!-- Action: Cargar Mueble Barra con Módulo (Reference Image) -->
       <button 
         type="button"
         (click)="loadDeskBarTemplate()"
-        class="px-3 py-1.5 text-xs font-semibold bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 rounded-xl border border-cyan-500/40 flex items-center gap-1.5 transition shadow-sm"
-        title="Cargar la estructura de barra con techo de 1800x600 y módulo lateral (idéntica a la imagen de referencia)">
+        class="h-7 px-2.5 text-[11px] font-semibold bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 rounded-lg border border-cyan-500/40 flex items-center gap-1 transition"
+        title="Cargar plantilla de mueble barra con módulo lateral">
         <span class="material-icons text-xs text-cyan-400">desk</span>
-        <span>Barra con Módulo</span>
+        <span>Barra Módulo</span>
       </button>
 
-      <!-- Action: Cargar Bajo Mesada 2P -->
       <button 
         type="button"
         (click)="loadStandardBaseCabinet()"
-        class="px-3 py-1.5 text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl border border-zinc-700 flex items-center gap-1.5 transition shadow-sm"
+        class="h-7 px-2.5 text-[11px] font-semibold bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 rounded-lg border border-amber-500/40 flex items-center gap-1 transition"
         title="Cargar plantilla estándar de bajo mesada de cocina">
         <span class="material-icons text-xs text-amber-400">countertops</span>
         <span>Bajo Mesada</span>
       </button>
     </div>
-
   </div>
 
-  <!-- MAIN 2-COLUMN FULL-WIDTH LAYOUT (Optimized for 1080p and widescreen displays) -->
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+  <!-- MAIN 2-COLUMN FULL-VIEWPORT LAYOUT (Dynamic 100vh Fill for 1080p and 2K screens) -->
+  <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2 h-full">
     
-    <!-- LEFT COLUMN: Massive Three.js 3D Viewport (approx 75% width on desktop) -->
-    <div class="col-span-12 lg:col-span-8 xl:col-span-9 flex flex-col gap-2">
+    <!-- LEFT COLUMN: 3D Viewport & Bottom Chips (Takes full available height) -->
+    <div class="col-span-12 lg:col-span-8 xl:col-span-9 flex flex-col gap-1.5 h-full min-h-0">
       
-      <!-- Three.js 3D Viewer Container -->
-      <app-furniture-3d-viewer
-        [parts]="currentParts()"
-        [selectedPartId]="selectedPartId()"
-        [selectedPartIds]="selectedPartIds()"
-        [materials]="materials()"
-        (partSelected)="onSelectPartFrom3D($event)"
-        (partsSelected)="onPartsSelectedFrom3D($event)"
-        (partModified)="onPartModifiedFromViewer($event)"
-        (multiplePartsModified)="onMultiplePartsModifiedFromViewer($event)"
-        (dragStarted)="onDragStarted()">
-      </app-furniture-3d-viewer>
+      <!-- Three.js 3D Viewer Container (Fills remaining height) -->
+      <div class="flex-1 min-h-0 w-full h-full relative">
+        <app-furniture-3d-viewer
+          [parts]="currentParts()"
+          [selectedPartId]="selectedPartId()"
+          [selectedPartIds]="selectedPartIds()"
+          [materials]="materials()"
+          (partSelected)="onSelectPartFrom3D($event)"
+          (partsSelected)="onPartsSelectedFrom3D($event)"
+          (partModified)="onPartModifiedFromViewer($event)"
+          (multiplePartsModified)="onMultiplePartsModifiedFromViewer($event)"
+          (dragStarted)="onDragStarted()">
+        </app-furniture-3d-viewer>
+      </div>
 
       <!-- BOTTOM PIECE CHIPS (Quick 1-Click selection & status of every piece in the 3D space) -->
-      <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-2.5 shadow-md flex items-center gap-2 overflow-x-auto">
+      <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl px-3 py-2 shadow-md flex items-center gap-2 overflow-x-auto shrink-0">
         <span class="text-[11px] font-bold text-zinc-400 whitespace-nowrap flex items-center gap-1 pl-1">
           <span class="material-icons text-xs text-cyan-400">dns</span>
           Piezas:
@@ -143,8 +119,8 @@
 
     </div>
 
-    <!-- RIGHT COLUMN: Inspector & Tool Dock (approx 25% width on desktop) -->
-    <div class="col-span-12 lg:col-span-4 xl:col-span-3 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[820px]">
+    <!-- RIGHT COLUMN: Inspector & Tool Dock (Dynamic 100% height fill on 1080p and 2K) -->
+    <div class="col-span-12 lg:col-span-4 xl:col-span-3 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl overflow-hidden flex flex-col h-full min-h-0">
       
       <!-- Dock Tabs Header -->
       <div class="flex items-center border-b border-zinc-800 bg-zinc-950/70 p-1">
@@ -172,7 +148,7 @@
 
       <!-- TAB 1: INDIVIDUAL PIECE PROPERTIES (Edición Pieza por Pieza) -->
       @if (activeDockTab() === 'piece') {
-        <div class="p-3.5 space-y-4 overflow-y-auto flex-1">
+        <div class="p-3.5 space-y-4 overflow-y-auto flex-1 min-h-0">
           
           @if (selectedPart(); as sel) {
             
@@ -569,7 +545,7 @@
 
       <!-- TAB 2: PIECE CATALOG & ASSEMBLY TREE -->
       @if (activeDockTab() === 'catalog') {
-        <div class="p-3.5 space-y-4 overflow-y-auto flex-1">
+        <div class="p-3.5 space-y-4 overflow-y-auto flex-1 min-h-0">
           
           <!-- CATALOG OF COMPONENTS TO ADD -->
           <div class="space-y-2">

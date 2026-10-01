@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para selección múltiple de piezas con traslación en grupo, herramienta de cinta métrica interactiva 3D con cotas X/Y/Z, y reorganización de la barra superior a pantalla completa en 3 zonas con botones estilizados en una sola línea.",
-  "updatedAt":  "2026-10-01T00:47:50.956964085Z",
+  "summary":  "Plan de implementación para rediseño visual y ergonómico UI/UX: tipografía Plus Jakarta Sans y JetBrains Mono, barra superior compacta sin desbordamiento (ocultando Etiquetas y optimizando el título y botones), y layout dinámico a pantalla completa (100vh) adaptable automáticamente a monitores 1080p y 2K sin scroll vertical molesto.",
+  "updatedAt":  "2026-10-01T01:13:21.174904149Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

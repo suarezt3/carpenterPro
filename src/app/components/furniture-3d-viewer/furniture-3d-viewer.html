@@ -1,6 +1,6 @@
 <div #container3d 
   [class]="isWhiteTheme() ? 'bg-slate-100/80 border-slate-300' : 'bg-zinc-950 border-zinc-800'"
-  class="relative w-full h-[540px] sm:h-[640px] lg:h-[720px] rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-300">
+  class="relative w-full h-full min-h-[380px] rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-300">
 
   <!-- 3D WebGL Canvas -->
   <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>

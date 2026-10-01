@@ -28,6 +28,7 @@ export class HeaderComponent {
   projectsTab = signal<'cloud' | 'local'>('cloud');
   sqlCopied = signal(false);
   toastMessage = signal<string | null>(null);
+  readonly showLabelsTab = signal(false);
 
   readonly project = this.projectService.currentProject;
   readonly savedProjects = this.projectService.savedProjects;
