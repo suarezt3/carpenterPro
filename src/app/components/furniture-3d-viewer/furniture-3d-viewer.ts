@@ -9,11 +9,13 @@ import {
   ChangeDetectionStrategy,
   afterNextRender,
   effect,
-  OnDestroy
+  OnDestroy,
+  inject
 } from '@angular/core';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Part, Material } from '../../models/melamine.models';
+import { Part, Material, DrillHole, CollisionRecord } from '../../models/melamine.models';
+import { JoineryEngineService } from '../../services/joinery-engine.service';
 
 interface PieceMeshData {
   part: Part;
@@ -53,6 +55,8 @@ export interface ClearanceInfo {
   }
 })
 export class Furniture3dViewerComponent implements OnDestroy {
+  private joineryEngine = inject(JoineryEngineService);
+
   // Inputs
   parts = input<Part[]>([]);
   selectedPartId = input<string | null>(null);
@@ -66,6 +70,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   multiplePartsModified = output<{ updates: { part: Part; updates: Partial<Part> }[] }>();
   dragStarted = output<void>();
   clearanceCalculated = output<ClearanceInfo | null>();
+  collisionsDetected = output<CollisionRecord[]>();
+  drillHolesUpdated = output<DrillHole[]>();
 
   // Canvas and Container refs
   canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas3d');
@@ -77,7 +83,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
   explodedPercent = signal<number>(0);
   show3dDimensions = signal<boolean>(true);
   showClearances = signal<boolean>(true);
+  showDrillHoles = signal<boolean>(true);
   isWhiteTheme = signal<boolean>(true); // Default to clean pure white studio background
+
+  // Collisions & Joinery Signals
+  readonly detectedCollisions = signal<CollisionRecord[]>([]);
+  readonly allDrillHoles = signal<DrillHole[]>([]);
 
   // Precision Nudge & Magnetic Snapping
   readonly isMagneticSnap = signal<boolean>(true);
@@ -138,6 +149,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private dimensionGroup = new THREE.Group();
   private gizmoGroup = new THREE.Group();
   private measureGroup = new THREE.Group();
+  private drillGroup = new THREE.Group();
   private gridHelper: THREE.GridHelper | null = null;
   private floorMesh: THREE.Mesh | null = null;
 
@@ -161,13 +173,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.initThree();
     });
 
-    // Rebuild scene when pieces, selection, materials, or xRay change
+    // Rebuild scene when pieces, selection, materials, xRay, or drill holes change
     effect(() => {
       const parts = this.parts();
       const selIds = this.activeSelectedIds();
       const mats = this.materials();
       const xRay = this.isXRay();
       const showDims = this.show3dDimensions();
+      this.showDrillHoles();
 
       if (this.scene) {
         this.buildFurnitureScene(parts, selIds, mats, xRay, showDims);
@@ -230,6 +243,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.dimensionGroup);
     this.scene.add(this.gizmoGroup);
     this.scene.add(this.measureGroup);
+    this.scene.add(this.drillGroup);
 
     // Initial Scene Build
     this.buildFurnitureScene(
@@ -370,7 +384,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     xRay: boolean,
     showDims: boolean
   ) {
-    // Clear previous furniture & dimensions & gizmo
+    // Clear previous furniture & dimensions & gizmo & drills
     while (this.furnitureGroup.children.length > 0) {
       const obj = this.furnitureGroup.children[0];
       this.furnitureGroup.remove(obj);
@@ -383,10 +397,31 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const obj = this.gizmoGroup.children[0];
       this.gizmoGroup.remove(obj);
     }
+    while (this.drillGroup.children.length > 0) {
+      const obj = this.drillGroup.children[0];
+      this.drillGroup.remove(obj);
+    }
     this.pieceObjects = [];
     this.gizmoHitMeshes = [];
 
-    if (!parts || parts.length === 0) return;
+    if (!parts || parts.length === 0) {
+      this.detectedCollisions.set([]);
+      this.allDrillHoles.set([]);
+      return;
+    }
+
+    // 1. Calculate Joinery & Collisions via JoineryEngineService
+    const joinery = this.joineryEngine.calculateJoinery(parts);
+    this.detectedCollisions.set(joinery.collisions);
+    this.collisionsDetected.emit(joinery.collisions);
+    this.allDrillHoles.set(joinery.allDrillHoles);
+    this.drillHolesUpdated.emit(joinery.allDrillHoles);
+
+    const collidingPartIds = new Set<string>();
+    for (const c of joinery.collisions) {
+      collidingPartIds.add(c.partAId);
+      collidingPartIds.add(c.partBId);
+    }
 
     const selectedDataList: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number }[] = [];
 
@@ -415,13 +450,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const pz = part.posZ ?? 0;
 
       const isSelected = selectedIds.includes(part.id);
+      const isColliding = collidingPartIds.has(part.id);
+
       if (isSelected) {
         selectedDataList.push({ part, px, py, pz, sx, sy, sz });
       }
 
       // Geometry with bevel or box
       const geometry = new THREE.BoxGeometry(sx, sy, sz);
-      const material = this.createPieceMaterial(part, isSelected, mats, xRay);
+      const material = this.createPieceMaterial(part, isSelected, mats, xRay, isColliding);
 
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(px, py, pz);
@@ -431,10 +468,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       // Edges geometry for crisp technical outline
       const edges = new THREE.EdgesGeometry(geometry);
-      const edgeColor = isSelected ? 0x0284c7 : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46);
+      const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x0284c7 : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46));
       const edgeMat = new THREE.LineBasicMaterial({
         color: edgeColor,
-        linewidth: isSelected ? 3 : 1
+        linewidth: isColliding ? 3 : (isSelected ? 3 : 1)
       });
       const edgeLines = new THREE.LineSegments(edges, edgeMat);
       mesh.add(edgeLines);
@@ -453,6 +490,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
         originalPos: mesh.position.clone(),
         explodedOffset
       });
+    }
+
+    // 2. Render Drill Holes when toggle is enabled
+    if (this.showDrillHoles() && joinery.allDrillHoles.length > 0) {
+      this.renderDrillHolesVisuals(joinery.allDrillHoles);
     }
 
     // Single piece selected -> Full Gizmo (Translation arrows + Edge Stretch handles) and 3D dimensions & Clearances
@@ -857,12 +899,89 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
+  toggleDrillHoles() {
+    this.showDrillHoles.update(v => !v);
+  }
+
+  private renderDrillHolesVisuals(holes: DrillHole[]) {
+    for (const hole of holes) {
+      const holeGroup = new THREE.Group();
+      holeGroup.position.set(hole.posX, hole.posY, hole.posZ);
+
+      let color = 0x06b6d4; // Cyan for screws 4x50
+      let cylRadius = Math.max(2.5, hole.diameter / 2);
+      let cylHeight = Math.min(24, hole.depth);
+
+      if (hole.type === 'dowel_8x30') {
+        color = 0xf59e0b; // Amber for dowels 8x30
+        cylRadius = 4.0;
+        cylHeight = 16;
+      } else if (hole.type === 'hinge_35') {
+        color = 0xa855f7; // Purple for 35mm hinge cups
+        cylRadius = 17.5;
+        cylHeight = 12.5;
+      }
+
+      // 3D Drill Bore Cylinder
+      const cylGeo = new THREE.CylinderGeometry(cylRadius, cylRadius, cylHeight, 16);
+      const cylMat = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.25,
+        metalness: 0.35,
+        emissive: color,
+        emissiveIntensity: 0.45,
+        depthTest: true
+      });
+      const cylMesh = new THREE.Mesh(cylGeo, cylMat);
+
+      // Orient cylinder based on normalAxis
+      if (hole.normalAxis === 'x') {
+        cylMesh.rotation.z = Math.PI / 2;
+      } else if (hole.normalAxis === 'z') {
+        cylMesh.rotation.x = Math.PI / 2;
+      }
+
+      holeGroup.add(cylMesh);
+
+      // Technical entry ring for high-precision CAD look
+      const ringGeo = new THREE.RingGeometry(cylRadius * 0.7, cylRadius * 1.15, 20);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x0f172a,
+        side: THREE.DoubleSide,
+        depthTest: false
+      });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      if (hole.normalAxis === 'x') {
+        ringMesh.rotation.y = Math.PI / 2;
+      } else if (hole.normalAxis === 'y') {
+        ringMesh.rotation.x = Math.PI / 2;
+      }
+      holeGroup.add(ringMesh);
+
+      this.drillGroup.add(holeGroup);
+    }
+  }
+
   private createPieceMaterial(
     part: Part,
     isSelected: boolean,
     mats: Material[],
-    xRay: boolean
+    xRay: boolean,
+    isColliding = false
   ): THREE.Material {
+    if (isColliding) {
+      // Striking ruby red highlight for collided / penetrating pieces
+      return new THREE.MeshStandardMaterial({
+        color: 0xef4444,
+        emissive: 0x991b1b,
+        emissiveIntensity: 0.55,
+        transparent: true,
+        opacity: 0.85,
+        roughness: 0.25,
+        metalness: 0.15
+      });
+    }
+
     if (isSelected) {
       // Technical Blueprint Cobalt Blue
       return new THREE.MeshStandardMaterial({

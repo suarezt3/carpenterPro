@@ -169,6 +169,35 @@ export interface OptimizationResult {
   thickEdgeMeters: number;
 }
 
+export interface DrillHole {
+  id: string;
+  type: 'screw_4x50' | 'dowel_8x30' | 'hinge_35' | 'shelf_pin_5';
+  diameter: number; // mm
+  depth: number; // mm
+  posX: number; // Global o relativo en mm
+  posY: number;
+  posZ: number;
+  normalAxis: 'x' | 'y' | 'z';
+  direction: 1 | -1;
+  surfaceType: 'face' | 'edge';
+  partId: string;
+  partName: string;
+  targetPartId?: string;
+  targetPartName?: string;
+  description: string;
+}
+
+export interface CollisionRecord {
+  partAId: string;
+  partAName: string;
+  partBId: string;
+  partBName: string;
+  overlapX: number;
+  overlapY: number;
+  overlapZ: number;
+  overlapVolumeMm3: number;
+}
+
 export interface Project {
   id: string;
   name: string;

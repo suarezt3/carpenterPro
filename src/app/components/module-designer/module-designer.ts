@@ -11,20 +11,26 @@ import {
   ComponentRole,
   EdgeBandingType,
   Part,
-  PartOrientation
+  PartOrientation,
+  DrillHole
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
+import { JoineryEngineService } from '../../services/joinery-engine.service';
+import { DxfExporterService } from '../../services/dxf-exporter.service';
+import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
 
 @Component({
   selector: 'app-module-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Furniture3dViewerComponent],
+  imports: [ReactiveFormsModule, Furniture3dViewerComponent, TechnicalSheetModalComponent],
   templateUrl: './module-designer.html'
 })
 export class ModuleDesignerComponent {
   private projectService = inject(ProjectStorageService);
   private confirmService = inject(ConfirmDialogService);
+  private joineryEngine = inject(JoineryEngineService);
+  private dxfExporter = inject(DxfExporterService);
 
   readonly project = this.projectService.currentProject;
   readonly materials = this.projectService.materialsList;
@@ -37,8 +43,22 @@ export class ModuleDesignerComponent {
   // Dynamic Clearance Info from 3D (Luz libre a elementos adyacentes)
   readonly clearanceInfo = signal<ClearanceInfo | null>(null);
 
+  // Technical Shop Sheet Modal
+  readonly showTechnicalSheetModal = signal<boolean>(false);
+
   // Active dock tab: 'piece' (properties of selected part) or 'catalog' (add pieces & tree)
   readonly activeDockTab = signal<'piece' | 'catalog'>('catalog');
+
+  readonly joineryData = computed(() => {
+    return this.joineryEngine.calculateJoinery(this.currentParts());
+  });
+
+  // Drill holes for the currently selected part
+  readonly selectedPartDrillHoles = computed<DrillHole[]>(() => {
+    const sel = this.selectedPart();
+    if (!sel) return [];
+    return this.joineryData().drillHolesByPart.get(sel.id) || [];
+  });
 
   // Computed selected part
   readonly selectedPart = computed<Part | null>(() => {
@@ -609,5 +629,17 @@ export class ModuleDesignerComponent {
       this.selectedPartId.set(parts[0].id);
       this.activeDockTab.set('piece');
     }
+  }
+
+  openTechnicalSheet() {
+    this.showTechnicalSheetModal.set(true);
+  }
+
+  closeTechnicalSheet() {
+    this.showTechnicalSheetModal.set(false);
+  }
+
+  exportDxf() {
+    this.dxfExporter.exportProjectToDxf(this.project());
   }
 }

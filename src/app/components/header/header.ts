@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, signal, output, input } fro
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
+import { DxfExporterService } from '../../services/dxf-exporter.service';
+import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
 import { ProjectSettings } from '../../models/melamine.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SlicePipe } from '@angular/common';
@@ -9,7 +11,7 @@ import { SlicePipe } from '@angular/common';
 @Component({
   selector: 'app-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, SlicePipe],
+  imports: [ReactiveFormsModule, SlicePipe, TechnicalSheetModalComponent],
   host: {
     '(window:keydown)': 'handleGlobalKeyDown($event)'
   },
@@ -18,6 +20,7 @@ import { SlicePipe } from '@angular/common';
 export class HeaderComponent {
   private projectService = inject(ProjectStorageService);
   private confirmService = inject(ConfirmDialogService);
+  private dxfExporter = inject(DxfExporterService);
   private fb = inject(FormBuilder);
 
   activeTab = input<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>('modules');
@@ -27,6 +30,7 @@ export class HeaderComponent {
   showSettingsModal = signal(false);
   showNewProjectModal = signal(false);
   showSqlModal = signal(false);
+  showTechnicalSheetModal = signal(false);
   projectsTab = signal<'cloud' | 'local'>('cloud');
   sqlCopied = signal(false);
   toastMessage = signal<string | null>(null);
@@ -275,5 +279,18 @@ export class HeaderComponent {
       };
       reader.readAsText(file);
     }
+  }
+
+  openTechnicalSheet() {
+    this.showTechnicalSheetModal.set(true);
+  }
+
+  closeTechnicalSheet() {
+    this.showTechnicalSheetModal.set(false);
+  }
+
+  exportDxf() {
+    this.dxfExporter.exportProjectToDxf(this.project());
+    this.showToast('📐 Archivo DXF para CNC generado y descargado');
   }
 }

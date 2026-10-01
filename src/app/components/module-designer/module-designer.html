@@ -41,6 +41,27 @@
         <span class="material-icons text-xs text-amber-400">countertops</span>
         <span>Bajo Mesada</span>
       </button>
+
+      <div class="h-4 w-px bg-zinc-700/60 mx-0.5 hidden sm:block"></div>
+
+      <!-- Quick CAD Technical Export Buttons -->
+      <button 
+        type="button"
+        (click)="openTechnicalSheet()"
+        class="h-7 px-2.5 text-[11px] font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 rounded-lg flex items-center gap-1.5 transition shadow-xs"
+        title="Ver y descargar planos técnicos 2D acotados en PDF para taller">
+        <span class="material-icons text-xs">architecture</span>
+        <span>Plano 2D (PDF)</span>
+      </button>
+
+      <button 
+        type="button"
+        (click)="exportDxf()"
+        class="h-7 px-2.5 text-[11px] font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center gap-1.5 transition shadow-xs"
+        title="Descargar archivo vectorial DXF por capas para CNC y seccionadoras">
+        <span class="material-icons text-xs">download</span>
+        <span class="hidden md:inline">DXF CNC</span>
+      </button>
     </div>
   </div>
 
@@ -650,6 +671,48 @@
               </div>
             </div>
 
+            <!-- SECTION 4.5: MECANIZADOS Y PERFORACIONES PARAMÉTRICAS (CNC / TALLER) -->
+            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-amber-400">adjust</span>
+                  Mecanizados de Ensamble
+                </span>
+                <span class="text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                  {{ selectedPartDrillHoles().length }} taladros
+                </span>
+              </div>
+
+              @if (selectedPartDrillHoles().length > 0) {
+                <div class="space-y-1.5 max-h-40 overflow-y-auto pr-1 text-xs">
+                  @for (hole of selectedPartDrillHoles(); track hole.id) {
+                    <div class="p-2 bg-zinc-900/90 rounded-lg border border-zinc-800/80 flex items-start gap-2">
+                      <span class="w-2 h-2 rounded-full mt-1 shrink-0"
+                        [class]="hole.type === 'screw_4x50' ? 'bg-cyan-400' : (hole.type === 'dowel_8x30' ? 'bg-amber-400' : 'bg-purple-400')">
+                      </span>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between">
+                          <span class="font-bold text-zinc-200">
+                            {{ hole.type === 'screw_4x50' ? 'Tornillo 4x50' : (hole.type === 'dowel_8x30' ? 'Tarugo 8x30' : 'Bisagra 35mm') }}
+                          </span>
+                          <span class="font-mono text-[10px] text-zinc-400">
+                            Ø{{ hole.diameter }}×{{ hole.depth }}mm
+                          </span>
+                        </div>
+                        <p class="text-[10px] text-zinc-400 truncate mt-0.5" [title]="hole.description">
+                          {{ hole.description }}
+                        </p>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="p-3 text-center bg-zinc-900/50 rounded-lg border border-zinc-800 text-[11px] text-zinc-500">
+                  Pieza libre sin uniones a 90° o no requiere perforaciones de ensamble.
+                </div>
+              }
+            </div>
+
             <!-- SECTION 5: ACTIONS (Duplicar / Eliminar) -->
             <div class="pt-2 flex items-center gap-2">
               <button 
@@ -856,3 +919,11 @@
   </div>
 
 </div>
+
+<!-- MODAL: PLANO TÉCNICO 2D DE FABRICACIÓN (TALLER) -->
+@if (showTechnicalSheetModal()) {
+  <app-technical-sheet-modal
+    [project]="project()"
+    (modalClose)="closeTechnicalSheet()">
+  </app-technical-sheet-modal>
+}

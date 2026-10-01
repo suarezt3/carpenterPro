@@ -1,0 +1,394 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-xs select-none overflow-y-auto">
+  
+  <div 
+    [class]="isBlueprintDark() ? 'bg-zinc-950 text-zinc-100 border-zinc-800' : 'bg-slate-50 text-slate-900 border-slate-300'"
+    class="relative w-full max-w-6xl max-h-[96vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+
+    <!-- HEADER TOOLBAR (Non-printable) -->
+    <div class="print:hidden px-5 py-3.5 border-b flex flex-wrap items-center justify-between gap-3 shrink-0"
+      [class]="isBlueprintDark() ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-slate-200 shadow-xs'">
+      
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-500 flex items-center justify-center shadow-xs">
+          <span class="material-icons text-xl">architecture</span>
+        </div>
+        <div>
+          <h3 class="text-sm sm:text-base font-bold tracking-tight">Plano Técnico 2D de Fabricación (Taller)</h3>
+          <p class="text-xs opacity-70">Vistas ortográficas acotadas con cuadro de rotulación de ingeniería</p>
+        </div>
+      </div>
+
+      <!-- Action & View Controls -->
+      <div class="flex items-center gap-2 flex-wrap">
+        
+        <!-- Toggle Blueprint Dark / White Paper -->
+        <button 
+          type="button" 
+          (click)="toggleTheme()"
+          [class]="isBlueprintDark() ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-slate-200 text-slate-800 hover:bg-slate-300'"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+          <span class="material-icons text-sm">{{ isBlueprintDark() ? 'wb_sunny' : 'nightlight' }}</span>
+          <span>{{ isBlueprintDark() ? 'Papel Blanco' : 'CAD Oscuro' }}</span>
+        </button>
+
+        <!-- Export DXF Button -->
+        <button 
+          type="button" 
+          (click)="downloadDxf()"
+          class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-xs">
+          <span class="material-icons text-sm">download</span>
+          <span>Exportar DXF CNC</span>
+        </button>
+
+        <!-- Print / PDF Button -->
+        <button 
+          type="button" 
+          (click)="printSheet()"
+          class="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold rounded-lg text-xs flex items-center gap-1.5 transition shadow-md">
+          <span class="material-icons text-sm">print</span>
+          <span>Imprimir / Guardar PDF</span>
+        </button>
+
+        <!-- Close Button -->
+        <button 
+          type="button" 
+          (click)="modalClose.emit()"
+          class="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition"
+          title="Cerrar plano">
+          <span class="material-icons text-base">close</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- PRINTABLE DRAWING SHEET AREA -->
+    <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 print:p-0 print:m-0 print:space-y-4 print:overflow-visible">
+      
+      <div 
+        id="printableDrawing"
+        [class]="isBlueprintDark() ? 'bg-zinc-900 border-zinc-800 shadow-xl' : 'bg-white border-slate-300 shadow-lg text-slate-900'"
+        class="border rounded-2xl p-6 sm:p-8 space-y-8 max-w-5xl mx-auto print:border-none print:shadow-none print:p-4 print:w-full">
+        
+        <!-- TITLE BLOCK HEADER (Top) -->
+        <div class="border-b pb-4 flex items-start justify-between gap-4"
+          [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-300'">
+          <div>
+            <span class="text-[10px] font-mono uppercase tracking-widest text-amber-500 font-bold block mb-0.5">
+              MELAMIPRO STUDIO • ESPECIFICACIÓN TÉCNICA DE CARPINTERÍA
+            </span>
+            <h2 class="text-xl sm:text-2xl font-black tracking-tight">
+              {{ project().name }}
+            </h2>
+            <p class="text-xs opacity-75 mt-0.5">
+              Cliente: <strong>{{ project().clientName || 'General' }}</strong> • Fecha: <strong>{{ project().date }}</strong> • Medidas en Milímetros (mm)
+            </p>
+          </div>
+
+          <!-- Overall Dimensions Summary Card -->
+          <div class="text-right shrink-0">
+            <span class="text-[10px] font-mono text-zinc-400 block">VOLUMEN EXTERIOR (L x A x P):</span>
+            <span class="text-base sm:text-lg font-black font-mono text-cyan-500">
+              {{ bounds().width }} × {{ bounds().height }} × {{ bounds().depth }} mm
+            </span>
+            <p class="text-[11px] opacity-75 mt-0.5">
+              {{ project().parts.length }} piezas • {{ drillHoles().length }} perforaciones de taller
+            </p>
+          </div>
+        </div>
+
+        <!-- ORTHOGRAPHIC PROJECTIONS (SVG Views) -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+          
+          <!-- VISTA 1: ALZADA FRONTAL (Eje X vs Eje Y) -->
+          <div class="col-span-12 md:col-span-8 space-y-2">
+            <div class="flex items-center justify-between border-b pb-1"
+              [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
+              <span class="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                <span class="material-icons text-sm">visibility</span>
+                01. Vista Frontal (Alzada)
+              </span>
+              <span class="text-[11px] font-mono text-zinc-400">
+                Ancho: {{ bounds().width }} mm | Alto: {{ bounds().height }} mm
+              </span>
+            </div>
+
+            <!-- Front SVG Projection Canvas -->
+            <div class="w-full flex items-center justify-center p-3 rounded-xl border overflow-x-auto"
+              [class]="isBlueprintDark() ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'">
+              <svg 
+                [attr.viewBox]="'-80 -60 ' + (bounds().width + 160) + ' ' + (bounds().height + 110)" 
+                class="w-full max-h-[380px] overflow-visible">
+                
+                <!-- Background Grid Dots -->
+                <defs>
+                  <pattern id="gridDots" width="100" height="100" patternUnits="userSpaceOnUse">
+                    <circle cx="2" cy="2" r="1.5" fill="#94a3b8" opacity="0.3" />
+                  </pattern>
+                  <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#0284c7" />
+                  </marker>
+                </defs>
+                <rect 
+                  [attr.x]="-60" 
+                  [attr.y]="-40" 
+                  [attr.width]="bounds().width + 120" 
+                  [attr.height]="bounds().height + 80" 
+                  fill="url(#gridDots)" />
+
+                <!-- Floor Line -->
+                <line 
+                  [attr.x1]="-40" 
+                  [attr.y1]="bounds().height" 
+                  [attr.x2]="bounds().width + 40" 
+                  [attr.y2]="bounds().height" 
+                  stroke="#64748b" 
+                  stroke-width="2" 
+                  stroke-dasharray="6,4" />
+                <text 
+                  [attr.x]="-35" 
+                  [attr.y]="bounds().height + 15" 
+                  font-size="11" 
+                  font-family="monospace" 
+                  fill="#64748b">
+                  Nivel Suelo 0.00
+                </text>
+
+                <!-- Front Projected Pieces (Rectangles) -->
+                @for (piece of frontPieces(); track piece.id) {
+                  <g class="hover:opacity-80 transition cursor-pointer">
+                    <rect
+                      [attr.x]="piece.x"
+                      [attr.y]="piece.y"
+                      [attr.width]="piece.w"
+                      [attr.height]="piece.h"
+                      [attr.fill]="isBlueprintDark() ? '#1e293b' : '#f1f5f9'"
+                      [attr.stroke]="isBlueprintDark() ? '#38bdf8' : '#0f172a'"
+                      stroke-width="1.8" />
+                    
+                    <!-- Label inside piece if wide enough -->
+                    @if (piece.w >= 60 && piece.h >= 24) {
+                      <text
+                        [attr.x]="piece.x + piece.w / 2"
+                        [attr.y]="piece.y + piece.h / 2 + 4"
+                        text-anchor="middle"
+                        font-size="10"
+                        font-family="monospace"
+                        font-weight="bold"
+                        [attr.fill]="isBlueprintDark() ? '#e2e8f0' : '#1e293b'">
+                        {{ piece.name }}
+                      </text>
+                    }
+                  </g>
+                }
+
+                <!-- Dimension: Overall Width (Top) -->
+                <line 
+                  x1="0" 
+                  y1="-30" 
+                  [attr.x2]="bounds().width" 
+                  y2="-30" 
+                  stroke="#0284c7" 
+                  stroke-width="1.5" 
+                  marker-start="url(#arrow)" 
+                  marker-end="url(#arrow)" />
+                <line x1="0" y1="-40" x2="0" y2="0" stroke="#0284c7" stroke-width="1" stroke-dasharray="3,3" />
+                <line [attr.x1]="bounds().width" y1="-40" [attr.x2]="bounds().width" y2="0" stroke="#0284c7" stroke-width="1" stroke-dasharray="3,3" />
+                <text 
+                  [attr.x]="bounds().width / 2" 
+                  y="-38" 
+                  text-anchor="middle" 
+                  font-size="14" 
+                  font-family="monospace" 
+                  font-weight="bold" 
+                  fill="#0284c7">
+                  ↔ {{ bounds().width }} mm
+                </text>
+
+                <!-- Dimension: Overall Height (Left) -->
+                <line 
+                  x1="-40" 
+                  y1="0" 
+                  x1="-40" 
+                  [attr.y2]="bounds().height" 
+                  stroke="#0284c7" 
+                  stroke-width="1.5" 
+                  marker-start="url(#arrow)" 
+                  marker-end="url(#arrow)" />
+                <line x1="-50" y1="0" x2="0" y2="0" stroke="#0284c7" stroke-width="1" stroke-dasharray="3,3" />
+                <line x1="-50" [attr.y1]="bounds().height" x2="0" [attr.y2]="bounds().height" stroke="#0284c7" stroke-width="1" stroke-dasharray="3,3" />
+                <text 
+                  x="-48" 
+                  [attr.y]="bounds().height / 2" 
+                  text-anchor="middle" 
+                  [attr.transform]="'rotate(-90, -48, ' + (bounds().height / 2) + ')'" 
+                  font-size="14" 
+                  font-family="monospace" 
+                  font-weight="bold" 
+                  fill="#0284c7">
+                  ↕ {{ bounds().height }} mm
+                </text>
+
+              </svg>
+            </div>
+          </div>
+
+          <!-- VISTA 2: PERFIL LATERAL (Eje Z vs Eje Y) -->
+          <div class="col-span-12 md:col-span-4 space-y-2">
+            <div class="flex items-center justify-between border-b pb-1"
+              [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
+              <span class="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                <span class="material-icons text-sm">straighten</span>
+                02. Vista Lateral (Perfil)
+              </span>
+              <span class="text-[11px] font-mono text-zinc-400">
+                Prof: {{ bounds().depth }} mm
+              </span>
+            </div>
+
+            <!-- Side SVG Projection Canvas -->
+            <div class="w-full flex items-center justify-center p-3 rounded-xl border overflow-x-auto"
+              [class]="isBlueprintDark() ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'">
+              <svg 
+                [attr.viewBox]="'-60 -60 ' + (bounds().depth + 110) + ' ' + (bounds().height + 110)" 
+                class="w-full max-h-[380px] overflow-visible">
+                
+                <!-- Side Pieces -->
+                @for (piece of sidePieces(); track piece.id) {
+                  <rect
+                    [attr.x]="piece.x"
+                    [attr.y]="piece.y"
+                    [attr.width]="piece.w"
+                    [attr.height]="piece.h"
+                    [attr.fill]="isBlueprintDark() ? '#1e293b' : '#f1f5f9'"
+                    [attr.stroke]="isBlueprintDark() ? '#38bdf8' : '#0f172a'"
+                    stroke-width="1.8" />
+                }
+
+                <!-- Dimension: Overall Depth (Top) -->
+                <line 
+                  x1="0" 
+                  y1="-30" 
+                  [attr.x2]="bounds().depth" 
+                  y2="-30" 
+                  stroke="#0284c7" 
+                  stroke-width="1.5" 
+                  marker-start="url(#arrow)" 
+                  marker-end="url(#arrow)" />
+                <text 
+                  [attr.x]="bounds().depth / 2" 
+                  y="-38" 
+                  text-anchor="middle" 
+                  font-size="13" 
+                  font-family="monospace" 
+                  font-weight="bold" 
+                  fill="#0284c7">
+                  Prof: {{ bounds().depth }} mm
+                </text>
+              </svg>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- CUADRO DE ROTULACIÓN DE INGENIERÍA (Title Block) -->
+        <div class="border-2 rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-mono"
+          [class]="isBlueprintDark() ? 'border-zinc-700 bg-zinc-950/80' : 'border-slate-400 bg-slate-100/90'">
+          
+          <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">PROYECTO:</span>
+            <p class="font-bold truncate text-sm mt-0.5">{{ project().name }}</p>
+            <span class="text-[10px] text-zinc-400">MelamiPro CAD Studio</span>
+          </div>
+
+          <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">CLIENTE / TALLER:</span>
+            <p class="font-bold truncate text-sm mt-0.5">{{ project().clientName || 'General' }}</p>
+            <span class="text-[10px] text-zinc-400">Fecha: {{ project().date }}</span>
+          </div>
+
+          <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">ENSAMBLE & TORNILLERÍA:</span>
+            <p class="font-bold text-amber-500 mt-0.5">Soberbio 4x50 mm</p>
+            <span class="text-[10px] text-zinc-400">+ Tarugos madera 8x30</span>
+          </div>
+
+          <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">MATERIAL PRINCIPAL:</span>
+            <p class="font-bold truncate mt-0.5">{{ project().materials[0]?.name || 'Melamina 18mm' }}</p>
+            <span class="text-[10px] text-zinc-400">Espesor: {{ project().materials[0]?.thickness || 18 }} mm</span>
+          </div>
+
+          <div class="flex flex-col justify-between">
+            <div>
+              <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">APROBACIÓN DE CORTE:</span>
+              <div class="h-6 border-b border-dashed border-zinc-400 mt-2"></div>
+            </div>
+            <span class="text-[9px] text-zinc-500 text-right">Firma / Sello de Taller</span>
+          </div>
+
+        </div>
+
+        <!-- TABLA RESUMEN DE DESPIECE & PERFORACIONES DE TALLER -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between border-b pb-1"
+            [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
+            <span class="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+              <span class="material-icons text-sm">format_list_numbered</span>
+              03. Listado de Piezas y Mecanizados para Armado
+            </span>
+            <span class="text-xs font-mono font-bold text-cyan-500">
+              Total: {{ project().parts.length }} piezas | {{ drillHoles().length }} taladros
+            </span>
+          </div>
+
+          <div class="overflow-x-auto rounded-xl border"
+            [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
+            <table class="w-full text-left text-xs font-mono">
+              <thead [class]="isBlueprintDark() ? 'bg-zinc-800/80 text-zinc-300' : 'bg-slate-100 text-slate-700'">
+                <tr>
+                  <th class="p-2.5">Pieza</th>
+                  <th class="p-2.5">Cant.</th>
+                  <th class="p-2.5">Medida (Largo x Ancho)</th>
+                  <th class="p-2.5">Esp.</th>
+                  <th class="p-2.5">Material</th>
+                  <th class="p-2.5">Tapacantos (L1/L2/A1/A2)</th>
+                  <th class="p-2.5">Mecanizados / Taladros</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y"
+                [class]="isBlueprintDark() ? 'divide-zinc-800 text-zinc-300' : 'divide-slate-200 text-slate-800'">
+                @for (part of project().parts; track part.id) {
+                  <tr class="hover:bg-amber-500/5 transition">
+                    <td class="p-2.5 font-bold">{{ part.name }}</td>
+                    <td class="p-2.5">{{ part.quantity }}x</td>
+                    <td class="p-2.5 font-bold text-cyan-600">{{ part.length }} × {{ part.width }} mm</td>
+                    <td class="p-2.5">{{ part.thickness }} mm</td>
+                    <td class="p-2.5 truncate max-w-[140px]">{{ part.materialName }}</td>
+                    <td class="p-2.5 text-[11px]">
+                      {{ part.edges.l1 !== 'none' ? 'L1 ' : '' }}{{ part.edges.l2 !== 'none' ? 'L2 ' : '' }}{{ part.edges.a1 !== 'none' ? 'A1 ' : '' }}{{ part.edges.a2 !== 'none' ? 'A2' : '' }}
+                      @if (part.edges.l1 === 'none' && part.edges.l2 === 'none' && part.edges.a1 === 'none' && part.edges.a2 === 'none') {
+                        <span class="text-zinc-400">Sin canto</span>
+                      }
+                    </td>
+                    <td class="p-2.5 text-[11px] text-amber-500 font-semibold">
+                      @let partDrills = joineryData().drillHolesByPart.get(part.id);
+                      @if (partDrills && partDrills.length > 0) {
+                        <span>{{ partDrills.length }} taladros (4x50 / 8x30)</span>
+                      } @else {
+                        <span class="text-zinc-400">Corte libre</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>

@@ -167,7 +167,27 @@
           class="h-8.5 inline-flex items-center gap-1 px-2.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0"
           title="Descargar copia del proyecto en archivo JSON">
           <span class="material-icons text-sm text-cyan-400 shrink-0">file_download</span>
-          <span class="hidden 2xl:inline whitespace-nowrap">Exportar</span>
+          <span class="hidden 2xl:inline whitespace-nowrap">JSON</span>
+        </button>
+
+        <!-- Botón Plano 2D Técnico (PDF) -->
+        <button 
+          type="button"
+          (click)="openTechnicalSheet()"
+          class="h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-950 bg-amber-500 hover:bg-amber-400 rounded-lg shadow-sm transition whitespace-nowrap shrink-0"
+          title="Ver y descargar planos técnicos 2D acotados en PDF para taller">
+          <span class="material-icons text-sm shrink-0">architecture</span>
+          <span class="whitespace-nowrap">Plano 2D</span>
+        </button>
+
+        <!-- Botón Exportar DXF CNC -->
+        <button 
+          type="button"
+          (click)="exportDxf()"
+          class="h-8.5 inline-flex items-center gap-1 px-2.5 text-xs font-semibold text-cyan-300 bg-cyan-950/70 hover:bg-cyan-900/80 rounded-lg border border-cyan-500/40 transition whitespace-nowrap shrink-0"
+          title="Descargar archivo vectorial DXF por capas para CNC y seccionadoras">
+          <span class="material-icons text-sm text-cyan-400 shrink-0">download</span>
+          <span class="hidden xl:inline whitespace-nowrap">DXF CNC</span>
         </button>
 
         <!-- Botón Configuración -->
@@ -649,3 +669,12 @@
     </div>
   </div>
 }
+
+<!-- MODAL: PLANO TÉCNICO 2D DE FABRICACIÓN (TALLER) -->
+@if (showTechnicalSheetModal()) {
+  <app-technical-sheet-modal
+    [project]="project()"
+    (modalClose)="closeTechnicalSheet()">
+  </app-technical-sheet-modal>
+}
+

@@ -50,6 +50,40 @@
     </div>
   }
 
+  <!-- TOP-RIGHT COLLISION & INTERFERENCE WARNING HUD -->
+  @if (detectedCollisions().length > 0) {
+    <div class="absolute top-16 right-4 z-20 flex flex-col gap-1.5 max-w-sm pointer-events-auto animate-in slide-in-from-top duration-200">
+      <div class="bg-rose-950/95 backdrop-blur-md p-3 rounded-2xl border-2 border-rose-500 shadow-[0_8px_32px_rgba(244,63,94,0.4)] text-white space-y-1.5">
+        <div class="flex items-center justify-between border-b border-rose-800/80 pb-1.5">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+            <span class="text-xs font-black tracking-wide uppercase text-rose-200">
+              Interferencia 3D ({{ detectedCollisions().length }})
+            </span>
+          </div>
+          <span class="text-[10px] font-mono bg-rose-900/80 px-2 py-0.5 rounded text-rose-200 font-bold">
+            Solapamiento
+          </span>
+        </div>
+        <div class="space-y-1 max-h-36 overflow-y-auto pr-1 text-[11px]">
+          @for (col of detectedCollisions(); track $index) {
+            <div class="p-1.5 bg-zinc-950/60 rounded-lg border border-rose-900/60">
+              <p class="font-bold text-rose-300">
+                {{ col.partAName }} ↔ {{ col.partBName }}
+              </p>
+              <p class="text-[10px] text-zinc-400 font-mono">
+                Invasión: {{ col.overlapX }}×{{ col.overlapY }}×{{ col.overlapZ }} mm
+              </p>
+            </div>
+          }
+        </div>
+        <p class="text-[10px] text-rose-200/80 italic">
+          Las piezas en rojo se solapan. Modifica las cotas para evitar errores de corte.
+        </p>
+      </div>
+    </div>
+  }
+
   <!-- FLOATING 3D MEASUREMENT TAPE HUD -->
   @if (isMeasureMode()) {
     <div class="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 max-w-xl w-[92%] animate-in fade-in zoom-in-95 duration-150">
@@ -204,6 +238,17 @@
         title="Mostrar u ocultar cotas dinámicas de luz libre y huecos interiores entre piezas">
         <span class="material-icons text-sm">unfold_more</span>
         <span class="hidden sm:inline">Luz Libre</span>
+      </button>
+
+      <!-- Mecanizados & Perforaciones Toggle -->
+      <button 
+        type="button"
+        (click)="toggleDrillHoles()"
+        [class]="showDrillHoles() ? 'bg-cyan-500 text-zinc-950 font-bold shadow-xs' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
+        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
+        title="Mostrar u ocultar taladros y perforaciones de ensamble 3D (Tornillos 4x50, Tarugos 8x30, Bisagras 35mm)">
+        <span class="material-icons text-sm">adjust</span>
+        <span class="hidden sm:inline">Mecanizados</span>
       </button>
 
       <!-- Rayos X / Transparente -->
