@@ -112,6 +112,131 @@
     </div>
   </div>
 
+  <!-- FLOATING MICRO-NUDGE HUD (Posicionamiento milimétrico sin depender de guías en zoom) -->
+  @if (selectedPart(); as sel) {
+    <div class="absolute bottom-16 sm:bottom-16 left-4 z-30 pointer-events-auto flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-zinc-950/95 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-zinc-800 shadow-2xl flex flex-col gap-2 max-w-[340px]">
+        
+        <!-- Header: Title, Step selector, Magnetic Toggle -->
+        <div class="flex items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
+          <div class="flex items-center gap-1.5">
+            <span class="material-icons text-sm text-cyan-400">tune</span>
+            <span class="text-xs font-bold text-white tracking-tight">Micro-Ajuste en Zoom</span>
+          </div>
+
+          <div class="flex items-center gap-1">
+            <!-- Step selector: 1mm vs 10mm -->
+            <button
+              type="button"
+              (click)="setNudgeStep(1)"
+              [class]="nudgeStep() === 1 ? 'bg-cyan-500 text-zinc-950 font-bold border-cyan-400 shadow-sm' : 'bg-zinc-800 text-zinc-400 hover:text-white border-zinc-700'"
+              class="px-2 py-0.5 text-[10px] rounded border transition"
+              title="Paso de 1 milímetro">
+              1 mm
+            </button>
+            <button
+              type="button"
+              (click)="setNudgeStep(10)"
+              [class]="nudgeStep() === 10 ? 'bg-cyan-500 text-zinc-950 font-bold border-cyan-400 shadow-sm' : 'bg-zinc-800 text-zinc-400 hover:text-white border-zinc-700'"
+              class="px-2 py-0.5 text-[10px] rounded border transition"
+              title="Paso de 10 milímetros">
+              10 mm
+            </button>
+
+            <!-- Magnetic Snap Toggle -->
+            <button
+              type="button"
+              (click)="toggleMagneticSnap()"
+              [class]="isMagneticSnap() ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'"
+              class="px-2 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-0.5 transition ml-1"
+              [title]="isMagneticSnap() ? 'Imán de caras activo (12mm). Une piezas a 0mm de contacto perfecto.' : 'Imán desactivado. Desplazamiento libre.'">
+              <span class="material-icons text-[12px]">filter_vintage</span>
+              <span>{{ isMagneticSnap() ? 'Imán ON' : 'Imán OFF' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3 Axis Controls (X lateral, Y vertical, Z profundidad) -->
+        <div class="grid grid-cols-3 gap-1.5 text-center">
+          
+          <!-- Axis X -->
+          <div class="bg-zinc-900/90 rounded-xl p-1.5 border border-zinc-800 flex flex-col items-center">
+            <span class="text-[10px] font-bold text-red-400 mb-1">X Lateral</span>
+            <div class="flex items-center gap-1 w-full justify-center">
+              <button
+                type="button"
+                (click)="nudgePart('x', -nudgeStep())"
+                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
+                title="Mover a la izquierda (o flecha ←)">
+                ◄
+              </button>
+              <button
+                type="button"
+                (click)="nudgePart('x', nudgeStep())"
+                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
+                title="Mover a la derecha (o flecha →)">
+                ►
+              </button>
+            </div>
+            <span class="text-[9px] font-mono text-zinc-400 mt-1">{{ formatCoord(sel.posX) }} mm</span>
+          </div>
+
+          <!-- Axis Y (Height) -->
+          <div class="bg-zinc-900/90 rounded-xl p-1.5 border border-zinc-800 flex flex-col items-center">
+            <span class="text-[10px] font-bold text-emerald-400 mb-1">Y Altura</span>
+            <div class="flex items-center gap-1 w-full justify-center">
+              <button
+                type="button"
+                (click)="nudgePart('y', -nudgeStep())"
+                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
+                title="Bajar pieza (o flecha ↓ / AvPág)">
+                ▼
+              </button>
+              <button
+                type="button"
+                (click)="nudgePart('y', nudgeStep())"
+                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
+                title="Subir pieza (o flecha ↑ / RePág)">
+                ▲
+              </button>
+            </div>
+            <span class="text-[9px] font-mono text-zinc-400 mt-1">{{ formatCoord(sel.posY) }} mm</span>
+          </div>
+
+          <!-- Axis Z (Depth) -->
+          <div class="bg-zinc-900/90 rounded-xl p-1.5 border border-zinc-800 flex flex-col items-center">
+            <span class="text-[10px] font-bold text-blue-400 mb-1">Z Fondo</span>
+            <div class="flex items-center gap-1 w-full justify-center">
+              <button
+                type="button"
+                (click)="nudgePart('z', -nudgeStep())"
+                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
+                title="Mover al fondo">
+                ◄
+              </button>
+              <button
+                type="button"
+                (click)="nudgePart('z', nudgeStep())"
+                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
+                title="Mover al frente">
+                ►
+              </button>
+            </div>
+            <span class="text-[9px] font-mono text-zinc-400 mt-1">{{ formatCoord(sel.posZ) }} mm</span>
+          </div>
+
+        </div>
+
+        <!-- Keyboard Shortcut Helper -->
+        <p class="text-[10px] text-zinc-400 flex items-center justify-between">
+          <span>Teclas: <kbd class="px-1 py-0.5 bg-zinc-800 rounded font-mono text-zinc-300">←</kbd> <kbd class="px-1 py-0.5 bg-zinc-800 rounded font-mono text-zinc-300">→</kbd> <kbd class="px-1 py-0.5 bg-zinc-800 rounded font-mono text-zinc-300">↑</kbd> <kbd class="px-1 py-0.5 bg-zinc-800 rounded font-mono text-zinc-300">↓</kbd></span>
+          <span class="text-zinc-500 font-mono text-[9px]">(Shift=×10)</span>
+        </p>
+
+      </div>
+    </div>
+  }
+
   <!-- BOTTOM TOOLBAR: Exploded View Slider & Navigation Help -->
   <div class="absolute bottom-4 left-4 right-4 flex flex-col sm:flex-row items-center justify-between gap-3 pointer-events-none z-20">
     

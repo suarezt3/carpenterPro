@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para corregir el estiramiento unidireccional de piezas en el visor 3D, agregar historial de Deshacer/Rehacer (Undo/Redo con Ctrl+Z y Ctrl+Y), y configurar el guardado manual en la nube con interruptor de auto-guardado opcional.",
-  "updatedAt": "2026-09-30T03:03:28.426749645Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Plan de implementación para incorporar imán magnético automático entre piezas con precisión milimétrica de 1mm, atajos de flechas de teclado para mover piezas con zoom aplicado, y un HUD flotante de micro-ajuste en el visor 3D.",
+  "updatedAt":  "2026-10-01T00:34:08.110339557Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

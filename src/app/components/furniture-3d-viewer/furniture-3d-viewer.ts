@@ -37,7 +37,8 @@ interface GizmoHitData {
   styleUrls: [],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    class: 'block w-full h-full'
+    class: 'block w-full h-full',
+    '(window:keydown)': 'handleViewerKeyDown($event)'
   }
 })
 export class Furniture3dViewerComponent implements OnDestroy {
@@ -61,6 +62,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
   explodedPercent = signal<number>(0);
   show3dDimensions = signal<boolean>(true);
   isWhiteTheme = signal<boolean>(true); // Default to clean pure white studio background
+
+  // Precision Nudge & Magnetic Snapping
+  readonly isMagneticSnap = signal<boolean>(true);
+  readonly nudgeStep = signal<number>(1); // 1 mm default (toggleable to 10mm)
 
   // Active Selected Part computed
   selectedPart = computed(() => {
@@ -804,30 +809,43 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const deltaWorld = currentIntersection.clone().sub(this.dragPlaneIntersectionStart);
         const hit = this.activeGizmoHit;
         const part = this.dragInitialPart;
-        const snap = 5; // 5 mm snapping for high-precision carpentry
+        const snap = 1; // 1 mm fine precision
 
         if (hit.type === 'axis') {
-          // Axis Translation: X, Y, or Z
+          // Axis Translation: X, Y, or Z with magnetic face snapping
           const updates: Partial<Part> = {};
+          let targetPos = {
+            x: (part.posX ?? 0),
+            y: (part.posY ?? 0),
+            z: (part.posZ ?? 0)
+          };
 
           if (hit.axis === 'x') {
-            const rawDelta = deltaWorld.x;
-            const steppedDelta = Math.round(rawDelta / snap) * snap;
-            updates.posX = (part.posX ?? 0) + steppedDelta;
+            const steppedDelta = Math.round(deltaWorld.x / snap) * snap;
+            targetPos.x += steppedDelta;
+            if (this.isMagneticSnap()) {
+              targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'x');
+            }
+            updates.posX = targetPos.x;
           } else if (hit.axis === 'y') {
-            const rawDelta = deltaWorld.y;
-            const steppedDelta = Math.round(rawDelta / snap) * snap;
-            updates.posY = Math.max(0, (part.posY ?? 0) + steppedDelta);
+            const steppedDelta = Math.round(deltaWorld.y / snap) * snap;
+            targetPos.y = Math.max(0, targetPos.y + steppedDelta);
+            if (this.isMagneticSnap()) {
+              targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'y');
+            }
+            updates.posY = targetPos.y;
           } else if (hit.axis === 'z') {
-            const rawDelta = deltaWorld.z;
-            const steppedDelta = Math.round(rawDelta / snap) * snap;
-            updates.posZ = (part.posZ ?? 0) + steppedDelta;
+            const steppedDelta = Math.round(deltaWorld.z / snap) * snap;
+            targetPos.z += steppedDelta;
+            if (this.isMagneticSnap()) {
+              targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'z');
+            }
+            updates.posZ = targetPos.z;
           }
 
           this.partModified.emit({ part, updates });
         } else if (hit.type === 'handle') {
-          // Edge Stretch Handle: Length or Width
-          // Directional stretching: grows ONLY towards the pulled side, keeping the opposite edge anchored
+          // Edge Stretch Handle: Length or Width with magnetic snap to adjacent faces
           const updates: Partial<Part> = {};
           const orient = part.orientation || 'horizontal';
 
@@ -846,17 +864,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
             }
 
             const steppedDelta = Math.round(axisDelta / snap) * snap;
-            const newLength = Math.max(50, part.length + steppedDelta);
-            const actualDelta = newLength - part.length;
-
-            updates.length = newLength;
-            const currentPos = part[posAxis] ?? 0;
-            // Shifting center position by half of delta in handle direction anchors the opposite side
-            let newPos = currentPos + (actualDelta / 2) * hit.dir;
-            if (posAxis === 'posY') {
-              newPos = Math.max(newLength / 2, newPos);
-            }
-            updates[posAxis] = newPos;
+            const res = this.applyMagneticSnapToStretch(part, 'length', posAxis, hit.dir, steppedDelta);
+            updates.length = res.dim;
+            updates[posAxis] = res.pos;
 
           } else if (hit.handleTarget === 'width') {
             let axisDelta = 0;
@@ -873,17 +883,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
             }
 
             const steppedDelta = Math.round(axisDelta / snap) * snap;
-            const newWidth = Math.max(50, part.width + steppedDelta);
-            const actualDelta = newWidth - part.width;
-
-            updates.width = newWidth;
-            const currentPos = part[posAxis] ?? 0;
-            // Shifting center position by half of delta in handle direction anchors the opposite side
-            let newPos = currentPos + (actualDelta / 2) * hit.dir;
-            if (posAxis === 'posY') {
-              newPos = Math.max(newWidth / 2, newPos);
-            }
-            updates[posAxis] = newPos;
+            const res = this.applyMagneticSnapToStretch(part, 'width', posAxis, hit.dir, steppedDelta);
+            updates.width = res.dim;
+            updates[posAxis] = res.pos;
           }
 
           this.partModified.emit({ part, updates });
@@ -936,6 +938,365 @@ export class Furniture3dViewerComponent implements OnDestroy {
         canvas.style.cursor = 'default';
       }
     }
+  }
+
+  // --- PRECISION NUDGE & MAGNETIC SNAPPING METHODS ---
+
+  setNudgeStep(step: number) {
+    this.nudgeStep.set(step);
+  }
+
+  toggleMagneticSnap() {
+    this.isMagneticSnap.update(v => !v);
+  }
+
+  formatCoord(val?: number): number {
+    return Math.round(val ?? 0);
+  }
+
+  nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
+    const sel = this.selectedPart();
+    if (!sel) return;
+
+    this.dragStarted.emit();
+
+    let targetPos = {
+      x: sel.posX ?? 0,
+      y: sel.posY ?? 0,
+      z: sel.posZ ?? 0
+    };
+
+    targetPos[axis] += delta;
+    if (axis === 'y') {
+      targetPos.y = Math.max(0, targetPos.y);
+    }
+
+    if (this.isMagneticSnap()) {
+      targetPos = this.applyMagneticSnapToPosition(sel, targetPos, axis);
+    }
+
+    const updates: Partial<Part> = {};
+    if (axis === 'x') updates.posX = targetPos.x;
+    if (axis === 'y') updates.posY = targetPos.y;
+    if (axis === 'z') updates.posZ = targetPos.z;
+
+    this.partModified.emit({ part: sel, updates });
+  }
+
+  handleViewerKeyDown(e: KeyboardEvent) {
+    const sel = this.selectedPart();
+    if (!sel) return;
+
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+
+    const step = e.shiftKey ? Math.max(10, this.nudgeStep() * 10) : this.nudgeStep();
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        this.nudgePart('x', -step);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        this.nudgePart('x', step);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (e.altKey) {
+          this.nudgePart('y', step);
+        } else {
+          this.nudgePart('z', -step);
+        }
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        if (e.altKey) {
+          this.nudgePart('y', -step);
+        } else {
+          this.nudgePart('z', step);
+        }
+        break;
+      case 'PageUp':
+        e.preventDefault();
+        this.nudgePart('y', step);
+        break;
+      case 'PageDown':
+        e.preventDefault();
+        this.nudgePart('y', -step);
+        break;
+      case 'w':
+      case 'W':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          this.nudgePart('y', step);
+        }
+        break;
+      case 's':
+      case 'S':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          this.nudgePart('y', -step);
+        }
+        break;
+    }
+  }
+
+  private getPartBounds(
+    part: Part,
+    customPos?: { x: number; y: number; z: number },
+    customSize?: { length?: number; width?: number }
+  ) {
+    const t = part.thickness || 18;
+    const L = customSize?.length ?? part.length;
+    const W = customSize?.width ?? part.width;
+
+    let sx = L;
+    let sy = t;
+    let sz = W;
+
+    const orient = part.orientation || 'horizontal';
+    if (orient === 'vertical_yz') {
+      sx = t;
+      sy = L;
+      sz = W;
+    } else if (orient === 'vertical_xy') {
+      sx = L;
+      sy = W;
+      sz = t;
+    }
+
+    const px = customPos?.x ?? (part.posX ?? 0);
+    const py = customPos?.y ?? (part.posY ?? (sy / 2));
+    const pz = customPos?.z ?? (part.posZ ?? 0);
+
+    const hx = sx / 2;
+    const hy = sy / 2;
+    const hz = sz / 2;
+
+    return {
+      minX: px - hx,
+      maxX: px + hx,
+      minY: py - hy,
+      maxY: py + hy,
+      minZ: pz - hz,
+      maxZ: pz + hz,
+      sx,
+      sy,
+      sz,
+      px,
+      py,
+      pz
+    };
+  }
+
+  private applyMagneticSnapToPosition(
+    movingPart: Part,
+    proposedPos: { x: number; y: number; z: number },
+    axis: 'x' | 'y' | 'z',
+    threshold = 12
+  ): { x: number; y: number; z: number } {
+    const movingBounds = this.getPartBounds(movingPart, proposedPos);
+    const otherParts = this.parts().filter(p => p.id !== movingPart.id);
+    if (otherParts.length === 0) return proposedPos;
+
+    let bestSnapPos: number | null = null;
+    let minDistance = threshold;
+
+    for (const other of otherParts) {
+      const otherBounds = this.getPartBounds(other);
+
+      if (axis === 'x') {
+        const overlapY = movingBounds.minY < otherBounds.maxY + 60 && movingBounds.maxY > otherBounds.minY - 60;
+        const overlapZ = movingBounds.minZ < otherBounds.maxZ + 60 && movingBounds.maxZ > otherBounds.minZ - 60;
+        if (!overlapY || !overlapZ) continue;
+
+        const hx = movingBounds.sx / 2;
+        const candidates = [
+          otherBounds.minX - hx,
+          otherBounds.maxX + hx,
+          otherBounds.minX + hx,
+          otherBounds.maxX - hx
+        ];
+
+        for (const cand of candidates) {
+          const dist = Math.abs(proposedPos.x - cand);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestSnapPos = cand;
+          }
+        }
+      } else if (axis === 'y') {
+        const overlapX = movingBounds.minX < otherBounds.maxX + 60 && movingBounds.maxX > otherBounds.minX - 60;
+        const overlapZ = movingBounds.minZ < otherBounds.maxZ + 60 && movingBounds.maxZ > otherBounds.minZ - 60;
+        if (!overlapX || !overlapZ) continue;
+
+        const hy = movingBounds.sy / 2;
+        const candidates = [
+          otherBounds.minY - hy,
+          otherBounds.maxY + hy,
+          otherBounds.minY + hy,
+          otherBounds.maxY - hy
+        ];
+
+        for (const cand of candidates) {
+          const dist = Math.abs(proposedPos.y - cand);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestSnapPos = Math.max(hy, cand);
+          }
+        }
+      } else if (axis === 'z') {
+        const overlapX = movingBounds.minX < otherBounds.maxX + 60 && movingBounds.maxX > otherBounds.minX - 60;
+        const overlapY = movingBounds.minY < otherBounds.maxY + 60 && movingBounds.maxY > otherBounds.minY - 60;
+        if (!overlapX || !overlapY) continue;
+
+        const hz = movingBounds.sz / 2;
+        const candidates = [
+          otherBounds.minZ - hz,
+          otherBounds.maxZ + hz,
+          otherBounds.minZ + hz,
+          otherBounds.maxZ - hz
+        ];
+
+        for (const cand of candidates) {
+          const dist = Math.abs(proposedPos.z - cand);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestSnapPos = cand;
+          }
+        }
+      }
+    }
+
+    if (bestSnapPos !== null) {
+      const snapped = { ...proposedPos };
+      snapped[axis] = Math.round(bestSnapPos * 10) / 10;
+      return snapped;
+    }
+
+    return proposedPos;
+  }
+
+  private applyMagneticSnapToStretch(
+    part: Part,
+    targetDimension: 'length' | 'width',
+    posAxis: 'posX' | 'posY' | 'posZ',
+    dir: number,
+    steppedDelta: number,
+    threshold = 12
+  ): { dim: number; pos: number } {
+    const initialPart = this.dragInitialPart || part;
+    const initBounds = this.getPartBounds(initialPart);
+    const initialDim = initialPart[targetDimension];
+    const proposedDim = Math.max(50, initialDim + steppedDelta);
+    const initialPos = initialPart[posAxis] ?? 0;
+
+    const actualDelta = proposedDim - initialDim;
+    let defPos = initialPos + (actualDelta / 2) * dir;
+    if (posAxis === 'posY') {
+      defPos = Math.max(proposedDim / 2, defPos);
+    }
+
+    if (!this.isMagneticSnap()) {
+      return { dim: proposedDim, pos: defPos };
+    }
+
+    let anchoredFace = 0;
+    let proposedMovingFace = 0;
+
+    if (posAxis === 'posX') {
+      if (dir === 1) {
+        anchoredFace = initBounds.minX;
+        proposedMovingFace = anchoredFace + proposedDim;
+      } else {
+        anchoredFace = initBounds.maxX;
+        proposedMovingFace = anchoredFace - proposedDim;
+      }
+    } else if (posAxis === 'posY') {
+      if (dir === 1) {
+        anchoredFace = initBounds.minY;
+        proposedMovingFace = anchoredFace + proposedDim;
+      } else {
+        anchoredFace = initBounds.maxY;
+        proposedMovingFace = anchoredFace - proposedDim;
+      }
+    } else if (posAxis === 'posZ') {
+      if (dir === 1) {
+        anchoredFace = initBounds.minZ;
+        proposedMovingFace = anchoredFace + proposedDim;
+      } else {
+        anchoredFace = initBounds.maxZ;
+        proposedMovingFace = anchoredFace - proposedDim;
+      }
+    }
+
+    const otherParts = this.parts().filter(p => p.id !== part.id);
+    let bestCandidateFace: number | null = null;
+    let minDistance = threshold;
+
+    for (const other of otherParts) {
+      const otherBounds = this.getPartBounds(other);
+
+      if (posAxis === 'posX') {
+        const overlapY = initBounds.minY < otherBounds.maxY + 60 && initBounds.maxY > otherBounds.minY - 60;
+        const overlapZ = initBounds.minZ < otherBounds.maxZ + 60 && initBounds.maxZ > otherBounds.minZ - 60;
+        if (!overlapY || !overlapZ) continue;
+
+        for (const face of [otherBounds.minX, otherBounds.maxX]) {
+          const dist = Math.abs(proposedMovingFace - face);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestCandidateFace = face;
+          }
+        }
+      } else if (posAxis === 'posY') {
+        const overlapX = initBounds.minX < otherBounds.maxX + 60 && initBounds.maxX > otherBounds.minX - 60;
+        const overlapZ = initBounds.minZ < otherBounds.maxZ + 60 && initBounds.maxZ > otherBounds.minZ - 60;
+        if (!overlapX || !overlapZ) continue;
+
+        for (const face of [otherBounds.minY, otherBounds.maxY]) {
+          const dist = Math.abs(proposedMovingFace - face);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestCandidateFace = face;
+          }
+        }
+      } else if (posAxis === 'posZ') {
+        const overlapX = initBounds.minX < otherBounds.maxX + 60 && initBounds.maxX > otherBounds.minX - 60;
+        const overlapY = initBounds.minY < otherBounds.maxY + 60 && initBounds.maxY > otherBounds.minY - 60;
+        if (!overlapX || !overlapY) continue;
+
+        for (const face of [otherBounds.minZ, otherBounds.maxZ]) {
+          const dist = Math.abs(proposedMovingFace - face);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestCandidateFace = face;
+          }
+        }
+      }
+    }
+
+    if (bestCandidateFace !== null) {
+      let snappedDim = 0;
+      if (dir === 1) {
+        snappedDim = Math.round(bestCandidateFace - anchoredFace);
+      } else {
+        snappedDim = Math.round(anchoredFace - bestCandidateFace);
+      }
+
+      if (snappedDim >= 50) {
+        let snappedPos = anchoredFace + (snappedDim / 2) * dir;
+        if (posAxis === 'posY') {
+          snappedPos = Math.max(snappedDim / 2, snappedPos);
+        }
+        return { dim: snappedDim, pos: snappedPos };
+      }
+    }
+
+    return { dim: proposedDim, pos: defPos };
   }
 
   // Camera preset controls

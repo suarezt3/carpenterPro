@@ -1,53 +1,58 @@
-# Estiramiento Unidireccional 3D, Deshacer/Rehacer y Control de Guardado en Nube
+# Imán Magnético 3D a 1mm, Control con Teclado y Micro-Ajuste en Zoom
 
-Ajuste del comportamiento de redimensionamiento de piezas mediante tiradores 3D para que crezcan exclusivamente hacia el lado jalado (anclando el extremo opuesto), incorporación de un sistema de historial de cambios con botones Deshacer/Rehacer (y atajos de teclado Ctrl+Z / Ctrl+Y), y desacoplamiento del guardado en la nube con botón manual y switch opcional de auto-guardado.
+Implementación de un sistema de unión magnética inteligente (Face Snapping) con resolución de 1 mm para acoplar piezas sin solapamientos ni holguras, control de desplazamiento milimétrico mediante flechas de teclado y un HUD flotante de micro-ajuste para manipular piezas con zoom aplicado sin depender de la visibilidad de las guías 3D.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
 > Decisiones confirmadas por el usuario:
-> 1. **Guardado en la nube**: Se implementará el guardado manual mediante el botón "Guardar en Nube", junto con un interruptor (switch) visible para habilitar/deshabilitar el auto-guardado automático según la preferencia del carpintero.
-> 2. **Historial de cambios**: Se añadirán botones dedicados para **Deshacer (Undo)** y **Rehacer (Redo)** en la barra superior, con soporte de atajos de teclado globales (`Ctrl+Z` / `Cmd+Z` y `Ctrl+Y` / `Ctrl+Shift+Z`).
+> 1. **Ajuste de unión entre piezas**: Imán magnético automático a caras y cantos de piezas contiguas con precisión de 1 mm (eliminando los saltos bruscos de 5 mm y asegurando unión exacta a 0 mm de contacto).
+> 2. **Desplazamiento con zoom aplicado**: Control dual mediante flechas del teclado en el visor 3D y una botonera HUD flotante de micro-ajuste milimétrico (X, Y, Z con pasos de 1 mm y 10 mm).
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **Estiramiento Unidireccional de Piezas (3D)**: Actualmente, al modificar la longitud o ancho de una pieza jalando un tirador exterior, la pieza crece simétricamente en ambos sentidos respecto a su centro. Con este ajuste, al jalar el extremo superior, la base permanece fija y solo crece hacia arriba; al jalar hacia abajo, el tope se mantiene fijo y solo crece hacia abajo; y de forma análoga para laterales y fondo.
-- **Historial Deshacer / Rehacer (Undo / Redo)**: El usuario podrá experimentar libremente en el diseño 3D, agregar, mover, redimensionar piezas o modificar materiales sabiendo que puede revertir cualquier error al instante.
-- **Control de Guardado Flexible**: Control explícito del momento exacto en que se suben los datos a Supabase, evitando sobreescrituras no deseadas en la nube mientras se realizan pruebas intermedias.
+- **Imán Magnético Inteligente (Face Snapping)**:
+  - Al arrastrar o estirar una pieza, el visor calculará en tiempo real los planos límites (caras frontal, trasera, laterales, superior e inferior) de todas las demás piezas del mueble.
+  - Cuando la cara de la pieza en movimiento se acerque a menos de 12 mm de la cara de otra pieza, se "enganchará" magnéticamente con precisión matemática de 0 mm (contacto perfecto sin interpenetración).
+  - La resolución base de arrastre libre pasa de 5 mm a 1 mm.
+- **Movimiento con Teclado en Zoom (Nudge System)**:
+  - Al tener una pieza seleccionada, el usuario podrá acercar la cámara al máximo para inspeccionar un ensamble o unión y mover la pieza utilizando las **Flechas del teclado** (←/→ para eje X, ↑/↓ para eje Z de profundidad, y `RePág`/`AvPág` o `Shift+↑/↓` para eje Y de altura).
+- **HUD Flotante de Micro-Ajuste**:
+  - En la esquina inferior del visor 3D se mostrará un panel compacto y no invasivo con botones `[-1mm]`, `[+1mm]`, `[-10mm]`, `[+10mm]` para cada eje (X lateral, Y vertical, Z profundidad), permitiendo ajustar la posición con un clic manteniendo la vista de detalle.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-### Flujo de Interacción y Controles
+### Flujo de Interacción y Pantalla
 
-1. **Visor 3D y Manipulación**:
-   - Al seleccionar una pieza (resaltada en Azul Cobalt Técnico `#1d4ed8`), aparecen los tiradores en sus extremos.
-   - Al arrastrar el tirador superior (+Y o +X según orientación), el cursor cambia a flechas dimensionales y la pieza se estira en tiempo real únicamente en la dirección del arrastre con snap de 5 mm.
-   - El extremo opuesto actúa como punto de anclaje estático.
+1. **Inspección de Unión y Arrastre Suave**:
+   - Al estirar o trasladar una pieza, los movimientos son ultra-fluidos en pasos de 1 mm.
+   - Si la pieza se aproxima a otra pieza vecina, se activa un efecto de enganche magnético y un destello sutil de color cian en la arista de contacto, garantizando que queden exactamente alineadas como en un software CAD profesional (SketchUp / AutoCAD).
 
-2. **Barra Superior (Top Bar Contract)**:
-   - Se incorporan los botones **Deshacer** (`mat-icon: undo`) y **Rehacer` (`mat-icon: redo`) junto al nombre del proyecto o en la botonera de acciones principales, con estados activos/deshabilitados según la disponibilidad del historial.
-   - Al lado del botón **"Guardar en Nube"**, se añade un selector compacto de **Auto-guardar** (con indicador ON/OFF), permitiendo guardar manualmente con un clic o activar la sincronización periódica automática.
+2. **Control por Teclado**:
+   - `←` / `→`: Mover ±1 mm en el eje horizontal X (o ±10 mm con `Shift`).
+   - `↑` / `↓`: Mover ±1 mm en profundidad Z (o ±10 mm con `Shift`).
+   - `Shift + ↑` / `Shift + ↓` (o teclas `W`/`S` / `PageUp`/`PageDown`): Mover ±1 mm en elevación vertical Y.
+   - Cada movimiento genera un registro reversible con `Ctrl+Z` (Deshacer).
 
-3. **Atajos de Teclado**:
-   - `Ctrl+Z` / `Cmd+Z`: Deshacer la última acción.
-   - `Ctrl+Y` / `Ctrl+Shift+Z` / `Cmd+Shift+Z`: Rehacer la última acción deshecha.
-   - Los atajos se ignoran si el foco está dentro de un campo de texto o formulario para no interferir con la edición de texto.
+3. **HUD Flotante en el Canvas 3D**:
+   - Situado de forma limpia en el visor (`bg-zinc-950/80 backdrop-blur-md border border-zinc-800 rounded-xl`).
+   - Selector de paso rápido: `[1 mm]` y `[10 mm]`.
+   - Botonera direccional: `X: ◄ ►`, `Y: ▲ ▼`, `Z: ◄ ►` con valores de coordenadas en milímetros actualizados en tiempo real.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Compensación de Posición en Redimensionamiento**:
-  - *Enfoque*: Cuando la dimensión de la pieza cambia en $\Delta$, su posición de centro en ese eje debe desplazarse exactamente en $(\Delta / 2) \times \text{dirección}$.
-  - *Razón*: Dado que Three.js construye las geometrías de cajas (`BoxGeometry`) centradas en $(0,0,0)$, desplazar el centro en la mitad del cambio fija automáticamente el lado opuesto en el espacio 3D mundial.
-- **Pila de Historial en Memoria y Snapshot Diferido**:
-  - *Enfoque*: Registrar el estado del proyecto en la pila de `undo` antes de iniciar la interacción (por ejemplo al hacer `pointerdown` en un tirador o al agregar/eliminar piezas) y limitar la pila a 30 niveles para garantizar máxima fluidez y bajo consumo de memoria.
-- **Auto-guardado Opcional con Persistencia Local Siempre Activa**:
-  - *Enfoque*: El almacenamiento local en el navegador (`localStorage`) se mantiene instantáneo para evitar pérdida de datos si se cierra la pestaña; la sincronización con Supabase respeta la preferencia del switch (desactivado por defecto o configurable) y solo se ejecuta automáticamente si el usuario lo activa.
+- **Umbral Magnético de 12 mm con Prioridad de Contacto**:
+  - *Enfoque*: Calcular distancias entre cajas envolventes (AABB) de la pieza activa contra todas las piezas estáticas. Si la distancia entre caras coplanares o adyacentes es menor a 12 mm, forzar la posición a la cara exacta. Si la distancia es mayor, aplicar el snap de 1 mm.
+  - *Razón*: Resuelve definitivamente el problema mostrado en la captura del usuario, donde un snap de 5 mm saltaba entre una holgura visible y una superposición indeseada.
+- **Teclas Activas solo con Pieza Seleccionada y Foco Fuera de Formularios**:
+  - *Enfoque*: El escuchador de teclado solo actúa cuando hay una pieza seleccionada y el usuario no está editando un campo de texto `<input>`.
+  - *Razón*: Garantiza que escribir nombres o notas no mueva accidentalmente el mueble 3D.
 
 ---
 
@@ -55,44 +60,31 @@ Ajuste del comportamiento de redimensionamiento de piezas mediante tiradores 3D 
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        Top Bar (Header Component)                      │
-│   [MelamiPro] · [Deshacer (Ctrl+Z)] [Rehacer (Ctrl+Y)]                 │
-│                 [Switch: Auto-guardar ON/OFF] [Guardar en Nube]        │
+│                   3D Viewport (furniture-3d-viewer)                    │
+│   - Raycaster & Dragging Gizmo                                         │
+│   - Magnetic Face-Snapping Engine (12mm threshold -> exact 0mm face)   │
+│   - Step resolution: 1mm (configurable 1mm / 5mm / 10mm)               │
+│   - Keyboard Event Handler (Arrow keys, Shift, PageUp/Down)            │
+│   - Floating Micro-Nudge HUD (X, Y, Z stepping buttons)                │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                 ProjectStorageService (State Manager)                  │
-│   - currentProject (signal)                                            │
-│   - undoStack / redoStack (signals)                                    │
-│   - canUndo / canRedo (computed)                                       │
-│   - autoSyncCloud (signal, default false / persistible)                │
-│   - undo() / redo() / pushHistoryState()                               │
-│   - saveCurrentToCloud()                                               │
-└──────────────────┬─────────────────────────────────┬───────────────────┘
-                   │                                 │
-                   ▼                                 ▼
-┌─────────────────────────────────────┐   ┌──────────────────────────────┐
-│  3D Viewer (furniture-3d-viewer)    │   │   SupabaseService (Cloud)    │
-│  - onPointerDown: push snapshot     │   │   - saveProject(...)         │
-│  - onPointerMove:                   │   │   (solo invocado manualmente │
-│    newDim = dim + steppedDelta      │   │    o si autoSyncCloud está   │
-│    newPos = pos + (stepped/2) * dir │   │    activado)                 │
-└─────────────────────────────────────┘   └──────────────────────────────┘
+│                   ModuleDesigner / ProjectStorageService               │
+│   - updatePartLive(updates) -> actualiza la pieza en tiempo real       │
+│   - pushSnapshot() -> registra en historial para Deshacer (Ctrl+Z)     │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Componentes y Archivos Clave a Modificar
 
 1. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts`**:
-   - Ajustar el cálculo matemático de estiramiento en `onPointerMove`: calcular tanto el nuevo tamaño (`length` o `width`) como el nuevo desplazamiento del centro (`posX`, `posY` o `posZ`) en función del vector unitario del tirador (`dir`) y la orientación de la pieza (`horizontal`, `vertical_yz`, `vertical_xy`).
-   - Emitir el registro de historial al inicio del arrastre de tiradores para que la operación completa sea reversible en un solo paso de Deshacer.
+   - Algoritmo de cálculo de caras (minX, maxX, minY, maxY, minZ, maxZ) de todas las piezas estáticas.
+   - Función `applyMagneticSnap(proposedPos, proposedSize, orient)` para alinear automáticamente las caras a 0 mm de holgura.
+   - Ajuste de resolución de arrastre de `snap = 5` a `snap = 1` mm.
+   - Método `nudgePart(axis: 'x' | 'y' | 'z', delta: number)` con llamada a `dragStarted` y `partModified`.
+   - Manejador de teclado para flechas y teclas de elevación.
+   - Señal `nudgeStep = signal<number>(1)` (opciones 1mm y 10mm).
 
-2. **`src/app/services/project-storage.service.ts`**:
-   - Implementar las señales `undoStack`, `redoStack`, `canUndo`, `canRedo`, `autoSyncEnabled`.
-   - Métodos `undo()`, `redo()`, `snapshotState()`, `toggleAutoSync()`.
-   - Modificar `saveToStorage`: solo llamar a `scheduleCloudAutoSync` si `autoSyncEnabled()` es verdadero.
-
-3. **`src/app/components/header/header.ts` & `header.html`**:
-   - Agregar botones con iconos `<mat-icon>undo</mat-icon>` y `<mat-icon>redo</mat-icon>`.
-   - Añadir interruptor toggle estilizado para "Auto-guardar en nube".
-   - Conectar atajos de teclado (`window.addEventListener('keydown')`) para Deshacer y Rehacer.
+2. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.html`**:
+   - Incorporar el HUD flotante de micro-ajuste en la esquina inferior del visor 3D, visible cuando hay una pieza seleccionada.
