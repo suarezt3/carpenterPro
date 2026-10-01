@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para incorporar imán magnético automático entre piezas con precisión milimétrica de 1mm, atajos de flechas de teclado para mover piezas con zoom aplicado, y un HUD flotante de micro-ajuste en el visor 3D.",
-  "updatedAt":  "2026-10-01T00:34:08.110339557Z",
+  "summary":  "Plan de implementación para selección múltiple de piezas con traslación en grupo, herramienta de cinta métrica interactiva 3D con cotas X/Y/Z, y reorganización de la barra superior a pantalla completa en 3 zonas con botones estilizados en una sola línea.",
+  "updatedAt":  "2026-10-01T00:47:50.956964085Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

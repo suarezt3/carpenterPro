@@ -1,90 +1,118 @@
-# Imán Magnético 3D a 1mm, Control con Teclado y Micro-Ajuste en Zoom
+# Selección Múltiple 3D, Cinta Métrica Interactiva y Reorganización de la Barra Superior
 
-Implementación de un sistema de unión magnética inteligente (Face Snapping) con resolución de 1 mm para acoplar piezas sin solapamientos ni holguras, control de desplazamiento milimétrico mediante flechas de teclado y un HUD flotante de micro-ajuste para manipular piezas con zoom aplicado sin depender de la visibilidad de las guías 3D.
+Implementación de selección múltiple de piezas (Shift+Clic y botón "Seleccionar Todo") con traslación simultánea en bloque, herramienta de cinta métrica 3D interactiva para medir distancias y holguras entre puntos o piezas (distancia directa, $\Delta X$, $\Delta Y$, $\Delta Z$), y rediseño del encabezado superior a pantalla completa eliminando márgenes desperdiciados y estandarizando todos los botones en una sola fila equilibrada.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
 > Decisiones confirmadas por el usuario:
-> 1. **Ajuste de unión entre piezas**: Imán magnético automático a caras y cantos de piezas contiguas con precisión de 1 mm (eliminando los saltos bruscos de 5 mm y asegurando unión exacta a 0 mm de contacto).
-> 2. **Desplazamiento con zoom aplicado**: Control dual mediante flechas del teclado en el visor 3D y una botonera HUD flotante de micro-ajuste milimétrico (X, Y, Z con pasos de 1 mm y 10 mm).
+> 1. **Selección múltiple**: Mantener tecla `Shift` + clic para agregar o quitar piezas de la selección, junto con un botón rápido de "Seleccionar Todo" y gizmo centralizado para arrastrar todo el conjunto a la vez.
+> 2. **Herramienta de medición**: Cinta métrica interactiva 3D entre 2 clics con lectura de distancia directa y desglose de cotas proyectadas en los 3 ejes ($\Delta X$ lateral, $\Delta Y$ altura, $\Delta Z$ fondo).
+> 3. **Encabezado superior**: Distribución expandida a todo el ancho de la pantalla (`w-full`) en 3 zonas (Identidad/Proyecto, Pestañas de navegación centralizadas, y Botones de acción alineados con altura uniforme `h-9` y texto de una sola línea `whitespace-nowrap`).
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **Imán Magnético Inteligente (Face Snapping)**:
-  - Al arrastrar o estirar una pieza, el visor calculará en tiempo real los planos límites (caras frontal, trasera, laterales, superior e inferior) de todas las demás piezas del mueble.
-  - Cuando la cara de la pieza en movimiento se acerque a menos de 12 mm de la cara de otra pieza, se "enganchará" magnéticamente con precisión matemática de 0 mm (contacto perfecto sin interpenetración).
-  - La resolución base de arrastre libre pasa de 5 mm a 1 mm.
-- **Movimiento con Teclado en Zoom (Nudge System)**:
-  - Al tener una pieza seleccionada, el usuario podrá acercar la cámara al máximo para inspeccionar un ensamble o unión y mover la pieza utilizando las **Flechas del teclado** (←/→ para eje X, ↑/↓ para eje Z de profundidad, y `RePág`/`AvPág` o `Shift+↑/↓` para eje Y de altura).
-- **HUD Flotante de Micro-Ajuste**:
-  - En la esquina inferior del visor 3D se mostrará un panel compacto y no invasivo con botones `[-1mm]`, `[+1mm]`, `[-10mm]`, `[+10mm]` para cada eje (X lateral, Y vertical, Z profundidad), permitiendo ajustar la posición con un clic manteniendo la vista de detalle.
+- **Selección Múltiple y Arrastre en Grupo**:
+  - Permite agrupar un cajón, módulo o conjunto de piezas completo para moverlo o reubicarlo como una sola unidad en el plano 3D.
+  - Al seleccionar varias piezas (mediante `Shift+Clic` o botón "Seleccionar Todo"), el gizmo de traslación 3D se ubica en el centro geométrico del grupo. Al arrastrar una flecha o usar las flechas del teclado / HUD, **todas las piezas se desplazan juntas en sincronía**, manteniendo sus distancias relativas.
+  - Cada traslación en bloque se registra en el historial como una sola acción de Deshacer (`Ctrl+Z`).
+- **Cinta Métrica 3D Interactiva**:
+  - Activada con un botón `Medir / Cinta Métrica` en la barra del visor 3D.
+  - Permite hacer clic en cualquier punto o arista de una pieza (punto A) y luego en otra (punto B), trazando una línea milimétrica con extremos tipo cota y una tarjeta flotante con la distancia exacta ($D$) y sus componentes:
+    - $\Delta X$: distancia horizontal / luz entre costados.
+    - $\Delta Y$: distancia vertical / luz entre estantes o suelo.
+    - $\Delta Z$: distancia en profundidad.
+- **Rediseño Completo del Encabezado (Top Bar Contract)**:
+  - Elimina la restricción `max-w-7xl` para aprovechar los monitores panorámicos de carpintería y taller.
+  - Corrige el botón "Guardar en Nube" para que mantenga altura constante (`h-9`), no se deforme ni se haga "gordito", y conserve espaciado simétrico con el resto de opciones.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-### Flujo de Interacción y Pantalla
+### 1. Barra Superior Reorganizada a Pantalla Completa (3 Zonas)
 
-1. **Inspección de Unión y Arrastre Suave**:
-   - Al estirar o trasladar una pieza, los movimientos son ultra-fluidos en pasos de 1 mm.
-   - Si la pieza se aproxima a otra pieza vecina, se activa un efecto de enganche magnético y un destello sutil de color cian en la arista de contacto, garantizando que queden exactamente alineadas como en un software CAD profesional (SketchUp / AutoCAD).
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ [MelamiPro · Mueble Barra]         [Módulos 3D] [Piezas] [Corte] [Presupuesto]         [↺] [↻] [Auto:ON] [Guardar]│
+│                                                                                       [Nuevo] [Proyectos] [Export]│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
-2. **Control por Teclado**:
-   - `←` / `→`: Mover ±1 mm en el eje horizontal X (o ±10 mm con `Shift`).
-   - `↑` / `↓`: Mover ±1 mm en profundidad Z (o ±10 mm con `Shift`).
-   - `Shift + ↑` / `Shift + ↓` (o teclas `W`/`S` / `PageUp`/`PageDown`): Mover ±1 mm en elevación vertical Y.
-   - Cada movimiento genera un registro reversible con `Ctrl+Z` (Deshacer).
+- **Zona Izquierda**: Logotipo, versión y nombre del proyecto editable con cliente.
+- **Zona Central**: Navegador de pestañas con botones tipo cápsula refinada y estados activos de alto contraste.
+- **Zona Derecha**: Grupo de acciones con padding uniforme, sin saltos de línea ni botones sobredimensionados:
+  - Bloque Deshacer / Rehacer (`Ctrl+Z` / `Ctrl+Y`).
+  - Interruptor compacto `Auto-guardado ON/OFF`.
+  - Botón `Guardar en Nube` estilizado con texto en una sola línea `whitespace-nowrap`.
+  - Botones secundarios: `Nuevo`, `Proyectos`, `Exportar JSON`, `Configuración`.
 
-3. **HUD Flotante en el Canvas 3D**:
-   - Situado de forma limpia en el visor (`bg-zinc-950/80 backdrop-blur-md border border-zinc-800 rounded-xl`).
-   - Selector de paso rápido: `[1 mm]` y `[10 mm]`.
-   - Botonera direccional: `X: ◄ ►`, `Y: ▲ ▼`, `Z: ◄ ►` con valores de coordenadas en milímetros actualizados en tiempo real.
+### 2. Selección Múltiple 3D
+
+- En la barra inferior del visor 3D se añade el botón **"Seleccionar Todo"** y el contador dinámico (ej. `3 piezas seleccionadas`).
+- Al presionar `Shift` y hacer clic en el 3D, la pieza se añade o retira de la selección activa.
+- Las piezas seleccionadas muestran un contorno azul cobalto técnico.
+- Las flechas del gizmo 3D aparecen centradas en el grupo.
+
+### 3. Cinta Métrica 3D
+
+- Botón en la botonera superior del visor: `Regla / Medir` con icono `straighten`.
+- Al activarse, aparece una guía visual y se habilita el puntero de medición.
+- Un clic fija el Punto A y el siguiente fija el Punto B, desplegando la cota 3D con indicador numérico.
+- Botón "Limpiar Medida" o presionar `Esc` para reiniciar.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Umbral Magnético de 12 mm con Prioridad de Contacto**:
-  - *Enfoque*: Calcular distancias entre cajas envolventes (AABB) de la pieza activa contra todas las piezas estáticas. Si la distancia entre caras coplanares o adyacentes es menor a 12 mm, forzar la posición a la cara exacta. Si la distancia es mayor, aplicar el snap de 1 mm.
-  - *Razón*: Resuelve definitivamente el problema mostrado en la captura del usuario, donde un snap de 5 mm saltaba entre una holgura visible y una superposición indeseada.
-- **Teclas Activas solo con Pieza Seleccionada y Foco Fuera de Formularios**:
-  - *Enfoque*: El escuchador de teclado solo actúa cuando hay una pieza seleccionada y el usuario no está editando un campo de texto `<input>`.
-  - *Razón*: Garantiza que escribir nombres o notas no mueva accidentalmente el mueble 3D.
+- **Centroide de Grupo para el Gizmo de Traslación**:
+  - *Enfoque*: Calcular el centroide $\bar{P} = \frac{1}{N}\sum P_i$ de las piezas seleccionadas y posicionar allí las flechas de traslación.
+  - *Razón*: Mover el grupo desde su centro visual resulta natural e intuitivo para el usuario, independientemente de cuántas piezas compongan el conjunto.
+- **Sincronización en Lote con `pushSnapshot()`**:
+  - *Enfoque*: Desplazar todas las piezas con un solo `updateProject` acumulativo por interacción, de modo que presionar `Ctrl+Z` revierta el movimiento de todo el cajón o grupo a la vez.
+- **Cinta Métrica Basada en Raycasting 3D con Puntos de Anclaje a Vértices**:
+  - *Enfoque*: La cinta métrica detecta las superficies y esquinas de las piezas mediante raycasting, permitiendo medir luces internas, alturas de cajón o espacios libres con exactitud milimétrica.
 
 ---
 
 ## 4. Technical Architecture & Data Strategy
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                   3D Viewport (furniture-3d-viewer)                    │
-│   - Raycaster & Dragging Gizmo                                         │
-│   - Magnetic Face-Snapping Engine (12mm threshold -> exact 0mm face)   │
-│   - Step resolution: 1mm (configurable 1mm / 5mm / 10mm)               │
-│   - Keyboard Event Handler (Arrow keys, Shift, PageUp/Down)            │
-│   - Floating Micro-Nudge HUD (X, Y, Z stepping buttons)                │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                   ModuleDesigner / ProjectStorageService               │
-│   - updatePartLive(updates) -> actualiza la pieza en tiempo real       │
-│   - pushSnapshot() -> registra en historial para Deshacer (Ctrl+Z)     │
-└────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                           Header Component (w-full)                            │
+│  - Zona 1: Brand & Project Info                                                │
+│  - Zona 2: Navigation Tabs                                                     │
+│  - Zona 3: Action Buttons (Undo/Redo, Auto-Sync, Save Cloud, Projects, Export) │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                   Furniture3dViewerComponent (3D Core)                         │
+│  - selectedPartIds: signal<string[]> (Multi-Selection Set)                     │
+│  - selectAllParts() / togglePartSelection(partId)                              │
+│  - Group Dragging: onPointerMove traslada todas las piezas por deltaWorld      │
+│  - Measure Tool:                                                               │
+│    - isMeasureMode: signal<boolean>(false)                                     │
+│    - measurePointA: Vector3 | null                                             │
+│    - measurePointB: Vector3 | null                                             │
+│    - dynamic MeasureLine 3D & HTML HUD Badge                                   │
+└────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Componentes y Archivos Clave a Modificar
 
-1. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts`**:
-   - Algoritmo de cálculo de caras (minX, maxX, minY, maxY, minZ, maxZ) de todas las piezas estáticas.
-   - Función `applyMagneticSnap(proposedPos, proposedSize, orient)` para alinear automáticamente las caras a 0 mm de holgura.
-   - Ajuste de resolución de arrastre de `snap = 5` a `snap = 1` mm.
-   - Método `nudgePart(axis: 'x' | 'y' | 'z', delta: number)` con llamada a `dragStarted` y `partModified`.
-   - Manejador de teclado para flechas y teclas de elevación.
-   - Señal `nudgeStep = signal<number>(1)` (opciones 1mm y 10mm).
+1. **`src/app/components/header/header.html` & `header.ts`**:
+   - Reemplazar `max-w-7xl mx-auto` por contenedor fluido a pantalla completa `w-full px-4 sm:px-6 lg:px-8`.
+   - Reestructurar el header en 3 zonas claras con flexbox equilibrado (`justify-between items-center`).
+   - Normalizar la altura (`h-9`), padding y `whitespace-nowrap` del botón "Guardar en Nube" y resto de botones para eliminar deformaciones.
 
-2. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.html`**:
-   - Incorporar el HUD flotante de micro-ajuste en la esquina inferior del visor 3D, visible cuando hay una pieza seleccionada.
+2. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts` & `furniture-3d-viewer.html`**:
+   - Soporte de selección múltiple: signal `selectedPartIds = signal<string[]>([])`.
+   - Detección de `e.shiftKey` en `onPointerDown` para multi-selección acumulativa.
+   - Botón "Seleccionar Todo" y "Deseleccionar".
+   - Arrastre grupal: cuando `selectedPartIds.length > 1`, desplazar todas las piezas seleccionadas simultáneamente.
+   - Herramienta de medición 3D: modo cinta métrica interactiva con cálculo de distancia euclidiana y proyecciones en X, Y, Z.
+
+3. **`src/app/components/module-designer/module-designer.ts` & `module-designer.html`**:
+   - Soporte para mover múltiples piezas seleccionadas en bloque desde el diseñador.

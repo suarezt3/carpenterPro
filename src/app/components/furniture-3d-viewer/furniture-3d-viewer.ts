@@ -45,11 +45,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
   // Inputs
   parts = input<Part[]>([]);
   selectedPartId = input<string | null>(null);
+  selectedPartIds = input<string[]>([]);
   materials = input<Material[]>([]);
 
   // Outputs
   partSelected = output<Part | null>();
+  partsSelected = output<string[]>();
   partModified = output<{ part: Part; updates: Partial<Part> }>();
+  multiplePartsModified = output<{ updates: { part: Part; updates: Partial<Part> }[] }>();
   dragStarted = output<void>();
 
   // Canvas and Container refs
@@ -67,12 +70,47 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly isMagneticSnap = signal<boolean>(true);
   readonly nudgeStep = signal<number>(1); // 1 mm default (toggleable to 10mm)
 
-  // Active Selected Part computed
-  selectedPart = computed(() => {
-    const id = this.selectedPartId();
-    if (!id) return null;
-    return this.parts().find(p => p.id === id) || null;
+  // 3D Measurement Tape / Ruler tool
+  readonly isMeasureMode = signal<boolean>(false);
+  readonly measurePointA = signal<{ x: number; y: number; z: number } | null>(null);
+  readonly measurePointB = signal<{ x: number; y: number; z: number } | null>(null);
+  readonly measureDistance = computed(() => {
+    const a = this.measurePointA();
+    const b = this.measurePointB();
+    if (!a || !b) return null;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const dz = b.z - a.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    return {
+      total: Math.round(dist * 10) / 10,
+      dx: Math.round(Math.abs(dx) * 10) / 10,
+      dy: Math.round(Math.abs(dy) * 10) / 10,
+      dz: Math.round(Math.abs(dz) * 10) / 10
+    };
   });
+
+  // Active Selected Part IDs set
+  readonly activeSelectedIds = computed<string[]>(() => {
+    const multi = this.selectedPartIds();
+    if (multi && multi.length > 0) return multi;
+    const single = this.selectedPartId();
+    return single ? [single] : [];
+  });
+
+  // Active Selected Parts list
+  readonly selectedParts = computed<Part[]>(() => {
+    const ids = this.activeSelectedIds();
+    return this.parts().filter(p => ids.includes(p.id));
+  });
+
+  // Active Selected Part (primary)
+  readonly selectedPart = computed(() => {
+    const list = this.selectedParts();
+    return list.length > 0 ? list[0] : null;
+  });
+
+  readonly isMultiSelect = computed(() => this.activeSelectedIds().length > 1);
 
   // Three.js Core
   private scene!: THREE.Scene;
@@ -86,6 +124,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private furnitureGroup = new THREE.Group();
   private dimensionGroup = new THREE.Group();
   private gizmoGroup = new THREE.Group();
+  private measureGroup = new THREE.Group();
   private gridHelper: THREE.GridHelper | null = null;
   private floorMesh: THREE.Mesh | null = null;
 
@@ -100,6 +139,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private activeGizmoHit: GizmoHitData | null = null;
   private dragStartPointer = { x: 0, y: 0 };
   private dragInitialPart: Part | null = null;
+  private dragInitialParts: Part[] = [];
   private dragPlane = new THREE.Plane();
   private dragPlaneIntersectionStart = new THREE.Vector3();
 
@@ -111,13 +151,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
     // Rebuild scene when pieces, selection, materials, or xRay change
     effect(() => {
       const parts = this.parts();
-      const selId = this.selectedPartId();
+      const selIds = this.activeSelectedIds();
       const mats = this.materials();
       const xRay = this.isXRay();
       const showDims = this.show3dDimensions();
 
       if (this.scene) {
-        this.buildFurnitureScene(parts, selId, mats, xRay, showDims);
+        this.buildFurnitureScene(parts, selIds, mats, xRay, showDims);
         this.updateExplodedOffsets(this.explodedPercent());
       }
     });
@@ -176,11 +216,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.furnitureGroup);
     this.scene.add(this.dimensionGroup);
     this.scene.add(this.gizmoGroup);
+    this.scene.add(this.measureGroup);
 
     // Initial Scene Build
     this.buildFurnitureScene(
       this.parts(),
-      this.selectedPartId(),
+      this.activeSelectedIds(),
       this.materials(),
       this.isXRay(),
       this.show3dDimensions()
@@ -293,9 +334,25 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.gridHelper);
   }
 
+  private calculateCentroid(parts: Part[]): { x: number; y: number; z: number } {
+    if (parts.length === 0) return { x: 0, y: 0, z: 0 };
+    let sumX = 0, sumY = 0, sumZ = 0;
+    for (const p of parts) {
+      const b = this.getPartBounds(p);
+      sumX += b.px;
+      sumY += b.py;
+      sumZ += b.pz;
+    }
+    return {
+      x: Math.round(sumX / parts.length),
+      y: Math.round(sumY / parts.length),
+      z: Math.round(sumZ / parts.length)
+    };
+  }
+
   private buildFurnitureScene(
     parts: Part[],
-    selectedId: string | null,
+    selectedIds: string[],
     mats: Material[],
     xRay: boolean,
     showDims: boolean
@@ -318,7 +375,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     if (!parts || parts.length === 0) return;
 
-    let selectedPartData: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number } | null = null;
+    const selectedDataList: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number }[] = [];
 
     for (const part of parts) {
       const t = part.thickness || 18;
@@ -344,9 +401,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const py = part.posY ?? (sy / 2);
       const pz = part.posZ ?? 0;
 
-      const isSelected = selectedId === part.id;
+      const isSelected = selectedIds.includes(part.id);
       if (isSelected) {
-        selectedPartData = { part, px, py, pz, sx, sy, sz };
+        selectedDataList.push({ part, px, py, pz, sx, sy, sz });
       }
 
       // Geometry with bevel or box
@@ -361,10 +418,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       // Edges geometry for crisp technical outline
       const edges = new THREE.EdgesGeometry(geometry);
-      const edgeColor = isSelected ? 0x60a5fa : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46);
+      const edgeColor = isSelected ? 0x0284c7 : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46);
       const edgeMat = new THREE.LineBasicMaterial({
         color: edgeColor,
-        linewidth: isSelected ? 2.5 : 1
+        linewidth: isSelected ? 3 : 1
       });
       const edgeLines = new THREE.LineSegments(edges, edgeMat);
       mesh.add(edgeLines);
@@ -385,30 +442,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
       });
     }
 
-    // If there is an active selected piece, render 3D Dimensions and interactive 3D Gizmo
-    if (selectedPartData) {
+    // Single piece selected -> Full Gizmo (Translation arrows + Edge Stretch handles) and 3D dimensions
+    if (selectedDataList.length === 1) {
+      const s = selectedDataList[0];
       if (showDims) {
-        this.renderPieceDimensions(
-          selectedPartData.part,
-          selectedPartData.px,
-          selectedPartData.py,
-          selectedPartData.pz,
-          selectedPartData.sx,
-          selectedPartData.sy,
-          selectedPartData.sz
-        );
+        this.renderPieceDimensions(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
       }
-
-      // Build Interactive Translation Arrows and Edge Stretch Handles
-      this.buildGizmo(
-        selectedPartData.part,
-        selectedPartData.px,
-        selectedPartData.py,
-        selectedPartData.pz,
-        selectedPartData.sx,
-        selectedPartData.sy,
-        selectedPartData.sz
-      );
+      this.buildGizmo(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
+    } else if (selectedDataList.length > 1) {
+      // Multiple pieces selected (Group Assembly) -> Centered Group Translation Gizmo
+      const centroid = this.calculateCentroid(selectedDataList.map(d => d.part));
+      this.buildGroupGizmo(centroid.x, centroid.y, centroid.z);
     }
   }
 
@@ -571,6 +615,227 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.gizmoGroup.add(group);
   }
 
+  // Create Centered Translation Gizmo for Multiple Selected Pieces (Group/Drawer Assembly)
+  private buildGroupGizmo(px: number, py: number, pz: number) {
+    const group = new THREE.Group();
+    group.position.set(px, py, pz);
+
+    const arrowLength = 175;
+    const coneRadius = 15;
+    const coneHeight = 38;
+    const cylRadius = 4.5;
+
+    const createAxisArrow = (
+      dirVector: THREE.Vector3,
+      colorHex: number,
+      axis: 'x' | 'y' | 'z',
+      dir: number
+    ) => {
+      const arrowGroup = new THREE.Group();
+
+      const shaftGeo = new THREE.CylinderGeometry(cylRadius, cylRadius, arrowLength, 12);
+      shaftGeo.translate(0, arrowLength / 2, 0);
+      const shaftMat = new THREE.MeshBasicMaterial({
+        color: colorHex,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.95
+      });
+      const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+
+      const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 16);
+      coneGeo.translate(0, arrowLength + coneHeight / 2, 0);
+      const coneMat = new THREE.MeshBasicMaterial({
+        color: colorHex,
+        depthTest: false
+      });
+      const cone = new THREE.Mesh(coneGeo, coneMat);
+
+      const hitGeo = new THREE.CylinderGeometry(coneRadius * 1.6, coneRadius * 1.6, arrowLength + coneHeight, 8);
+      hitGeo.translate(0, (arrowLength + coneHeight) / 2, 0);
+      const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+      const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+
+      arrowGroup.add(shaft);
+      arrowGroup.add(cone);
+      arrowGroup.add(hitMesh);
+      arrowGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirVector);
+
+      const gizmoData: GizmoHitData = {
+        isGizmo: true,
+        type: 'axis',
+        axis,
+        dir
+      };
+      hitMesh.userData = { ...gizmoData, parentArrow: arrowGroup };
+      cone.userData = { ...gizmoData, parentArrow: arrowGroup };
+      shaft.userData = { ...gizmoData, parentArrow: arrowGroup };
+
+      this.gizmoHitMeshes.push(hitMesh, cone);
+      return arrowGroup;
+    };
+
+    // Center Hub Marker showing grouped selection
+    const hubGeo = new THREE.SphereGeometry(14, 16, 16);
+    const hubMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      emissive: 0x38bdf8,
+      emissiveIntensity: 0.6,
+      roughness: 0.2,
+      depthTest: false
+    });
+    const hub = new THREE.Mesh(hubGeo, hubMat);
+    group.add(hub);
+
+    // 3 Translation Arrows (X, Y, Z)
+    group.add(createAxisArrow(new THREE.Vector3(1, 0, 0), 0xef4444, 'x', 1));
+    group.add(createAxisArrow(new THREE.Vector3(0, 1, 0), 0x10b981, 'y', 1));
+    group.add(createAxisArrow(new THREE.Vector3(0, 0, 1), 0x3b82f6, 'z', 1));
+
+    group.renderOrder = 999;
+    this.gizmoGroup.add(group);
+  }
+
+  // Render Interactive 3D Measurement Visuals (Point A, Point B, Guide Lines & Dimensions)
+  renderMeasurementVisuals() {
+    while (this.measureGroup.children.length > 0) {
+      const obj = this.measureGroup.children[0];
+      this.measureGroup.remove(obj);
+    }
+
+    const a = this.measurePointA();
+    const b = this.measurePointB();
+    if (!a) return;
+
+    const createMarker = (pt: { x: number; y: number; z: number }, colorHex: number, labelText: string) => {
+      const markerGroup = new THREE.Group();
+      markerGroup.position.set(pt.x, pt.y, pt.z);
+
+      const sphereGeo = new THREE.SphereGeometry(14, 16, 16);
+      const sphereMat = new THREE.MeshBasicMaterial({ color: colorHex, depthTest: false });
+      const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+      markerGroup.add(sphere);
+
+      const ringGeo = new THREE.RingGeometry(18, 22, 24);
+      const ringMat = new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, depthTest: false });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 2;
+      markerGroup.add(ring);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#09090b';
+        ctx.fillRect(0, 0, 128, 64);
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, 64, 32);
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.position.set(0, 32, 0);
+      sprite.scale.set(70, 35, 1);
+      markerGroup.add(sprite);
+
+      return markerGroup;
+    };
+
+    this.measureGroup.add(createMarker(a, 0xfacc15, 'A'));
+
+    if (b) {
+      this.measureGroup.add(createMarker(b, 0x38bdf8, 'B'));
+
+      // Direct Euclidean Line between A and B
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(a.x, a.y, a.z),
+        new THREE.Vector3(b.x, b.y, b.z)
+      ]);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0xfacc15,
+        linewidth: 3,
+        depthTest: false
+      });
+      const directLine = new THREE.Line(lineGeo, lineMat);
+      this.measureGroup.add(directLine);
+
+      // Delta X line (Horizontal red)
+      if (Math.abs(b.x - a.x) > 2) {
+        const geoX = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(a.x, a.y, a.z),
+          new THREE.Vector3(b.x, a.y, a.z)
+        ]);
+        const matX = new THREE.LineDashedMaterial({ color: 0xef4444, dashSize: 15, gapSize: 10, depthTest: false });
+        const lineX = new THREE.Line(geoX, matX);
+        lineX.computeLineDistances();
+        this.measureGroup.add(lineX);
+      }
+
+      // Delta Y line (Vertical green)
+      if (Math.abs(b.y - a.y) > 2) {
+        const geoY = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(b.x, a.y, a.z),
+          new THREE.Vector3(b.x, b.y, a.z)
+        ]);
+        const matY = new THREE.LineDashedMaterial({ color: 0x10b981, dashSize: 15, gapSize: 10, depthTest: false });
+        const lineY = new THREE.Line(geoY, matY);
+        lineY.computeLineDistances();
+        this.measureGroup.add(lineY);
+      }
+
+      // Delta Z line (Depth blue)
+      if (Math.abs(b.z - a.z) > 2) {
+        const geoZ = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(b.x, b.y, a.z),
+          new THREE.Vector3(b.x, b.y, b.z)
+        ]);
+        const matZ = new THREE.LineDashedMaterial({ color: 0x3b82f6, dashSize: 15, gapSize: 10, depthTest: false });
+        const lineZ = new THREE.Line(geoZ, matZ);
+        lineZ.computeLineDistances();
+        this.measureGroup.add(lineZ);
+      }
+
+      // Floating Midpoint Sprite with formatted distance
+      const mid = new THREE.Vector3(
+        (a.x + b.x) / 2,
+        (a.y + b.y) / 2 + 35,
+        (a.z + b.z) / 2
+      );
+      const dist = this.measureDistance();
+      if (dist) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#09090b';
+          ctx.beginPath();
+          ctx.roundRect(0, 0, 256, 80, 16);
+          ctx.fill();
+          ctx.strokeStyle = '#facc15';
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
+          ctx.fillStyle = '#facc15';
+          ctx.font = 'bold 36px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${dist.total} mm`, 128, 40);
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.position.copy(mid);
+        sprite.scale.set(160, 50, 1);
+        this.measureGroup.add(sprite);
+      }
+    }
+  }
+
   private createPieceMaterial(
     part: Part,
     isSelected: boolean,
@@ -724,7 +989,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
-  // Pointer Down: Detect clicks on Gizmo controls vs Pieces vs Empty space
+  // Pointer Down: Detect clicks on Gizmo controls vs Pieces vs Empty space vs Measurement picking
   private onPointerDown(e: PointerEvent) {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas || !this.camera) return;
@@ -735,19 +1000,50 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
+    // 0. Measurement Tape picking mode (Point A -> Point B)
+    if (this.isMeasureMode()) {
+      const measureIntersects = this.raycaster.intersectObjects(
+        [...this.pieceObjects.map(p => p.mesh), ...(this.floorMesh ? [this.floorMesh] : [])],
+        true
+      );
+      if (measureIntersects.length > 0) {
+        const pt = measureIntersects[0].point;
+        const snapPt = {
+          x: Math.round(pt.x),
+          y: Math.max(0, Math.round(pt.y)),
+          z: Math.round(pt.z)
+        };
+
+        if (!this.measurePointA()) {
+          this.measurePointA.set(snapPt);
+        } else if (this.measurePointA() && !this.measurePointB()) {
+          this.measurePointB.set(snapPt);
+        } else {
+          this.measurePointA.set(snapPt);
+          this.measurePointB.set(null);
+        }
+        this.renderMeasurementVisuals();
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      return;
+    }
+
     // 1. Check if clicking on Gizmo translation arrow or stretch handle
     if (this.gizmoHitMeshes.length > 0) {
       const gizmoIntersects = this.raycaster.intersectObjects(this.gizmoHitMeshes, true);
       if (gizmoIntersects.length > 0) {
         const hit = gizmoIntersects[0].object;
         const hitData = hit.userData as GizmoHitData;
-        const selPart = this.selectedPart();
+        const selParts = this.selectedParts();
 
-        if (hitData && hitData.isGizmo && selPart) {
+        if (hitData && hitData.isGizmo && selParts.length > 0) {
           this.isDragging = true;
           this.activeGizmoHit = hitData;
           this.dragStartPointer = { x: e.clientX, y: e.clientY };
-          this.dragInitialPart = { ...selPart };
+          this.dragInitialPart = { ...selParts[0] };
+          this.dragInitialParts = selParts.map(p => ({ ...p }));
 
           // Notify parent to capture history snapshot before starting continuous drag
           this.dragStarted.emit();
@@ -756,7 +1052,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
           this.controls.enabled = false;
 
           // Set up a raycasting plane facing the camera or orthogonal to axis
-          const piecePos = new THREE.Vector3(selPart.posX ?? 0, selPart.posY ?? 0, selPart.posZ ?? 0);
+          const centroid = this.calculateCentroid(selParts);
+          const piecePos = new THREE.Vector3(centroid.x, centroid.y, centroid.z);
           const camDir = new THREE.Vector3();
           this.camera.getWorldDirection(camDir);
           this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), piecePos);
@@ -774,7 +1071,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
-    // 2. Normal Piece selection
+    // 2. Normal Piece selection (with Shift-Click multi-selection)
     const intersects = this.raycaster.intersectObjects(
       this.pieceObjects.map(p => p.mesh),
       false
@@ -784,10 +1081,25 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const topHit = intersects[0].object as THREE.Mesh;
       const part = topHit.userData['part'] as Part;
       if (part) {
-        this.partSelected.emit(part);
+        if (e.shiftKey) {
+          const cur = [...this.activeSelectedIds()];
+          const idx = cur.indexOf(part.id);
+          if (idx >= 0) {
+            cur.splice(idx, 1);
+          } else {
+            cur.push(part.id);
+          }
+          this.partsSelected.emit(cur);
+          const first = cur.length > 0 ? (this.parts().find(p => p.id === cur[0]) || null) : null;
+          this.partSelected.emit(first);
+        } else {
+          this.partsSelected.emit([part.id]);
+          this.partSelected.emit(part);
+        }
       }
     } else {
       // Clicked background -> deselect
+      this.partsSelected.emit([]);
       this.partSelected.emit(null);
     }
   }
@@ -797,7 +1109,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas || !this.camera) return;
 
-    if (this.isDragging && this.activeGizmoHit && this.dragInitialPart) {
+    if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
       const rect = canvas.getBoundingClientRect();
       this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -808,44 +1120,74 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersection)) {
         const deltaWorld = currentIntersection.clone().sub(this.dragPlaneIntersectionStart);
         const hit = this.activeGizmoHit;
-        const part = this.dragInitialPart;
         const snap = 1; // 1 mm fine precision
 
         if (hit.type === 'axis') {
-          // Axis Translation: X, Y, or Z with magnetic face snapping
-          const updates: Partial<Part> = {};
-          let targetPos = {
-            x: (part.posX ?? 0),
-            y: (part.posY ?? 0),
-            z: (part.posZ ?? 0)
-          };
+          if (this.dragInitialParts.length > 1) {
+            // Group Translation for multiple selected pieces (drawer/cabinet)
+            let delta = 0;
+            if (hit.axis === 'x') {
+              delta = Math.round(deltaWorld.x / snap) * snap;
+            } else if (hit.axis === 'y') {
+              delta = Math.round(deltaWorld.y / snap) * snap;
+            } else if (hit.axis === 'z') {
+              delta = Math.round(deltaWorld.z / snap) * snap;
+            }
 
-          if (hit.axis === 'x') {
-            const steppedDelta = Math.round(deltaWorld.x / snap) * snap;
-            targetPos.x += steppedDelta;
-            if (this.isMagneticSnap()) {
-              targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'x');
+            const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+            for (const p of this.dragInitialParts) {
+              const upd: Partial<Part> = {};
+              if (hit.axis === 'x') {
+                upd.posX = (p.posX ?? 0) + delta;
+              } else if (hit.axis === 'y') {
+                upd.posY = Math.max(0, (p.posY ?? 0) + delta);
+              } else if (hit.axis === 'z') {
+                upd.posZ = (p.posZ ?? 0) + delta;
+              }
+              updatesList.push({ part: p, updates: upd });
             }
-            updates.posX = targetPos.x;
-          } else if (hit.axis === 'y') {
-            const steppedDelta = Math.round(deltaWorld.y / snap) * snap;
-            targetPos.y = Math.max(0, targetPos.y + steppedDelta);
-            if (this.isMagneticSnap()) {
-              targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'y');
+            this.multiplePartsModified.emit({ updates: updatesList });
+            if (updatesList.length > 0) {
+              this.partModified.emit(updatesList[0]);
             }
-            updates.posY = targetPos.y;
-          } else if (hit.axis === 'z') {
-            const steppedDelta = Math.round(deltaWorld.z / snap) * snap;
-            targetPos.z += steppedDelta;
-            if (this.isMagneticSnap()) {
-              targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'z');
+          } else if (this.dragInitialPart) {
+            // Single Part Axis Translation with magnetic face snapping
+            const part = this.dragInitialPart;
+            const updates: Partial<Part> = {};
+            let targetPos = {
+              x: (part.posX ?? 0),
+              y: (part.posY ?? 0),
+              z: (part.posZ ?? 0)
+            };
+
+            if (hit.axis === 'x') {
+              const steppedDelta = Math.round(deltaWorld.x / snap) * snap;
+              targetPos.x += steppedDelta;
+              if (this.isMagneticSnap()) {
+                targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'x');
+              }
+              updates.posX = targetPos.x;
+            } else if (hit.axis === 'y') {
+              const steppedDelta = Math.round(deltaWorld.y / snap) * snap;
+              targetPos.y = Math.max(0, targetPos.y + steppedDelta);
+              if (this.isMagneticSnap()) {
+                targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'y');
+              }
+              updates.posY = targetPos.y;
+            } else if (hit.axis === 'z') {
+              const steppedDelta = Math.round(deltaWorld.z / snap) * snap;
+              targetPos.z += steppedDelta;
+              if (this.isMagneticSnap()) {
+                targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'z');
+              }
+              updates.posZ = targetPos.z;
             }
-            updates.posZ = targetPos.z;
+
+            this.partModified.emit({ part, updates });
           }
-
-          this.partModified.emit({ part, updates });
-        } else if (hit.type === 'handle') {
+        } else if (hit.type === 'handle' && this.dragInitialPart) {
           // Edge Stretch Handle: Length or Width with magnetic snap to adjacent faces
+          const part = this.dragInitialPart;
           const updates: Partial<Part> = {};
           const orient = part.orientation || 'horizontal';
 
@@ -954,12 +1296,61 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return Math.round(val ?? 0);
   }
 
+  // --- MULTI-SELECTION & MEASUREMENT CONTROLS ---
+
+  selectAllParts() {
+    const all = this.parts().map(p => p.id);
+    this.partsSelected.emit(all);
+    if (this.parts().length > 0) {
+      this.partSelected.emit(this.parts()[0]);
+    }
+  }
+
+  clearSelection() {
+    this.partsSelected.emit([]);
+    this.partSelected.emit(null);
+  }
+
+  toggleMeasureMode() {
+    const next = !this.isMeasureMode();
+    this.isMeasureMode.set(next);
+    if (!next) {
+      this.clearMeasure();
+    }
+  }
+
+  clearMeasure() {
+    this.measurePointA.set(null);
+    this.measurePointB.set(null);
+    while (this.measureGroup.children.length > 0) {
+      const obj = this.measureGroup.children[0];
+      this.measureGroup.remove(obj);
+    }
+  }
+
   nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
-    const sel = this.selectedPart();
-    if (!sel) return;
+    const selList = this.selectedParts();
+    if (selList.length === 0) return;
 
     this.dragStarted.emit();
 
+    if (selList.length > 1) {
+      const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+      for (const p of selList) {
+        const upd: Partial<Part> = {};
+        if (axis === 'x') upd.posX = (p.posX ?? 0) + delta;
+        if (axis === 'y') upd.posY = Math.max(0, (p.posY ?? 0) + delta);
+        if (axis === 'z') upd.posZ = (p.posZ ?? 0) + delta;
+        updatesList.push({ part: p, updates: upd });
+      }
+      this.multiplePartsModified.emit({ updates: updatesList });
+      if (updatesList.length > 0) {
+        this.partModified.emit(updatesList[0]);
+      }
+      return;
+    }
+
+    const sel = selList[0];
     let targetPos = {
       x: sel.posX ?? 0,
       y: sel.posY ?? 0,

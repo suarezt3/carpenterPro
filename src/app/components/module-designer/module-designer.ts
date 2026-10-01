@@ -30,6 +30,8 @@ export class ModuleDesignerComponent {
 
   // Selected Part ID in 3D
   readonly selectedPartId = signal<string | null>(null);
+  // Selected Multiple Part IDs in 3D (Shift-Click or Select All)
+  readonly selectedPartIds = signal<string[]>([]);
 
   // Active dock tab: 'piece' (properties of selected part) or 'catalog' (add pieces & tree)
   readonly activeDockTab = signal<'piece' | 'catalog'>('catalog');
@@ -39,6 +41,12 @@ export class ModuleDesignerComponent {
     const id = this.selectedPartId();
     if (!id) return null;
     return this.currentParts().find(p => p.id === id) || null;
+  });
+
+  // Computed multiple selected parts
+  readonly selectedPartsList = computed<Part[]>(() => {
+    const ids = this.selectedPartIds();
+    return this.currentParts().filter(p => ids.includes(p.id));
   });
 
   // Total square meters computed
@@ -54,6 +62,7 @@ export class ModuleDesignerComponent {
     if (parts.length > 0) {
       const topPart = parts.find(p => p.name.toUpperCase().includes('TECHO') || p.id === 'desk_top') || parts[0];
       this.selectedPartId.set(topPart.id);
+      this.selectedPartIds.set([topPart.id]);
       this.activeDockTab.set('piece');
     }
   }
@@ -66,20 +75,54 @@ export class ModuleDesignerComponent {
       this.activeDockTab.set('piece');
     } else {
       this.selectedPartId.set(null);
+      this.selectedPartIds.set([]);
     }
   }
 
-  selectPartById(id: string) {
-    this.selectedPartId.set(id);
-    this.activeDockTab.set('piece');
+  onPartsSelectedFrom3D(partIds: string[]) {
+    this.selectedPartIds.set(partIds);
+    if (partIds.length > 0) {
+      this.selectedPartId.set(partIds[0]);
+      this.activeDockTab.set('piece');
+    } else {
+      this.selectedPartId.set(null);
+    }
   }
 
-  deselectPart() {
+  selectAllParts() {
+    const all = this.currentParts().map(p => p.id);
+    this.selectedPartIds.set(all);
+    if (all.length > 0) {
+      this.selectedPartId.set(all[0]);
+    }
+  }
+
+  deselectAll() {
     this.selectedPartId.set(null);
+    this.selectedPartIds.set([]);
     this.activeDockTab.set('catalog');
   }
 
-  // --- PIECE EDITING (Real-time single-part manipulation) ---
+  selectPartById(id: string, e?: MouseEvent) {
+    if (e && e.shiftKey) {
+      const cur = [...this.selectedPartIds()];
+      const idx = cur.indexOf(id);
+      if (idx >= 0) cur.splice(idx, 1);
+      else cur.push(id);
+      this.selectedPartIds.set(cur);
+      this.selectedPartId.set(cur.length > 0 ? cur[0] : null);
+    } else {
+      this.selectedPartId.set(id);
+      this.selectedPartIds.set([id]);
+      this.activeDockTab.set('piece');
+    }
+  }
+
+  deselectPart() {
+    this.deselectAll();
+  }
+
+  // --- PIECE EDITING (Real-time single & group manipulation) ---
 
   updateSelectedPart(changes: Partial<Part>) {
     const current = this.selectedPart();
@@ -108,6 +151,12 @@ export class ModuleDesignerComponent {
     };
     // Do not flood undo stack on every 5ms mousemove; snapshot was taken on dragStarted
     this.projectService.updatePart(updated, false);
+  }
+
+  // Receives synchronized multi-part translation changes from group gizmo
+  onMultiplePartsModifiedFromViewer(event: { updates: { part: Part; updates: Partial<Part> }[] }) {
+    const updatesList = event.updates.map(u => ({ partId: u.part.id, updates: u.updates }));
+    this.projectService.updateMultipleParts(updatesList, false);
   }
 
   // Sets material and automatically synchronizes the matching thickness & name

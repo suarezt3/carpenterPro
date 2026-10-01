@@ -80,9 +80,12 @@
       <app-furniture-3d-viewer
         [parts]="currentParts()"
         [selectedPartId]="selectedPartId()"
+        [selectedPartIds]="selectedPartIds()"
         [materials]="materials()"
         (partSelected)="onSelectPartFrom3D($event)"
+        (partsSelected)="onPartsSelectedFrom3D($event)"
         (partModified)="onPartModifiedFromViewer($event)"
+        (multiplePartsModified)="onMultiplePartsModifiedFromViewer($event)"
         (dragStarted)="onDragStarted()">
       </app-furniture-3d-viewer>
 
@@ -92,6 +95,16 @@
           <span class="material-icons text-xs text-cyan-400">dns</span>
           Piezas:
         </span>
+
+        <!-- Select All Button -->
+        <button 
+          type="button"
+          (click)="selectAllParts()"
+          class="px-2 py-1 rounded-lg text-xs bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 flex items-center gap-1 shrink-0 transition"
+          title="Seleccionar todas las piezas a la vez para moverlas en bloque">
+          <span class="material-icons text-xs text-amber-400">select_all</span>
+          <span>Todo ({{ currentParts().length }})</span>
+        </button>
 
         @if (currentParts().length === 0) {
           <span class="text-xs text-zinc-500 italic pl-2">
@@ -103,9 +116,12 @@
           @for (part of currentParts(); track part.id) {
             <button 
               type="button"
-              (click)="selectPartById(part.id)"
-              [class]="selectedPartId() === part.id ? 'bg-cyan-500 text-zinc-950 font-bold border-cyan-400 shadow-md ring-2 ring-cyan-400/40' : 'bg-zinc-800/90 text-zinc-300 hover:text-white hover:bg-zinc-700/90 border-zinc-700'"
-              class="px-2.5 py-1 rounded-lg text-xs border flex items-center gap-1.5 whitespace-nowrap transition">
+              (click)="selectPartById(part.id, $event)"
+              [class]="selectedPartIds().includes(part.id) 
+                ? 'bg-cyan-500 text-zinc-950 font-bold border-cyan-400 shadow-md ring-2 ring-cyan-400/40' 
+                : 'bg-zinc-800/90 text-zinc-300 hover:text-white hover:bg-zinc-700/90 border-zinc-700'"
+              class="px-2.5 py-1 rounded-lg text-xs border flex items-center gap-1.5 whitespace-nowrap transition"
+              title="Clic para seleccionar • Shift+Clic para multi-selección">
               <span>{{ part.name }}</span>
               <span class="font-mono text-[10px] opacity-75 font-semibold">
                 {{ part.length }}×{{ part.width }}
@@ -114,13 +130,13 @@
           }
         </div>
 
-        @if (selectedPartId()) {
+        @if (selectedPartId() || selectedPartIds().length > 0) {
           <button 
             type="button" 
-            (click)="deselectPart()" 
-            class="text-[11px] text-zinc-400 hover:text-white underline whitespace-nowrap px-1"
-            title="Deseleccionar pieza">
-            Deseleccionar
+            (click)="deselectAll()" 
+            class="text-[11px] text-zinc-400 hover:text-white underline whitespace-nowrap px-1 shrink-0"
+            title="Deseleccionar piezas">
+            Deseleccionar ({{ selectedPartIds().length }})
           </button>
         }
       </div>

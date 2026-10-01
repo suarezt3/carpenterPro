@@ -669,6 +669,19 @@ export class ProjectStorageService {
     }), recordHistory);
   }
 
+  updateMultipleParts(updatesList: { partId: string; updates: Partial<Part> }[], recordHistory = true) {
+    this.updateProject(p => {
+      const updatesMap = new Map(updatesList.map(u => [u.partId, u.updates]));
+      return {
+        ...p,
+        parts: p.parts.map(pt => {
+          const upd = updatesMap.get(pt.id);
+          return upd ? { ...pt, ...upd } : pt;
+        })
+      };
+    }, recordHistory);
+  }
+
   duplicatePart(partId: string): Part | null {
     const part = this.currentProject().parts.find(p => p.id === partId);
     if (!part) return null;

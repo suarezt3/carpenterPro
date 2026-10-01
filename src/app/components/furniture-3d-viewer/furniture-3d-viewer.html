@@ -5,8 +5,28 @@
   <!-- 3D WebGL Canvas -->
   <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
 
-  <!-- TOP-LEFT HUD BADGE (Matching user reference image: TECHO: 1800 x 600 mm) -->
-  @if (selectedPart(); as sel) {
+  <!-- TOP-LEFT HUD BADGE (Single Piece or Multi-Piece Group) -->
+  @if (isMultiSelect()) {
+    <div class="absolute top-4 left-4 z-20 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
+      <div class="flex items-center gap-3 bg-zinc-950/95 backdrop-blur-md px-4 py-2.5 rounded-xl border-2 border-amber-400 shadow-[0_4px_25px_rgba(245,158,11,0.35)]">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+          <span class="text-xs font-black tracking-wider text-white uppercase">GRUPO ({{ activeSelectedIds().length }} PIEZAS):</span>
+        </div>
+        <span class="text-xs font-bold text-amber-300">Arrastre en bloque sincronizado</span>
+        <button 
+          type="button" 
+          (click)="clearSelection()" 
+          class="text-xs text-zinc-400 hover:text-white underline ml-1">
+          Deseleccionar
+        </button>
+      </div>
+      <div class="hidden sm:flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-md px-3 py-1 rounded-lg border border-zinc-700/60 text-[11px] text-zinc-300 shadow">
+        <span class="material-icons text-xs text-amber-400">pan_tool</span>
+        <span>Arrastra las <strong>flechas 3D</strong> o usa las <strong>flechas del teclado</strong> para mover todas las piezas juntas</span>
+      </div>
+    </div>
+  } @else if (selectedPart(); as sel) {
     <div class="absolute top-4 left-4 z-20 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
       <div class="flex items-center gap-3 bg-zinc-950/95 backdrop-blur-md px-4 py-2.5 rounded-xl border-2 border-cyan-400 shadow-[0_4px_25px_rgba(0,255,204,0.35)]">
         <div class="flex items-center gap-2">
@@ -20,17 +40,81 @@
       <!-- Quick Drag & Stretch Helper Tag -->
       <div class="hidden sm:flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-md px-3 py-1 rounded-lg border border-zinc-700/60 text-[11px] text-zinc-300 shadow">
         <span class="material-icons text-xs text-amber-400">pan_tool</span>
-        <span>Arrastra las <strong>flechas 3D</strong> para mover o los <strong>cubos en los bordes</strong> para estirar</span>
+        <span>Arrastra las <strong>flechas 3D</strong> para mover o los <strong>cubos en los bordes</strong> para estirar • <kbd class="px-1 py-0.2 bg-zinc-800 rounded font-mono text-[10px] text-amber-300">Shift+Clic</kbd> para añadir más piezas</span>
       </div>
     </div>
   } @else {
     <div class="absolute top-4 left-4 z-10 hidden sm:flex items-center gap-2 bg-zinc-900/85 backdrop-blur-md px-3.5 py-2 rounded-xl border border-zinc-700/60 text-xs text-zinc-200 shadow-md">
       <span class="material-icons text-cyan-400 text-sm">touch_app</span>
-      <span>Haz clic en cualquier pieza 3D para seleccionarla, moverla o estirarla con el Gizmo</span>
+      <span>Haz clic en cualquier pieza 3D para seleccionarla • Mantén <strong class="text-amber-300">Shift</strong> para seleccionar varias</span>
     </div>
   }
 
-  <!-- TOP RIGHT TOOLBAR: View presets, Cotas 3D, Rayos X, Theme Toggle, Reset -->
+  <!-- FLOATING 3D MEASUREMENT TAPE HUD -->
+  @if (isMeasureMode()) {
+    <div class="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 max-w-xl w-[92%] animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-zinc-950/95 backdrop-blur-md px-4 py-3 rounded-2xl border-2 border-amber-400 shadow-[0_8px_30px_rgba(245,158,11,0.3)] flex flex-col gap-2.5 w-full">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="material-icons text-amber-400 text-base">square_foot</span>
+            <span class="text-xs font-bold text-white tracking-wide uppercase">Cinta Métrica 3D Interactiva</span>
+          </div>
+          <div class="flex items-center gap-2">
+            @if (measurePointA()) {
+              <button 
+                type="button" 
+                (click)="clearMeasure()"
+                class="px-2 py-0.5 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-700 transition">
+                Nueva Medida
+              </button>
+            }
+            <button 
+              type="button" 
+              (click)="toggleMeasureMode()"
+              class="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+              title="Cerrar cinta métrica">
+              ✕
+            </button>
+          </div>
+        </div>
+
+        @if (!measurePointA()) {
+          <div class="text-xs text-amber-200/90 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0"></span>
+            <span><strong>Paso 1:</strong> Haz clic sobre cualquier arista o punto de una pieza para fijar el <strong>Punto A</strong>.</span>
+          </div>
+        } @else if (measurePointA() && !measurePointB()) {
+          <div class="text-xs text-cyan-200/90 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0"></span>
+            <span><strong>Paso 2:</strong> Punto A fijado. Haz clic en la segunda arista o pieza para medir la luz o distancia (<strong>Punto B</strong>).</span>
+          </div>
+        } @else if (measureDistance(); as dist) {
+          <div class="flex items-center justify-between gap-4 flex-wrap bg-zinc-900/90 p-2.5 rounded-xl border border-zinc-800">
+            <div class="flex flex-col">
+              <span class="text-[10px] uppercase font-bold text-zinc-400">Distancia Directa:</span>
+              <span class="text-lg font-black text-amber-400 font-mono tracking-tight">{{ dist.total }} mm</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="flex flex-col text-center">
+                <span class="text-[10px] font-bold text-red-400">ΔX (Luz Ancho)</span>
+                <span class="text-xs font-bold text-white font-mono">{{ dist.dx }} mm</span>
+              </div>
+              <div class="flex flex-col text-center">
+                <span class="text-[10px] font-bold text-emerald-400">ΔY (Luz Altura)</span>
+                <span class="text-xs font-bold text-white font-mono">{{ dist.dy }} mm</span>
+              </div>
+              <div class="flex flex-col text-center">
+                <span class="text-[10px] font-bold text-blue-400">ΔZ (Profundidad)</span>
+                <span class="text-xs font-bold text-white font-mono">{{ dist.dz }} mm</span>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- TOP RIGHT TOOLBAR: View presets, Cotas 3D, Cinta Métrica, Rayos X, Theme Toggle, Reset -->
   <div class="absolute top-4 right-4 flex flex-wrap items-center gap-2 pointer-events-none z-20">
     
     <!-- View Angle Buttons -->
@@ -65,9 +149,30 @@
       </button>
     </div>
 
-    <!-- Toggles: Theme, 3D Dimensions, Rayos X, Reset -->
+    <!-- Toggles: Theme, 3D Dimensions, Cinta Métrica, Rayos X, Select All, Reset -->
     <div class="flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-md p-1 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto">
       
+      <!-- Select All Parts Button -->
+      <button 
+        type="button"
+        (click)="selectAllParts()"
+        class="px-2 py-1 text-xs rounded-lg flex items-center gap-1 text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
+        title="Seleccionar todas las piezas del mueble (para mover en bloque o agrupar)">
+        <span class="material-icons text-sm text-cyan-400">select_all</span>
+        <span class="hidden xl:inline">Todo</span>
+      </button>
+
+      <!-- 3D Measure Tape Toggle Button -->
+      <button 
+        type="button"
+        (click)="toggleMeasureMode()"
+        [class]="isMeasureMode() ? 'bg-amber-400 text-zinc-950 font-bold border-amber-300 shadow-md ring-2 ring-amber-400/50' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
+        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
+        title="Activar cinta métrica 3D para medir distancias y luces entre caras o puntos">
+        <span class="material-icons text-sm">square_foot</span>
+        <span class="hidden sm:inline">Cinta Métrica</span>
+      </button>
+
       <!-- Studio White / Dark Mode Toggle -->
       <button 
         type="button"
@@ -76,7 +181,7 @@
         class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition shadow-xs"
         [title]="isWhiteTheme() ? 'Cambiar a modo CAD oscuro' : 'Cambiar a fondo blanco de estudio técnico'">
         <span class="material-icons text-sm">{{ isWhiteTheme() ? 'wb_sunny' : 'nightlight' }}</span>
-        <span class="hidden md:inline">{{ isWhiteTheme() ? 'Estudio Blanco' : 'Oscuro' }}</span>
+        <span class="hidden md:inline">{{ isWhiteTheme() ? 'Blanco' : 'Oscuro' }}</span>
       </button>
 
       <!-- 3D Dimensions Line Toggle -->
