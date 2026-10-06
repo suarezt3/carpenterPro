@@ -1,146 +1,285 @@
 <div #container3d 
-  [class]="isWhiteTheme() ? 'bg-slate-100/80 border-slate-300' : 'bg-zinc-950 border-zinc-800'"
-  class="relative w-full h-full min-h-[380px] rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-300">
+  [class]="isWhiteTheme() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950 border-zinc-800'"
+  class="relative w-full h-full min-h-[420px] rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-200">
 
   <!-- 3D WebGL Canvas -->
   <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
 
-  <!-- TOP-LEFT HUD BADGE (Single Piece or Multi-Piece Group) -->
-  @if (isMultiSelect()) {
-    <div class="absolute top-4 left-4 z-20 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
-      <div class="flex items-center gap-3 bg-zinc-950/95 backdrop-blur-md px-4 py-2.5 rounded-xl border-2 border-amber-400 shadow-[0_4px_25px_rgba(245,158,11,0.35)]">
-        <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-          <span class="text-xs font-black tracking-wider text-white uppercase">GRUPO ({{ activeSelectedIds().length }} PIEZAS):</span>
-        </div>
-        <span class="text-xs font-bold text-amber-300">Arrastre en bloque sincronizado</span>
-        <button 
-          type="button" 
-          (click)="clearSelection()" 
-          class="text-xs text-zinc-400 hover:text-white underline ml-1">
-          Deseleccionar
-        </button>
-      </div>
-      <div class="hidden sm:flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-md px-3 py-1 rounded-lg border border-zinc-700/60 text-[11px] text-zinc-300 shadow">
-        <span class="material-icons text-xs text-amber-400">pan_tool</span>
-        <span>Arrastra las <strong>flechas 3D</strong> o usa las <strong>flechas del teclado</strong> para mover todas las piezas juntas</span>
-      </div>
-    </div>
-  } @else if (selectedPart(); as sel) {
-    <div class="absolute top-4 left-4 z-20 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
-      <div class="flex items-center gap-3 bg-zinc-950/95 backdrop-blur-md px-4 py-2.5 rounded-xl border-2 border-cyan-400 shadow-[0_4px_25px_rgba(0,255,204,0.35)]">
-        <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-          <span class="text-xs font-black tracking-wider text-white uppercase">{{ sel.name }}:</span>
-        </div>
-        <span class="text-sm font-black text-cyan-300 font-mono tracking-tight">{{ sel.length }} x {{ sel.width }} mm</span>
-        <span class="text-xs font-semibold text-zinc-400 font-mono">({{ sel.thickness }}mm)</span>
-      </div>
+  <!-- SKETCHUP-STYLE LEFT VERTICAL CAD PALETTE -->
+  <div class="absolute top-3 left-3 z-30 flex flex-col gap-1 bg-white/95 text-slate-700 backdrop-blur-md p-1 rounded-2xl border border-slate-200/90 shadow-xl pointer-events-auto transition-colors duration-200">
+    
+    <!-- 1. SELECT TOOL -->
+    <button 
+      type="button"
+      (click)="setActiveTool('select')"
+      [class]="activeTool() === 'select' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Seleccionar (V o Espacio): Haz clic para seleccionar piezas o Shift+Clic para multi-selección">
+      <span class="material-icons text-lg">near_me</span>
+    </button>
 
-      <!-- Quick Drag & Stretch Helper Tag -->
-      <div class="hidden sm:flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-md px-3 py-1 rounded-lg border border-zinc-700/60 text-[11px] text-zinc-300 shadow">
-        <span class="material-icons text-xs text-amber-400">pan_tool</span>
-        <span>Arrastra las <strong>flechas 3D</strong> para mover o los <strong>cubos en los bordes</strong> para estirar • <kbd class="px-1 py-0.2 bg-zinc-800 rounded font-mono text-[10px] text-amber-300">Shift+Clic</kbd> para añadir más piezas</span>
-      </div>
-    </div>
-  } @else {
-    <div class="absolute top-4 left-4 z-10 hidden sm:flex items-center gap-2 bg-zinc-900/85 backdrop-blur-md px-3.5 py-2 rounded-xl border border-zinc-700/60 text-xs text-zinc-200 shadow-md">
-      <span class="material-icons text-cyan-400 text-sm">touch_app</span>
-      <span>Haz clic en cualquier pieza 3D para seleccionarla • Mantén <strong class="text-amber-300">Shift</strong> para seleccionar varias</span>
-    </div>
-  }
+    <!-- 2. PUSH/PULL (EMPUJAR / TIRAR) TOOL -->
+    <button 
+      type="button"
+      (click)="setActiveTool('push_pull')"
+      [class]="activeTool() === 'push_pull' ? 'bg-amber-500 text-white font-bold shadow-md shadow-amber-500/30 ring-2 ring-amber-400/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition relative"
+      title="Empujar / Tirar (P): Haz clic en cualquier cara de la pieza y arrastra para estirar o encoger sus dimensiones en tiempo real">
+      <span class="material-icons text-lg">open_in_full</span>
+      <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400"></span>
+    </button>
 
-  <!-- TOP-RIGHT COLLISION & INTERFERENCE WARNING HUD -->
-  @if (detectedCollisions().length > 0) {
-    <div class="absolute top-16 right-4 z-20 flex flex-col gap-1.5 max-w-sm pointer-events-auto animate-in slide-in-from-top duration-200">
-      <div class="bg-rose-950/95 backdrop-blur-md p-3 rounded-2xl border-2 border-rose-500 shadow-[0_8px_32px_rgba(244,63,94,0.4)] text-white space-y-1.5">
-        <div class="flex items-center justify-between border-b border-rose-800/80 pb-1.5">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-            <span class="text-xs font-black tracking-wide uppercase text-rose-200">
-              Interferencia 3D ({{ detectedCollisions().length }})
-            </span>
+    <!-- 3. MOVE (GIZMO) TOOL -->
+    <button 
+      type="button"
+      (click)="setActiveTool('move')"
+      [class]="activeTool() === 'move' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Mover (M): Muestra las flechas 3D para posicionar y trasladar piezas en los ejes X, Y, Z">
+      <span class="material-icons text-lg">open_with</span>
+    </button>
+
+    <!-- 4. MEASURE TAPE TOOL -->
+    <button 
+      type="button"
+      (click)="setActiveTool('measure')"
+      [class]="activeTool() === 'measure' ? 'bg-amber-500 text-white font-bold shadow-md shadow-amber-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Cinta Métrica 3D (T): Mide distancias reales y luces entre aristas o caras">
+      <span class="material-icons text-lg">straighten</span>
+    </button>
+
+    <div class="w-6 h-px bg-slate-200 mx-auto my-0.5"></div>
+
+    <!-- 5. CAMERA PRESETS POPOVER -->
+    <div class="relative">
+      <button 
+        type="button"
+        (click)="toggleViewsDropdown()"
+        class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
+        title="Vistas de Cámara (Iso 3D, Frontal, Lateral, Planta)">
+        <span class="material-icons text-lg">videocam</span>
+      </button>
+
+      @if (showViewsDropdown()) {
+        <div class="absolute left-11 top-0 z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 min-w-[130px] animate-in fade-in zoom-in-95 text-xs font-semibold text-slate-700">
+          <button (click)="setViewPreset('iso'); closeViewsDropdown()" class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left">
+            <span class="material-icons text-xs text-sky-500">view_in_ar</span>
+            <span>3D Isométrica</span>
+          </button>
+          <button (click)="setViewPreset('front'); closeViewsDropdown()" class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left">
+            <span class="material-icons text-xs text-emerald-500">crop_square</span>
+            <span>Frontal</span>
+          </button>
+          <button (click)="setViewPreset('side'); closeViewsDropdown()" class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left">
+            <span class="material-icons text-xs text-amber-500">view_sidebar</span>
+            <span>Lateral</span>
+          </button>
+          <button (click)="setViewPreset('top'); closeViewsDropdown()" class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left">
+            <span class="material-icons text-xs text-purple-500">dashboard</span>
+            <span>Planta</span>
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- 6. DRILL HOLES (MECANIZADOS) TOGGLE -->
+    <button 
+      type="button"
+      (click)="toggleDrillHoles()"
+      [class]="showDrillHoles() ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Mecanizados: Mostrar u ocultar taladros y tornillos 4x50, tarugos 8x30 y cazoletas 35mm">
+      <span class="material-icons text-lg">adjust</span>
+    </button>
+
+    <!-- 7. COTAS 3D -->
+    <button 
+      type="button"
+      (click)="toggleDimensions()"
+      [class]="show3dDimensions() ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Cotas 3D: Mostrar u ocultar líneas de acotado milimétrico sobre el mueble">
+      <span class="material-icons text-lg">straighten</span>
+    </button>
+
+    <!-- 8. LUZ LIBRE -->
+    <button 
+      type="button"
+      (click)="toggleClearances()"
+      [class]="showClearances() ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Luz Libre: Cotas dinámicas de huecos interiores útiles entre baldas y laterales">
+      <span class="material-icons text-lg">unfold_more</span>
+    </button>
+
+    <!-- 9. RAYOS X -->
+    <button 
+      type="button"
+      (click)="toggleXRay()"
+      [class]="isXRay() ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Rayos X: Transparencia técnica para inspeccionar ensambles interiores">
+      <span class="material-icons text-lg">visibility</span>
+    </button>
+
+    <!-- 10. DESPIECE EXPLOSIONADO FLYOUT -->
+    <div class="relative">
+      <button 
+        type="button"
+        (click)="toggleExplodedSlider()"
+        [class]="explodedPercent() > 0 ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+        class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+        title="Despiece Explosionado 3D">
+        <span class="material-icons text-lg">burst_mode</span>
+      </button>
+
+      @if (showExplodedSlider()) {
+        <div class="absolute left-11 top-0 z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 flex flex-col gap-2 w-52 animate-in fade-in zoom-in-95 text-xs text-slate-700">
+          <div class="flex items-center justify-between font-bold">
+            <span>Separación 3D</span>
+            <span class="font-mono text-sky-600">{{ explodedPercent() }}%</span>
           </div>
-          <span class="text-[10px] font-mono bg-rose-900/80 px-2 py-0.5 rounded text-rose-200 font-bold">
-            Solapamiento
-          </span>
-        </div>
-        <div class="space-y-1 max-h-36 overflow-y-auto pr-1 text-[11px]">
-          @for (col of detectedCollisions(); track $index) {
-            <div class="p-1.5 bg-zinc-950/60 rounded-lg border border-rose-900/60">
-              <p class="font-bold text-rose-300">
-                {{ col.partAName }} ↔ {{ col.partBName }}
-              </p>
-              <p class="text-[10px] text-zinc-400 font-mono">
-                Invasión: {{ col.overlapX }}×{{ col.overlapY }}×{{ col.overlapZ }} mm
-              </p>
-            </div>
+          <input 
+            type="range" 
+            min="0" 
+            max="100" 
+            [value]="explodedPercent()"
+            (input)="onExplodedSliderInput($event)"
+            class="w-full accent-sky-500 cursor-pointer h-1.5 bg-slate-200 rounded-lg" />
+          @if (explodedPercent() > 0) {
+            <button (click)="resetExploded()" class="text-[11px] text-sky-600 hover:underline text-right">
+              Unir Mueble
+            </button>
           }
         </div>
-        <p class="text-[10px] text-rose-200/80 italic">
-          Las piezas en rojo se solapan. Modifica las cotas para evitar errores de corte.
-        </p>
+      }
+    </div>
+
+    <div class="w-6 h-px bg-slate-200 mx-auto my-0.5"></div>
+
+    <!-- 11. THEME TOGGLE (STUDIO LIGHT / CAD DARK) -->
+    <button 
+      type="button"
+      (click)="toggleTheme()"
+      class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
+      [title]="isWhiteTheme() ? 'Cambiar a modo CAD oscuro' : 'Cambiar a fondo claro estudio SketchUp'">
+      <span class="material-icons text-lg">{{ isWhiteTheme() ? 'wb_sunny' : 'nightlight' }}</span>
+    </button>
+
+    <!-- 12. RESET CAMERA -->
+    <button 
+      type="button"
+      (click)="resetCamera()"
+      class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
+      title="Centrar y reiniciar cámara (Z)">
+      <span class="material-icons text-lg">filter_center_focus</span>
+    </button>
+
+  </div>
+
+  <!-- TOP-LEFT SELECTION BADGE (MINIMAL & NON-INTRUSIVE) -->
+  @if (isMultiSelect()) {
+    <div class="absolute top-3 left-16 z-20 flex items-center gap-2.5 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md pointer-events-auto animate-in fade-in duration-150">
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-700">GRUPO ({{ activeSelectedIds().length }}):</span>
+      </div>
+      <span class="text-xs font-semibold text-amber-600">Arrastre sincronizado</span>
+      <button 
+        type="button" 
+        (click)="clearSelection()" 
+        class="text-xs text-slate-400 hover:text-slate-800 underline ml-1">
+        Deseleccionar
+      </button>
+    </div>
+  } @else if (selectedPart(); as sel) {
+    <div class="absolute top-3 left-16 z-20 flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md pointer-events-auto animate-in fade-in duration-150">
+      <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+      <span class="text-xs font-bold text-slate-800">{{ sel.name }}:</span>
+      <span class="text-xs font-mono font-bold text-sky-600">{{ sel.length }} × {{ sel.width }} mm</span>
+      <span class="text-[11px] font-mono text-slate-400">({{ sel.thickness }}mm)</span>
+      <button 
+        type="button" 
+        (click)="clearSelection()" 
+        class="text-slate-400 hover:text-slate-800 ml-1"
+        title="Deseleccionar">
+        <span class="material-icons text-xs">close</span>
+      </button>
+    </div>
+  }
+
+  <!-- PUSH/PULL LIVE DELTA FLOATING BADGE -->
+  @if (pushPullDelta(); as pp) {
+    <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-in zoom-in-95 duration-100">
+      <div class="flex items-center gap-2 bg-amber-500 text-white px-3.5 py-1.5 rounded-full shadow-lg font-bold text-xs font-mono">
+        <span class="material-icons text-sm">open_in_full</span>
+        <span>{{ pp.axisName }}: {{ pp.currentVal }} mm</span>
+        <span class="px-1.5 py-0.2 bg-white/20 rounded-full text-[11px]">
+          {{ pp.delta >= 0 ? '+' : '' }}{{ pp.delta }} mm
+        </span>
       </div>
     </div>
   }
 
-  <!-- FLOATING 3D MEASUREMENT TAPE HUD -->
+  <!-- TOP-RIGHT COLLISION & INTERFERENCE WARNING BADGE -->
+  @if (detectedCollisions().length > 0) {
+    <div class="absolute top-3 right-3 z-20 pointer-events-auto">
+      <div class="flex items-center gap-2 bg-rose-600 text-white px-3 py-1.5 rounded-xl shadow-lg text-xs font-bold animate-pulse">
+        <span class="material-icons text-sm">warning</span>
+        <span>{{ detectedCollisions().length }} solapamiento(s)</span>
+      </div>
+    </div>
+  }
+
+  <!-- 3D MEASUREMENT TAPE ACTIVE HUD -->
   @if (isMeasureMode()) {
-    <div class="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 max-w-xl w-[92%] animate-in fade-in zoom-in-95 duration-150">
-      <div class="bg-zinc-950/95 backdrop-blur-md px-4 py-3 rounded-2xl border-2 border-amber-400 shadow-[0_8px_30px_rgba(245,158,11,0.3)] flex flex-col gap-2.5 w-full">
-        <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
-          <div class="flex items-center gap-2">
-            <span class="material-icons text-amber-400 text-base">square_foot</span>
-            <span class="text-xs font-bold text-white tracking-wide uppercase">Cinta Métrica 3D Interactiva</span>
+    <div class="absolute top-12 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 max-w-md w-[90%] animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-white/95 text-slate-800 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-slate-200 shadow-xl flex flex-col gap-2 w-full">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+          <div class="flex items-center gap-1.5">
+            <span class="material-icons text-amber-500 text-sm">straighten</span>
+            <span class="text-xs font-bold tracking-wide uppercase text-slate-800">Cinta Métrica 3D</span>
           </div>
           <div class="flex items-center gap-2">
             @if (measurePointA()) {
               <button 
                 type="button" 
                 (click)="clearMeasure()"
-                class="px-2 py-0.5 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-700 transition">
+                class="px-2 py-0.5 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition font-medium">
                 Nueva Medida
               </button>
             }
             <button 
               type="button" 
-              (click)="toggleMeasureMode()"
-              class="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+              (click)="setActiveTool('select')"
+              class="text-slate-400 hover:text-slate-700"
               title="Cerrar cinta métrica">
-              ✕
+              <span class="material-icons text-sm">close</span>
             </button>
           </div>
         </div>
 
         @if (!measurePointA()) {
-          <div class="text-xs text-amber-200/90 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0"></span>
-            <span><strong>Paso 1:</strong> Haz clic sobre cualquier arista o punto de una pieza para fijar el <strong>Punto A</strong>.</span>
-          </div>
+          <p class="text-xs text-amber-600 font-medium flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            Haz clic en una pieza o arista para fijar el <strong>Punto A</strong>.
+          </p>
         } @else if (measurePointA() && !measurePointB()) {
-          <div class="text-xs text-cyan-200/90 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0"></span>
-            <span><strong>Paso 2:</strong> Punto A fijado. Haz clic en la segunda arista o pieza para medir la luz o distancia (<strong>Punto B</strong>).</span>
-          </div>
+          <p class="text-xs text-sky-600 font-medium flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+            Punto A fijado. Haz clic en el <strong>Punto B</strong> para medir la distancia real.
+          </p>
         } @else if (measureDistance(); as dist) {
-          <div class="flex items-center justify-between gap-4 flex-wrap bg-zinc-900/90 p-2.5 rounded-xl border border-zinc-800">
+          <div class="flex items-center justify-between gap-3 bg-slate-50 p-2 rounded-xl border border-slate-100">
             <div class="flex flex-col">
-              <span class="text-[10px] uppercase font-bold text-zinc-400">Distancia Directa:</span>
-              <span class="text-lg font-black text-amber-400 font-mono tracking-tight">{{ dist.total }} mm</span>
+              <span class="text-[10px] uppercase font-bold text-slate-400">Distancia Directa</span>
+              <span class="text-base font-black text-amber-600 font-mono">{{ dist.total }} mm</span>
             </div>
-            <div class="flex items-center gap-3">
-              <div class="flex flex-col text-center">
-                <span class="text-[10px] font-bold text-red-400">ΔX (Luz Ancho)</span>
-                <span class="text-xs font-bold text-white font-mono">{{ dist.dx }} mm</span>
-              </div>
-              <div class="flex flex-col text-center">
-                <span class="text-[10px] font-bold text-emerald-400">ΔY (Luz Altura)</span>
-                <span class="text-xs font-bold text-white font-mono">{{ dist.dy }} mm</span>
-              </div>
-              <div class="flex flex-col text-center">
-                <span class="text-[10px] font-bold text-blue-400">ΔZ (Profundidad)</span>
-                <span class="text-xs font-bold text-white font-mono">{{ dist.dz }} mm</span>
-              </div>
+            <div class="flex items-center gap-2 text-[11px] font-mono text-slate-600">
+              <span>ΔX: <strong>{{ dist.dx }}</strong></span>
+              <span>ΔY: <strong>{{ dist.dy }}</strong></span>
+              <span>ΔZ: <strong>{{ dist.dz }}</strong></span>
             </div>
           </div>
         }
@@ -148,158 +287,32 @@
     </div>
   }
 
-  <!-- TOP RIGHT TOOLBAR: View presets, Cotas 3D, Cinta Métrica, Rayos X, Theme Toggle, Reset -->
-  <div class="absolute top-4 right-4 flex flex-wrap items-center gap-2 pointer-events-none z-20">
-    
-    <!-- View Angle Buttons -->
-    <div class="flex items-center gap-1 bg-zinc-900/90 backdrop-blur-md p-1 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto">
-      <button 
-        type="button"
-        (click)="setViewPreset('iso')" 
-        class="px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition"
-        title="Vista Isométrica 3D">
-        3D Iso
-      </button>
-      <button 
-        type="button"
-        (click)="setViewPreset('front')" 
-        class="px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition"
-        title="Vista Frontal / Alzada">
-        Frontal
-      </button>
-      <button 
-        type="button"
-        (click)="setViewPreset('side')" 
-        class="px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition"
-        title="Vista Lateral / Perfil">
-        Lateral
-      </button>
-      <button 
-        type="button"
-        (click)="setViewPreset('top')" 
-        class="px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition"
-        title="Vista Superior / Planta">
-        Planta
-      </button>
-    </div>
-
-    <!-- Toggles: Theme, 3D Dimensions, Cinta Métrica, Rayos X, Select All, Reset -->
-    <div class="flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-md p-1 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto">
-      
-      <!-- Select All Parts Button -->
-      <button 
-        type="button"
-        (click)="selectAllParts()"
-        class="px-2 py-1 text-xs rounded-lg flex items-center gap-1 text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
-        title="Seleccionar todas las piezas del mueble (para mover en bloque o agrupar)">
-        <span class="material-icons text-sm text-cyan-400">select_all</span>
-        <span class="hidden xl:inline">Todo</span>
-      </button>
-
-      <!-- 3D Measure Tape Toggle Button -->
-      <button 
-        type="button"
-        (click)="toggleMeasureMode()"
-        [class]="isMeasureMode() ? 'bg-amber-400 text-zinc-950 font-bold border-amber-300 shadow-md ring-2 ring-amber-400/50' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
-        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
-        title="Activar cinta métrica 3D para medir distancias y luces entre caras o puntos">
-        <span class="material-icons text-sm">square_foot</span>
-        <span class="hidden sm:inline">Cinta Métrica</span>
-      </button>
-
-      <!-- Studio White / Dark Mode Toggle -->
-      <button 
-        type="button"
-        (click)="toggleTheme()"
-        [class]="isWhiteTheme() ? 'bg-amber-400 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
-        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition shadow-xs"
-        [title]="isWhiteTheme() ? 'Cambiar a modo CAD oscuro' : 'Cambiar a fondo blanco de estudio técnico'">
-        <span class="material-icons text-sm">{{ isWhiteTheme() ? 'wb_sunny' : 'nightlight' }}</span>
-        <span class="hidden md:inline">{{ isWhiteTheme() ? 'Blanco' : 'Oscuro' }}</span>
-      </button>
-
-      <!-- 3D Dimensions Line Toggle -->
-      <button 
-        type="button"
-        (click)="toggleDimensions()"
-        [class]="show3dDimensions() ? 'bg-cyan-500 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
-        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
-        title="Mostrar u ocultar cotas y medidas 3D directamente sobre el modelo">
-        <span class="material-icons text-sm">straighten</span>
-        <span class="hidden sm:inline">Cotas 3D</span>
-      </button>
-
-      <!-- Luz Libre (Clearance Dimensions) Toggle -->
-      <button 
-        type="button"
-        (click)="toggleClearances()"
-        [class]="showClearances() ? 'bg-emerald-500 text-zinc-950 font-bold shadow-xs' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
-        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
-        title="Mostrar u ocultar cotas dinámicas de luz libre y huecos interiores entre piezas">
-        <span class="material-icons text-sm">unfold_more</span>
-        <span class="hidden sm:inline">Luz Libre</span>
-      </button>
-
-      <!-- Mecanizados & Perforaciones Toggle -->
-      <button 
-        type="button"
-        (click)="toggleDrillHoles()"
-        [class]="showDrillHoles() ? 'bg-cyan-500 text-zinc-950 font-bold shadow-xs' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
-        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
-        title="Mostrar u ocultar taladros y perforaciones de ensamble 3D (Tornillos 4x50, Tarugos 8x30, Bisagras 35mm)">
-        <span class="material-icons text-sm">adjust</span>
-        <span class="hidden sm:inline">Mecanizados</span>
-      </button>
-
-      <!-- Rayos X / Transparente -->
-      <button 
-        type="button"
-        (click)="toggleXRay()"
-        [class]="isXRay() ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'"
-        class="px-2.5 py-1 text-xs rounded-lg flex items-center gap-1.5 transition"
-        title="Activar transparencia de paneles para inspeccionar ensambles interiores">
-        <span class="material-icons text-sm">visibility</span>
-        <span class="hidden sm:inline">Rayos X</span>
-      </button>
-
-      <!-- Reset Camera -->
-      <button 
-        type="button"
-        (click)="resetCamera()"
-        class="p-1 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition"
-        title="Centrar y reiniciar cámara">
-        <span class="material-icons text-sm">filter_center_focus</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- FLOATING MICRO-NUDGE HUD (Posicionamiento milimétrico sin depender de guías en zoom) -->
+  <!-- FLOATING MICRO-NUDGE HUD (CUADRO DE MICRO-AJUSTE EN ZOOM - CONSERVADO SEGÚN REQUERIMIENTO) -->
   @if (selectedPart(); as sel) {
-    <div class="absolute bottom-16 sm:bottom-16 left-4 z-30 pointer-events-auto flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-150">
-      <div class="bg-zinc-950/95 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-zinc-800 shadow-2xl flex flex-col gap-2 max-w-[340px]">
+    <div class="absolute bottom-10 left-16 z-20 pointer-events-auto flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-white/95 text-slate-800 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200/90 shadow-xl flex flex-col gap-1.5 max-w-[320px]">
         
         <!-- Header: Title, Step selector, Magnetic Toggle -->
-        <div class="flex items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
+        <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5">
           <div class="flex items-center gap-1.5">
-            <span class="material-icons text-sm text-cyan-400">tune</span>
-            <span class="text-xs font-bold text-white tracking-tight">Micro-Ajuste en Zoom</span>
+            <span class="material-icons text-sm text-sky-500">tune</span>
+            <span class="text-xs font-bold text-slate-800">Micro-Ajuste en Zoom</span>
           </div>
 
           <div class="flex items-center gap-1">
-            <!-- Step selector: 1mm vs 10mm -->
             <button
               type="button"
               (click)="setNudgeStep(1)"
-              [class]="nudgeStep() === 1 ? 'bg-cyan-500 text-zinc-950 font-bold border-cyan-400 shadow-sm' : 'bg-zinc-800 text-zinc-400 hover:text-white border-zinc-700'"
-              class="px-2 py-0.5 text-[10px] rounded border transition"
+              [class]="nudgeStep() === 1 ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+              class="px-1.5 py-0.5 text-[10px] rounded transition"
               title="Paso de 1 milímetro">
               1 mm
             </button>
             <button
               type="button"
               (click)="setNudgeStep(10)"
-              [class]="nudgeStep() === 10 ? 'bg-cyan-500 text-zinc-950 font-bold border-cyan-400 shadow-sm' : 'bg-zinc-800 text-zinc-400 hover:text-white border-zinc-700'"
-              class="px-2 py-0.5 text-[10px] rounded border transition"
+              [class]="nudgeStep() === 10 ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+              class="px-1.5 py-0.5 text-[10px] rounded transition"
               title="Paso de 10 milímetros">
               10 mm
             </button>
@@ -308,134 +321,128 @@
             <button
               type="button"
               (click)="toggleMagneticSnap()"
-              [class]="isMagneticSnap() ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'"
-              class="px-2 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-0.5 transition ml-1"
-              [title]="isMagneticSnap() ? 'Imán de caras activo (12mm). Une piezas a 0mm de contacto perfecto.' : 'Imán desactivado. Desplazamiento libre.'">
-              <span class="material-icons text-[12px]">filter_vintage</span>
-              <span>{{ isMagneticSnap() ? 'Imán ON' : 'Imán OFF' }}</span>
+              [class]="isMagneticSnap() ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-slate-100 text-slate-400 border-slate-200'"
+              class="px-1.5 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-0.5 transition ml-0.5"
+              [title]="isMagneticSnap() ? 'Imán de caras activo. Une piezas a 0mm de contacto perfecto.' : 'Imán desactivado.'">
+              <span class="material-icons text-[11px]">filter_vintage</span>
+              <span>{{ isMagneticSnap() ? 'Imán ON' : 'OFF' }}</span>
             </button>
           </div>
         </div>
 
         <!-- 3 Axis Controls (X lateral, Y vertical, Z profundidad) -->
-        <div class="grid grid-cols-3 gap-1.5 text-center">
+        <div class="grid grid-cols-3 gap-1 text-center">
           
           <!-- Axis X -->
-          <div class="bg-zinc-900/90 rounded-xl p-1.5 border border-zinc-800 flex flex-col items-center">
-            <span class="text-[10px] font-bold text-red-400 mb-1">X Lateral</span>
-            <div class="flex items-center gap-1 w-full justify-center">
+          <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
+            <span class="text-[10px] font-bold text-red-500">X Lateral</span>
+            <div class="flex items-center gap-1 w-full justify-center my-0.5">
               <button
                 type="button"
                 (click)="nudgePart('x', -nudgeStep())"
-                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
-                title="Mover a la izquierda (o flecha ←)">
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                title="Mover a la izquierda (←)">
                 ◄
               </button>
               <button
                 type="button"
                 (click)="nudgePart('x', nudgeStep())"
-                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
-                title="Mover a la derecha (o flecha →)">
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                title="Mover a la derecha (→)">
                 ►
               </button>
             </div>
-            <span class="text-[9px] font-mono text-zinc-400 mt-1">{{ formatCoord(sel.posX) }} mm</span>
+            <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posX) }} mm</span>
           </div>
 
           <!-- Axis Y (Height) -->
-          <div class="bg-zinc-900/90 rounded-xl p-1.5 border border-zinc-800 flex flex-col items-center">
-            <span class="text-[10px] font-bold text-emerald-400 mb-1">Y Altura</span>
-            <div class="flex items-center gap-1 w-full justify-center">
+          <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
+            <span class="text-[10px] font-bold text-emerald-600">Y Altura</span>
+            <div class="flex items-center gap-1 w-full justify-center my-0.5">
               <button
                 type="button"
                 (click)="nudgePart('y', -nudgeStep())"
-                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
-                title="Bajar pieza (o flecha ↓ / AvPág)">
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                title="Bajar pieza (↓)">
                 ▼
               </button>
               <button
                 type="button"
                 (click)="nudgePart('y', nudgeStep())"
-                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
-                title="Subir pieza (o flecha ↑ / RePág)">
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                title="Subir pieza (↑)">
                 ▲
               </button>
             </div>
-            <span class="text-[9px] font-mono text-zinc-400 mt-1">{{ formatCoord(sel.posY) }} mm</span>
+            <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posY) }} mm</span>
           </div>
 
           <!-- Axis Z (Depth) -->
-          <div class="bg-zinc-900/90 rounded-xl p-1.5 border border-zinc-800 flex flex-col items-center">
-            <span class="text-[10px] font-bold text-blue-400 mb-1">Z Fondo</span>
-            <div class="flex items-center gap-1 w-full justify-center">
+          <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
+            <span class="text-[10px] font-bold text-sky-600">Z Fondo</span>
+            <div class="flex items-center gap-1 w-full justify-center my-0.5">
               <button
                 type="button"
                 (click)="nudgePart('z', -nudgeStep())"
-                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
                 title="Mover al fondo">
                 ◄
               </button>
               <button
                 type="button"
                 (click)="nudgePart('z', nudgeStep())"
-                class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center border border-zinc-700 active:scale-95 transition"
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
                 title="Mover al frente">
                 ►
               </button>
             </div>
-            <span class="text-[9px] font-mono text-zinc-400 mt-1">{{ formatCoord(sel.posZ) }} mm</span>
+            <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posZ) }} mm</span>
           </div>
 
         </div>
-
-        <!-- Keyboard Shortcut Helper -->
-        <p class="text-[10px] text-zinc-400 flex items-center justify-between">
-          <span>Teclas: <kbd class="px-1 py-0.5 bg-zinc-800 rounded font-mono text-zinc-300">←</kbd> <kbd class="px-1 py-0.5 bg-zinc-800 rounded font-mono text-zinc-300">→</kbd> <kbd class="px-1 py-0.5 bg-zinc-800 rounded font-mono text-zinc-300">↑</kbd> <kbd class="px-1 py-0.5 bg-zinc-800 rounded font-mono text-zinc-300">↓</kbd></span>
-          <span class="text-zinc-500 font-mono text-[9px]">(Shift=×10)</span>
-        </p>
 
       </div>
     </div>
   }
 
-  <!-- BOTTOM TOOLBAR: Exploded View Slider & Navigation Help -->
-  <div class="absolute bottom-4 left-4 right-4 flex flex-col sm:flex-row items-center justify-between gap-3 pointer-events-none z-20">
+  <!-- SKETCHUP CAD BOTTOM STATUS BAR & MEASUREMENTS BOX -->
+  <div class="absolute bottom-0 left-0 right-0 h-7 bg-white/95 text-slate-600 backdrop-blur-md border-t border-slate-200/90 px-3 flex items-center justify-between text-xs z-20 pointer-events-auto">
     
-    <!-- Exploded view slider -->
-    <div class="flex items-center gap-2.5 bg-zinc-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-zinc-700/70 shadow-lg pointer-events-auto w-full sm:w-auto">
-      <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5 whitespace-nowrap">
-        <span class="material-icons text-sm text-cyan-400">burst_mode</span>
-        Despiece 3D:
-      </span>
-      <input 
-        type="range" 
-        min="0" 
-        max="100" 
-        [value]="explodedPercent()"
-        (input)="explodedPercent.set(+$any($event.target).value)"
-        class="w-32 sm:w-48 accent-cyan-400 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
-        title="Desliza para separar las piezas en el espacio 3D" />
-      <span class="text-xs font-mono font-bold text-cyan-400 w-9 text-right">
-        {{ explodedPercent() }}%
-      </span>
-      @if (explodedPercent() > 0) {
-        <button 
-          (click)="explodedPercent.set(0)" 
-          class="text-xs text-zinc-400 hover:text-white underline ml-1">
-          Unir
-        </button>
+    <!-- Left: Contextual tool hint -->
+    <div class="flex items-center gap-2 truncate pr-2">
+      @if (activeTool() === 'push_pull') {
+        <span class="material-icons text-sm text-amber-500">open_in_full</span>
+        @if (hoveredFaceInfo(); as hf) {
+          <span class="font-medium text-slate-800">
+            Posa y arrastra la <strong>{{ hf.faceLabel }}</strong> de <strong>{{ hf.partName }}</strong> ({{ hf.dimLabel }})
+          </span>
+        } @else {
+          <span><strong>Empujar / Tirar (P):</strong> Posa el cursor sobre una cara de la pieza y arrastra para estirar o encoger.</span>
+        }
+      } @else if (activeTool() === 'select') {
+        <span class="material-icons text-sm text-sky-500">near_me</span>
+        <span><strong>Seleccionar:</strong> Haz clic en una pieza • <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Shift+Clic</kbd> para selección múltiple • Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> para Empujar/Tirar</span>
+      } @else if (activeTool() === 'move') {
+        <span class="material-icons text-sm text-sky-500">open_with</span>
+        <span><strong>Mover (M):</strong> Arrastra las flechas 3D para posicionar la pieza en X, Y o Z.</span>
+      } @else if (activeTool() === 'measure') {
+        <span class="material-icons text-sm text-amber-500">straighten</span>
+        <span><strong>Cinta Métrica (T):</strong> Clic en dos puntos para medir la distancia real en milímetros.</span>
       }
     </div>
 
-    <!-- Mouse & Gizmo Controls Hint -->
-    <div class="hidden md:flex items-center gap-2.5 text-xs text-zinc-300 bg-zinc-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-zinc-800/80 shadow pointer-events-none">
-      <span>🖱️ <strong>Rotar:</strong> Clic izquierdo</span>
-      <span>•</span>
-      <span><strong>Desplazar:</strong> Clic derecho</span>
-      <span>•</span>
-      <span><strong>Zoom:</strong> Rueda</span>
-      <span>•</span>
-      <span><strong class="text-cyan-400">Arrastrar Gizmo:</strong> Mueve o estira la pieza</span>
+    <!-- Right: SketchUp Measurements Box -->
+    <div class="flex items-center gap-1.5 shrink-0 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200 font-mono text-xs">
+      <span class="text-[10px] uppercase font-bold text-slate-400">Medidas:</span>
+      @if (pushPullDelta(); as pp) {
+        <strong class="text-amber-600">{{ pp.axisName }} {{ pp.currentVal }} mm</strong>
+      } @else if (measureDistance(); as dist) {
+        <strong class="text-sky-600">{{ dist.total }} mm</strong>
+      } @else if (selectedPart(); as sel) {
+        <strong class="text-slate-800">{{ sel.length }} × {{ sel.width }} mm</strong>
+      } @else {
+        <span class="text-slate-400">— mm</span>
+      }
     </div>
 
   </div>

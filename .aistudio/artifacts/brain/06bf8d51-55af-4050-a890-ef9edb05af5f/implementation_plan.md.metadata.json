@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación exhaustivo para integrar las 4 herramientas avanzadas de nivel CAD profesional estilo SketchUp y AutoCAD en MelamiPro Studio: 1) Perforaciones y mecanizados automáticos de ensamble (tornillos soberbios 4x50, tarugos 8x30 y cazoletas de bisagra 35mm), 2) Detección de colisiones e interferencias 3D con resaltado rojo en tiempo real, 3) Exportación vectorial DXF multicapa para centros de corte CNC y seccionadoras, y 4) Planos técnicos 2D acotados en PDF para armado de taller con vistas ortográficas y cuadro de rotulación.",
-  "updatedAt":  "2026-10-01T12:35:26.935673758Z",
+  "summary":  "Plan de rediseño de interfaz y experiencia de usuario estilo SketchUp: unificación del área de trabajo eliminando barras duplicadas y exceso de tonos oscuros, barra de herramientas vertical izquierda profesional (Seleccionar, Empujar/Tirar Push-Pull, Mover, Medir, Añadir pieza), bandeja lateral derecha colapsable para dejar el 100% del lienzo limpio, preservación del cuadrito de micro-ajuste de zoom, y nueva herramienta interactiva 3D Empujar/Tirar (Push/Pull) para estirar placas directamente arrastrando sus caras.",
+  "updatedAt":  "2026-10-06T02:04:28.741200839Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

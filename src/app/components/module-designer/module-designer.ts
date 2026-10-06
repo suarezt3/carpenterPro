@@ -49,6 +49,22 @@ export class ModuleDesignerComponent {
   // Active dock tab: 'piece' (properties of selected part) or 'catalog' (add pieces & tree)
   readonly activeDockTab = signal<'piece' | 'catalog'>('catalog');
 
+  // Sidebar collapse toggle for 100% full-screen 3D modeling
+  readonly isSidebarCollapsed = signal<boolean>(false);
+  readonly showTemplatesDropdown = signal<boolean>(false);
+
+  toggleSidebar() {
+    this.isSidebarCollapsed.update(v => !v);
+  }
+
+  toggleTemplatesDropdown() {
+    this.showTemplatesDropdown.update(v => !v);
+  }
+
+  closeTemplatesDropdown() {
+    this.showTemplatesDropdown.set(false);
+  }
+
   readonly joineryData = computed(() => {
     return this.joineryEngine.calculateJoinery(this.currentParts());
   });

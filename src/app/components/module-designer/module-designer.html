@@ -1,75 +1,89 @@
 <div class="w-full h-full flex flex-col p-2 sm:p-2.5 gap-2 min-h-0 overflow-hidden">
 
-  <!-- SLIM TOP BAR: Workspace Title, 3D Stats & Model Templates (Anti-noise, Single Row) -->
-  <div class="h-10 px-3 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center justify-between gap-3 shrink-0 shadow-sm">
+  <!-- CLEAN SKETCHUP-STYLE TOP BAR: Workspace Info, Clean Model Templates & Sidebar Toggle -->
+  <div class="h-9 px-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3 shrink-0 shadow-xs">
     <div class="flex items-center gap-2 min-w-0">
-      <span class="material-icons text-cyan-400 text-lg">view_in_ar</span>
-      <span class="text-xs font-bold text-white tracking-tight whitespace-nowrap">Modelador 3D</span>
-      <span class="text-zinc-600 hidden sm:inline">|</span>
-      <div class="hidden sm:flex items-center gap-2 text-xs text-zinc-400 font-mono">
-        <span>Piezas: <strong class="text-cyan-300">{{ currentParts().length }}</strong></span>
+      <span class="material-icons text-sky-600 text-lg">view_in_ar</span>
+      <span class="text-xs font-bold text-slate-800 tracking-tight whitespace-nowrap">Modelador 3D</span>
+      <span class="text-slate-300 hidden sm:inline">|</span>
+      <div class="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-mono">
+        <span>Piezas: <strong class="text-sky-600">{{ currentParts().length }}</strong></span>
         <span>·</span>
-        <span>Área: <strong class="text-amber-300">{{ totalAreaM2() }} m²</strong></span>
+        <span>Área: <strong class="text-amber-600">{{ totalAreaM2() }} m²</strong></span>
       </div>
     </div>
 
-    <!-- Quick Templates & Actions -->
-    <div class="flex items-center gap-1.5 shrink-0">
+    <!-- Quick Actions & Plantillas Menu -->
+    <div class="flex items-center gap-2 shrink-0">
+      
+      <!-- Dropdown Plantillas de Mueble -->
+      <div class="relative">
+        <button 
+          type="button"
+          (click)="toggleTemplatesDropdown()"
+          class="h-7 px-2.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 flex items-center gap-1.5 transition"
+          title="Cargar plantillas de muebles prediseñados o iniciar en blanco">
+          <span class="material-icons text-sm text-amber-500">menu_book</span>
+          <span>Plantillas de Mueble</span>
+          <span class="material-icons text-xs">arrow_drop_down</span>
+        </button>
+
+        @if (showTemplatesDropdown()) {
+          <div class="absolute right-0 top-8 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 min-w-[220px] animate-in fade-in zoom-in-95 text-xs text-slate-700">
+            <button 
+              type="button"
+              (click)="loadStandardBaseCabinet(); closeTemplatesDropdown()"
+              class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left font-medium">
+              <span class="material-icons text-sm text-amber-500">countertops</span>
+              <div class="flex flex-col">
+                <span class="font-bold text-slate-800">Bajo Mesada Estándar</span>
+                <span class="text-[10px] text-slate-400">Cocina con balda y divisiones</span>
+              </div>
+            </button>
+            <button 
+              type="button"
+              (click)="loadDeskBarTemplate(); closeTemplatesDropdown()"
+              class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left font-medium">
+              <span class="material-icons text-sm text-sky-500">desk</span>
+              <div class="flex flex-col">
+                <span class="font-bold text-slate-800">Barra Desayunadora</span>
+                <span class="text-[10px] text-slate-400">Encimera con módulo lateral</span>
+              </div>
+            </button>
+            <div class="h-px bg-slate-100 my-0.5"></div>
+            <button 
+              type="button"
+              (click)="startBlank(); closeTemplatesDropdown()"
+              class="px-2.5 py-1.5 rounded-lg hover:bg-rose-50 text-rose-700 flex items-center gap-2 text-left font-medium">
+              <span class="material-icons text-sm text-rose-500">delete_sweep</span>
+              <div class="flex flex-col">
+                <span class="font-bold">Lienzo en Blanco</span>
+                <span class="text-[10px] text-rose-400">Diseñar desde cero</span>
+              </div>
+            </button>
+          </div>
+        }
+      </div>
+
+      <!-- Toggle Right Sidebar Button -->
       <button 
         type="button"
-        (click)="startBlank()"
-        class="h-7 px-2.5 text-[11px] font-semibold bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg border border-zinc-700 flex items-center gap-1 transition"
-        title="Limpiar el lienzo 3D para construir un mueble desde cero">
-        <span class="material-icons text-xs text-rose-400">delete_sweep</span>
-        <span class="hidden sm:inline">En Blanco</span>
+        (click)="toggleSidebar()"
+        [class]="isSidebarCollapsed() ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'"
+        class="h-7 px-2.5 text-xs font-semibold rounded-lg border flex items-center gap-1.5 transition"
+        [title]="isSidebarCollapsed() ? 'Mostrar bandeja de propiedades' : 'Ocultar bandeja para lienzo 3D al 100% de pantalla'">
+        <span class="material-icons text-sm">{{ isSidebarCollapsed() ? 'dock' : 'view_sidebar' }}</span>
+        <span class="hidden sm:inline">{{ isSidebarCollapsed() ? 'Mostrar Bandeja' : 'Ocultar Bandeja' }}</span>
       </button>
 
-      <button 
-        type="button"
-        (click)="loadDeskBarTemplate()"
-        class="h-7 px-2.5 text-[11px] font-semibold bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 rounded-lg border border-cyan-500/40 flex items-center gap-1 transition"
-        title="Cargar plantilla de mueble barra con módulo lateral">
-        <span class="material-icons text-xs text-cyan-400">desk</span>
-        <span>Barra Módulo</span>
-      </button>
-
-      <button 
-        type="button"
-        (click)="loadStandardBaseCabinet()"
-        class="h-7 px-2.5 text-[11px] font-semibold bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 rounded-lg border border-amber-500/40 flex items-center gap-1 transition"
-        title="Cargar plantilla estándar de bajo mesada de cocina">
-        <span class="material-icons text-xs text-amber-400">countertops</span>
-        <span>Bajo Mesada</span>
-      </button>
-
-      <div class="h-4 w-px bg-zinc-700/60 mx-0.5 hidden sm:block"></div>
-
-      <!-- Quick CAD Technical Export Buttons -->
-      <button 
-        type="button"
-        (click)="openTechnicalSheet()"
-        class="h-7 px-2.5 text-[11px] font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 rounded-lg flex items-center gap-1.5 transition shadow-xs"
-        title="Ver y descargar planos técnicos 2D acotados en PDF para taller">
-        <span class="material-icons text-xs">architecture</span>
-        <span>Plano 2D (PDF)</span>
-      </button>
-
-      <button 
-        type="button"
-        (click)="exportDxf()"
-        class="h-7 px-2.5 text-[11px] font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center gap-1.5 transition shadow-xs"
-        title="Descargar archivo vectorial DXF por capas para CNC y seccionadoras">
-        <span class="material-icons text-xs">download</span>
-        <span class="hidden md:inline">DXF CNC</span>
-      </button>
     </div>
   </div>
 
-  <!-- MAIN 2-COLUMN FULL-VIEWPORT LAYOUT (Dynamic 100vh Fill for 1080p and 2K screens) -->
+  <!-- MAIN 2-COLUMN FULL-VIEWPORT LAYOUT (Dynamic 100vh Fill) -->
   <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2 h-full">
     
-    <!-- LEFT COLUMN: 3D Viewport & Bottom Chips (Takes full available height) -->
-    <div class="col-span-12 lg:col-span-8 xl:col-span-9 flex flex-col gap-1.5 h-full min-h-0">
+    <!-- LEFT COLUMN: 3D Viewport & Bottom Chips -->
+    <div [class]="isSidebarCollapsed() ? 'col-span-12 flex flex-col gap-1.5 h-full min-h-0 relative' : 'col-span-12 lg:col-span-8 xl:col-span-9 flex flex-col gap-1.5 h-full min-h-0 relative'">
       
       <!-- Three.js 3D Viewer Container (Fills remaining height) -->
       <div class="flex-1 min-h-0 w-full h-full relative">
@@ -87,10 +101,22 @@
         </app-furniture-3d-viewer>
       </div>
 
+      <!-- Floating expand button if sidebar is collapsed -->
+      @if (isSidebarCollapsed()) {
+        <button
+          type="button"
+          (click)="toggleSidebar()"
+          class="absolute top-3 right-3 z-30 h-8 px-2.5 bg-white text-slate-700 hover:text-slate-900 border border-slate-200 rounded-xl shadow-lg flex items-center gap-1 text-xs font-bold transition hover:bg-slate-50"
+          title="Abrir Bandeja de Propiedades">
+          <span class="material-icons text-sm text-sky-600">chevron_left</span>
+          <span>Bandeja</span>
+        </button>
+      }
+
       <!-- BOTTOM PIECE CHIPS (Quick 1-Click selection & status of every piece in the 3D space) -->
-      <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl px-3 py-2 shadow-md flex items-center gap-2 overflow-x-auto shrink-0">
-        <span class="text-[11px] font-bold text-zinc-400 whitespace-nowrap flex items-center gap-1 pl-1">
-          <span class="material-icons text-xs text-cyan-400">dns</span>
+      <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs flex items-center gap-2 overflow-x-auto shrink-0">
+        <span class="text-[11px] font-bold text-slate-400 whitespace-nowrap flex items-center gap-1 pl-1">
+          <span class="material-icons text-xs text-sky-500">dns</span>
           Piezas:
         </span>
 
@@ -98,15 +124,15 @@
         <button 
           type="button"
           (click)="selectAllParts()"
-          class="px-2 py-1 rounded-lg text-xs bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 flex items-center gap-1 shrink-0 transition"
+          class="px-2 py-0.5 rounded-lg text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center gap-1 shrink-0 transition"
           title="Seleccionar todas las piezas a la vez para moverlas en bloque">
-          <span class="material-icons text-xs text-amber-400">select_all</span>
+          <span class="material-icons text-xs text-amber-500">select_all</span>
           <span>Todo ({{ currentParts().length }})</span>
         </button>
 
         @if (currentParts().length === 0) {
-          <span class="text-xs text-zinc-500 italic pl-2">
-            Lienzo vacío. Haz clic en "+ Añadir Piezas" en el panel derecho para comenzar a construir.
+          <span class="text-xs text-slate-400 italic pl-2">
+            Lienzo vacío. Haz clic en "Plantillas" arriba para cargar un mueble o añade piezas desde la bandeja.
           </span>
         }
 
@@ -116,9 +142,9 @@
               type="button"
               (click)="selectPartById(part.id, $event)"
               [class]="selectedPartIds().includes(part.id) 
-                ? 'bg-cyan-500 text-zinc-950 font-bold border-cyan-400 shadow-md ring-2 ring-cyan-400/40' 
-                : 'bg-zinc-800/90 text-zinc-300 hover:text-white hover:bg-zinc-700/90 border-zinc-700'"
-              class="px-2.5 py-1 rounded-lg text-xs border flex items-center gap-1.5 whitespace-nowrap transition"
+                ? 'bg-sky-500 text-white font-bold border-sky-400 shadow-xs ring-2 ring-sky-400/40' 
+                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'"
+              class="px-2 py-0.5 rounded-lg text-xs border flex items-center gap-1.5 whitespace-nowrap transition"
               title="Clic para seleccionar • Shift+Clic para multi-selección">
               <span>{{ part.name }}</span>
               <span class="font-mono text-[10px] opacity-75 font-semibold">
@@ -132,7 +158,7 @@
           <button 
             type="button" 
             (click)="deselectAll()" 
-            class="text-[11px] text-zinc-400 hover:text-white underline whitespace-nowrap px-1 shrink-0"
+            class="text-[11px] text-slate-400 hover:text-slate-700 underline whitespace-nowrap px-1 shrink-0"
             title="Deseleccionar piezas">
             Deseleccionar ({{ selectedPartIds().length }})
           </button>
@@ -141,32 +167,43 @@
 
     </div>
 
-    <!-- RIGHT COLUMN: Inspector & Tool Dock (Dynamic 100% height fill on 1080p and 2K) -->
-    <div class="col-span-12 lg:col-span-4 xl:col-span-3 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl overflow-hidden flex flex-col h-full min-h-0">
-      
-      <!-- Dock Tabs Header -->
-      <div class="flex items-center border-b border-zinc-800 bg-zinc-950/70 p-1">
-        <button 
-          type="button"
-          (click)="activeDockTab.set('piece')"
-          [class]="activeDockTab() === 'piece' ? 'bg-zinc-800 text-cyan-400 font-bold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'"
-          class="flex-1 py-2 text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
-          <span class="material-icons text-sm">tune</span>
-          <span>Propiedades de Pieza</span>
-          @if (selectedPart()) {
-            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
-          }
-        </button>
+    <!-- RIGHT COLUMN: Inspector & Tool Dock (Collapsible) -->
+    @if (!isSidebarCollapsed()) {
+      <div class="col-span-12 lg:col-span-4 xl:col-span-3 bg-white border border-slate-200 rounded-2xl shadow-md overflow-hidden flex flex-col h-full min-h-0 text-slate-800">
+        
+        <!-- Dock Tabs Header -->
+        <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-1">
+          <div class="flex items-center gap-1 flex-1">
+            <button 
+              type="button"
+              (click)="activeDockTab.set('piece')"
+              [class]="activeDockTab() === 'piece' ? 'bg-white text-sky-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
+              class="flex-1 py-1.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
+              <span class="material-icons text-sm">tune</span>
+              <span>Propiedades</span>
+              @if (selectedPart()) {
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+              }
+            </button>
 
-        <button 
-          type="button"
-          (click)="activeDockTab.set('catalog')"
-          [class]="activeDockTab() === 'catalog' ? 'bg-zinc-800 text-amber-400 font-bold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'"
-          class="flex-1 py-2 text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
-          <span class="material-icons text-sm">add_circle</span>
-          <span>Catálogo & Estructura</span>
-        </button>
-      </div>
+            <button 
+              type="button"
+              (click)="activeDockTab.set('catalog')"
+              [class]="activeDockTab() === 'catalog' ? 'bg-white text-amber-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
+              class="flex-1 py-1.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
+              <span class="material-icons text-sm">add_circle</span>
+              <span>Catálogo</span>
+            </button>
+          </div>
+
+          <button 
+            type="button"
+            (click)="toggleSidebar()"
+            class="p-1 text-slate-400 hover:text-slate-700 rounded-lg ml-1"
+            title="Colapsar bandeja lateral (100% pantalla 3D)">
+            <span class="material-icons text-sm">chevron_right</span>
+          </button>
+        </div>
 
       <!-- TAB 1: INDIVIDUAL PIECE PROPERTIES (Edición Pieza por Pieza) -->
       @if (activeDockTab() === 'piece') {
@@ -915,6 +952,7 @@
       }
 
     </div>
+  }
 
   </div>
 
