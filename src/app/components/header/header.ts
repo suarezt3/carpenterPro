@@ -15,7 +15,8 @@ import { ThemeService } from '../../services/theme.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, SlicePipe, TechnicalSheetModalComponent],
   host: {
-    '(window:keydown)': 'handleGlobalKeyDown($event)'
+    '(window:keydown)': 'handleGlobalKeyDown($event)',
+    '(document:click)': 'closeDropdowns()'
   },
   templateUrl: './header.html'
 })
@@ -28,6 +29,10 @@ export class HeaderComponent {
 
   activeTab = input<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>('modules');
   tabChanged = output<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>();
+
+  // Dropdown menus state (compact toolbar to prevent overflow on laptops)
+  readonly isProjectDropdownOpen = signal(false);
+  readonly isExportDropdownOpen = signal(false);
 
   showProjectsModal = signal(false);
   showSettingsModal = signal(false);
@@ -139,7 +144,28 @@ export class HeaderComponent {
     }
   }
 
+  toggleProjectDropdown(e?: Event) {
+    e?.stopPropagation();
+    this.isProjectDropdownOpen.update(v => !v);
+    this.isExportDropdownOpen.set(false);
+  }
+
+  toggleExportDropdown(e?: Event) {
+    e?.stopPropagation();
+    this.isExportDropdownOpen.update(v => !v);
+    this.isProjectDropdownOpen.set(false);
+  }
+
+  closeDropdowns() {
+    this.isProjectDropdownOpen.set(false);
+    this.isExportDropdownOpen.set(false);
+  }
+
   handleGlobalKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      this.closeDropdowns();
+    }
+
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
       return;

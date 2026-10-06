@@ -25,7 +25,8 @@
             ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-sky-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/40 font-bold shadow-xs whitespace-nowrap text-xs transition') 
             : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition')">
           <span class="material-icons text-base">kitchen</span>
-          <span>1. Diseñador 3D</span>
+          <span class="hidden lg:inline">1. Diseñador 3D</span>
+          <span class="lg:hidden">1. 3D</span>
           <span [class]="themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono' : 'text-[10px] px-1 py-0.2 rounded-full bg-zinc-800 text-zinc-300 font-mono'">{{ project().modules.length }}</span>
         </button>
 
@@ -35,7 +36,8 @@
             ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-sky-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/40 font-bold shadow-xs whitespace-nowrap text-xs transition') 
             : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition')">
           <span class="material-icons text-base">format_list_numbered</span>
-          <span>2. Despiece</span>
+          <span class="hidden lg:inline">2. Despiece</span>
+          <span class="lg:hidden">2. Piezas</span>
           <span [class]="themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono' : 'text-[10px] px-1 py-0.2 rounded-full bg-zinc-800 text-zinc-300 font-mono'">{{ partsCount() }}</span>
         </button>
 
@@ -45,7 +47,8 @@
             ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-sky-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/40 font-bold shadow-xs whitespace-nowrap text-xs transition') 
             : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition')">
           <span class="material-icons text-base">grid_view</span>
-          <span>3. Optimizador 2D</span>
+          <span class="hidden lg:inline">3. Optimizador 2D</span>
+          <span class="lg:hidden">3. Corte</span>
           <span class="text-[9px] uppercase font-bold tracking-wider px-1 py-0.2 rounded bg-emerald-500/15 text-emerald-700 border border-emerald-500/30">Sierra</span>
         </button>
 
@@ -55,10 +58,10 @@
             ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-sky-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/40 font-bold shadow-xs whitespace-nowrap text-xs transition') 
             : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition')">
           <span class="material-icons text-base">monetization_on</span>
-          <span>4. Presupuesto</span>
+          <span class="hidden lg:inline">4. Presupuesto</span>
+          <span class="lg:hidden">4. Cotizar</span>
         </button>
 
-        <!-- Pestaña 5. Etiquetas: OCULTA por preferencia del usuario, lista para reactivarse -->
         @if (showLabelsTab()) {
           <button 
             (click)="selectTab('labels')"
@@ -71,7 +74,7 @@
         }
       </nav>
 
-      <!-- ZONE 3 (RIGHT): Action Buttons (High Density h-8.5, Single-Line, Anti-Overflow) -->
+      <!-- ZONE 3 (RIGHT): Action Buttons (Grouped Compact Menus, Anti-Overflow) -->
       <div class="flex items-center gap-1.5 shrink-0 justify-end">
 
         <!-- Selector de Tema (SketchUp Classic Claro / Oscuro) -->
@@ -79,13 +82,13 @@
           type="button"
           (click)="themeService.toggleTheme()"
           [class]="themeService.isClassic() 
-            ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs' 
-            : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-amber-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0'"
+            ? 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs' 
+            : 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-amber-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0'"
           [title]="themeService.isClassic() ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo SketchUp Classic (Claro)'">
           <span class="material-icons text-sm" [class.text-amber-500]="themeService.isClassic()" [class.text-amber-400]="!themeService.isClassic()">
             {{ themeService.isClassic() ? 'light_mode' : 'dark_mode' }}
           </span>
-          <span class="whitespace-nowrap hidden sm:inline">
+          <span class="whitespace-nowrap hidden xl:inline">
             {{ themeService.isClassic() ? 'Classic' : 'Oscuro' }}
           </span>
         </button>
@@ -96,7 +99,7 @@
             type="button"
             (click)="undo()" 
             [disabled]="!canUndo()"
-            [class]="themeService.isClassic() ? 'h-full px-2 rounded text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap' : 'h-full px-2 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap'"
+            [class]="themeService.isClassic() ? 'h-full px-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap' : 'h-full px-1.5 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap'"
             title="Deshacer cambio (Ctrl+Z)">
             <span class="material-icons text-base">undo</span>
           </button>
@@ -105,39 +108,161 @@
             type="button"
             (click)="redo()" 
             [disabled]="!canRedo()"
-            [class]="themeService.isClassic() ? 'h-full px-2 rounded text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap' : 'h-full px-2 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap'"
+            [class]="themeService.isClassic() ? 'h-full px-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap' : 'h-full px-1.5 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap'"
             title="Rehacer cambio (Ctrl+Y)">
             <span class="material-icons text-base">redo</span>
           </button>
         </div>
 
-        <!-- Switch Opcional de Auto-guardado en Nube -->
-        <button
-          type="button"
-          (click)="toggleAutoSync()"
-          [class]="autoSyncEnabled() 
-            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/50' 
-            : (themeService.isClassic() ? 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200' : 'bg-zinc-800/80 border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700')"
-          class="h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-medium rounded-lg border transition shadow-sm whitespace-nowrap shrink-0"
-          [title]="autoSyncEnabled() ? 'Auto-guardado en nube ACTIVADO (haz clic para desactivar)' : 'Auto-guardado en nube DESACTIVADO. Pulsa para activar la sincronización periódica automática.'">
-          <span 
-            [class]="autoSyncEnabled() ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-zinc-500'" 
-            class="w-1.5 h-1.5 rounded-full transition-colors shrink-0"></span>
-          <span class="text-[11px] font-semibold">Auto</span>
-          <span class="text-[9px] uppercase font-bold tracking-wider" [class.text-emerald-400]="autoSyncEnabled()">
-            {{ autoSyncEnabled() ? 'ON' : 'OFF' }}
-          </span>
-        </button>
+        <!-- MENÚ DESPLEGABLE: PROYECTO (Nuevo, Abrir proyectos, Auto-sync) -->
+        <div class="relative">
+          <button 
+            type="button"
+            (click)="toggleProjectDropdown($event)"
+            [class]="themeService.isClassic() 
+              ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs' 
+              : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0'"
+            title="Menú de Proyectos y Gestión de Archivos">
+            <span class="material-icons text-sm text-amber-500 shrink-0">folder_open</span>
+            <span class="whitespace-nowrap">Proyecto</span>
+            @if (cloudProjects().length > 0) {
+              <span class="px-1 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-300 border border-blue-500/30">
+                {{ cloudProjects().length }}
+              </span>
+            }
+            <span class="material-icons text-xs text-slate-400">expand_more</span>
+          </button>
 
-        <!-- Botón Guardar en la Nube con Supabase (Manual, single-line h-8.5) -->
+          @if (isProjectDropdownOpen()) {
+            <div 
+              (click)="$event.stopPropagation()"
+              [class]="themeService.isClassic() 
+                ? 'absolute right-0 top-full mt-1.5 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 text-xs text-slate-700 animate-in fade-in-50 zoom-in-95' 
+                : 'absolute right-0 top-full mt-1.5 z-50 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 text-xs text-zinc-200 animate-in fade-in-50 zoom-in-95'">
+              
+              <!-- Opción: Nuevo Proyecto -->
+              <button 
+                type="button"
+                (click)="openNewProjectModal(); closeDropdowns()"
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                <span class="material-icons text-sm text-emerald-500 shrink-0">add_circle</span>
+                <div class="flex flex-col">
+                  <span class="font-bold">Nuevo Proyecto</span>
+                  <span class="text-[10px] text-slate-400">Crear lienzo en blanco</span>
+                </div>
+              </button>
+
+              <!-- Opción: Abrir / Gestionar Proyectos -->
+              <button 
+                type="button"
+                (click)="showProjectsModal.set(true); closeDropdowns()"
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                <span class="material-icons text-sm text-amber-500 shrink-0">folder_open</span>
+                <div class="flex flex-col flex-1">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold">Abrir Proyectos</span>
+                    @if (cloudProjects().length > 0) {
+                      <span class="px-1 text-[9px] font-bold rounded-full bg-blue-500/20 text-blue-600">
+                        {{ cloudProjects().length }} en nube
+                      </span>
+                    }
+                  </div>
+                  <span class="text-[10px] text-slate-400">Nube Supabase y guardados locales</span>
+                </div>
+              </button>
+
+              <div [class]="themeService.isClassic() ? 'h-px bg-slate-100 my-0.5' : 'h-px bg-zinc-800 my-0.5'"></div>
+
+              <!-- Opción: Conmutador de Auto-guardado en Nube -->
+              <button 
+                type="button"
+                (click)="toggleAutoSync()"
+                [class]="themeService.isClassic() ? 'flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                <div class="flex items-center gap-2">
+                  <span class="material-icons text-sm text-sky-500 shrink-0">cloud_sync</span>
+                  <div class="flex flex-col">
+                    <span class="font-bold">Auto-Guardado</span>
+                    <span class="text-[10px] text-slate-400">Sincronización en la nube</span>
+                  </div>
+                </div>
+                <span 
+                  [class]="autoSyncEnabled() ? 'px-2 py-0.5 text-[9px] font-bold uppercase rounded-full bg-emerald-500/20 text-emerald-600 border border-emerald-500/30' : 'px-2 py-0.5 text-[9px] font-bold uppercase rounded-full bg-slate-200 text-slate-500'">
+                  {{ autoSyncEnabled() ? 'ON' : 'OFF' }}
+                </span>
+              </button>
+            </div>
+          }
+        </div>
+
+        <!-- MENÚ DESPLEGABLE: EXPORTAR (Plano 2D PDF, DXF CNC, Descargar JSON) -->
+        <div class="relative">
+          <button 
+            type="button"
+            (click)="toggleExportDropdown($event)"
+            [class]="themeService.isClassic() 
+              ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs' 
+              : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0'"
+            title="Menú de Exportaciones para Taller y Fábrica">
+            <span class="material-icons text-sm text-sky-500 shrink-0">file_download</span>
+            <span class="whitespace-nowrap">Exportar</span>
+            <span class="material-icons text-xs text-slate-400">expand_more</span>
+          </button>
+
+          @if (isExportDropdownOpen()) {
+            <div 
+              (click)="$event.stopPropagation()"
+              [class]="themeService.isClassic() 
+                ? 'absolute right-0 top-full mt-1.5 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 text-xs text-slate-700 animate-in fade-in-50 zoom-in-95' 
+                : 'absolute right-0 top-full mt-1.5 z-50 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 text-xs text-zinc-200 animate-in fade-in-50 zoom-in-95'">
+              
+              <!-- Plano 2D Técnico PDF -->
+              <button 
+                type="button"
+                (click)="openTechnicalSheet(); closeDropdowns()"
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                <span class="material-icons text-sm text-amber-500 shrink-0">architecture</span>
+                <div class="flex flex-col">
+                  <span class="font-bold">Plano 2D Técnico (PDF)</span>
+                  <span class="text-[10px] text-slate-400">Fichas acotadas para taller</span>
+                </div>
+              </button>
+
+              <!-- Exportar DXF CNC -->
+              <button 
+                type="button"
+                (click)="exportDxf(); closeDropdowns()"
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                <span class="material-icons text-sm text-cyan-500 shrink-0">download</span>
+                <div class="flex flex-col">
+                  <span class="font-bold">Exportar DXF CNC</span>
+                  <span class="text-[10px] text-slate-400">Capas vectoriales para mecanizado</span>
+                </div>
+              </button>
+
+              <!-- Descargar Copia JSON -->
+              <button 
+                type="button"
+                (click)="exportJson(); closeDropdowns()"
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                <span class="material-icons text-sm text-slate-500 shrink-0">code</span>
+                <div class="flex flex-col">
+                  <span class="font-bold">Copia JSON</span>
+                  <span class="text-[10px] text-slate-400">Respaldo completo editable</span>
+                </div>
+              </button>
+            </div>
+          }
+        </div>
+
+        <!-- Botón Directo Destacado: Guardar en la Nube con Supabase -->
         <button 
           type="button"
           (click)="saveCurrentToCloud()"
           [class]="syncStatus() === 'syncing' 
-            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-700/80 rounded-lg border border-blue-500/50 shadow-sm animate-pulse whitespace-nowrap shrink-0'
+            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-700/90 rounded-lg border border-blue-500/50 shadow-sm animate-pulse whitespace-nowrap shrink-0'
             : syncStatus() === 'table_needed'
-            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-amber-300 bg-amber-950/60 hover:bg-amber-900/80 rounded-lg border border-amber-600/50 shadow-sm transition whitespace-nowrap shrink-0'
-            : 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500 shadow-sm shadow-blue-900/20 transition whitespace-nowrap shrink-0'"
+            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-amber-300 bg-amber-950/70 hover:bg-amber-900/90 rounded-lg border border-amber-600/50 shadow-sm transition whitespace-nowrap shrink-0'
+            : 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500 shadow-sm transition whitespace-nowrap shrink-0'"
           title="Guardar proyecto en la base de datos de Supabase">
           @if (syncStatus() === 'syncing') {
             <span class="material-icons text-sm animate-spin shrink-0">sync</span>
@@ -151,66 +276,13 @@
           }
         </button>
 
-        <!-- Botón Nuevo -->
-        <button 
-          type="button"
-          (click)="openNewProjectModal()"
-          class="h-8.5 inline-flex items-center gap-1 px-2.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0"
-          title="Crear un nuevo proyecto en blanco">
-          <span class="material-icons text-sm text-emerald-400 shrink-0">add</span>
-          <span class="whitespace-nowrap">Nuevo</span>
-        </button>
-
-        <!-- Botón Proyectos -->
-        <button 
-          type="button"
-          (click)="showProjectsModal.set(true)"
-          class="h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0"
-          title="Gestionar proyectos en la nube o local">
-          <span class="material-icons text-sm text-amber-400 shrink-0">folder_open</span>
-          <span class="whitespace-nowrap">Proyectos</span>
-          @if (cloudProjects().length > 0) {
-            <span class="px-1 text-[10px] font-bold rounded-full bg-blue-500/30 text-blue-300 border border-blue-500/40">
-              {{ cloudProjects().length }}
-            </span>
-          }
-        </button>
-
-        <!-- Botón Exportar JSON -->
-        <button 
-          type="button"
-          (click)="exportJson()"
-          class="h-8.5 inline-flex items-center gap-1 px-2.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0"
-          title="Descargar copia del proyecto en archivo JSON">
-          <span class="material-icons text-sm text-cyan-400 shrink-0">file_download</span>
-          <span class="hidden 2xl:inline whitespace-nowrap">JSON</span>
-        </button>
-
-        <!-- Botón Plano 2D Técnico (PDF) -->
-        <button 
-          type="button"
-          (click)="openTechnicalSheet()"
-          class="h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-950 bg-amber-500 hover:bg-amber-400 rounded-lg shadow-sm transition whitespace-nowrap shrink-0"
-          title="Ver y descargar planos técnicos 2D acotados en PDF para taller">
-          <span class="material-icons text-sm shrink-0">architecture</span>
-          <span class="whitespace-nowrap">Plano 2D</span>
-        </button>
-
-        <!-- Botón Exportar DXF CNC -->
-        <button 
-          type="button"
-          (click)="exportDxf()"
-          class="h-8.5 inline-flex items-center gap-1 px-2.5 text-xs font-semibold text-cyan-300 bg-cyan-950/70 hover:bg-cyan-900/80 rounded-lg border border-cyan-500/40 transition whitespace-nowrap shrink-0"
-          title="Descargar archivo vectorial DXF por capas para CNC y seccionadoras">
-          <span class="material-icons text-sm text-cyan-400 shrink-0">download</span>
-          <span class="hidden xl:inline whitespace-nowrap">DXF CNC</span>
-        </button>
-
         <!-- Botón Configuración -->
         <button 
           type="button"
           (click)="openSettings()"
-          class="h-8.5 w-8.5 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg border border-transparent hover:border-zinc-700 transition shrink-0"
+          [class]="themeService.isClassic() 
+            ? 'h-8.5 w-8.5 inline-flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-lg border border-slate-300 transition shrink-0 shadow-xs' 
+            : 'h-8.5 w-8.5 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg border border-transparent hover:border-zinc-700 transition shrink-0'"
           title="Configuración de Sierra (Kerf), Refilado y Costos">
           <span class="material-icons text-base">settings</span>
         </button>

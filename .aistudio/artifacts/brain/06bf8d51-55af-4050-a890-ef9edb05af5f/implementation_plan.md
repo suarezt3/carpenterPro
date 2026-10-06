@@ -1,76 +1,141 @@
-# Plan de Implementación: Espesor Push/Pull, Cinta Métrica Dinámica, Clic Derecho y Tema SketchUp Classic Global
+# Optimización de Interfaz Compacta, Ajuste Responsivo y Cinta Métrica Magnética Persistente 3D
 
-Este plan aborda las cuatro solicitudes clave del usuario para perfeccionar la experiencia de modelado y diseño en MelamiPro Studio con calidad profesional de tipo SketchUp.
+Plan de implementación integral para eliminar los desbordamientos en la barra de herramientas superior y los paneles laterales en pantallas portátiles (resoluciones 1920x1080 con escalado DPI), e implementar el sistema de imán magnético con cotas 3D permanentes en la cinta métrica.
 
----
+### User Review & Critical Decisions
 
-## 1. Herramienta Empujar / Tirar (`Push/Pull`) en Espesor y Altura en Tiempo Real
-### Problema detectado
-Actualmente, al posarse sobre la cara superior de una pieza horizontal (`axis === 'y'`), el mapeo dimensional estaba erróneamente enlazado a `length` (longitud) en lugar de `thickness` (espesor). Como resultado, al arrastrar hacia arriba no engrosaba la pieza.
-
-### Solución propuesta
-- **Mapeo Dimensional Exacto por Normal de Cara**:
-  - Piezas Horizontales:
-    - Cara superior o inferior (Normal Y+, Y-): Modifica directamente el **espesor** (`thickness`) y la elevación (`posY`), de modo que al tirar hacia arriba la pieza se hace físicamente más gruesa en milímetros en tiempo real.
-    - Caras laterales (Normal X+, X-): Modifica el **largo** (`length`).
-    - Caras frontales/traseras (Normal Z+, Z-): Modifica el **ancho** (`width`).
-  - Piezas Verticales (Laterales YZ y Fondos XY):
-    - Cara superior (Normal Y+): Modifica la altura vertical (`length` o `width` según orientación).
-    - Caras planas frontal/posterior: Modifica el espesor (`thickness`).
-- **Previsualización de Extrusión Dinámica**:
-  - Al tirar de la cara, el recuadro resaltado de la cara sigue el nuevo grosor y el HUD muestra `Espesor: XX mm (+YY mm)` o `Altura: XX mm`.
-  - Mantiene contacto con el suelo o con la cara de apoyo para no flotar indebidamente.
+> [!IMPORTANT]
+> Confirmaciones de interacción validadas con el usuario:
+> - **Barra superior compacta**: Menús desplegables agrupados por contexto (Archivo/Proyecto, Exportaciones) y barra compacta con accesos directos principales para garantizar que nunca desborde ni requiera reducir el zoom del navegador en pantallas de 1920px con escalado.
+> - **Imán magnético inteligente (Snap 3D)**: Adhesión magnética automática con retroalimentación visual a vértices, esquinas y puntos medios de las aristas de todas las piezas del despiece.
+> - **Persistencia de cotas de medición**: Al finalizar una medida entre dos puntos, la cota permanece fija en el espacio 3D para permitir orbitar, rotar e inspeccionar libremente el modelo sin que se borre al hacer clic, eliminándose únicamente mediante el botón "Nueva Medida", "Borrar cota" o la tecla Esc.
 
 ---
 
-## 2. Cinta Métrica 3D (`Measure Tape`): Estiramiento Clic + Arrastre Dinámico
-### Problema detectado
-Actualmente la cinta métrica solo funcionaba con clics separados y al dar clic de nuevo se reiniciaba de inmediato perdiendo la medición.
+### 1. Overview & Core Concept
 
-### Solución propuesta
-- **Interacción Clic y Arrastrar (Click & Drag to Stretch)**:
-  - `PointerDown`: Fija el Punto A de inicio sobre cualquier arista o cara de la pieza/suelo.
-  - `PointerMove` continuo: Mientras se mantiene presionado el botón del ratón, se estira la cinta métrica en tiempo real con línea amarilla segmentada, flechas en los extremos y etiqueta flotante con la distancia milimétrica en vivo.
-  - `PointerUp`: Fija el Punto B final.
-- **Persistencia de la Medida**:
-  - La cota y línea trazada se mantienen fijas en el lienzo 3D para permitir inspección minuciosa.
-  - No se borra al interactuar con la cámara.
-  - Se añade un botón visible de "Nueva Medida" o tecla `Escape` para limpiar cuando el usuario lo desee.
+- **What It Does**: 
+  1. Reorganiza la barra superior (`header.html`) en una estructura modular con menús desplegables contextuales ("Proyecto" y "Exportar"), manteniendo accesos rápidos esenciales (Guardar en la nube, Tema Claro/Oscuro, Deshacer/Rehacer y Ajustes), adaptándose a cualquier ancho de pantalla sin provocar barras de scroll horizontal ni requerir zoom reducido.
+  2. Dota a la paleta CAD lateral izquierda del visor 3D de contención de altura (`max-h-[calc(100vh-8rem)]`, scroll suave y diseño ergonómico) para evitar que sus botones se corten verticalmente en pantallas de baja altura o ventanas no maximizadas.
+  3. Integra un algoritmo de imán magnético (*magnetic vertex & edge snapping*) en la herramienta de Cinta Métrica (`furniture-3d-viewer.ts`), que detecta esquinas y puntos medios a corta distancia del cursor proyectado con un indicador visual brillante.
+  4. Implementa el estado persistente de medición: la línea de cota con sus extremos y etiqueta milimétrica se queda congelada en las coordenadas globales 3D. El usuario puede orbitar con botón izquierdo o derecho del ratón para verificar la medida sin destruir los datos medidos.
+
+- **Target Audience / Persona**: Carpinteros, ebanistas, diseñadores de mobiliario y armadores de melamina que trabajan en talleres o sobre la marcha con portátiles de 14"–16" (1080p escalados al 125%–150%) y requieren precisión milimétrica al medir ensambles y luces entre piezas.
+
+- **Key Value**: Elimina la fricción visual y el desbordamiento de la pantalla, agiliza la navegación y permite verificar ensambles y cotas complejas sin pérdida de datos ni clics accidentales.
 
 ---
 
-## 3. Resolución del Conflicto de Clic Derecho (Menú Contextual vs. Panorámica de Cámara)
-### Problema detectado
-En `OrbitControls`, mantener presionado el clic derecho y arrastrar permite desplazar la cámara (Pan / Moverse). Al soltar el ratón tras mover la cámara, el navegador disparaba el evento `contextmenu`, abriendo el menú contextual de forma molesta.
+### 2. User Experience & Visual Design
 
-### Solución propuesta
-- **Detección de Arrastre vs. Clic Estático**:
-  - En `pointerdown`: Se registra la posición inicial `(clientX, clientY)` del clic derecho.
-  - En `pointermove`: Si el ratón se desplaza más de 6 píxeles mientras el botón derecho está presionado, se marca el estado `isRightDragPanning = true`.
-  - En `contextmenu`: Si `isRightDragPanning === true`, se cancela inmediatamente el evento con `e.preventDefault()` y NO se abre el menú.
-  - El menú contextual solo se desplegará cuando sea un clic derecho genuino y estático sobre una pieza o sobre el lienzo.
+- **Key User Flows**:
+  - *Navegación compacta en la barra superior*:
+    - **Zona 1 (Marca)**: Logotipo y nombre del proyecto sin elementos redundantes.
+    - **Zona 2 (Navegación central)**: Pestañas numeradas de trabajo (1. Diseñador 3D, 2. Despiece, 3. Optimizador 2D, 4. Presupuesto).
+    - **Zona 3 (Acciones y Desplegables)**:
+      - Menú *Proyecto* (Nuevo, Abrir proyectos guardados, Auto-guardado en la nube).
+      - Menú *Exportar* (Plano 2D PDF, DXF CNC, Descargar JSON).
+      - Acciones directas: Selector de Tema (Classic Claro / Oscuro), Deshacer / Rehacer, Guardar destacado en nube y Ajustes.
+  - *Inspección con Cinta Métrica Magnética*:
+    - Al activar la herramienta (o pulsar `T`), el cursor activa la detección de piezas. Al pasar a menos de 20 píxeles de una esquina o punto medio de arista, aparece un punto verde magnético con halo (*Snap Marker*) que atrae el origen de la medida.
+    - El usuario presiona y arrastra (o hace clic inicial y secundario). Al fijar el segundo punto, la cota 3D (líneas guía, ticks y etiqueta con milímetros exactos) se dibuja en el espacio tridimensional.
+    - El usuario puede rotar libremente el visor 3D, acercar el zoom y orbitar desde cualquier ángulo para verificar que la cota esté exactamente donde la necesita.
+    - En el visor aparece un panel flotante HUD con la medida fijada (ej. `Distancia: 564.0 mm`), con dos opciones directas: `[Nueva Medida]` (o pulsar `T` / clic en botón) y `[Borrar cota]` (o presionar `Esc`).
 
----
+- **Visual Identity & Theme**:
+  - Estilo SketchUp Classic compatible con modo oscuro mediante `ThemeService`.
+  - Desplegables limpios con fondo blanco/zinc, bordes finos `border-slate-200` / `border-zinc-800` y sombras suaves.
+  - Marcador de imán en color esmeralda/ámbar de alto contraste sobre piezas de madera y melamina con `billboard` para que siempre mire a la cámara.
 
-## 4. Unificación de Estilo Visual SketchUp Classic (Blanco y Gris Perla) en Todas las Secciones
-### Problema detectado
-Las pestañas de **Despiece**, **Optimizador 2D**, **Presupuesto** y el encabezado principal aún conservaban el fondo negro oscuro (`bg-zinc-950`), lo que rompía la coherencia visual con el nuevo modelador 3D.
-
-### Solución propuesta
-- **Sincronización de Tema Global**:
-  - Crear un estado reactivo global de tema (`isWhiteTheme` / `currentTheme: 'light' | 'dark'`) accesible en toda la app.
-  - Por defecto: **Estilo SketchUp Classic** (Fondo blanco y gris perla, acentos neutros y tipografía nítida).
-  - Incluir selector de alternancia rápida (Sol/Luna) en el encabezado superior para quienes deseen alternar entre tema claro y oscuro.
-- **Rediseño de Componentes Clave**:
-  - **Encabezado (`Header`)**: Barra limpia blanca/gris perla, pestañas en botones sutiles estilo CAD, textos contrastados.
-  - **Despiece (`PartsList`)**: Tarjetas de resumen en blanco/gris perla, tabla de piezas con cabeceras claras, indicadores de tapacanto limpios.
-  - **Optimizador 2D (`CutOptimizer`)**: Tableros de corte 2D sobre lienzo perla claro, tarjetas de estadísticas limpias y controles sin estridencias.
-  - **Presupuesto (`BudgetView`)**: Formato de cotización profesional en papel/perla, tablas de costos claras y exportación impecable.
+- **Interactive Feedback & Motion**:
+  - Animación suave de apertura de menús desplegables (`animate-in fade-in-50 zoom-in-95 duration-100`).
+  - Indicador visual magnético con pulso sutil cuando se adhiere a una esquina.
+  - Cierre automático de desplegables al hacer clic fuera o presionar `Esc`.
 
 ---
 
-## Plan de Verificación
-1. **Prueba de Espesor 3D**: Activar `Empujar / Tirar` (tecla `P`), posarse sobre la cara superior de un módulo o base y arrastrar hacia arriba; verificar que el espesor/altura aumente visiblemente y se actualice en la lista de piezas.
-2. **Prueba de Cinta Métrica**: Activar cinta métrica (`T`), hacer clic y arrastrar hasta otra esquina; verificar que la línea y la medida se estiren en tiempo real y queden fijas al soltar.
-3. **Prueba de Clic Derecho**: Mantener clic derecho presionado y mover el ratón para desplazar la cámara; verificar que al soltar NO se abra el menú contextual. Hacer un clic derecho corto sobre una pieza y verificar que SÍ se abra el menú contextual.
-4. **Prueba de Tema Global**: Navegar entre Diseñador 3D, Despiece, Optimizador 2D y Presupuesto; comprobar que todas las vistas compartan el estilo blanco/gris perla uniforme y que el alternador de tema funcione fluidamente.
+### 3. Key Product Decisions & Trade-Offs
+
+- **Decisión 1: Reagrupación de botones en menús desplegables vs barra de 2 filas**:
+  - *Enfoque elegido*: Desplegables contextuales ("Proyecto" y "Exportar").
+  - *Razón*: Mantiene la altura de la cabecera en una sola fila compacta (56px) para no restar área útil al visor 3D y canvas WebGL, cumpliendo la regla de altura máxima y evitando que el usuario deba modificar el zoom del navegador en pantallas de 1920px escaladas.
+  - *Alternativa descartada*: Barra de dos filas fijas restaría más de 100px verticales al área de trabajo de modelado 3D.
+
+- **Decisión 2: Persistencia de cota 3D con retención durante la órbita**:
+  - *Enfoque elegido*: Mantener la cota fijada en el grafo de escena (`THREE.Group`) como objeto estático independiente del control de órbita (`OrbitControls`).
+  - *Razón*: En los programas CAD profesionales (como SketchUp y AutoCAD), al trazar una línea de cota temporal o guía, el usuario orbita alrededor para inspeccionar el ensamble; reiniciar la medición con cualquier clic frustraba la verificación.
+  - *Alternativa descartada*: Permitir que cualquier clic en el canvas reinicie la medida provocaba la pérdida inmediata de la cota al intentar rotar la cámara.
+
+- **Decisión 3: Cálculo del imán (Snap) sobre bounding box y geometría real de piezas**:
+  - *Enfoque elegido*: Precomputar los 8 vértices de las cajas orientadas de cada pieza visible y los 12 puntos medios de sus aristas proyectados en coordenadas de pantalla.
+  - *Razón*: Extremadamente veloz (0.1ms por cuadro), predecible para piezas rectangulares de carpintería y sin sobrecargar la GPU.
+
+---
+
+### 4. Technical Architecture & Data Strategy *(Technical Reference)*
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                               HEADER COMPONENT                         │
+│  [Logo / Brand] ─── [Pestañas de Navegación 1..4] ─── [Zona Acciones]  │
+│                                                          │             │
+│                                ┌─────────────────────────┴──────────┐  │
+│                                │ Menú Proyecto: Nuevo, Abrir, Auto  │  │
+│                                │ Menú Exportar: PDF 2D, DXF, JSON   │  │
+│                                │ Botón Guardar en Nube (destacado)  │  │
+│                                │ Tema Claro/Oscuro & Deshacer/Rehacer│ │
+│                                └────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                     FURNITURE 3D VIEWER (Three.js)                     │
+│                                                                        │
+│  ┌─────────────────────────┐               ┌────────────────────────┐  │
+│  │ Paleta Lateral CAD      │               │ Canvas WebGL           │  │
+│  │ max-h-[calc(100vh-8rem)]│               │                        │  │
+│  │ Herramientas + Vistas   │               │  ┌──────────────────┐  │  │
+│  │ Scroll contenido        │               │  │ Mueble 3D / Piezas│ │  │
+│  └─────────────────────────┘               │  └────────┬─────────┘  │  │
+│                                                        │               │
+│                                             [Raycast & Snap Engine]    │
+│                                                        │               │
+│                                                        ▼               │
+│                                            ┌───────────────────────┐   │
+│                                            │ Snap Points:          │   │
+│                                            │ • 8 Vértices (Esquinas│   │
+│                                            │ • 12 Puntos Medios    │   │
+│                                            └───────────┬───────────┘   │
+│                                                        │               │
+│                                                        ▼               │
+│                                            ┌───────────────────────┐   │
+│                                            │ Cota Persistente:     │   │
+│                                            │ • Línea 3D con Ticks  │   │
+│                                            │ • Etiqueta milimétrica │  │
+│                                            │ • Orbitación libre    │   │
+│                                            │ • HUD: Nueva / Borrar │   │
+│                                            └───────────────────────┘   │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Plan de Modificaciones de Código:
+
+1. **`src/app/components/header/header.ts` & `header.html`**:
+   - Crear estados de señal para los menús desplegables (`isProjectMenuOpen = signal(false)`, `isExportMenuOpen = signal(false)`).
+   - Implementar directiva/oyente de cierre al hacer clic fuera o presionar `Esc`.
+   - Reagrupar acciones secundarias en desplegables contextuales limpios y compactos.
+   - Ajustar el ancho máximo de la barra y botones a clase de altura compacta con contención `overflow-hidden` responsiva.
+
+2. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.html`**:
+   - Añadir `max-h-[calc(100vh-8rem)] overflow-y-auto scrollbar-none` a la paleta CAD lateral izquierda (`div.absolute.top-3.left-3`).
+   - Integrar tarjeta flotante HUD de Cota Persistente en el visor con distancia en mm, botón "Nueva Medida" y botón "Borrar Cota".
+
+3. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts`**:
+   - Implementar método `findMagneticSnapPoint(screenX, screenY)` que evalúa los vértices y puntos medios de las piezas más cercanas dentro de un radio umbral (18 píxeles en pantalla).
+   - Crear malla/sprite de Three.js para el marcador de imán (*Snap Indicator* verde esmeralda brillante).
+   - En `onPointerDown` con la herramienta `measure`:
+     - Si ya hay una cota fijada y el usuario hace clic o arrastra para rotar la cámara (`OrbitControls`), la cota NO se borra.
+     - Si el usuario pulsa "Nueva Medida" o arrastra con la intención de medir, se inicia una nueva captura.
+   - En `onPointerUp`:
+     - Al fijar el segundo punto, establecer `isMeasurementPersistent = true`.
+     - Dejar los gráficos 3D (línea de cota, extremos y etiqueta HTML/Sprite) renderizándose continuamente en el bucle `animate()`.
+   - Añadir escucha de teclado `Escape` para resetear la medición activa o cota fijada.

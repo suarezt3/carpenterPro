@@ -122,8 +122,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   // 3D Measurement Tape / Ruler tool
   readonly isMeasureMode = signal<boolean>(false);
+  readonly isMeasurementPersistent = signal<boolean>(false);
   readonly measurePointA = signal<{ x: number; y: number; z: number } | null>(null);
   readonly measurePointB = signal<{ x: number; y: number; z: number } | null>(null);
+  readonly hasActiveMeasurement = computed(() => !!this.measurePointA() && !!this.measurePointB());
   readonly measureDistance = computed(() => {
     const a = this.measurePointA();
     const b = this.measurePointB();
@@ -175,6 +177,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private dimensionGroup = new THREE.Group();
   private gizmoGroup = new THREE.Group();
   private measureGroup = new THREE.Group();
+  private magneticSnapGroup = new THREE.Group();
   private drillGroup = new THREE.Group();
   private pushPullHighlightGroup = new THREE.Group();
   private gridHelper: THREE.GridHelper | null = null;
@@ -294,6 +297,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.dimensionGroup);
     this.scene.add(this.gizmoGroup);
     this.scene.add(this.measureGroup);
+    this.scene.add(this.magneticSnapGroup);
     this.scene.add(this.drillGroup);
     this.scene.add(this.pushPullHighlightGroup);
     this.scene.add(this.rectPreviewGroup);
@@ -817,6 +821,182 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     group.renderOrder = 999;
     this.gizmoGroup.add(group);
+  }
+
+  // --- MAGNETIC SNAP ENGINE (IMÁN 3D PARA CINTA MÉTRICA) ---
+
+  // Generates 8 Corner Vertices and 12 Edge Midpoints for any given part
+  private getPartSnapPoints(part: Part): { pos: THREE.Vector3; type: 'corner' | 'midpoint'; partName: string }[] {
+    const b = this.getPartBounds(part);
+    const px = b.px;
+    const py = b.py;
+    const pz = b.pz;
+    const hx = b.sx / 2;
+    const hy = b.sy / 2;
+    const hz = b.sz / 2;
+
+    const points: { pos: THREE.Vector3; type: 'corner' | 'midpoint'; partName: string }[] = [];
+
+    // 8 Corner Vertices (Esquinas)
+    for (const dx of [-hx, hx]) {
+      for (const dy of [-hy, hy]) {
+        for (const dz of [-hz, hz]) {
+          points.push({
+            pos: new THREE.Vector3(px + dx, py + dy, pz + dz),
+            type: 'corner',
+            partName: part.name
+          });
+        }
+      }
+    }
+
+    // 12 Edge Midpoints (Puntos medios de aristas)
+    // 4 edges parallel to X
+    for (const dy of [-hy, hy]) {
+      for (const dz of [-hz, hz]) {
+        points.push({
+          pos: new THREE.Vector3(px, py + dy, pz + dz),
+          type: 'midpoint',
+          partName: part.name
+        });
+      }
+    }
+    // 4 edges parallel to Y
+    for (const dx of [-hx, hx]) {
+      for (const dz of [-hz, hz]) {
+        points.push({
+          pos: new THREE.Vector3(px + dx, py, pz + dz),
+          type: 'midpoint',
+          partName: part.name
+        });
+      }
+    }
+    // 4 edges parallel to Z
+    for (const dx of [-hx, hx]) {
+      for (const dy of [-hy, hy]) {
+        points.push({
+          pos: new THREE.Vector3(px + dx, py + dy, pz),
+          type: 'midpoint',
+          partName: part.name
+        });
+      }
+    }
+
+    return points;
+  }
+
+  // Finds nearest vertex corner or edge midpoint to projected screen mouse position
+  private findMagneticSnapCandidate(
+    screenX: number,
+    screenY: number,
+    thresholdPx = 24
+  ): { worldPos: THREE.Vector3; type: 'corner' | 'midpoint'; partName: string } | null {
+    if (!this.camera || !this.canvasRef()?.nativeElement) return null;
+    const canvas = this.canvasRef()!.nativeElement;
+    const rect = canvas.getBoundingClientRect();
+    const visibleParts = this.parts().filter(p => !this.hiddenPartIds().has(p.id));
+
+    let bestCandidate: { worldPos: THREE.Vector3; type: 'corner' | 'midpoint'; partName: string } | null = null;
+    let minDistance = thresholdPx;
+    const tempV = new THREE.Vector3();
+
+    for (const part of visibleParts) {
+      const snapPoints = this.getPartSnapPoints(part);
+      for (const sp of snapPoints) {
+        tempV.copy(sp.pos).project(this.camera);
+        if (tempV.z > 1) continue; // Behind camera
+
+        const pX = ((tempV.x + 1) / 2) * rect.width + rect.left;
+        const pY = ((-tempV.y + 1) / 2) * rect.height + rect.top;
+
+        const dist = Math.hypot(pX - screenX, pY - screenY);
+        // Corners get a slight distance attraction bonus (0.85x)
+        const effectiveDist = sp.type === 'corner' ? dist * 0.85 : dist;
+        if (effectiveDist < minDistance) {
+          minDistance = effectiveDist;
+          bestCandidate = {
+            worldPos: sp.pos.clone(),
+            type: sp.type,
+            partName: sp.partName
+          };
+        }
+      }
+    }
+
+    return bestCandidate;
+  }
+
+  // Renders glowing Emerald 3D magnetic snapping indicator on hovered vertex or edge midpoint
+  private updateMagneticSnapIndicator(
+    candidate: { worldPos: THREE.Vector3; type: 'corner' | 'midpoint'; partName: string } | null
+  ) {
+    while (this.magneticSnapGroup.children.length > 0) {
+      const obj = this.magneticSnapGroup.children[0];
+      this.magneticSnapGroup.remove(obj);
+    }
+
+    if (!candidate) return;
+
+    this.magneticSnapGroup.position.copy(candidate.worldPos);
+
+    // 1. Center Sphere (Emerald dot)
+    const dotGeo = new THREE.SphereGeometry(6, 12, 12);
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0x10b981, depthTest: false });
+    const dot = new THREE.Mesh(dotGeo, dotMat);
+    this.magneticSnapGroup.add(dot);
+
+    // 2. High-visibility Ring
+    const ringGeo = new THREE.RingGeometry(10, 14, 20);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: candidate.type === 'corner' ? 0x10b981 : 0xf59e0b,
+      side: THREE.DoubleSide,
+      depthTest: false,
+      transparent: true,
+      opacity: 0.95
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.quaternion.copy(this.camera.quaternion); // Billboard to face camera
+    this.magneticSnapGroup.add(ring);
+
+    // 3. Mini Label Sprite
+    const labelText = candidate.type === 'corner' ? 'Esquina (Imán)' : 'Punto medio (Imán)';
+    const canvas = document.createElement('canvas');
+    canvas.width = 240;
+    canvas.height = 60;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.beginPath();
+      ctx.roundRect(0, 0, 240, 60, 12);
+      ctx.fill();
+      ctx.strokeStyle = candidate.type === 'corner' ? '#10b981' : '#f59e0b';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labelText, 120, 30);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.position.set(0, 28, 0);
+    sprite.scale.set(70, 20, 1);
+    this.magneticSnapGroup.add(sprite);
+  }
+
+  // Start a fresh measurement without resetting tool
+  startNewMeasurement() {
+    this.isMeasurementPersistent.set(false);
+    this.measurePointA.set(null);
+    this.measurePointB.set(null);
+    while (this.measureGroup.children.length > 0) {
+      const obj = this.measureGroup.children[0];
+      this.measureGroup.remove(obj);
+    }
+    this.updateMagneticSnapIndicator(null);
   }
 
   // Render Interactive 3D Measurement Visuals (Point A, Point B, Guide Lines & Dimensions)
@@ -1465,21 +1645,41 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     // 0. Measurement Tape drag mode (Point A -> Clic y arrastrar para estirar y soltar para fijar la cota)
     if (this.isMeasureMode()) {
-      const measureIntersects = this.raycaster.intersectObjects(
-        [...this.pieceObjects.map(p => p.mesh), ...(this.floorMesh ? [this.floorMesh] : [])],
-        true
-      );
-      if (measureIntersects.length > 0) {
-        const pt = measureIntersects[0].point;
-        const snapPt = {
-          x: Math.round(pt.x),
-          y: Math.max(0, Math.round(pt.y)),
-          z: Math.round(pt.z)
-        };
+      // If a measurement is already persistent and the user clicks/drags to orbit/inspect,
+      // DO NOT clear or restart the measurement! Let OrbitControls handle it!
+      if (this.isMeasurementPersistent()) {
+        return;
+      }
 
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY);
+      let snapPt: { x: number; y: number; z: number } | null = null;
+
+      if (snapCand) {
+        snapPt = {
+          x: Math.round(snapCand.worldPos.x),
+          y: Math.max(0, Math.round(snapCand.worldPos.y)),
+          z: Math.round(snapCand.worldPos.z)
+        };
+      } else {
+        const measureIntersects = this.raycaster.intersectObjects(
+          [...this.pieceObjects.map(p => p.mesh), ...(this.floorMesh ? [this.floorMesh] : [])],
+          true
+        );
+        if (measureIntersects.length > 0) {
+          const pt = measureIntersects[0].point;
+          snapPt = {
+            x: Math.round(pt.x),
+            y: Math.max(0, Math.round(pt.y)),
+            z: Math.round(pt.z)
+          };
+        }
+      }
+
+      if (snapPt) {
         this.measurePointA.set(snapPt);
         this.measurePointB.set(snapPt);
         this.isMeasuringDrag = true;
+        this.isMeasurementPersistent.set(false);
         this.controls.enabled = false;
         this.renderMeasurementVisuals();
         e.preventDefault();
@@ -1760,38 +1960,51 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
-    // 0.05. Measurement Tape Live Dragging
-    if (this.isMeasuringDrag && this.measurePointA()) {
-      const rect = canvas.getBoundingClientRect();
-      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      this.raycaster.setFromCamera(this.mouse, this.camera);
+    // 0.05. Measurement Tape Live Dragging & Magnetic Snapping
+    if (this.isMeasureMode()) {
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY);
+      this.updateMagneticSnapIndicator(snapCand);
 
-      const measureIntersects = this.raycaster.intersectObjects(
-        [...this.pieceObjects.map(p => p.mesh), ...(this.floorMesh ? [this.floorMesh] : [])],
-        true
-      );
-      if (measureIntersects.length > 0) {
-        const pt = measureIntersects[0].point;
-        this.measurePointB.set({
-          x: Math.round(pt.x),
-          y: Math.max(0, Math.round(pt.y)),
-          z: Math.round(pt.z)
-        });
-      } else {
-        const ptA = this.measurePointA()!;
-        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -ptA.y);
-        const intersectPt = new THREE.Vector3();
-        if (this.raycaster.ray.intersectPlane(plane, intersectPt)) {
+      if (this.isMeasuringDrag && this.measurePointA()) {
+        if (snapCand) {
           this.measurePointB.set({
-            x: Math.round(intersectPt.x),
-            y: Math.max(0, Math.round(intersectPt.y)),
-            z: Math.round(intersectPt.z)
+            x: Math.round(snapCand.worldPos.x),
+            y: Math.max(0, Math.round(snapCand.worldPos.y)),
+            z: Math.round(snapCand.worldPos.z)
           });
+        } else {
+          const rect = canvas.getBoundingClientRect();
+          this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+          this.raycaster.setFromCamera(this.mouse, this.camera);
+
+          const measureIntersects = this.raycaster.intersectObjects(
+            [...this.pieceObjects.map(p => p.mesh), ...(this.floorMesh ? [this.floorMesh] : [])],
+            true
+          );
+          if (measureIntersects.length > 0) {
+            const pt = measureIntersects[0].point;
+            this.measurePointB.set({
+              x: Math.round(pt.x),
+              y: Math.max(0, Math.round(pt.y)),
+              z: Math.round(pt.z)
+            });
+          } else {
+            const ptA = this.measurePointA()!;
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -ptA.y);
+            const intersectPt = new THREE.Vector3();
+            if (this.raycaster.ray.intersectPlane(plane, intersectPt)) {
+              this.measurePointB.set({
+                x: Math.round(intersectPt.x),
+                y: Math.max(0, Math.round(intersectPt.y)),
+                z: Math.round(intersectPt.z)
+              });
+            }
+          }
         }
+        this.renderMeasurementVisuals();
+        return;
       }
-      this.renderMeasurementVisuals();
-      return;
     }
 
     // 0.1. Draw 3D Rectangle Live Preview
@@ -2071,7 +2284,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.controls.enabled = true;
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) canvas.style.cursor = 'default';
+
+      const a = this.measurePointA();
+      const b = this.measurePointB();
+      if (a && b) {
+        const dist = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+        if (dist >= 4) {
+          // Measurement is complete and permanent in 3D scene!
+          this.isMeasurementPersistent.set(true);
+        }
+      }
       this.renderMeasurementVisuals();
+      this.updateMagneticSnapIndicator(null);
       return;
     }
 
@@ -2580,12 +2804,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
   }
 
   clearMeasure() {
+    this.isMeasurementPersistent.set(false);
     this.measurePointA.set(null);
     this.measurePointB.set(null);
     while (this.measureGroup.children.length > 0) {
       const obj = this.measureGroup.children[0];
       this.measureGroup.remove(obj);
     }
+    this.updateMagneticSnapIndicator(null);
   }
 
   nudgePart(axis: 'x' | 'y' | 'z', delta: number) {

@@ -6,8 +6,8 @@
   <!-- 3D WebGL Canvas -->
   <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
 
-  <!-- SKETCHUP-STYLE LEFT VERTICAL CAD PALETTE -->
-  <div class="absolute top-3 left-3 z-30 flex flex-col gap-1 bg-white/95 text-slate-700 backdrop-blur-md p-1 rounded-2xl border border-slate-200/90 shadow-xl pointer-events-auto transition-colors duration-200">
+  <!-- SKETCHUP-STYLE LEFT VERTICAL CAD PALETTE (ANTI-OVERFLOW ON LAPTOPS) -->
+  <div class="absolute top-3 left-3 z-30 flex flex-col gap-1 bg-white/95 text-slate-700 backdrop-blur-md p-1 rounded-2xl border border-slate-200/90 shadow-xl pointer-events-auto transition-colors duration-200 max-h-[calc(100%-1.5rem)] overflow-y-auto scrollbar-none">
     
     <!-- 1. SELECT TOOL -->
     <button 
@@ -282,50 +282,76 @@
     </div>
   }
 
-  <!-- 3D MEASUREMENT TAPE ACTIVE HUD -->
+  <!-- 3D MEASUREMENT TAPE ACTIVE HUD (IMÁN Y COTAS PERSISTENTES) -->
   @if (isMeasureMode()) {
-    <div class="absolute top-12 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 max-w-md w-[90%] animate-in fade-in zoom-in-95 duration-150">
-      <div class="bg-white/95 text-slate-800 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-slate-200 shadow-xl flex flex-col gap-2 w-full">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
-          <div class="flex items-center gap-1.5">
-            <span class="material-icons text-amber-500 text-sm">straighten</span>
-            <span class="text-xs font-bold tracking-wide uppercase text-slate-800">Cinta Métrica 3D</span>
-          </div>
+    <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-1.5 max-w-lg w-[95%] sm:w-auto animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-white/95 text-slate-800 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-slate-200 shadow-xl flex flex-col gap-2 w-full min-w-[320px]">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-1.5 gap-3">
           <div class="flex items-center gap-2">
-            @if (measurePointA()) {
+            <span class="material-icons text-amber-500 text-base">straighten</span>
+            <span class="text-xs font-bold tracking-wide uppercase text-slate-800">Cinta Métrica 3D</span>
+            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Imán inteligente
+            </span>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            @if (hasActiveMeasurement()) {
+              <button 
+                type="button" 
+                (click)="startNewMeasurement()"
+                class="px-2 py-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg transition font-bold flex items-center gap-1"
+                title="Comenzar una nueva medición">
+                <span class="material-icons text-xs">add</span>
+                <span>Nueva Medida</span>
+              </button>
               <button 
                 type="button" 
                 (click)="clearMeasure()"
-                class="px-2 py-0.5 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition font-medium">
-                Nueva Medida
+                class="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition font-medium flex items-center gap-1"
+                title="Eliminar cota actual">
+                <span class="material-icons text-xs">delete_outline</span>
+                <span>Borrar cota</span>
               </button>
             }
             <button 
               type="button" 
               (click)="setActiveTool('select')"
-              class="text-slate-400 hover:text-slate-700"
+              class="text-slate-400 hover:text-slate-700 p-0.5 rounded-lg"
               title="Cerrar cinta métrica">
               <span class="material-icons text-sm">close</span>
             </button>
           </div>
         </div>
 
-        @if (!measurePointA()) {
-          <p class="text-xs text-amber-600 font-medium flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-            Haz clic y arrastra desde cualquier punto o pieza para estirar la cinta. Suelta para fijar la cota.
+        @if (!hasActiveMeasurement()) {
+          <p class="text-xs text-slate-600 font-medium flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0"></span>
+            <span>Haz clic y arrastra entre dos puntos. El <strong>imán</strong> se adhiere automáticamente a esquinas y puntos medios de las piezas.</span>
           </p>
         } @else if (measureDistance(); as dist) {
-          <div class="flex items-center justify-between gap-3 bg-slate-50 p-2 rounded-xl border border-slate-100">
-            <div class="flex flex-col">
-              <span class="text-[10px] uppercase font-bold text-slate-400">Distancia Directa</span>
-              <span class="text-base font-black text-amber-600 font-mono">{{ dist.total }} mm</span>
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center justify-between gap-4 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+              <div class="flex flex-col">
+                <span class="text-[10px] uppercase font-bold text-amber-800/80">Distancia 3D</span>
+                <span class="text-lg font-black text-amber-700 font-mono">{{ dist.total }} mm</span>
+              </div>
+              <div class="flex items-center gap-2.5 text-xs font-mono text-slate-700 bg-white/80 px-2.5 py-1.5 rounded-lg border border-amber-200/60 shadow-2xs">
+                <span>ΔX: <strong class="text-rose-600">{{ dist.dx }}</strong></span>
+                <span>·</span>
+                <span>ΔY: <strong class="text-emerald-600">{{ dist.dy }}</strong></span>
+                <span>·</span>
+                <span>ΔZ: <strong class="text-sky-600">{{ dist.dz }}</strong></span>
+              </div>
             </div>
-            <div class="flex items-center gap-2 text-[11px] font-mono text-slate-600">
-              <span>ΔX: <strong>{{ dist.dx }}</strong></span>
-              <span>ΔY: <strong>{{ dist.dy }}</strong></span>
-              <span>ΔZ: <strong>{{ dist.dz }}</strong></span>
-            </div>
+
+            @if (isMeasurementPersistent()) {
+              <p class="text-[11px] text-emerald-700 font-medium flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200/60">
+                <span class="material-icons text-xs text-emerald-600">check_circle</span>
+                <span>Cota fija en 3D: Puedes rotar, orbitar e inspeccionar el modelo libremente sin que se borre.</span>
+              </p>
+            }
           </div>
         }
       </div>
