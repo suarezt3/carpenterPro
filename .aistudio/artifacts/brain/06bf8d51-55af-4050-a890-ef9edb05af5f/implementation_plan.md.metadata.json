@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de rediseño de interfaz y experiencia de usuario estilo SketchUp: unificación del área de trabajo eliminando barras duplicadas y exceso de tonos oscuros, barra de herramientas vertical izquierda profesional (Seleccionar, Empujar/Tirar Push-Pull, Mover, Medir, Añadir pieza), bandeja lateral derecha colapsable para dejar el 100% del lienzo limpio, preservación del cuadrito de micro-ajuste de zoom, y nueva herramienta interactiva 3D Empujar/Tirar (Push/Pull) para estirar placas directamente arrastrando sus caras.",
-  "updatedAt":  "2026-10-06T02:04:28.741200839Z",
+  "summary":  "Plan de arquitectura y diseño para implementar las herramientas avanzadas de SketchUp:\n1) Herramienta Dibujar Rectángulo 3D en el lienzo y caras.\n2) Herramienta Rotar 3D con transportador de ángulos.\n3) Menú contextual interactivo de clic derecho (duplicar, rotar 90°, alinear al suelo/centrar, aislar/ocultar, tapacantos y agrupar).\n4) Rediseño total de la bandeja lateral derecha a estética SketchUp Classic (fondo blanco/gris perla, eliminación de tonos fluorescentes confusos y tarjetas limpias).\n5) Refinamiento visual del cursor y trama punteada de Empujar/Tirar (Push/Pull) idéntica a SketchUp.",
+  "updatedAt":  "2026-10-06T02:32:02.845621010Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

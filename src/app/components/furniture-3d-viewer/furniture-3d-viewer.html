@@ -1,5 +1,6 @@
 <div #container3d 
   [class]="isWhiteTheme() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950 border-zinc-800'"
+  (contextmenu)="onContextMenu($event)"
   class="relative w-full h-full min-h-[420px] rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-200">
 
   <!-- 3D WebGL Canvas -->
@@ -39,7 +40,27 @@
       <span class="material-icons text-lg">open_with</span>
     </button>
 
-    <!-- 4. MEASURE TAPE TOOL -->
+    <!-- 4. ROTATE 90° (TRANSPORTADOR CAD) TOOL -->
+    <button 
+      type="button"
+      (click)="setActiveTool('rotate_90')"
+      [class]="activeTool() === 'rotate_90' ? 'bg-amber-500 text-white font-bold shadow-md shadow-amber-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Rotar 90° (Q): Haz clic en cualquier pieza para girarla 90 grados con transportador">
+      <span class="material-icons text-lg">rotate_right</span>
+    </button>
+
+    <!-- 5. DRAW 3D RECTANGLE TOOL -->
+    <button 
+      type="button"
+      (click)="setActiveTool('draw_rect')"
+      [class]="activeTool() === 'draw_rect' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Dibujar Rectángulo 3D (R): Dibuja un rectángulo en el suelo o sobre una cara para crear una pieza y luego usar Empujar/Tirar">
+      <span class="material-icons text-lg">crop_square</span>
+    </button>
+
+    <!-- 6. MEASURE TAPE TOOL -->
     <button 
       type="button"
       (click)="setActiveTool('measure')"
@@ -51,7 +72,7 @@
 
     <div class="w-6 h-px bg-slate-200 mx-auto my-0.5"></div>
 
-    <!-- 5. CAMERA PRESETS POPOVER -->
+    <!-- 7. CAMERA PRESETS POPOVER -->
     <div class="relative">
       <button 
         type="button"
@@ -83,7 +104,7 @@
       }
     </div>
 
-    <!-- 6. DRILL HOLES (MECANIZADOS) TOGGLE -->
+    <!-- 8. DRILL HOLES (MECANIZADOS) TOGGLE -->
     <button 
       type="button"
       (click)="toggleDrillHoles()"
@@ -93,7 +114,7 @@
       <span class="material-icons text-lg">adjust</span>
     </button>
 
-    <!-- 7. COTAS 3D -->
+    <!-- 9. COTAS 3D -->
     <button 
       type="button"
       (click)="toggleDimensions()"
@@ -103,7 +124,7 @@
       <span class="material-icons text-lg">straighten</span>
     </button>
 
-    <!-- 8. LUZ LIBRE -->
+    <!-- 10. LUZ LIBRE -->
     <button 
       type="button"
       (click)="toggleClearances()"
@@ -113,7 +134,7 @@
       <span class="material-icons text-lg">unfold_more</span>
     </button>
 
-    <!-- 9. RAYOS X -->
+    <!-- 11. RAYOS X -->
     <button 
       type="button"
       (click)="toggleXRay()"
@@ -123,7 +144,7 @@
       <span class="material-icons text-lg">visibility</span>
     </button>
 
-    <!-- 10. DESPIECE EXPLOSIONADO FLYOUT -->
+    <!-- 12. DESPIECE EXPLOSIONADO FLYOUT -->
     <div class="relative">
       <button 
         type="button"
@@ -158,7 +179,7 @@
 
     <div class="w-6 h-px bg-slate-200 mx-auto my-0.5"></div>
 
-    <!-- 11. THEME TOGGLE (STUDIO LIGHT / CAD DARK) -->
+    <!-- 13. THEME TOGGLE (STUDIO LIGHT / CAD DARK) -->
     <button 
       type="button"
       (click)="toggleTheme()"
@@ -167,7 +188,7 @@
       <span class="material-icons text-lg">{{ isWhiteTheme() ? 'wb_sunny' : 'nightlight' }}</span>
     </button>
 
-    <!-- 12. RESET CAMERA -->
+    <!-- 14. RESET CAMERA -->
     <button 
       type="button"
       (click)="resetCamera()"
@@ -209,6 +230,22 @@
     </div>
   }
 
+  <!-- HIDDEN PIECES BANNER -->
+  @if (hiddenPartIds().size > 0) {
+    <div class="absolute top-12 left-16 z-20 pointer-events-auto animate-in fade-in duration-150">
+      <div class="flex items-center gap-2 bg-amber-500/95 text-white backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md text-xs font-semibold">
+        <span class="material-icons text-sm">visibility_off</span>
+        <span>{{ hiddenPartIds().size }} pieza(s) oculta(s)</span>
+        <button 
+          type="button" 
+          (click)="showAllParts()" 
+          class="underline hover:text-amber-100 ml-1.5 font-bold">
+          Mostrar Todas
+        </button>
+      </div>
+    </div>
+  }
+
   <!-- PUSH/PULL LIVE DELTA FLOATING BADGE -->
   @if (pushPullDelta(); as pp) {
     <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-in zoom-in-95 duration-100">
@@ -217,6 +254,19 @@
         <span>{{ pp.axisName }}: {{ pp.currentVal }} mm</span>
         <span class="px-1.5 py-0.2 bg-white/20 rounded-full text-[11px]">
           {{ pp.delta >= 0 ? '+' : '' }}{{ pp.delta }} mm
+        </span>
+      </div>
+    </div>
+  }
+
+  <!-- DRAW RECTANGLE LIVE FLOATING BADGE -->
+  @if (isDrawingRect() && rectDrawDims(); as rd) {
+    <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-in zoom-in-95 duration-100">
+      <div class="flex items-center gap-2 bg-sky-600 text-white px-3.5 py-1.5 rounded-full shadow-lg font-bold text-xs font-mono">
+        <span class="material-icons text-sm">crop_square</span>
+        <span>Rectángulo: {{ rd.length }} × {{ rd.width }} mm</span>
+        <span class="px-1.5 py-0.2 bg-white/20 rounded-full text-[10px]">
+          Espesor 18mm
         </span>
       </div>
     </div>
@@ -287,7 +337,7 @@
     </div>
   }
 
-  <!-- FLOATING MICRO-NUDGE HUD (CUADRO DE MICRO-AJUSTE EN ZOOM - CONSERVADO SEGÚN REQUERIMIENTO) -->
+  <!-- FLOATING MICRO-NUDGE HUD (CUADRO DE MICRO-AJUSTE EN ZOOM - CONSERVADO SEGÚN REQUERIMIENTO EXPLÍCITO) -->
   @if (selectedPart(); as sel) {
     <div class="absolute bottom-10 left-16 z-20 pointer-events-auto flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
       <div class="bg-white/95 text-slate-800 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200/90 shadow-xl flex flex-col gap-1.5 max-w-[320px]">
@@ -405,6 +455,212 @@
     </div>
   }
 
+  <!-- RIGHT-CLICK CONTEXT MENU -->
+  @if (contextMenuPos(); as pos) {
+    <!-- Full-screen invisible backdrop to dismiss menu on click outside -->
+    <button 
+      type="button" 
+      class="fixed inset-0 z-40 bg-transparent cursor-default w-full h-full border-0 p-0" 
+      (click)="closeContextMenu()" 
+      (contextmenu)="$event.preventDefault(); closeContextMenu()" 
+      aria-label="Cerrar menú contextual">
+    </button>
+
+    <div 
+      [style.left.px]="pos.x" 
+      [style.top.px]="pos.y" 
+      class="absolute z-50 bg-white text-slate-800 rounded-2xl border border-slate-200/90 shadow-2xl p-1.5 flex flex-col gap-0.5 min-w-[220px] text-xs font-medium animate-in fade-in zoom-in-95 select-none pointer-events-auto">
+      
+      @if (contextMenuPart(); as part) {
+        <!-- Piece header -->
+        <div class="px-2.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
+          <div class="flex items-center gap-1.5 truncate">
+            <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+            <span class="font-bold text-slate-900 truncate">{{ part.name }}</span>
+          </div>
+          <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ part.length }}×{{ part.width }}</span>
+        </div>
+
+        <!-- Duplicar -->
+        <button 
+          type="button"
+          (click)="duplicateContextMenuPart()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          <span class="material-icons text-sm text-sky-500">content_copy</span>
+          <span>Duplicar Pieza</span>
+        </button>
+
+        <!-- Girar 90° Submenu Toggle -->
+        <div class="relative">
+          <button 
+            type="button"
+            (click)="toggleRotateSubmenu()"
+            class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition">
+            <div class="flex items-center gap-2">
+              <span class="material-icons text-sm text-amber-500">rotate_right</span>
+              <span>Girar 90°</span>
+            </div>
+            <span class="material-icons text-xs text-slate-400">{{ showRotateSubmenu() ? 'expand_less' : 'chevron_right' }}</span>
+          </button>
+
+          @if (showRotateSubmenu()) {
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-1 my-0.5 flex flex-col gap-0.5 text-xs">
+              <button 
+                type="button" 
+                (click)="rotatePart90(part, 'y')"
+                class="px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center gap-2 text-left">
+                <span class="material-icons text-xs text-sky-500">sync</span>
+                <span>Girar Horizontal (Eje Y)</span>
+              </button>
+              <button 
+                type="button" 
+                (click)="rotatePart90(part, 'x')"
+                class="px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center gap-2 text-left">
+                <span class="material-icons text-xs text-amber-500">sync_alt</span>
+                <span>Girar Frontal (Eje X)</span>
+              </button>
+              <button 
+                type="button" 
+                (click)="rotatePart90(part, 'z')"
+                class="px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center gap-2 text-left">
+                <span class="material-icons text-xs text-emerald-500">import_export</span>
+                <span>Girar Lateral (Eje Z)</span>
+              </button>
+            </div>
+          }
+        </div>
+
+        <!-- Alinear 1-clic -->
+        <div class="grid grid-cols-2 gap-1 px-1 my-0.5">
+          <button 
+            type="button"
+            (click)="alignContextMenuPart('floor')"
+            class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition">
+            Al Suelo (Y=0)
+          </button>
+          <button 
+            type="button"
+            (click)="alignContextMenuPart('centerX')"
+            class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition">
+            Centrar Mueble
+          </button>
+        </div>
+
+        <div class="h-px bg-slate-100 my-0.5"></div>
+
+        <!-- Aislar / Ocultar -->
+        <button 
+          type="button"
+          (click)="isolatePart(part)"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          <span class="material-icons text-sm text-indigo-500">filter_center_focus</span>
+          <span>Aislar Pieza (Ocultar demás)</span>
+        </button>
+
+        <button 
+          type="button"
+          (click)="hidePart(part)"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          <span class="material-icons text-sm text-slate-400">visibility_off</span>
+          <span>Ocultar Temporalmente</span>
+        </button>
+
+        <!-- Cambiar Material Quick Submenu -->
+        <div class="relative">
+          <button 
+            type="button"
+            (click)="toggleQuickMaterialPicker()"
+            class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition">
+            <div class="flex items-center gap-2">
+              <span class="material-icons text-sm text-amber-500">palette</span>
+              <span>Cambiar Material</span>
+            </div>
+            <span class="material-icons text-xs text-slate-400">{{ showQuickMaterialPicker() ? 'expand_less' : 'chevron_right' }}</span>
+          </button>
+
+          @if (showQuickMaterialPicker()) {
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-1.5 my-0.5 flex flex-col gap-1 text-xs max-h-40 overflow-y-auto">
+              <span class="text-[10px] uppercase font-bold text-slate-400 px-1">Melaminas:</span>
+              @for (mat of materials(); track mat.id) {
+                <button 
+                  type="button"
+                  (click)="assignQuickMaterial(mat.id)"
+                  [class]="part.materialId === mat.id ? 'bg-sky-50 text-sky-700 font-bold border border-sky-200' : 'hover:bg-white text-slate-700'"
+                  class="px-2 py-1 rounded-lg text-left truncate flex items-center justify-between">
+                  <span class="truncate">{{ mat.name }}</span>
+                  <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ mat.thickness }}mm</span>
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Quick Tapacantos Row -->
+        <div class="px-2 py-1 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-1 my-0.5">
+          <span class="text-[10px] font-bold text-slate-500 uppercase">Cantos:</span>
+          <div class="flex items-center gap-1">
+            <button (click)="toggleEdgeBandingQuick('l1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" [class]="part.edges.l1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo 1">L1</button>
+            <button (click)="toggleEdgeBandingQuick('l2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" [class]="part.edges.l2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo 2">L2</button>
+            <button (click)="toggleEdgeBandingQuick('a1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" [class]="part.edges.a1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho 1">A1</button>
+            <button (click)="toggleEdgeBandingQuick('a2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" [class]="part.edges.a2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho 2">A2</button>
+          </div>
+        </div>
+
+        <div class="h-px bg-slate-100 my-0.5"></div>
+
+        <!-- Eliminar -->
+        <button 
+          type="button"
+          (click)="deleteContextMenuPart()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 flex items-center gap-2 text-left transition font-semibold">
+          <span class="material-icons text-sm text-rose-500">delete</span>
+          <span>Eliminar Pieza</span>
+        </button>
+
+      } @else {
+        <!-- Context menu for empty canvas space -->
+        <div class="px-2.5 py-1.5 border-b border-slate-100 text-slate-500 text-[11px] font-semibold">
+          Espacio de Trabajo 3D
+        </div>
+
+        @if (hiddenPartIds().size > 0) {
+          <button 
+            type="button"
+            (click)="showAllParts()"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+            <span class="material-icons text-sm text-amber-500">visibility</span>
+            <span>Mostrar Todas las Piezas ({{ hiddenPartIds().size }} ocultas)</span>
+          </button>
+        }
+
+        <button 
+          type="button"
+          (click)="setActiveTool('draw_rect'); closeContextMenu()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          <span class="material-icons text-sm text-sky-500">crop_square</span>
+          <span>Dibujar Rectángulo 3D (R)</span>
+        </button>
+
+        <button 
+          type="button"
+          (click)="setActiveTool('push_pull'); closeContextMenu()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          <span class="material-icons text-sm text-amber-500">open_in_full</span>
+          <span>Herramienta Empujar / Tirar (P)</span>
+        </button>
+
+        <button 
+          type="button"
+          (click)="resetCamera(); closeContextMenu()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          <span class="material-icons text-sm text-slate-500">filter_center_focus</span>
+          <span>Centrar Cámara en Mueble (Z)</span>
+        </button>
+      }
+
+    </div>
+  }
+
   <!-- SKETCHUP CAD BOTTOM STATUS BAR & MEASUREMENTS BOX -->
   <div class="absolute bottom-0 left-0 right-0 h-7 bg-white/95 text-slate-600 backdrop-blur-md border-t border-slate-200/90 px-3 flex items-center justify-between text-xs z-20 pointer-events-auto">
     
@@ -419,9 +675,15 @@
         } @else {
           <span><strong>Empujar / Tirar (P):</strong> Posa el cursor sobre una cara de la pieza y arrastra para estirar o encoger.</span>
         }
+      } @else if (activeTool() === 'draw_rect') {
+        <span class="material-icons text-sm text-sky-500">crop_square</span>
+        <span><strong>Dibujar Rectángulo 3D (R):</strong> Haz clic y arrastra en el suelo para definir el largo y ancho de una nueva pieza.</span>
+      } @else if (activeTool() === 'rotate_90') {
+        <span class="material-icons text-sm text-amber-500">rotate_right</span>
+        <span><strong>Rotar 90° (Q):</strong> Haz clic sobre cualquier pieza para girarla 90° en el plano horizontal.</span>
       } @else if (activeTool() === 'select') {
         <span class="material-icons text-sm text-sky-500">near_me</span>
-        <span><strong>Seleccionar:</strong> Haz clic en una pieza • <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Shift+Clic</kbd> para selección múltiple • Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> para Empujar/Tirar</span>
+        <span><strong>Seleccionar:</strong> Clic en pieza • <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Clic Derecho</kbd> Menú Contextual • Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> Empujar • Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">R</kbd> Rectángulo</span>
       } @else if (activeTool() === 'move') {
         <span class="material-icons text-sm text-sky-500">open_with</span>
         <span><strong>Mover (M):</strong> Arrastra las flechas 3D para posicionar la pieza en X, Y o Z.</span>
@@ -436,6 +698,8 @@
       <span class="text-[10px] uppercase font-bold text-slate-400">Medidas:</span>
       @if (pushPullDelta(); as pp) {
         <strong class="text-amber-600">{{ pp.axisName }} {{ pp.currentVal }} mm</strong>
+      } @else if (rectDrawDims(); as rd) {
+        <strong class="text-sky-600">{{ rd.length }} × {{ rd.width }} mm</strong>
       } @else if (measureDistance(); as dist) {
         <strong class="text-sky-600">{{ dist.total }} mm</strong>
       } @else if (selectedPart(); as sel) {

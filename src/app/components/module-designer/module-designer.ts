@@ -143,6 +143,14 @@ export class ModuleDesignerComponent {
     this.activeDockTab.set('catalog');
   }
 
+  isPartSelected(id: string): boolean {
+    return this.selectedPartId() === id || this.selectedPartIds().includes(id);
+  }
+
+  onChipClick(id: string, event: MouseEvent) {
+    this.selectPartById(id, event);
+  }
+
   selectPartById(id: string, e?: MouseEvent) {
     if (e && e.shiftKey) {
       const cur = [...this.selectedPartIds()];
@@ -180,16 +188,13 @@ export class ModuleDesignerComponent {
     this.projectService.pushSnapshot();
   }
 
-  // Receives real-time 3D translation & stretch changes directly from the 3D Viewer Gizmo
+  // Receives real-time 3D translation & stretch changes directly from the 3D Viewer Gizmo or context menu
   onPartModifiedFromViewer(event: { part: Part; updates: Partial<Part> }) {
-    const current = this.selectedPart();
-    if (!current) return;
-
+    const targetPart = this.currentParts().find(p => p.id === event.part.id) || event.part;
     const updated: Part = {
-      ...current,
+      ...targetPart,
       ...event.updates
     };
-    // Do not flood undo stack on every 5ms mousemove; snapshot was taken on dragStarted
     this.projectService.updatePart(updated, false);
   }
 
@@ -197,6 +202,49 @@ export class ModuleDesignerComponent {
   onMultiplePartsModifiedFromViewer(event: { updates: { part: Part; updates: Partial<Part> }[] }) {
     const updatesList = event.updates.map(u => ({ partId: u.part.id, updates: u.updates }));
     this.projectService.updateMultipleParts(updatesList, false);
+  }
+
+  // Receives newly drawn piece from 3D Rectangle Tool
+  onPartCreatedFromViewer(partData: Partial<Part>) {
+    const defaultMat = this.materials()[0];
+    const newPart: Part = {
+      id: crypto.randomUUID(),
+      name: partData.name || `Pieza ${this.currentParts().length + 1}`,
+      length: partData.length || 600,
+      width: partData.width || 400,
+      thickness: partData.thickness || (defaultMat ? defaultMat.thickness : 18),
+      quantity: 1,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Blanca 18mm',
+      grain: 'length',
+      edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+      posX: partData.posX ?? 0,
+      posY: partData.posY ?? 9,
+      posZ: partData.posZ ?? 0,
+      orientation: partData.orientation || 'horizontal',
+      componentRole: 'free'
+    };
+    this.projectService.addPart(newPart);
+    this.selectedPartId.set(newPart.id);
+    this.selectedPartIds.set([newPart.id]);
+    this.activeDockTab.set('piece');
+  }
+
+  onPartDeletedFromViewer(partId: string) {
+    this.projectService.deletePart(partId);
+    if (this.selectedPartId() === partId) {
+      this.selectedPartId.set(null);
+      this.selectedPartIds.set([]);
+    }
+  }
+
+  onPartDuplicatedFromViewer(part: Part) {
+    const cloned = this.projectService.duplicatePart(part.id);
+    if (cloned) {
+      this.selectedPartId.set(cloned.id);
+      this.selectedPartIds.set([cloned.id]);
+      this.activeDockTab.set('piece');
+    }
   }
 
   // Sets material and automatically synchronizes the matching thickness & name

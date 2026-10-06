@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Part, Material, DrillHole, CollisionRecord } from '../../models/melamine.models';
+import { Part, Material, DrillHole, CollisionRecord, EdgeBandingType } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 
 interface PieceMeshData {
@@ -68,6 +68,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
   partsSelected = output<string[]>();
   partModified = output<{ part: Part; updates: Partial<Part> }>();
   multiplePartsModified = output<{ updates: { part: Part; updates: Partial<Part> }[] }>();
+  partCreated = output<Partial<Part>>();
+  partDeleted = output<string>();
+  partDuplicated = output<Part>();
   dragStarted = output<void>();
   clearanceCalculated = output<ClearanceInfo | null>();
   collisionsDetected = output<CollisionRecord[]>();
@@ -87,11 +90,27 @@ export class Furniture3dViewerComponent implements OnDestroy {
   isWhiteTheme = signal<boolean>(true); // Default to clean pure white studio background
 
   // SketchUp CAD Palette & Push/Pull State
-  readonly activeTool = signal<'select' | 'push_pull' | 'move' | 'measure'>('select');
+  readonly activeTool = signal<'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect'>('select');
   readonly pushPullDelta = signal<{ axisName: string; initialVal: number; currentVal: number; delta: number } | null>(null);
   readonly hoveredFaceInfo = signal<{ partName: string; faceLabel: string; dimLabel: string } | null>(null);
   readonly showViewsDropdown = signal<boolean>(false);
   readonly showExplodedSlider = signal<boolean>(false);
+
+  // Right-Click Context Menu State
+  readonly contextMenuPos = signal<{ x: number; y: number } | null>(null);
+  readonly contextMenuPart = signal<Part | null>(null);
+  readonly showQuickMaterialPicker = signal<boolean>(false);
+  readonly showRotateSubmenu = signal<boolean>(false);
+
+  // Hidden / Isolated Parts
+  readonly hiddenPartIds = signal<Set<string>>(new Set());
+
+  // Draw 3D Rectangle Tool State
+  readonly isDrawingRect = signal<boolean>(false);
+  readonly rectDrawDims = signal<{ length: number; width: number } | null>(null);
+  private rectStartPoint: THREE.Vector3 | null = null;
+  private rectCurrentPoint: THREE.Vector3 | null = null;
+  private rectPreviewGroup = new THREE.Group();
 
   // Collisions & Joinery Signals
   readonly detectedCollisions = signal<CollisionRecord[]>([]);
@@ -204,6 +223,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const showDims = this.show3dDimensions();
       this.showDrillHoles();
       this.activeTool();
+      this.hiddenPartIds();
 
       if (this.scene) {
         this.buildFurnitureScene(parts, selIds, mats, xRay, showDims);
@@ -268,6 +288,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.measureGroup);
     this.scene.add(this.drillGroup);
     this.scene.add(this.pushPullHighlightGroup);
+    this.scene.add(this.rectPreviewGroup);
 
     // Initial Scene Build
     this.buildFurnitureScene(
@@ -450,6 +471,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const selectedDataList: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number }[] = [];
 
     for (const part of parts) {
+      if (this.hiddenPartIds().has(part.id)) {
+        continue;
+      }
+
       const t = part.thickness || 18;
       const L = part.length;
       const W = part.width;
@@ -1447,6 +1472,51 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return;
     }
 
+    // 0.2. Draw 3D Rectangle Tool
+    if (this.activeTool() === 'draw_rect') {
+      const allFloorAndParts = [
+        ...(this.floorMesh ? [this.floorMesh] : []),
+        ...this.pieceObjects.map(p => p.mesh)
+      ];
+      const floorIntersects = this.raycaster.intersectObjects(allFloorAndParts, false);
+      if (floorIntersects.length > 0) {
+        const pt = floorIntersects[0].point;
+        const snap = 10;
+        this.rectStartPoint = new THREE.Vector3(
+          Math.round(pt.x / snap) * snap,
+          Math.round(pt.y),
+          Math.round(pt.z / snap) * snap
+        );
+        this.rectCurrentPoint = this.rectStartPoint.clone();
+        this.isDrawingRect.set(true);
+        this.controls.enabled = false;
+        canvas.style.cursor = 'crosshair';
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
+    // 0.3. Rotate 90° Tool
+    if (this.activeTool() === 'rotate_90') {
+      const intersects = this.raycaster.intersectObjects(
+        this.pieceObjects.map(p => p.mesh),
+        false
+      );
+      if (intersects.length > 0) {
+        const hit = intersects[0].object as THREE.Mesh;
+        const part = hit.userData['part'] as Part;
+        if (part) {
+          this.rotatePart90(part, 'y');
+          this.partsSelected.emit([part.id]);
+          this.partSelected.emit(part);
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
+
     // 0.5. Push/Pull (Empujar / Tirar) Tool
     if (this.activeTool() === 'push_pull') {
       const intersects = this.raycaster.intersectObjects(
@@ -1644,10 +1714,35 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
-  // Pointer Move: Dragging Gizmo, Push/Pulling or Updating Hover Cursors
+    // Pointer Move: Dragging Gizmo, Push/Pulling, Drawing Rect or Updating Hover Cursors
   private onPointerMove(e: PointerEvent) {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas || !this.camera) return;
+
+    // 0.1. Draw 3D Rectangle Live Preview
+    if (this.isDrawingRect() && this.rectStartPoint) {
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      const drawPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.rectStartPoint.y);
+      const intersectPt = new THREE.Vector3();
+      if (this.raycaster.ray.intersectPlane(drawPlane, intersectPt)) {
+        const snap = 10;
+        this.rectCurrentPoint = new THREE.Vector3(
+          Math.round(intersectPt.x / snap) * snap,
+          this.rectStartPoint.y,
+          Math.round(intersectPt.z / snap) * snap
+        );
+
+        const L = Math.round(Math.abs(this.rectCurrentPoint.x - this.rectStartPoint.x));
+        const W = Math.round(Math.abs(this.rectCurrentPoint.z - this.rectStartPoint.z));
+        this.rectDrawDims.set({ length: L, width: W });
+        this.renderRectPreview();
+      }
+      return;
+    }
 
     // 0. Push/Pull Active Dragging
     if (this.isPushPulling && this.pushPullData) {
@@ -1857,6 +1952,41 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   // Pointer Up: Release Dragging
   private onPointerUp() {
+    if (this.isDrawingRect() && this.rectStartPoint && this.rectCurrentPoint) {
+      const L = Math.round(Math.abs(this.rectCurrentPoint.x - this.rectStartPoint.x));
+      const W = Math.round(Math.abs(this.rectCurrentPoint.z - this.rectStartPoint.z));
+
+      if (L >= 60 && W >= 60) {
+        const posX = Math.round((this.rectStartPoint.x + this.rectCurrentPoint.x) / 2);
+        const posZ = Math.round((this.rectStartPoint.z + this.rectCurrentPoint.z) / 2);
+        const posY = this.rectStartPoint.y + 9;
+
+        this.partCreated.emit({
+          name: `Pieza Dibujada ${this.parts().length + 1}`,
+          length: L,
+          width: W,
+          thickness: 18,
+          posX,
+          posY,
+          posZ,
+          orientation: 'horizontal'
+        });
+
+        // Switch to Push/Pull so user can immediately pull it upwards if desired
+        this.setActiveTool('push_pull');
+      }
+
+      this.isDrawingRect.set(false);
+      this.rectStartPoint = null;
+      this.rectCurrentPoint = null;
+      this.rectDrawDims.set(null);
+      this.clearRectPreview();
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+      return;
+    }
+
     if (this.isPushPulling) {
       this.isPushPulling = false;
       this.pushPullData = null;
@@ -1882,7 +2012,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   // --- SKETCHUP CAD TOOLS & PUSH/PULL FACE RAYCASTING ---
 
-  setActiveTool(tool: 'select' | 'push_pull' | 'move' | 'measure') {
+  setActiveTool(tool: 'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect') {
     this.activeTool.set(tool);
     if (tool === 'measure') {
       this.isMeasureMode.set(true);
@@ -1890,10 +2020,23 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.isMeasureMode.set(false);
       this.clearMeasure();
     }
+    if (tool !== 'draw_rect') {
+      this.clearRectPreview();
+      this.isDrawingRect.set(false);
+      this.rectStartPoint = null;
+      this.rectCurrentPoint = null;
+      this.rectDrawDims.set(null);
+    }
+    if (tool === 'rotate_90' && this.selectedPart()) {
+      // If a part is already selected and user activates rotate, rotate it 90 deg immediately
+      this.rotatePart90(this.selectedPart()!, 'y');
+    }
     this.clearPushPullHighlight();
     this.hoveredFaceInfo.set(null);
     const canvas = this.canvasRef()?.nativeElement;
-    if (canvas) canvas.style.cursor = 'default';
+    if (canvas) {
+      canvas.style.cursor = tool === 'draw_rect' ? 'crosshair' : 'default';
+    }
   }
 
   private updatePushPullHover(e: PointerEvent) {
@@ -2045,6 +2188,235 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
+  // --- 3D RECTANGLE PREVIEW METHODS ---
+
+  private renderRectPreview() {
+    this.clearRectPreview();
+    if (!this.rectStartPoint || !this.rectCurrentPoint) return;
+
+    const minX = Math.min(this.rectStartPoint.x, this.rectCurrentPoint.x);
+    const maxX = Math.max(this.rectStartPoint.x, this.rectCurrentPoint.x);
+    const minZ = Math.min(this.rectStartPoint.z, this.rectCurrentPoint.z);
+    const maxZ = Math.max(this.rectStartPoint.z, this.rectCurrentPoint.z);
+
+    const length = Math.max(20, maxX - minX);
+    const width = Math.max(20, maxZ - minZ);
+    const thickness = 18;
+
+    const centerX = (minX + maxX) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+    const centerY = this.rectStartPoint.y + thickness / 2;
+
+    const geom = new THREE.BoxGeometry(length, thickness, width);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x0284c7,
+      transparent: true,
+      opacity: 0.35,
+      depthTest: false
+    });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(centerX, centerY, centerZ);
+
+    const edges = new THREE.EdgesGeometry(geom);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x0284c7, linewidth: 2, depthTest: false });
+    const wireframe = new THREE.LineSegments(edges, lineMat);
+    mesh.add(wireframe);
+
+    this.rectPreviewGroup.add(mesh);
+  }
+
+  private clearRectPreview() {
+    while (this.rectPreviewGroup.children.length > 0) {
+      const obj = this.rectPreviewGroup.children[0];
+      this.rectPreviewGroup.remove(obj);
+    }
+  }
+
+  // --- RIGHT-CLICK CONTEXT MENU ACTIONS ---
+
+  onContextMenu(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const canvas = this.canvasRef()?.nativeElement;
+    const container = this.containerRef()?.nativeElement;
+    if (!canvas || !container || !this.camera) return;
+
+    const rect = canvas.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    const visibleMeshes = this.pieceObjects.map(p => p.mesh);
+    const intersects = this.raycaster.intersectObjects(visibleMeshes, false);
+
+    const contRect = container.getBoundingClientRect();
+    const posX = Math.max(10, Math.min(e.clientX - contRect.left, contRect.width - 240));
+    const posY = Math.max(10, Math.min(e.clientY - contRect.top, contRect.height - 340));
+
+    if (intersects.length > 0) {
+      const topHit = intersects[0].object as THREE.Mesh;
+      const part = topHit.userData['part'] as Part;
+      if (part) {
+        this.contextMenuPart.set(part);
+        this.contextMenuPos.set({ x: posX, y: posY });
+        this.partsSelected.emit([part.id]);
+        this.partSelected.emit(part);
+        this.showQuickMaterialPicker.set(false);
+        this.showRotateSubmenu.set(false);
+        return;
+      }
+    }
+
+    // Clicked empty canvas space
+    this.contextMenuPart.set(null);
+    this.contextMenuPos.set({ x: posX, y: posY });
+    this.showQuickMaterialPicker.set(false);
+    this.showRotateSubmenu.set(false);
+  }
+
+  closeContextMenu() {
+    this.contextMenuPos.set(null);
+    this.contextMenuPart.set(null);
+    this.showQuickMaterialPicker.set(false);
+    this.showRotateSubmenu.set(false);
+  }
+
+  toggleRotateSubmenu() {
+    this.showRotateSubmenu.update(v => !v);
+    this.showQuickMaterialPicker.set(false);
+  }
+
+  toggleQuickMaterialPicker() {
+    this.showQuickMaterialPicker.update(v => !v);
+    this.showRotateSubmenu.set(false);
+  }
+
+  duplicateContextMenuPart() {
+    const part = this.contextMenuPart();
+    if (part) {
+      this.partDuplicated.emit(part);
+      this.closeContextMenu();
+    }
+  }
+
+  rotatePart90(part: Part, axis: 'x' | 'y' | 'z' = 'y') {
+    const updates: Partial<Part> = {};
+    const currentOrient = part.orientation || 'horizontal';
+
+    if (axis === 'y') {
+      // Rotate around vertical Y: swap length and width
+      updates.length = part.width;
+      updates.width = part.length;
+    } else if (axis === 'x') {
+      // Pitch rotation: cycle between horizontal and vertical_xy
+      if (currentOrient === 'horizontal') {
+        updates.orientation = 'vertical_xy';
+      } else if (currentOrient === 'vertical_xy') {
+        updates.orientation = 'horizontal';
+      } else {
+        updates.orientation = 'horizontal';
+      }
+    } else if (axis === 'z') {
+      // Roll rotation: cycle between horizontal and vertical_yz
+      if (currentOrient === 'horizontal') {
+        updates.orientation = 'vertical_yz';
+      } else if (currentOrient === 'vertical_yz') {
+        updates.orientation = 'horizontal';
+      } else {
+        updates.orientation = 'horizontal';
+      }
+    }
+
+    this.partModified.emit({ part, updates });
+    this.closeContextMenu();
+  }
+
+  alignContextMenuPart(type: 'floor' | 'centerX' | 'centerZ') {
+    const part = this.contextMenuPart();
+    if (!part) return;
+
+    const t = part.thickness || 18;
+    const L = part.length;
+    const orientation = part.orientation || 'horizontal';
+    let sy = t;
+    if (orientation === 'vertical_yz') sy = L;
+    else if (orientation === 'vertical_xy') sy = part.width;
+
+    const updates: Partial<Part> = {};
+    if (type === 'floor') {
+      updates.posY = sy / 2;
+    } else if (type === 'centerX') {
+      updates.posX = 0;
+    } else if (type === 'centerZ') {
+      updates.posZ = 0;
+    }
+
+    this.partModified.emit({ part, updates });
+    this.closeContextMenu();
+  }
+
+  isolatePart(part: Part) {
+    const allOther = new Set(this.parts().filter(p => p.id !== part.id).map(p => p.id));
+    this.hiddenPartIds.set(allOther);
+    this.closeContextMenu();
+  }
+
+  hidePart(part: Part) {
+    const next = new Set(this.hiddenPartIds());
+    next.add(part.id);
+    this.hiddenPartIds.set(next);
+    this.clearSelection();
+    this.closeContextMenu();
+  }
+
+  showAllParts() {
+    this.hiddenPartIds.set(new Set());
+    this.closeContextMenu();
+  }
+
+  assignQuickMaterial(matId: string) {
+    const part = this.contextMenuPart();
+    const mat = this.materials().find(m => m.id === matId);
+    if (!part || !mat) return;
+
+    this.partModified.emit({
+      part,
+      updates: {
+        materialId: mat.id,
+        materialName: mat.name,
+        thickness: mat.thickness
+      }
+    });
+    this.closeContextMenu();
+  }
+
+  toggleEdgeBandingQuick(edgeKey: 'l1' | 'l2' | 'a1' | 'a2') {
+    const part = this.contextMenuPart();
+    if (!part) return;
+
+    const cycle: Record<EdgeBandingType, EdgeBandingType> = {
+      none: 'thin',
+      thin: 'thick',
+      thick: 'none'
+    };
+    const nextVal = cycle[part.edges[edgeKey]];
+    const updatedEdges = { ...part.edges, [edgeKey]: nextVal };
+    this.partModified.emit({
+      part,
+      updates: { edges: updatedEdges }
+    });
+    this.contextMenuPart.set({ ...part, edges: updatedEdges });
+  }
+
+  deleteContextMenuPart() {
+    const part = this.contextMenuPart();
+    if (part) {
+      this.partDeleted.emit(part.id);
+      this.closeContextMenu();
+    }
+  }
+
   // --- PRECISION NUDGE & MAGNETIC SNAPPING METHODS ---
 
   setNudgeStep(step: number) {
@@ -2185,6 +2557,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.setActiveTool('move');
       return;
     }
+    if (e.key === 'r' || e.key === 'R') {
+      e.preventDefault();
+      this.setActiveTool('draw_rect');
+      return;
+    }
+    if (e.key === 'q' || e.key === 'Q') {
+      e.preventDefault();
+      this.setActiveTool('rotate_90');
+      return;
+    }
     if (e.key === 't' || e.key === 'T') {
       e.preventDefault();
       this.setActiveTool('measure');
@@ -2192,9 +2574,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      this.closeContextMenu();
       this.clearSelection();
       this.clearMeasure();
       this.clearPushPullHighlight();
+      this.clearRectPreview();
       return;
     }
 

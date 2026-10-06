@@ -31,7 +31,7 @@
         @if (showTemplatesDropdown()) {
           <div class="absolute right-0 top-8 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 min-w-[220px] animate-in fade-in zoom-in-95 text-xs text-slate-700">
             <button 
-              type="button"
+              type="button" 
               (click)="loadStandardBaseCabinet(); closeTemplatesDropdown()"
               class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left font-medium">
               <span class="material-icons text-sm text-amber-500">countertops</span>
@@ -41,7 +41,7 @@
               </div>
             </button>
             <button 
-              type="button"
+              type="button" 
               (click)="loadDeskBarTemplate(); closeTemplatesDropdown()"
               class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left font-medium">
               <span class="material-icons text-sm text-sky-500">desk</span>
@@ -52,7 +52,7 @@
             </button>
             <div class="h-px bg-slate-100 my-0.5"></div>
             <button 
-              type="button"
+              type="button" 
               (click)="startBlank(); closeTemplatesDropdown()"
               class="px-2.5 py-1.5 rounded-lg hover:bg-rose-50 text-rose-700 flex items-center gap-2 text-left font-medium">
               <span class="material-icons text-sm text-rose-500">delete_sweep</span>
@@ -67,7 +67,7 @@
 
       <!-- Toggle Right Sidebar Button -->
       <button 
-        type="button"
+        type="button" 
         (click)="toggleSidebar()"
         [class]="isSidebarCollapsed() ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'"
         class="h-7 px-2.5 text-xs font-semibold rounded-lg border flex items-center gap-1.5 transition"
@@ -79,7 +79,7 @@
     </div>
   </div>
 
-  <!-- MAIN 2-COLUMN FULL-VIEWPORT LAYOUT (Dynamic 100vh Fill) -->
+  <!-- MAIN 2-COLUMN FULL-VIEWPORT LAYOUT -->
   <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2 h-full">
     
     <!-- LEFT COLUMN: 3D Viewport & Bottom Chips -->
@@ -96,6 +96,9 @@
           (partsSelected)="onPartsSelectedFrom3D($event)"
           (partModified)="onPartModifiedFromViewer($event)"
           (multiplePartsModified)="onMultiplePartsModifiedFromViewer($event)"
+          (partCreated)="onPartCreatedFromViewer($event)"
+          (partDeleted)="onPartDeletedFromViewer($event)"
+          (partDuplicated)="onPartDuplicatedFromViewer($event)"
           (dragStarted)="onDragStarted()"
           (clearanceCalculated)="onClearanceCalculated($event)">
         </app-furniture-3d-viewer>
@@ -103,8 +106,8 @@
 
       <!-- Floating expand button if sidebar is collapsed -->
       @if (isSidebarCollapsed()) {
-        <button
-          type="button"
+        <button 
+          type="button" 
           (click)="toggleSidebar()"
           class="absolute top-3 right-3 z-30 h-8 px-2.5 bg-white text-slate-700 hover:text-slate-900 border border-slate-200 rounded-xl shadow-lg flex items-center gap-1 text-xs font-bold transition hover:bg-slate-50"
           title="Abrir Bandeja de Propiedades">
@@ -122,8 +125,8 @@
 
         <!-- Select All Button -->
         <button 
-          type="button"
-          (click)="selectAllParts()"
+          type="button" 
+          (click)="selectAllParts()" 
           class="px-2 py-0.5 rounded-lg text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center gap-1 shrink-0 transition"
           title="Seleccionar todas las piezas a la vez para moverlas en bloque">
           <span class="material-icons text-xs text-amber-500">select_all</span>
@@ -139,14 +142,13 @@
         <div class="flex items-center gap-1.5 flex-1 min-w-0">
           @for (part of currentParts(); track part.id) {
             <button 
-              type="button"
-              (click)="selectPartById(part.id, $event)"
-              [class]="selectedPartIds().includes(part.id) 
-                ? 'bg-sky-500 text-white font-bold border-sky-400 shadow-xs ring-2 ring-sky-400/40' 
-                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'"
-              class="px-2 py-0.5 rounded-lg text-xs border flex items-center gap-1.5 whitespace-nowrap transition"
-              title="Clic para seleccionar • Shift+Clic para multi-selección">
-              <span>{{ part.name }}</span>
+              type="button" 
+              (click)="onChipClick(part.id, $event)" 
+              [class]="isPartSelected(part.id) ? 'bg-sky-500 text-white font-bold shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80'"
+              class="px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 shrink-0 transition"
+              [title]="part.name + ' (' + part.length + '×' + part.width + 'mm)'">
+              <span class="w-1.5 h-1.5 rounded-full" [class]="isPartSelected(part.id) ? 'bg-white' : 'bg-slate-400'"></span>
+              <span class="truncate max-w-[130px]">{{ part.name }}</span>
               <span class="font-mono text-[10px] opacity-75 font-semibold">
                 {{ part.length }}×{{ part.width }}
               </span>
@@ -167,7 +169,7 @@
 
     </div>
 
-    <!-- RIGHT COLUMN: Inspector & Tool Dock (Collapsible) -->
+    <!-- RIGHT COLUMN: Inspector & Tool Dock (SketchUp Classic Style) -->
     @if (!isSidebarCollapsed()) {
       <div class="col-span-12 lg:col-span-4 xl:col-span-3 bg-white border border-slate-200 rounded-2xl shadow-md overflow-hidden flex flex-col h-full min-h-0 text-slate-800">
         
@@ -175,7 +177,7 @@
         <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-1">
           <div class="flex items-center gap-1 flex-1">
             <button 
-              type="button"
+              type="button" 
               (click)="activeDockTab.set('piece')"
               [class]="activeDockTab() === 'piece' ? 'bg-white text-sky-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
               class="flex-1 py-1.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
@@ -187,7 +189,7 @@
             </button>
 
             <button 
-              type="button"
+              type="button" 
               (click)="activeDockTab.set('catalog')"
               [class]="activeDockTab() === 'catalog' ? 'bg-white text-amber-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
               class="flex-1 py-1.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
@@ -197,31 +199,31 @@
           </div>
 
           <button 
-            type="button"
-            (click)="toggleSidebar()"
+            type="button" 
+            (click)="toggleSidebar()" 
             class="p-1 text-slate-400 hover:text-slate-700 rounded-lg ml-1"
             title="Colapsar bandeja lateral (100% pantalla 3D)">
             <span class="material-icons text-sm">chevron_right</span>
           </button>
         </div>
 
-      <!-- TAB 1: INDIVIDUAL PIECE PROPERTIES (Edición Pieza por Pieza) -->
+      <!-- TAB 1: INDIVIDUAL PIECE PROPERTIES (SketchUp Classic Style) -->
       @if (activeDockTab() === 'piece') {
-        <div class="p-3.5 space-y-4 overflow-y-auto flex-1 min-h-0">
+        <div class="p-3.5 space-y-3.5 overflow-y-auto flex-1 min-h-0">
           
           @if (selectedPart(); as sel) {
             
             <!-- Header: Piece Name & Badges -->
-            <div class="pb-3 border-b border-zinc-800 space-y-1.5">
+            <div class="pb-2.5 border-b border-slate-200 space-y-1.5">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1">
-                  <span class="material-icons text-xs">extension</span>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-sky-700 flex items-center gap-1">
+                  <span class="material-icons text-xs text-sky-600">extension</span>
                   Pieza Seleccionada
                 </span>
                 <button 
                   type="button" 
                   (click)="deselectPart()" 
-                  class="text-zinc-400 hover:text-white"
+                  class="text-slate-400 hover:text-slate-700"
                   title="Cerrar inspector">
                   <span class="material-icons text-sm">close</span>
                 </button>
@@ -232,34 +234,34 @@
                 type="text" 
                 [value]="sel.name" 
                 (input)="updateSelectedPart({ name: $any($event.target).value })"
-                class="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-lg text-sm font-bold text-white focus:outline-hidden focus:border-cyan-400"
+                class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-hidden focus:border-sky-500 focus:bg-white"
                 placeholder="Nombre de la pieza" />
             </div>
 
-            <!-- SECTION 1: DIMENSIONES INDIVIDUALES (Largo × Ancho × Espesor) -->
-            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-3">
-              <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                <span class="material-icons text-xs text-cyan-400">square_foot</span>
+            <!-- SECTION 1: DIMENSIONES DE CORTE (Largo × Ancho × Espesor) -->
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
+              <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span class="material-icons text-xs text-sky-600">square_foot</span>
                 Dimensiones de Corte (mm)
               </span>
 
               <!-- LARGO -->
               <div class="space-y-1">
                 <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-zinc-400 font-medium">Largo (mm):</span>
-                  <span class="font-mono font-bold text-cyan-300">{{ sel.length }} mm</span>
+                  <span class="text-slate-600 font-medium">Largo (mm):</span>
+                  <span class="font-mono font-bold text-sky-700">{{ sel.length }} mm</span>
                 </div>
                 <div class="flex items-center gap-1">
                   <button 
                     type="button" 
                     (click)="adjustPartProperty('length', -50)" 
-                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
                     -50
                   </button>
                   <button 
                     type="button" 
                     (click)="adjustPartProperty('length', -10)" 
-                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
                     -10
                   </button>
                   <input 
@@ -267,17 +269,17 @@
                     step="5"
                     [value]="sel.length"
                     (input)="updateSelectedPart({ length: +$any($event.target).value })"
-                    class="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-xs font-bold text-white focus:outline-hidden focus:border-cyan-400 font-mono" />
+                    class="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-center text-xs font-bold text-slate-800 focus:outline-hidden focus:border-sky-500 font-mono shadow-2xs" />
                   <button 
                     type="button" 
                     (click)="adjustPartProperty('length', 10)" 
-                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
                     +10
                   </button>
                   <button 
                     type="button" 
                     (click)="adjustPartProperty('length', 50)" 
-                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
                     +50
                   </button>
                 </div>
@@ -286,20 +288,20 @@
               <!-- ANCHO -->
               <div class="space-y-1">
                 <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-zinc-400 font-medium">Ancho (mm):</span>
-                  <span class="font-mono font-bold text-cyan-300">{{ sel.width }} mm</span>
+                  <span class="text-slate-600 font-medium">Ancho (mm):</span>
+                  <span class="font-mono font-bold text-sky-700">{{ sel.width }} mm</span>
                 </div>
                 <div class="flex items-center gap-1">
                   <button 
                     type="button" 
                     (click)="adjustPartProperty('width', -50)" 
-                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
                     -50
                   </button>
                   <button 
                     type="button" 
                     (click)="adjustPartProperty('width', -10)" 
-                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
                     -10
                   </button>
                   <input 
@@ -307,17 +309,17 @@
                     step="5"
                     [value]="sel.width"
                     (input)="updateSelectedPart({ width: +$any($event.target).value })"
-                    class="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-xs font-bold text-white focus:outline-hidden focus:border-cyan-400 font-mono" />
+                    class="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-center text-xs font-bold text-slate-800 focus:outline-hidden focus:border-sky-500 font-mono shadow-2xs" />
                   <button 
                     type="button" 
                     (click)="adjustPartProperty('width', 10)" 
-                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
                     +10
                   </button>
                   <button 
                     type="button" 
                     (click)="adjustPartProperty('width', 50)" 
-                    class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono rounded font-bold">
+                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
                     +50
                   </button>
                 </div>
@@ -325,106 +327,108 @@
 
             </div>
 
-            <!-- SECCIÓN CAD: LUZ LIBRE Y HUECOS ÚTILES (ESTILO SKETCHUP) -->
+            <!-- SECTION: LUZ LIBRE Y HUECOS ÚTILES (CAD SKETCHUP) -->
             @if (clearanceInfo(); as clr) {
-              <div class="bg-emerald-950/20 border border-emerald-500/35 rounded-xl p-3 space-y-2.5 shadow-sm">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                    <span class="material-icons text-sm">unfold_more</span>
-                    Luz Libre (Espacio Interior Útil)
-                  </span>
-                  <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
-                    CAD 3D
-                  </span>
+              @if (clr.topClearance !== null || clr.bottomClearance !== null || clr.leftClearance !== null || clr.rightClearance !== null) {
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span class="material-icons text-sm text-emerald-600">unfold_more</span>
+                      Luz Libre (Espacio Interior Útil)
+                    </span>
+                    <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono border border-emerald-200">
+                      CAD 3D
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 text-xs">
+                    <!-- Arriba -->
+                    <div class="p-2 bg-white rounded-lg border border-slate-200">
+                      <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
+                        <span class="material-icons text-xs text-emerald-600">arrow_upward</span>
+                        Hacia Arriba:
+                      </span>
+                      @if (clr.topClearance !== null) {
+                        <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.topClearance }} mm</p>
+                        <p class="text-[9px] text-slate-400 truncate" [title]="clr.topNeighborName || ''">
+                          hasta {{ clr.topNeighborName }}
+                        </p>
+                      } @else {
+                        <p class="font-mono text-slate-400 text-xs italic">Espacio abierto</p>
+                      }
+                    </div>
+
+                    <!-- Abajo -->
+                    <div class="p-2 bg-white rounded-lg border border-slate-200">
+                      <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
+                        <span class="material-icons text-xs text-emerald-600">arrow_downward</span>
+                        Hacia Abajo:
+                      </span>
+                      @if (clr.bottomClearance !== null) {
+                        <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.bottomClearance }} mm</p>
+                        <p class="text-[9px] text-slate-400 truncate" [title]="clr.bottomNeighborName || ''">
+                          hasta {{ clr.bottomNeighborName }}
+                        </p>
+                      } @else {
+                        <p class="font-mono text-slate-400 text-xs italic">Hasta el suelo</p>
+                      }
+                    </div>
+
+                    <!-- Izquierda -->
+                    <div class="p-2 bg-white rounded-lg border border-slate-200">
+                      <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
+                        <span class="material-icons text-xs text-sky-600">arrow_back</span>
+                        Hacia Izquierda:
+                      </span>
+                      @if (clr.leftClearance !== null) {
+                        <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.leftClearance }} mm</p>
+                        <p class="text-[9px] text-slate-400 truncate" [title]="clr.leftNeighborName || ''">
+                          hasta {{ clr.leftNeighborName }}
+                        </p>
+                      } @else {
+                        <p class="font-mono text-slate-400 text-xs italic">Espacio abierto</p>
+                      }
+                    </div>
+
+                    <!-- Derecha -->
+                    <div class="p-2 bg-white rounded-lg border border-slate-200">
+                      <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
+                        <span class="material-icons text-xs text-sky-600">arrow_forward</span>
+                        Hacia Derecha:
+                      </span>
+                      @if (clr.rightClearance !== null) {
+                        <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.rightClearance }} mm</p>
+                        <p class="text-[9px] text-slate-400 truncate" [title]="clr.rightNeighborName || ''">
+                          hasta {{ clr.rightNeighborName }}
+                        </p>
+                      } @else {
+                        <p class="font-mono text-slate-400 text-xs italic">Espacio abierto</p>
+                      }
+                    </div>
+                  </div>
                 </div>
-
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                  <!-- Arriba -->
-                  <div class="p-2 bg-zinc-950/70 rounded-lg border border-zinc-800/90">
-                    <span class="text-[10px] text-zinc-400 flex items-center gap-1 mb-0.5">
-                      <span class="material-icons text-xs text-emerald-400">arrow_upward</span>
-                      Hacia Arriba:
-                    </span>
-                    @if (clr.topClearance !== null) {
-                      <p class="font-mono font-bold text-emerald-300 text-sm">{{ clr.topClearance }} mm</p>
-                      <p class="text-[9px] text-zinc-500 truncate" [title]="clr.topNeighborName || ''">
-                        hasta {{ clr.topNeighborName }}
-                      </p>
-                    } @else {
-                      <p class="font-mono text-zinc-500 text-xs italic">Espacio abierto</p>
-                    }
-                  </div>
-
-                  <!-- Abajo -->
-                  <div class="p-2 bg-zinc-950/70 rounded-lg border border-zinc-800/90">
-                    <span class="text-[10px] text-zinc-400 flex items-center gap-1 mb-0.5">
-                      <span class="material-icons text-xs text-emerald-400">arrow_downward</span>
-                      Hacia Abajo:
-                    </span>
-                    @if (clr.bottomClearance !== null) {
-                      <p class="font-mono font-bold text-emerald-300 text-sm">{{ clr.bottomClearance }} mm</p>
-                      <p class="text-[9px] text-zinc-500 truncate" [title]="clr.bottomNeighborName || ''">
-                        hasta {{ clr.bottomNeighborName }}
-                      </p>
-                    } @else {
-                      <p class="font-mono text-zinc-500 text-xs italic">Hasta el suelo</p>
-                    }
-                  </div>
-
-                  <!-- Izquierda -->
-                  <div class="p-2 bg-zinc-950/70 rounded-lg border border-zinc-800/90">
-                    <span class="text-[10px] text-zinc-400 flex items-center gap-1 mb-0.5">
-                      <span class="material-icons text-xs text-cyan-400">arrow_back</span>
-                      Hacia Izquierda:
-                    </span>
-                    @if (clr.leftClearance !== null) {
-                      <p class="font-mono font-bold text-cyan-300 text-sm">{{ clr.leftClearance }} mm</p>
-                      <p class="text-[9px] text-zinc-500 truncate" [title]="clr.leftNeighborName || ''">
-                        hasta {{ clr.leftNeighborName }}
-                      </p>
-                    } @else {
-                      <p class="font-mono text-zinc-500 text-xs italic">Espacio abierto</p>
-                    }
-                  </div>
-
-                  <!-- Derecha -->
-                  <div class="p-2 bg-zinc-950/70 rounded-lg border border-zinc-800/90">
-                    <span class="text-[10px] text-zinc-400 flex items-center gap-1 mb-0.5">
-                      <span class="material-icons text-xs text-cyan-400">arrow_forward</span>
-                      Hacia Derecha:
-                    </span>
-                    @if (clr.rightClearance !== null) {
-                      <p class="font-mono font-bold text-cyan-300 text-sm">{{ clr.rightClearance }} mm</p>
-                      <p class="text-[9px] text-zinc-500 truncate" [title]="clr.rightNeighborName || ''">
-                        hasta {{ clr.rightNeighborName }}
-                      </p>
-                    } @else {
-                      <p class="font-mono text-zinc-500 text-xs italic">Espacio abierto</p>
-                    }
-                  </div>
-                </div>
-              </div>
+              }
             }
 
-            <!-- SECTION 2: TABLERO & MELAMINA ASIGNADA (Espesor sincronizado al 100%) -->
-            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2.5">
+            <!-- SECTION 2: TABLERO & MELAMINA ASIGNADA -->
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2.5">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                  <span class="material-icons text-xs text-amber-400">palette</span>
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-amber-500">palette</span>
                   Tablero & Espesor
                 </span>
-                <span class="text-xs font-mono font-bold text-cyan-300 bg-cyan-950/90 px-2 py-0.5 rounded border border-cyan-800/80">
+                <span class="text-xs font-mono font-bold text-sky-700 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
                   {{ sel.thickness }} mm
                 </span>
               </div>
 
               <!-- Selector de Material del Proyecto -->
               <div class="space-y-1">
-                <span class="text-[10px] text-zinc-400 font-medium block">Melamina Asignada a esta Pieza:</span>
+                <span class="text-[10px] text-slate-500 font-medium block">Melamina Asignada a esta Pieza:</span>
                 <select 
                   [value]="sel.materialId"
                   (change)="onMaterialChange($any($event.target).value)"
-                  class="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-white focus:outline-hidden focus:border-cyan-400">
+                  class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-hidden focus:border-sky-500">
                   @for (mat of materials(); track mat.id) {
                     <option [value]="mat.id">
                       {{ mat.name }} ({{ mat.thickness }} mm)
@@ -434,235 +438,165 @@
               </div>
 
               <!-- Botones de Espesor Rápido -->
-              <div class="space-y-1 pt-1 border-t border-zinc-800/80">
-                <span class="text-[10px] text-zinc-400 font-medium block">Espesor Rápido de Taller:</span>
+              <div class="space-y-1 pt-1 border-t border-slate-200">
+                <span class="text-[10px] text-slate-500 font-medium block">Espesor Rápido de Taller:</span>
                 <div class="grid grid-cols-4 gap-1">
                   <button 
                     type="button" 
                     (click)="onThicknessChange(18)"
-                    [class]="sel.thickness === 18 ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
-                    class="py-1 text-[11px] rounded transition">
+                    [class]="sel.thickness === 18 ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1 text-[11px] rounded-lg transition shadow-2xs">
                     18 mm
                   </button>
                   <button 
                     type="button" 
                     (click)="onThicknessChange(15)"
-                    [class]="sel.thickness === 15 ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
-                    class="py-1 text-[11px] rounded transition">
+                    [class]="sel.thickness === 15 ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1 text-[11px] rounded-lg transition shadow-2xs">
                     15 mm
                   </button>
                   <button 
                     type="button" 
                     (click)="onThicknessChange(3)"
-                    [class]="sel.thickness === 3 ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
-                    class="py-1 text-[11px] rounded transition">
+                    [class]="sel.thickness === 3 ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1 text-[11px] rounded-lg transition shadow-2xs">
                     3 mm
                   </button>
                   <button 
                     type="button" 
                     (click)="onThicknessChange(36)"
-                    [class]="sel.thickness === 36 ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
-                    class="py-1 text-[11px] rounded transition">
+                    [class]="sel.thickness === 36 ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1 text-[11px] rounded-lg transition shadow-2xs">
                     36 mm
                   </button>
                 </div>
               </div>
             </div>
 
-            <!-- SECTION 3: POSICIÓN 3D MILIMÉTRICA (Ajuste Asistido) -->
-            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-3">
-              <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                <span class="material-icons text-xs text-amber-400">open_with</span>
+            <!-- SECTION 3: POSICIÓN 3D MILIMÉTRICA -->
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
+              <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span class="material-icons text-xs text-amber-500">open_with</span>
                 Posición 3D en Milímetros
               </span>
 
               <!-- EJE X -->
               <div class="space-y-1">
                 <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-zinc-400">Eje X (Izquierda / Derecha):</span>
-                  <span class="font-mono text-cyan-300 font-bold">{{ sel.posX ?? 0 }} mm</span>
+                  <span class="text-slate-600">Eje X (Izquierda / Derecha):</span>
+                  <span class="font-mono text-slate-800 font-bold">{{ sel.posX ?? 0 }} mm</span>
                 </div>
                 <div class="flex items-center gap-1">
-                  <button (click)="adjustPartProperty('posX', -50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-50</button>
-                  <button (click)="adjustPartProperty('posX', -10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-10</button>
+                  <button (click)="adjustPartProperty('posX', -50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-50</button>
+                  <button (click)="adjustPartProperty('posX', -10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-10</button>
                   <input 
                     type="number" 
                     step="5"
                     [value]="sel.posX ?? 0"
                     (input)="updateSelectedPart({ posX: +$any($event.target).value })"
-                    class="flex-1 px-1.5 py-0.5 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-white font-mono" />
-                  <button (click)="adjustPartProperty('posX', 10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+10</button>
-                  <button (click)="adjustPartProperty('posX', 50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+50</button>
+                    class="flex-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded-lg text-center text-xs text-slate-800 font-mono shadow-2xs" />
+                  <button (click)="adjustPartProperty('posX', 10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+10</button>
+                  <button (click)="adjustPartProperty('posX', 50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+50</button>
                 </div>
               </div>
 
-              <!-- EJE Y (Altura desde suelo) -->
+              <!-- EJE Y -->
               <div class="space-y-1">
                 <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-zinc-400">Eje Y (Elevación del Suelo):</span>
-                  <span class="font-mono text-cyan-300 font-bold">{{ sel.posY ?? 0 }} mm</span>
+                  <span class="text-slate-600">Eje Y (Elevación del Suelo):</span>
+                  <span class="font-mono text-slate-800 font-bold">{{ sel.posY ?? 0 }} mm</span>
                 </div>
                 <div class="flex items-center gap-1">
-                  <button (click)="adjustPartProperty('posY', -50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-50</button>
-                  <button (click)="adjustPartProperty('posY', -10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-10</button>
+                  <button (click)="adjustPartProperty('posY', -50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-50</button>
+                  <button (click)="adjustPartProperty('posY', -10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-10</button>
                   <input 
                     type="number" 
                     step="5"
                     [value]="sel.posY ?? 0"
                     (input)="updateSelectedPart({ posY: +$any($event.target).value })"
-                    class="flex-1 px-1.5 py-0.5 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-white font-mono" />
-                  <button (click)="adjustPartProperty('posY', 10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+10</button>
-                  <button (click)="adjustPartProperty('posY', 50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+50</button>
+                    class="flex-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded-lg text-center text-xs text-slate-800 font-mono shadow-2xs" />
+                  <button (click)="adjustPartProperty('posY', 10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+10</button>
+                  <button (click)="adjustPartProperty('posY', 50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+50</button>
                 </div>
               </div>
 
-              <!-- EJE Z (Profundidad) -->
+              <!-- EJE Z -->
               <div class="space-y-1">
                 <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-zinc-400">Eje Z (Profundidad adelante/atrás):</span>
-                  <span class="font-mono text-cyan-300 font-bold">{{ sel.posZ ?? 0 }} mm</span>
+                  <span class="text-slate-600">Eje Z (Profundidad adelante/atrás):</span>
+                  <span class="font-mono text-slate-800 font-bold">{{ sel.posZ ?? 0 }} mm</span>
                 </div>
                 <div class="flex items-center gap-1">
-                  <button (click)="adjustPartProperty('posZ', -50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-50</button>
-                  <button (click)="adjustPartProperty('posZ', -10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">-10</button>
+                  <button (click)="adjustPartProperty('posZ', -50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-50</button>
+                  <button (click)="adjustPartProperty('posZ', -10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-10</button>
                   <input 
                     type="number" 
                     step="5"
                     [value]="sel.posZ ?? 0"
                     (input)="updateSelectedPart({ posZ: +$any($event.target).value })"
-                    class="flex-1 px-1.5 py-0.5 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-white font-mono" />
-                  <button (click)="adjustPartProperty('posZ', 10)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+10</button>
-                  <button (click)="adjustPartProperty('posZ', 50)" class="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-[10px] rounded font-bold">+50</button>
+                    class="flex-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded-lg text-center text-xs text-slate-800 font-mono shadow-2xs" />
+                  <button (click)="adjustPartProperty('posZ', 10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+10</button>
+                  <button (click)="adjustPartProperty('posZ', 50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+50</button>
                 </div>
               </div>
 
               <!-- Alineaciones rápidas de 1 clic -->
-              <div class="grid grid-cols-3 gap-1 pt-1 border-t border-zinc-800">
+              <div class="grid grid-cols-3 gap-1 pt-1 border-t border-slate-200">
                 <button 
                   type="button" 
                   (click)="alignPart('floor')"
-                  class="py-1 px-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] text-center transition font-semibold">
+                  class="py-1 px-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-semibold shadow-2xs">
                   Al Suelo
                 </button>
                 <button 
                   type="button" 
                   (click)="alignPart('centerX')"
-                  class="py-1 px-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] text-center transition font-semibold">
+                  class="py-1 px-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-semibold shadow-2xs">
                   Centrar X
                 </button>
                 <button 
                   type="button" 
                   (click)="alignPart('centerZ')"
-                  class="py-1 px-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] text-center transition font-semibold">
+                  class="py-1 px-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-semibold shadow-2xs">
                   Centrar Z
                 </button>
               </div>
 
             </div>
 
-            <!-- SECTION CAD: COTAS DE LUZ LIBRE (HUECOS ÚTILES ENTRE PIEZAS) -->
-            @if (clearanceInfo(); as clr) {
-              @if (clr.topClearance !== null || clr.bottomClearance !== null || clr.leftClearance !== null || clr.rightClearance !== null) {
-                <div class="bg-emerald-950/30 p-3 rounded-xl border border-emerald-700/60 space-y-2">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                      <span class="material-icons text-xs text-emerald-400">straighten</span>
-                      Luz Libre Útil (CAD SketchUp)
-                    </span>
-                    <span class="text-[10px] font-mono font-bold bg-emerald-900/80 text-emerald-200 px-1.5 py-0.5 rounded border border-emerald-600/40">
-                      Hueco Neto
-                    </span>
-                  </div>
-                  <p class="text-[10px] text-emerald-200/70 leading-tight">
-                    Distancias interiores netas hasta las piezas adyacentes (descontando espesores):
-                  </p>
-                  <div class="grid grid-cols-2 gap-2 text-xs">
-                    @if (clr.topClearance !== null) {
-                      <div class="bg-zinc-900/90 p-2 rounded-lg border border-emerald-800/50">
-                        <span class="text-[10px] text-zinc-400 flex items-center gap-1">
-                          <span class="material-icons text-[12px] text-emerald-400">arrow_upward</span>
-                          Arriba:
-                        </span>
-                        <p class="text-sm font-bold text-emerald-300 font-mono mt-0.5">{{ clr.topClearance }} mm</p>
-                        @if (clr.topNeighborName) {
-                          <p class="text-[9px] text-zinc-500 truncate mt-0.5" [title]="clr.topNeighborName">Hasta {{ clr.topNeighborName }}</p>
-                        }
-                      </div>
-                    }
-                    @if (clr.bottomClearance !== null) {
-                      <div class="bg-zinc-900/90 p-2 rounded-lg border border-emerald-800/50">
-                        <span class="text-[10px] text-zinc-400 flex items-center gap-1">
-                          <span class="material-icons text-[12px] text-emerald-400">arrow_downward</span>
-                          Abajo:
-                        </span>
-                        <p class="text-sm font-bold text-emerald-300 font-mono mt-0.5">{{ clr.bottomClearance }} mm</p>
-                        @if (clr.bottomNeighborName) {
-                          <p class="text-[9px] text-zinc-500 truncate mt-0.5" [title]="clr.bottomNeighborName">Hasta {{ clr.bottomNeighborName }}</p>
-                        }
-                      </div>
-                    }
-                    @if (clr.leftClearance !== null) {
-                      <div class="bg-zinc-900/90 p-2 rounded-lg border border-emerald-800/50">
-                        <span class="text-[10px] text-zinc-400 flex items-center gap-1">
-                          <span class="material-icons text-[12px] text-emerald-400">arrow_back</span>
-                          Izquierda:
-                        </span>
-                        <p class="text-sm font-bold text-emerald-300 font-mono mt-0.5">{{ clr.leftClearance }} mm</p>
-                        @if (clr.leftNeighborName) {
-                          <p class="text-[9px] text-zinc-500 truncate mt-0.5" [title]="clr.leftNeighborName">Hasta {{ clr.leftNeighborName }}</p>
-                        }
-                      </div>
-                    }
-                    @if (clr.rightClearance !== null) {
-                      <div class="bg-zinc-900/90 p-2 rounded-lg border border-emerald-800/50">
-                        <span class="text-[10px] text-zinc-400 flex items-center gap-1">
-                          <span class="material-icons text-[12px] text-emerald-400">arrow_forward</span>
-                          Derecha:
-                        </span>
-                        <p class="text-sm font-bold text-emerald-300 font-mono mt-0.5">{{ clr.rightClearance }} mm</p>
-                        @if (clr.rightNeighborName) {
-                          <p class="text-[9px] text-zinc-500 truncate mt-0.5" [title]="clr.rightNeighborName">Hasta {{ clr.rightNeighborName }}</p>
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-            }
-
-            <!-- SECTION 3: ORIENTACIÓN ESPACIAL -->
-            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2">
-              <span class="text-xs font-bold text-zinc-300 block">Orientación de la Pieza:</span>
+            <!-- SECTION: ORIENTACIÓN ESPACIAL -->
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+              <span class="text-xs font-bold text-slate-800 block">Orientación de la Pieza:</span>
               <div class="grid grid-cols-3 gap-1 text-[10px]">
                 <button 
                   type="button"
                   (click)="setPartOrientation('horizontal')"
-                  [class]="(sel.orientation || 'horizontal') === 'horizontal' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
-                  class="py-1.5 rounded transition text-center font-medium">
+                  [class]="(sel.orientation || 'horizontal') === 'horizontal' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                  class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
                   Horizontal
                 </button>
                 <button 
                   type="button"
                   (click)="setPartOrientation('vertical_yz')"
-                  [class]="sel.orientation === 'vertical_yz' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
-                  class="py-1.5 rounded transition text-center font-medium">
+                  [class]="sel.orientation === 'vertical_yz' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                  class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
                   Lateral (YZ)
                 </button>
                 <button 
                   type="button"
                   (click)="setPartOrientation('vertical_xy')"
-                  [class]="sel.orientation === 'vertical_xy' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
-                  class="py-1.5 rounded transition text-center font-medium">
+                  [class]="sel.orientation === 'vertical_xy' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                  class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
                   Frontal (XY)
                 </button>
               </div>
             </div>
 
             <!-- SECTION 4: TAPACANTOS INTELIGENTES (L1, L2, A1, A2) -->
-            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2">
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-zinc-300">Tapacantos (Bordes):</span>
-                <span class="text-[10px] text-zinc-500">Clic para cambiar</span>
+                <span class="text-xs font-bold text-slate-800">Tapacantos (Bordes):</span>
+                <span class="text-[10px] text-slate-400">Clic para cambiar</span>
               </div>
               
               <div class="grid grid-cols-4 gap-1.5 text-center">
@@ -670,8 +604,8 @@
                 <button 
                   type="button"
                   (click)="togglePartEdge('l1')"
-                  [class]="sel.edges.l1 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : (sel.edges.l1 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400')"
-                  class="p-1.5 rounded-lg border border-zinc-700 transition flex flex-col items-center">
+                  [class]="sel.edges.l1 === 'thick' ? 'bg-amber-500 text-white font-bold' : (sel.edges.l1 === 'thin' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-500 border border-slate-200')"
+                  class="p-1.5 rounded-lg transition flex flex-col items-center shadow-2xs">
                   <span class="text-[9px] uppercase font-mono">L1</span>
                   <span class="text-[10px]">{{ sel.edges.l1 === 'thick' ? '2.0mm' : (sel.edges.l1 === 'thin' ? '0.45mm' : 'Sin') }}</span>
                 </button>
@@ -680,8 +614,8 @@
                 <button 
                   type="button"
                   (click)="togglePartEdge('l2')"
-                  [class]="sel.edges.l2 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : (sel.edges.l2 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400')"
-                  class="p-1.5 rounded-lg border border-zinc-700 transition flex flex-col items-center">
+                  [class]="sel.edges.l2 === 'thick' ? 'bg-amber-500 text-white font-bold' : (sel.edges.l2 === 'thin' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-500 border border-slate-200')"
+                  class="p-1.5 rounded-lg transition flex flex-col items-center shadow-2xs">
                   <span class="text-[9px] uppercase font-mono">L2</span>
                   <span class="text-[10px]">{{ sel.edges.l2 === 'thick' ? '2.0mm' : (sel.edges.l2 === 'thin' ? '0.45mm' : 'Sin') }}</span>
                 </button>
@@ -690,8 +624,8 @@
                 <button 
                   type="button"
                   (click)="togglePartEdge('a1')"
-                  [class]="sel.edges.a1 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : (sel.edges.a1 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400')"
-                  class="p-1.5 rounded-lg border border-zinc-700 transition flex flex-col items-center">
+                  [class]="sel.edges.a1 === 'thick' ? 'bg-amber-500 text-white font-bold' : (sel.edges.a1 === 'thin' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-500 border border-slate-200')"
+                  class="p-1.5 rounded-lg transition flex flex-col items-center shadow-2xs">
                   <span class="text-[9px] uppercase font-mono">A1</span>
                   <span class="text-[10px]">{{ sel.edges.a1 === 'thick' ? '2.0mm' : (sel.edges.a1 === 'thin' ? '0.45mm' : 'Sin') }}</span>
                 </button>
@@ -700,43 +634,43 @@
                 <button 
                   type="button"
                   (click)="togglePartEdge('a2')"
-                  [class]="sel.edges.a2 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : (sel.edges.a2 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400')"
-                  class="p-1.5 rounded-lg border border-zinc-700 transition flex flex-col items-center">
+                  [class]="sel.edges.a2 === 'thick' ? 'bg-amber-500 text-white font-bold' : (sel.edges.a2 === 'thin' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-500 border border-slate-200')"
+                  class="p-1.5 rounded-lg transition flex flex-col items-center shadow-2xs">
                   <span class="text-[9px] uppercase font-mono">A2</span>
                   <span class="text-[10px]">{{ sel.edges.a2 === 'thick' ? '2.0mm' : (sel.edges.a2 === 'thin' ? '0.45mm' : 'Sin') }}</span>
                 </button>
               </div>
             </div>
 
-            <!-- SECTION 4.5: MECANIZADOS Y PERFORACIONES PARAMÉTRICAS (CNC / TALLER) -->
-            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 space-y-2.5">
+            <!-- SECTION 4.5: MECANIZADOS Y PERFORACIONES PARAMÉTRICAS -->
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                  <span class="material-icons text-xs text-amber-400">adjust</span>
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-amber-500">adjust</span>
                   Mecanizados de Ensamble
                 </span>
-                <span class="text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                <span class="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg border border-amber-200">
                   {{ selectedPartDrillHoles().length }} taladros
                 </span>
               </div>
 
               @if (selectedPartDrillHoles().length > 0) {
-                <div class="space-y-1.5 max-h-40 overflow-y-auto pr-1 text-xs">
+                <div class="space-y-1.5 max-h-36 overflow-y-auto pr-1 text-xs">
                   @for (hole of selectedPartDrillHoles(); track hole.id) {
-                    <div class="p-2 bg-zinc-900/90 rounded-lg border border-zinc-800/80 flex items-start gap-2">
+                    <div class="p-2 bg-white rounded-lg border border-slate-200 flex items-start gap-2 shadow-2xs">
                       <span class="w-2 h-2 rounded-full mt-1 shrink-0"
-                        [class]="hole.type === 'screw_4x50' ? 'bg-cyan-400' : (hole.type === 'dowel_8x30' ? 'bg-amber-400' : 'bg-purple-400')">
+                        [class]="hole.type === 'screw_4x50' ? 'bg-sky-500' : (hole.type === 'dowel_8x30' ? 'bg-amber-500' : 'bg-purple-500')">
                       </span>
                       <div class="min-w-0 flex-1">
                         <div class="flex items-center justify-between">
-                          <span class="font-bold text-zinc-200">
+                          <span class="font-bold text-slate-800">
                             {{ hole.type === 'screw_4x50' ? 'Tornillo 4x50' : (hole.type === 'dowel_8x30' ? 'Tarugo 8x30' : 'Bisagra 35mm') }}
                           </span>
-                          <span class="font-mono text-[10px] text-zinc-400">
+                          <span class="font-mono text-[10px] text-slate-500">
                             Ø{{ hole.diameter }}×{{ hole.depth }}mm
                           </span>
                         </div>
-                        <p class="text-[10px] text-zinc-400 truncate mt-0.5" [title]="hole.description">
+                        <p class="text-[10px] text-slate-400 truncate mt-0.5" [title]="hole.description">
                           {{ hole.description }}
                         </p>
                       </div>
@@ -744,27 +678,27 @@
                   }
                 </div>
               } @else {
-                <div class="p-3 text-center bg-zinc-900/50 rounded-lg border border-zinc-800 text-[11px] text-zinc-500">
-                  Pieza libre sin uniones a 90° o no requiere perforaciones de ensamble.
+                <div class="p-2.5 text-center bg-white rounded-lg border border-slate-200 text-[11px] text-slate-400">
+                  Pieza sin uniones a 90° o no requiere perforaciones adicionales.
                 </div>
               }
             </div>
 
             <!-- SECTION 5: ACTIONS (Duplicar / Eliminar) -->
-            <div class="pt-2 flex items-center gap-2">
+            <div class="pt-1 flex items-center gap-2">
               <button 
-                type="button"
+                type="button" 
                 (click)="duplicateSelectedPart()"
-                class="flex-1 py-2 text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl border border-zinc-700 flex items-center justify-center gap-1.5 transition">
-                <span class="material-icons text-sm text-cyan-400">content_copy</span>
+                class="flex-1 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 transition shadow-2xs">
+                <span class="material-icons text-sm text-sky-600">content_copy</span>
                 <span>Duplicar Pieza</span>
               </button>
 
               <button 
-                type="button"
+                type="button" 
                 (click)="deleteSelectedPart()"
-                class="flex-1 py-2 text-xs font-semibold bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 rounded-xl border border-rose-800/60 flex items-center justify-center gap-1.5 transition">
-                <span class="material-icons text-sm text-rose-400">delete</span>
+                class="flex-1 py-2 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl border border-rose-200 flex items-center justify-center gap-1.5 transition shadow-2xs">
+                <span class="material-icons text-sm text-rose-500">delete</span>
                 <span>Eliminar Pieza</span>
               </button>
             </div>
@@ -773,19 +707,19 @@
             
             <!-- Empty state when no piece is selected -->
             <div class="p-8 text-center space-y-3">
-              <div class="w-12 h-12 rounded-2xl bg-zinc-800/80 border border-zinc-700 flex items-center justify-center mx-auto text-zinc-400">
-                <span class="material-icons text-2xl text-cyan-400">touch_app</span>
+              <div class="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
+                <span class="material-icons text-2xl text-sky-600">touch_app</span>
               </div>
               <div>
-                <h4 class="text-sm font-bold text-white">Ninguna pieza seleccionada</h4>
-                <p class="text-xs text-zinc-400 mt-1">
-                  Haz clic directamente sobre cualquier pieza en el lienzo 3D para editar sus medidas y posición de forma independiente.
+                <h4 class="text-sm font-bold text-slate-800">Ninguna pieza seleccionada</h4>
+                <p class="text-xs text-slate-500 mt-1">
+                  Haz clic directamente sobre cualquier pieza en el lienzo 3D o usa el clic derecho para abrir el menú contextual.
                 </p>
               </div>
               <button 
                 type="button" 
                 (click)="activeDockTab.set('catalog')"
-                class="px-4 py-2 text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl transition shadow">
+                class="px-4 py-2 text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white rounded-xl transition shadow-xs">
                 Abrir Catálogo de Piezas (+)
               </button>
             </div>
@@ -795,17 +729,17 @@
         </div>
       }
 
-      <!-- TAB 2: PIECE CATALOG & ASSEMBLY TREE -->
+      <!-- TAB 2: PIECE CATALOG & ASSEMBLY TREE (SketchUp Classic Style) -->
       @if (activeDockTab() === 'catalog') {
-        <div class="p-3.5 space-y-4 overflow-y-auto flex-1 min-h-0">
+        <div class="p-3.5 space-y-3.5 overflow-y-auto flex-1 min-h-0">
           
           <!-- CATALOG OF COMPONENTS TO ADD -->
           <div class="space-y-2">
-            <span class="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-              <span class="material-icons text-xs text-amber-400">library_add</span>
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span class="material-icons text-xs text-amber-500">library_add</span>
               Catálogo de Piezas (Añadir al Mueble)
             </span>
-            <p class="text-[11px] text-zinc-400">
+            <p class="text-[11px] text-slate-500">
               Selecciona una pieza para insertarla en el modelo 3D con medidas iniciales de taller:
             </p>
 
@@ -813,122 +747,122 @@
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('top')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-cyan-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-cyan-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ Techo / Barra</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-sky-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-sky-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ Techo / Barra</span>
               </button>
 
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('side_left')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-amber-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ Lateral Izq.</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-amber-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-amber-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ Lateral Izq.</span>
               </button>
 
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('side_right')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-amber-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ Lateral Der.</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-amber-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-amber-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ Lateral Der.</span>
               </button>
 
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('bottom')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-orange-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-orange-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ Piso / Base</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-orange-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-orange-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ Piso / Base</span>
               </button>
 
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('divider')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-yellow-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-yellow-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ División Vert.</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-yellow-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-yellow-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ División Vert.</span>
               </button>
 
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('shelf')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-emerald-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-emerald-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ Repisa Interior</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-emerald-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-emerald-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ Repisa Interior</span>
               </button>
 
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('back')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-purple-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-purple-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ Fondo Trasero</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-purple-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-purple-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ Fondo Trasero</span>
               </button>
 
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('door')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-blue-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-blue-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ Puerta Batiente</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-blue-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ Puerta Batiente</span>
               </button>
 
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('drawer_front')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-indigo-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-indigo-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ Frente Cajón</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-indigo-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ Frente Cajón</span>
               </button>
 
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('plinth')"
-                class="p-2 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-stone-500/50 rounded-xl text-left transition flex items-center gap-2 group">
-                <span class="w-2.5 h-2.5 rounded bg-stone-400 group-hover:scale-125 transition"></span>
-                <span class="text-zinc-200 font-medium">+ Zócalo Piso</span>
+                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-stone-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
+                <span class="w-2.5 h-2.5 rounded bg-stone-500 group-hover:scale-125 transition"></span>
+                <span class="text-slate-800 font-medium">+ Zócalo Piso</span>
               </button>
             </div>
 
             <!-- Free custom piece -->
             <button 
-              type="button"
+              type="button" 
               (click)="addPieceFromCatalog('free')"
-              class="w-full py-2 bg-zinc-950/80 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-cyan-400 rounded-xl text-xs font-semibold text-zinc-300 hover:text-white transition flex items-center justify-center gap-1.5">
-              <span class="material-icons text-sm text-cyan-400">add</span>
+              class="w-full py-2 bg-slate-50 hover:bg-white border border-dashed border-slate-300 hover:border-sky-500 rounded-xl text-xs font-semibold text-slate-700 transition flex items-center justify-center gap-1.5 shadow-2xs">
+              <span class="material-icons text-sm text-sky-600">add</span>
               <span>+ Añadir Pieza Libre Personalizada</span>
             </button>
           </div>
 
           <!-- ASSEMBLY STRUCTURE / PIECES LIST -->
-          <div class="space-y-2 pt-2 border-t border-zinc-800">
+          <div class="space-y-2 pt-2 border-t border-slate-200">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-zinc-300 flex items-center gap-1">
-                <span class="material-icons text-xs text-cyan-400">format_list_numbered</span>
+              <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
+                <span class="material-icons text-xs text-sky-600">format_list_numbered</span>
                 Piezas Actuales ({{ currentParts().length }})
               </span>
-              <span class="text-[10px] text-zinc-500 font-mono">L × A × E</span>
+              <span class="text-[10px] text-slate-400 font-mono">L × A × E</span>
             </div>
 
-            <div class="space-y-1 max-h-[300px] overflow-y-auto pr-1">
+            <div class="space-y-1 max-h-[280px] overflow-y-auto pr-1">
               @for (part of currentParts(); track part.id) {
                 <div 
-                  [class]="selectedPartId() === part.id ? 'bg-cyan-500/20 border-cyan-400/80 text-white' : 'bg-zinc-950/60 border-zinc-800 text-zinc-300 hover:bg-zinc-800/80'"
+                  [class]="selectedPartId() === part.id ? 'bg-sky-50 border-sky-300 text-sky-900 shadow-2xs' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
                   class="p-1.5 rounded-xl border flex items-center justify-between gap-2 transition text-xs">
                   
                   <button 
-                    type="button"
-                    (click)="selectPartById(part.id)"
+                    type="button" 
+                    (click)="selectPartById(part.id)" 
                     class="flex items-center gap-2 min-w-0 flex-1 text-left">
                     <span 
-                      [class]="selectedPartId() === part.id ? 'bg-cyan-400 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-400'"
+                      [class]="selectedPartId() === part.id ? 'bg-sky-500 text-white font-bold' : 'bg-white border border-slate-200 text-slate-600'"
                       class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] shrink-0 font-mono">
                       {{ $index + 1 }}
                     </span>
                     <div class="truncate">
                       <p class="font-bold truncate text-[11px]">{{ part.name }}</p>
-                      <p class="font-mono text-[10px] text-zinc-400">
+                      <p class="font-mono text-[10px] text-slate-400">
                         {{ part.length }} × {{ part.width }} × {{ part.thickness }} mm
                       </p>
                     </div>
@@ -936,9 +870,9 @@
 
                   <div class="flex items-center gap-1 shrink-0">
                     <button 
-                      type="button"
-                      (click)="deletePartById(part.id, $event)"
-                      class="text-zinc-500 hover:text-rose-400 p-1 rounded transition"
+                      type="button" 
+                      (click)="deletePartById(part.id, $event)" 
+                      class="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition"
                       title="Eliminar esta pieza">
                       <span class="material-icons text-xs">delete</span>
                     </button>

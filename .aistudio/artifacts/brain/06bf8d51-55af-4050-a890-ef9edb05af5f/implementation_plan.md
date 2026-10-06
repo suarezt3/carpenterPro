@@ -1,146 +1,112 @@
-# Rediseño de Experiencia de Usuario Estilo SketchUp & Herramienta Empujar/Tirar (Push/Pull)
+# Plan: Herramientas SketchUp (Rectángulo 3D, Rotar), Menú Contextual Clic Derecho y Rediseño de Bandeja Classic
 
-Este plan aborda la simplificación integral de la interfaz de MelamiPro Studio para transformar el entorno de modelado en un espacio limpio, despejado y profesional inspirado en **SketchUp 2024**, eliminando la duplicación de barras, reduciendo la saturación de colores oscuros y añadiendo la icónica herramienta interactiva **Empujar/Tirar (Push/Pull)**.
+Este plan define la implementación de las capacidades solicitadas inspiradas en **SketchUp 2024**, incorporando herramientas de creación geométrica, menú contextual de ingeniería rápida al hacer clic derecho y la unificación cromática de la bandeja lateral derecha según el estilo **SketchUp Classic**.
 
 ---
 
-## User Review & Critical Decisions
+## Decisiones Críticas Acordadas con el Usuario
 
 > [!IMPORTANT]
-> A continuación se detallan las decisiones acordadas para la nueva interfaz y ergonomía de trabajo:
+> A partir de las capturas y respuestas del usuario, se definen los siguientes componentes:
 
-- **Estilo Visual e Identidad Cromática**:
-  - Transición del diseño negro denso hacia una paleta **SketchUp Classic / Studio Light**: marcos en grises neutros limpios (`#f1f5f9`, `#e2e8f0`, `#ffffff`), fondo de modelado 3D en gris perla claro con horizonte suave y líneas de eje ortogonales discretas.
-- **Limpieza de Espacio y Eliminación de Duplicados**:
-  - Se elimina por completo la segunda barra de título redundante que contenía botones repetidos ("Plano 2D", "Plano 2D PDF", "DXF CNC", "Barra Módulo", "Bajo Mesada").
-  - Las acciones globales de guardado, exportación e impresión se centralizan en la barra superior compacta de un solo renglón.
-  - Las plantillas de muebles se trasladan a un menú desplegable limpio "Plantillas de Mueble" en la barra superior.
-- **Disposición Ergonómica Estilo SketchUp**:
-  - **Barra Vertical Izquierda (Conjunto de Herramientas CAD)**: Herramientas compactas de 36px organizadas en columna:
-    1. *Seleccionar* (Puntero / Flecha estándar).
-    2. *Empujar / Tirar (Push/Pull)*: La nueva herramienta para estirar o encoger caras directamente arrastrando con el ratón.
-    3. *Mover / Trasladar*: Gizmo de traslación 3D para posicionar piezas.
-    4. *Cinta Métrica 3D*: Para medir distancias y luces interiores.
-    5. *Añadir Pieza*: Desplegable rápido para insertar lateral, piso, techo o estante.
-    6. *Vistas Rápidas*: Iso 3D, Frontal, Lateral y Planta en un menú desplegable compacto.
-    7. *Mecanizados y Cotas*: Conmutadores discretos de taladros y cotas.
-  - **Bandeja Derecha Colapsable ("Bandeja Predeterminada")**:
-    - Un botón flotante permite plegar/desplegar la bandeja con 1 clic para disponer del **100% del ancho del lienzo 3D** completamente despejado para modelar sin estorbos.
-  - **Conservación del HUD de Micro-Ajuste**:
-    - Se mantiene intacto el cuadro de micro-ajuste de zoom y posición milimétrica en la esquina inferior izquierda que el usuario prefiere tener a mano.
-- **Herramienta Interactiva "Empujar / Tirar" (Push/Pull)**:
-  - Al activar la herramienta y pasar el cursor sobre cualquier cara de una pieza de melamina (cara superior, frontal, lateral), la cara se ilumina con una trama sutil.
-  - Al hacer clic y arrastrar hacia afuera o adentro, la dimensión correspondiente (*Largo* o *Ancho*) crece o decrece en tiempo real con indicador milimétrico flotante (`+20 mm`, `850 mm`).
+1. **Herramienta Dibujar Rectángulo 3D (Tecla `R`)**:
+   - Permite hacer clic y arrastrar en la cuadrícula milimétrica del suelo o sobre cualquier cara de una pieza existente para dibujar la huella rectangular de una nueva tabla de melamina con previsualización en vivo (`Largo × Ancho`).
+   - Al soltar el clic, la pieza se inserta de inmediato y el cursor queda listo para darle espesor o altura con la herramienta **Empujar / Tirar (Push/Pull)**.
 
----
+2. **Herramienta Rotar 3D (Tecla `Q`) con Transportador**:
+   - Renderiza un transportador circular con graduación de ángulos (0°, 45°, 90°, 180°) sobre la pieza activa.
+   - Permite giros rápidos de 90° en los tres planos (Horizontal, Lateral YZ, Frontal XY) o rotación interactiva con arrastre.
 
-## 1. Overview & Core Concept
+3. **Menú Contextual de Clic Derecho (SketchUp Entity Menu)**:
+   - Al hacer clic derecho sobre cualquier pieza en el espacio 3D, se abre un menú contextual flotante en la posición del ratón con las acciones acordadas:
+     - 📋 **Duplicar Pieza**: Clona la pieza con desplazamiento automático de 20 mm.
+     - 🔄 **Girar 90°**: Alterna instantáneamente la orientación (Horizontal ↔ Vertical ↔ Frontal).
+     - ⬇️ **Alinear al Suelo (Y = 0)**: Apoya la pieza en la base del mueble.
+     - 🎯 **Centrar en X / Centrar en Z**: Centra automáticamente en el vano o eje.
+     - 👁️ **Aislar Pieza**: Oculta temporalmente el resto del mueble para inspeccionar solo esta pieza; botón "Restaurar Vista" para regresar.
+     - 📦 **Agrupar / Desagrupar**: Añade o separa piezas del grupo de arrastre sincronizado.
+     - 🪵 **Cambiar Material / Tapacantos**: Menú rápido para asignar melamina y cantos.
+     - 🗑️ **Eliminar Pieza**: Suprime la pieza con atajo `Supr / Backspace`.
 
-### What It Does
-1. **Lienzo 3D Despejado y Sin Distracciones**: Libera más del 85% de la pantalla para el visor 3D, eliminando múltiples capas de tarjetas flotantes superpuestas y márgenes redundantes.
-2. **Herramienta Push/Pull Nativa**: Permite editar las dimensiones de cualquier pieza como en SketchUp: tocando la cara de un lateral para elevar la altura del mueble, o la cara de una balda para modificar el ancho interior sin tener que escribir en formularios numéricos.
-3. **Flujo de Herramientas Estándar CAD**: El usuario selecciona una herramienta en la barra izquierda (Seleccionar, Mover, Empujar, Medir) y el cursor responde en consecuencia con guía de ayuda contextual en la barra de estado inferior.
+4. **Rediseño Total de la Bandeja Lateral Derecha (Estilo SketchUp Classic)**:
+   - **Eliminación del fondo negro y la mezcla confusa de colores** (aguamarina, verde pastel, amarillo mostaza, rosa):
+     - **Superficies**: Tarjetas en blanco puro (`#ffffff`) sobre marco en gris perla suave (`#f8fafc` / `#f1f5f9`) con bordes sutiles de precisión (`#e2e8f0`).
+     - **Tipografía**: Grafito slate oscuro de alta legibilidad (`#0f172a` y `#334155`), sin textos fluorescentes.
+     - **Botones de Paso (-50, -10, +10, +50)**: Rediseñados a botones compactos limpios en gris neutro claro con respuesta táctil sobria.
+     - **Acento Unificado**: Azul técnico CAD (`#0284c7`) para estados activos, eliminando la confusión visual de múltiples tonalidades no relacionadas.
+
+5. **Fidelidad Visual de la Herramienta Empujar/Tirar (Push/Pull)**:
+   - Siguiendo la captura enviada por el usuario (Imagen 1), al posar el cursor sobre una cara, esta se resalta con la **trama punteada (stipple dot pattern)** clásica de SketchUp y un cursor gráfico distintivo con plano y flecha roja saliente.
 
 ---
 
-## 2. User Experience & Visual Design
+## 1. Arquitectura Técnica de Componentes
 
-### Key User Flows
-
-#### Flujo 1: Interacción con la Herramienta Empujar/Tirar (Push/Pull)
-1. El usuario hace clic en el icono **Empujar/Tirar** (icono estándar de cubo con flecha roja saliente `open_in_full` / `expand`) en la barra vertical izquierda.
-2. Al posar el ratón sobre el canto superior de un lateral, la cara superior se resalta con un marco azul técnico y un cursor indicador.
-3. El usuario arrastra hacia arriba: la pieza aumenta su longitud en tiempo real. En la barra inferior y junto al cursor aparece la cota milimétrica en vivo (ej. `Largo: 875 mm (+20 mm)`).
-4. Al soltar el clic, la medida queda aplicada, el ensamble y los mecanizados se recalculan automáticamente.
-
-#### Flujo 2: Ocultar y Mostrar la Bandeja Lateral Derecha
-1. Mientras diseña y revisa el mueble, el usuario hace clic en el botón de colapso `chevron_right` en el borde de la bandeja derecha.
-2. La bandeja se desliza suavemente hacia la derecha, expandiendo el lienzo 3D a pantalla completa.
-3. Al seleccionar una pieza o hacer clic en la pestaña de la bandeja, esta se despliega con su información técnica compacta.
-
-#### Flujo 3: Carga de Plantillas Limpia
-1. En la barra superior, un botón desplegable con menú compacto **"Plantillas"** permite elegir: *Bajo Mesada*, *Barra Módulo* o *Lienzo en Blanco*, eliminando los 3 botones sueltos que ocupaban la barra secundaria.
-
-### Visual Identity & Theme
-- **Fondo de Escena 3D**: Gris estudio limpio (`#f8fafc` a `#f1f5f9`), suelo con cuadrícula milimétrica nítida en gris pizarra suave (`#cbd5e1`), sombras suaves de oclusión ambiental.
-- **Cuerpo y Marco de Herramientas**: Superficies en gris neutro claro (`#ffffff` y `#f1f5f9`) con bordes sutiles (`#e2e8f0`), tipografía en gris grafito de alta legibilidad (`#0f172a`), acentos de acción en azul técnico (`#0284c7`) y ámbar de carpintería (`#f59e0b`).
-- **Barra de Estado Inferior Estilo SketchUp**: Franja inferior limpia de 28px con texto de ayuda contextual a la izquierda y el cuadro numérico *Medidas: [valor] mm* a la derecha.
+### Componentes Involucrados:
+- **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts`**:
+  - Estado `activeTool: 'select' | 'push_pull' | 'rectangle' | 'rotate' | 'move' | 'measure'`.
+  - Herramienta Rectángulo 3D: Raycasting sobre plano horizontal / caras, dibujo de rectángulo guía con `THREE.LineSegments` y generación de la nueva pieza `Part`.
+  - Herramienta Rotar 3D: Transportador circular (`THREE.RingGeometry` y marcas de ángulo a 0°, 90°, 180°, 270°).
+  - Menú Contextual 3D: Captura de evento `contextmenu` sobre piezas, emisión del evento `contextMenuOpened` con coordenadas de pantalla `(clientX, clientY)` y datos de la pieza.
+  - Trama punteada para Push/Pull mediante textura procedural de puntos generada en canvas HTML para simular la cara seleccionada de SketchUp.
+- **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.html`**:
+  - Incorporación de los botones **Rectángulo** (`crop_square` / `rectangle`) y **Rotar 3D** (`rotate_90_degrees_cw` / `sync`) en la paleta izquierda.
+  - Menú contextual flotante interactivo con animación suave y desenfoque de fondo.
+- **`src/app/components/module-designer/module-designer.html`**:
+  - Rediseño integral de las tarjetas de propiedades (Dimensiones, Luz Libre, Tablero, Posición 3D, Orientación, Tapacantos, Mecanizados) con la paleta **SketchUp Classic**.
+- **`src/app/services/project-storage.service.ts`**:
+  - Métodos utilitarios rápidos para duplicar pieza, alinear a suelo, aislar y rotar pieza en 90°.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. Plan de Implementación Paso a Paso
 
-### Decisión 1: Barra Vertical Izquierda vs Menús Flotantes Dispersos
-- **Enfoque Elegido**: Agrupar todas las herramientas interactivas del 3D en una barra vertical izquierda delgada (ancho 44px) fija al costado del viewport.
-- **Por qué**: Es el estándar indiscutible de CAD (SketchUp, AutoCAD, Blender). Elimina la dispersión visual donde los botones flotaban por arriba, por abajo y al centro tapando el mueble.
+### Paso 1: Rediseño Cromático de la Bandeja Lateral Derecha (SketchUp Classic)
+- En `module-designer.html`:
+  - Reemplazar las tarjetas oscuras `bg-zinc-950` y los múltiples tonos disonantes (aguamarina, verde pastel, amarillo chillón, botón rosa) por tarjetas blancas y gris perla (`bg-white border-slate-200 text-slate-800`).
+  - Unificar todas las secciones bajo una jerarquía tipográfica limpia y consistente:
+    - *Dimensiones de Corte*: Campos numéricos en fondo blanco con bordes discretos y botones `-50, -10, +10, +50` en gris slate claro (`bg-slate-100 hover:bg-slate-200 text-slate-700`).
+    - *Luz Libre*: Tarjetas compactas en blanco con bordes neutros y acento verde esmeralda sutil solo en los valores de hueco útil.
+    - *Tablero & Espesor*: Selector de melamina y botones de espesor (15mm, 18mm) en estilo botón de opción limpio.
+    - *Posición 3D*: Coordenadas X, Y, Z con botones alineados `Al Suelo`, `Centrar X`, `Centrar Z`.
+    - *Tapacantos*: Selector de 4 bordes unificado en escala de grises y azul técnico.
+    - *Botón Eliminar*: Sustituir el botón rosa por un botón sobrio en rojo técnico suave (`hover:bg-rose-50 text-rose-600 border-rose-200`).
 
-### Decisión 2: Implementación de Empujar/Tirar con Raycasting de Caras en Three.js
-- **Enfoque Elegido**: Raycaster que detecta la normal de la cara del cuboide sobre la cual incide el puntero (`face.normal`). Según la normal (+X, -X, +Y, -Y, +Z, -Z), el arrastre modifica directamente la coordenada dimensional correspondiente (`length` o `width`).
-- **Por qué**: Brinda una respuesta natural a 60 FPS sin necesidad de librerías externas adicionales, aprovechando la infraestructura Three.js que ya está optimizada en el proyecto.
+### Paso 2: Menú Contextual al Hacer Clic Derecho en Piezas 3D
+- En `furniture-3d-viewer.ts`:
+  - Agregar escucha del evento `contextmenu` en el `<canvas>`.
+  - Detectar si el clic derecho incide sobre una pieza mediante raycaster.
+  - Si incide sobre una pieza, seleccionar la pieza y desplegar el menú contextual en las coordenadas del cursor.
+  - Implementar acciones directas en el componente:
+    1. **Duplicar**: Clona la pieza con nuevo ID y desplazamiento de +25mm.
+    2. **Rotar 90°**: Cambia la orientación cíclicamente (Horizontal -> Lateral YZ -> Frontal XY) adaptando dimensiones.
+    3. **Alinear al Suelo**: Fija `posY = (thickness o height) / 2` apoyándola a cota 0mm.
+    4. **Centrar en X / Z**: Calcula el centro del mueble y coloca la pieza en el punto medio.
+    5. **Aislar Pieza**: Signal `isolatedPartId`: cuando está activo, oculta visualmente las demás piezas y muestra un chip flotante "Modo Aislado - Restaurar".
+    6. **Agrupar / Desagrupar**: Añade o retira de la selección múltiple.
+    7. **Eliminar**: Elimina la pieza con registro en el historial para Ctrl+Z.
 
-### Decisión 3: Bandeja Lateral Colapsable
-- **Enfoque Elegido**: Panel derecho con botón de alternancia colapsable (`isSidebarCollapsed = signal<boolean>(false)`).
-- **Por qué**: Permite que el usuario decida cuándo concentrarse en modelar visualmente (100% lienzo) y cuándo afinar detalles en el formulario de propiedades.
+### Paso 3: Herramienta Dibujar Rectángulo 3D (Tecla `R`)
+- Añadir la herramienta `rectangle` a la barra de herramientas izquierda (`activeTool = 'rectangle'`).
+- En `furniture-3d-viewer.ts`:
+  - Al hacer `pointerdown` en el suelo (plano Y=0) o sobre una cara de otra pieza, fijar la esquina inicial `(x0, z0)`.
+  - En `pointermove`, dibujar un rectángulo dinámico azul/ámbar proyectado en tiempo real con cota milimétrica (`Largo × Ancho`).
+  - En `pointerup`, crear la pieza con material por defecto y espesor de 18mm, seleccionarla automáticamente y pasar a la herramienta `push_pull` para extruir o ajustar su grosor.
 
----
+### Paso 4: Herramienta Rotar 3D con Transportador (Tecla `Q`)
+- Añadir la herramienta `rotate` a la barra izquierda.
+- Al activar sobre una pieza seleccionada, dibuja un transportador de ángulos circular sobre el plano dominante de la pieza.
+- Permite arrastrar el transportador o hacer clic en marcas de 90° para girar la pieza con precisión angular instantánea.
 
-## 4. Technical Architecture & Component Layout
-
-### Diagrama de la Nueva Interfaz SketchUp
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Top Bar: MelamiPro | Diseñador 3D · Despiece · Optimizador · Presupuesto | [Plantillas ▾] [Guardar] [PDF/DXF] │
-├───────┬─────────────────────────────────────────────────────────────────────────────────┬───────────────┤
-│ TOOLS │                                                                                 │ BANDEJA LAT.  │
-│ (Izq) │                               LIENZO 3D DESPEJADO                               │ (Colapsable)  │
-│  [↖]  │                                                                                 │               │
-│ Select│                  (Fondo Claro Estudio / Modelo 3D Limpio)                       │ • Propiedades │
-│  [⇲]  │                                                                                 │   de Pieza    │
-│Push/Pull                                                                                │ • Dimensiones │
-│  [✥]  │                                                                                 │ • Tapacantos  │
-│ Move  │                                                                                 │ • Mecanizados │
-│  [📏]  │   ┌──────────────────────────┐                                                  │               │
-│ Tape  │   │  Micro-Ajuste en Zoom    │                                                  │ [ ❯ Colapsar ]│
-│  [⊞]  │   │  (X, Y, Z / Imán / Paso) │                                                  │               │
-│ Add   │   └──────────────────────────┘                                                  │               │
-├───────┴─────────────────────────────────────────────────────────────────────────────────┴───────────────┤
-│ Barra de Estado: "Herramienta Activa: Empujar/Tirar • Clic y arrastra para estirar"      | Medidas: 855 mm │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Plan de Implementación Paso a Paso
-
-### Paso 1: Eliminar Barra Secundaria Duplicada y Reorganizar Cabecera
-- En `module-designer.html`, suprimir la barra superior repetida con "Modelador 3D", "Barra Módulo", "Bajo Mesada" y botones duplicados de Plano 2D y DXF.
-- Añadir en la barra superior un selector desplegable limpio de plantillas ("Mueble Bajo Mesada", "Barra Desayunadora", "Lienzo en Blanco").
-- Mantener los botones de exportación ("Plano 2D PDF" y "DXF CNC") de forma única y organizada en la cabecera principal.
-
-### Paso 2: Construir la Barra de Herramientas Vertical Izquierda Estilo SketchUp
-- Crear la barra vertical izquierda del visor con iconos compactos (Seleccionar, Push/Pull, Mover Gizmo, Cinta Métrica, Añadir Pieza, Vistas de Cámara).
-- Vincular la herramienta activa (`activeTool: 'select' | 'push_pull' | 'move' | 'measure'`) con el cursor del canvas y el motor 3D.
-
-### Paso 3: Desarrollar la Herramienta Interactiva Empujar/Tirar (Push/Pull)
-- En `furniture-3d-viewer.ts`, detectar con el raycaster la cara normal apuntada en la pieza.
-- Renderizar un plano/borde de realce sobre la cara activa.
-- Al iniciar `pointerdown` y mover el cursor, proyectar el desplazamiento en la dirección normal para estirar o encoger la longitud o anchura de la pieza con visualización de cotas instantáneas.
-- Emitir la actualización `partModified` para que todo el proyecto se actualice armónicamente.
-
-### Paso 4: Bandeja Lateral Derecha Colapsable y Ajuste de Paleta Clara
-- Implementar botón colapsable en la bandeja derecha (`chevron_right` / `chevron_left`).
-- Configurar la paleta de colores por defecto en modo claro neutro estilo SketchUp (`isWhiteTheme = true` optimizado con tonos slate/zinc suaves en lugar del negro masivo).
-- Asegurar que el cuadro flotante de micro-ajuste de zoom se mantenga en la esquina inferior izquierda con su diseño funcional.
-
-### Paso 5: Barra de Estado Inferior
-- Añadir la barra de pie estilo CAD con indicaciones de la herramienta seleccionada a la izquierda y el cuadro de lectura milimétrica a la derecha.
+### Paso 5: Textura Punteada de Selección Estilo SketchUp para Empujar/Tirar
+- Generar una textura procedimental de puntos (stipple pattern de 8×8 píxeles con un punto central gris/azul) usando un `<canvas>` en memoria.
+- Asignar la textura con repetición al plano de resaltado de cara en `furniture-3d-viewer.ts` para que al pasar por cualquier cara en modo Empujar/Tirar, la cara adquiera exactamente la apariencia punteada que el usuario mostró en la Imagen 1.
 
 ---
 
-## Verificación y Calidad
-1. **Espacio Visual**: Comprobar que no existan botones duplicados ni barras secundarias innecesarias.
-2. **Push/Pull Test**: Probar la herramienta arrastrando caras de piezas para verificar que se alarguen y encojan con suavidad y precisión milimétrica.
-3. **Colapso de Bandeja**: Verificar que al plegar la bandeja lateral derecha el visor 3D se redimensione automáticamente ocupando el 100% del ancho sin romper la relación de aspecto.
-4. **Micro-ajuste**: Verificar que el cuadro de micro-ajuste en zoom funcione exactamente igual y permanezca accesible.
-5. **Compilación y Linter**: Ejecutar `compile_applet` y `lint_applet` para garantizar cero errores.
+## 3. Verificación y Pruebas
+1. **Inspección Visual**: Verificar que la bandeja lateral derecha ya no tenga fondo negro ni la mezcla de aguamarina, amarillo y rosa, luciendo limpia, luminosa y profesional como SketchUp.
+2. **Clic Derecho**: Probar el menú contextual haciendo clic derecho en laterales, techo y baldas, verificando duplicación, giro en 90°, alineación al suelo y aislamiento.
+3. **Rectángulo 3D**: Probar dibujar un rectángulo arrastrando en el suelo y ver la pieza creada instantáneamente.
+4. **Rotar 3D**: Probar el giro con transportador.
+5. **Compilación y Linters**: Ejecutar `compile_applet` y `lint_applet` asegurando 0 errores.
