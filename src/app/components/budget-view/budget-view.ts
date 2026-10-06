@@ -4,6 +4,7 @@ import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { HardwareItem, Material } from '../../models/melamine.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
   selector: 'app-budget-view',
@@ -12,6 +13,7 @@ import { ConfirmDialogService } from '../../services/confirm-dialog.service';
   templateUrl: './budget-view.html'
 })
 export class BudgetViewComponent {
+  readonly themeService = inject(ThemeService);
   private projectService = inject(ProjectStorageService);
   private confirmService = inject(ConfirmDialogService);
   private optimizer = inject(CutOptimizerService);

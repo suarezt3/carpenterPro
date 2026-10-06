@@ -195,11 +195,19 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private dragPlane = new THREE.Plane();
   private dragPlaneIntersectionStart = new THREE.Vector3();
 
+  // Right-Click vs Pan/Orbit Detection State
+  private rightPointerDownPos: { x: number; y: number } | null = null;
+  private rightPointerDownTime = 0;
+  private rightPointerDragged = false;
+
+  // Tape Measure Drag State (Clic y arrastrar para estirar y soltar para fijar cota)
+  private isMeasuringDrag = false;
+
   // Push / Pull Tool Interactive State
   private isPushPulling = false;
   private pushPullData: {
     part: Part;
-    targetDim: 'length' | 'width';
+    targetDim: 'length' | 'width' | 'thickness';
     posAxis: 'posX' | 'posY' | 'posZ';
     dir: number;
     initialDim: number;
@@ -1436,13 +1444,26 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas || !this.camera) return;
 
+    // Close open context menu on canvas interaction
+    if (this.contextMenuPos()) {
+      this.closeContextMenu();
+    }
+
+    // Right-Click tracking: record down coordinates & time to distinguish stationary click from drag pan/orbit
+    if (e.button === 2) {
+      this.rightPointerDownPos = { x: e.clientX, y: e.clientY };
+      this.rightPointerDownTime = Date.now();
+      this.rightPointerDragged = false;
+      return;
+    }
+
     const rect = canvas.getBoundingClientRect();
     this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // 0. Measurement Tape picking mode (Point A -> Point B)
+    // 0. Measurement Tape drag mode (Point A -> Clic y arrastrar para estirar y soltar para fijar la cota)
     if (this.isMeasureMode()) {
       const measureIntersects = this.raycaster.intersectObjects(
         [...this.pieceObjects.map(p => p.mesh), ...(this.floorMesh ? [this.floorMesh] : [])],
@@ -1456,14 +1477,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
           z: Math.round(pt.z)
         };
 
-        if (!this.measurePointA()) {
-          this.measurePointA.set(snapPt);
-        } else if (this.measurePointA() && !this.measurePointB()) {
-          this.measurePointB.set(snapPt);
-        } else {
-          this.measurePointA.set(snapPt);
-          this.measurePointB.set(null);
-        }
+        this.measurePointA.set(snapPt);
+        this.measurePointB.set(snapPt);
+        this.isMeasuringDrag = true;
+        this.controls.enabled = false;
         this.renderMeasurementVisuals();
         e.preventDefault();
         e.stopPropagation();
@@ -1551,41 +1568,55 @@ export class Furniture3dViewerComponent implements OnDestroy {
         }
 
         const orient = part.orientation || 'horizontal';
-        let targetDim: 'length' | 'width' = 'length';
+        let targetDim: 'length' | 'width' | 'thickness' = 'length';
         let posAxis: 'posX' | 'posY' | 'posZ' = 'posX';
+        let axisName = 'Largo';
 
         if (orient === 'horizontal') {
           if (axis === 'x') {
             targetDim = 'length';
             posAxis = 'posX';
+            axisName = 'Largo';
           } else if (axis === 'z') {
             targetDim = 'width';
             posAxis = 'posZ';
+            axisName = 'Ancho';
           } else {
-            targetDim = 'length';
+            // Y normal face is the top or bottom board face -> Thickness!
+            targetDim = 'thickness';
             posAxis = 'posY';
+            axisName = 'Espesor';
           }
         } else if (orient === 'vertical_yz') {
           if (axis === 'y') {
             targetDim = 'length';
             posAxis = 'posY';
+            axisName = 'Alto';
           } else if (axis === 'z') {
             targetDim = 'width';
             posAxis = 'posZ';
+            axisName = 'Fondo';
           } else {
-            targetDim = 'length';
+            // X normal face is perpendicular to board plane -> Thickness!
+            targetDim = 'thickness';
             posAxis = 'posX';
+            axisName = 'Espesor';
           }
         } else {
+          // vertical_xy
           if (axis === 'x') {
             targetDim = 'length';
             posAxis = 'posX';
+            axisName = 'Largo';
           } else if (axis === 'y') {
             targetDim = 'width';
             posAxis = 'posY';
+            axisName = 'Alto';
           } else {
-            targetDim = 'length';
+            // Z normal face is perpendicular to board plane -> Thickness!
+            targetDim = 'thickness';
             posAxis = 'posZ';
+            axisName = 'Espesor';
           }
         }
 
@@ -1597,7 +1628,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.partsSelected.emit([part.id]);
         this.partSelected.emit(part);
 
-        const initialDim = targetDim === 'length' ? part.length : part.width;
+        const initialDim = targetDim === 'thickness'
+          ? (part.thickness || 18)
+          : (targetDim === 'length' ? part.length : part.width);
         const initialPos = (part[posAxis] ?? 0);
 
         const axisVector = new THREE.Vector3();
@@ -1627,7 +1660,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         }
 
         this.pushPullDelta.set({
-          axisName: targetDim === 'length' ? 'Largo' : 'Ancho',
+          axisName,
           initialVal: initialDim,
           currentVal: initialDim,
           delta: 0
@@ -1719,6 +1752,48 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas || !this.camera) return;
 
+    // Track right pointer drag to distinguish panning from stationary context menu click
+    if (this.rightPointerDownPos) {
+      const dist = Math.hypot(e.clientX - this.rightPointerDownPos.x, e.clientY - this.rightPointerDownPos.y);
+      if (dist > 5) {
+        this.rightPointerDragged = true;
+      }
+    }
+
+    // 0.05. Measurement Tape Live Dragging
+    if (this.isMeasuringDrag && this.measurePointA()) {
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      const measureIntersects = this.raycaster.intersectObjects(
+        [...this.pieceObjects.map(p => p.mesh), ...(this.floorMesh ? [this.floorMesh] : [])],
+        true
+      );
+      if (measureIntersects.length > 0) {
+        const pt = measureIntersects[0].point;
+        this.measurePointB.set({
+          x: Math.round(pt.x),
+          y: Math.max(0, Math.round(pt.y)),
+          z: Math.round(pt.z)
+        });
+      } else {
+        const ptA = this.measurePointA()!;
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -ptA.y);
+        const intersectPt = new THREE.Vector3();
+        if (this.raycaster.ray.intersectPlane(plane, intersectPt)) {
+          this.measurePointB.set({
+            x: Math.round(intersectPt.x),
+            y: Math.max(0, Math.round(intersectPt.y)),
+            z: Math.round(intersectPt.z)
+          });
+        }
+      }
+      this.renderMeasurementVisuals();
+      return;
+    }
+
     // 0.1. Draw 3D Rectangle Live Preview
     if (this.isDrawingRect() && this.rectStartPoint) {
       const rect = canvas.getBoundingClientRect();
@@ -1771,8 +1846,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
         updates[data.targetDim] = res.dim;
         updates[data.posAxis] = res.pos;
 
+        const axisName = data.targetDim === 'thickness'
+          ? 'Espesor'
+          : (data.targetDim === 'length' ? 'Largo' : 'Ancho');
+
         this.pushPullDelta.set({
-          axisName: data.targetDim === 'length' ? 'Largo' : 'Ancho',
+          axisName,
           initialVal: data.initialDim,
           currentVal: res.dim,
           delta: res.dim - data.initialDim
@@ -1984,6 +2063,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.controls.enabled = true;
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) canvas.style.cursor = 'default';
+      return;
+    }
+
+    if (this.isMeasuringDrag) {
+      this.isMeasuringDrag = false;
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+      this.renderMeasurementVisuals();
       return;
     }
 
@@ -2237,6 +2325,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
   onContextMenu(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+
+    // Only open context menu on genuine stationary click, NEVER when mouse was dragged or held down to orbit/pan
+    const duration = Date.now() - this.rightPointerDownTime;
+    const wasDragged = this.rightPointerDragged;
+    this.rightPointerDownPos = null;
+    this.rightPointerDragged = false;
+
+    if (wasDragged || duration > 300) {
+      return;
+    }
 
     const canvas = this.canvasRef()?.nativeElement;
     const container = this.containerRef()?.nativeElement;
@@ -2775,7 +2873,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   private applyMagneticSnapToStretch(
     part: Part,
-    targetDimension: 'length' | 'width',
+    targetDimension: 'length' | 'width' | 'thickness',
     posAxis: 'posX' | 'posY' | 'posZ',
     dir: number,
     steppedDelta: number,
@@ -2784,7 +2882,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const initialPart = this.dragInitialPart || part;
     const initBounds = this.getPartBounds(initialPart);
     const initialDim = initialPart[targetDimension];
-    const proposedDim = Math.max(50, initialDim + steppedDelta);
+    const minAllowed = targetDimension === 'thickness' ? 3 : 50;
+    const proposedDim = Math.max(minAllowed, initialDim + steppedDelta);
     const initialPos = initialPart[posAxis] ?? 0;
 
     const actualDelta = proposedDim - initialDim;
@@ -2880,7 +2979,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         snappedDim = Math.round(anchoredFace - bestCandidateFace);
       }
 
-      if (snappedDim >= 50) {
+      if (snappedDim >= minAllowed) {
         let snappedPos = anchoredFace + (snappedDim / 2) * dir;
         if (posAxis === 'posY') {
           snappedPos = Math.max(snappedDim / 2, snappedPos);

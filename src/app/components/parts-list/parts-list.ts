@@ -3,6 +3,7 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { EdgeBandingType, GrainDirection, Part } from '../../models/melamine.models';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
   selector: 'app-parts-list',
@@ -11,6 +12,7 @@ import { ConfirmDialogService } from '../../services/confirm-dialog.service';
   templateUrl: './parts-list.html'
 })
 export class PartsListComponent {
+  readonly themeService = inject(ThemeService);
   private projectService = inject(ProjectStorageService);
   private confirmService = inject(ConfirmDialogService);
   private fb = inject(FormBuilder);

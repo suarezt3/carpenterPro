@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
+import { ThemeService } from '../../services/theme.service';
 import { OptimizationResult, PlacedPart, PlacedSheet } from '../../models/melamine.models';
 
 @Component({
@@ -10,6 +11,7 @@ import { OptimizationResult, PlacedPart, PlacedSheet } from '../../models/melami
   templateUrl: './cut-optimizer-view.html'
 })
 export class CutOptimizerViewComponent {
+  readonly themeService = inject(ThemeService);
   private projectService = inject(ProjectStorageService);
   private optimizer = inject(CutOptimizerService);
 

@@ -8,6 +8,8 @@ import { ProjectSettings } from '../../models/melamine.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SlicePipe } from '@angular/common';
 
+import { ThemeService } from '../../services/theme.service';
+
 @Component({
   selector: 'app-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -18,6 +20,7 @@ import { SlicePipe } from '@angular/common';
   templateUrl: './header.html'
 })
 export class HeaderComponent {
+  readonly themeService = inject(ThemeService);
   private projectService = inject(ProjectStorageService);
   private confirmService = inject(ConfirmDialogService);
   private dxfExporter = inject(DxfExporterService);

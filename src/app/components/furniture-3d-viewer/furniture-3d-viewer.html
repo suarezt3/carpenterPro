@@ -313,12 +313,7 @@
         @if (!measurePointA()) {
           <p class="text-xs text-amber-600 font-medium flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-            Haz clic en una pieza o arista para fijar el <strong>Punto A</strong>.
-          </p>
-        } @else if (measurePointA() && !measurePointB()) {
-          <p class="text-xs text-sky-600 font-medium flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
-            Punto A fijado. Haz clic en el <strong>Punto B</strong> para medir la distancia real.
+            Haz clic y arrastra desde cualquier punto o pieza para estirar la cinta. Suelta para fijar la cota.
           </p>
         } @else if (measureDistance(); as dist) {
           <div class="flex items-center justify-between gap-3 bg-slate-50 p-2 rounded-xl border border-slate-100">

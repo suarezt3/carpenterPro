@@ -1,4 +1,4 @@
-<div class="h-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
+<div [class]="themeService.isClassic() ? 'h-screen bg-slate-100 text-slate-800 flex flex-col overflow-hidden' : 'h-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden'">
   <!-- Global Header & Tabs -->
   <app-header 
     class="shrink-0"
@@ -32,14 +32,14 @@
         </div>
 
         <!-- Global Footer on Document / Report Pages -->
-        <footer class="bg-zinc-900/60 border-t border-zinc-800/80 py-4 text-center text-xs text-zinc-500 print:hidden mt-8 shrink-0">
+        <footer [class]="themeService.isClassic() ? 'bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 print:hidden mt-8 shrink-0' : 'bg-zinc-900/60 border-t border-zinc-800/80 py-4 text-center text-xs text-zinc-500 print:hidden mt-8 shrink-0'">
           <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <div class="flex items-center gap-2">
-              <span class="font-bold text-zinc-300">MelamiPro Studio</span>
+              <span [class]="themeService.isClassic() ? 'font-bold text-slate-800' : 'font-bold text-zinc-300'">MelamiPro Studio</span>
               <span>•</span>
               <span>Software de Despiece, Optimización de Melamina y Presupuesto</span>
             </div>
-            <div class="flex items-center gap-4 text-[11px] text-zinc-400">
+            <div [class]="themeService.isClassic() ? 'flex items-center gap-4 text-[11px] text-slate-500' : 'flex items-center gap-4 text-[11px] text-zinc-400'">
               <span>Cortes tipo Guillotina</span>
               <span>•</span>
               <span>Holguras Telescópicas -26mm</span>
