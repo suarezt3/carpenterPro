@@ -26,6 +26,8 @@ interface PieceMeshData {
   isDrawer?: boolean;
   doorPivot?: THREE.Group;
   hingeSide?: 'left' | 'right' | 'top';
+  doorLocalMeshPos?: THREE.Vector3;
+  doorPivotOriginalPos?: THREE.Vector3;
 }
 
 interface GizmoHitData {
@@ -469,6 +471,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
     this.pieceObjects = [];
     this.gizmoHitMeshes = [];
+    this.openCurrentMap.clear();
+    this.openTargetMap.clear();
+    this.isAllOpen.set(false);
 
     if (!parts || parts.length === 0) {
       this.detectedCollisions.set([]);
@@ -575,6 +580,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       let doorPivot: THREE.Group | undefined;
       let hingeSide: 'left' | 'right' | 'top' = 'left';
+      let doorLocalMeshPos: THREE.Vector3 | undefined;
+      let doorPivotOriginalPos: THREE.Vector3 | undefined;
 
       if (isDoor) {
         if (part.name.toUpperCase().includes('BASCULANTE') || part.name.toUpperCase().includes('ELEVABLE')) {
@@ -593,6 +600,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
           doorPivot.position.set(px - sx / 2, py, pz);
           mesh.position.set(sx / 2, 0, 0);
         }
+        doorLocalMeshPos = mesh.position.clone();
+        doorPivotOriginalPos = doorPivot.position.clone();
         doorPivot.add(mesh);
         this.furnitureGroup.add(doorPivot);
         mesh.userData = { part, isPiece: true, isDoor: true };
@@ -614,7 +623,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
         isDoor,
         isDrawer,
         doorPivot,
-        hingeSide
+        hingeSide,
+        doorLocalMeshPos,
+        doorPivotOriginalPos
       });
     }
 
@@ -1814,10 +1825,25 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private updateExplodedOffsets(percent: number) {
     const factor = percent / 100;
     for (const item of this.pieceObjects) {
-      const targetPos = item.originalPos
-        .clone()
-        .addScaledVector(item.explodedOffset, factor);
-      item.mesh.position.copy(targetPos);
+      if (item.isDoor && item.doorPivot && item.doorPivotOriginalPos && item.doorLocalMeshPos) {
+        const targetPivotPos = item.doorPivotOriginalPos
+          .clone()
+          .addScaledVector(item.explodedOffset, factor);
+        item.doorPivot.position.copy(targetPivotPos);
+        item.mesh.position.copy(item.doorLocalMeshPos);
+      } else if (item.isDrawer) {
+        const curOpen = this.openCurrentMap.get(item.part.id) || 0;
+        const targetPos = item.originalPos
+          .clone()
+          .addScaledVector(item.explodedOffset, factor);
+        targetPos.z += curOpen * 280;
+        item.mesh.position.copy(targetPos);
+      } else {
+        const targetPos = item.originalPos
+          .clone()
+          .addScaledVector(item.explodedOffset, factor);
+        item.mesh.position.copy(targetPos);
+      }
     }
   }
 
@@ -3592,7 +3618,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
           p.doorPivot.rotation.x = cur * (Math.PI / 2.2);
         }
       } else if (p.isDrawer) {
-        p.mesh.position.z = p.originalPos.z + cur * 280;
+        const expZ = p.explodedOffset.z * (this.explodedPercent() / 100);
+        p.mesh.position.z = p.originalPos.z + expZ + cur * 280;
       }
     }
   }
