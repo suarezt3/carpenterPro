@@ -19,11 +19,13 @@ import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
+import { TemplatesModalComponent } from '../templates-modal/templates-modal';
+import { FurnitureTemplate } from '../../services/templates-catalog.service';
 
 @Component({
   selector: 'app-module-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Furniture3dViewerComponent, TechnicalSheetModalComponent],
+  imports: [ReactiveFormsModule, Furniture3dViewerComponent, TechnicalSheetModalComponent, TemplatesModalComponent],
   templateUrl: './module-designer.html'
 })
 export class ModuleDesignerComponent {
@@ -52,9 +54,19 @@ export class ModuleDesignerComponent {
   // Sidebar collapse toggle for 100% full-screen 3D modeling
   readonly isSidebarCollapsed = signal<boolean>(false);
   readonly showTemplatesDropdown = signal<boolean>(false);
+  readonly showTemplatesModal = signal<boolean>(false);
 
   toggleSidebar() {
     this.isSidebarCollapsed.update(v => !v);
+  }
+
+  openTemplatesModal() {
+    this.showTemplatesDropdown.set(false);
+    this.showTemplatesModal.set(true);
+  }
+
+  closeTemplatesModal() {
+    this.showTemplatesModal.set(false);
   }
 
   toggleTemplatesDropdown() {
@@ -674,6 +686,17 @@ export class ModuleDesignerComponent {
     this.selectedPartIds.set([]);
     this.clearanceInfo.set(null);
     this.activeDockTab.set('catalog');
+  }
+
+  onTemplateSelected(event: { template: FurnitureTemplate; mode: 'replace' | 'append' }) {
+    this.projectService.loadTemplateFurniture(event.template, event.mode);
+    const parts = this.currentParts();
+    if (parts.length > 0) {
+      const top = parts.find(p => p.name.toUpperCase().includes('TECHO') || p.name.toUpperCase().includes('TAPA') || p.name.toUpperCase().includes('ENCIMERA')) || parts[0];
+      this.selectedPartId.set(top.id);
+      this.selectedPartIds.set([top.id]);
+      this.activeDockTab.set('piece');
+    }
   }
 
   loadDeskBarTemplate() {

@@ -22,6 +22,7 @@ export type ComponentRole =
   | 'door' 
   | 'drawer_front' 
   | 'plinth' 
+  | 'tie'
   | 'free';
 
 export interface Part {

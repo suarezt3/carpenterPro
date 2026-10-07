@@ -1,83 +1,96 @@
-# Cinta Métrica de Precisión CAD, Panel Compacto y Manual Interactivo de Documentación
+# Catálogo de 20 Plantillas Profesionales de Muebles y Reorganización del Buscador de Documentación
 
-Plan de implementación integral para renovar la cinta métrica con estética y precisión CAD (puntas de flecha finas, eliminación de ruido visual y esferas gigantes, captura magnética exacta), reubicar el panel de control a la izquierda junto a la paleta CAD, y crear el centro interactivo de documentación y ayuda accesible desde la barra superior.
+Plan de implementación integral para eliminar la cinta horizontal redundante en el modal de documentación, situar el buscador interactivo directamente sobre la columna lateral izquierda con scroll vertical, e incorporar una biblioteca profesional de 20 plantillas completas de muebles organizadas en 5 categorías (Cocina, Baño, Closets, Sala TV, Oficina) con opciones para reemplazar el diseño actual o añadir junto a él en el espacio 3D.
 
 ---
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> A continuación se detallan las decisiones confirmadas basadas en tus respuestas:
-> - **Estilo visual de la cinta métrica**: Flechas CAD finas en las puntas con cruz sutil, eliminando las esferas de 14-22 mm y los rótulos cuadrados gigantes para permitir una visibilidad 100% limpia de la pieza.
-> - **Ubicación del panel de control de medida**: Panel compacto flotante junto a la paleta lateral izquierda (en lugar de colocarse en el centro de la pantalla), con botones proporcionados y elegantes para "Nueva Medida" y "Borrar cota".
-> - **Acceso a la Documentación**: Botón "Ayuda" con icono en la barra superior que abre un manual modal interactivo completo con buscador, explicaciones paso a paso de cada herramienta (incluyendo Mecanizados CNC) y diagramas visuales.
+> A continuación se resumen las decisiones confirmadas basadas en tus respuestas:
+> - **Reorganización del Modal de Ayuda**: Se elimina la cinta horizontal superior de categorías/buscador para evitar duplicidades. La barra de búsqueda se coloca en la parte superior del panel lateral izquierdo, permitiendo escribir y buscar en tiempo real en títulos, atajos y pasos detallados con scroll vertical de todas las guías.
+> - **Catálogo de 20 Plantillas Reales**: Creación de 20 modelos prediseñados de piezas reales y funcionales divididas en: **Cocina (5)**, **Baño (3)**, **Closets y Dormitorio (5)**, **Sala TV (4)** y **Oficina (3)**.
+> - **Acción de Carga**: Modal interactivo de selección con vista previa donde el usuario puede elegir entre **Reemplazar el diseño actual** o **Añadir junto al diseño actual** en el visor 3D.
 
 ---
 
 ### 1. Overview & Core Concept
 
 - **Qué hace**:
-  1. **Cinta Métrica de Precisión Milimétrica**: Transforma la herramienta de medición 3D en un calibrador técnico estilo CAD/SketchUp. Utiliza puntas de flecha cónicas finas en los dos extremos, cruz sutil de centro, motor de imán mejorado que detecta con exactitud los 8 vértices y 12 puntos medios de las piezas para garantizar que una pieza de 509 mm marque exactamente 509 mm, y mantiene la cota fija al rotar/orbitar la escena.
-  2. **HUD Compacto Lateral**: Sustituye la tarjeta central grande por una tarjeta compacta y estilizada ubicada a la izquierda, justo al lado de la barra vertical de herramientas CAD, visible únicamente mientras se mide o hay una cota activa.
-  3. **Centro Interactivo de Documentación y Ayuda**: Incorpora un modal completo en la barra superior donde se explica detalladamente el funcionamiento de todas las herramientas del software:
-     - **Mecanizados y Perforaciones**: Explica cómo el motor analiza automáticamente los puntos de contacto entre piezas, calcula los taladros para tornillos 4x50, espigas 8x30 y cazoletas de bisagras de 35 mm, muestra su código de colores y permite exportarlos a DXF/CNC.
-     - **Cinta Métrica y Cotas**: Guía paso a paso sobre el imán inteligente, fijación de cotas e inspección 3D.
-     - **Push/Pull, Mover y Rotar**: Cómo interactuar con las piezas directamente en el espacio 3D.
-     - **Luz Libre (Holguras)**: Cálculo en tiempo real de espacios libres entre estantes y laterales.
-     - **Optimización y Despiece**: Flujo completo hacia corte y fabricación.
+  1. **Buscador y Navegación Lateral de Ayuda**: Rediseño del modal de documentación con una barra de búsqueda dedicada y enfocable directamente sobre la lista vertical lateral izquierda, con scroll suave y filtrado instantáneo que busca en nombres de herramientas, pasos operativos y atajos.
+  2. **Biblioteca de 20 Plantillas de Muebles**: Sustituye las 2 plantillas genéricas por una colección completa de 20 muebles estándar de carpintería y fabricación en melamina con dimensiones reales, cálculo de fajas, zócalos, fondos, repisas y puertas.
+  3. **Selector Modal de Plantillas**: Nueva interfaz visual con filtros por categoría (Cocina, Baño, Closet, Sala TV, Oficina), fichas de dimensiones ($L \times H \times P$), conteo de piezas y botones para cargar limpio o insertar contiguo.
 
-- **Público Objetivo**: Diseñadores de mobiliario en melamina, carpinteros, fabricantes CNC y usuarios que necesitan exactitud dimensional estricta y una curva de aprendizaje intuitiva sin sobrecarga visual.
+- **Público Objetivo**: Carpinteros, diseñadores de interiores y fabricantes que necesitan partir de muebles base reales para acelerar su diseño y consultar guías rápidas sin fricciones en la interfaz.
 
 ---
 
 ### 2. User Experience & Visual Design
 
-#### 2.1. Cinta Métrica CAD Rediseñada
-- **Extremos de Flecha CAD**:
-  - En los dos extremos de la cota (Punto A y Punto B) se colocan conos esbeltos orientados a lo largo de la línea de medición cuya punta toca con precisión matemática el vértice o punto de contacto.
-  - Se añade una sutil cruz técnica (retícula en cruz ortogonal de 6 mm de diámetro con línea fina de 1 px) en la punta exacta para dar certeza visual sin tapar la arista ni la superficie de la pieza.
-  - Se eliminan por completo las esferas amarillas de radio 14 mm, los anillos de radio 22 mm y las tarjetas sprite gigantes con letras "A" y "B".
-- **Línea de Medición y Cota Técnica**:
-  - Línea continua dorada de alta definición (`#f59e0b` o `#facc15`) entre ambas flechas.
-  - Rótulo de distancia flotante compacto y estilizado centrado sobre la línea con texto monoespaciado en mm.
-  - Líneas de proyección de cotas auxiliares discretas en los ejes ΔX, ΔY, ΔZ solo cuando se requiere análisis ortogonal.
+#### 2.1. Modal de Documentación Rediseñado
+- **Sin cinta superior redundante**: Se elimina la barra horizontal que duplicaba las pestañas.
+- **Buscador en cabecera lateral**: Campo de texto amplio con icono, placeholder claro, foco automático y botón de limpieza inmediata.
+- **Lista lateral vertical scrollable**: Todas las guías apiladas con sus iconos temáticos, badges de color y títulos en alto contraste.
+- **Panel de lectura principal**: Al seleccionar cualquier guía o buscar, el panel derecho muestra la ficha técnica, pasos explicados y consejos de taller.
 
-#### 2.2. Panel Flotante Compacto (Lateral Izquierdo)
-- **Posición**: Anclado a `left-18` o `left-20` (inmediatamente a la derecha de la paleta vertical de herramientas CAD) y `top-20`, sin invadir el centro ni la vista principal del modelo.
-- **Jerarquía y Controles**:
-  - Cabecera mínima con icono de cinta, badge "Imán activo" y botón de cerrar.
-  - Bloque numérico claro: `Distancia Total: 509 mm` (con desglose ΔX, ΔY, ΔZ en una sola línea compacta).
-  - Botones de acción refinados y proporcionados: botón primario "Nueva Medida" y secundario "Borrar cota" con iconos sutiles.
-  - Estado vacío orientativo: si aún no se ha medido, una breve píldora flotante que indica "Haz clic en una esquina para comenzar".
+#### 2.2. Catálogo de 20 Plantillas de Muebles
 
-#### 2.3. Modal Interactivo de Documentación ("Manual de Herramientas")
-- **Acceso**: Botón en el Header superior `[ Ayuda / Manual ]` con icono `help_outline`, accesible en cualquier momento.
-- **Estructura del Modal**:
-  - **Buscador Rápido**: Filtro en tiempo real para encontrar herramientas por nombre (ej. "mecanizados", "medir", "tornillos", "puertas", "dxf").
-  - **Navegación por Categorías**:
-    1. *Herramientas 3D y Medición* (Cinta métrica magnética, Push/Pull, Mover/Rotar, Luz libre, Rayos X).
-    2. *Mecanizados y Ensambles CNC* (Explicación técnica detallada del cálculo automático de tornillos, espigas, bisagras y exportación DXF).
-    3. *Diseño y Modulación* (Crear piezas, cambiar orientación, materiales, cantos PVC).
-    4. *Despiece, Corte y Fabricación* (Lista de corte, optimizador 2D, exportación PDF/DXF).
-    5. *Atajos de Teclado* (Esc, Supr, Ctrl+Z, etc.).
-  - **Tarjetas de Herramientas**: Cada herramienta cuenta con su icono oficial, descripción clara de cómo se activa, qué hace paso a paso, diagrama o referencia esquemática y consejos profesionales para su uso.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CATÁLOGO DE PLANTILLAS PROFESIONALES                    │
+│   [ Todos (20) ]  [ Cocina (5) ]  [ Baño (3) ]  [ Closets (5) ]  ...       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌───────────────────────┐  ┌───────────────────────┐  ┌─────────────────┐  │
+│  │ Bajo Mesada 2P + Caj  │  │ Alacena Aérea 2P      │  │ Torre Calientes │  │
+│  │ 1200 x 850 x 600 mm   │  │ 800 x 700 x 320 mm    │  │ 600x2100x600 mm │  │
+│  │ [8 piezas] [Cocina]   │  │ [6 piezas] [Cocina]   │  │ [10 pzs] [Cocina]  │
+│  │ [Reemplazar] [+Añadir]│  │ [Reemplazar] [+Añadir]│  │ [Reemplazar]... │  │
+│  └───────────────────────┘  └───────────────────────┘  └─────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Lista Detallada de las 20 Plantillas:
+1. **Cocina**:
+   - `cocina_bajo_mesada_120`: Bajo Mesada 2 Puertas + 3 Cajones ($1200 \times 850 \times 600\text{ mm}$).
+   - `cocina_alacena_80`: Alacena Aérea 2 Puertas con Repisa Interna ($800 \times 700 \times 320\text{ mm}$).
+   - `cocina_torre_horno`: Torre Despensero para Microondas y Horno ($600 \times 2100 \times 600\text{ mm}$).
+   - `cocina_esquinero_l`: Mueble Esquinero en L para Cocina ($900 \times 850 \times 900\text{ mm}$).
+   - `cocina_isla_desayunador`: Isla Central con Barra Desayunadora y Estantes ($1500 \times 900 \times 800\text{ mm}$).
+2. **Baño**:
+   - `bano_vanitory_cajon`: Vanitory Flotante con Cajón y Hueco Inferior ($700 \times 550 \times 450\text{ mm}$).
+   - `bano_gabinete_espejo`: Gabinete Aéreo con Puertas de Espejo ($600 \times 650 \times 160\text{ mm}$).
+   - `bano_columna_auxiliar`: Columna Torre de Baño Estrecha ($350 \times 1600 \times 300\text{ mm}$).
+3. **Closets y Dormitorio**:
+   - `closet_ropero_2cuerpos`: Closet 2 Cuerpos con Maletero, Perchero y Zapatero ($1600 \times 2200 \times 550\text{ mm}$).
+   - `dormitorio_comoda_4cajones`: Cómoda / Chifonier de 4 Cajones ($800 \times 950 \times 450\text{ mm}$).
+   - `dormitorio_mesa_noche`: Mesa de Noche / Buró 2 Cajones ($450 \times 550 \times 400\text{ mm}$).
+   - `dormitorio_zapatero_inclinado`: Mueble Zapatero Vertical ($700 \times 1200 \times 350\text{ mm}$).
+   - `dormitorio_cabecero_repisas`: Cabecero de Cama con Nichos y Repisas ($1600 \times 1000 \times 200\text{ mm}$).
+4. **Sala y TV**:
+   - `sala_rack_tv_panel`: Rack Flotante para TV de 65" con Panel Alistonado ($1800 \times 1400 \times 350\text{ mm}$).
+   - `sala_mesa_centro`: Mesa de Centro Rectangular con Revistero ($900 \times 420 \times 550\text{ mm}$).
+   - `sala_biblioteca_5niveles`: Biblioteca Modular de 5 Niveles ($800 \times 1800 \times 300\text{ mm}$).
+   - `sala_aparador_buffet`: Aparador Buffet 3 Puertas ($1400 \times 800 \times 400\text{ mm}$).
+5. **Oficina y Estudio**:
+   - `oficina_escritorio_l`: Escritorio Gerencial en L con Cajonera ($1400 \times 750 \times 1200\text{ mm}$).
+   - `oficina_home_office`: Escritorio Home Office con Repisa Aérea ($1000 \times 750 \times 500\text{ mm}$).
+   - `oficina_archivador_movil`: Cajonera Rodante de 3 Cajones ($450 \times 650 \times 500\text{ mm}$).
 
 ---
 
 ### 3. Key Product Decisions & Trade-Offs
 
-- **Decisión 1: Sustitución de Marcadores Esféricos por Flechas Cónicas y Retícula Cruzada**
-  - *Enfoque*: Generar una geometría `ConeGeometry` esbelta en Three.js con la punta orientada exactamente hacia el punto medido, más una cruz sutil de 2 segmentos de línea en el plano normal.
-  - *Por qué*: Resuelve directamente la queja del usuario sobre no poder ver si la cinta terminó donde necesitaba al rotar la imagen por culpa del círculo gigante y la etiqueta cuadrada.
-  - *Alternativas descartadas*: Mantener esferas más pequeñas. Fueron descartadas porque cualquier esfera oculta el vértice de la esquina de la madera.
+- **Decisión 1: Eliminar la cinta superior y anclar el buscador en el panel lateral izquierdo**
+  - *Enfoque*: Quitar el carrusel superior horizontal de botones que ocupaba espacio vertical y comprimía el campo de búsqueda. Colocar el input de búsqueda en la cabecera de la columna izquierda con ancho del 100%.
+  - *Por qué*: Resuelve directamente el problema reportado por el usuario donde el botón de búsqueda no se podía escribir bien y simplifica la navegación en una sola lista vertical scrollable.
 
-- **Decisión 2: Mejora del Algoritmo de Snap Magnético y Aumento de Sensibilidad**
-  - *Enfoque*: Elevar el radio de captura en pantalla a 32-36 px, comprobar exhaustivamente los 8 vértices exactos de cada pieza en coordenadas de mundo, y si el cursor está sobre la pieza, priorizar las esquinas más cercanas antes que el raycast en el plano interior de la cara.
-  - *Por qué*: Explica por qué una pieza de 509 mm dio 501 mm (el raycast cayó 8 mm adentro de la cara en lugar de adherirse al vértice de la arista). Con el imán mejorado, el imán se engancha al vértice exacto, garantizando 509 mm exactos.
+- **Decisión 2: Servicio Centralizado de Plantillas (`templates-catalog.service.ts`)**
+  - *Enfoque*: Crear un servicio dedicado que genera las piezas exactas con materiales, vetas, cantos y posiciones en 3D para las 20 plantillas.
+  - *Por qué*: Mantiene el código desacoplado, modular y permite reutilizar las plantillas tanto desde el botón de la barra superior como desde el modal interactivo de modulación.
 
-- **Decisión 3: Reubicación del HUD de Medición al Lateral Izquierdo**
-  - *Enfoque*: Mover el HUD a la izquierda junto a la barra de herramientas y reducir su altura y tamaño de botones en un 40%.
-  - *Por qué*: Despeja el centro de la pantalla permitiendo orbitar e inspeccionar el mueble sin distracciones visuales.
+- **Decisión 3: Modo "Reemplazar" o "Añadir al lado (+X)"**
+  - *Enfoque*: Cuando el usuario selecciona "Añadir", el sistema calcula el desplazamiento en X (offset de $+100\text{ mm}$ después de la pieza más a la derecha del mueble actual) y genera nuevos IDs únicos para que ambos módulos coexistan en el mismo visor 3D.
+  - *Por qué*: Permite armar cocinas o habitaciones completas combinando varios módulos prediseñados (ej. Bajo mesada + Alacena + Torre).
 
 ---
 
@@ -85,36 +98,22 @@ Plan de implementación integral para renovar la cinta métrica con estética y 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                             HEADER COMPONENT                                │
-│   [Proyecto ▼]  [Exportar ▼]  ...  [ Ayuda / Manual ] (Abre Modal Doc)      │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-                      ┌────────────────┴────────────────┐
-                      ▼                                 ▼
-         ┌─────────────────────────┐       ┌────────────────────────┐
-         │  DocumentationModal     │       │  Furniture3DViewer     │
-         │  - Buscador             │       │  - Canvas Three.js     │
-         │  - Tabs de categorías   │       │  - Paleta CAD Izquierda│
-         │  - Guía Mecanizados CNC │       └───────────┬────────────┘
-         │  - Guía Cinta Métrica   │                   │
-         │  - Atajos de teclado    │                   │
-         └─────────────────────────┘                   ▼
-                                           ┌────────────────────────┐
-                                           │  Left-Docked HUD       │
-                                           │  - Distancia CAD       │
-                                           │  - Botones Compactos   │
-                                           │  - Snap Feedback       │
-                                           └────────────────────────┘
+│                          MODULE DESIGNER / HEADER                           │
+│   [ Plantillas de Mueble (20) ] ──────► Abre TemplatesCatalogModalComponent │
+└──────────────────────┬──────────────────────────────────┬───────────────────┘
+                       │                                  │
+                       ▼                                  ▼
+        ┌─────────────────────────────┐    ┌──────────────────────────────────┐
+        │  TemplatesCatalogService    │    │  DocumentationModalComponent     │
+        │  - 20 presets paramétricos  │    │  - Buscador integrado lateral izq│
+        │  - Cocina, Baño, Closets,   │    │  - Scroll vertical unificado     │
+        │    Sala TV, Oficina         │    │  - Búsqueda en pasos y atajos    │
+        │  - Offset 3D para "+Añadir" │    └──────────────────────────────────┘
+        └─────────────────────────────┘
 ```
 
-#### Modificaciones Técnicas Clave:
-1. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts`**:
-   - Rediseño de `renderMeasurementVisuals()`: sustitución de `SphereGeometry`/`RingGeometry`/`Sprite` gigante por flechas cónicas CAD y crucetas técnicas.
-   - Refuerzo de `findMagneticSnapCandidate()` y `getPartSnapPoints()`: cálculo exhaustivo de esquinas mundiales con tolerancia y orden de atracción para fijación exacta al mm.
-   - Estado de indicador magnético con rótulo de asistencia de snap en tiempo real.
-2. **`src/app/components/furniture-3d-viewer/furniture-3d-viewer.html`**:
-   - Reubicación del HUD de medida: de `left-1/2 -translate-x-1/2` a posición lateral izquierda compacta (`left-20 top-4`), reduciendo padding, botones y tipografías.
-3. **`src/app/components/documentation-modal/documentation-modal.ts` y `.html`**:
-   - Creación de un componente modal standalone de Documentación y Manual de Herramientas con diseño limpio, buscador y cobertura completa de mecanizados, cinta métrica y utilidades CAD.
-4. **`src/app/components/header/header.ts` y `.html`**:
-   - Inclusión del botón "Ayuda / Guía" que emite o activa la apertura del modal de documentación.
+#### Archivos Clave a Modificar / Crear:
+1. `src/app/services/templates-catalog.service.ts`: Modelado dimensional de las 20 plantillas completas con roles de pieza y cantos PVC.
+2. `src/app/components/templates-modal/templates-modal.ts` y `.html`: Modal interactivo de catálogo con tarjetas, vistas de dimensiones, filtros de categoría y botones "Cargar" o "Añadir (+)".
+3. `src/app/components/module-designer/module-designer.ts` y `.html`: Conectar el botón de plantillas al nuevo modal de catálogo.
+4. `src/app/components/documentation-modal/documentation-modal.html` y `.ts`: Reorganizar el buscador eliminando la cinta superior y colocándolo sobre la columna izquierda con scroll vertical.

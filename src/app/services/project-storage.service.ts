@@ -9,6 +9,7 @@ import {
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { SupabaseService, CloudProjectRecord } from './supabase.service';
+import { FurnitureTemplate } from './templates-catalog.service';
 
 const STORAGE_KEY = 'melamipro_current_project';
 const PROJECTS_LIST_KEY = 'melamipro_saved_projects_meta';
@@ -573,6 +574,47 @@ export class ProjectStorageService {
       modules: [],
       parts: []
     }));
+  }
+
+  loadTemplateFurniture(template: FurnitureTemplate, mode: 'replace' | 'append' = 'replace') {
+    const mats = this.currentProject().materials;
+    let offsetX = 0;
+
+    if (mode === 'append') {
+      const existingParts = this.currentProject().parts;
+      if (existingParts.length > 0) {
+        let maxX = -Infinity;
+        for (const part of existingParts) {
+          let halfW = 0;
+          if (part.orientation === 'horizontal' || part.orientation === 'vertical_xy') {
+            halfW = (part.length || 0) / 2;
+          } else {
+            halfW = (part.thickness || 18) / 2;
+          }
+          const rightEdge = (part.posX || 0) + halfW;
+          if (rightEdge > maxX) maxX = rightEdge;
+        }
+        if (maxX !== -Infinity) {
+          offsetX = Math.round(maxX + (template.dimensions.width / 2) + 200);
+        }
+      }
+    }
+
+    const newParts = template.generateParts(mats, offsetX);
+
+    if (mode === 'replace') {
+      this.updateProject(p => ({
+        ...p,
+        name: template.name,
+        modules: [],
+        parts: newParts
+      }));
+    } else {
+      this.updateProject(p => ({
+        ...p,
+        parts: [...p.parts, ...newParts]
+      }));
+    }
   }
 
   loadDeskBarFurniture() {

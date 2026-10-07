@@ -16,54 +16,15 @@
     <!-- Quick Actions & Plantillas Menu -->
     <div class="flex items-center gap-2 shrink-0">
       
-      <!-- Dropdown Plantillas de Mueble -->
-      <div class="relative">
-        <button 
-          type="button"
-          (click)="toggleTemplatesDropdown()"
-          class="h-7 px-2.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 flex items-center gap-1.5 transition"
-          title="Cargar plantillas de muebles prediseñados o iniciar en blanco">
-          <span class="material-icons text-sm text-amber-500">menu_book</span>
-          <span>Plantillas de Mueble</span>
-          <span class="material-icons text-xs">arrow_drop_down</span>
-        </button>
-
-        @if (showTemplatesDropdown()) {
-          <div class="absolute right-0 top-8 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 min-w-[220px] animate-in fade-in zoom-in-95 text-xs text-slate-700">
-            <button 
-              type="button" 
-              (click)="loadStandardBaseCabinet(); closeTemplatesDropdown()"
-              class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left font-medium">
-              <span class="material-icons text-sm text-amber-500">countertops</span>
-              <div class="flex flex-col">
-                <span class="font-bold text-slate-800">Bajo Mesada Estándar</span>
-                <span class="text-[10px] text-slate-400">Cocina con balda y divisiones</span>
-              </div>
-            </button>
-            <button 
-              type="button" 
-              (click)="loadDeskBarTemplate(); closeTemplatesDropdown()"
-              class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left font-medium">
-              <span class="material-icons text-sm text-sky-500">desk</span>
-              <div class="flex flex-col">
-                <span class="font-bold text-slate-800">Barra Desayunadora</span>
-                <span class="text-[10px] text-slate-400">Encimera con módulo lateral</span>
-              </div>
-            </button>
-            <div class="h-px bg-slate-100 my-0.5"></div>
-            <button 
-              type="button" 
-              (click)="startBlank(); closeTemplatesDropdown()"
-              class="px-2.5 py-1.5 rounded-lg hover:bg-rose-50 text-rose-700 flex items-center gap-2 text-left font-medium">
-              <span class="material-icons text-sm text-rose-500">delete_sweep</span>
-              <div class="flex flex-col">
-                <span class="font-bold">Lienzo en Blanco</span>
-                <span class="text-[10px] text-rose-400">Diseñar desde cero</span>
-              </div>
-            </button>
-          </div>
-        }
-      </div>
+      <!-- Botón Catálogo de 20 Plantillas de Muebles -->
+      <button 
+        type="button"
+        (click)="openTemplatesModal()"
+        class="h-7 px-3 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg flex items-center gap-1.5 transition shadow-2xs"
+        title="Explorar catálogo de 20 plantillas de muebles (Cocina, Baño, Closets, Sala TV, Oficina)">
+        <span class="material-icons text-sm">menu_book</span>
+        <span>Plantillas de Muebles (20)</span>
+      </button>
 
       <!-- Toggle Right Sidebar Button -->
       <button 
@@ -899,3 +860,12 @@
     (modalClose)="closeTechnicalSheet()">
   </app-technical-sheet-modal>
 }
+
+<!-- MODAL: CATÁLOGO DE 20 PLANTILLAS DE MUEBLES -->
+<app-templates-modal
+  [isOpen]="showTemplatesModal()"
+  [materials]="materials()"
+  (modalClose)="closeTemplatesModal()"
+  (templateSelected)="onTemplateSelected($event)"
+  (startBlankRequested)="startBlank()">
+</app-templates-modal>

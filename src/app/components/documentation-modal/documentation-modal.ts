@@ -35,8 +35,8 @@ export class DocumentationModalComponent {
     { id: 'all', label: 'Todas las Guías', icon: 'auto_stories' },
     { id: 'mecanizados', label: 'Mecanizados CNC', icon: 'adjust', badge: 'Auto' },
     { id: 'cinta_metrica', label: 'Cinta Métrica 3D', icon: 'straighten', badge: 'Imán' },
-    { id: 'herramientas_3d', label: 'Herramientas CAD', icon: 'architecture' },
-    { id: 'modulos_piezas', label: 'Módulos y Melamina', icon: 'view_in_ar' },
+    { id: 'herramientas_3d', label: 'Herramientas 3D CAD', icon: 'architecture' },
+    { id: 'modulos_piezas', label: 'Módulos y Plantillas', icon: 'view_in_ar' },
     { id: 'optimizador', label: 'Corte y Fabricación', icon: 'precision_manufacturing' },
     { id: 'atajos', label: 'Atajos de Teclado', icon: 'keyboard' }
   ];
@@ -46,9 +46,9 @@ export class DocumentationModalComponent {
       id: 'mecanizados_cnc',
       category: 'mecanizados',
       title: 'Mecanizados y Perforaciones CNC Automáticas',
-      shortDesc: 'Cómo el motor inteligente calcula tornillos de ensamble, espigas y bisagras analizando las uniones de melamina.',
+      shortDesc: 'Cómo el motor inteligente calcula tornillos de ensamble, espigas y bisagras analizando automáticamente las uniones de melamina.',
       icon: 'adjust',
-      iconColor: 'text-sky-500',
+      iconColor: 'text-sky-600',
       badge: 'Cálculo Inteligente',
       steps: [
         'El sistema analiza automáticamente todas las superficies de contacto y solapamiento entre piezas contiguas (por ejemplo: laterales con base, techo, estantes fijos o divisiones verticales).',
@@ -57,7 +57,7 @@ export class DocumentationModalComponent {
         '• Tornillos de ensamble (Cian): Genera un taladro pasante de Ø 4 mm en la cara exterior y un taladro piloto/guía de Ø 3 mm x 30 mm en el canto de la pieza perpendicular, ubicados a 50 mm y 100 mm de cada borde.',
         '• Espigas / Tarugos de madera (Ámbar): Genera perforaciones de Ø 8 mm x 15 mm de profundidad en ambas piezas enfrentadas para ensamble oculto sin tornillos exteriores.',
         '• Cazoletas de Bisagras (Púrpura): En piezas configuradas como puerta, calcula automáticamente los huecos de Ø 35 mm x 12.5 mm de profundidad a 100 mm de los extremos superior e inferior, con distancia de cazoleta al borde K = 4 mm.',
-        'Para visualizar los taladros en el visor 3D, haz clic en el botón de mecanizados (ícono de diana/taladro) en la barra vertical de herramientas. Los cilindros se dibujarán con sus colores correspondientes.',
+        'Para visualizar los taladros en el visor 3D, haz clic en el botón de mecanizados (ícono de diana/taladro) en la barra vertical izquierda de herramientas. Los cilindros 3D se dibujarán con sus colores correspondientes.',
         'Al exportar a DXF CNC, todos estos puntos se exportan en capas vectoriales con sus diámetros y profundidades para centros de mecanizado CNC o routers.'
       ],
       tips: [
@@ -70,16 +70,16 @@ export class DocumentationModalComponent {
         { label: 'Espigas de Madera', value: 'Ø 8 mm x 15 mm profundidad (Color Ámbar)' },
         { label: 'Cazoleta Bisagra', value: 'Ø 35 mm x 12.5 mm (Color Púrpura, K = 4 mm)' },
         { label: 'Ubicación bordes', value: 'Distancia estándar 50 mm / 100 mm de aristas' },
-        { label: 'Exportación', value: 'Capas DXF CNC + Fichas acotadas PDF' }
+        { label: 'Exportación CNC', value: 'Capas DXF CNC + Fichas acotadas PDF' }
       ]
     },
     {
       id: 'cinta_metrica_cad',
       category: 'cinta_metrica',
       title: 'Cinta Métrica y Acotado de Precisión CAD',
-      shortDesc: 'Medición milimétrica exacta con imán a esquinas/puntos medios, flechas CAD y cotas persistentes al orbitar.',
+      shortDesc: 'Medición milimétrica exacta con imán a esquinas/puntos medios, flechas CAD y cotas persistentes al orbitar el 3D.',
       icon: 'straighten',
-      iconColor: 'text-amber-500',
+      iconColor: 'text-amber-600',
       badge: 'Precisión Milimétrica',
       steps: [
         'Activa la herramienta pulsando el icono de cinta métrica en la barra vertical izquierda o presionando la tecla [ M ].',
@@ -106,9 +106,9 @@ export class DocumentationModalComponent {
       id: 'push_pull_tool',
       category: 'herramientas_3d',
       title: 'Empujar / Tirar (Push/Pull) y Edición Directa 3D',
-      shortDesc: 'Redimensiona piezas estirando sus caras en tiempo real como en SketchUp con auto-alineación.',
+      shortDesc: 'Redimensiona piezas estirando sus caras en tiempo real como en SketchUp con auto-alineación coplanar.',
       icon: 'open_in_full',
-      iconColor: 'text-amber-500',
+      iconColor: 'text-amber-600',
       badge: 'Estilo SketchUp',
       steps: [
         'Selecciona la herramienta "Empujar / Tirar" en la paleta izquierda o pulsa la tecla [ P ].',
@@ -131,9 +131,9 @@ export class DocumentationModalComponent {
       id: 'luz_libre_tool',
       category: 'herramientas_3d',
       title: 'Luz Libre (Cálculo Automático de Holguras Útiles)',
-      shortDesc: 'Visualiza el espacio útil real en milímetros entre estantes, divisiones y laterales para ubicar objetos.',
+      shortDesc: 'Visualiza el espacio útil real en milímetros entre estantes, divisiones y laterales para ubicar objetos y electrodomésticos.',
       icon: 'height',
-      iconColor: 'text-emerald-500',
+      iconColor: 'text-emerald-600',
       badge: 'Ergonomía',
       steps: [
         'Activa la herramienta "Luz Libre" con el icono de doble flecha vertical en la paleta izquierda.',
@@ -146,39 +146,41 @@ export class DocumentationModalComponent {
       ],
       technicalDetails: [
         { label: 'Direcciones', value: 'Luz superior, inferior, izquierda y derecha' },
-        { label: 'Tolerancia', value: 'Descuenta automáticamente los 15 mm o 18 mm de espesor' }
+        { label: 'Tolerancia', value: 'Descuenta automáticamente los 15 mm o 18 mm de espesor de placas' }
       ]
     },
     {
-      id: 'modulos_biblioteca',
+      id: 'plantillas_muebles',
       category: 'modulos_piezas',
-      title: 'Biblioteca de Módulos y Piezas de Melamina',
-      shortDesc: 'Generación paramétrica de muebles estándar (bajo mesadas, alacenas, torres) y piezas a medida.',
-      icon: 'view_in_ar',
-      iconColor: 'text-blue-500',
-      badge: 'Paramétrico',
+      title: 'Catálogo de 20 Plantillas de Muebles y Despiece',
+      shortDesc: 'Accede a 20 plantillas profesionales organizadas en Cocina, Baño, Closets, Sala TV y Oficina con opción de reemplazar o añadir al 3D.',
+      icon: 'menu_book',
+      iconColor: 'text-blue-600',
+      badge: '20 Plantillas',
       steps: [
-        'En la pestaña "Módulos", puedes seleccionar tipos de muebles preconfigurados: Bajo Mesada, Alacena, Despensero / Torre o Cajonero.',
-        'Ajusta las dimensiones generales del módulo (Ancho, Alto, Profundidad y zócalo inferior).',
-        'Cada módulo genera automáticamente sus laterales, base, techo, estantes y amarres/fajas estructurales.',
-        'En la pestaña "Piezas", puedes agregar piezas individuales libres, duplicar estantes, añadir separadores verticales o puertas.',
-        'Personaliza los materiales (Roble, Blanco Frost, Nogal, Antracita) y asigna tapacantos de PVC (0.45 mm o 2 mm) a cada uno de los 4 bordes.'
+        'Haz clic en el botón "Plantillas de Muebles" en la barra superior o en el modelador 3D.',
+        'Explora las 20 plantillas categorizadas: Cocina (bajo mesadas, alacenas, torres), Baño (vanitories flotantes, gabinetes con espejo), Closets (roperos, cómodas, mesas de noche, zapateros), Sala TV (racks, libreros, mesas de centro) y Oficina (escritorios en L, cajoneras móviles).',
+        'Al hacer clic en cualquier plantilla podrás elegir:',
+        '• "Reemplazar diseño actual": Borra el lienzo actual y carga el mueble seleccionado centrado en el espacio 3D.',
+        '• "Añadir junto al diseño": Coloca el mueble a la derecha del diseño actual sin borrar tus piezas previas, ideal para componer habitaciones completas.',
+        '• "Lienzo en Blanco": Inicia un diseño desde cero.'
       ],
       tips: [
-        'El asignador de cantos PVC descuenta automáticamente el espesor del tapacanto grueso (2 mm) de las dimensiones de corte para que la pieza final armada coincida con el diseño exacto.'
+        'Todas las piezas de las plantillas son 100% editables: puedes cambiar su material, grosor, tapacantos o medidas usando la herramienta Empujar/Tirar o el panel de propiedades.'
       ],
       technicalDetails: [
-        { label: 'Espesores estándar', value: '15 mm, 18 mm, 25 mm, 36 mm (engrosado)' },
-        { label: 'Cantos PVC', value: 'Delgado (0.45 mm) y Grueso (2.0 mm) por borde' }
+        { label: 'Categorías', value: 'Cocina, Baño, Closets, Sala TV, Oficina' },
+        { label: 'Total Muebles', value: '20 diseños paramétricos completos' },
+        { label: 'Modos de Carga', value: 'Reemplazo total o Adición lateral en 3D' }
       ]
     },
     {
       id: 'optimizador_despiece',
       category: 'optimizador',
       title: 'Optimización de Corte 2D y Despiece Milimétrico',
-      shortDesc: 'Algoritmo guillotine de máximo rendimiento de placas con kerf de sierra, refilado y etiquetas imprimibles.',
+      shortDesc: 'Algoritmo guillotine de máximo rendimiento de placas con kerf de sierra, refilado y etiquetas imprimibles con QR.',
       icon: 'precision_manufacturing',
-      iconColor: 'text-purple-500',
+      iconColor: 'text-purple-600',
       badge: 'Ahorro de Material',
       steps: [
         'Ve a la pestaña "Optimizador" en la barra superior.',
@@ -200,22 +202,22 @@ export class DocumentationModalComponent {
       id: 'atajos_teclado',
       category: 'atajos',
       title: 'Guía Rápida de Atajos de Teclado',
-      shortDesc: 'Trabaja como un profesional con atajos directos para medir, seleccionar, deshacer y transformar piezas.',
+      shortDesc: 'Trabaja con máxima agilidad usando atajos directos para medir, seleccionar, deshacer y transformar piezas.',
       icon: 'keyboard',
-      iconColor: 'text-emerald-500',
+      iconColor: 'text-emerald-600',
       badge: 'Productividad',
       steps: [
         '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar',
-        '• [ M ]: Cinta Métrica 3D con Imán Inteligente',
-        '• [ P ]: Empujar / Tirar (Push/Pull) para redimensionar caras',
-        '• [ Q ]: Rotar pieza 90 grados',
-        '• [ R ]: Dibujar rectángulo 3D en piso o cara',
-        '• [ W / A / S / D ]: Mover pieza seleccionada en incrementos de 1 mm / 10 mm (Alineación fina)',
+        '• [ M ]: Cinta Métrica 3D con Imán Inteligente a vértices',
+        '• [ P ]: Empujar / Tirar (Push/Pull) para estirar caras en tiempo real',
+        '• [ Q ]: Rotar pieza seleccionada 90 grados',
+        '• [ R ]: Dibujar rectángulo 3D en piso o cara de pieza',
+        '• [ W / A / S / D ]: Mover pieza seleccionada en incrementos finos de 1 mm / 10 mm',
         '• [ Supr / Delete / Backspace ]: Eliminar pieza seleccionada',
         '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer último cambio',
         '• [ Ctrl + Y ] / [ Cmd + Shift + Z ]: Rehacer cambio',
         '• [ Esc ]: Cancelar herramienta activa, limpiar cota o cerrar modales',
-        '• [ Clic Derecho + Arrastrar ]: Orbitar / rotar cámara 3D libremente',
+        '• [ Clic Derecho + Arrastrar ]: Orbitar y rotar cámara 3D libremente',
         '• [ Rueda del Ratón ]: Zoom adelante / atrás'
       ],
       tips: [
@@ -235,15 +237,20 @@ export class DocumentationModalComponent {
       if (!q) return true;
       const inTitle = art.title.toLowerCase().includes(q);
       const inDesc = art.shortDesc.toLowerCase().includes(q);
+      const inBadge = art.badge ? art.badge.toLowerCase().includes(q) : false;
       const inSteps = art.steps.some(s => s.toLowerCase().includes(q));
-      return inTitle || inDesc || inSteps;
+      const inTips = art.tips.some(t => t.toLowerCase().includes(q));
+      const inTech = art.technicalDetails ? art.technicalDetails.some(td => td.label.toLowerCase().includes(q) || td.value.toLowerCase().includes(q)) : false;
+      return inTitle || inDesc || inBadge || inSteps || inTips || inTech;
     });
   });
 
   selectedArticle = computed(() => {
     const currentId = this.selectedArticleId();
-    const found = this.articles.find(a => a.id === currentId);
-    return found || this.articles[0];
+    const list = this.filteredArticles();
+    if (list.length === 0) return null;
+    const found = list.find(a => a.id === currentId);
+    return found || list[0];
   });
 
   selectCategory(catId: string) {
