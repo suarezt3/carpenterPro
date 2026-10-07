@@ -623,12 +623,36 @@ export class Furniture3dViewerComponent implements OnDestroy {
       );
 
       const hw = part.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(part);
-      const isDoor = hw.movableType === 'door' || part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA');
-      const isDrawer = hw.movableType === 'drawer' || part.componentRole === 'drawer_front' || 
-                       part.name.toUpperCase().includes('CAJON') || 
-                       part.name.toUpperCase().includes('CAJÓN') ||
-                       part.name.toUpperCase().includes('GAVETA') ||
-                       part.id.includes('caj_ind_');
+      const isDoor = (hw.movableType === 'door' || part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
+                     !part.name.toUpperCase().includes('CAJ');
+
+      // Internal drawer box sub-parts (sides, back, inner-front, bottom)
+      const isInternalBoxPart = part.componentRole === 'drawer_box' ||
+                                part.name.toUpperCase().includes('LATERAL') ||
+                                part.name.toUpperCase().includes('COSTADO') ||
+                                part.name.toUpperCase().includes('TRASERA') ||
+                                part.name.toUpperCase().includes('FONDO') ||
+                                part.name.toUpperCase().includes('CONTRAFRENTE') ||
+                                part.name.toUpperCase().includes('INTERIOR');
+
+      // Drawer front facade: ONLY the front panel of the drawer
+      const isDrawerFront = !isInternalBoxPart && (
+        part.componentRole === 'drawer_front' ||
+        (hw.movableType === 'drawer' && !isInternalBoxPart) ||
+        (part.name.toUpperCase().includes('FRENTE') && (part.name.toUpperCase().includes('CAJ') || part.name.toUpperCase().includes('GAVET'))) ||
+        ((part.name.toUpperCase().startsWith('CAJ') || part.name.toUpperCase().startsWith('GAVET')) && !isInternalBoxPart)
+      );
+
+      // isDrawer: includes both the front and internal parts so they move synchronously
+      const isDrawer = isDrawerFront || (
+        isInternalBoxPart && (
+          part.name.toUpperCase().includes('CAJON') ||
+          part.name.toUpperCase().includes('CAJÓN') ||
+          part.name.toUpperCase().includes('GAVETA') ||
+          part.id.includes('caj_') ||
+          part.id.includes('gav_')
+        )
+      );
 
       let doorPivot: THREE.Group | undefined;
       let hingeSide: 'left' | 'right' | 'top' | 'bottom' = hw.openingDirection || 'left';
@@ -695,21 +719,22 @@ export class Furniture3dViewerComponent implements OnDestroy {
         // Check if separate box sub-parts already exist in the project parts list for this drawer
         const hasSeparateBoxParts = parts.some(other =>
           other.id !== part.id && (
+            other.componentRole === 'drawer_box' ||
             (other.name.toUpperCase().includes('GAVETA') || 
              other.name.toUpperCase().includes('CAJÓN') || 
-             other.name.toUpperCase().includes('CAJON')) &&
-            Math.abs((other.posY || 0) - (part.posY || 0)) < 35
-          )
+             other.name.toUpperCase().includes('CAJON'))
+          ) && Math.abs((other.posY || 0) - (part.posY || 0)) < 35
         );
 
         // If it's a front plate without separate 3D box parts, attach complete 5-piece drawer box
-        if (!hasSeparateBoxParts && (part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('FRENTE'))) {
+        if (isDrawerFront && !hasSeparateBoxParts) {
           const drawerBoxMesh = this.createDrawerBoxMesh(part, sx, sy, sz);
           if (drawerBoxMesh) mesh.add(drawerBoxMesh);
         }
 
-        // Hardware: 3D Handles & Telescopic Runners
-        if (this.showHardware()) {
+        // Hardware: 3D Handles & Telescopic Runners ONLY ON THE FRONT FACADE!
+        // Internal box parts never get handles or slides!
+        if (isDrawerFront && this.showHardware()) {
           handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, false, 'top');
           if (handleGroup) mesh.add(handleGroup);
           slideGroup = this.createDrawerSlidesMesh(part, hw, sx, sy, sz);
@@ -719,11 +744,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
         // Apply preserved open translation immediately
         const curOpen = this.openCurrentMap.get(part.id) || 0;
         if (curOpen > 0) {
-          mesh.position.z += curOpen * 280;
+          const maxSlide = Math.min(380, Math.max(180, (part.width || 450) * 0.72));
+          mesh.position.z += curOpen * maxSlide;
         }
 
         this.furnitureGroup.add(mesh);
-        mesh.userData = { part, isPiece: true, isDrawer: true };
+        mesh.userData = { part, isPiece: true, isDrawer: true, isDrawerFront };
       } else {
         mesh.position.set(px, py, pz);
         this.furnitureGroup.add(mesh);
@@ -1936,10 +1962,28 @@ export class Furniture3dViewerComponent implements OnDestroy {
     };
 
     // Calculate strict internal positions inside cabinet carcass
-    // sx is the drawer front width; carcass side panel has thickness t (e.g. 18mm)
-    // The slide must be mounted inside the interior void, centered in the 12.7mm clearance gap
+    // Check if carcass side panels exist in the model to mount the slides flush to the actual carcass walls
+    const allParts = this.parts();
+    const leftPanel = allParts.find(p => 
+      p.id !== part.id && (p.componentRole === 'side_left' || p.name.toUpperCase().includes('LATERAL IZQ')) &&
+      Math.abs((p.posY ?? 0) - (part.posY ?? 0)) < 400
+    );
+    const rightPanel = allParts.find(p => 
+      p.id !== part.id && (p.componentRole === 'side_right' || p.name.toUpperCase().includes('LATERAL DER')) &&
+      Math.abs((p.posY ?? 0) - (part.posY ?? 0)) < 400
+    );
+
     let leftX = (-sx / 2) + t + (railThickness / 2);
     let rightX = (sx / 2) - t - (railThickness / 2);
+
+    if (leftPanel && rightPanel) {
+      const px = part.posX ?? 0;
+      const leftInnerFaceX = (leftPanel.posX ?? 0) + ((leftPanel.thickness || 18) / 2);
+      const rightInnerFaceX = (rightPanel.posX ?? 0) - ((rightPanel.thickness || 18) / 2);
+      leftX = (leftInnerFaceX - px) + (railThickness / 2);
+      rightX = (rightInnerFaceX - px) - (railThickness / 2);
+    }
+
     let posY = -sy * 0.15; // Centered on drawer box body height
 
     if (slideType === 'undermount') {
@@ -2020,7 +2064,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const ringMat = new THREE.MeshBasicMaterial({
         color: 0x0f172a,
         side: THREE.DoubleSide,
-        depthTest: false
+        depthTest: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1
       });
       const ringMesh = new THREE.Mesh(ringGeo, ringMat);
       if (hole.normalAxis === 'x') {

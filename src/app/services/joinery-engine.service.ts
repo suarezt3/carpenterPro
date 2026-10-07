@@ -159,12 +159,23 @@ export class JoineryEngineService {
     }
 
     // 2. Compute Technical System 32 Slide Drill Holes on Cabinet Side Panels (at 37mm from front edge)
+    // Compute strictly ONCE per physical drawer front facade to eliminate duplicate drill holes
     for (const b of boundsList) {
-      const isDrawer = b.part.componentRole === 'drawer_front' ||
-                       b.part.name.toUpperCase().includes('CAJON') ||
-                       b.part.name.toUpperCase().includes('CAJÓN') ||
-                       b.part.name.toUpperCase().includes('GAVETA');
-      if (isDrawer) {
+      const isInternalBox = b.part.componentRole === 'drawer_box' ||
+                            b.part.name.toUpperCase().includes('LATERAL') ||
+                            b.part.name.toUpperCase().includes('COSTADO') ||
+                            b.part.name.toUpperCase().includes('TRASERA') ||
+                            b.part.name.toUpperCase().includes('FONDO') ||
+                            b.part.name.toUpperCase().includes('CONTRAFRENTE') ||
+                            b.part.name.toUpperCase().includes('INTERIOR');
+      const isDrawerFront = !isInternalBox && (
+        b.part.componentRole === 'drawer_front' ||
+        b.part.hardwareConfig?.movableType === 'drawer' ||
+        (b.part.name.toUpperCase().includes('FRENTE') && (b.part.name.toUpperCase().includes('CAJ') || b.part.name.toUpperCase().includes('GAVET'))) ||
+        ((b.part.name.toUpperCase().startsWith('CAJ') || b.part.name.toUpperCase().startsWith('GAVET')) && !isInternalBox)
+      );
+
+      if (isDrawerFront) {
         const slideHoles = this.generateSlideSystem32Holes(b, boundsList);
         for (const h of slideHoles) {
           drillHolesByPart.get(h.partId)?.push(h);

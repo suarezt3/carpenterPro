@@ -1,41 +1,41 @@
 @if (isOpen()) {
   <div 
-    class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150"
+    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-8 bg-stone-950/75 backdrop-blur-xs animate-in fade-in duration-150"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
     (keydown.escape)="close()"
     (click)="close()">
     
-    <!-- Modal Container -->
+    <!-- Modal Container: Professional Architectural Warm Neutral Style -->
     <div 
-      class="relative w-full max-w-6xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border transition-colors duration-150"
-      [class]="themeService.isClassic() ? 'bg-white border-slate-200 text-slate-900 shadow-slate-900/10' : 'bg-slate-900 border-slate-700 text-slate-100 shadow-black/40'"
+      class="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border transition-colors duration-150"
+      [class]="themeService.isClassic() ? 'bg-stone-50 border-stone-200 text-stone-900 shadow-stone-900/20' : 'bg-stone-900 border-stone-800 text-stone-100 shadow-black/60'"
       role="document"
       tabindex="0"
       (keydown)="$event.stopPropagation()"
       (click)="$event.stopPropagation()">
 
-      <!-- HEADER MODAL: Clean White/Slate with CAD Blue and Amber accent -->
+      <!-- HEADER MODAL: Refined Slate & Warm Wood Amber Accent -->
       <div 
-        class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b shrink-0"
-        [class]="themeService.isClassic() ? 'bg-slate-50/80 border-slate-200 text-slate-900' : 'bg-slate-950 border-slate-800 text-white'">
+        class="flex items-center justify-between px-5 sm:px-6 py-4 border-b shrink-0"
+        [class]="themeService.isClassic() ? 'bg-white border-stone-200 text-stone-900' : 'bg-stone-900/90 border-stone-800 text-stone-100'">
         
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center bg-blue-600 text-white font-bold shadow-xs">
-            <span class="material-icons text-xl">auto_stories</span>
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center bg-stone-900 text-amber-400 border border-stone-700 shadow-xs shrink-0">
+            <span class="material-icons text-xl">menu_book</span>
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h2 class="text-base font-bold tracking-tight" [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'">
+              <h2 class="text-base font-bold tracking-tight" [class]="themeService.isClassic() ? 'text-stone-900' : 'text-stone-100'">
                 Catálogo de Plantillas
               </h2>
-              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                26 Muebles 3D
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                {{ filteredTemplates().length }} Muebles Verificados
               </span>
             </div>
-            <p class="text-xs text-slate-500 font-medium">
-              Elige un mueble base para reemplazar el diseño actual o añadirlo al lado en el visor 3D.
+            <p class="text-xs text-stone-500 font-medium mt-0.5">
+              Módulos paramétricos listos para despiece, ensamble 3D y optimización de corte.
             </p>
           </div>
         </div>
@@ -45,9 +45,10 @@
           <button 
             type="button" 
             (click)="onStartBlank()"
-            class="h-8 px-2.5 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 transition shadow-2xs"
-            title="Limpiar todo e iniciar un mueble desde cero">
-            <span class="material-icons text-sm text-slate-500">note_add</span>
+            class="h-8 px-3 text-xs font-semibold bg-white hover:bg-stone-100 text-stone-700 border border-stone-300 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+            [class]="themeService.isClassic() ? 'bg-white hover:bg-stone-100 text-stone-700 border-stone-300' : 'bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700'"
+            title="Iniciar proyecto desde un lienzo en blanco">
+            <span class="material-icons text-sm text-stone-400">note_add</span>
             <span>Lienzo en Blanco</span>
           </button>
 
@@ -55,45 +56,45 @@
           <button 
             type="button" 
             (click)="close()"
-            [class]="themeService.isClassic() ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700'"
-            class="w-8 h-8 rounded-lg flex items-center justify-center transition shadow-2xs"
+            [class]="themeService.isClassic() ? 'text-stone-400 hover:text-stone-700 hover:bg-stone-100 border border-stone-200' : 'text-stone-400 hover:text-white hover:bg-stone-800 border border-stone-700'"
+            class="w-8 h-8 rounded-lg flex items-center justify-center transition shadow-2xs cursor-pointer"
             title="Cerrar catálogo (Esc)">
             <span class="material-icons text-lg">close</span>
           </button>
         </div>
       </div>
 
-      <!-- SEARCH & CATEGORIES BAR: Standardized Gray / Blue Palette -->
+      <!-- SEARCH & CATEGORIES BAR: Discreet Pro Toolbar -->
       <div 
-        class="px-5 sm:px-6 py-2.5 border-b flex flex-col md:flex-row gap-2.5 items-stretch md:items-center justify-between shrink-0"
-        [class]="themeService.isClassic() ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'">
+        class="px-5 sm:px-6 py-2.5 border-b flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shrink-0"
+        [class]="themeService.isClassic() ? 'bg-stone-100/70 border-stone-200' : 'bg-stone-900/60 border-stone-800'">
         
-        <!-- Categorías Tabs con Botones de Navegación Lateral y Scroll Suave -->
-        <div class="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
+        <!-- Categorías Tabs con Botones de Navegación Compactos y Scroll Táctil/Mouse -->
+        <div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
           <button
             type="button"
             (click)="scrollCategories('left')"
-            class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition shrink-0 shadow-2xs"
-            title="Desplazar categorías a la izquierda">
-            <span class="material-icons text-base">chevron_left</span>
+            class="w-7 h-7 rounded-lg flex items-center justify-center text-stone-500 hover:text-stone-900 dark:hover:text-white bg-white dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 border border-stone-200 dark:border-stone-700 transition shrink-0 shadow-2xs cursor-pointer"
+            title="Desplazar a la izquierda">
+            <span class="material-icons text-sm">chevron_left</span>
           </button>
 
           <div 
             #categoriesNav
             (wheel)="onCategoryWheel($event)"
-            class="flex items-center gap-1.5 overflow-x-auto py-1 scroll-smooth scrollbar-thin flex-1 min-w-0">
+            class="flex items-center gap-1.5 overflow-x-auto py-1 scroll-smooth scrollbar-none flex-1 min-w-0">
             @for (cat of categories(); track cat.id) {
               <button 
                 type="button"
                 (click)="selectCategory(cat.id)"
                 [class]="activeCategory() === cat.id 
-                  ? 'bg-blue-600 text-white font-bold shadow-xs' 
-                  : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 font-medium' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium')"
-                class="px-2.5 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer">
-                <span class="material-icons text-sm">{{ cat.icon }}</span>
+                  ? 'bg-stone-900 text-stone-100 font-bold shadow-xs dark:bg-amber-600 dark:text-stone-950' 
+                  : (themeService.isClassic() ? 'bg-white hover:bg-stone-200/70 text-stone-700 border border-stone-200/80 font-medium' : 'bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700/80 font-medium')"
+                class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer">
+                <span class="material-icons text-sm" [class.text-amber-400]="activeCategory() === cat.id">{{ cat.icon }}</span>
                 <span>{{ cat.label }}</span>
                 <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold" 
-                  [class]="activeCategory() === cat.id ? 'bg-blue-800 text-blue-100' : (themeService.isClassic() ? 'bg-slate-200 text-slate-700' : 'bg-slate-700 text-slate-200')">
+                  [class]="activeCategory() === cat.id ? 'bg-stone-700 text-stone-200 dark:bg-amber-700 dark:text-stone-900' : (themeService.isClassic() ? 'bg-stone-100 text-stone-600' : 'bg-stone-700 text-stone-300')">
                   {{ cat.count }}
                 </span>
               </button>
@@ -103,135 +104,145 @@
           <button
             type="button"
             (click)="scrollCategories('right')"
-            class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition shrink-0 shadow-2xs"
-            title="Desplazar categorías a la derecha">
-            <span class="material-icons text-base">chevron_right</span>
+            class="w-7 h-7 rounded-lg flex items-center justify-center text-stone-500 hover:text-stone-900 dark:hover:text-white bg-white dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 border border-stone-200 dark:border-stone-700 transition shrink-0 shadow-2xs cursor-pointer"
+            title="Desplazar a la derecha">
+            <span class="material-icons text-sm">chevron_right</span>
           </button>
         </div>
 
-        <!-- Buscador en tiempo real -->
-        <div class="relative w-full md:w-64 shrink-0">
-          <span class="material-icons absolute left-2.5 top-2 text-slate-400 text-base pointer-events-none">search</span>
+        <!-- Buscador Limpio -->
+        <div class="relative w-full md:w-60 shrink-0">
+          <span class="material-icons absolute left-2.5 top-2 text-stone-400 text-base pointer-events-none">search</span>
           <input 
             type="text"
             [value]="searchQuery()"
             (input)="searchQuery.set($any($event.target).value)"
-            placeholder="Buscar mueble..."
+            placeholder="Filtrar plantilla..."
             autocomplete="off"
             [class]="themeService.isClassic() 
-              ? 'w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-500 rounded-lg outline-none text-slate-900 font-medium placeholder:text-slate-400 shadow-2xs transition' 
-              : 'w-full pl-8 pr-7 py-1.5 text-xs bg-slate-800 border border-slate-700 focus:border-blue-400 rounded-lg outline-none text-slate-100 font-medium placeholder:text-slate-400 transition'"
+              ? 'w-full pl-8 pr-7 py-1.5 text-xs bg-white focus:bg-white border border-stone-300 focus:border-stone-500 rounded-lg outline-none text-stone-900 font-medium placeholder:text-stone-400 shadow-2xs transition' 
+              : 'w-full pl-8 pr-7 py-1.5 text-xs bg-stone-800 border border-stone-700 focus:border-stone-500 rounded-lg outline-none text-stone-100 font-medium placeholder:text-stone-400 transition'"
           />
           @if (searchQuery()) {
             <button 
-              type="button"
+              type="button" 
               (click)="searchQuery.set('')"
-              class="absolute right-2 top-2 text-slate-400 hover:text-slate-600 transition"
-              title="Limpiar búsqueda">
+              class="absolute right-2 top-2 text-stone-400 hover:text-stone-600 transition cursor-pointer"
+              title="Borrar búsqueda">
               <span class="material-icons text-sm">cancel</span>
             </button>
           }
         </div>
       </div>
 
-      <!-- TEMPLATES GRID: 3 COLUMNS COMPACT & USER-FRIENDLY (NO GIANT CARDS, STANDARDIZED PALETTE) -->
+      <!-- TEMPLATES GRID: Clean 2-Columns Architectural Cards (Proportions & Warm Slate Palette) -->
       <div 
-        class="flex-1 overflow-y-auto p-4 sm:p-5 min-h-0 scrollbar-thin"
-        [class]="themeService.isClassic() ? 'bg-slate-100/60' : 'bg-slate-950/60'">
+        class="flex-1 overflow-y-auto p-5 sm:p-6 min-h-0 scrollbar-thin"
+        [class]="themeService.isClassic() ? 'bg-stone-100/40' : 'bg-stone-950/60'">
         
         @if (filteredTemplates().length === 0) {
-          <div class="p-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-            <span class="material-icons text-4xl text-slate-400">search_off</span>
-            <span class="font-bold text-slate-800 text-sm">No se encontraron plantillas</span>
-            <span class="text-slate-500">Prueba con otra palabra clave o selecciona "Todas las Plantillas".</span>
+          <div class="p-12 text-center text-xs text-stone-500 flex flex-col items-center gap-2">
+            <span class="material-icons text-4xl text-stone-400">search_off</span>
+            <span class="font-bold text-stone-800 dark:text-stone-200 text-sm">No se encontraron plantillas</span>
+            <span class="text-stone-500">Prueba cambiando el término de búsqueda o selecciona otra categoría.</span>
             <button 
               type="button" 
               (click)="searchQuery.set(''); activeCategory.set('all')" 
-              class="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition">
-              Mostrar todas las plantillas
+              class="mt-2 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white font-bold rounded-lg text-xs transition cursor-pointer">
+              Ver todas las plantillas
             </button>
           </div>
         } @else {
-          <!-- COMPACT 3-COLUMNS RESPONSIVE GRID -->
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             @for (tpl of filteredTemplates(); track tpl.id) {
               <div 
-                class="rounded-xl border flex flex-col justify-between transition-all duration-150 hover:shadow-md overflow-hidden group"
-                [class]="themeService.isClassic() ? 'bg-white border-slate-200 hover:border-blue-400 shadow-2xs' : 'bg-slate-900 border-slate-800 hover:border-blue-500 shadow-2xs'">
+                class="rounded-xl border flex flex-col justify-between transition-all duration-150 hover:shadow-lg overflow-hidden group"
+                [class]="themeService.isClassic() ? 'bg-white border-stone-200 hover:border-stone-400 shadow-xs' : 'bg-stone-900 border-stone-800 hover:border-stone-600 shadow-xs'">
                 
-                <!-- CARD BODY -->
-                <div class="p-3.5 pb-2.5 flex flex-col flex-1">
-                  <!-- Header: Themed Icon + Name + Badge -->
-                  <div class="flex items-start gap-2.5">
-                    <!-- Icon Badge -->
-                    <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105"
-                      [class]="themeService.isClassic() ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-blue-950 border-blue-800 text-blue-400'">
-                      <span class="material-icons text-lg">{{ tpl.icon || 'kitchen' }}</span>
-                    </div>
-
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-center justify-between gap-1.5 mb-0.5">
-                        <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500 truncate">
+                <!-- CARD HEADER & CONTENT -->
+                <div class="p-4 flex flex-col flex-1">
+                  
+                  <!-- Top Row: Icon, Category & Parts Count -->
+                  <div class="flex items-start justify-between gap-3 mb-2.5">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105"
+                        [class]="themeService.isClassic() ? 'bg-stone-100 border-stone-200 text-stone-800' : 'bg-stone-800 border-stone-700 text-amber-400'">
+                        <span class="material-icons text-xl">{{ tpl.icon || 'kitchen' }}</span>
+                      </div>
+                      <div class="min-w-0">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
                           {{ tpl.categoryLabel }}
                         </span>
-                        <span class="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded-full shrink-0">
-                          {{ tpl.partsCount }} piezas
-                        </span>
+                        <h3 class="text-sm font-bold tracking-tight text-stone-900 dark:text-stone-100 group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors leading-tight truncate"
+                          [title]="tpl.name">
+                          {{ tpl.name }}
+                        </h3>
                       </div>
-                      
-                      <h3 class="text-xs font-bold tracking-tight text-slate-900 group-hover:text-blue-700 transition-colors leading-snug line-clamp-1"
-                        [class]="themeService.isClassic() ? 'text-slate-900' : 'text-slate-100'"
-                        [title]="tpl.name">
-                        {{ tpl.name }}
-                      </h3>
                     </div>
+
+                    <span class="text-[11px] font-mono font-bold text-stone-700 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 px-2 py-0.5 rounded-full shrink-0">
+                      {{ tpl.partsCount }} piezas
+                    </span>
                   </div>
 
                   <!-- Description -->
-                  <p class="text-[11px] leading-relaxed text-slate-500 font-normal line-clamp-2 mt-2 mb-2.5">
+                  <p class="text-xs leading-relaxed text-stone-500 font-normal mt-1 mb-3">
                     {{ tpl.description }}
                   </p>
 
-                  <!-- Technical Dimensions Pill (CAD Standard) -->
-                  <div class="mt-auto pt-1">
-                    <div class="px-2.5 py-1.5 rounded-lg border flex items-center justify-between text-[11px] font-mono"
-                      [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-800/80 border-slate-700 text-slate-300'">
-                      <div class="flex items-center gap-1 text-slate-400 font-sans text-[10px] font-semibold">
-                        <span class="material-icons text-xs text-blue-600">straighten</span>
-                        <span>Cotas:</span>
-                      </div>
-                      <div class="flex items-center gap-1 font-bold text-slate-800" [class]="themeService.isClassic() ? 'text-slate-900' : 'text-slate-100'">
-                        <span class="text-blue-700 font-mono">{{ tpl.dimensions.width }}</span>
-                        <span class="text-slate-300 text-[10px]">×</span>
-                        <span class="text-blue-700 font-mono">{{ tpl.dimensions.height }}</span>
-                        <span class="text-slate-300 text-[10px]">×</span>
-                        <span class="text-blue-700 font-mono">{{ tpl.dimensions.depth }}</span>
-                        <span class="text-[10px] text-slate-400 font-normal">mm</span>
+                  <!-- Technical Specs: Dimensions Pill & Hardware Spec -->
+                  <div class="mt-auto space-y-2 pt-1 border-t border-stone-100 dark:border-stone-800/80">
+                    
+                    <!-- Dimensiones -->
+                    <div class="flex items-center justify-between text-xs font-mono px-2.5 py-1.5 rounded-lg border"
+                      [class]="themeService.isClassic() ? 'bg-stone-50 border-stone-200 text-stone-700' : 'bg-stone-800/60 border-stone-700 text-stone-300'">
+                      <span class="font-sans text-[11px] font-semibold text-stone-400 flex items-center gap-1">
+                        <span class="material-icons text-xs text-stone-500">straighten</span>
+                        <span>Medidas:</span>
+                      </span>
+                      <div class="flex items-center gap-1 font-bold text-stone-900 dark:text-stone-100">
+                        <span>{{ tpl.dimensions.width }}</span>
+                        <span class="text-stone-400 text-[10px]">×</span>
+                        <span>{{ tpl.dimensions.height }}</span>
+                        <span class="text-stone-400 text-[10px]">×</span>
+                        <span>{{ tpl.dimensions.depth }}</span>
+                        <span class="text-[10px] text-stone-400 font-normal">mm</span>
                       </div>
                     </div>
+
+                    <!-- Herrajes incluidos -->
+                    <div class="flex items-center gap-1.5 text-[11px] text-stone-500">
+                      <span class="material-icons text-xs text-amber-600">tune</span>
+                      @if (tpl.id === 'cajonera_3_cajones') {
+                        <span>3 gavetas completas de 5 piezas · Correderas telescópicas · Tirador centrado</span>
+                      } @else {
+                        <span>1 puerta batiente · Bisagras cazoleta Ø35mm · Repisa interior regulable</span>
+                      }
+                    </div>
+
                   </div>
                 </div>
 
-                <!-- CARD ACTIONS: High Contrast, Compact, Standardized Buttons -->
+                <!-- CARD ACTIONS: Professional Proportioned Buttons -->
                 <div 
-                  class="px-3.5 py-2 border-t grid grid-cols-2 gap-2"
-                  [class]="themeService.isClassic() ? 'bg-slate-50/70 border-slate-200' : 'bg-slate-950/70 border-slate-800'">
+                  class="px-4 py-3 border-t grid grid-cols-2 gap-2.5"
+                  [class]="themeService.isClassic() ? 'bg-stone-50/80 border-stone-200' : 'bg-stone-900/80 border-stone-800'">
                   
                   <button 
-                    type="button"
+                    type="button" 
                     (click)="onSelectTemplate(tpl, 'replace')"
-                    class="py-1.5 px-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-1 transition shadow-2xs"
-                    title="Cargar y reemplazar el diseño actual">
-                    <span class="material-icons text-xs">sync</span>
-                    <span>Reemplazar</span>
+                    class="py-2 px-3 text-xs font-bold bg-stone-900 hover:bg-stone-800 text-white rounded-lg flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer dark:bg-stone-100 dark:hover:bg-white dark:text-stone-950"
+                    title="Cargar este mueble reemplazando el diseño actual">
+                    <span class="material-icons text-xs">view_in_ar</span>
+                    <span>Cargar en Lienzo</span>
                   </button>
 
                   <button 
-                    type="button"
+                    type="button" 
                     (click)="onSelectTemplate(tpl, 'append')"
-                    class="py-1.5 px-2 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg flex items-center justify-center gap-1 transition shadow-2xs"
-                    [class]="themeService.isClassic() ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'"
-                    title="Añadir al lado en el visor 3D">
+                    class="py-2 px-3 text-xs font-semibold rounded-lg border flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
+                    [class]="themeService.isClassic() ? 'bg-white hover:bg-stone-100 text-stone-700 border-stone-300' : 'bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700'"
+                    title="Añadir este mueble al lado en el visor 3D">
                     <span class="material-icons text-xs">add</span>
                     <span>Añadir al lado</span>
                   </button>
@@ -245,15 +256,15 @@
 
       </div>
 
-      <!-- FOOTER INFO: White / Slate with Subtle Amber Icon -->
+      <!-- FOOTER INFO: Professional Status Bar -->
       <div 
         class="px-5 sm:px-6 py-2.5 border-t flex items-center justify-between shrink-0 text-xs"
-        [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200 text-slate-600' : 'bg-slate-950 border-slate-800 text-slate-400'">
+        [class]="themeService.isClassic() ? 'bg-white border-stone-200 text-stone-600' : 'bg-stone-900 border-stone-800 text-stone-400'">
         <div class="flex items-center gap-1.5">
           <span class="material-icons text-sm text-amber-500">verified</span>
-          <span class="font-medium">Modelos optimizados con despiece paramétrico y cotas de taller.</span>
+          <span class="font-medium text-stone-600 dark:text-stone-300">Construcción técnica con holguras reales, correderas y cotas de corte estándar.</span>
         </div>
-        <span class="font-mono font-bold text-slate-500">{{ filteredTemplates().length }} plantillas disponibles</span>
+        <span class="font-mono font-bold text-stone-500">{{ filteredTemplates().length }} de {{ catalogService.templates.length }} disponibles</span>
       </div>
 
     </div>

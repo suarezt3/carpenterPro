@@ -1,6 +1,6 @@
-<header [class]="themeService.isClassic() ? 'bg-white border-b border-slate-200 text-slate-800 sticky top-0 z-40 print:hidden w-full shadow-xs' : 'bg-zinc-900 border-b border-zinc-800 text-zinc-100 sticky top-0 z-40 print:hidden w-full'">
+<header [class]="themeService.isClassic() ? 'bg-white border-b border-slate-200 text-slate-800 sticky top-0 z-50 print:hidden w-full shadow-xs' : 'bg-zinc-900 border-b border-zinc-800 text-zinc-100 sticky top-0 z-50 print:hidden w-full'">
   <div class="w-full px-2.5 sm:px-4 lg:px-6">
-    <div class="flex items-center justify-between h-14 gap-2 flex-nowrap overflow-x-auto scrollbar-none">
+    <div class="flex items-center justify-between h-14 gap-2 flex-nowrap overflow-visible">
       
       <!-- ZONE 1 (LEFT): Brand & Compact Project Name (Single-line, no bulky subtitle) -->
       <div class="flex items-center gap-2.5 min-w-0 shrink-0">
@@ -115,7 +115,7 @@
         </div>
 
         <!-- MENÚ DESPLEGABLE: PROYECTO (Nuevo, Abrir proyectos, Auto-sync) -->
-        <div class="relative">
+        <div class="relative z-50">
           <button 
             type="button"
             (click)="toggleProjectDropdown($event)"
@@ -140,8 +140,8 @@
               (keydown)="$event.stopPropagation()"
               (click)="$event.stopPropagation()"
               [class]="themeService.isClassic() 
-                ? 'absolute right-0 top-full mt-1.5 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 text-xs text-slate-700 animate-in fade-in-50 zoom-in-95' 
-                : 'absolute right-0 top-full mt-1.5 z-50 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 text-xs text-zinc-200 animate-in fade-in-50 zoom-in-95'">
+                ? 'absolute right-0 top-full mt-2 z-50 w-60 bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 text-xs text-slate-700 animate-in fade-in-50 zoom-in-95' 
+                : 'absolute right-0 top-full mt-2 z-50 w-60 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 text-xs text-zinc-200 animate-in fade-in-50 zoom-in-95'">
               
               <!-- Opción: Nuevo Proyecto -->
               <button 

@@ -1,7 +1,7 @@
 <div [class]="themeService.isClassic() ? 'h-screen bg-slate-100 text-slate-800 flex flex-col overflow-hidden' : 'h-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden'">
   <!-- Global Header & Tabs -->
   <app-header 
-    class="shrink-0"
+    class="shrink-0 relative z-50"
     [activeTab]="activeTab()"
     (tabChanged)="onTabChanged($event)">
   </app-header>

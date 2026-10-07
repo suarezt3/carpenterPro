@@ -1,53 +1,99 @@
-# Plan de Implementación: Gavetas Completas de 5 Piezas, Montaje Real de Correderas y Mecanizados Técnicos
+# Plan de Rediseño: Catálogo de Plantillas Profesional, Corrección de Herrajes 3D y Menú de Proyectos
 
-A partir de tus respuestas y observaciones, implementaremos una solución integral para que los cajones sean muebles reales completos tanto en el visor 3D como en la lista de despiece y corte:
+Reestructuración integral y profesional del catálogo de plantillas, ajuste de paleta a tonos neutros cálidos y madera sobria, corrección de z-index del menú Proyecto en cabecera, eliminación definitiva de herrajes y correderas duplicadas en el visor 3D, y restricción a dos plantillas canónicas verificadas.
 
----
+## Decisiones Confirmadas con el Usuario
 
-## 1. Construcción Completa de Gaveta (Caja de Cajón de 5 Piezas)
-Actualmente varias plantillas y generadores solo colocaban la tapa frontal exterior. Implementaremos la estructura completa y paramétrica de la gaveta:
-- **Tapa de Frente Decorativo:** Frente exterior con recubrimientos/holguras periféricas estándar (1.5mm a 2mm).
-- **Caja de Gaveta (5 piezas):**
-  1. **Lateral Izquierdo Gaveta:** Con holgura lateral estándar (12.7 mm respecto al costado del mueble para correderas telescópicas).
-  2. **Lateral Derecho Gaveta:** Con holgura lateral estándar de 12.7 mm.
-  3. **Frente Interior Gaveta:** Conectado a los laterales de gaveta.
-  4. **Trasera Gaveta:** Descontada para dejar espacio a la profundidad del fondo.
-  5. **Fondo Gaveta:** Pieza horizontal (MDF/Melamina 3mm, 6mm o 15/18mm) ranurada o clavada bajo la caja.
-- **Despiece Automático:** Todas estas piezas se incorporarán al optimizador de corte y la lista de materiales con sus nombres y medidas exactas.
+> [!IMPORTANT]
+> - **Alcance de Plantillas**: Restricción inicial a exactamente 2 plantillas limpias y funcionales:
+>   1. **Cajonera de 3 Cajones**: Módulo bajo con 3 cajones de extracción individual, frentes limpios y proporciones de taller.
+>   2. **Módulo Bajo de Cocina con 1 Puerta y Repisa**: Módulo canónico con 1 puerta batiente con bisagras cazoleta de 35 mm y repisa intermedia.
+> - **Paleta Visual**: Neutro cálido (gris pizarra / zinc suave con detalles sobrios en madera natural), eliminando el azul estridente y los contrastes duros.
+> - **Herrajes en Cajones**: Exactamente 1 tirador centrado en el frente exterior y 1 par de correderas interiores (izquierda y derecha), evitando la replicación en laterales, traseras o fondos.
+> - **Despliegue del Menú Proyecto**: Corrección del contenedor de cabecera para que el menú de proyectos flote libremente por encima de la cinta de trabajo sin quedar oculto.
 
 ---
 
-## 2. Montaje de Rieles en los Costados Interiores del Mueble
-- **Ubicación Exacta:** Las correderas se anclan directamente en la cara interior de los laterales del mueble a la altura central/inferior de cada gaveta, respetando los 12.7 mm de luz lateral.
-- **Sin Sobredimensionamiento:** Longitud de corredera adaptada a la profundidad útil del mueble (250, 300, 350, 400, 450, 500, 550, 600 mm).
+## 1. Visión General & Objetivos
+
+El objetivo es transformar la experiencia del catálogo y modelado 3D de un aspecto prototípico o sobrecargado a una herramienta CAD/CAM de carpintería profesional:
+- **Catálogo refinado y proporcional**: Botones compactos, navegación por categorías fluida sin flechas toscas ni barras de desplazamiento dobles, y tipografía técnica limpia.
+- **Visualizador 3D exacto**: Renderizado estricto de herrajes; los tiradores y correderas pertenecen exclusivamente al frente/ensamblaje del cajón y nunca a las piezas internas individuales (fondos, laterales, traseras).
+- **Z-Index y apilamiento DOM impecable**: El selector de proyectos en la cabecera superior debe ser 100% visible y utilizable sobre cualquier barra o cinta inferior.
 
 ---
 
-## 3. Mecanizados Técnicos y Eliminación de Círculos Erróneos en Frentes
-- **Mecanizados de Correderas (Sistema 32):**
-  - Primera perforación técnica a **37 mm** exactos de la arista frontal del costado del mueble.
-  - Perforaciones subsiguientes con paso de **32 mm** (o múltiplos 64mm, 128mm, 192mm) a lo largo de la línea de la corredera.
-- **Limpieza de Círculos en Frentes:**
-  - Se eliminan perforaciones o tarugos de ensamble estructural en las caras visibles frontales de los cajones.
-  - Perforaciones de tirador / manija centradas paramétricamente según la distancia entre centros (96mm, 128mm, 160mm, 192mm).
+## 2. Experiencia de Usuario y Diseño Visual
+
+### A. Paleta de Colores Profesional (Neutro Cálido & Madera Sobria)
+- **Superficie base y modal**: Slate / Zinc neutro cálido (`bg-stone-50` / `bg-slate-50` en fondos claros, `bg-white` en tarjetas, bordes sutiles `border-slate-200/80`).
+- **Acentos**: Tono madera cálida refinada (`amber-700/80` o `stone-700`) para elementos destacados en lugar de azul chillón.
+- **Acciones primarias**: Botón de reemplazo con fondo pizarra oscuro o madera tenue (`bg-slate-900 hover:bg-slate-800 text-white` o `bg-stone-800`), y botón secundario "Añadir al lado" con contorno fino (`border-slate-300 text-slate-700 hover:bg-slate-100`).
+
+### B. Navegación de Categorías y Flechas
+- **Controles de desplazamiento**: Flechas compactas (`w-7 h-7`), integradas visualmente al contenedor con micro-interacciones suaves.
+- **Eliminación de scrollbar doble**: Ocultar el scrollbar nativo horizontal manteniendo el desplazamiento táctil/rueda (`scrollbar-none`).
+- **Pestañas de categoría**: Altura y padding equilibrados (`px-3 py-1.5 text-xs`), con contador numérico tipográfico sutil.
+
+### C. Menú Desplegable "Proyecto"
+- Establecer en `<app-header>` la clase `relative z-50` para evitar que el contenedor `<main>` o la barra de herramientas capture el contexto de apilamiento.
+- Ajustar el contenedor flex de la barra superior para permitir que el dropdown flotante (`absolute top-full z-50`) se dibuje por encima de cualquier cinta o viewport.
 
 ---
 
-## 4. Animación Sincronizada de la Gaveta Completa
-- Al hacer clic sobre la tapa o la manija de un cajón, se deslizan juntos hacia adelante:
-  - Tapa frontal
-  - Costados de la gaveta
-  - Trasera de la gaveta
-  - Fondo de la gaveta
-  - Tirador
-  - Tramo extensible móvil de la corredera
-- Cada cajón se abrirá y cerrará de manera individual e independiente.
+## 3. Arquitectura Técnica y Corrección de Herrajes 3D
+
+### Diagrama de Flujo y Jerarquía
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       MelamiPro Header                      │
+│   [Classic]  [Deshacer/Rehacer]  [Proyecto ▼ (z-index 50)]  │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Flota sobre la cinta
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Barra de Herramientas 3D                    │
+│   [Modelador 3D]       [Plantillas (Modal)]  [Lienzo Vacío] │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+               ┌───────────────┴───────────────┐
+               ▼                               ▼
+┌──────────────────────────────┐ ┌──────────────────────────────┐
+│  Plantilla 1: Cajonera 3C    │ │  Plantilla 2: Bajo 1 Puerta  │
+│  - 3 Frentes de cajón        │ │  - 1 Puerta batiente         │
+│  - 1 Tirador por frente      │ │  - Bisagras cazoleta 35mm    │
+│  - 1 Par de rieles laterales │ │  - Repisa regulable          │
+│  - Cajas de gaveta 5 piezas  │ │  - Laterales y fondo         │
+└──────────────────────────────┘ └──────────────────────────────┘
+```
+
+### Reglas Estrictas en el Renderizador 3D (`furniture-3d-viewer.ts`)
+1. **Detección Estricta de Frentes de Cajón**:
+   - `isDrawerFront` debe ser `true` únicamente si `componentRole === 'drawer_front'` o el nombre es específicamente "FRENTE DE CAJÓN".
+   - Piezas auxiliares como `Lateral Izq. Gaveta`, `Trasera Gaveta`, `Fondo Gaveta` **NO** deben ser marcadas como frente ni recibir tiradores ni juegos de correderas adicionales.
+2. **Evitar Duplicación de Cajas de Cajón**:
+   - Si la plantilla ya provee las 5 piezas físicas de la gaveta en el despiece, el visor no debe inyectar una segunda caja procedural dentro de la misma pieza.
+3. **Alineación de Correderas Telescópicas**:
+   - Las correderas se posicionan estrictamente en la cota interior de los costados del mueble con longitud acorde a la profundidad del mueble (ej. 450 mm o 400 mm).
 
 ---
 
-## Verificación y Pruebas
-1. Carga de plantillas con cajones (cómodas, escritorios, veladores, reposteros con gavetas).
-2. Verificación en 3D de la caja de cajón de 5 piezas con sus rieles en los laterales.
-3. Apertura de cajones independientes comprobando que toda la caja se mueva unida.
-4. Inspección de puntos de perforación técnicos (37mm sin círculos parásitos en el frente).
-5. Compilación limpia sin errores TypeScript ni de renderizado.
+## 4. Plan de Ejecución Paso a Paso
+
+1. **Corrección de Apilamiento del Menú "Proyecto"**:
+   - Modificar `app.html` y `header.html` para garantizar que el menú flotante tenga un z-index prioritario y no se recorte por `overflow-x-auto`.
+2. **Rediseño del Catálogo de Plantillas (`templates-modal.html` & `templates-modal.ts`)**:
+   - Sustituir la paleta azul chillón por una paleta neutra cálida profesional.
+   - Redimensionar y estilizar los botones de desplazamiento de categorías `<` y `>`.
+   - Limpiar el scroll horizontal (eliminar scrollbar antiestético manteniendo soporte de arrastre y rueda).
+   - Ajustar las tarjetas: dimensiones tipográficas acordes, botones de acción proporcionados.
+3. **Corrección en el Visor 3D (`furniture-3d-viewer.ts`)**:
+   - Aislar la generación de tiradores y correderas para que nunca se apliquen a piezas internas de gaveta (laterales, trasera, fondo).
+   - Asegurar exactamente 1 tirador frontal por cajón y un solo par de correderas por gaveta.
+4. **Configuración de las 2 Plantillas Iniciales en `templates-catalog.service.ts`**:
+   - Depurar el catálogo para dejar activas las dos plantillas solicitadas:
+     - **Cajonera Módulo 3 Cajones**: ancho 500 mm, alto 720 mm, prof 500 mm, con sus 3 frentes y gavetas bien calculadas.
+     - **Módulo Bajo Cocina con 1 Puerta y Repisa**: ancho 450 mm, alto 720 mm, prof 550 mm, con 1 puerta batiente y 1 repisa interior.
+5. **Verificación y Compilación**:
+   - Ejecutar verificación de compilación sin errores para asegurar estabilidad total.
