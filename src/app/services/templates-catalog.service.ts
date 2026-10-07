@@ -73,7 +73,7 @@ export class TemplatesCatalogService {
           {
             id: 'bm_division_' + crypto.randomUUID().slice(0, 6),
             name: 'DIVISIÓN CENTRAL',
-            length: 734, width: 560, thickness: t, quantity: 1,
+            length: 716, width: 560, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX + 182, posY: 456, posZ: 0, orientation: 'vertical_yz', componentRole: 'divider'
@@ -178,18 +178,18 @@ export class TemplatesCatalogService {
           {
             id: 'al_techo_' + crypto.randomUUID().slice(0, 6),
             name: 'TECHO SUPERIOR',
-            length: 764, width: 320, thickness: t, quantity: 1,
+            length: 764, width: 298, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX, posY: 691, posZ: 0, orientation: 'horizontal', componentRole: 'top'
+            posX: offsetX, posY: 691, posZ: 10, orientation: 'horizontal', componentRole: 'top'
           },
           {
             id: 'al_piso_' + crypto.randomUUID().slice(0, 6),
             name: 'BASE INFERIOR',
-            length: 764, width: 320, thickness: t, quantity: 1,
+            length: 764, width: 298, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX, posY: 9, posZ: 0, orientation: 'horizontal', componentRole: 'bottom'
+            posX: offsetX, posY: 9, posZ: 10, orientation: 'horizontal', componentRole: 'bottom'
           },
           {
             id: 'al_lat_izq_' + crypto.randomUUID().slice(0, 6),
@@ -210,10 +210,10 @@ export class TemplatesCatalogService {
           {
             id: 'al_estante_' + crypto.randomUUID().slice(0, 6),
             name: 'ESTANTE INTERMEDIO',
-            length: 764, width: 300, thickness: t, quantity: 1,
+            length: 764, width: 290, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX, posY: 350, posZ: 0, orientation: 'horizontal', componentRole: 'shelf'
+            posX: offsetX, posY: 350, posZ: 10, orientation: 'horizontal', componentRole: 'shelf'
           },
           {
             id: 'al_fondo_' + crypto.randomUUID().slice(0, 6),
@@ -365,7 +365,7 @@ export class TemplatesCatalogService {
           {
             id: 'esq_fondo_tras_' + crypto.randomUUID().slice(0, 6),
             name: 'RESPALDO TRASERO 1',
-            length: 814, width: 882, thickness: t, quantity: 1,
+            length: 882, width: 814, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX, posY: 416, posZ: -441, orientation: 'vertical_xy', componentRole: 'back'
@@ -463,10 +463,10 @@ export class TemplatesCatalogService {
           {
             id: 'isl_division_' + crypto.randomUUID().slice(0, 6),
             name: 'DIVISOR INTERNO',
-            length: 775, width: 530, thickness: t, quantity: 1,
+            length: 766, width: 530, thickness: t, quantity: 1,
             materialId: matDark.id, materialName: matDark.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX, posY: 476, posZ: -100, orientation: 'vertical_yz', componentRole: 'divider'
+            posX: offsetX, posY: 481, posZ: -100, orientation: 'vertical_yz', componentRole: 'divider'
           },
           {
             id: 'isl_puerta_1_' + crypto.randomUUID().slice(0, 6),
@@ -621,10 +621,10 @@ export class TemplatesCatalogService {
           {
             id: 'chif_piso_' + crypto.randomUUID().slice(0, 6),
             name: 'PISO INFERIOR',
-            length: 764, width: 430, thickness: t, quantity: 1,
+            length: 764, width: 410, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX, posY: 79, posZ: 0, orientation: 'horizontal', componentRole: 'bottom'
+            posX: offsetX, posY: 79, posZ: -10, orientation: 'horizontal', componentRole: 'bottom'
           },
           {
             id: 'chif_zocalo_' + crypto.randomUUID().slice(0, 6),
@@ -703,34 +703,34 @@ export class TemplatesCatalogService {
           {
             id: 'caj_ind_lat_izq_' + crypto.randomUUID().slice(0, 6),
             name: 'LATERAL / COSTADO IZQUIERDO CAJÓN',
-            length: 140, width: 430, thickness: t, quantity: 1,
+            length: 140, width: 412, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX - 215, posY: 75, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_left'
+            posX: offsetX - 206, posY: 75, posZ: 1, orientation: 'vertical_yz', componentRole: 'side_left'
           },
           {
             id: 'caj_ind_lat_der_' + crypto.randomUUID().slice(0, 6),
             name: 'LATERAL / COSTADO DERECHO CAJÓN',
-            length: 140, width: 430, thickness: t, quantity: 1,
+            length: 140, width: 412, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX + 215, posY: 75, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_right'
+            posX: offsetX + 206, posY: 75, posZ: 1, orientation: 'vertical_yz', componentRole: 'side_right'
           },
           {
             id: 'caj_ind_contra_' + crypto.randomUUID().slice(0, 6),
             name: 'CONTRAFRENTE TRASERO CAJÓN',
-            length: 412, width: 140, thickness: t, quantity: 1,
+            length: 394, width: 140, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX, posY: 75, posZ: -206, orientation: 'vertical_xy', componentRole: 'back'
+            posX: offsetX, posY: 75, posZ: -196, orientation: 'vertical_xy', componentRole: 'back'
           },
           {
             id: 'caj_ind_fondo_' + crypto.randomUUID().slice(0, 6),
             name: 'FONDO DE CAJÓN (MDF 6mm)',
-            length: 422, width: 420, thickness: 6, quantity: 1,
+            length: 394, width: 394, thickness: 6, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'none',
             edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX, posY: 15, posZ: 0, orientation: 'horizontal', componentRole: 'bottom'
+            posX: offsetX, posY: 8, posZ: 10, orientation: 'horizontal', componentRole: 'bottom'
           }
         ];
       }
@@ -801,18 +801,18 @@ export class TemplatesCatalogService {
           {
             id: 'oll_gaveta_1_' + crypto.randomUUID().slice(0, 6),
             name: 'FRENTE GAVETA 1 CACEROLERA (SUPERIOR)',
-            length: 860, width: 355, thickness: t, quantity: 1,
+            length: 860, width: 350, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 625, posZ: 291, orientation: 'vertical_xy', componentRole: 'drawer_front'
+            posX: offsetX, posY: 632, posZ: 291, orientation: 'vertical_xy', componentRole: 'drawer_front'
           },
           {
             id: 'oll_gaveta_2_' + crypto.randomUUID().slice(0, 6),
             name: 'FRENTE GAVETA 2 OLLERA (INFERIOR)',
-            length: 860, width: 355, thickness: t, quantity: 1,
+            length: 860, width: 350, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 265, posZ: 291, orientation: 'vertical_xy', componentRole: 'drawer_front'
+            posX: offsetX, posY: 277, posZ: 291, orientation: 'vertical_xy', componentRole: 'drawer_front'
           }
         ];
       }
@@ -1479,10 +1479,10 @@ export class TemplatesCatalogService {
           {
             id: 'cab_panel_' + crypto.randomUUID().slice(0, 6),
             name: 'PANEL PRINCIPAL DE FONDO',
-            length: 1000, width: 1600, thickness: t, quantity: 1,
+            length: 1600, width: 982, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'width',
             edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 500, posZ: -91, orientation: 'vertical_xy', componentRole: 'back'
+            posX: offsetX, posY: 491, posZ: -91, orientation: 'vertical_xy', componentRole: 'back'
           },
           {
             id: 'cab_repisa_sup_' + crypto.randomUUID().slice(0, 6),
@@ -1495,18 +1495,18 @@ export class TemplatesCatalogService {
           {
             id: 'cab_nicho_izq_' + crypto.randomUUID().slice(0, 6),
             name: 'REPISA NICHO IZQUIERDA',
-            length: 300, width: 180, thickness: t, quantity: 1,
+            length: 300, width: 160, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
-            posX: offsetX - 600, posY: 600, posZ: 0, orientation: 'horizontal', componentRole: 'shelf'
+            posX: offsetX - 600, posY: 600, posZ: -2, orientation: 'horizontal', componentRole: 'shelf'
           },
           {
             id: 'cab_nicho_der_' + crypto.randomUUID().slice(0, 6),
             name: 'REPISA NICHO DERECHA',
-            length: 300, width: 180, thickness: t, quantity: 1,
+            length: 300, width: 160, thickness: t, quantity: 1,
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
-            posX: offsetX + 600, posY: 600, posZ: 0, orientation: 'horizontal', componentRole: 'shelf'
+            posX: offsetX + 600, posY: 600, posZ: -2, orientation: 'horizontal', componentRole: 'shelf'
           }
         ];
       }
@@ -1531,10 +1531,10 @@ export class TemplatesCatalogService {
           {
             id: 'rk_panel_' + crypto.randomUUID().slice(0, 6),
             name: 'PANEL TRASERO TV 65"',
-            length: 1000, width: 1800, thickness: t, quantity: 1,
+            length: 1800, width: 950, thickness: t, quantity: 1,
             materialId: matWood.id, materialName: matWood.name, grain: 'length',
             edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 900, posZ: -166, orientation: 'vertical_xy', componentRole: 'back'
+            posX: offsetX, posY: 925, posZ: -166, orientation: 'vertical_xy', componentRole: 'back'
           },
           {
             id: 'rk_tapa_bajo_' + crypto.randomUUID().slice(0, 6),
@@ -1555,7 +1555,7 @@ export class TemplatesCatalogService {
           {
             id: 'rk_lat_izq_' + crypto.randomUUID().slice(0, 6),
             name: 'LATERAL IZQUIERDO',
-            length: 432, width: 350, thickness: t, quantity: 1,
+            length: 414, width: 350, thickness: t, quantity: 1,
             materialId: matDark.id, materialName: matDark.name, grain: 'length',
             edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
             posX: offsetX - 891, posY: 225, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_left'
@@ -1563,7 +1563,7 @@ export class TemplatesCatalogService {
           {
             id: 'rk_lat_der_' + crypto.randomUUID().slice(0, 6),
             name: 'LATERAL DERECHO',
-            length: 432, width: 350, thickness: t, quantity: 1,
+            length: 414, width: 350, thickness: t, quantity: 1,
             materialId: matDark.id, materialName: matDark.name, grain: 'length',
             edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
             posX: offsetX + 891, posY: 225, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_right'
@@ -1782,10 +1782,10 @@ export class TemplatesCatalogService {
           {
             id: 'ap_div_' + crypto.randomUUID().slice(0, 6),
             name: 'DIVISIÓN INTERNA',
-            length: 703, width: 380, thickness: t, quantity: 1,
+            length: 694, width: 380, thickness: t, quantity: 1,
             materialId: matWood.id, materialName: matWood.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX - 227, posY: 440, posZ: 0, orientation: 'vertical_yz', componentRole: 'divider'
+            posX: offsetX - 227, posY: 435, posZ: 0, orientation: 'vertical_yz', componentRole: 'divider'
           },
           {
             id: 'ap_puerta_1_' + crypto.randomUUID().slice(0, 6),

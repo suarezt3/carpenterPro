@@ -1,6 +1,6 @@
 {
-  "summary": "Plan integral para la corrección profunda de plantillas de muebles, nuevo catálogo en cuadrícula de 2 columnas con previsualizaciones isométricas 3D, plantillas especializadas para cajones, botón de lienzo en blanco en cinta superior, reparación del atajo Supr/Delete/Backspace para eliminar piezas, catálogo ampliado de maderas y melaminas (maderas nobles, mármol y mates), y funcionalidad interactiva de apertura y movimiento 3D de puertas y cajones.",
-  "updatedAt": "2026-10-07T13:22:11.324666354Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Plan para eliminar miniaturas del catálogo de plantillas, rediseñar las tarjetas con cabecera limpia, auditar y corregir todas las coordenadas de plantillas (reparar puertas flotantes de mueble sobre inodoro y colisión en gavetero ollero), y transformar los campos de Posición 3D y Dimensiones de Corte en una cuadrícula compacta de 3 columnas tipo software CAD sin desbordamientos.",
+  "updatedAt":  "2026-10-07T14:27:22.730362768Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

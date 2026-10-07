@@ -44,9 +44,21 @@ export class JoineryEngineService {
       sy = L;
       sz = W;
     } else if (orient === 'vertical_xy') {
-      sx = L;
-      sy = W;
-      sz = t;
+      const isDoor = part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA');
+      const isDrawer = part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('CAJÓN') || part.name.toUpperCase().includes('CAJON') || part.name.toUpperCase().includes('GAVETA');
+      if (isDoor && L > W) {
+        sx = W;
+        sy = L;
+        sz = t;
+      } else if (isDrawer && W > L) {
+        sx = W;
+        sy = L;
+        sz = t;
+      } else {
+        sx = L;
+        sy = W;
+        sz = t;
+      }
     }
 
     const px = part.posX ?? 0;

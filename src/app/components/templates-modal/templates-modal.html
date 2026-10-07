@@ -136,44 +136,64 @@
                 class="rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-xl overflow-hidden group"
                 [class]="themeService.isClassic() ? 'bg-white border-slate-300 shadow-sm hover:border-amber-400' : 'bg-zinc-900 border-zinc-800 hover:border-amber-500/70'">
                 
-                <!-- TOP CARD: 3D ISOMETRIC PREVIEW -->
-                <div class="p-4 pb-2">
-                  <app-template-thumbnail [template]="tpl" class="w-full h-36 block"></app-template-thumbnail>
-                </div>
-
-                <!-- CARD BODY: INFO & METRICS -->
-                <div class="px-5 py-2 flex flex-col gap-2 flex-1">
-                  <!-- Header row: category, badge, parts count -->
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                      <span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-800 border border-amber-500/30">
-                        {{ tpl.categoryLabel }}
-                      </span>
-                      <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                        {{ tpl.badge }}
-                      </span>
+                <!-- CARD HEADER: THEMED ICON, CATEGORY BADGE & TITLE -->
+                <div class="p-5 pb-3 flex flex-col gap-3 flex-1">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                      <!-- Themed Icon Container -->
+                      <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-2xs border transition-colors group-hover:scale-105"
+                        [class]="themeService.isClassic() ? 'bg-amber-500/10 border-amber-500/20 text-amber-700' : 'bg-amber-500/15 border-amber-500/30 text-amber-400'">
+                        <span class="material-icons text-2xl">{{ tpl.icon || 'kitchen' }}</span>
+                      </div>
+                      
+                      <div>
+                        <!-- Category & Sub-badge -->
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-800 border border-amber-500/30">
+                            {{ tpl.categoryLabel }}
+                          </span>
+                          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ tpl.badge }}
+                          </span>
+                        </div>
+                        
+                        <h3 class="text-base font-black tracking-tight leading-snug group-hover:text-amber-700 transition-colors" [class]="themeService.isClassic() ? 'text-slate-950' : 'text-white'">
+                          {{ tpl.name }}
+                        </h3>
+                      </div>
                     </div>
 
-                    <span class="text-xs font-mono font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <span class="material-icons text-xs text-sky-500">grid_view</span>
+                    <!-- Parts count badge -->
+                    <span class="text-xs font-mono font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-full flex items-center gap-1 shrink-0">
+                      <span class="material-icons text-xs text-sky-600">grid_view</span>
                       {{ tpl.partsCount }} piezas
                     </span>
                   </div>
 
-                  <!-- Title & Description -->
-                  <div>
-                    <h3 class="text-base font-black tracking-tight leading-snug group-hover:text-amber-700 transition-colors" [class]="themeService.isClassic() ? 'text-slate-950' : 'text-white'">
-                      {{ tpl.name }}
-                    </h3>
-                    <p class="text-xs font-medium mt-1 leading-relaxed" [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-300'">
-                      {{ tpl.description }}
-                    </p>
-                  </div>
+                  <!-- Description -->
+                  <p class="text-xs font-medium leading-relaxed" [class]="themeService.isClassic() ? 'text-slate-600' : 'text-zinc-300'">
+                    {{ tpl.description }}
+                  </p>
 
-                  <!-- DIMENSION PILLS IN MM -->
-                  <div class="pt-1 flex items-center gap-2 text-xs font-mono font-black" [class]="themeService.isClassic() ? 'text-slate-900' : 'text-amber-300'">
-                    <span class="material-icons text-xs text-slate-500">straighten</span>
-                    <span>Dimensiones: {{ tpl.dimensions.width }} ancho × {{ tpl.dimensions.height }} alto × {{ tpl.dimensions.depth }} prof mm</span>
+                  <!-- PROMINENT DIMENSIONS BANNER IN MM -->
+                  <div class="mt-auto pt-2">
+                    <div class="p-3 rounded-xl border flex items-center justify-between text-xs font-mono"
+                      [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-zinc-950/80 border-zinc-800 text-zinc-200'">
+                      <div class="flex items-center gap-1.5 text-slate-500 font-sans text-[11px] font-bold">
+                        <span class="material-icons text-sm text-amber-500">straighten</span>
+                        <span>Medidas:</span>
+                      </div>
+                      <div class="flex items-center gap-2 text-xs font-black">
+                        <span class="text-amber-600 font-extrabold">{{ tpl.dimensions.width }}</span>
+                        <span class="text-[10px] text-slate-400 font-normal">ancho</span>
+                        <span class="text-slate-300">×</span>
+                        <span class="text-amber-600 font-extrabold">{{ tpl.dimensions.height }}</span>
+                        <span class="text-[10px] text-slate-400 font-normal">alto</span>
+                        <span class="text-slate-300">×</span>
+                        <span class="text-amber-600 font-extrabold">{{ tpl.dimensions.depth }}</span>
+                        <span class="text-[10px] text-slate-400 font-normal">prof mm</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -185,7 +205,7 @@
                   <button 
                     type="button"
                     (click)="onSelectTemplate(tpl, 'replace')"
-                    class="py-2 px-3 text-xs font-black bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm hover:scale-[1.01]"
+                    class="py-2.5 px-3 text-xs font-black bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm hover:scale-[1.01]"
                     title="Borrar lienzo actual y cargar este mueble">
                     <span class="material-icons text-sm">sync</span>
                     <span>Reemplazar</span>
@@ -194,7 +214,7 @@
                   <button 
                     type="button"
                     (click)="onSelectTemplate(tpl, 'append')"
-                    class="py-2 px-3 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm hover:scale-[1.01]"
+                    class="py-2.5 px-3 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm hover:scale-[1.01]"
                     title="Añadir este mueble al lado en el visor 3D sin borrar el actual">
                     <span class="material-icons text-sm">add_box</span>
                     <span>Añadir al lado</span>

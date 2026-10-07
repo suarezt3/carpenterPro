@@ -209,93 +209,94 @@
                 placeholder="Nombre de la pieza" />
             </div>
 
-            <!-- SECTION 1: DIMENSIONES DE CORTE (Largo × Ancho × Espesor) -->
-            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
-              <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <span class="material-icons text-xs text-sky-600">square_foot</span>
-                Dimensiones de Corte (mm)
-              </span>
+            <!-- SECTION 1: DIMENSIONES DE CORTE (Largo × Ancho × Espesor) - CUADRÍCULA COMPACTA CAD -->
+            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-sky-600">square_foot</span>
+                  Dimensiones de Corte (mm)
+                </span>
+                <span class="text-[9px] font-mono font-bold text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
+                  CAD 3D
+                </span>
+              </div>
 
-              <!-- LARGO -->
-              <div class="space-y-1">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-slate-600 font-medium">Largo (mm):</span>
-                  <span class="font-mono font-bold text-sky-700">{{ sel.length }} mm</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <button 
-                    type="button" 
-                    (click)="adjustPartProperty('length', -50)" 
-                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
-                    -50
-                  </button>
-                  <button 
-                    type="button" 
-                    (click)="adjustPartProperty('length', -10)" 
-                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
-                    -10
-                  </button>
+              <!-- 3-COLUMNS CAD COMPACT GRID -->
+              <div class="grid grid-cols-3 gap-1.5">
+                <!-- Columna Largo -->
+                <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Largo</span>
+                    <span class="text-[9px] font-mono text-sky-600 font-bold">L</span>
+                  </div>
                   <input 
                     type="number" 
-                    step="5"
+                    step="1"
+                    min="1"
                     [value]="sel.length"
                     (input)="updateSelectedPart({ length: +$any($event.target).value })"
-                    class="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-center text-xs font-bold text-slate-800 focus:outline-hidden focus:border-sky-500 font-mono shadow-2xs" />
-                  <button 
-                    type="button" 
-                    (click)="adjustPartProperty('length', 10)" 
-                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
-                    +10
-                  </button>
-                  <button 
-                    type="button" 
-                    (click)="adjustPartProperty('length', 50)" 
-                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
-                    +50
-                  </button>
+                    class="w-full px-1.5 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 transition" />
+                  <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('length', -10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-[9px] font-mono rounded font-bold transition"
+                      title="-10 mm">-10</button>
+                    <span class="text-[9px] text-slate-400 font-mono">mm</span>
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('length', 10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-[9px] font-mono rounded font-bold transition"
+                      title="+10 mm">+10</button>
+                  </div>
                 </div>
-              </div>
 
-              <!-- ANCHO -->
-              <div class="space-y-1">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-slate-600 font-medium">Ancho (mm):</span>
-                  <span class="font-mono font-bold text-sky-700">{{ sel.width }} mm</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <button 
-                    type="button" 
-                    (click)="adjustPartProperty('width', -50)" 
-                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
-                    -50
-                  </button>
-                  <button 
-                    type="button" 
-                    (click)="adjustPartProperty('width', -10)" 
-                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
-                    -10
-                  </button>
+                <!-- Columna Ancho -->
+                <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Ancho</span>
+                    <span class="text-[9px] font-mono text-sky-600 font-bold">W</span>
+                  </div>
                   <input 
                     type="number" 
-                    step="5"
+                    step="1"
+                    min="1"
                     [value]="sel.width"
                     (input)="updateSelectedPart({ width: +$any($event.target).value })"
-                    class="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-center text-xs font-bold text-slate-800 focus:outline-hidden focus:border-sky-500 font-mono shadow-2xs" />
-                  <button 
-                    type="button" 
-                    (click)="adjustPartProperty('width', 10)" 
-                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
-                    +10
-                  </button>
-                  <button 
-                    type="button" 
-                    (click)="adjustPartProperty('width', 50)" 
-                    class="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-mono rounded-lg border border-slate-200 font-bold shadow-2xs">
-                    +50
-                  </button>
+                    class="w-full px-1.5 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 transition" />
+                  <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('width', -10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-[9px] font-mono rounded font-bold transition"
+                      title="-10 mm">-10</button>
+                    <span class="text-[9px] text-slate-400 font-mono">mm</span>
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('width', 10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-[9px] font-mono rounded font-bold transition"
+                      title="+10 mm">+10</button>
+                  </div>
+                </div>
+
+                <!-- Columna Espesor -->
+                <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Espesor</span>
+                    <span class="text-[9px] font-mono text-sky-600 font-bold">T</span>
+                  </div>
+                  <input 
+                    type="number" 
+                    step="1"
+                    min="1"
+                    [value]="sel.thickness"
+                    (input)="onThicknessChange(+$any($event.target).value)"
+                    class="w-full px-1.5 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 transition" />
+                  <div class="flex items-center justify-center mt-1 pt-1 border-t border-slate-100">
+                    <span class="text-[9px] text-slate-500 font-mono font-bold">{{ sel.thickness }} mm</span>
+                  </div>
                 </div>
               </div>
-
             </div>
 
             <!-- SECTION: LUZ LIBRE Y HUECOS ÚTILES (CAD SKETCHUP) -->
@@ -444,92 +445,127 @@
               </div>
             </div>
 
-            <!-- SECTION 3: POSICIÓN 3D MILIMÉTRICA -->
-            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
-              <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <span class="material-icons text-xs text-amber-500">open_with</span>
-                Posición 3D en Milímetros
-              </span>
+            <!-- SECTION 3: POSICIÓN 3D EN MILÍMETROS - CUADRÍCULA COMPACTA CAD -->
+            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-amber-500">open_with</span>
+                  Posición 3D en Milímetros
+                </span>
+                <span class="text-[9px] font-mono text-slate-500 font-semibold">
+                  Ejes XYZ
+                </span>
+              </div>
 
-              <!-- EJE X -->
-              <div class="space-y-1">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-slate-600">Eje X (Izquierda / Derecha):</span>
-                  <span class="font-mono text-slate-800 font-bold">{{ sel.posX ?? 0 }} mm</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <button (click)="adjustPartProperty('posX', -50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-50</button>
-                  <button (click)="adjustPartProperty('posX', -10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-10</button>
+              <!-- 3-COLUMNS CAD COMPACT GRID: X (Rojo), Y (Verde), Z (Azul) -->
+              <div class="grid grid-cols-3 gap-1.5">
+                <!-- EJE X (ROJO - Izq/Der) -->
+                <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-rose-500">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-extrabold text-rose-600 font-mono">EJE X</span>
+                    <span class="text-[9px] text-slate-400">Izq/Der</span>
+                  </div>
                   <input 
                     type="number" 
                     step="5"
                     [value]="sel.posX ?? 0"
                     (input)="updateSelectedPart({ posX: +$any($event.target).value })"
-                    class="flex-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded-lg text-center text-xs text-slate-800 font-mono shadow-2xs" />
-                  <button (click)="adjustPartProperty('posX', 10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+10</button>
-                  <button (click)="adjustPartProperty('posX', 50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+50</button>
+                    class="w-full px-1 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-rose-500 transition" />
+                  <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('posX', -10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-rose-700 text-[9px] font-mono rounded font-bold transition"
+                      title="-10 mm">-10</button>
+                    <span class="text-[9px] text-slate-400 font-mono">mm</span>
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('posX', 10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-rose-700 text-[9px] font-mono rounded font-bold transition"
+                      title="+10 mm">+10</button>
+                  </div>
                 </div>
-              </div>
 
-              <!-- EJE Y -->
-              <div class="space-y-1">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-slate-600">Eje Y (Elevación del Suelo):</span>
-                  <span class="font-mono text-slate-800 font-bold">{{ sel.posY ?? 0 }} mm</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <button (click)="adjustPartProperty('posY', -50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-50</button>
-                  <button (click)="adjustPartProperty('posY', -10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-10</button>
+                <!-- EJE Y (VERDE - Altura/Suelo) -->
+                <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-emerald-500">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-extrabold text-emerald-600 font-mono">EJE Y</span>
+                    <span class="text-[9px] text-slate-400">Altura</span>
+                  </div>
                   <input 
                     type="number" 
                     step="5"
                     [value]="sel.posY ?? 0"
                     (input)="updateSelectedPart({ posY: +$any($event.target).value })"
-                    class="flex-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded-lg text-center text-xs text-slate-800 font-mono shadow-2xs" />
-                  <button (click)="adjustPartProperty('posY', 10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+10</button>
-                  <button (click)="adjustPartProperty('posY', 50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+50</button>
+                    class="w-full px-1 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-emerald-500 transition" />
+                  <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('posY', -10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-emerald-700 text-[9px] font-mono rounded font-bold transition"
+                      title="-10 mm">-10</button>
+                    <span class="text-[9px] text-slate-400 font-mono">mm</span>
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('posY', 10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-emerald-700 text-[9px] font-mono rounded font-bold transition"
+                      title="+10 mm">+10</button>
+                  </div>
                 </div>
-              </div>
 
-              <!-- EJE Z -->
-              <div class="space-y-1">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-slate-600">Eje Z (Profundidad adelante/atrás):</span>
-                  <span class="font-mono text-slate-800 font-bold">{{ sel.posZ ?? 0 }} mm</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <button (click)="adjustPartProperty('posZ', -50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-50</button>
-                  <button (click)="adjustPartProperty('posZ', -10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">-10</button>
+                <!-- EJE Z (AZUL - Profundidad) -->
+                <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-sky-500">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-extrabold text-sky-600 font-mono">EJE Z</span>
+                    <span class="text-[9px] text-slate-400">Prof.</span>
+                  </div>
                   <input 
                     type="number" 
                     step="5"
                     [value]="sel.posZ ?? 0"
                     (input)="updateSelectedPart({ posZ: +$any($event.target).value })"
-                    class="flex-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded-lg text-center text-xs text-slate-800 font-mono shadow-2xs" />
-                  <button (click)="adjustPartProperty('posZ', 10)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+10</button>
-                  <button (click)="adjustPartProperty('posZ', 50)" class="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] rounded-lg font-bold shadow-2xs">+50</button>
+                    class="w-full px-1 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 transition" />
+                  <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('posZ', -10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-sky-700 text-[9px] font-mono rounded font-bold transition"
+                      title="-10 mm">-10</button>
+                    <span class="text-[9px] text-slate-400 font-mono">mm</span>
+                    <button 
+                      type="button" 
+                      (click)="adjustPartProperty('posZ', 10)" 
+                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-sky-700 text-[9px] font-mono rounded font-bold transition"
+                      title="+10 mm">+10</button>
+                  </div>
                 </div>
               </div>
 
-              <!-- Alineaciones rápidas de 1 clic -->
+              <!-- ALINEACIONES RÁPIDAS CAD DE 1 CLIC -->
               <div class="grid grid-cols-3 gap-1 pt-1 border-t border-slate-200">
                 <button 
                   type="button" 
                   (click)="alignPart('floor')"
-                  class="py-1 px-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-semibold shadow-2xs">
-                  Al Suelo
+                  class="py-1 px-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-0.5"
+                  title="Posicionar pieza directamente sobre el piso (Y=0)">
+                  <span class="material-icons text-xs text-emerald-600">vertical_align_bottom</span>
+                  <span>Al Suelo</span>
                 </button>
                 <button 
                   type="button" 
                   (click)="alignPart('centerX')"
-                  class="py-1 px-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-semibold shadow-2xs">
-                  Centrar X
+                  class="py-1 px-1 bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-0.5"
+                  title="Centrar pieza horizontalmente en el eje X (X=0)">
+                  <span class="material-icons text-xs text-rose-500">align_horizontal_center</span>
+                  <span>Centrar X</span>
                 </button>
                 <button 
                   type="button" 
                   (click)="alignPart('centerZ')"
-                  class="py-1 px-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-semibold shadow-2xs">
-                  Centrar Z
+                  class="py-1 px-1 bg-white hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-0.5"
+                  title="Centrar pieza en profundidad en el eje Z (Z=0)">
+                  <span class="material-icons text-xs text-sky-500">filter_center_focus</span>
+                  <span>Centrar Z</span>
                 </button>
               </div>
 
