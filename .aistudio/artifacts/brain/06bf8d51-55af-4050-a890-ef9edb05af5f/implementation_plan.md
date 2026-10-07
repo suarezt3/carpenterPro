@@ -1,78 +1,114 @@
-# Plan de Implementación: Catálogo sin Miniaturas, Corrección de Plantillas y Cuadrícula CAD Compacta
+# Plan de Implementación: Repositorio de Accesorios, Animación Fluida y Configuración de Puertas/Cajones
 
-Eliminación de las miniaturas SVG del catálogo de plantillas para un diseño limpio y rápido, corrección exhaustiva de las coordenadas de las plantillas (especialmente puertas flotantes de organizador sobre inodoro y colisión de cajones en gavetero ollero), y compactación de los paneles de "Posición 3D" y "Dimensiones de Corte" en una cuadrícula CAD de 3 columnas sin desbordamiento.
+## Resumen Ejecutivo
+Implementar un repositorio profesional de accesorios de carpintería (manijas/tiradores, bisagras de cazoleta, correderas telescópicas), corregir el problema de animación donde las puertas/cajones "brincan" y quedan en el mismo lugar al hacer clic (provocado por la reconstrucción del árbol 3D y desacoplamiento de mecanizados/pivotes), y habilitar tanto en el **menú contextual de clic derecho** como en el **panel inspector de piezas** la capacidad de convertir cualquier pieza personalizada en puerta o cajón, asignar sus accesorios y animar su apertura y cierre de forma interactiva.
 
-## Decisiones Críticas y Preferencias del Usuario
+---
+
+## Decisiones del Usuario y Preferencias Confirmadas
 
 > [!IMPORTANT]
-> Decisiones confirmadas a través del diálogo interactivo:
-> - **Catálogo de Plantillas**: Se retiran por completo las miniaturas SVG que no se veían bien. Las tarjetas del catálogo se rediseñan con una cabecera limpia, icono temático distintivo en contenedor estilizado, insignias de categoría, medidas destacadas en milímetros y botones de acción directos.
-> - **Campos de Posición 3D y Dimensiones de Corte**: Se reemplaza el diseño anterior (que tenía botones -50, -10, +10, +50 en cada fila causando desbordamiento horizontal en la bandeja lateral) por una **cuadrícula compacta de 3 columnas tipo software CAD** (X, Y, Z y Largo, Ancho, Espesor) con inputs numéricos estilizados, etiquetas claras y botones de alineación rápida.
-> - **Corrección de Plantillas de Muebles**: Se corrigen las coordenadas de todas las plantillas que presentaban desfasajes o colisiones (puertas flotando en el aire en el organizador sobre inodoro, colisión del piso con la gaveta inferior en el gavetero ollero de cocina, y cotas de todas las plantillas).
+> Decisiones confirmadas a través de la entrevista interactiva:
+> - **Gestión de accesorios**: Catálogo integrado en el inspector de propiedades y en el menú contextual de clic derecho.
+> - **Configuración de piezas personalizadas**: Accesible tanto desde el menú contextual de clic derecho como desde el panel inspector de la pieza seleccionada.
+> - **Controles de animación**: Clic directo en el tirador/manija 3D, opción de "Abrir / Cerrar" en el menú contextual y botón global de apertura en la barra de herramientas.
 
 ---
 
-## 1. Visión General de los Cambios
+## 1. Diagnóstico del Error de Visualización y Animación ("Brinco")
 
-### ¿Qué soluciona esta actualización?
-1. **Remoción de Miniaturas SVG**: Eliminar el componente y las vistas previas SVG de las tarjetas del catálogo. Reemplazarlas por tarjetas limpias de 2 columnas con tipografía de alto contraste, dimensiones resaltadas e icono temático.
-2. **Corrección de Puertas Flotantes (`bano_sobre_inodoro`)**: Corregir las dimensiones y posición de las puertas del organizador sobre inodoro. El error se originaba en la inversión de largo y ancho en la orientación `vertical_xy`, haciendo que las puertas tuvieran 490 mm de ancho en lugar de 304 mm y aparecieran desubicadas a Y=1400. Se ajustan a `length: 304, width: 490, posY: 1150` para cerrar el vano entre 900 mm y 1400 mm de manera perfecta.
-3. **Corrección de Colisiones en Cajones (`cocina_gavetero_ollero`)**: Corregir las cotas de la gaveta inferior para que no intercepte el piso de 18 mm (`posY: 89`), ubicando la gaveta inferior a `posY: 277` y la superior a `posY: 632`, eliminando la alerta de colisión en rojo.
-4. **Auditoría Matemática Integral de las 26 Plantillas**: Verificar todas las plantillas para asegurar que no existan piezas flotantes, vanos desfasados ni colisiones espaciales.
-5. **Rediseño Ultracompacto de "Dimensiones de Corte" y "Posición 3D" en la Bandeja**:
-   - Sustituir las filas con múltiples botones `-50 / -10 / +10 / +50` que desbordaban la barra lateral.
-   - Implementar cuadrícula CAD de 3 columnas: `[ Eje X ] [ Eje Y ] [ Eje Z ]` y `[ Largo ] [ Ancho ] [ Espesor ]` con inputs numéricos directos y botones de centrado/suelo abajo.
+### Causa Raíz Detectada
+1. **Reconstrucción destructiva de la escena**: Al hacer clic en una pieza o en su entorno, el visor Three.js emite `partSelected`, lo cual actualiza `selectedPartIds` en el diseñador. El efecto reactivo (`effect()`) en el visor detectaba el cambio de selección y llamaba a `buildFurnitureScene()`, limpiando completamente `openCurrentMap.clear()` y `openTargetMap.clear()`, destruyendo la malla y recreándola cerrada instantáneamente tras un único frame.
+2. **Círculos en las puertas**: Los círculos observados en las puertas corresponden a las **cazoletas de bisagra de 35 mm** (mecanizados CNC calculados por el motor de ensamble). Al estar ubicados en un grupo estático separado (`drillGroup`), no estaban emparentados con el pivote de giro (`doorPivot`). Al rotar la puerta, los círculos quedaban en el aire o creaban una discrepancia visual.
+3. **Ausencia de modelos 3D de herrajes**: No existían accesorios físicos visuales (manijas, bisagras metálicas, correderas) emparentados con la puerta o cajón.
 
 ---
 
-## 2. Experiencia de Usuario y Diseño Visual
+## 2. Arquitectura de la Solución y Componentes
 
-### A. Catálogo de Plantillas Rediseñado (Sin Miniaturas)
-- **Cabecera de Tarjeta**: Contenedor con icono temático según la categoría (`countertops`, `table_rows`, `inventory_2`, `door_sliding`, `desk`, etc.), nombre del mueble en negrita, insignia de categoría y contador de piezas.
-- **Medidas Destacadas**: Cinta milimétrica destacada en negrita (`700 ancho × 550 alto × 450 prof mm`).
-- **Descripción Concisa**: Texto explicativo sin saturación visual.
-- **Botones de Acción**: Botón ámbar "Reemplazar" y botón oscuro "Añadir al lado".
-
-### B. Bandeja Lateral CAD (Sin Desbordamientos)
-- **Dimensiones de Corte (mm)**:
-  - Cuadrícula compacta de 3 columnas (`Largo`, `Ancho`, `Espesor`) que cabe cómodamente incluso en barras laterales estrechas de 280-320 px.
-- **Posición 3D en Milímetros**:
-  - Cuadrícula compacta de 3 columnas con colores identificadores CAD estándar:
-    * **Eje X (Rojo)**: Izquierda / Derecha
-    * **Eje Y (Verde)**: Altura / Elevación del suelo
-    * **Eje Z (Azul)**: Profundidad adelante / atrás
-  - Botones inferiores compactos: `[ Al Suelo ]`, `[ Centrar X ]`, `[ Centrar Z ]`.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       MODULO DESIGNER / WORKSPACE                          │
+├──────────────────────────────────────┬──────────────────────────────────────┤
+│       PANEL INSPECTOR DE PIEZA       │       VISOR 3D (THREE.JS / CAD)      │
+│  - Rol Móvil (Puerta/Cajón/Fija)     │  - Árbol jerárquico:                 │
+│  - HingeSide: Izq, Der, Basculante   │    doorPivot ──► DoorMesh            │
+│  - Catálogo Accesorios / Tiradores   │              ├──► Handle3D (Tirador) │
+│  - Selector Bisagras / Correderas    │              └──► HingeCups (35mm)   │
+│  - Test apertura instantáneo         │  - Click en tirador / puerta         │
+├──────────────────────────────────────┴──────────────────────────────────────┤
+│                         MENÚ CONTEXTUAL CLIC DERECHO                        │
+│  - "Convertir en Puerta" (Izq / Der / Basculante)                           │
+│  - "Convertir en Cajón" (Frente móvil con correderas)                       │
+│  - "Asignar Tirador..." (Barra, Concha, Botón, Gola, Sin Tirador)           │
+│  - "Abrir / Cerrar Pieza" (Animación lerp suave a 90° o extensión)          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 3. Plan de Modificaciones Técnicas
+## 3. Especificación Detallada de Cambios
 
-### Archivos a Modificar:
-1. `src/app/components/templates-modal/templates-modal.html`:
-   - Eliminar `<app-template-thumbnail>`.
-   - Reestructurar el cuerpo de cada tarjeta del catálogo hacia el diseño limpio con cabecera de icono, medidas destacadas y botones directos.
-2. `src/app/services/templates-catalog.service.ts`:
-   - Corregir `bano_sobre_inodoro`: ajustar `so_puerta_1_` y `so_puerta_2_` (`length: 304, width: 490, posY: 1150, posZ: 134`) para encajar exactamente en el vano de la estructura.
-   - Corregir `cocina_gavetero_ollero`: ajustar `oll_gaveta_1_` (`posY: 632`) y `oll_gaveta_2_` (`posY: 277`) para respetar holguras con el piso y fajas de amarre sin colisiones.
-   - Auditar las demás plantillas para garantizar tolerancias y ensambles exactos.
-3. `src/app/components/module-designer/module-designer.html`:
-   - Rediseñar la sección "Dimensiones de Corte (mm)" a cuadrícula compacta de 3 columnas (`grid grid-cols-3 gap-2`).
-   - Rediseñar la sección "Posición 3D en Milímetros" a cuadrícula compacta de 3 columnas (`grid grid-cols-3 gap-2`) con etiquetas identificadoras de ejes y eliminar los botones `-50 / -10 / +10 / +50` desbordados.
-4. `src/app/components/module-designer/module-designer.ts`:
-   - Asegurar que los métodos de ajuste numérico respondan inmediatamente a cambios directos sin latencia.
+### A. Repositorio de Accesorios de Carpintería (`accessories-catalog.service.ts` o modelo integrado)
+Crear catálogo tipado con metadatos y generadores geométricos 3D optimizados:
+1. **Tiradores y Manijas**:
+   - **Tirador Tubular de Barra**: Acero cepillado o negro mate (distancias estándar: 96mm, 128mm, 160mm, 192mm).
+   - **Tirador de Concha / Clásico**: Con fijación frontal o trasera.
+   - **Tirador Botón Cilíndrico**: Minimalista moderno (diámetro 20-25mm).
+   - **Tirador Perfil Gola / J-Pull**: Integrado en el borde superior o lateral.
+   - **Push-to-Open (Sin tirador)**: Apertura por expulsión mecánica.
+2. **Bisagras de Cazoleta (35mm)**:
+   - Bisagra Recta (Parche / Cobertura total).
+   - Bisagra Acodada (Semi-parche / Codo 9).
+   - Bisagra Superacodada (Encastrada / Codo 18).
+   - Brazo Basculante / Pistón de gas para puertas elevables.
+3. **Correderas de Cajón**:
+   - Correderas telescópicas laterales (extensión total 45mm zincada).
+   - Guías ocultas bajo cajón con cierre suave.
+
+### B. Corrección de la Animación de Apertura (Suavidad sin Saltos)
+1. **Preservación de Estado**:
+   - Modificar `buildFurnitureScene()` y los efectos reactivos para no borrar `openTargetMap` ni reiniciar el progreso de rotación/desplazamiento al cambiar de selección.
+   - Optimizar la actualización de selección: actualizar materiales y el Gizmo de transformación sin destruir ni reconstruir la escena Three.js cuando solo cambian los IDs seleccionados.
+2. **Emparentamiento Correcto**:
+   - Emparentar tanto el tirador 3D como las cazoletas de bisagra (`hinge_35`) directamente dentro del `doorPivot`.
+   - Al rotar `doorPivot.rotation.y` (o `rotation.x` en basculantes), la puerta, su tirador y sus bisagras se moverán solidariamente en una sola transformación matemática.
+3. **Animación Lerp con Easing Real**:
+   - Suavizar la interpolación de apertura con delta time para que responda uniformemente a 60 FPS sin saltos abruptos.
+
+### C. Menú Contextual de Clic Derecho
+Añadir sección dedicada a piezas móviles:
+- **Puerta / Bisagra**:
+  - Convertir en Puerta (Bisagra Izquierda)
+  - Convertir en Puerta (Bisagra Derecha)
+  - Convertir en Puerta Basculante (Superior)
+- **Cajón**:
+  - Convertir en Frente de Cajón Móvil
+- **Quitar Rol Móvil**:
+  - Volver a pieza fija estándar
+- **Herrajes y Tirador**:
+  - Submenú rápido con opciones visuales de tirador (Barra, Concha, Botón, Gola, Push-Open).
+- **Acción Rápida de Animación**:
+  - Opción directa "Abrir / Cerrar Pieza" para probar el movimiento inmediatamente.
+
+### D. Panel Inspector de Piezas (Module Designer)
+- Nueva sección colapsable **"Comportamiento Móvil y Accesorios"**:
+  - Selector de Rol: Estándar (Fija) | Puerta | Frente de Cajón.
+  - Si es Puerta: Selector de ubicación de bisagra (Izquierda, Derecha, Superior).
+  - Selector de Tirador: Lista desplegable con vista previa de estilo, material y orientación (Horizontal / Vertical).
+  - Posicionamiento del tirador: Centrado, borde superior, borde inferior, centrado lateral.
+  - Botón interactivo de prueba: "Probar Animación (Abrir / Cerrar)".
 
 ---
 
 ## 4. Plan de Verificación
 
-1. **Verificación Visual de Catálogo**:
-   - Abrir el catálogo de plantillas y comprobar que las tarjetas se muestran limpias, legibles, en 2 columnas y sin las miniaturas SVG anteriores.
-2. **Prueba de Carga de Muebles Corregidos**:
-   - Cargar `Mueble Organizador sobre Inodoro y Toallero`: verificar que las puertas ya no flotan en el aire y están montadas en su vano del mueble.
-   - Cargar `Gavetero Ollero 2 Gavetas para Cocina`: verificar que no hay piezas marcadas en rojo por colisión.
-3. **Prueba de Bandeja Lateral CAD**:
-   - Seleccionar cualquier pieza y verificar que los campos de "Dimensiones de Corte" y "Posición 3D" encajan perfectamente en la barra lateral sin desbordamiento horizontal (`no scroll horizontal`).
-4. **Prueba de Edición Numérica**:
-   - Modificar valores en los campos de X, Y, Z y Largo/Ancho comprobando que la pieza en el visor 3D se actualiza al instante.
-5. **Compilación y Linteo**:
-   - Ejecutar `compile_applet` y `lint_applet` para confirmar cero errores de compilación y cero errores de TypeScript.
+1. **Prueba de Carga de Plantilla**: Cargar la plantilla "Closet / Ropero 2 Cuerpos con Maletero y Perchero", verificar que las puertas se ubiquen perfectamente alineadas con sus bisagras y tiradores integrados.
+2. **Prueba de Clic en Tiradores / Puertas**: Hacer clic en el tirador o puerta y confirmar que se abre a 90° de manera continua y fluida, sin saltos ni reseteos de posición.
+3. **Prueba de Creación Manual**:
+   - Crear una pieza rectangular manual.
+   - Hacer clic derecho -> "Convertir en Puerta (Bisagra Izquierda)" o asignarlo en el inspector.
+   - Comprobar que adquiere automáticamente el tirador y bisagras, y que se anima al hacer clic o mediante el menú.
+4. **Prueba de Creación de Cajón**:
+   - Crear un frente de cajón, designarlo como cajón y comprobar la animación de extracción hacia el frente.
+5. **Verificación de Compilación**: Ejecutar `compile_applet` para garantizar cero errores de TypeScript y AOT.

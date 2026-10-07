@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para eliminar miniaturas del catálogo de plantillas, rediseñar las tarjetas con cabecera limpia, auditar y corregir todas las coordenadas de plantillas (reparar puertas flotantes de mueble sobre inodoro y colisión en gavetero ollero), y transformar los campos de Posición 3D y Dimensiones de Corte en una cuadrícula compacta de 3 columnas tipo software CAD sin desbordamientos.",
-  "updatedAt":  "2026-10-07T14:27:22.730362768Z",
+  "summary":  "Plan de implementación para el repositorio de accesorios (manijas, bisagras, correderas), corrección de la animación fluida de piezas móviles sin saltos, e integración del menú contextual de clic derecho e inspector para convertir y animar puertas y cajones personalizados.",
+  "updatedAt":  "2026-10-07T16:05:23.629176364Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

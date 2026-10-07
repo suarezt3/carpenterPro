@@ -9,13 +9,27 @@ import {
   ChangeDetectionStrategy,
   afterNextRender,
   effect,
+  untracked,
   OnDestroy,
   inject
 } from '@angular/core';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Part, Material, DrillHole, CollisionRecord, EdgeBandingType } from '../../models/melamine.models';
+import { 
+  Part, 
+  Material, 
+  DrillHole, 
+  CollisionRecord, 
+  EdgeBandingType, 
+  PartHardwareConfig,
+  HandleType,
+  HandleFinish,
+  HingeType,
+  SlideType,
+  OpeningDirection
+} from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
+import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 
 interface PieceMeshData {
   part: Part;
@@ -25,9 +39,12 @@ interface PieceMeshData {
   isDoor?: boolean;
   isDrawer?: boolean;
   doorPivot?: THREE.Group;
-  hingeSide?: 'left' | 'right' | 'top';
+  hingeSide?: 'left' | 'right' | 'top' | 'bottom';
   doorLocalMeshPos?: THREE.Vector3;
   doorPivotOriginalPos?: THREE.Vector3;
+  handleGroup?: THREE.Group;
+  hingeGroup?: THREE.Group;
+  slideGroup?: THREE.Group;
 }
 
 interface GizmoHitData {
@@ -62,6 +79,7 @@ export interface ClearanceInfo {
 })
 export class Furniture3dViewerComponent implements OnDestroy {
   private joineryEngine = inject(JoineryEngineService);
+  readonly hardwareCatalog = inject(HardwareCatalogService);
 
   // Inputs
   parts = input<Part[]>([]);
@@ -93,6 +111,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   show3dDimensions = signal<boolean>(true);
   showClearances = signal<boolean>(true);
   showDrillHoles = signal<boolean>(true);
+  showHardware = signal<boolean>(true); // Visualizar tiradores, bisagras y correderas 3D
   isWhiteTheme = signal<boolean>(true); // Default to clean pure white studio background
 
   // SketchUp CAD Palette & Push/Pull State
@@ -107,6 +126,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly contextMenuPart = signal<Part | null>(null);
   readonly showQuickMaterialPicker = signal<boolean>(false);
   readonly showRotateSubmenu = signal<boolean>(false);
+  readonly showMovableRoleSubmenu = signal<boolean>(false);
+  readonly showHandleSubmenu = signal<boolean>(false);
+  readonly showHingeSubmenu = signal<boolean>(false);
 
   // Hidden / Isolated Parts
   readonly hiddenPartIds = signal<Set<string>>(new Set());
@@ -164,8 +186,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   // Interactive 3D Doors & Drawers Open/Close State
   readonly isAllOpen = signal<boolean>(false);
-  private openTargetMap = new Map<string, number>();
-  private openCurrentMap = new Map<string, number>();
+  openTargetMap = new Map<string, number>();
+  openCurrentMap = new Map<string, number>();
+
+  isPartOpen(partId: string): boolean {
+    return (this.openTargetMap.get(partId) || 0) > 0.5;
+  }
 
   // Active Selected Part (primary)
   readonly selectedPart = computed(() => {
@@ -236,20 +262,33 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.initThree();
     });
 
-    // Rebuild scene when pieces, selection, materials, xRay, or drill holes change
+    // 1. Rebuild 3D geometry ONLY when pieces, materials, xRay, dims, drill holes, hardware or hidden parts change
     effect(() => {
       const parts = this.parts();
-      const selIds = this.activeSelectedIds();
       const mats = this.materials();
       const xRay = this.isXRay();
       const showDims = this.show3dDimensions();
       this.showDrillHoles();
+      this.showHardware();
       this.activeTool();
       this.hiddenPartIds();
 
       if (this.scene) {
+        // Read activeSelectedIds untracked so selection changes don't destroy and rebuild the 3D scene!
+        const selIds = untracked(() => this.activeSelectedIds());
         this.buildFurnitureScene(parts, selIds, mats, xRay, showDims);
         this.updateExplodedOffsets(this.explodedPercent());
+      }
+    });
+
+    // 2. High-performance selection highlights & gizmo update WITHOUT rebuilding the 3D scene
+    effect(() => {
+      const selIds = this.activeSelectedIds();
+      const mats = this.materials();
+      const xRay = this.isXRay();
+
+      if (this.scene && this.pieceObjects.length > 0) {
+        this.updateSelectionHighlights(selIds, mats, xRay);
       }
     });
 
@@ -471,9 +510,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
     this.pieceObjects = [];
     this.gizmoHitMeshes = [];
+
+    // Preserve open animation states for existing parts (prevents jumping!)
+    const prevOpenCurrent = new Map(this.openCurrentMap);
+    const prevOpenTarget = new Map(this.openTargetMap);
     this.openCurrentMap.clear();
     this.openTargetMap.clear();
-    this.isAllOpen.set(false);
+    for (const [id, val] of prevOpenTarget.entries()) {
+      if (parts.some(p => p.id === id)) {
+        this.openTargetMap.set(id, val);
+        this.openCurrentMap.set(id, prevOpenCurrent.get(id) ?? val);
+      }
+    }
+    const anyStillOpen = Array.from(this.openTargetMap.values()).some(v => v > 0.5);
+    this.isAllOpen.set(anyStillOpen);
 
     if (!parts || parts.length === 0) {
       this.detectedCollisions.set([]);
@@ -571,42 +621,90 @@ export class Furniture3dViewerComponent implements OnDestroy {
         pz * 0.45
       );
 
-      const isDoor = part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA');
-      const isDrawer = part.componentRole === 'drawer_front' || 
+      const hw = part.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(part);
+      const isDoor = hw.movableType === 'door' || part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA');
+      const isDrawer = hw.movableType === 'drawer' || part.componentRole === 'drawer_front' || 
                        part.name.toUpperCase().includes('CAJON') || 
                        part.name.toUpperCase().includes('CAJÓN') ||
                        part.name.toUpperCase().includes('GAVETA') ||
                        part.id.includes('caj_ind_');
 
       let doorPivot: THREE.Group | undefined;
-      let hingeSide: 'left' | 'right' | 'top' = 'left';
+      let hingeSide: 'left' | 'right' | 'top' | 'bottom' = hw.openingDirection || 'left';
       let doorLocalMeshPos: THREE.Vector3 | undefined;
       let doorPivotOriginalPos: THREE.Vector3 | undefined;
+      let handleGroup: THREE.Group | undefined;
+      let hingeGroup: THREE.Group | undefined;
+      let slideGroup: THREE.Group | undefined;
 
       if (isDoor) {
-        if (part.name.toUpperCase().includes('BASCULANTE') || part.name.toUpperCase().includes('ELEVABLE')) {
-          hingeSide = 'top';
-          doorPivot = new THREE.Group();
-          doorPivot.position.set(px, py + sy / 2, pz);
-          mesh.position.set(0, -sy / 2, 0);
-        } else if (part.name.toUpperCase().includes('DER') || (part.posX || 0) > 0) {
-          hingeSide = 'right';
-          doorPivot = new THREE.Group();
-          doorPivot.position.set(px + sx / 2, py, pz);
-          mesh.position.set(-sx / 2, 0, 0);
+        if (!hw.openingDirection) {
+          if (part.name.toUpperCase().includes('BASCULANTE') || part.name.toUpperCase().includes('ELEVABLE')) {
+            hingeSide = 'top';
+          } else if (part.name.toUpperCase().includes('DER') || (part.posX || 0) > 0) {
+            hingeSide = 'right';
+          } else {
+            hingeSide = 'left';
+          }
+        } else {
+          hingeSide = hw.openingDirection;
+        }
+
+        doorPivot = new THREE.Group();
+        if (hingeSide === 'top') {
+          doorPivot.position.set(px, py + sy / 2, pz + sz / 2);
+          mesh.position.set(0, -sy / 2, -sz / 2);
+        } else if (hingeSide === 'bottom') {
+          doorPivot.position.set(px, py - sy / 2, pz + sz / 2);
+          mesh.position.set(0, sy / 2, -sz / 2);
+        } else if (hingeSide === 'right') {
+          doorPivot.position.set(px + sx / 2, py, pz + sz / 2);
+          mesh.position.set(-sx / 2, 0, -sz / 2);
         } else {
           hingeSide = 'left';
-          doorPivot = new THREE.Group();
-          doorPivot.position.set(px - sx / 2, py, pz);
-          mesh.position.set(sx / 2, 0, 0);
+          doorPivot.position.set(px - sx / 2, py, pz + sz / 2);
+          mesh.position.set(sx / 2, 0, -sz / 2);
         }
         doorLocalMeshPos = mesh.position.clone();
         doorPivotOriginalPos = doorPivot.position.clone();
         doorPivot.add(mesh);
+
+        // Hardware: 3D Handles & Concealed 35mm Hinges
+        if (this.showHardware()) {
+          handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, true, hingeSide);
+          if (handleGroup) mesh.add(handleGroup);
+          hingeGroup = this.createHingesMesh(part, hw, sx, sy, sz, hingeSide);
+          if (hingeGroup) mesh.add(hingeGroup);
+        }
+
+        // Apply preserved open rotation immediately so it doesn't jump
+        const curOpen = this.openCurrentMap.get(part.id) || 0;
+        if (curOpen > 0) {
+          if (hingeSide === 'left') doorPivot.rotation.y = -curOpen * (Math.PI / 2.05);
+          else if (hingeSide === 'right') doorPivot.rotation.y = curOpen * (Math.PI / 2.05);
+          else if (hingeSide === 'top') doorPivot.rotation.x = curOpen * (Math.PI / 2.2);
+          else if (hingeSide === 'bottom') doorPivot.rotation.x = -curOpen * (Math.PI / 2.2);
+        }
+
         this.furnitureGroup.add(doorPivot);
         mesh.userData = { part, isPiece: true, isDoor: true };
       } else if (isDrawer) {
         mesh.position.set(px, py, pz);
+
+        // Hardware: 3D Handles & Telescopic Runners
+        if (this.showHardware()) {
+          handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, false, 'top');
+          if (handleGroup) mesh.add(handleGroup);
+          slideGroup = this.createDrawerSlidesMesh(part, hw, sx, sy, sz);
+          if (slideGroup) mesh.add(slideGroup);
+        }
+
+        // Apply preserved open translation immediately
+        const curOpen = this.openCurrentMap.get(part.id) || 0;
+        if (curOpen > 0) {
+          mesh.position.z += curOpen * 280;
+        }
+
         this.furnitureGroup.add(mesh);
         mesh.userData = { part, isPiece: true, isDrawer: true };
       } else {
@@ -625,7 +723,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
         doorPivot,
         hingeSide,
         doorLocalMeshPos,
-        doorPivotOriginalPos
+        doorPivotOriginalPos,
+        handleGroup,
+        hingeGroup,
+        slideGroup
       });
     }
 
@@ -1302,10 +1403,318 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showDrillHoles.update(v => !v);
   }
 
+  toggleHardware() {
+    this.showHardware.update(v => !v);
+  }
+
+  private updateSelectionHighlights(selectedIds: string[], mats: Material[], xRay: boolean) {
+    const collidingPartIds = new Set<string>();
+    for (const c of this.detectedCollisions()) {
+      collidingPartIds.add(c.partAId);
+      collidingPartIds.add(c.partBId);
+    }
+
+    const selectedDataList: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number }[] = [];
+
+    for (const item of this.pieceObjects) {
+      const part = item.part;
+      const isSelected = selectedIds.includes(part.id);
+      const isColliding = collidingPartIds.has(part.id);
+
+      // 1. Update mesh material highlight in place
+      item.mesh.material = this.createPieceMaterial(part, isSelected, mats, xRay, isColliding);
+
+      // 2. Update technical edge outline color
+      for (const child of item.mesh.children) {
+        if (child instanceof THREE.LineSegments) {
+          const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x0284c7 : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46));
+          (child.material as THREE.LineBasicMaterial).color.setHex(edgeColor);
+          (child.material as THREE.LineBasicMaterial).linewidth = isSelected || isColliding ? 3 : 1;
+        }
+      }
+
+      if (isSelected) {
+        const t = part.thickness || 18;
+        const L = part.length;
+        const W = part.width;
+        let sx = L; let sy = t; let sz = W;
+        if (part.orientation === 'vertical_yz') { sx = t; sy = L; sz = W; }
+        else if (part.orientation === 'vertical_xy') {
+          if (item.isDoor && L > W) { sx = W; sy = L; sz = t; }
+          else if (item.isDrawer && W > L) { sx = W; sy = L; sz = t; }
+          else { sx = L; sy = W; sz = t; }
+        }
+        selectedDataList.push({
+          part,
+          px: item.originalPos.x,
+          py: item.originalPos.y,
+          pz: item.originalPos.z,
+          sx, sy, sz
+        });
+      }
+    }
+
+    // Refresh CAD Gizmo & Dimension overlays only
+    while (this.dimensionGroup.children.length > 0) {
+      this.dimensionGroup.remove(this.dimensionGroup.children[0]);
+    }
+    while (this.gizmoGroup.children.length > 0) {
+      this.gizmoGroup.remove(this.gizmoGroup.children[0]);
+    }
+    this.gizmoHitMeshes = [];
+
+    if (selectedDataList.length === 1) {
+      const s = selectedDataList[0];
+      if (this.show3dDimensions()) {
+        this.renderPieceDimensions(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
+      }
+      if (this.showClearances()) {
+        this.renderClearanceDimensions(s.part, this.parts());
+      } else {
+        this.clearanceCalculated.emit(null);
+      }
+      if (this.activeTool() === 'move' || this.activeTool() === 'select') {
+        this.buildGizmo(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
+      }
+    } else {
+      this.clearanceCalculated.emit(null);
+      if (selectedDataList.length > 1 && (this.activeTool() === 'move' || this.activeTool() === 'select')) {
+        const centroid = this.calculateCentroid(selectedDataList.map(d => d.part));
+        this.buildGroupGizmo(centroid.x, centroid.y, centroid.z);
+      }
+    }
+  }
+
+  private createHandleMesh(
+    part: Part,
+    hw: PartHardwareConfig,
+    sx: number,
+    sy: number,
+    sz: number,
+    isDoor: boolean,
+    hingeSide: 'left' | 'right' | 'top' | 'bottom'
+  ): THREE.Group {
+    const group = new THREE.Group();
+    const handleType = hw.handleType || 'bar_modern';
+    if (handleType === 'none') return group;
+
+    const hexColor = this.hardwareCatalog.getFinishHexColor(hw.handleFinish);
+    const metalness = hw.handleFinish === 'black' ? 0.35 : 0.88;
+    const roughness = hw.handleFinish === 'black' ? 0.4 : 0.2;
+
+    const handleMat = new THREE.MeshStandardMaterial({
+      color: hexColor,
+      metalness,
+      roughness
+    });
+
+    const standoffMat = new THREE.MeshStandardMaterial({
+      color: hexColor,
+      metalness,
+      roughness
+    });
+
+    if (handleType === 'bar_modern' || handleType === 'bar_black') {
+      const len = hw.handleLength || (handleType === 'bar_black' ? 192 : 160);
+      const isBarBlack = handleType === 'bar_black';
+
+      let barMesh: THREE.Mesh;
+      if (isBarBlack) {
+        barMesh = new THREE.Mesh(new THREE.BoxGeometry(10, len, 12), handleMat);
+      } else {
+        barMesh = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, len, 18), handleMat);
+      }
+
+      const standoff1 = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 25, 14), standoffMat);
+      standoff1.rotation.x = Math.PI / 2;
+      standoff1.position.set(0, len / 2 - 18, -12);
+
+      const standoff2 = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 25, 14), standoffMat);
+      standoff2.rotation.x = Math.PI / 2;
+      standoff2.position.set(0, -len / 2 + 18, -12);
+
+      group.add(barMesh);
+      group.add(standoff1);
+      group.add(standoff2);
+    } else if (handleType === 'knob_round') {
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(4, 6, 18, 16), standoffMat);
+      stem.rotation.x = Math.PI / 2;
+      stem.position.set(0, 0, -9);
+
+      const head = new THREE.Mesh(new THREE.CylinderGeometry(14, 12, 9, 24), handleMat);
+      head.rotation.x = Math.PI / 2;
+      head.position.set(0, 0, 4);
+
+      group.add(stem);
+      group.add(head);
+    } else if (handleType === 'knob_square') {
+      const stem = new THREE.Mesh(new THREE.BoxGeometry(7, 7, 18), standoffMat);
+      stem.position.set(0, 0, -9);
+
+      const head = new THREE.Mesh(new THREE.BoxGeometry(22, 22, 8), handleMat);
+      head.position.set(0, 0, 4);
+
+      group.add(stem);
+      group.add(head);
+    } else if (handleType === 'profile_gola') {
+      const width = isDoor ? Math.max(80, sx * 0.85) : Math.max(100, sx - 24);
+      const profile = new THREE.Mesh(new THREE.BoxGeometry(width, 18, 14), handleMat);
+      group.add(profile);
+    } else if (handleType === 'cup_vintage') {
+      const cupBack = new THREE.Mesh(new THREE.BoxGeometry(96, 36, 4), handleMat);
+      const cupFront = new THREE.Mesh(new THREE.CylinderGeometry(18, 18, 64, 16, 1, false, 0, Math.PI), handleMat);
+      cupFront.rotation.z = Math.PI / 2;
+      cupFront.position.set(0, -6, 10);
+      group.add(cupBack);
+      group.add(cupFront);
+    }
+
+    // Position handle on door or drawer face
+    if (isDoor) {
+      const margin = 45;
+      if (hingeSide === 'left') {
+        group.position.set(sx / 2 - margin, 0, sz / 2 + 15);
+      } else if (hingeSide === 'right') {
+        group.position.set(-sx / 2 + margin, 0, sz / 2 + 15);
+      } else if (hingeSide === 'top') {
+        group.rotation.z = Math.PI / 2;
+        group.position.set(0, -sy / 2 + margin, sz / 2 + 15);
+      } else if (hingeSide === 'bottom') {
+        group.rotation.z = Math.PI / 2;
+        group.position.set(0, sy / 2 - margin, sz / 2 + 15);
+      }
+    } else {
+      if (handleType !== 'knob_round' && handleType !== 'knob_square') {
+        group.rotation.z = Math.PI / 2;
+      }
+      group.position.set(0, 0, sz / 2 + 15);
+    }
+
+    group.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.userData = { isHandle: true, part, parentPartId: part.id };
+      }
+    });
+
+    return group;
+  }
+
+  private createHingesMesh(
+    part: Part,
+    hw: PartHardwareConfig,
+    sx: number,
+    sy: number,
+    sz: number,
+    hingeSide: 'left' | 'right' | 'top' | 'bottom'
+  ): THREE.Group {
+    const group = new THREE.Group();
+    if (hw.hingeType === 'none') return group;
+
+    const hingeMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.85,
+      roughness: 0.25
+    });
+
+    const isGasPiston = hw.hingeType === 'gas_piston' || hingeSide === 'top';
+
+    if (isGasPiston) {
+      const pistonOffsets = [-sx / 2 + 35, sx / 2 - 35];
+      for (const ox of pistonOffsets) {
+        const piston = new THREE.Group();
+        const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 120, 16), hingeMat);
+        const rod = new THREE.Mesh(
+          new THREE.CylinderGeometry(4, 4, 100, 14),
+          new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.1 })
+        );
+        rod.position.y = -60;
+        piston.add(cylinder);
+        piston.add(rod);
+        piston.position.set(ox, 0, -sz / 2 - 25);
+        piston.rotation.x = -Math.PI / 4;
+        group.add(piston);
+      }
+    } else {
+      const hingeYPositions: number[] = [];
+      const margin = 100;
+      hingeYPositions.push(sy / 2 - margin);
+      hingeYPositions.push(-sy / 2 + margin);
+      if (sy > 1000) {
+        hingeYPositions.push(0);
+      }
+      if (sy > 1700) {
+        hingeYPositions.push(sy / 4);
+      }
+
+      const hingeX = hingeSide === 'left' ? -sx / 2 + 22.5 : sx / 2 - 22.5;
+
+      for (const hy of hingeYPositions) {
+        const singleHinge = new THREE.Group();
+
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(17.5, 17.5, 12, 20), hingeMat);
+        cup.rotation.x = Math.PI / 2;
+        cup.position.set(0, 0, -sz / 2 + 6);
+        singleHinge.add(cup);
+
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(18, 14, 45), hingeMat);
+        const armOffsetX = hingeSide === 'left' ? -12 : 12;
+        arm.position.set(armOffsetX, 0, -sz / 2 - 16);
+        singleHinge.add(arm);
+
+        singleHinge.position.set(hingeX, hy, 0);
+        group.add(singleHinge);
+      }
+    }
+
+    group.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        child.userData = { isHinge: true, part, parentPartId: part.id };
+      }
+    });
+
+    return group;
+  }
+
+  private createDrawerSlidesMesh(
+    part: Part,
+    hw: PartHardwareConfig,
+    sx: number,
+    sy: number,
+    sz: number
+  ): THREE.Group {
+    const group = new THREE.Group();
+    if (hw.slideType === 'none') return group;
+
+    const slideMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.8,
+      roughness: 0.3
+    });
+
+    const depth = Math.max(250, (part.width || 450) * 0.9);
+
+    const leftSlide = new THREE.Mesh(new THREE.BoxGeometry(6, 35, depth), slideMat);
+    leftSlide.position.set(-sx / 2 - 4, -sy / 4, -depth / 2 + sz / 2);
+
+    const rightSlide = new THREE.Mesh(new THREE.BoxGeometry(6, 35, depth), slideMat);
+    rightSlide.position.set(sx / 2 + 4, -sy / 4, -depth / 2 + sz / 2);
+
+    group.add(leftSlide);
+    group.add(rightSlide);
+
+    group.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        child.userData = { isSlide: true, part, parentPartId: part.id };
+      }
+    });
+
+    return group;
+  }
+
   private renderDrillHolesVisuals(holes: DrillHole[]) {
     for (const hole of holes) {
       const holeGroup = new THREE.Group();
-      holeGroup.position.set(hole.posX, hole.posY, hole.posZ);
 
       let color = 0x06b6d4; // Cyan for screws 4x50
       let cylRadius = Math.max(2.5, hole.diameter / 2);
@@ -1322,13 +1731,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
 
       // 3D Drill Bore Cylinder
-      const cylGeo = new THREE.CylinderGeometry(cylRadius, cylRadius, cylHeight, 16);
+      const cylGeo = new THREE.CylinderGeometry(cylRadius, cylRadius, cylHeight, 20);
       const cylMat = new THREE.MeshStandardMaterial({
         color,
         roughness: 0.25,
         metalness: 0.35,
         emissive: color,
-        emissiveIntensity: 0.45,
+        emissiveIntensity: 0.35,
         depthTest: true
       });
       const cylMesh = new THREE.Mesh(cylGeo, cylMat);
@@ -1343,7 +1752,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       holeGroup.add(cylMesh);
 
       // Technical entry ring for high-precision CAD look
-      const ringGeo = new THREE.RingGeometry(cylRadius * 0.7, cylRadius * 1.15, 20);
+      const ringGeo = new THREE.RingGeometry(cylRadius * 0.75, cylRadius * 1.15, 24);
       const ringMat = new THREE.MeshBasicMaterial({
         color: 0x0f172a,
         side: THREE.DoubleSide,
@@ -1357,7 +1766,23 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
       holeGroup.add(ringMesh);
 
-      this.drillGroup.add(holeGroup);
+      const targetPieceItem = this.pieceObjects.find(p => p.part.id === hole.partId);
+      cylMesh.userData = { isDrillHole: true, part: targetPieceItem?.part, parentPartId: hole.partId };
+      ringMesh.userData = { isDrillHole: true, part: targetPieceItem?.part, parentPartId: hole.partId };
+
+      // ATTACH HINGE BOREHOLES TO THE DOOR MESH SO THEY ROTATE IN SYNC!
+      if (targetPieceItem?.doorPivot && hole.type === 'hinge_35') {
+        const localPos = new THREE.Vector3(
+          hole.posX - targetPieceItem.originalPos.x,
+          hole.posY - targetPieceItem.originalPos.y,
+          hole.posZ - targetPieceItem.originalPos.z
+        );
+        holeGroup.position.copy(localPos);
+        targetPieceItem.mesh.add(holeGroup);
+      } else {
+        holeGroup.position.set(hole.posX, hole.posY, hole.posZ);
+        this.drillGroup.add(holeGroup);
+      }
     }
   }
 
@@ -2166,19 +2591,39 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
-    // 2. Normal Piece selection (with Shift-Click multi-selection)
-    const intersects = this.raycaster.intersectObjects(
-      this.pieceObjects.map(p => p.mesh),
-      false
-    );
+    // 2. Normal Piece & Handle selection (with Shift-Click multi-selection)
+    const targets: THREE.Object3D[] = [];
+    for (const item of this.pieceObjects) {
+      targets.push(item.mesh);
+      if (item.doorPivot) targets.push(item.doorPivot);
+    }
+    targets.push(this.drillGroup);
+
+    const intersects = this.raycaster.intersectObjects(targets, true);
 
     if (intersects.length > 0) {
       const topHit = intersects[0].object as THREE.Mesh;
-      const part = topHit.userData['part'] as Part;
-      const isDoor = topHit.userData['isDoor'];
-      const isDrawer = topHit.userData['isDrawer'];
+      let part = topHit.userData['part'] as Part | undefined;
+      let isDoor = topHit.userData['isDoor'];
+      let isDrawer = topHit.userData['isDrawer'];
+      let isHandle = topHit.userData['isHandle'];
+
+      // Ascend parent hierarchy if hit was a handle sub-mesh or drill cylinder
+      let currObj: THREE.Object3D | null = topHit;
+      while (currObj && !part && currObj !== this.furnitureGroup && currObj !== this.scene) {
+        if (currObj.userData?.['part']) {
+          part = currObj.userData['part'];
+          isDoor = isDoor || currObj.userData['isDoor'];
+          isDrawer = isDrawer || currObj.userData['isDrawer'];
+          isHandle = isHandle || currObj.userData['isHandle'];
+          break;
+        }
+        currObj = currObj.parent;
+      }
+
       if (part) {
-        if (!e.shiftKey && (isDoor || isDrawer)) {
+        // Clicking a 3D handle or clicking an unshifted door/drawer toggles opening animation
+        if (isHandle || (!e.shiftKey && (isDoor || isDrawer))) {
           this.togglePartOpen(part.id);
         }
         if (e.shiftKey) {
@@ -2861,16 +3306,32 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    const visibleMeshes = this.pieceObjects.map(p => p.mesh);
-    const intersects = this.raycaster.intersectObjects(visibleMeshes, false);
+    const targets: THREE.Object3D[] = [];
+    for (const item of this.pieceObjects) {
+      targets.push(item.mesh);
+      if (item.doorPivot) targets.push(item.doorPivot);
+    }
+    targets.push(this.drillGroup);
+
+    const intersects = this.raycaster.intersectObjects(targets, true);
 
     const contRect = container.getBoundingClientRect();
-    const posX = Math.max(10, Math.min(e.clientX - contRect.left, contRect.width - 240));
-    const posY = Math.max(10, Math.min(e.clientY - contRect.top, contRect.height - 340));
+    const posX = Math.max(10, Math.min(e.clientX - contRect.left, contRect.width - 250));
+    const posY = Math.max(10, Math.min(e.clientY - contRect.top, contRect.height - 380));
 
     if (intersects.length > 0) {
       const topHit = intersects[0].object as THREE.Mesh;
-      const part = topHit.userData['part'] as Part;
+      let part = topHit.userData['part'] as Part | undefined;
+
+      let currObj: THREE.Object3D | null = topHit;
+      while (currObj && !part && currObj !== this.furnitureGroup && currObj !== this.scene) {
+        if (currObj.userData?.['part']) {
+          part = currObj.userData['part'];
+          break;
+        }
+        currObj = currObj.parent;
+      }
+
       if (part) {
         this.contextMenuPart.set(part);
         this.contextMenuPos.set({ x: posX, y: posY });
@@ -2878,6 +3339,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.partSelected.emit(part);
         this.showQuickMaterialPicker.set(false);
         this.showRotateSubmenu.set(false);
+        this.showMovableRoleSubmenu.set(false);
+        this.showHandleSubmenu.set(false);
+        this.showHingeSubmenu.set(false);
         return;
       }
     }
@@ -2887,6 +3351,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.contextMenuPos.set({ x: posX, y: posY });
     this.showQuickMaterialPicker.set(false);
     this.showRotateSubmenu.set(false);
+    this.showMovableRoleSubmenu.set(false);
+    this.showHandleSubmenu.set(false);
+    this.showHingeSubmenu.set(false);
   }
 
   closeContextMenu() {
@@ -2894,16 +3361,141 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.contextMenuPart.set(null);
     this.showQuickMaterialPicker.set(false);
     this.showRotateSubmenu.set(false);
+    this.showMovableRoleSubmenu.set(false);
+    this.showHandleSubmenu.set(false);
+    this.showHingeSubmenu.set(false);
   }
 
   toggleRotateSubmenu() {
     this.showRotateSubmenu.update(v => !v);
     this.showQuickMaterialPicker.set(false);
+    this.showMovableRoleSubmenu.set(false);
+    this.showHandleSubmenu.set(false);
+    this.showHingeSubmenu.set(false);
   }
 
   toggleQuickMaterialPicker() {
     this.showQuickMaterialPicker.update(v => !v);
     this.showRotateSubmenu.set(false);
+    this.showMovableRoleSubmenu.set(false);
+    this.showHandleSubmenu.set(false);
+    this.showHingeSubmenu.set(false);
+  }
+
+  toggleMovableRoleSubmenu() {
+    this.showMovableRoleSubmenu.update(v => !v);
+    this.showRotateSubmenu.set(false);
+    this.showQuickMaterialPicker.set(false);
+    this.showHandleSubmenu.set(false);
+    this.showHingeSubmenu.set(false);
+  }
+
+  toggleHandleSubmenu() {
+    this.showHandleSubmenu.update(v => !v);
+    this.showRotateSubmenu.set(false);
+    this.showQuickMaterialPicker.set(false);
+    this.showMovableRoleSubmenu.set(false);
+    this.showHingeSubmenu.set(false);
+  }
+
+  toggleHingeSubmenu() {
+    this.showHingeSubmenu.update(v => !v);
+    this.showRotateSubmenu.set(false);
+    this.showQuickMaterialPicker.set(false);
+    this.showMovableRoleSubmenu.set(false);
+    this.showHandleSubmenu.set(false);
+  }
+
+  setContextMenuPartMovable(role: 'door' | 'drawer_front' | 'shelf' | 'free', direction: OpeningDirection = 'left') {
+    const part = this.contextMenuPart();
+    if (!part) return;
+
+    let hwConfig: PartHardwareConfig;
+    if (role === 'door') {
+      hwConfig = {
+        ...(part.hardwareConfig || {}),
+        isMovable: true,
+        movableType: 'door',
+        openingDirection: direction,
+        hingeType: direction === 'top' ? 'gas_piston' : 'straight',
+        handleType: part.hardwareConfig?.handleType || 'bar_modern',
+        handleFinish: part.hardwareConfig?.handleFinish || 'brushed_steel'
+      };
+    } else if (role === 'drawer_front') {
+      hwConfig = {
+        ...(part.hardwareConfig || {}),
+        isMovable: true,
+        movableType: 'drawer',
+        slideType: part.hardwareConfig?.slideType || 'telescopic',
+        handleType: part.hardwareConfig?.handleType || 'bar_modern',
+        handleFinish: part.hardwareConfig?.handleFinish || 'brushed_steel',
+        handlePosition: 'horizontal'
+      };
+    } else {
+      hwConfig = {
+        ...(part.hardwareConfig || {}),
+        isMovable: false,
+        movableType: 'none',
+        handleType: 'none',
+        hingeType: 'none',
+        slideType: 'none'
+      };
+    }
+
+    const updates: Partial<Part> = {
+      componentRole: role,
+      hardwareConfig: hwConfig
+    };
+
+    this.partModified.emit({ part, updates });
+    this.closeContextMenu();
+  }
+
+  setContextMenuPartHandle(handleType: HandleType, finish: HandleFinish = 'brushed_steel') {
+    const part = this.contextMenuPart();
+    if (!part) return;
+
+    const hw: PartHardwareConfig = {
+      ...(part.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(part)),
+      handleType,
+      handleFinish: finish
+    };
+
+    this.partModified.emit({ part, updates: { hardwareConfig: hw } });
+    this.closeContextMenu();
+  }
+
+  setContextMenuPartHinge(hingeType: HingeType) {
+    const part = this.contextMenuPart();
+    if (!part) return;
+
+    const hw: PartHardwareConfig = {
+      ...(part.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(part)),
+      hingeType
+    };
+
+    this.partModified.emit({ part, updates: { hardwareConfig: hw } });
+    this.closeContextMenu();
+  }
+
+  setContextMenuPartSlide(slideType: SlideType) {
+    const part = this.contextMenuPart();
+    if (!part) return;
+
+    const hw: PartHardwareConfig = {
+      ...(part.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(part)),
+      slideType
+    };
+
+    this.partModified.emit({ part, updates: { hardwareConfig: hw } });
+    this.closeContextMenu();
+  }
+
+  toggleContextMenuAnimation() {
+    const part = this.contextMenuPart();
+    if (!part) return;
+    this.togglePartOpen(part.id);
+    this.closeContextMenu();
   }
 
   duplicateContextMenuPart() {
@@ -3596,13 +4188,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
-  private updateOpeningAnimations() {
+  private clock = new THREE.Clock();
+
+  private updateOpeningAnimations(delta = 0.016) {
+    const lerpFactor = Math.min(1, delta * 9.5);
     for (const p of this.pieceObjects) {
       if (!p.isDoor && !p.isDrawer) continue;
       const tgt = this.openTargetMap.get(p.part.id) || 0;
       let cur = this.openCurrentMap.get(p.part.id) || 0;
       if (Math.abs(cur - tgt) > 0.001) {
-        cur += (tgt - cur) * 0.12;
+        cur += (tgt - cur) * lerpFactor;
         this.openCurrentMap.set(p.part.id, cur);
       } else {
         cur = tgt;
@@ -3616,10 +4211,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
           p.doorPivot.rotation.y = cur * (Math.PI / 2.05);
         } else if (p.hingeSide === 'top') {
           p.doorPivot.rotation.x = cur * (Math.PI / 2.2);
+        } else if (p.hingeSide === 'bottom') {
+          p.doorPivot.rotation.x = -cur * (Math.PI / 2.2);
         }
       } else if (p.isDrawer) {
         const expZ = p.explodedOffset.z * (this.explodedPercent() / 100);
-        p.mesh.position.z = p.originalPos.z + expZ + cur * 280;
+        const maxSlide = Math.min(380, Math.max(180, (p.part.width || 450) * 0.72));
+        p.mesh.position.z = p.originalPos.z + expZ + cur * maxSlide;
       }
     }
   }
@@ -3655,7 +4253,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   private animate() {
     this.animationFrameId = requestAnimationFrame(() => this.animate());
-    this.updateOpeningAnimations();
+    const delta = Math.min(this.clock.getDelta(), 0.1);
+    this.updateOpeningAnimations(delta);
     if (this.controls) {
       this.controls.update();
     }

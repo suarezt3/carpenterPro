@@ -3,7 +3,8 @@ import {
   Component,
   computed,
   inject,
-  signal
+  signal,
+  viewChild
 } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { ProjectStorageService } from '../../services/project-storage.service';
@@ -12,12 +13,14 @@ import {
   EdgeBandingType,
   Part,
   PartOrientation,
-  DrillHole
+  DrillHole,
+  PartHardwareConfig
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
+import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
 import { TemplatesModalComponent } from '../templates-modal/templates-modal';
 import { FurnitureTemplate } from '../../services/templates-catalog.service';
@@ -264,6 +267,9 @@ export class ModuleDesignerComponent {
 
   // --- PIECE EDITING (Real-time single & group manipulation) ---
 
+  readonly hardwareCatalog = inject(HardwareCatalogService);
+  readonly viewer3dRef = viewChild<Furniture3dViewerComponent>('viewer3d');
+
   updateSelectedPart(changes: Partial<Part>) {
     const current = this.selectedPart();
     if (!current) return;
@@ -273,6 +279,56 @@ export class ModuleDesignerComponent {
       ...changes
     };
     this.projectService.updatePart(updated);
+  }
+
+  testPieceAnimation(partId: string) {
+    this.viewer3dRef()?.togglePartOpen(partId);
+  }
+
+  updateSelectedPartRole(role: ComponentRole) {
+    const sel = this.selectedPart();
+    if (!sel) return;
+    let hw = sel.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(sel);
+    if (role === 'door') {
+      hw = {
+        ...hw,
+        isMovable: true,
+        movableType: 'door',
+        openingDirection: hw.openingDirection || 'left',
+        hingeType: hw.hingeType && hw.hingeType !== 'none' ? hw.hingeType : 'straight',
+        handleType: hw.handleType && hw.handleType !== 'none' ? hw.handleType : 'bar_modern',
+        handleFinish: hw.handleFinish || 'brushed_steel'
+      };
+    } else if (role === 'drawer_front') {
+      hw = {
+        ...hw,
+        isMovable: true,
+        movableType: 'drawer',
+        slideType: hw.slideType && hw.slideType !== 'none' ? hw.slideType : 'telescopic',
+        handleType: hw.handleType && hw.handleType !== 'none' ? hw.handleType : 'bar_modern',
+        handleFinish: hw.handleFinish || 'brushed_steel'
+      };
+    } else {
+      hw = {
+        ...hw,
+        isMovable: false,
+        movableType: 'none',
+        handleType: 'none',
+        hingeType: 'none',
+        slideType: 'none'
+      };
+    }
+    this.updateSelectedPart({ componentRole: role, hardwareConfig: hw });
+  }
+
+  updateSelectedPartHardware(updates: Partial<PartHardwareConfig>) {
+    const sel = this.selectedPart();
+    if (!sel) return;
+    const hw: PartHardwareConfig = {
+      ...(sel.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(sel)),
+      ...updates
+    };
+    this.updateSelectedPart({ hardwareConfig: hw });
   }
 
   // Called when starting a 3D gizmo translation or stretch drag

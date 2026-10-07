@@ -25,6 +25,50 @@ export type ComponentRole =
   | 'tie'
   | 'free';
 
+export type HandleType = 
+  | 'bar_modern' 
+  | 'bar_black' 
+  | 'knob_round' 
+  | 'knob_square' 
+  | 'profile_gola' 
+  | 'cup_vintage' 
+  | 'none';
+
+export type HandleFinish = 
+  | 'brushed_steel' 
+  | 'black' 
+  | 'gold' 
+  | 'chrome' 
+  | 'white';
+
+export type HingeType = 
+  | 'straight'       // Bisagra Recta (Parche / Solapada total)
+  | 'half_cranked'   // Bisagra Semicodo (Semiparche / Semisolapada)
+  | 'full_cranked'   // Bisagra Codo (Interior / Embutida)
+  | 'gas_piston'     // Pistón Elevable a Gas (Alacenas)
+  | 'none';
+
+export type SlideType = 
+  | 'telescopic'     // Telescópica 45mm
+  | 'soft_close'     // Telescópica con Cierre Suave
+  | 'undermount'     // Corredera Oculta bajo fondo
+  | 'none';
+
+export type OpeningDirection = 'left' | 'right' | 'top' | 'bottom';
+
+export interface PartHardwareConfig {
+  isMovable?: boolean;
+  movableType?: 'door' | 'drawer' | 'none';
+  handleType?: HandleType;
+  handleFinish?: HandleFinish;
+  handleLength?: number; // mm
+  handlePosition?: 'vertical' | 'horizontal' | 'centered';
+  hingeType?: HingeType;
+  openingDirection?: OpeningDirection;
+  slideType?: SlideType;
+  isOpen?: boolean;
+}
+
 export interface Part {
   id: string;
   name: string;
@@ -47,6 +91,7 @@ export interface Part {
   posZ?: number; // mm (posición en eje Z profundidad)
   orientation?: PartOrientation; // horizontal o vertical
   componentRole?: ComponentRole;
+  hardwareConfig?: PartHardwareConfig;
 }
 
 export type FurnitureModuleType =

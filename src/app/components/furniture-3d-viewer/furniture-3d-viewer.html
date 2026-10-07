@@ -110,7 +110,7 @@
       (click)="toggleDrillHoles()"
       [class]="showDrillHoles() ? 'text-sky-600 bg-sky-50 shadow-xs ring-1 ring-sky-300' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
       class="w-9 h-9 rounded-xl flex items-center justify-center transition relative"
-      title="Mecanizados CNC: Visualizar taladros automáticos calculados (Tornillos 4x50, Espigas 8x30, Bisagras 35mm)">
+      title="Mecanizados CNC: Perforaciones calculadas (Cazoletas de bisagra Ø35mm moradas, tornillos 4x50 cyan y clavijas 8x30 ámbar)">
       <span class="material-icons text-lg">adjust</span>
       @if (showDrillHoles() && allDrillHoles().length > 0) {
         <span class="absolute -top-1 -right-1 px-1 py-0.2 rounded-full text-[9px] font-bold bg-sky-500 text-white leading-tight">
@@ -149,14 +149,27 @@
       <span class="material-icons text-lg">visibility</span>
     </button>
 
-    <!-- 12. ABRIR / CERRAR PUERTAS Y CAJONES (MOVIMIENTO 3D) -->
+    <!-- 11.5. HERRAJES & ACCESORIOS 3D (TIRADORES, BISAGRAS, CORREDERAS) -->
+    <button 
+      type="button"
+      (click)="toggleHardware()"
+      [class]="showHardware() ? 'text-blue-600 bg-blue-50 ring-1 ring-blue-300 shadow-xs' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Herrajes 3D: Mostrar u ocultar tiradores/manijas, bisagras y correderas">
+      <span class="material-icons text-lg">hardware</span>
+    </button>
+
+    <!-- 12. ABRIR / CERRAR PUERTAS Y CAJONES (MOVIMIENTO 3D SUAVE) -->
     <button 
       type="button"
       (click)="toggleAllDoorsAndDrawers()"
-      [class]="isAllOpen() ? 'text-amber-600 bg-amber-50 ring-1 ring-amber-300 shadow-xs' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
-      [title]="isAllOpen() ? 'Cerrar todas las puertas y cajones' : 'Abrir puertas y cajones en 3D (Inspeccionar interior)'">
+      [class]="isAllOpen() ? 'text-blue-700 bg-blue-50 ring-2 ring-blue-400 shadow-xs font-bold' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition relative"
+      [title]="isAllOpen() ? 'Cerrar todas las puertas y cajones (Animación fluida)' : 'Abrir todas las puertas y cajones en 3D (Animación fluida)'">
       <span class="material-icons text-lg">{{ isAllOpen() ? 'meeting_room' : 'door_sliding' }}</span>
+      @if (isAllOpen()) {
+        <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-500 border border-white"></span>
+      }
     </button>
 
     <!-- 13. DESPIECE EXPLOSIONADO FLYOUT -->
@@ -519,6 +532,131 @@
           </div>
           <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ part.length }}×{{ part.width }}</span>
         </div>
+
+        <!-- SECCIÓN 1: ANIMACIÓN Y TIPO DE PIEZA MÓVIL (PUERTA / CAJÓN) -->
+        <div class="p-1.5 bg-blue-50/70 rounded-xl border border-blue-100 flex flex-col gap-1 my-1">
+          <!-- Probar Apertura directa -->
+          <button 
+            type="button" 
+            (click)="toggleContextMenuAnimation()"
+            class="w-full py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs">
+            <div class="flex items-center gap-1.5">
+              <span class="material-icons text-sm">{{ (openTargetMap.get(part.id) || 0) > 0.5 ? 'meeting_room' : 'door_sliding' }}</span>
+              <span>{{ (openTargetMap.get(part.id) || 0) > 0.5 ? 'Cerrar Pieza' : 'Animar / Abrir Pieza' }}</span>
+            </div>
+            <span class="text-[10px] font-mono opacity-80 uppercase">3D</span>
+          </button>
+
+          <!-- Submenú: Convertir Tipo de Pieza -->
+          <div class="relative">
+            <button 
+              type="button" 
+              (click)="toggleMovableRoleSubmenu()"
+              class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium">
+              <div class="flex items-center gap-1.5">
+                <span class="material-icons text-xs text-blue-600">tune</span>
+                <span>Tipo (Puerta / Cajón / Estante)</span>
+              </div>
+              <span class="material-icons text-xs text-slate-400">{{ showMovableRoleSubmenu() ? 'expand_less' : 'chevron_right' }}</span>
+            </button>
+
+            @if (showMovableRoleSubmenu()) {
+              <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
+                <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1">Puertas Batientes / Elevables:</span>
+                <button type="button" (click)="setContextMenuPartMovable('door', 'left')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'door' && (!part.hardwareConfig?.openingDirection || part.hardwareConfig?.openingDirection === 'left')">
+                  <span class="material-icons text-xs text-blue-500">arrow_back</span>
+                  <span>Puerta (Bisagra Izquierda)</span>
+                </button>
+                <button type="button" (click)="setContextMenuPartMovable('door', 'right')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'door' && part.hardwareConfig?.openingDirection === 'right'">
+                  <span class="material-icons text-xs text-blue-500">arrow_forward</span>
+                  <span>Puerta (Bisagra Derecha)</span>
+                </button>
+                <button type="button" (click)="setContextMenuPartMovable('door', 'top')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'door' && part.hardwareConfig?.openingDirection === 'top'">
+                  <span class="material-icons text-xs text-amber-500">arrow_upward</span>
+                  <span>Puerta Basculante Superior</span>
+                </button>
+
+                <div class="h-px bg-slate-100 my-0.5"></div>
+                <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1">Cajones y Estructura:</span>
+                <button type="button" (click)="setContextMenuPartMovable('drawer_front', 'top')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'drawer_front'">
+                  <span class="material-icons text-xs text-emerald-500">view_day</span>
+                  <span>Frente de Cajón Móvil</span>
+                </button>
+                <button type="button" (click)="setContextMenuPartMovable('shelf')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'shelf'">
+                  <span class="material-icons text-xs text-slate-400">table_rows</span>
+                  <span>Estante / Pieza Fija</span>
+                </button>
+              </div>
+            }
+          </div>
+
+          <!-- Submenú: Tirador / Manija -->
+          <div class="relative">
+            <button 
+              type="button" 
+              (click)="toggleHandleSubmenu()"
+              class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium">
+              <div class="flex items-center gap-1.5">
+                <span class="material-icons text-xs text-amber-600">hardware</span>
+                <span>Asignar Tirador / Manija</span>
+              </div>
+              <span class="material-icons text-xs text-slate-400">{{ showHandleSubmenu() ? 'expand_less' : 'chevron_right' }}</span>
+            </button>
+
+            @if (showHandleSubmenu()) {
+              <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md max-h-48 overflow-y-auto">
+                @for (hOpt of hardwareCatalog.handleOptions; track hOpt.id) {
+                  <button 
+                    type="button" 
+                    (click)="setContextMenuPartHandle(hOpt.id, part.hardwareConfig?.handleFinish || 'brushed_steel')"
+                    [class]="(part.hardwareConfig?.handleType || 'bar_modern') === hOpt.id ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
+                    class="px-2 py-1 rounded-lg flex items-center justify-between text-left">
+                    <div class="flex items-center gap-1.5 truncate">
+                      <span class="material-icons text-xs text-slate-400">{{ hOpt.icon }}</span>
+                      <span class="truncate">{{ hOpt.name }}</span>
+                    </div>
+                    <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ hOpt.defaultLength ? hOpt.defaultLength + 'mm' : '' }}</span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Submenú: Bisagras (si es puerta) -->
+          @if (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) {
+            <div class="relative">
+              <button 
+                type="button" 
+                (click)="toggleHingeSubmenu()"
+                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium">
+                <div class="flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-purple-600">door_sliding</span>
+                  <span>Bisagra Cazoleta Ø35mm</span>
+                </div>
+                <span class="material-icons text-xs text-slate-400">{{ showHingeSubmenu() ? 'expand_less' : 'chevron_right' }}</span>
+              </button>
+
+              @if (showHingeSubmenu()) {
+                <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
+                  @for (hinge of hardwareCatalog.hingeOptions; track hinge.id) {
+                    <button 
+                      type="button" 
+                      (click)="setContextMenuPartHinge(hinge.id)"
+                      [class]="(part.hardwareConfig?.hingeType || 'straight') === hinge.id ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
+                      class="px-2 py-1 rounded-lg flex items-center justify-between text-left">
+                      <div class="flex items-center gap-1.5 truncate">
+                        <span class="material-icons text-xs text-slate-400">{{ hinge.icon }}</span>
+                        <span class="truncate">{{ hinge.name }}</span>
+                      </div>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="h-px bg-slate-100 my-0.5"></div>
 
         <!-- Duplicar -->
         <button 
