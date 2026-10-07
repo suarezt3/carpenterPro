@@ -19,6 +19,7 @@ export type ComponentRole =
   | 'divider' 
   | 'shelf' 
   | 'back' 
+  | 'front'
   | 'door' 
   | 'drawer_front' 
   | 'plinth' 
@@ -52,6 +53,7 @@ export type SlideType =
   | 'telescopic'     // Telescópica 45mm
   | 'soft_close'     // Telescópica con Cierre Suave
   | 'undermount'     // Corredera Oculta bajo fondo
+  | 'telescopic_35'  // Telescópica Ligera 35mm
   | 'none';
 
 export type OpeningDirection = 'left' | 'right' | 'top' | 'bottom';
@@ -217,7 +219,7 @@ export interface OptimizationResult {
 
 export interface DrillHole {
   id: string;
-  type: 'screw_4x50' | 'dowel_8x30' | 'hinge_35' | 'shelf_pin_5';
+  type: 'screw_4x50' | 'dowel_8x30' | 'hinge_35' | 'shelf_pin_5' | 'slide_system32' | 'handle_hole_4';
   diameter: number; // mm
   depth: number; // mm
   posX: number; // Global o relativo en mm

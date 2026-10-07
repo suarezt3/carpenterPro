@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para el repositorio de accesorios (manijas, bisagras, correderas), corrección de la animación fluida de piezas móviles sin saltos, e integración del menú contextual de clic derecho e inspector para convertir y animar puertas y cajones personalizados.",
-  "updatedAt":  "2026-10-07T16:05:23.629176364Z",
+  "summary":  "Plan detallado para la generación de cajones completos de 5 piezas (tapa, laterales, trasera, frente interior y fondo), montaje de rieles en costados interiores con mecanizados a 37mm y animación unificada de la gaveta completa.",
+  "updatedAt":  "2026-10-07T20:32:20.897609562Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

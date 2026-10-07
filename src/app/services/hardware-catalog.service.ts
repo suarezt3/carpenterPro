@@ -171,29 +171,38 @@ export class HardwareCatalogService {
     {
       id: 'telescopic',
       name: 'Corredera Telescópica 45mm',
-      extensionType: 'Extensión Total',
-      loadCapacityKg: 35,
-      description: 'Extracción total con rodamientos de bolas de acero templado galvanizado.',
+      extensionType: 'Extensión Total (35-45kg)',
+      loadCapacityKg: 45,
+      description: 'Extracción total con rodamientos de bolas de acero templado. Holgura requerida 12.7mm por lado.',
       unitCost: 5.50,
       icon: 'view_week'
     },
     {
       id: 'soft_close',
-      name: 'Corredera Telescópica Soft-Close',
-      extensionType: 'Extensión Total con Freno',
+      name: 'Corredera Telescópica Cierre Suave (Soft-Close)',
+      extensionType: 'Extensión Total con Freno Hidráulico',
       loadCapacityKg: 40,
-      description: 'Pistón amortiguador hidráulico para cierre lento y silencioso antipellizco.',
+      description: 'Pistón amortiguador hidráulico integrado para cierre silencioso y suave antipellizco.',
       unitCost: 8.90,
       icon: 'motion_photos_paused'
     },
     {
       id: 'undermount',
-      name: 'Corredera Oculta Bajo Fondo',
-      extensionType: 'Extensión Total Sincronizada',
+      name: 'Corredera Oculta Bajo Cajón (Tandem)',
+      extensionType: 'Extensión Total Oculta Sincronizada',
       loadCapacityKg: 40,
-      description: 'Montaje invisible bajo el cajón con regulación 3D y desacople rápido.',
+      description: 'Montaje invisible bajo el fondo del cajón con regulación 3D y gatillos de desacople rápido.',
       unitCost: 14.50,
       icon: 'layers'
+    },
+    {
+      id: 'telescopic_35',
+      name: 'Corredera Telescópica Ligera 35mm',
+      extensionType: 'Extensión Total (25kg)',
+      loadCapacityKg: 25,
+      description: 'Perfil compacto de 35mm para cajones medianos o de baja profundidad. Holgura 12.5mm.',
+      unitCost: 3.90,
+      icon: 'linear_scale'
     },
     {
       id: 'none',

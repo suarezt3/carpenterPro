@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject, viewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ThemeService } from '../../services/theme.service';
 import { TemplatesCatalogService, FurnitureTemplate } from '../../services/templates-catalog.service';
@@ -43,6 +43,31 @@ export class TemplatesModalComponent {
       return inName || inDesc || inBadge || inDims || inCat;
     });
   });
+
+  categoriesNavRef = viewChild<ElementRef<HTMLDivElement>>('categoriesNav');
+
+  scrollCategories(direction: 'left' | 'right') {
+    const el = this.categoriesNavRef()?.nativeElement;
+    if (!el) return;
+    const scrollAmount = 260;
+    el.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    });
+  }
+
+  onCategoryWheel(event: WheelEvent) {
+    const el = this.categoriesNavRef()?.nativeElement;
+    if (!el) return;
+    // If vertical scrolling wheel, translate to horizontal scroll
+    if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+      el.scrollBy({
+        left: event.deltaY,
+        behavior: 'auto'
+      });
+      event.preventDefault();
+    }
+  }
 
   selectCategory(catId: string) {
     this.activeCategory.set(catId);

@@ -541,8 +541,8 @@
             (click)="toggleContextMenuAnimation()"
             class="w-full py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs">
             <div class="flex items-center gap-1.5">
-              <span class="material-icons text-sm">{{ (openTargetMap.get(part.id) || 0) > 0.5 ? 'meeting_room' : 'door_sliding' }}</span>
-              <span>{{ (openTargetMap.get(part.id) || 0) > 0.5 ? 'Cerrar Pieza' : 'Animar / Abrir Pieza' }}</span>
+              <span class="material-icons text-sm">{{ isPartOpen(part.id) ? 'meeting_room' : 'door_sliding' }}</span>
+              <span>{{ isPartOpen(part.id) ? 'Cerrar Pieza' : 'Animar / Abrir Pieza' }}</span>
             </div>
             <span class="text-[10px] font-mono opacity-80 uppercase">3D</span>
           </button>
@@ -648,6 +648,40 @@
                         <span class="material-icons text-xs text-slate-400">{{ hinge.icon }}</span>
                         <span class="truncate">{{ hinge.name }}</span>
                       </div>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Submenú: Correderas (si es cajón) -->
+          @if (part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('CAJON') || part.name.toUpperCase().includes('CAJÓN') || part.name.toUpperCase().includes('GAVETA') || part.hardwareConfig?.movableType === 'drawer') {
+            <div class="relative">
+              <button 
+                type="button" 
+                (click)="toggleSlideSubmenu()"
+                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium">
+                <div class="flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-sky-600">view_week</span>
+                  <span>Tipo de Corredera</span>
+                </div>
+                <span class="material-icons text-xs text-slate-400">{{ showSlideSubmenu() ? 'expand_less' : 'chevron_right' }}</span>
+              </button>
+
+              @if (showSlideSubmenu()) {
+                <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
+                  @for (slide of hardwareCatalog.slideOptions; track slide.id) {
+                    <button 
+                      type="button" 
+                      (click)="setContextMenuPartSlide(slide.id)"
+                      [class]="(part.hardwareConfig?.slideType || 'telescopic') === slide.id ? 'bg-sky-50 text-sky-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
+                      class="px-2 py-1 rounded-lg flex items-center justify-between text-left">
+                      <div class="flex items-center gap-1.5 truncate">
+                        <span class="material-icons text-xs text-slate-400">{{ slide.icon }}</span>
+                        <span class="truncate">{{ slide.name }}</span>
+                      </div>
+                      <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ slide.loadCapacityKg ? slide.loadCapacityKg + 'kg' : '' }}</span>
                     </button>
                   }
                 </div>

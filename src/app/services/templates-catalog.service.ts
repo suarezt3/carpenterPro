@@ -29,6 +29,150 @@ export class TemplatesCatalogService {
     return { id: def.id, name: def.name, thickness: def.thickness };
   }
 
+  private generateDrawerBoxParts(
+    drawerIdPrefix: string,
+    drawerName: string,
+    frontWidth: number,
+    frontHeight: number,
+    carcassInnerWidth: number,
+    availableDepth: number,
+    posX: number,
+    posY: number,
+    posZ: number,
+    matFront: { id: string; name: string; thickness: number },
+    matBody: { id: string; name: string; thickness: number },
+    matBottom: { id: string; name: string; thickness: number },
+    t = 18
+  ): Part[] {
+    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
+    const targetDepth = availableDepth - 35;
+    const slideLength = standardLengths.filter(l => l <= targetDepth).pop() || 350;
+    const boxHeight = Math.max(90, Math.min(Math.floor(frontHeight * 0.72), 220));
+    const boxClearancePerSide = 12.7; // Standard 1/2" telescopic clearance
+    const boxOuterWidth = carcassInnerWidth - (boxClearancePerSide * 2);
+    const boxInnerWidth = boxOuterWidth - (t * 2);
+    const uid = crypto.randomUUID().slice(0, 6);
+
+    return [
+      // 1. Frente Exterior Decorativo
+      {
+        id: `${drawerIdPrefix}_frente_${uid}`,
+        name: `${drawerName} (Frente Exterior)`,
+        length: frontWidth,
+        width: frontHeight,
+        thickness: t,
+        quantity: 1,
+        materialId: matFront.id,
+        materialName: matFront.name,
+        grain: 'length',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX,
+        posY,
+        posZ,
+        orientation: 'vertical_xy',
+        componentRole: 'drawer_front',
+        hardwareConfig: {
+          isMovable: true,
+          movableType: 'drawer',
+          slideType: 'telescopic',
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          handlePosition: 'horizontal'
+        }
+      },
+      // 2. Lateral Izquierdo de Gaveta
+      {
+        id: `${drawerIdPrefix}_lat_izq_${uid}`,
+        name: `${drawerName} (Lateral Izq. Gaveta)`,
+        length: slideLength,
+        width: boxHeight,
+        thickness: t,
+        quantity: 1,
+        materialId: matBody.id,
+        materialName: matBody.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX - (boxOuterWidth / 2) + (t / 2),
+        posY: posY - ((frontHeight - boxHeight) * 0.15),
+        posZ: posZ - (t / 2) - (slideLength / 2),
+        orientation: 'vertical_yz',
+        componentRole: 'side_left'
+      },
+      // 3. Lateral Derecho de Gaveta
+      {
+        id: `${drawerIdPrefix}_lat_der_${uid}`,
+        name: `${drawerName} (Lateral Der. Gaveta)`,
+        length: slideLength,
+        width: boxHeight,
+        thickness: t,
+        quantity: 1,
+        materialId: matBody.id,
+        materialName: matBody.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX + (boxOuterWidth / 2) - (t / 2),
+        posY: posY - ((frontHeight - boxHeight) * 0.15),
+        posZ: posZ - (t / 2) - (slideLength / 2),
+        orientation: 'vertical_yz',
+        componentRole: 'side_right'
+      },
+      // 4. Trasera Interior de Gaveta
+      {
+        id: `${drawerIdPrefix}_trasera_${uid}`,
+        name: `${drawerName} (Trasera Gaveta)`,
+        length: boxInnerWidth,
+        width: boxHeight,
+        thickness: t,
+        quantity: 1,
+        materialId: matBody.id,
+        materialName: matBody.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: posY - ((frontHeight - boxHeight) * 0.15),
+        posZ: posZ - t - slideLength + (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'back'
+      },
+      // 5. Frente Interior / Contrafrente de Gaveta
+      {
+        id: `${drawerIdPrefix}_frente_int_${uid}`,
+        name: `${drawerName} (Frente Interior Gaveta)`,
+        length: boxInnerWidth,
+        width: boxHeight,
+        thickness: t,
+        quantity: 1,
+        materialId: matBody.id,
+        materialName: matBody.name,
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: posY - ((frontHeight - boxHeight) * 0.15),
+        posZ: posZ - t - (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'front'
+      },
+      // 6. Fondo de Gaveta (MDF 6mm)
+      {
+        id: `${drawerIdPrefix}_fondo_${uid}`,
+        name: `${drawerName} (Fondo Gaveta MDF)`,
+        length: boxOuterWidth - 10,
+        width: slideLength - 10,
+        thickness: 6,
+        quantity: 1,
+        materialId: matBottom.id,
+        materialName: matBottom.name,
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: posY - (boxHeight / 2) + 8,
+        posZ: posZ - (t / 2) - (slideLength / 2),
+        orientation: 'horizontal',
+        componentRole: 'bottom'
+      }
+    ];
+  }
+
   readonly templates: FurnitureTemplate[] = [
     // --- 1. COCINA ---
     {
@@ -134,30 +278,9 @@ export class TemplatesCatalogService {
             edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
             posX: offsetX - 13, posY: 463, posZ: 299, orientation: 'vertical_xy', componentRole: 'door'
           },
-          {
-            id: 'bm_cajon_1_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN SUPERIOR (Cubiertos)',
-            length: 140, width: 396, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX + 390, posY: 757, posZ: 299, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'bm_cajon_2_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN MEDIO',
-            length: 290, width: 396, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX + 390, posY: 538, posZ: 299, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'bm_cajon_3_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN OLLERO INFERIOR',
-            length: 290, width: 396, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX + 390, posY: 244, posZ: 299, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          }
+          ...this.generateDrawerBoxParts('bm_caj_1', 'Cajón Superior', 396, 140, 396, 580, offsetX + 390, 757, 299, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('bm_caj_2', 'Cajón Medio', 396, 290, 396, 580, offsetX + 390, 538, 299, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('bm_caj_3', 'Cajón Ollero Inferior', 396, 290, 396, 580, offsetX + 390, 244, 299, mat, mat, mat, t)
         ];
       }
     },
@@ -552,30 +675,9 @@ export class TemplatesCatalogService {
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX, posY: 693, posZ: -180, orientation: 'horizontal', componentRole: 'tie'
           },
-          {
-            id: 'caj3_caj_1_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 1 (SUPERIOR)',
-            length: 460, width: 198, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 590, posZ: 241, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'caj3_caj_2_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 2 (MEDIO)',
-            length: 460, width: 198, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 390, posZ: 241, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'caj3_caj_3_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 3 (INFERIOR)',
-            length: 460, width: 198, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 190, posZ: 241, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          }
+          ...this.generateDrawerBoxParts('caj3_caj_1', 'Cajón 1 (Superior)', 460, 198, 464, 480, offsetX, 590, 241, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('caj3_caj_2', 'Cajón 2 (Medio)', 460, 198, 464, 480, offsetX, 390, 241, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('caj3_caj_3', 'Cajón 3 (Inferior)', 460, 198, 464, 480, offsetX, 190, 241, mat, mat, mat, t)
         ];
       }
     },
@@ -642,38 +744,10 @@ export class TemplatesCatalogService {
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX, posY: 923, posZ: -150, orientation: 'horizontal', componentRole: 'tie'
           },
-          {
-            id: 'chif_caj_1_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 1 (SUPERIOR)',
-            length: 760, width: 200, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 805, posZ: 216, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'chif_caj_2_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 2',
-            length: 760, width: 200, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 595, posZ: 216, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'chif_caj_3_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 3',
-            length: 760, width: 200, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 385, posZ: 216, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'chif_caj_4_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 4 (INFERIOR)',
-            length: 760, width: 200, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 175, posZ: 216, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          }
+          ...this.generateDrawerBoxParts('chif_caj_1', 'Cajón 1 (Superior)', 760, 200, 764, 430, offsetX, 805, 216, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('chif_caj_2', 'Cajón 2', 760, 200, 764, 430, offsetX, 595, 216, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('chif_caj_3', 'Cajón 3', 760, 200, 764, 430, offsetX, 385, 216, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('chif_caj_4', 'Cajón 4 (Inferior)', 760, 200, 764, 430, offsetX, 175, 216, mat, mat, mat, t)
         ];
       }
     },
@@ -798,22 +872,8 @@ export class TemplatesCatalogService {
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX, posY: 823, posZ: 220, orientation: 'horizontal', componentRole: 'tie'
           },
-          {
-            id: 'oll_gaveta_1_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE GAVETA 1 CACEROLERA (SUPERIOR)',
-            length: 860, width: 350, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 632, posZ: 291, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'oll_gaveta_2_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE GAVETA 2 OLLERA (INFERIOR)',
-            length: 860, width: 350, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 277, posZ: 291, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          }
+          ...this.generateDrawerBoxParts('oll_gav_1', 'Gaveta Cacerolera Superior', 860, 350, 864, 580, offsetX, 632, 291, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('oll_gav_2', 'Gaveta Ollera Inferior', 860, 350, 864, 580, offsetX, 277, 291, mat, mat, mat, t)
         ];
       }
     },
@@ -873,14 +933,7 @@ export class TemplatesCatalogService {
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX, posY: 250, posZ: 0, orientation: 'horizontal', componentRole: 'shelf'
           },
-          {
-            id: 'van_cajon_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN SUPERIOR',
-            length: 270, width: 694, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 395, posZ: 234, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          }
+          ...this.generateDrawerBoxParts('van_caj', 'Cajón Superior Baño', 694, 270, 664, 430, offsetX, 395, 234, mat, mat, mat, t)
         ];
       }
     },
@@ -1289,38 +1342,10 @@ export class TemplatesCatalogService {
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX, posY: 30, posZ: 180, orientation: 'vertical_xy', componentRole: 'plinth'
           },
-          {
-            id: 'com_caj_1_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 1 (SUPERIOR)',
-            length: 200, width: 792, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 820, posZ: 234, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'com_caj_2_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 2',
-            length: 200, width: 792, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 610, posZ: 234, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'com_caj_3_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 3',
-            length: 200, width: 792, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 400, posZ: 234, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'com_caj_4_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 4 (INFERIOR)',
-            length: 200, width: 792, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 190, posZ: 234, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          }
+          ...this.generateDrawerBoxParts('com_caj_1', 'Cajón 1 (Superior)', 792, 200, 764, 450, offsetX, 820, 234, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('com_caj_2', 'Cajón 2', 792, 200, 764, 450, offsetX, 610, 234, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('com_caj_3', 'Cajón 3', 792, 200, 764, 450, offsetX, 400, 234, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('com_caj_4', 'Cajón 4 (Inferior)', 792, 200, 764, 450, offsetX, 190, 234, mat, mat, mat, t)
         ];
       }
     },
@@ -1370,22 +1395,8 @@ export class TemplatesCatalogService {
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX, posY: 9, posZ: 0, orientation: 'horizontal', componentRole: 'bottom'
           },
-          {
-            id: 'mn_caj_1_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 1',
-            length: 240, width: 442, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 400, posZ: 209, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          },
-          {
-            id: 'mn_caj_2_' + crypto.randomUUID().slice(0, 6),
-            name: 'FRENTE CAJÓN 2',
-            length: 240, width: 442, thickness: t, quantity: 1,
-            materialId: mat.id, materialName: mat.name, grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX, posY: 145, posZ: 209, orientation: 'vertical_xy', componentRole: 'drawer_front'
-          }
+          ...this.generateDrawerBoxParts('mn_caj_1', 'Cajón 1 (Superior)', 442, 240, 414, 400, offsetX, 400, 209, mat, mat, mat, t),
+          ...this.generateDrawerBoxParts('mn_caj_2', 'Cajón 2 (Inferior)', 442, 240, 414, 400, offsetX, 145, 209, mat, mat, mat, t)
         ];
       }
     },

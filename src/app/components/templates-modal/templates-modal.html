@@ -68,24 +68,45 @@
         class="px-5 sm:px-6 py-2.5 border-b flex flex-col md:flex-row gap-2.5 items-stretch md:items-center justify-between shrink-0"
         [class]="themeService.isClassic() ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'">
         
-        <!-- Categorías Tabs -->
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-          @for (cat of categories(); track cat.id) {
-            <button 
-              type="button"
-              (click)="selectCategory(cat.id)"
-              [class]="activeCategory() === cat.id 
-                ? 'bg-blue-600 text-white font-bold shadow-xs' 
-                : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 font-medium' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium')"
-              class="px-2.5 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
-              <span class="material-icons text-sm">{{ cat.icon }}</span>
-              <span>{{ cat.label }}</span>
-              <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold" 
-                [class]="activeCategory() === cat.id ? 'bg-blue-800 text-blue-100' : (themeService.isClassic() ? 'bg-slate-200 text-slate-700' : 'bg-slate-700 text-slate-200')">
-                {{ cat.count }}
-              </span>
-            </button>
-          }
+        <!-- Categorías Tabs con Botones de Navegación Lateral y Scroll Suave -->
+        <div class="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
+          <button
+            type="button"
+            (click)="scrollCategories('left')"
+            class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition shrink-0 shadow-2xs"
+            title="Desplazar categorías a la izquierda">
+            <span class="material-icons text-base">chevron_left</span>
+          </button>
+
+          <div 
+            #categoriesNav
+            (wheel)="onCategoryWheel($event)"
+            class="flex items-center gap-1.5 overflow-x-auto py-1 scroll-smooth scrollbar-thin flex-1 min-w-0">
+            @for (cat of categories(); track cat.id) {
+              <button 
+                type="button"
+                (click)="selectCategory(cat.id)"
+                [class]="activeCategory() === cat.id 
+                  ? 'bg-blue-600 text-white font-bold shadow-xs' 
+                  : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 font-medium' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium')"
+                class="px-2.5 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer">
+                <span class="material-icons text-sm">{{ cat.icon }}</span>
+                <span>{{ cat.label }}</span>
+                <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold" 
+                  [class]="activeCategory() === cat.id ? 'bg-blue-800 text-blue-100' : (themeService.isClassic() ? 'bg-slate-200 text-slate-700' : 'bg-slate-700 text-slate-200')">
+                  {{ cat.count }}
+                </span>
+              </button>
+            }
+          </div>
+
+          <button
+            type="button"
+            (click)="scrollCategories('right')"
+            class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition shrink-0 shadow-2xs"
+            title="Desplazar categorías a la derecha">
+            <span class="material-icons text-base">chevron_right</span>
+          </button>
         </div>
 
         <!-- Buscador en tiempo real -->

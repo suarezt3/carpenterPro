@@ -129,6 +129,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly showMovableRoleSubmenu = signal<boolean>(false);
   readonly showHandleSubmenu = signal<boolean>(false);
   readonly showHingeSubmenu = signal<boolean>(false);
+  readonly showSlideSubmenu = signal<boolean>(false);
 
   // Hidden / Isolated Parts
   readonly hiddenPartIds = signal<Set<string>>(new Set());
@@ -690,6 +691,22 @@ export class Furniture3dViewerComponent implements OnDestroy {
         mesh.userData = { part, isPiece: true, isDoor: true };
       } else if (isDrawer) {
         mesh.position.set(px, py, pz);
+
+        // Check if separate box sub-parts already exist in the project parts list for this drawer
+        const hasSeparateBoxParts = parts.some(other =>
+          other.id !== part.id && (
+            (other.name.toUpperCase().includes('GAVETA') || 
+             other.name.toUpperCase().includes('CAJÓN') || 
+             other.name.toUpperCase().includes('CAJON')) &&
+            Math.abs((other.posY || 0) - (part.posY || 0)) < 35
+          )
+        );
+
+        // If it's a front plate without separate 3D box parts, attach complete 5-piece drawer box
+        if (!hasSeparateBoxParts && (part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('FRENTE'))) {
+          const drawerBoxMesh = this.createDrawerBoxMesh(part, sx, sy, sz);
+          if (drawerBoxMesh) mesh.add(drawerBoxMesh);
+        }
 
         // Hardware: 3D Handles & Telescopic Runners
         if (this.showHardware()) {
@@ -1676,6 +1693,107 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return group;
   }
 
+  private createDrawerBoxMesh(
+    part: Part,
+    sx: number,
+    sy: number,
+    sz: number
+  ): THREE.Group {
+    const boxGroup = new THREE.Group();
+    const t = 15; // standard drawer box wall thickness 15mm
+    const frontWidth = sx;
+    const frontHeight = sy;
+    const availableDepth = Math.max(250, (part.width || 450) - 25);
+    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
+    const boxDepth = standardLengths.filter(l => l <= availableDepth).pop() || 350;
+    const boxHeight = Math.max(80, Math.min(Math.floor(frontHeight * 0.72), 220));
+
+    // Standard clearances: 12.7mm (1/2") telescopic slide per side + 18mm carcass side panels
+    const carcassSideT = 18;
+    const clearance = 12.7;
+    const boxOuterWidth = Math.max(120, frontWidth - (2 * carcassSideT) - (2 * clearance));
+    const boxInnerWidth = Math.max(80, boxOuterWidth - (2 * t));
+
+    const boxMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc, // Clean melamine interior
+      roughness: 0.65,
+      metalness: 0.05
+    });
+
+    const bottomMat = new THREE.MeshStandardMaterial({
+      color: 0xe2e8f0, // MDF bottom board
+      roughness: 0.7,
+      metalness: 0.02
+    });
+
+    const edgeLineMat = new THREE.LineBasicMaterial({
+      color: 0x94a3b8,
+      linewidth: 1
+    });
+
+    const addBoxPart = (geometry: THREE.BoxGeometry, x: number, y: number, z: number, mat: THREE.Material) => {
+      const pMesh = new THREE.Mesh(geometry, mat);
+      pMesh.position.set(x, y, z);
+      pMesh.castShadow = true;
+      pMesh.receiveShadow = true;
+      const edges = new THREE.EdgesGeometry(geometry);
+      const lines = new THREE.LineSegments(edges, edgeLineMat);
+      pMesh.add(lines);
+      boxGroup.add(pMesh);
+    };
+
+    const centerY = - (frontHeight - boxHeight) * 0.15;
+    const centerZ = - (sz / 2) - (boxDepth / 2);
+
+    // 1. Lateral Izquierdo de la gaveta
+    addBoxPart(
+      new THREE.BoxGeometry(t, boxHeight, boxDepth),
+      - (boxOuterWidth / 2) + (t / 2),
+      centerY,
+      centerZ,
+      boxMat
+    );
+
+    // 2. Lateral Derecho de la gaveta
+    addBoxPart(
+      new THREE.BoxGeometry(t, boxHeight, boxDepth),
+      (boxOuterWidth / 2) - (t / 2),
+      centerY,
+      centerZ,
+      boxMat
+    );
+
+    // 3. Trasera interior de la gaveta
+    addBoxPart(
+      new THREE.BoxGeometry(boxInnerWidth, boxHeight, t),
+      0,
+      centerY,
+      - (sz / 2) - boxDepth + (t / 2),
+      boxMat
+    );
+
+    // 4. Frente Interior / Contrafrente de la gaveta
+    addBoxPart(
+      new THREE.BoxGeometry(boxInnerWidth, boxHeight, t),
+      0,
+      centerY,
+      - (sz / 2) - (t / 2),
+      boxMat
+    );
+
+    // 5. Fondo de la gaveta (MDF 6mm)
+    const bottomThickness = 6;
+    addBoxPart(
+      new THREE.BoxGeometry(boxOuterWidth - 8, bottomThickness, boxDepth - 8),
+      0,
+      centerY - (boxHeight / 2) + 8,
+      centerZ,
+      bottomMat
+    );
+
+    return boxGroup;
+  }
+
   private createDrawerSlidesMesh(
     part: Part,
     hw: PartHardwareConfig,
@@ -1686,19 +1804,157 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const group = new THREE.Group();
     if (hw.slideType === 'none') return group;
 
-    const slideMat = new THREE.MeshStandardMaterial({
+    const slideType = hw.slideType || 'telescopic';
+    const t = part.thickness || 18;
+
+    // Commercial standard nominal lengths: 250, 300, 350, 400, 450, 500, 550, 600 mm
+    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
+    const availableDepth = Math.max(250, (part.width || 450) - 25);
+    const nominalLength = standardLengths.filter(l => l <= availableDepth).pop() || 350;
+
+    // Standard dimensions per slide type
+    let railHeight = 45; // mm standard heavy duty
+    let railThickness = 12.7; // 1/2" side gap per side
+    if (slideType === 'telescopic_35') {
+      railHeight = 35;
+      railThickness = 12.5;
+    } else if (slideType === 'undermount') {
+      railHeight = 28;
+      railThickness = 21; // under-mount bottom clearance
+    }
+
+    const slideSteelMat = new THREE.MeshStandardMaterial({
       color: 0x94a3b8,
-      metalness: 0.8,
+      metalness: 0.88,
+      roughness: 0.22
+    });
+
+    const ballBearingMat = new THREE.MeshStandardMaterial({
+      color: 0xe2e8f0,
+      metalness: 0.95,
+      roughness: 0.1
+    });
+
+    const damperMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7, // Hydraulic blue damper
+      metalness: 0.5,
       roughness: 0.3
     });
 
-    const depth = Math.max(250, (part.width || 450) * 0.9);
+    const clipMat = new THREE.MeshStandardMaterial({
+      color: 0xea580c, // Undermount front quick-release orange clip
+      roughness: 0.35
+    });
 
-    const leftSlide = new THREE.Mesh(new THREE.BoxGeometry(6, 35, depth), slideMat);
-    leftSlide.position.set(-sx / 2 - 4, -sy / 4, -depth / 2 + sz / 2);
+    const createSingleSlideAssembly = (isLeft: boolean): THREE.Group => {
+      const slideAssembly = new THREE.Group();
 
-    const rightSlide = new THREE.Mesh(new THREE.BoxGeometry(6, 35, depth), slideMat);
-    rightSlide.position.set(sx / 2 + 4, -sy / 4, -depth / 2 + sz / 2);
+      if (slideType === 'undermount') {
+        // --- CORREDERA OCULTA BAJO CAJÓN (TANDEM) ---
+        // Mounted underneath drawer bottom channel
+        const mainTrack = new THREE.Mesh(
+          new THREE.BoxGeometry(18, railHeight, nominalLength),
+          slideSteelMat
+        );
+        mainTrack.position.set(0, 0, -nominalLength / 2);
+        slideAssembly.add(mainTrack);
+
+        // Front 3D quick-release locking catch
+        const frontClip = new THREE.Mesh(
+          new THREE.BoxGeometry(22, 14, 25),
+          clipMat
+        );
+        frontClip.position.set(0, -railHeight / 2 + 7, -12.5);
+        slideAssembly.add(frontClip);
+
+        // Synchronizer pinion / rear damper
+        const rearDamper = new THREE.Mesh(
+          new THREE.BoxGeometry(14, 12, 45),
+          damperMat
+        );
+        rearDamper.position.set(0, 0, -nominalLength + 25);
+        slideAssembly.add(rearDamper);
+      } else {
+        // --- CORREDERA TELESCÓPICA (45mm, SOFT-CLOSE O 35mm) ---
+        // 1. Carcase Outer Member (Stationary C-profile against internal side wall)
+        const outerProfile = new THREE.Mesh(
+          new THREE.BoxGeometry(4.5, railHeight, nominalLength),
+          slideSteelMat
+        );
+        outerProfile.position.set(isLeft ? -3.5 : 3.5, 0, -nominalLength / 2);
+        slideAssembly.add(outerProfile);
+
+        // 2. Intermediate Ball-Bearing Carriage
+        const intermediateProfile = new THREE.Mesh(
+          new THREE.BoxGeometry(3.5, railHeight * 0.72, nominalLength * 0.9),
+          ballBearingMat
+        );
+        intermediateProfile.position.set(0, 0, -nominalLength / 2 + 10);
+        slideAssembly.add(intermediateProfile);
+
+        // 3. Inner Drawer Member (Attached to drawer box)
+        const innerProfile = new THREE.Mesh(
+          new THREE.BoxGeometry(4.0, railHeight * 0.55, nominalLength * 0.85),
+          slideSteelMat
+        );
+        innerProfile.position.set(isLeft ? 3.5 : -3.5, 0, -nominalLength / 2 + 15);
+        slideAssembly.add(innerProfile);
+
+        // System 32 stamped mounting hole visual dots on rail
+        const holeGeo = new THREE.CylinderGeometry(2.2, 2.2, 5, 12);
+        const holeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+        const holeSpacings = [37, 69, 101, 165, 229];
+        for (const distFromFront of holeSpacings) {
+          if (distFromFront < nominalLength - 30) {
+            const dot = new THREE.Mesh(holeGeo, holeMat);
+            dot.rotation.z = Math.PI / 2;
+            dot.position.set(isLeft ? -3.5 : 3.5, 0, -distFromFront);
+            slideAssembly.add(dot);
+          }
+        }
+
+        // Soft-Close Hydraulic Piston & Spring Return Unit
+        if (slideType === 'soft_close') {
+          const piston = new THREE.Mesh(
+            new THREE.CylinderGeometry(3.2, 3.2, 50, 12),
+            damperMat
+          );
+          piston.rotation.x = Math.PI / 2;
+          piston.position.set(isLeft ? -1 : 1, -railHeight * 0.2, -nominalLength + 35);
+          slideAssembly.add(piston);
+
+          const triggerCatch = new THREE.Mesh(
+            new THREE.BoxGeometry(5, 10, 16),
+            damperMat
+          );
+          triggerCatch.position.set(isLeft ? 1 : -1, railHeight * 0.2, -nominalLength + 55);
+          slideAssembly.add(triggerCatch);
+        }
+      }
+
+      return slideAssembly;
+    };
+
+    // Calculate strict internal positions inside cabinet carcass
+    // sx is the drawer front width; carcass side panel has thickness t (e.g. 18mm)
+    // The slide must be mounted inside the interior void, centered in the 12.7mm clearance gap
+    let leftX = (-sx / 2) + t + (railThickness / 2);
+    let rightX = (sx / 2) - t - (railThickness / 2);
+    let posY = -sy * 0.15; // Centered on drawer box body height
+
+    if (slideType === 'undermount') {
+      leftX = (-sx / 2) + t + 28;
+      rightX = (sx / 2) - t - 28;
+      posY = -sy / 2 + 14; // Bottom mounted underneath
+    }
+
+    const posZ = -sz / 2 - 2; // Sits directly behind drawer front
+
+    const leftSlide = createSingleSlideAssembly(true);
+    leftSlide.position.set(leftX, posY, posZ);
+
+    const rightSlide = createSingleSlideAssembly(false);
+    rightSlide.position.set(rightX, posY, posZ);
 
     group.add(leftSlide);
     group.add(rightSlide);
@@ -1728,6 +1984,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
         color = 0xa855f7; // Purple for 35mm hinge cups
         cylRadius = 17.5;
         cylHeight = 12.5;
+      } else if (hole.type === 'slide_system32') {
+        color = 0x10b981; // Emerald green for System 32 slide drill holes
+        cylRadius = 2.5;
+        cylHeight = 11.5;
+      } else if (hole.type === 'handle_hole_4') {
+        color = 0x38bdf8; // Sky blue for handle holes
+        cylRadius = 2.0;
+        cylHeight = 18;
       }
 
       // 3D Drill Bore Cylinder
@@ -3342,6 +3606,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.showMovableRoleSubmenu.set(false);
         this.showHandleSubmenu.set(false);
         this.showHingeSubmenu.set(false);
+        this.showSlideSubmenu.set(false);
         return;
       }
     }
@@ -3354,6 +3619,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showMovableRoleSubmenu.set(false);
     this.showHandleSubmenu.set(false);
     this.showHingeSubmenu.set(false);
+    this.showSlideSubmenu.set(false);
   }
 
   closeContextMenu() {
@@ -3364,6 +3630,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showMovableRoleSubmenu.set(false);
     this.showHandleSubmenu.set(false);
     this.showHingeSubmenu.set(false);
+    this.showSlideSubmenu.set(false);
   }
 
   toggleRotateSubmenu() {
@@ -3372,6 +3639,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showMovableRoleSubmenu.set(false);
     this.showHandleSubmenu.set(false);
     this.showHingeSubmenu.set(false);
+    this.showSlideSubmenu.set(false);
   }
 
   toggleQuickMaterialPicker() {
@@ -3380,6 +3648,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showMovableRoleSubmenu.set(false);
     this.showHandleSubmenu.set(false);
     this.showHingeSubmenu.set(false);
+    this.showSlideSubmenu.set(false);
   }
 
   toggleMovableRoleSubmenu() {
@@ -3388,6 +3657,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showQuickMaterialPicker.set(false);
     this.showHandleSubmenu.set(false);
     this.showHingeSubmenu.set(false);
+    this.showSlideSubmenu.set(false);
   }
 
   toggleHandleSubmenu() {
@@ -3396,6 +3666,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showQuickMaterialPicker.set(false);
     this.showMovableRoleSubmenu.set(false);
     this.showHingeSubmenu.set(false);
+    this.showSlideSubmenu.set(false);
   }
 
   toggleHingeSubmenu() {
@@ -3404,6 +3675,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showQuickMaterialPicker.set(false);
     this.showMovableRoleSubmenu.set(false);
     this.showHandleSubmenu.set(false);
+    this.showSlideSubmenu.set(false);
+  }
+
+  toggleSlideSubmenu() {
+    this.showSlideSubmenu.update(v => !v);
+    this.showRotateSubmenu.set(false);
+    this.showQuickMaterialPicker.set(false);
+    this.showMovableRoleSubmenu.set(false);
+    this.showHandleSubmenu.set(false);
+    this.showHingeSubmenu.set(false);
   }
 
   setContextMenuPartMovable(role: 'door' | 'drawer_front' | 'shelf' | 'free', direction: OpeningDirection = 'left') {
@@ -4159,14 +4440,43 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const next = cur > 0.5 ? 0 : 1;
     this.openTargetMap.set(partId, next);
 
-    // Si es un cajón o despiece de cajón, sincronizar apertura de todas las piezas del mismo cajón
     const targetPiece = this.pieceObjects.find(p => p.part.id === partId);
     if (targetPiece?.isDrawer) {
-      const partsArr = targetPiece.part.id.split('_');
-      const basePrefix = partsArr.slice(0, 2).join('_');
+      const targetY = targetPiece.originalPos.y;
+      const targetPart = targetPiece.part;
+
+      // Extract drawer instance identifier prefix if present
+      const boxSubKeywords = ['_frente_', '_lat_izq_', '_lat_der_', '_trasera_', '_frente_int_', '_fondo_'];
+      let specificPrefix = '';
+      for (const kw of boxSubKeywords) {
+        if (targetPart.id.includes(kw)) {
+          specificPrefix = targetPart.id.split(kw)[0];
+          break;
+        }
+      }
+      if (!specificPrefix && targetPart.id.includes('caj_ind_')) {
+        const match = targetPart.id.match(/caj_ind_\d+/);
+        if (match) specificPrefix = match[0];
+      }
+
+      // Synchronize ONLY sub-components that are part of the EXACT same physical drawer box
       for (const p of this.pieceObjects) {
-        if (p.isDrawer && (p.part.id.startsWith(basePrefix) || (targetPiece.part.id.includes('caj_ind_') && p.part.id.includes('caj_ind_')))) {
-          this.openTargetMap.set(p.part.id, next);
+        if (p.isDrawer && p.part.id !== partId) {
+          // If a specific drawer prefix is identified, match that exact prefix
+          if (specificPrefix && (p.part.id.startsWith(specificPrefix + '_') || p.part.id.includes(specificPrefix))) {
+            this.openTargetMap.set(p.part.id, next);
+            continue;
+          }
+
+          // Otherwise, match only if they are interior box sub-parts belonging to the same module and same Y level
+          const isAnotherFront = (p.part.componentRole === 'drawer_front' || p.part.name.toUpperCase().includes('FRENTE'));
+          const isAtSameElevation = Math.abs(p.originalPos.y - targetY) < 30;
+          const isSameModule = !targetPart.moduleId || p.part.moduleId === targetPart.moduleId;
+
+          // Never trigger a different drawer front or a drawer at a different height!
+          if (!isAnotherFront && isAtSameElevation && isSameModule && !specificPrefix) {
+            this.openTargetMap.set(p.part.id, next);
+          }
         }
       }
     }

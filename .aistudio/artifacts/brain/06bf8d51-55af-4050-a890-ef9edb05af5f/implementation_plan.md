@@ -1,114 +1,53 @@
-# Plan de Implementación: Repositorio de Accesorios, Animación Fluida y Configuración de Puertas/Cajones
+# Plan de Implementación: Gavetas Completas de 5 Piezas, Montaje Real de Correderas y Mecanizados Técnicos
 
-## Resumen Ejecutivo
-Implementar un repositorio profesional de accesorios de carpintería (manijas/tiradores, bisagras de cazoleta, correderas telescópicas), corregir el problema de animación donde las puertas/cajones "brincan" y quedan en el mismo lugar al hacer clic (provocado por la reconstrucción del árbol 3D y desacoplamiento de mecanizados/pivotes), y habilitar tanto en el **menú contextual de clic derecho** como en el **panel inspector de piezas** la capacidad de convertir cualquier pieza personalizada en puerta o cajón, asignar sus accesorios y animar su apertura y cierre de forma interactiva.
-
----
-
-## Decisiones del Usuario y Preferencias Confirmadas
-
-> [!IMPORTANT]
-> Decisiones confirmadas a través de la entrevista interactiva:
-> - **Gestión de accesorios**: Catálogo integrado en el inspector de propiedades y en el menú contextual de clic derecho.
-> - **Configuración de piezas personalizadas**: Accesible tanto desde el menú contextual de clic derecho como desde el panel inspector de la pieza seleccionada.
-> - **Controles de animación**: Clic directo en el tirador/manija 3D, opción de "Abrir / Cerrar" en el menú contextual y botón global de apertura en la barra de herramientas.
+A partir de tus respuestas y observaciones, implementaremos una solución integral para que los cajones sean muebles reales completos tanto en el visor 3D como en la lista de despiece y corte:
 
 ---
 
-## 1. Diagnóstico del Error de Visualización y Animación ("Brinco")
-
-### Causa Raíz Detectada
-1. **Reconstrucción destructiva de la escena**: Al hacer clic en una pieza o en su entorno, el visor Three.js emite `partSelected`, lo cual actualiza `selectedPartIds` en el diseñador. El efecto reactivo (`effect()`) en el visor detectaba el cambio de selección y llamaba a `buildFurnitureScene()`, limpiando completamente `openCurrentMap.clear()` y `openTargetMap.clear()`, destruyendo la malla y recreándola cerrada instantáneamente tras un único frame.
-2. **Círculos en las puertas**: Los círculos observados en las puertas corresponden a las **cazoletas de bisagra de 35 mm** (mecanizados CNC calculados por el motor de ensamble). Al estar ubicados en un grupo estático separado (`drillGroup`), no estaban emparentados con el pivote de giro (`doorPivot`). Al rotar la puerta, los círculos quedaban en el aire o creaban una discrepancia visual.
-3. **Ausencia de modelos 3D de herrajes**: No existían accesorios físicos visuales (manijas, bisagras metálicas, correderas) emparentados con la puerta o cajón.
-
----
-
-## 2. Arquitectura de la Solución y Componentes
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       MODULO DESIGNER / WORKSPACE                          │
-├──────────────────────────────────────┬──────────────────────────────────────┤
-│       PANEL INSPECTOR DE PIEZA       │       VISOR 3D (THREE.JS / CAD)      │
-│  - Rol Móvil (Puerta/Cajón/Fija)     │  - Árbol jerárquico:                 │
-│  - HingeSide: Izq, Der, Basculante   │    doorPivot ──► DoorMesh            │
-│  - Catálogo Accesorios / Tiradores   │              ├──► Handle3D (Tirador) │
-│  - Selector Bisagras / Correderas    │              └──► HingeCups (35mm)   │
-│  - Test apertura instantáneo         │  - Click en tirador / puerta         │
-├──────────────────────────────────────┴──────────────────────────────────────┤
-│                         MENÚ CONTEXTUAL CLIC DERECHO                        │
-│  - "Convertir en Puerta" (Izq / Der / Basculante)                           │
-│  - "Convertir en Cajón" (Frente móvil con correderas)                       │
-│  - "Asignar Tirador..." (Barra, Concha, Botón, Gola, Sin Tirador)           │
-│  - "Abrir / Cerrar Pieza" (Animación lerp suave a 90° o extensión)          │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+## 1. Construcción Completa de Gaveta (Caja de Cajón de 5 Piezas)
+Actualmente varias plantillas y generadores solo colocaban la tapa frontal exterior. Implementaremos la estructura completa y paramétrica de la gaveta:
+- **Tapa de Frente Decorativo:** Frente exterior con recubrimientos/holguras periféricas estándar (1.5mm a 2mm).
+- **Caja de Gaveta (5 piezas):**
+  1. **Lateral Izquierdo Gaveta:** Con holgura lateral estándar (12.7 mm respecto al costado del mueble para correderas telescópicas).
+  2. **Lateral Derecho Gaveta:** Con holgura lateral estándar de 12.7 mm.
+  3. **Frente Interior Gaveta:** Conectado a los laterales de gaveta.
+  4. **Trasera Gaveta:** Descontada para dejar espacio a la profundidad del fondo.
+  5. **Fondo Gaveta:** Pieza horizontal (MDF/Melamina 3mm, 6mm o 15/18mm) ranurada o clavada bajo la caja.
+- **Despiece Automático:** Todas estas piezas se incorporarán al optimizador de corte y la lista de materiales con sus nombres y medidas exactas.
 
 ---
 
-## 3. Especificación Detallada de Cambios
-
-### A. Repositorio de Accesorios de Carpintería (`accessories-catalog.service.ts` o modelo integrado)
-Crear catálogo tipado con metadatos y generadores geométricos 3D optimizados:
-1. **Tiradores y Manijas**:
-   - **Tirador Tubular de Barra**: Acero cepillado o negro mate (distancias estándar: 96mm, 128mm, 160mm, 192mm).
-   - **Tirador de Concha / Clásico**: Con fijación frontal o trasera.
-   - **Tirador Botón Cilíndrico**: Minimalista moderno (diámetro 20-25mm).
-   - **Tirador Perfil Gola / J-Pull**: Integrado en el borde superior o lateral.
-   - **Push-to-Open (Sin tirador)**: Apertura por expulsión mecánica.
-2. **Bisagras de Cazoleta (35mm)**:
-   - Bisagra Recta (Parche / Cobertura total).
-   - Bisagra Acodada (Semi-parche / Codo 9).
-   - Bisagra Superacodada (Encastrada / Codo 18).
-   - Brazo Basculante / Pistón de gas para puertas elevables.
-3. **Correderas de Cajón**:
-   - Correderas telescópicas laterales (extensión total 45mm zincada).
-   - Guías ocultas bajo cajón con cierre suave.
-
-### B. Corrección de la Animación de Apertura (Suavidad sin Saltos)
-1. **Preservación de Estado**:
-   - Modificar `buildFurnitureScene()` y los efectos reactivos para no borrar `openTargetMap` ni reiniciar el progreso de rotación/desplazamiento al cambiar de selección.
-   - Optimizar la actualización de selección: actualizar materiales y el Gizmo de transformación sin destruir ni reconstruir la escena Three.js cuando solo cambian los IDs seleccionados.
-2. **Emparentamiento Correcto**:
-   - Emparentar tanto el tirador 3D como las cazoletas de bisagra (`hinge_35`) directamente dentro del `doorPivot`.
-   - Al rotar `doorPivot.rotation.y` (o `rotation.x` en basculantes), la puerta, su tirador y sus bisagras se moverán solidariamente en una sola transformación matemática.
-3. **Animación Lerp con Easing Real**:
-   - Suavizar la interpolación de apertura con delta time para que responda uniformemente a 60 FPS sin saltos abruptos.
-
-### C. Menú Contextual de Clic Derecho
-Añadir sección dedicada a piezas móviles:
-- **Puerta / Bisagra**:
-  - Convertir en Puerta (Bisagra Izquierda)
-  - Convertir en Puerta (Bisagra Derecha)
-  - Convertir en Puerta Basculante (Superior)
-- **Cajón**:
-  - Convertir en Frente de Cajón Móvil
-- **Quitar Rol Móvil**:
-  - Volver a pieza fija estándar
-- **Herrajes y Tirador**:
-  - Submenú rápido con opciones visuales de tirador (Barra, Concha, Botón, Gola, Push-Open).
-- **Acción Rápida de Animación**:
-  - Opción directa "Abrir / Cerrar Pieza" para probar el movimiento inmediatamente.
-
-### D. Panel Inspector de Piezas (Module Designer)
-- Nueva sección colapsable **"Comportamiento Móvil y Accesorios"**:
-  - Selector de Rol: Estándar (Fija) | Puerta | Frente de Cajón.
-  - Si es Puerta: Selector de ubicación de bisagra (Izquierda, Derecha, Superior).
-  - Selector de Tirador: Lista desplegable con vista previa de estilo, material y orientación (Horizontal / Vertical).
-  - Posicionamiento del tirador: Centrado, borde superior, borde inferior, centrado lateral.
-  - Botón interactivo de prueba: "Probar Animación (Abrir / Cerrar)".
+## 2. Montaje de Rieles en los Costados Interiores del Mueble
+- **Ubicación Exacta:** Las correderas se anclan directamente en la cara interior de los laterales del mueble a la altura central/inferior de cada gaveta, respetando los 12.7 mm de luz lateral.
+- **Sin Sobredimensionamiento:** Longitud de corredera adaptada a la profundidad útil del mueble (250, 300, 350, 400, 450, 500, 550, 600 mm).
 
 ---
 
-## 4. Plan de Verificación
+## 3. Mecanizados Técnicos y Eliminación de Círculos Erróneos en Frentes
+- **Mecanizados de Correderas (Sistema 32):**
+  - Primera perforación técnica a **37 mm** exactos de la arista frontal del costado del mueble.
+  - Perforaciones subsiguientes con paso de **32 mm** (o múltiplos 64mm, 128mm, 192mm) a lo largo de la línea de la corredera.
+- **Limpieza de Círculos en Frentes:**
+  - Se eliminan perforaciones o tarugos de ensamble estructural en las caras visibles frontales de los cajones.
+  - Perforaciones de tirador / manija centradas paramétricamente según la distancia entre centros (96mm, 128mm, 160mm, 192mm).
 
-1. **Prueba de Carga de Plantilla**: Cargar la plantilla "Closet / Ropero 2 Cuerpos con Maletero y Perchero", verificar que las puertas se ubiquen perfectamente alineadas con sus bisagras y tiradores integrados.
-2. **Prueba de Clic en Tiradores / Puertas**: Hacer clic en el tirador o puerta y confirmar que se abre a 90° de manera continua y fluida, sin saltos ni reseteos de posición.
-3. **Prueba de Creación Manual**:
-   - Crear una pieza rectangular manual.
-   - Hacer clic derecho -> "Convertir en Puerta (Bisagra Izquierda)" o asignarlo en el inspector.
-   - Comprobar que adquiere automáticamente el tirador y bisagras, y que se anima al hacer clic o mediante el menú.
-4. **Prueba de Creación de Cajón**:
-   - Crear un frente de cajón, designarlo como cajón y comprobar la animación de extracción hacia el frente.
-5. **Verificación de Compilación**: Ejecutar `compile_applet` para garantizar cero errores de TypeScript y AOT.
+---
+
+## 4. Animación Sincronizada de la Gaveta Completa
+- Al hacer clic sobre la tapa o la manija de un cajón, se deslizan juntos hacia adelante:
+  - Tapa frontal
+  - Costados de la gaveta
+  - Trasera de la gaveta
+  - Fondo de la gaveta
+  - Tirador
+  - Tramo extensible móvil de la corredera
+- Cada cajón se abrirá y cerrará de manera individual e independiente.
+
+---
+
+## Verificación y Pruebas
+1. Carga de plantillas con cajones (cómodas, escritorios, veladores, reposteros con gavetas).
+2. Verificación en 3D de la caja de cajón de 5 piezas con sus rieles en los laterales.
+3. Apertura de cajones independientes comprobando que toda la caja se mueva unida.
+4. Inspección de puntos de perforación técnicos (37mm sin círculos parásitos en el frente).
+5. Compilación limpia sin errores TypeScript ni de renderizado.

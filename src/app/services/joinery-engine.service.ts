@@ -137,11 +137,18 @@ export class JoineryEngineService {
     const boundsList = parts.map(p => this.getPartBounds(p));
     const collisions = this.detectCollisions(parts);
 
-    // 1. Compute Hinge Cup Drill Holes for Door Panels (Ø35mm)
+    // 1. Compute Hinge Cup Drill Holes for Door Panels ONLY (Ø35mm) - Strictly exclude drawer fronts
     for (const b of boundsList) {
-      const isDoor = b.part.componentRole === 'door' || 
-                     b.part.name.toUpperCase().includes('PUERTA') || 
-                     b.part.name.toUpperCase().includes('FRENTE');
+      const isDrawer = b.part.componentRole === 'drawer_front' ||
+                       b.part.name.toUpperCase().includes('CAJON') ||
+                       b.part.name.toUpperCase().includes('CAJÓN') ||
+                       b.part.name.toUpperCase().includes('GAVETA') ||
+                       b.part.id.includes('caj_ind_');
+      const isDoor = !isDrawer && (
+        b.part.componentRole === 'door' || 
+        (b.part.name.toUpperCase().includes('PUERTA') && !b.part.name.toUpperCase().includes('CAJ'))
+      );
+
       if (isDoor && b.sy >= 250) {
         const holes = this.generateDoorHingeHoles(b);
         for (const h of holes) {
@@ -151,7 +158,22 @@ export class JoineryEngineService {
       }
     }
 
-    // 2. Compute 90° Butt Joints between contacting pieces
+    // 2. Compute Technical System 32 Slide Drill Holes on Cabinet Side Panels (at 37mm from front edge)
+    for (const b of boundsList) {
+      const isDrawer = b.part.componentRole === 'drawer_front' ||
+                       b.part.name.toUpperCase().includes('CAJON') ||
+                       b.part.name.toUpperCase().includes('CAJÓN') ||
+                       b.part.name.toUpperCase().includes('GAVETA');
+      if (isDrawer) {
+        const slideHoles = this.generateSlideSystem32Holes(b, boundsList);
+        for (const h of slideHoles) {
+          drillHolesByPart.get(h.partId)?.push(h);
+          allDrillHoles.push(h);
+        }
+      }
+    }
+
+    // 3. Compute 90° Butt Joints between contacting pieces
     for (let i = 0; i < boundsList.length; i++) {
       for (let j = i + 1; j < boundsList.length; j++) {
         const b1 = boundsList[i];
@@ -166,6 +188,73 @@ export class JoineryEngineService {
       allDrillHoles,
       collisions
     };
+  }
+
+  private generateSlideSystem32Holes(drawer: Part3DBounds, allBounds: Part3DBounds[]): DrillHole[] {
+    const holes: DrillHole[] = [];
+    const slideY = drawer.py - (drawer.sy * 0.15); // Center height of drawer slide runner
+
+    // Find flanking cabinet side panels or dividers in the same module / vicinity
+    const verticalSides = allBounds.filter(b => 
+      b.part.id !== drawer.part.id &&
+      b.sx <= 32 && b.sy >= 150 && // Vertical panel
+      drawer.py >= b.minY - 20 && drawer.py <= b.maxY + 20
+    );
+
+    // Left flank (closest vertical panel to left of drawer)
+    const leftFlank = verticalSides
+      .filter(b => b.maxX <= drawer.minX + 30 && b.maxX >= drawer.minX - 50)
+      .sort((a, b) => b.maxX - a.maxX)[0];
+
+    // Right flank (closest vertical panel to right of drawer)
+    const rightFlank = verticalSides
+      .filter(b => b.minX >= drawer.maxX - 30 && b.minX <= drawer.maxX + 50)
+      .sort((a, b) => a.minX - b.minX)[0];
+
+    const flanks = [
+      { side: leftFlank, isLeft: true },
+      { side: rightFlank, isLeft: false }
+    ];
+
+    for (const { side, isLeft } of flanks) {
+      if (!side) continue;
+
+      // Front edge of side panel in Z axis
+      const frontEdgeZ = side.maxZ;
+      const holePosX = isLeft ? side.maxX : side.minX;
+      const normalAxis = 'x' as const;
+      const direction = (isLeft ? -1 : 1) as (1 | -1);
+
+      // System 32 hole spacing standard: 37mm setback from front edge, then 32, 64, 128, 192, 256 mm
+      const spacings = [37, 69, 101, 165, 229, 293];
+      const maxReachableDepth = side.sz - 40;
+
+      for (let i = 0; i < spacings.length; i++) {
+        const dist = spacings[i];
+        if (dist > maxReachableDepth) break;
+
+        const holeZ = frontEdgeZ - dist;
+        holes.push({
+          id: `slide_sys32_${side.part.id}_${drawer.part.id}_${i}`,
+          type: 'slide_system32',
+          diameter: 5,
+          depth: 11.5,
+          posX: holePosX,
+          posY: slideY,
+          posZ: holeZ,
+          normalAxis,
+          direction,
+          surfaceType: 'face',
+          partId: side.part.id,
+          partName: side.part.name,
+          targetPartId: drawer.part.id,
+          targetPartName: drawer.part.name,
+          description: `Perforación técnica corredera Sistema 32 Ø5x11.5mm (${dist}mm del borde frontal)`
+        });
+      }
+    }
+
+    return holes;
   }
 
   private generateDoorHingeHoles(b: Part3DBounds): DrillHole[] {
@@ -213,60 +302,109 @@ export class JoineryEngineService {
     drillMap: Map<string, DrillHole[]>,
     allDrills: DrillHole[]
   ) {
-    const contactTolerance = 2.5; // mm contact tolerance
+    // Exclude doors, drawer fronts, and non-structural decorative parts from carcass joint drilling
+    const isMovable1 = b1.part.componentRole === 'door' || b1.part.componentRole === 'drawer_front' || 
+                       b1.part.name.toUpperCase().includes('PUERTA') || b1.part.name.toUpperCase().includes('CAJON') ||
+                       b1.part.name.toUpperCase().includes('CAJÓN') || b1.part.name.toUpperCase().includes('GAVETA') ||
+                       b1.part.name.toUpperCase().includes('FRENTE');
+    const isMovable2 = b2.part.componentRole === 'door' || b2.part.componentRole === 'drawer_front' || 
+                       b2.part.name.toUpperCase().includes('PUERTA') || b2.part.name.toUpperCase().includes('CAJON') ||
+                       b2.part.name.toUpperCase().includes('CAJÓN') || b2.part.name.toUpperCase().includes('GAVETA') ||
+                       b2.part.name.toUpperCase().includes('FRENTE');
+    if (isMovable1 || isMovable2) return;
 
-    // Check Case A: b1 face in X touches b2 edge in X
-    // (e.g. vertical side b1 touching horizontal shelf b2 edge)
-    const overlapZ = Math.min(b1.maxZ, b2.maxZ) - Math.max(b1.minZ, b2.minZ);
+    const contactTolerance = 3.0; // mm contact tolerance
+
     const overlapX = Math.min(b1.maxX, b2.maxX) - Math.max(b1.minX, b2.minX);
+    const overlapZ = Math.min(b1.maxZ, b2.maxZ) - Math.max(b1.minZ, b2.minZ);
 
-    // X-Contact: shelf edge touches side face
-    const leftTouch = Math.abs(b2.minX - b1.maxX) <= contactTolerance;
-    const rightTouch = Math.abs(b2.maxX - b1.minX) <= contactTolerance;
+    if (overlapZ < 60) return;
 
-    if ((leftTouch || rightTouch) && overlapZ >= 80) {
-      // b1 is the passing panel (side), b2 is the butt panel (shelf)
-      const passing = leftTouch ? b1 : b2;
-      const butt = leftTouch ? b2 : b1;
-      const contactX = leftTouch ? b1.maxX : b1.minX;
-      const contactY = butt.py; // Mid-thickness of shelf
+    // --- CASE 1: X-JOINT (Vertical Side / Divider meeting Horizontal Shelf / Tie) ---
+    // One piece has thickness along X (sx <= 32) and the other has thickness along Y (sy <= 32)
+    const isSide1 = b1.sx <= 32 && b1.sy >= 60;
+    const isSide2 = b2.sx <= 32 && b2.sy >= 60;
+    const isShelf1 = b1.sy <= 32 && b1.sx >= 60;
+    const isShelf2 = b2.sy <= 32 && b2.sx >= 60;
 
-      this.distributeScrewAndDowelHoles(
-        passing,
-        butt,
-        'x',
-        contactX,
-        contactY,
-        Math.max(b1.minZ, b2.minZ),
-        Math.min(b1.maxZ, b2.maxZ),
-        drillMap,
-        allDrills
-      );
-      return;
+    if (isSide1 && isShelf2) {
+      const side = b1;
+      const shelf = b2;
+      const touchesLeft = Math.abs(shelf.minX - side.maxX) <= contactTolerance;
+      const touchesRight = Math.abs(shelf.maxX - side.minX) <= contactTolerance;
+
+      if (touchesLeft || touchesRight) {
+        const contactX = touchesLeft ? side.maxX : side.minX;
+        const contactY = Math.max(shelf.minY + 4, Math.min(shelf.maxY - 4, shelf.py));
+        const minZ = Math.max(side.minZ, shelf.minZ);
+        const maxZ = Math.min(side.maxZ, shelf.maxZ);
+
+        this.distributeScrewAndDowelHoles(
+          side,
+          shelf,
+          'x',
+          contactX,
+          contactY,
+          minZ,
+          maxZ,
+          drillMap,
+          allDrills
+        );
+        return;
+      }
+    } else if (isSide2 && isShelf1) {
+      const side = b2;
+      const shelf = b1;
+      const touchesLeft = Math.abs(shelf.minX - side.maxX) <= contactTolerance;
+      const touchesRight = Math.abs(shelf.maxX - side.minX) <= contactTolerance;
+
+      if (touchesLeft || touchesRight) {
+        const contactX = touchesLeft ? side.maxX : side.minX;
+        const contactY = Math.max(shelf.minY + 4, Math.min(shelf.maxY - 4, shelf.py));
+        const minZ = Math.max(side.minZ, shelf.minZ);
+        const maxZ = Math.min(side.maxZ, shelf.maxZ);
+
+        this.distributeScrewAndDowelHoles(
+          side,
+          shelf,
+          'x',
+          contactX,
+          contactY,
+          minZ,
+          maxZ,
+          drillMap,
+          allDrills
+        );
+        return;
+      }
     }
 
-    // Y-Contact: shelf face touches vertical divider top/bottom, or bottom panel touching side bottom
-    const topTouch = Math.abs(b2.minY - b1.maxY) <= contactTolerance;
-    const bottomTouch = Math.abs(b2.maxY - b1.minY) <= contactTolerance;
+    // --- CASE 2: Y-JOINT (Horizontal Top/Bottom Panel meeting Vertical Side or Divider) ---
+    if ((isShelf1 && isSide2) || (isShelf2 && isSide1)) {
+      const horizontal = isShelf1 ? b1 : b2;
+      const vertical = isShelf1 ? b2 : b1;
 
-    if ((topTouch || bottomTouch) && overlapZ >= 80 && overlapX >= 80) {
-      // Horizontal joint along Y
-      const passing = topTouch ? b2 : b1;
-      const butt = topTouch ? b1 : b2;
-      const contactY = topTouch ? b1.maxY : b1.minY;
-      const contactX = butt.px;
+      const touchesTop = Math.abs(vertical.minY - horizontal.maxY) <= contactTolerance;
+      const touchesBottom = Math.abs(vertical.maxY - horizontal.minY) <= contactTolerance;
 
-      this.distributeScrewAndDowelHoles(
-        passing,
-        butt,
-        'y',
-        contactX,
-        contactY,
-        Math.max(b1.minZ, b2.minZ),
-        Math.min(b1.maxZ, b2.maxZ),
-        drillMap,
-        allDrills
-      );
+      if ((touchesTop || touchesBottom) && overlapX >= 60) {
+        const contactY = touchesTop ? horizontal.maxY : horizontal.minY;
+        const contactX = Math.max(vertical.minX + 4, Math.min(vertical.maxX - 4, vertical.px));
+        const minZ = Math.max(horizontal.minZ, vertical.minZ);
+        const maxZ = Math.min(horizontal.maxZ, vertical.maxZ);
+
+        this.distributeScrewAndDowelHoles(
+          horizontal,
+          vertical,
+          'y',
+          contactY,
+          contactX,
+          minZ,
+          maxZ,
+          drillMap,
+          allDrills
+        );
+      }
     }
   }
 
