@@ -325,8 +325,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     // 10. Pointer Interactions (Selection, Gizmo Drag, Edge Handles)
     canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     window.addEventListener('pointermove', (e) => this.onPointerMove(e));
-    window.addEventListener('pointerup', () => this.onPointerUp());
-    window.addEventListener('pointercancel', () => this.onPointerUp());
+    window.addEventListener('pointerup', (e) => this.onPointerUp(e));
+    window.addEventListener('pointercancel', (e) => this.onPointerUp(e));
   }
 
   private applyThemeColors() {
@@ -885,11 +885,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return points;
   }
 
-  // Finds nearest vertex corner or edge midpoint to projected screen mouse position
+  // Finds nearest vertex corner or edge midpoint to projected screen mouse position with high CAD precision
   private findMagneticSnapCandidate(
     screenX: number,
     screenY: number,
-    thresholdPx = 24
+    thresholdPx = 36
   ): { worldPos: THREE.Vector3; type: 'corner' | 'midpoint'; partName: string } | null {
     if (!this.camera || !this.canvasRef()?.nativeElement) return null;
     const canvas = this.canvasRef()!.nativeElement;
@@ -910,8 +910,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const pY = ((-tempV.y + 1) / 2) * rect.height + rect.top;
 
         const dist = Math.hypot(pX - screenX, pY - screenY);
-        // Corners get a slight distance attraction bonus (0.85x)
-        const effectiveDist = sp.type === 'corner' ? dist * 0.85 : dist;
+        // Corners get a strong attraction bonus (0.65x) so outer edges lock firmly
+        const effectiveDist = sp.type === 'corner' ? dist * 0.65 : dist;
         if (effectiveDist < minDistance) {
           minDistance = effectiveDist;
           bestCandidate = {
@@ -923,10 +923,49 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
+    // Secondary 3D Face Proximity Fallback:
+    // If screen projection was just beyond threshold, check if mouse ray hits a part and snaps to its closest corner
+    if (!bestCandidate) {
+      const mouse = new THREE.Vector2(
+        ((screenX - rect.left) / rect.width) * 2 - 1,
+        -((screenY - rect.top) / rect.height) * 2 + 1
+      );
+      this.raycaster.setFromCamera(mouse, this.camera);
+      const intersects = this.raycaster.intersectObjects(
+        this.pieceObjects.map(p => p.mesh),
+        false
+      );
+      if (intersects.length > 0) {
+        const hit = intersects[0];
+        const hitPart = hit.object.userData?.['part'] as Part | undefined;
+        if (hitPart) {
+          const hitPt = hit.point;
+          const snapPoints = this.getPartSnapPoints(hitPart);
+          let closestPt: { pos: THREE.Vector3; type: 'corner' | 'midpoint'; partName: string } | null = null;
+          let min3dDist = 45; // mm in 3D
+          for (const sp of snapPoints) {
+            const d = hitPt.distanceTo(sp.pos);
+            const effD = sp.type === 'corner' ? d * 0.75 : d;
+            if (effD < min3dDist) {
+              min3dDist = effD;
+              closestPt = sp;
+            }
+          }
+          if (closestPt) {
+            bestCandidate = {
+              worldPos: closestPt.pos.clone(),
+              type: closestPt.type,
+              partName: closestPt.partName
+            };
+          }
+        }
+      }
+    }
+
     return bestCandidate;
   }
 
-  // Renders glowing Emerald 3D magnetic snapping indicator on hovered vertex or edge midpoint
+  // Renders subtle CAD magnetic snapping indicator (crosshair & clean badge) on hovered vertex
   private updateMagneticSnapIndicator(
     candidate: { worldPos: THREE.Vector3; type: 'corner' | 'midpoint'; partName: string } | null
   ) {
@@ -939,14 +978,24 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     this.magneticSnapGroup.position.copy(candidate.worldPos);
 
-    // 1. Center Sphere (Emerald dot)
-    const dotGeo = new THREE.SphereGeometry(6, 12, 12);
-    const dotMat = new THREE.MeshBasicMaterial({ color: 0x10b981, depthTest: false });
-    const dot = new THREE.Mesh(dotGeo, dotMat);
-    this.magneticSnapGroup.add(dot);
+    // 1. Subtle Precision Crosshair (Cruz sutil en el punto exacto)
+    const crossSize = 5.0; // mm
+    const crossPoints = [
+      new THREE.Vector3(-crossSize, 0, 0), new THREE.Vector3(crossSize, 0, 0),
+      new THREE.Vector3(0, -crossSize, 0), new THREE.Vector3(0, crossSize, 0),
+      new THREE.Vector3(0, 0, -crossSize), new THREE.Vector3(0, 0, crossSize)
+    ];
+    const crossGeo = new THREE.BufferGeometry().setFromPoints(crossPoints);
+    const crossMat = new THREE.LineBasicMaterial({
+      color: candidate.type === 'corner' ? 0x10b981 : 0xf59e0b,
+      depthTest: false,
+      linewidth: 2
+    });
+    const crossLines = new THREE.LineSegments(crossGeo, crossMat);
+    this.magneticSnapGroup.add(crossLines);
 
-    // 2. High-visibility Ring
-    const ringGeo = new THREE.RingGeometry(10, 14, 20);
+    // 2. High-precision Ring
+    const ringGeo = new THREE.RingGeometry(4, 6, 16);
     const ringMat = new THREE.MeshBasicMaterial({
       color: candidate.type === 'corner' ? 0x10b981 : 0xf59e0b,
       side: THREE.DoubleSide,
@@ -958,32 +1007,32 @@ export class Furniture3dViewerComponent implements OnDestroy {
     ring.quaternion.copy(this.camera.quaternion); // Billboard to face camera
     this.magneticSnapGroup.add(ring);
 
-    // 3. Mini Label Sprite
-    const labelText = candidate.type === 'corner' ? 'Esquina (Imán)' : 'Punto medio (Imán)';
+    // 3. Compact Label Sprite (No blocking the piece)
+    const labelText = candidate.type === 'corner' ? `Esquina · ${candidate.partName}` : `Centro · ${candidate.partName}`;
     const canvas = document.createElement('canvas');
     canvas.width = 240;
-    canvas.height = 60;
+    canvas.height = 48;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
       ctx.beginPath();
-      ctx.roundRect(0, 0, 240, 60, 12);
+      ctx.roundRect(0, 0, 240, 48, 10);
       ctx.fill();
       ctx.strokeStyle = candidate.type === 'corner' ? '#10b981' : '#f59e0b';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 24px sans-serif';
+      ctx.font = 'bold 20px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(labelText, 120, 30);
+      ctx.fillText(labelText, 120, 24);
     }
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.position.set(0, 28, 0);
-    sprite.scale.set(70, 20, 1);
+    sprite.position.set(0, 16, 0);
+    sprite.scale.set(60, 14, 1);
     this.magneticSnapGroup.add(sprite);
   }
 
@@ -999,7 +1048,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.updateMagneticSnapIndicator(null);
   }
 
-  // Render Interactive 3D Measurement Visuals (Point A, Point B, Guide Lines & Dimensions)
+  // Render Interactive 3D Measurement Visuals with Fine CAD Arrowheads & Subtle Center Cross
   renderMeasurementVisuals() {
     while (this.measureGroup.children.length > 0) {
       const obj = this.measureGroup.children[0];
@@ -1010,132 +1059,166 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const b = this.measurePointB();
     if (!a) return;
 
-    const createMarker = (pt: { x: number; y: number; z: number }, colorHex: number, labelText: string) => {
-      const markerGroup = new THREE.Group();
-      markerGroup.position.set(pt.x, pt.y, pt.z);
+    // Helper 1: Subtle technical crosshair (cruz fina de 7mm en el vértice exacto)
+    const createCadCrosshair = (pt: { x: number; y: number; z: number }, colorHex: number) => {
+      const group = new THREE.Group();
+      group.position.set(pt.x, pt.y, pt.z);
 
-      const sphereGeo = new THREE.SphereGeometry(14, 16, 16);
-      const sphereMat = new THREE.MeshBasicMaterial({ color: colorHex, depthTest: false });
-      const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-      markerGroup.add(sphere);
+      const s = 4.0; // 8mm total span
+      const pts = [
+        new THREE.Vector3(-s, 0, 0), new THREE.Vector3(s, 0, 0),
+        new THREE.Vector3(0, -s, 0), new THREE.Vector3(0, s, 0),
+        new THREE.Vector3(0, 0, -s), new THREE.Vector3(0, 0, s)
+      ];
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: colorHex, depthTest: false, linewidth: 2 });
+      const lines = new THREE.LineSegments(geo, mat);
+      group.add(lines);
 
-      const ringGeo = new THREE.RingGeometry(18, 22, 24);
-      const ringMat = new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, depthTest: false });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = Math.PI / 2;
-      markerGroup.add(ring);
+      // Micro center dot (1mm) for pin-point registration
+      const dotGeo = new THREE.SphereGeometry(1.2, 8, 8);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false });
+      group.add(new THREE.Mesh(dotGeo, dotMat));
 
+      return group;
+    };
+
+    // Helper 2: Slender CAD Arrowhead Cone touching the exact vertex with its apex
+    const createCadArrow = (tipPos: { x: number; y: number; z: number }, dirPointingAtTip: THREE.Vector3, colorHex: number) => {
+      const arrowLength = 12; // mm
+      const arrowRadius = 2.4; // mm
+      const coneGeo = new THREE.ConeGeometry(arrowRadius, arrowLength, 12);
+      // In Three.js, cone apex is at (0, +height/2, 0).
+      // Translate geometry so apex is at origin (0, 0, 0) and body extends along -Y:
+      coneGeo.translate(0, -arrowLength / 2, 0);
+
+      const coneMat = new THREE.MeshBasicMaterial({ color: colorHex, depthTest: false });
+      const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+
+      // Rotate cone so that local +Y aligns with dirPointingAtTip:
+      const defaultUp = new THREE.Vector3(0, 1, 0);
+      const normDir = dirPointingAtTip.clone().normalize();
+      coneMesh.quaternion.setFromUnitVectors(defaultUp, normDir);
+      coneMesh.position.set(tipPos.x, tipPos.y, tipPos.z);
+
+      return coneMesh;
+    };
+
+    // Initial state: only Point A is placed
+    if (!b) {
+      this.measureGroup.add(createCadCrosshair(a, 0xf59e0b));
+      const anchorRingGeo = new THREE.RingGeometry(3, 5, 16);
+      const anchorRingMat = new THREE.MeshBasicMaterial({
+        color: 0xf59e0b,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.85
+      });
+      const anchorRing = new THREE.Mesh(anchorRingGeo, anchorRingMat);
+      anchorRing.position.set(a.x, a.y, a.z);
+      anchorRing.quaternion.copy(this.camera.quaternion);
+      this.measureGroup.add(anchorRing);
+      return;
+    }
+
+    // Both Point A and Point B are defined:
+    const vecAB = new THREE.Vector3(b.x - a.x, b.y - a.y, b.z - a.z);
+    const totalDist = vecAB.length();
+
+    // Direction vectors pointing AT the endpoints
+    const dirAtA = totalDist > 0.1
+      ? new THREE.Vector3(a.x - b.x, a.y - b.y, a.z - b.z).normalize()
+      : new THREE.Vector3(0, 1, 0);
+    const dirAtB = dirAtA.clone().negate();
+
+    // Endpoints CAD Arrows (Puntas de flecha finas en ambos lados)
+    this.measureGroup.add(createCadArrow(a, dirAtA, 0xf59e0b));
+    this.measureGroup.add(createCadCrosshair(a, 0x10b981));
+
+    this.measureGroup.add(createCadArrow(b, dirAtB, 0xf59e0b));
+    this.measureGroup.add(createCadCrosshair(b, 0x10b981));
+
+    // Direct Euclidean CAD Measurement Line
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(a.x, a.y, a.z),
+      new THREE.Vector3(b.x, b.y, b.z)
+    ]);
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0xf59e0b,
+      linewidth: 2,
+      depthTest: false
+    });
+    const directLine = new THREE.Line(lineGeo, lineMat);
+    this.measureGroup.add(directLine);
+
+    // Subtle orthogonal delta projection lines
+    if (Math.abs(b.x - a.x) > 4) {
+      const geoX = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(a.x, a.y, a.z),
+        new THREE.Vector3(b.x, a.y, a.z)
+      ]);
+      const matX = new THREE.LineDashedMaterial({ color: 0xef4444, dashSize: 12, gapSize: 8, depthTest: false });
+      const lineX = new THREE.Line(geoX, matX);
+      lineX.computeLineDistances();
+      this.measureGroup.add(lineX);
+    }
+
+    if (Math.abs(b.y - a.y) > 4) {
+      const geoY = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(b.x, a.y, a.z),
+        new THREE.Vector3(b.x, b.y, a.z)
+      ]);
+      const matY = new THREE.LineDashedMaterial({ color: 0x10b981, dashSize: 12, gapSize: 8, depthTest: false });
+      const lineY = new THREE.Line(geoY, matY);
+      lineY.computeLineDistances();
+      this.measureGroup.add(lineY);
+    }
+
+    if (Math.abs(b.z - a.z) > 4) {
+      const geoZ = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(b.x, b.y, a.z),
+        new THREE.Vector3(b.x, b.y, b.z)
+      ]);
+      const matZ = new THREE.LineDashedMaterial({ color: 0x3b82f6, dashSize: 12, gapSize: 8, depthTest: false });
+      const lineZ = new THREE.Line(geoZ, matZ);
+      lineZ.computeLineDistances();
+      this.measureGroup.add(lineZ);
+    }
+
+    // Floating Midpoint Distance Badge (compact & non-intrusive)
+    const mid = new THREE.Vector3(
+      (a.x + b.x) / 2,
+      (a.y + b.y) / 2 + 18,
+      (a.z + b.z) / 2
+    );
+    const distInfo = this.measureDistance();
+    if (distInfo) {
       const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 64;
+      canvas.width = 180;
+      canvas.height = 48;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = '#09090b';
-        ctx.fillRect(0, 0, 128, 64);
-        ctx.fillStyle = '#f8fafc';
-        ctx.font = 'bold 32px sans-serif';
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 180, 48, 10);
+        ctx.fill();
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 22px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(labelText, 64, 32);
+        ctx.fillText(`${distInfo.total} mm`, 90, 24);
       }
       const texture = new THREE.CanvasTexture(canvas);
       const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
       const sprite = new THREE.Sprite(spriteMat);
-      sprite.position.set(0, 32, 0);
-      sprite.scale.set(70, 35, 1);
-      markerGroup.add(sprite);
-
-      return markerGroup;
-    };
-
-    this.measureGroup.add(createMarker(a, 0xfacc15, 'A'));
-
-    if (b) {
-      this.measureGroup.add(createMarker(b, 0x38bdf8, 'B'));
-
-      // Direct Euclidean Line between A and B
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(a.x, a.y, a.z),
-        new THREE.Vector3(b.x, b.y, b.z)
-      ]);
-      const lineMat = new THREE.LineBasicMaterial({
-        color: 0xfacc15,
-        linewidth: 3,
-        depthTest: false
-      });
-      const directLine = new THREE.Line(lineGeo, lineMat);
-      this.measureGroup.add(directLine);
-
-      // Delta X line (Horizontal red)
-      if (Math.abs(b.x - a.x) > 2) {
-        const geoX = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(a.x, a.y, a.z),
-          new THREE.Vector3(b.x, a.y, a.z)
-        ]);
-        const matX = new THREE.LineDashedMaterial({ color: 0xef4444, dashSize: 15, gapSize: 10, depthTest: false });
-        const lineX = new THREE.Line(geoX, matX);
-        lineX.computeLineDistances();
-        this.measureGroup.add(lineX);
-      }
-
-      // Delta Y line (Vertical green)
-      if (Math.abs(b.y - a.y) > 2) {
-        const geoY = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(b.x, a.y, a.z),
-          new THREE.Vector3(b.x, b.y, a.z)
-        ]);
-        const matY = new THREE.LineDashedMaterial({ color: 0x10b981, dashSize: 15, gapSize: 10, depthTest: false });
-        const lineY = new THREE.Line(geoY, matY);
-        lineY.computeLineDistances();
-        this.measureGroup.add(lineY);
-      }
-
-      // Delta Z line (Depth blue)
-      if (Math.abs(b.z - a.z) > 2) {
-        const geoZ = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(b.x, b.y, a.z),
-          new THREE.Vector3(b.x, b.y, b.z)
-        ]);
-        const matZ = new THREE.LineDashedMaterial({ color: 0x3b82f6, dashSize: 15, gapSize: 10, depthTest: false });
-        const lineZ = new THREE.Line(geoZ, matZ);
-        lineZ.computeLineDistances();
-        this.measureGroup.add(lineZ);
-      }
-
-      // Floating Midpoint Sprite with formatted distance
-      const mid = new THREE.Vector3(
-        (a.x + b.x) / 2,
-        (a.y + b.y) / 2 + 35,
-        (a.z + b.z) / 2
-      );
-      const dist = this.measureDistance();
-      if (dist) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 80;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#09090b';
-          ctx.beginPath();
-          ctx.roundRect(0, 0, 256, 80, 16);
-          ctx.fill();
-          ctx.strokeStyle = '#facc15';
-          ctx.lineWidth = 4;
-          ctx.stroke();
-
-          ctx.fillStyle = '#facc15';
-          ctx.font = 'bold 36px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(`${dist.total} mm`, 128, 40);
-        }
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
-        const sprite = new THREE.Sprite(spriteMat);
-        sprite.position.copy(mid);
-        sprite.scale.set(160, 50, 1);
-        this.measureGroup.add(sprite);
-      }
+      sprite.position.copy(mid);
+      sprite.scale.set(60, 16, 1);
+      this.measureGroup.add(sprite);
     }
   }
 
@@ -1651,7 +1734,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         return;
       }
 
-      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY);
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 36);
       let snapPt: { x: number; y: number; z: number } | null = null;
 
       if (snapCand) {
@@ -1666,12 +1749,36 @@ export class Furniture3dViewerComponent implements OnDestroy {
           true
         );
         if (measureIntersects.length > 0) {
-          const pt = measureIntersects[0].point;
-          snapPt = {
-            x: Math.round(pt.x),
-            y: Math.max(0, Math.round(pt.y)),
-            z: Math.round(pt.z)
-          };
+          const hit = measureIntersects[0];
+          const pt = hit.point;
+          const hitPart = hit.object.userData?.['part'] as Part | undefined;
+          if (hitPart) {
+            const snapPoints = this.getPartSnapPoints(hitPart);
+            let closestCorner = null;
+            let minCornerDist = 45; // mm in 3D
+            for (const sp of snapPoints) {
+              const d = pt.distanceTo(sp.pos);
+              const effD = sp.type === 'corner' ? d * 0.75 : d;
+              if (effD < minCornerDist) {
+                minCornerDist = effD;
+                closestCorner = sp;
+              }
+            }
+            if (closestCorner) {
+              snapPt = {
+                x: Math.round(closestCorner.pos.x),
+                y: Math.max(0, Math.round(closestCorner.pos.y)),
+                z: Math.round(closestCorner.pos.z)
+              };
+            }
+          }
+          if (!snapPt) {
+            snapPt = {
+              x: Math.round(pt.x),
+              y: Math.max(0, Math.round(pt.y)),
+              z: Math.round(pt.z)
+            };
+          }
         }
       }
 
@@ -1962,7 +2069,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     // 0.05. Measurement Tape Live Dragging & Magnetic Snapping
     if (this.isMeasureMode()) {
-      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY);
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 36);
       this.updateMagneticSnapIndicator(snapCand);
 
       if (this.isMeasuringDrag && this.measurePointA()) {
@@ -1983,12 +2090,35 @@ export class Furniture3dViewerComponent implements OnDestroy {
             true
           );
           if (measureIntersects.length > 0) {
-            const pt = measureIntersects[0].point;
-            this.measurePointB.set({
+            const hit = measureIntersects[0];
+            const pt = hit.point;
+            let resolvedPt = {
               x: Math.round(pt.x),
               y: Math.max(0, Math.round(pt.y)),
               z: Math.round(pt.z)
-            });
+            };
+            const hitPart = hit.object.userData?.['part'] as Part | undefined;
+            if (hitPart) {
+              const snapPoints = this.getPartSnapPoints(hitPart);
+              let closest = null;
+              let minDist = 45; // mm in 3D
+              for (const sp of snapPoints) {
+                const d = pt.distanceTo(sp.pos);
+                const effD = sp.type === 'corner' ? d * 0.75 : d;
+                if (effD < minDist) {
+                  minDist = effD;
+                  closest = sp;
+                }
+              }
+              if (closest) {
+                resolvedPt = {
+                  x: Math.round(closest.pos.x),
+                  y: Math.max(0, Math.round(closest.pos.y)),
+                  z: Math.round(closest.pos.z)
+                };
+              }
+            }
+            this.measurePointB.set(resolvedPt);
           } else {
             const ptA = this.measurePointA()!;
             const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -ptA.y);
@@ -2243,7 +2373,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   }
 
   // Pointer Up: Release Dragging
-  private onPointerUp() {
+  private onPointerUp(e?: PointerEvent) {
     if (this.isDrawingRect() && this.rectStartPoint && this.rectCurrentPoint) {
       const L = Math.round(Math.abs(this.rectCurrentPoint.x - this.rectStartPoint.x));
       const W = Math.round(Math.abs(this.rectCurrentPoint.z - this.rectStartPoint.z));
@@ -2284,6 +2414,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.controls.enabled = true;
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) canvas.style.cursor = 'default';
+
+      // Final magnetic lock verification at release point
+      if (e) {
+        const snapEnd = this.findMagneticSnapCandidate(e.clientX, e.clientY, 40);
+        if (snapEnd) {
+          this.measurePointB.set({
+            x: Math.round(snapEnd.worldPos.x),
+            y: Math.max(0, Math.round(snapEnd.worldPos.y)),
+            z: Math.round(snapEnd.worldPos.z)
+          });
+        }
+      }
 
       const a = this.measurePointA();
       const b = this.measurePointB();

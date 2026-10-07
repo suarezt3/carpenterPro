@@ -104,14 +104,19 @@
       }
     </div>
 
-    <!-- 8. DRILL HOLES (MECANIZADOS) TOGGLE -->
+    <!-- 8. DRILL HOLES (MECANIZADOS CNC) TOGGLE -->
     <button 
       type="button"
       (click)="toggleDrillHoles()"
-      [class]="showDrillHoles() ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
-      title="Mecanizados: Mostrar u ocultar taladros y tornillos 4x50, tarugos 8x30 y cazoletas 35mm">
+      [class]="showDrillHoles() ? 'text-sky-600 bg-sky-50 shadow-xs ring-1 ring-sky-300' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition relative"
+      title="Mecanizados CNC: Visualizar taladros automáticos calculados (Tornillos 4x50, Espigas 8x30, Bisagras 35mm)">
       <span class="material-icons text-lg">adjust</span>
+      @if (showDrillHoles() && allDrillHoles().length > 0) {
+        <span class="absolute -top-1 -right-1 px-1 py-0.2 rounded-full text-[9px] font-bold bg-sky-500 text-white leading-tight">
+          {{ allDrillHoles().length }}
+        </span>
+      }
     </button>
 
     <!-- 9. COTAS 3D -->
@@ -282,26 +287,59 @@
     </div>
   }
 
-  <!-- 3D MEASUREMENT TAPE ACTIVE HUD (IMÁN Y COTAS PERSISTENTES) -->
+  <!-- 3D MEASUREMENT TAPE COMPACT HUD (PANEL COMPACTO JUNTO A LA PALETA LATERAL IZQUIERDA) -->
   @if (isMeasureMode()) {
-    <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-1.5 max-w-lg w-[95%] sm:w-auto animate-in fade-in zoom-in-95 duration-150">
-      <div class="bg-white/95 text-slate-800 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-slate-200 shadow-xl flex flex-col gap-2 w-full min-w-[320px]">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-1.5 gap-3">
-          <div class="flex items-center gap-2">
-            <span class="material-icons text-amber-500 text-base">straighten</span>
-            <span class="text-xs font-bold tracking-wide uppercase text-slate-800">Cinta Métrica 3D</span>
-            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 border border-emerald-500/20">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Imán inteligente
+    <div class="absolute top-3 left-16 sm:left-17 z-30 pointer-events-auto flex flex-col gap-1.5 w-72 max-w-[calc(100vw-5rem)] animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-white/95 text-slate-800 backdrop-blur-md p-2.5 rounded-xl border border-slate-200 shadow-xl flex flex-col gap-2">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="material-icons text-amber-500 text-sm shrink-0">straighten</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-800 truncate">Cinta Métrica</span>
+            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Imán CAD
             </span>
           </div>
 
-          <div class="flex items-center gap-1.5">
-            @if (hasActiveMeasurement()) {
+          <button 
+            type="button" 
+            (click)="setActiveTool('select')"
+            class="text-slate-400 hover:text-slate-700 p-0.5 rounded transition"
+            title="Cerrar cinta métrica">
+            <span class="material-icons text-sm">close</span>
+          </button>
+        </div>
+
+        @if (!hasActiveMeasurement()) {
+          <div class="flex items-start gap-2 py-1 text-slate-600">
+            <span class="material-icons text-amber-500 text-sm shrink-0 mt-0.5">touch_app</span>
+            <p class="text-[11px] leading-snug">
+              Haz clic y arrastra de una esquina a otra. El <strong>imán</strong> captura con precisión exacta las esquinas de cada pieza.
+            </p>
+          </div>
+        } @else if (measureDistance(); as dist) {
+          <div class="flex flex-col gap-1.5">
+            <!-- Distancia Principal y Desglose Ortogonal -->
+            <div class="bg-amber-50/80 px-2.5 py-1.5 rounded-lg border border-amber-200/70 flex items-center justify-between">
+              <span class="text-[10px] uppercase font-bold text-amber-800">Cota CAD</span>
+              <span class="text-base font-black text-amber-700 font-mono tracking-tight">{{ dist.total }} mm</span>
+            </div>
+
+            <!-- Desglose por ejes ΔX ΔY ΔZ -->
+            <div class="flex items-center justify-around text-[10px] font-mono text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200/60">
+              <span>ΔX: <strong class="text-rose-600">{{ dist.dx }}</strong></span>
+              <span class="text-slate-300">|</span>
+              <span>ΔY: <strong class="text-emerald-600">{{ dist.dy }}</strong></span>
+              <span class="text-slate-300">|</span>
+              <span>ΔZ: <strong class="text-sky-600">{{ dist.dz }}</strong></span>
+            </div>
+
+            <!-- Botones compactos y elegantes para nueva medida y borrar cota -->
+            <div class="flex items-center gap-1.5 pt-0.5">
               <button 
                 type="button" 
                 (click)="startNewMeasurement()"
-                class="px-2 py-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg transition font-bold flex items-center gap-1"
+                class="flex-1 py-1 px-2 text-[11px] bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg shadow-xs transition flex items-center justify-center gap-1"
                 title="Comenzar una nueva medición">
                 <span class="material-icons text-xs">add</span>
                 <span>Nueva Medida</span>
@@ -309,48 +347,18 @@
               <button 
                 type="button" 
                 (click)="clearMeasure()"
-                class="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition font-medium flex items-center gap-1"
-                title="Eliminar cota actual">
+                class="py-1 px-2 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg border border-slate-200 transition flex items-center justify-center gap-1"
+                title="Borrar cota actual (Esc)">
                 <span class="material-icons text-xs">delete_outline</span>
-                <span>Borrar cota</span>
+                <span>Borrar</span>
               </button>
-            }
-            <button 
-              type="button" 
-              (click)="setActiveTool('select')"
-              class="text-slate-400 hover:text-slate-700 p-0.5 rounded-lg"
-              title="Cerrar cinta métrica">
-              <span class="material-icons text-sm">close</span>
-            </button>
-          </div>
-        </div>
-
-        @if (!hasActiveMeasurement()) {
-          <p class="text-xs text-slate-600 font-medium flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0"></span>
-            <span>Haz clic y arrastra entre dos puntos. El <strong>imán</strong> se adhiere automáticamente a esquinas y puntos medios de las piezas.</span>
-          </p>
-        } @else if (measureDistance(); as dist) {
-          <div class="flex flex-col gap-1.5">
-            <div class="flex items-center justify-between gap-4 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
-              <div class="flex flex-col">
-                <span class="text-[10px] uppercase font-bold text-amber-800/80">Distancia 3D</span>
-                <span class="text-lg font-black text-amber-700 font-mono">{{ dist.total }} mm</span>
-              </div>
-              <div class="flex items-center gap-2.5 text-xs font-mono text-slate-700 bg-white/80 px-2.5 py-1.5 rounded-lg border border-amber-200/60 shadow-2xs">
-                <span>ΔX: <strong class="text-rose-600">{{ dist.dx }}</strong></span>
-                <span>·</span>
-                <span>ΔY: <strong class="text-emerald-600">{{ dist.dy }}</strong></span>
-                <span>·</span>
-                <span>ΔZ: <strong class="text-sky-600">{{ dist.dz }}</strong></span>
-              </div>
             </div>
 
             @if (isMeasurementPersistent()) {
-              <p class="text-[11px] text-emerald-700 font-medium flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200/60">
-                <span class="material-icons text-xs text-emerald-600">check_circle</span>
-                <span>Cota fija en 3D: Puedes rotar, orbitar e inspeccionar el modelo libremente sin que se borre.</span>
-              </p>
+              <div class="flex items-center gap-1 text-[10px] text-emerald-700 font-medium bg-emerald-50/70 px-2 py-0.5 rounded border border-emerald-200/50">
+                <span class="material-icons text-[11px] text-emerald-600">lock</span>
+                <span class="truncate">Fija en 3D: rota e inspecciona libremente</span>
+              </div>
             }
           </div>
         }

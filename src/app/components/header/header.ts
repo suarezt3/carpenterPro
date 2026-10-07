@@ -4,6 +4,7 @@ import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
+import { DocumentationModalComponent } from '../documentation-modal/documentation-modal';
 import { ProjectSettings } from '../../models/melamine.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SlicePipe } from '@angular/common';
@@ -13,7 +14,7 @@ import { ThemeService } from '../../services/theme.service';
 @Component({
   selector: 'app-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, SlicePipe, TechnicalSheetModalComponent],
+  imports: [ReactiveFormsModule, SlicePipe, TechnicalSheetModalComponent, DocumentationModalComponent],
   host: {
     '(window:keydown)': 'handleGlobalKeyDown($event)',
     '(document:click)': 'closeDropdowns()'
@@ -39,6 +40,7 @@ export class HeaderComponent {
   showNewProjectModal = signal(false);
   showSqlModal = signal(false);
   showTechnicalSheetModal = signal(false);
+  showDocumentationModal = signal(false);
   projectsTab = signal<'cloud' | 'local'>('cloud');
   sqlCopied = signal(false);
   toastMessage = signal<string | null>(null);
@@ -316,6 +318,15 @@ export class HeaderComponent {
 
   closeTechnicalSheet() {
     this.showTechnicalSheetModal.set(false);
+  }
+
+  openDocumentationModal() {
+    this.closeDropdowns();
+    this.showDocumentationModal.set(true);
+  }
+
+  closeDocumentationModal() {
+    this.showDocumentationModal.set(false);
   }
 
   exportDxf() {

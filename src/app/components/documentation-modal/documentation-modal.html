@@ -1,0 +1,297 @@
+@if (isOpen()) {
+  <div 
+    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+    (keydown.escape)="close()"
+    (click)="close()">
+    
+    <!-- Modal Container -->
+    <div 
+      class="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border transition-colors duration-200"
+      [class]="themeService.isClassic() ? 'bg-white border-slate-300 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'"
+      role="document"
+      tabindex="0"
+      (keydown)="$event.stopPropagation()"
+      (click)="$event.stopPropagation()">
+
+      <!-- HEADER MODAL -->
+      <div 
+        class="flex items-center justify-between px-6 py-4 border-b shrink-0"
+        [class]="themeService.isClassic() ? 'bg-slate-100/90 border-slate-200 text-slate-900' : 'bg-zinc-950 border-zinc-800 text-zinc-100'">
+        
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/15 text-emerald-700 border border-emerald-500/30">
+            <span class="material-icons text-2xl">menu_book</span>
+          </div>
+          <div>
+            <h2 class="text-base sm:text-lg font-black tracking-tight flex items-center gap-2" [class]="themeService.isClassic() ? 'text-slate-950' : 'text-white'">
+              <span>Manual y Documentación de Herramientas</span>
+              <span class="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-2xs">
+                Guía Oficial
+              </span>
+            </h2>
+            <p class="text-xs font-medium" [class]="themeService.isClassic() ? 'text-slate-600' : 'text-zinc-400'">
+              Aprende a usar la cinta métrica CAD, mecanizados automáticos CNC, empujar/tirar y optimizador.
+            </p>
+          </div>
+        </div>
+
+        <button 
+          type="button" 
+          (click)="close()"
+          [class]="themeService.isClassic() ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'"
+          class="w-8 h-8 rounded-lg flex items-center justify-center transition"
+          title="Cerrar modal (Esc)">
+          <span class="material-icons text-xl">close</span>
+        </button>
+      </div>
+
+      <!-- SEARCH & CATEGORY BAR -->
+      <div 
+        class="px-6 py-3 border-b flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between shrink-0"
+        [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-900 border-zinc-800'">
+        
+        <!-- Buscador Reactivo -->
+        <div class="relative flex-1 max-w-md">
+          <span class="material-icons absolute left-3 top-2.5 text-slate-500 text-lg">search</span>
+          <input 
+            type="text"
+            [value]="searchQuery()"
+            (input)="searchQuery.set($any($event.target).value)"
+            placeholder="Buscar por herramienta, mecanizado, tecla o función..."
+            [class]="themeService.isClassic() 
+              ? 'w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none text-slate-900 font-medium placeholder:text-slate-400 shadow-2xs' 
+              : 'w-full pl-9 pr-8 py-2 text-xs bg-zinc-800 border border-zinc-700 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none text-zinc-100 placeholder:text-zinc-500'"
+          />
+          @if (searchQuery()) {
+            <button 
+              type="button"
+              (click)="searchQuery.set('')"
+              class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-700">
+              <span class="material-icons text-sm">cancel</span>
+            </button>
+          }
+        </div>
+
+        <!-- Categorías Pills -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-thin">
+          @for (cat of categories; track cat.id) {
+            <button 
+              type="button"
+              (click)="selectCategory(cat.id)"
+              [class]="activeCategory() === cat.id 
+                ? 'bg-emerald-600 text-white font-bold shadow-xs' 
+                : (themeService.isClassic() ? 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 font-semibold' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700 font-medium')"
+              class="px-2.5 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 whitespace-nowrap">
+              <span class="material-icons text-xs">{{ cat.icon }}</span>
+              <span>{{ cat.label }}</span>
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- MAIN SPLIT CONTENT -->
+      <div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- LISTA LATERAL DE ARTÍCULOS -->
+        <div 
+          class="w-full md:w-80 border-b md:border-b-0 md:border-r overflow-y-auto shrink-0 p-3 flex flex-col gap-2"
+          [class]="themeService.isClassic() ? 'bg-slate-100/70 border-slate-200' : 'bg-zinc-950/60 border-zinc-800'">
+          
+          @if (filteredArticles().length === 0) {
+            <div class="p-6 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
+              <span class="material-icons text-3xl opacity-40">search_off</span>
+              <span>No se encontraron guías con "{{ searchQuery() }}"</span>
+            </div>
+          }
+
+          @for (art of filteredArticles(); track art.id) {
+            <button 
+              type="button"
+              (click)="selectArticle(art.id)"
+              [class]="selectedArticleId() === art.id 
+                ? (themeService.isClassic() ? 'bg-white border-emerald-500 shadow-md ring-2 ring-emerald-500/20' : 'bg-zinc-800 border-emerald-500 shadow-md ring-2 ring-emerald-500/30')
+                : (themeService.isClassic() ? 'bg-white/80 hover:bg-white border-slate-200/90 hover:border-slate-300 shadow-2xs' : 'bg-zinc-900/60 hover:bg-zinc-800 border-zinc-800 hover:border-zinc-700')"
+              class="p-3 rounded-xl border text-left transition flex items-start gap-3 group">
+              
+              <div 
+                [class]="art.iconColor"
+                [class.bg-slate-100]="themeService.isClassic()"
+                [class.bg-zinc-800]="!themeService.isClassic()"
+                class="w-8 h-8 rounded-lg flex items-center justify-center border border-slate-200 shrink-0">
+                <span class="material-icons text-lg">{{ art.icon }}</span>
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between gap-1 mb-1">
+                  <h4 
+                    [class]="themeService.isClassic() ? 'text-slate-900 group-hover:text-emerald-700' : 'text-zinc-100 group-hover:text-emerald-400'"
+                    class="text-xs font-bold truncate">
+                    {{ art.title }}
+                  </h4>
+                  @if (art.badge) {
+                    <span 
+                      [class]="themeService.isClassic() ? 'bg-slate-200 text-slate-800 border border-slate-300' : 'bg-zinc-800 text-zinc-300 border border-zinc-700'"
+                      class="text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0">
+                      {{ art.badge }}
+                    </span>
+                  }
+                </div>
+                <p 
+                  [class]="themeService.isClassic() ? 'text-slate-600 font-medium' : 'text-zinc-400'"
+                  class="text-[11px] line-clamp-2 leading-relaxed">
+                  {{ art.shortDesc }}
+                </p>
+              </div>
+            </button>
+          }
+        </div>
+
+        <!-- DETALLE DEL ARTÍCULO SELECCIONADO -->
+        <div 
+          class="flex-1 overflow-y-auto p-6 flex flex-col gap-6"
+          [class]="themeService.isClassic() ? 'bg-white' : 'bg-zinc-900'">
+          @if (selectedArticle(); as art) {
+            
+            <!-- TÍTULO Y RESUMEN -->
+            <div 
+              class="flex flex-col gap-2.5 border-b pb-4"
+              [class]="themeService.isClassic() ? 'border-slate-200' : 'border-zinc-800'">
+              <div class="flex items-center gap-2">
+                <span 
+                  [class]="themeService.isClassic() ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-emerald-950 text-emerald-300 border-emerald-800'"
+                  class="px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-md border">
+                  {{ art.badge || 'Documentación' }}
+                </span>
+                <span class="text-xs text-slate-400">·</span>
+                <span 
+                  [class]="themeService.isClassic() ? 'text-slate-600 font-bold' : 'text-zinc-400'"
+                  class="text-xs font-mono capitalize">
+                  {{ art.category.replace('_', ' ') }}
+                </span>
+              </div>
+
+              <h3 
+                [class]="themeService.isClassic() ? 'text-slate-950' : 'text-white'"
+                class="text-xl sm:text-2xl font-black flex items-center gap-2.5 tracking-tight">
+                <span class="material-icons text-2xl shrink-0" [class]="art.iconColor">{{ art.icon }}</span>
+                <span>{{ art.title }}</span>
+              </h3>
+
+              <p 
+                [class]="themeService.isClassic() ? 'text-slate-700 font-medium' : 'text-zinc-300'"
+                class="text-xs sm:text-sm leading-relaxed">
+                {{ art.shortDesc }}
+              </p>
+            </div>
+
+            <!-- FICHA TÉCNICA / ESPECIFICACIONES -->
+            @if (art.technicalDetails && art.technicalDetails.length > 0) {
+              <div class="flex flex-col gap-2.5">
+                <h4 
+                  [class]="themeService.isClassic() ? 'text-slate-800 font-black' : 'text-zinc-300 font-bold'"
+                  class="text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <span class="material-icons text-sm text-sky-600">tune</span>
+                  <span>Especificaciones Técnicas y Parámetros</span>
+                </h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  @for (spec of art.technicalDetails; track spec.label) {
+                    <div 
+                      class="p-3 rounded-xl border flex flex-col gap-1 transition-colors"
+                      [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-300 shadow-2xs' : 'bg-zinc-800/80 border-zinc-700'">
+                      <span 
+                        [class]="themeService.isClassic() ? 'text-slate-600 font-extrabold' : 'text-zinc-400 font-bold'"
+                        class="text-[10px] uppercase tracking-wide">
+                        {{ spec.label }}
+                      </span>
+                      <span 
+                        [class]="themeService.isClassic() ? 'text-slate-950 font-black' : 'text-amber-300 font-bold'"
+                        class="text-xs font-mono">
+                        {{ spec.value }}
+                      </span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- PASO A PASO / FUNCIONAMIENTO -->
+            <div class="flex flex-col gap-3">
+              <h4 
+                [class]="themeService.isClassic() ? 'text-slate-800 font-black' : 'text-zinc-300 font-bold'"
+                class="text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <span class="material-icons text-sm text-emerald-600">format_list_numbered</span>
+                <span>Instrucciones y Funcionamiento Detallado</span>
+              </h4>
+
+              <div class="flex flex-col gap-2.5">
+                @for (step of art.steps; track step; let idx = $index) {
+                  <div 
+                    class="p-3.5 rounded-xl border flex items-start gap-3 transition-colors"
+                    [class]="themeService.isClassic() ? 'bg-white border-slate-300 shadow-2xs' : 'bg-zinc-800/70 border-zinc-700 shadow-xs'">
+                    
+                    <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black bg-emerald-600 text-white shrink-0 mt-0.5 shadow-2xs">
+                      {{ idx + 1 }}
+                    </span>
+
+                    <p 
+                      [class]="themeService.isClassic() ? 'text-slate-800 font-medium' : 'text-zinc-200'"
+                      class="text-xs leading-relaxed flex-1">
+                      {{ step }}
+                    </p>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- CONSEJOS PROFESIONALES (TIPS) -->
+            @if (art.tips && art.tips.length > 0) {
+              <div 
+                class="p-4 rounded-xl border flex flex-col gap-2"
+                [class]="themeService.isClassic() ? 'bg-amber-50 border-amber-300 text-amber-950' : 'bg-amber-950/30 border-amber-800 text-amber-200'">
+                
+                <div 
+                  [class]="themeService.isClassic() ? 'text-amber-950 font-black' : 'text-amber-300 font-bold'"
+                  class="flex items-center gap-2 text-xs">
+                  <span class="material-icons text-base text-amber-600">tips_and_updates</span>
+                  <span>Consejos Pro para Taller y Diseño</span>
+                </div>
+
+                <ul 
+                  [class]="themeService.isClassic() ? 'text-amber-950 font-medium' : 'text-amber-200/90'"
+                  class="flex flex-col gap-1.5 list-disc list-inside text-xs leading-relaxed pl-1">
+                  @for (tip of art.tips; track tip) {
+                    <li>{{ tip }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+          }
+        </div>
+      </div>
+
+      <!-- FOOTER MODAL -->
+      <div 
+        class="px-6 py-3 border-t flex items-center justify-between shrink-0"
+        [class]="themeService.isClassic() ? 'bg-slate-100 border-slate-200' : 'bg-zinc-950 border-zinc-800'">
+        <span 
+          [class]="themeService.isClassic() ? 'text-slate-600 font-medium' : 'text-zinc-400'"
+          class="text-xs flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>Manual interactivo actualizado · Diseñado para carpintería y fabricación CNC</span>
+        </span>
+
+        <button 
+          type="button" 
+          (click)="close()"
+          class="px-5 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition">
+          Entendido
+        </button>
+      </div>
+
+    </div>
+  </div>
+}
