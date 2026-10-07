@@ -207,18 +207,18 @@ export class DocumentationModalComponent {
       iconColor: 'text-emerald-600',
       badge: 'Productividad',
       steps: [
-        '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar',
-        '• [ M ]: Cinta Métrica 3D con Imán Inteligente a vértices',
-        '• [ P ]: Empujar / Tirar (Push/Pull) para estirar caras en tiempo real',
-        '• [ Q ]: Rotar pieza seleccionada 90 grados',
-        '• [ R ]: Dibujar rectángulo 3D en piso o cara de pieza',
-        '• [ W / A / S / D ]: Mover pieza seleccionada en incrementos finos de 1 mm / 10 mm',
-        '• [ Supr / Delete / Backspace ]: Eliminar pieza seleccionada',
-        '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer último cambio',
-        '• [ Ctrl + Y ] / [ Cmd + Shift + Z ]: Rehacer cambio',
-        '• [ Esc ]: Cancelar herramienta activa, limpiar cota o cerrar modales',
-        '• [ Clic Derecho + Arrastrar ]: Orbitar y rotar cámara 3D libremente',
-        '• [ Rueda del Ratón ]: Zoom adelante / atrás'
+        '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar piezas',
+        '• [ M ]: Cinta Métrica 3D con Imán Inteligente a vértices y aristas',
+        '• [ P ]: Empujar / Tirar (Push/Pull) para estirar o encoger caras en tiempo real',
+        '• [ Q ]: Rotar pieza seleccionada 90 grados en el plano',
+        '• [ R ]: Dibujar rectángulo 3D en el piso o sobre la cara de una pieza',
+        '• [ Supr / Delete / Backspace ]: Eliminar inmediatamente la pieza o grupo de piezas seleccionadas (con restauración vía Ctrl+Z)',
+        '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer última acción o restauración de pieza eliminada',
+        '• [ Ctrl + Y ] / [ Cmd + Shift + Z ]: Rehacer acción deshecha',
+        '• [ Clic en Puerta o Cajón ]: Abrir o cerrar individualmente puertas (giro 90°) o extraer cajones en el visor 3D',
+        '• [ Botón Abrir / Cerrar ]: Apertura global sincronizada de todas las puertas y cajoneras del mueble',
+        '• [ Flechas Teclado ]: Mover pieza seleccionada en incrementos milimétricos (1 mm o 10 mm con Shift)',
+        '• [ Esc ]: Cancelar herramienta activa, limpiar selección o cerrar ventanas emergentes'
       ],
       tips: [
         'Mantener pulsada la tecla Shift mientras haces clic te permite seleccionar múltiples piezas a la vez para moverlas o duplicarlas en bloque.'

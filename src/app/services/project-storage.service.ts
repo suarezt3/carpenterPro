@@ -131,6 +131,13 @@ export class ProjectStorageService {
         try {
           const parsed = JSON.parse(saved);
           if (parsed && parsed.id && parsed.parts) {
+            const demo = this.createDemoProject();
+            if (!parsed.materials) parsed.materials = [];
+            for (const dm of demo.materials) {
+              if (!parsed.materials.some((m: Material) => m.id === dm.id)) {
+                parsed.materials.push(dm);
+              }
+            }
             return parsed;
           }
         } catch (e) {
@@ -154,15 +161,135 @@ export class ProjectStorageService {
       textureType: 'wood'
     };
 
+    const matNogal: Material = {
+      id: 'mat_nogal_18',
+      name: 'Melamina Nogal Terracota 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 210000,
+      hasGrain: true,
+      colorHex: '#5c3a21',
+      textureType: 'wood'
+    };
+
+    const matRobleMiel: Material = {
+      id: 'mat_roblemiel_18',
+      name: 'Melamina Roble Miel Cálido 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 205000,
+      hasGrain: true,
+      colorHex: '#c29b68',
+      textureType: 'wood'
+    };
+
+    const matTeca: Material = {
+      id: 'mat_teca_18',
+      name: 'Melamina Teca Natural 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 215000,
+      hasGrain: true,
+      colorHex: '#8b5a2b',
+      textureType: 'wood'
+    };
+
+    const matFresno: Material = {
+      id: 'mat_fresno_18',
+      name: 'Melamina Fresno Nórdico Claro 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 198000,
+      hasGrain: true,
+      colorHex: '#d9c5a5',
+      textureType: 'wood'
+    };
+
+    const matCalacatta: Material = {
+      id: 'mat_calacatta_18',
+      name: 'Melamina Mármol Calacatta Blanco 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 245000,
+      hasGrain: false,
+      colorHex: '#f5f5f7',
+      textureType: 'stone'
+    };
+
+    const matGranito: Material = {
+      id: 'mat_granito_18',
+      name: 'Melamina Granito Negro Absoluto 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 240000,
+      hasGrain: false,
+      colorHex: '#262626',
+      textureType: 'stone'
+    };
+
     const matBlanco: Material = {
       id: 'mat_blanco_18',
-      name: 'Melamina Blanco Mate 18mm',
+      name: 'Melamina Blanco Frost Mate 18mm',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
       sheetCost: 145000,
       hasGrain: false,
-      colorHex: '#f1f1f1',
+      colorHex: '#f8fafc',
+      textureType: 'solid'
+    };
+
+    const matGrafito: Material = {
+      id: 'mat_grafito_18',
+      name: 'Melamina Negro Grafito Antihuella 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 185000,
+      hasGrain: false,
+      colorHex: '#1e293b',
+      textureType: 'solid'
+    };
+
+    const matSalvia: Material = {
+      id: 'mat_salvia_18',
+      name: 'Melamina Verde Salvia Mate 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 190000,
+      hasGrain: false,
+      colorHex: '#4a5d4e',
+      textureType: 'solid'
+    };
+
+    const matTerracota: Material = {
+      id: 'mat_terracota_18',
+      name: 'Melamina Terracota / Barro Cálido 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 190000,
+      hasGrain: false,
+      colorHex: '#9c533e',
+      textureType: 'solid'
+    };
+
+    const matAntracita: Material = {
+      id: 'mat_antracita_18',
+      name: 'Melamina Gris Antracita 18mm',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 165000,
+      hasGrain: false,
+      colorHex: '#334155',
       textureType: 'solid'
     };
 
@@ -190,7 +317,22 @@ export class ProjectStorageService {
       textureType: 'solid'
     };
 
-    const defaultMaterials = [matRoble, matBlanco, matGris15, matMdfFondo];
+    const defaultMaterials = [
+      matRoble,
+      matNogal,
+      matRobleMiel,
+      matTeca,
+      matFresno,
+      matCalacatta,
+      matGranito,
+      matBlanco,
+      matGrafito,
+      matSalvia,
+      matTerracota,
+      matAntracita,
+      matGris15,
+      matMdfFondo
+    ];
 
     // Inicializar directamente con el modelo de barra/mueble de referencia (Techo 1800x600, laterales, base)
     const initialParts: Part[] = [

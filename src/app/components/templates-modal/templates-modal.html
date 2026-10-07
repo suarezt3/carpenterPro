@@ -1,6 +1,6 @@
 @if (isOpen()) {
   <div 
-    class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+    class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -18,11 +18,11 @@
 
       <!-- HEADER MODAL -->
       <div 
-        class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b shrink-0"
+        class="flex items-center justify-between px-5 sm:px-6 py-4 border-b shrink-0"
         [class]="themeService.isClassic() ? 'bg-slate-100 border-slate-300 text-slate-950' : 'bg-zinc-950 border-zinc-800 text-zinc-100'">
         
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-500 text-slate-950 font-black shadow-xs">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-500 text-slate-950 font-black shadow-sm">
             <span class="material-icons text-2xl">menu_book</span>
           </div>
           <div>
@@ -31,16 +31,17 @@
                 Catálogo de Plantillas de Muebles
               </h2>
               <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-600 text-white shadow-2xs">
-                20 Modelos Paramétricos
+                26 Modelos Paramétricos 3D
               </span>
             </div>
             <p class="text-xs font-semibold" [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-300'">
-              Selecciona un mueble prediseñado para reemplazar el diseño actual o añadirlo a su lado en el lienzo 3D.
+              Muebles estándar y cajoneras listos para fabricar. Reemplaza el diseño actual o añádelo al lado en el visor 3D.
             </p>
           </div>
         </div>
 
         <div class="flex items-center gap-2">
+          <!-- Botón Lienzo en Blanco dentro del modal también -->
           <button 
             type="button" 
             (click)="onStartBlank()"
@@ -66,14 +67,14 @@
         class="px-5 sm:px-6 py-3 border-b flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shrink-0"
         [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-300' : 'bg-zinc-900 border-zinc-800'">
         
-        <!-- Categorías Tabs -->
+        <!-- Categorías Tabs (Horizontal scroll) -->
         <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-thin">
           @for (cat of categories(); track cat.id) {
             <button 
               type="button"
               (click)="selectCategory(cat.id)"
               [class]="activeCategory() === cat.id 
-                ? 'bg-amber-500 text-slate-950 font-black shadow-xs' 
+                ? 'bg-amber-500 text-slate-950 font-black shadow-xs ring-1 ring-amber-600' 
                 : (themeService.isClassic() ? 'bg-white text-slate-800 hover:bg-slate-200 border border-slate-300 font-bold' : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 border border-zinc-700 font-medium')"
               class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
               <span class="material-icons text-sm">{{ cat.icon }}</span>
@@ -85,14 +86,14 @@
           }
         </div>
 
-        <!-- Buscador -->
-        <div class="relative w-full md:w-72">
+        <!-- Buscador en tiempo real -->
+        <div class="relative w-full md:w-72 shrink-0">
           <span class="material-icons absolute left-2.5 top-2 text-slate-600 text-lg pointer-events-none">search</span>
           <input 
             type="text"
             [value]="searchQuery()"
             (input)="searchQuery.set($any($event.target).value)"
-            placeholder="Buscar por nombre, medidas..."
+            placeholder="Buscar por nombre, medidas, cajón..."
             autocomplete="off"
             [class]="themeService.isClassic() 
               ? 'w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-950 font-bold placeholder:text-slate-500 shadow-2xs' 
@@ -110,10 +111,10 @@
         </div>
       </div>
 
-      <!-- TEMPLATES GRID WITH SCROLL -->
+      <!-- TEMPLATES GRID: 2 COLUMNS (SPACIOUS & WITH 3D ISOMETRIC THUMBNAILS) -->
       <div 
         class="flex-1 overflow-y-auto p-5 sm:p-6 min-h-0 scrollbar-thin"
-        [class]="themeService.isClassic() ? 'bg-slate-100/60' : 'bg-zinc-950/60'">
+        [class]="themeService.isClassic() ? 'bg-slate-100/70' : 'bg-zinc-950/70'">
         
         @if (filteredTemplates().length === 0) {
           <div class="p-12 text-center text-xs text-slate-700 flex flex-col items-center gap-2">
@@ -124,63 +125,67 @@
               type="button" 
               (click)="searchQuery.set(''); activeCategory.set('all')" 
               class="mt-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs transition">
-              Mostrar todas las 20 plantillas
+              Mostrar todas las plantillas
             </button>
           </div>
         } @else {
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <!-- GRID DE 2 COLUMNAS AMPLIO -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
             @for (tpl of filteredTemplates(); track tpl.id) {
               <div 
-                class="rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-lg overflow-hidden group"
-                [class]="themeService.isClassic() ? 'bg-white border-slate-300 shadow-2xs hover:border-amber-400' : 'bg-zinc-900 border-zinc-800 hover:border-amber-500/60'">
+                class="rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-xl overflow-hidden group"
+                [class]="themeService.isClassic() ? 'bg-white border-slate-300 shadow-sm hover:border-amber-400' : 'bg-zinc-900 border-zinc-800 hover:border-amber-500/70'">
                 
-                <!-- TOP CARD BODY -->
-                <div class="p-4 flex flex-col gap-2.5">
-                  <div class="flex items-start justify-between gap-2">
+                <!-- TOP CARD: 3D ISOMETRIC PREVIEW -->
+                <div class="p-4 pb-2">
+                  <app-template-thumbnail [template]="tpl" class="w-full h-36 block"></app-template-thumbnail>
+                </div>
+
+                <!-- CARD BODY: INFO & METRICS -->
+                <div class="px-5 py-2 flex flex-col gap-2 flex-1">
+                  <!-- Header row: category, badge, parts count -->
+                  <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
-                      <div class="w-9 h-9 rounded-xl flex items-center justify-center bg-amber-500/15 text-amber-700 border border-amber-500/30 group-hover:scale-105 transition-transform">
-                        <span class="material-icons text-xl">{{ tpl.icon }}</span>
-                      </div>
-                      <div>
-                        <span class="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 block">
-                          {{ tpl.categoryLabel }}
-                        </span>
-                        <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-800 border border-slate-200">
-                          {{ tpl.badge }}
-                        </span>
-                      </div>
+                      <span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-800 border border-amber-500/30">
+                        {{ tpl.categoryLabel }}
+                      </span>
+                      <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                        {{ tpl.badge }}
+                      </span>
                     </div>
 
-                    <span class="text-[11px] font-mono font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
+                    <span class="text-xs font-mono font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <span class="material-icons text-xs text-sky-500">grid_view</span>
                       {{ tpl.partsCount }} piezas
                     </span>
                   </div>
 
+                  <!-- Title & Description -->
                   <div>
-                    <h3 class="text-sm font-black tracking-tight leading-snug group-hover:text-amber-800 transition-colors" [class]="themeService.isClassic() ? 'text-slate-950' : 'text-white'">
+                    <h3 class="text-base font-black tracking-tight leading-snug group-hover:text-amber-700 transition-colors" [class]="themeService.isClassic() ? 'text-slate-950' : 'text-white'">
                       {{ tpl.name }}
                     </h3>
-                    <p class="text-xs font-semibold mt-1 line-clamp-2 leading-relaxed" [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-300'">
+                    <p class="text-xs font-medium mt-1 leading-relaxed" [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-300'">
                       {{ tpl.description }}
                     </p>
                   </div>
 
-                  <!-- DIMENSION PILLS -->
-                  <div class="pt-1.5 flex items-center gap-2 text-[11px] font-mono font-black" [class]="themeService.isClassic() ? 'text-slate-900' : 'text-amber-300'">
+                  <!-- DIMENSION PILLS IN MM -->
+                  <div class="pt-1 flex items-center gap-2 text-xs font-mono font-black" [class]="themeService.isClassic() ? 'text-slate-900' : 'text-amber-300'">
                     <span class="material-icons text-xs text-slate-500">straighten</span>
-                    <span>{{ tpl.dimensions.width }} × {{ tpl.dimensions.height }} × {{ tpl.dimensions.depth }} mm</span>
+                    <span>Dimensiones: {{ tpl.dimensions.width }} ancho × {{ tpl.dimensions.height }} alto × {{ tpl.dimensions.depth }} prof mm</span>
                   </div>
                 </div>
 
-                <!-- CARD ACTIONS FOOTER -->
+                <!-- CARD ACTIONS FOOTER (HIGH CONTRAST & CLEAR ACTION BUTTONS) -->
                 <div 
-                  class="p-2.5 border-t grid grid-cols-2 gap-2"
-                  [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950/80 border-zinc-800'">
+                  class="p-3 px-5 border-t grid grid-cols-2 gap-3"
+                  [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950/90 border-zinc-800'">
                   
                   <button 
                     type="button"
                     (click)="onSelectTemplate(tpl, 'replace')"
-                    class="py-1.5 px-2 text-xs font-black bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg flex items-center justify-center gap-1 transition shadow-2xs"
+                    class="py-2 px-3 text-xs font-black bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm hover:scale-[1.01]"
                     title="Borrar lienzo actual y cargar este mueble">
                     <span class="material-icons text-sm">sync</span>
                     <span>Reemplazar</span>
@@ -189,7 +194,7 @@
                   <button 
                     type="button"
                     (click)="onSelectTemplate(tpl, 'append')"
-                    class="py-1.5 px-2 text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-lg flex items-center justify-center gap-1 transition shadow-2xs"
+                    class="py-2 px-3 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm hover:scale-[1.01]"
                     title="Añadir este mueble al lado en el visor 3D sin borrar el actual">
                     <span class="material-icons text-sm">add_box</span>
                     <span>Añadir al lado</span>
@@ -210,9 +215,9 @@
         [class]="themeService.isClassic() ? 'bg-slate-100 border-slate-300 text-slate-800' : 'bg-zinc-950 border-zinc-800 text-zinc-300'">
         <div class="flex items-center gap-2">
           <span class="material-icons text-sm text-amber-600">tune</span>
-          <span>Todas las piezas se generan con medidas milimétricas exactas listas para el optimizador y mecanizados CNC.</span>
+          <span>Despiece milimétrico con tapacantos y mecanizados calculados automáticamente para taller.</span>
         </div>
-        <span class="text-slate-500 font-mono">{{ filteredTemplates().length }} plantillas disponibles</span>
+        <span class="text-slate-600 font-mono font-bold">{{ filteredTemplates().length }} plantillas encontradas</span>
       </div>
 
     </div>

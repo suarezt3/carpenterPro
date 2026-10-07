@@ -149,7 +149,17 @@
       <span class="material-icons text-lg">visibility</span>
     </button>
 
-    <!-- 12. DESPIECE EXPLOSIONADO FLYOUT -->
+    <!-- 12. ABRIR / CERRAR PUERTAS Y CAJONES (MOVIMIENTO 3D) -->
+    <button 
+      type="button"
+      (click)="toggleAllDoorsAndDrawers()"
+      [class]="isAllOpen() ? 'text-amber-600 bg-amber-50 ring-1 ring-amber-300 shadow-xs' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      [title]="isAllOpen() ? 'Cerrar todas las puertas y cajones' : 'Abrir puertas y cajones en 3D (Inspeccionar interior)'">
+      <span class="material-icons text-lg">{{ isAllOpen() ? 'meeting_room' : 'door_sliding' }}</span>
+    </button>
+
+    <!-- 13. DESPIECE EXPLOSIONADO FLYOUT -->
     <div class="relative">
       <button 
         type="button"

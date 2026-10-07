@@ -1,119 +1,125 @@
-# Catálogo de 20 Plantillas Profesionales de Muebles y Reorganización del Buscador de Documentación
+# Plan de Implementación: Catálogo 2 Columnas con Miniaturas 3D, Apertura Interactiva de Puertas/Cajones, Nuevas Melaminas y Corrección de Atajos
 
-Plan de implementación integral para eliminar la cinta horizontal redundante en el modal de documentación, situar el buscador interactivo directamente sobre la columna lateral izquierda con scroll vertical, e incorporar una biblioteca profesional de 20 plantillas completas de muebles organizadas en 5 categorías (Cocina, Baño, Closets, Sala TV, Oficina) con opciones para reemplazar el diseño actual o añadir junto a él en el espacio 3D.
+Revisión integral de las plantillas de muebles con plantillas dedicadas para cajones, rediseño del catálogo en cuadrícula de 2 columnas con previsualizaciones isométricas 3D coloreadas, botón de Lienzo en Blanco en la cinta superior, reparación del atajo de teclado para suprimir piezas [Supr / Delete / Backspace], catálogo ampliado de melaminas y animación 3D de apertura de puertas y cajones.
 
----
-
-### User Review & Critical Decisions
+## Decisiones Críticas y Preferencias del Usuario
 
 > [!IMPORTANT]
-> A continuación se resumen las decisiones confirmadas basadas en tus respuestas:
-> - **Reorganización del Modal de Ayuda**: Se elimina la cinta horizontal superior de categorías/buscador para evitar duplicidades. La barra de búsqueda se coloca en la parte superior del panel lateral izquierdo, permitiendo escribir y buscar en tiempo real en títulos, atajos y pasos detallados con scroll vertical de todas las guías.
-> - **Catálogo de 20 Plantillas Reales**: Creación de 20 modelos prediseñados de piezas reales y funcionales divididas en: **Cocina (5)**, **Baño (3)**, **Closets y Dormitorio (5)**, **Sala TV (4)** y **Oficina (3)**.
-> - **Acción de Carga**: Modal interactivo de selección con vista previa donde el usuario puede elegir entre **Reemplazar el diseño actual** o **Añadir junto al diseño actual** en el visor 3D.
+> Decisiones confirmadas a través del diálogo interactivo:
+> - **Apertura de Puertas y Cajones**: Se implementa doble modalidad: clic directo sobre cualquier puerta o cajón en el visor 3D para abrir/cerrar individualmente, más un botón global en la barra de herramientas 3D para abrir/cerrar todas las puertas y cajoneras simultáneamente.
+> - **Estilo de Previsualización en el Catálogo**: Miniatura isométrica 3D coloreada con materiales reales (maderas, mármol y frentes lacados) generada paramétricamente para cada plantilla, permitiendo ver el mueble antes de cargarlo.
+> - **Gama de Nuevos Diseños de Melamina**: Prioridad en maderas nobles cálidas (Roble Miel, Nogal Terracota, Teca, Fresno Nórdico), piedras naturales (Mármol Calacatta Blanco, Granito Negro) y tonos mate modernos (Negro Grafito antihuella, Verde Salvia, Terracota / Barro).
 
 ---
 
-### 1. Overview & Core Concept
+## 1. Visión General y Alcance del Producto
 
-- **Qué hace**:
-  1. **Buscador y Navegación Lateral de Ayuda**: Rediseño del modal de documentación con una barra de búsqueda dedicada y enfocable directamente sobre la lista vertical lateral izquierda, con scroll suave y filtrado instantáneo que busca en nombres de herramientas, pasos operativos y atajos.
-  2. **Biblioteca de 20 Plantillas de Muebles**: Sustituye las 2 plantillas genéricas por una colección completa de 20 muebles estándar de carpintería y fabricación en melamina con dimensiones reales, cálculo de fajas, zócalos, fondos, repisas y puertas.
-  3. **Selector Modal de Plantillas**: Nueva interfaz visual con filtros por categoría (Cocina, Baño, Closet, Sala TV, Oficina), fichas de dimensiones ($L \times H \times P$), conteo de piezas y botones para cargar limpio o insertar contiguo.
-
-- **Público Objetivo**: Carpinteros, diseñadores de interiores y fabricantes que necesitan partir de muebles base reales para acelerar su diseño y consultar guías rápidas sin fricciones en la interfaz.
-
----
-
-### 2. User Experience & Visual Design
-
-#### 2.1. Modal de Documentación Rediseñado
-- **Sin cinta superior redundante**: Se elimina la barra horizontal que duplicaba las pestañas.
-- **Buscador en cabecera lateral**: Campo de texto amplio con icono, placeholder claro, foco automático y botón de limpieza inmediata.
-- **Lista lateral vertical scrollable**: Todas las guías apiladas con sus iconos temáticos, badges de color y títulos en alto contraste.
-- **Panel de lectura principal**: Al seleccionar cualquier guía o buscar, el panel derecho muestra la ficha técnica, pasos explicados y consejos de taller.
-
-#### 2.2. Catálogo de 20 Plantillas de Muebles
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    CATÁLOGO DE PLANTILLAS PROFESIONALES                    │
-│   [ Todos (20) ]  [ Cocina (5) ]  [ Baño (3) ]  [ Closets (5) ]  ...       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌───────────────────────┐  ┌───────────────────────┐  ┌─────────────────┐  │
-│  │ Bajo Mesada 2P + Caj  │  │ Alacena Aérea 2P      │  │ Torre Calientes │  │
-│  │ 1200 x 850 x 600 mm   │  │ 800 x 700 x 320 mm    │  │ 600x2100x600 mm │  │
-│  │ [8 piezas] [Cocina]   │  │ [6 piezas] [Cocina]   │  │ [10 pzs] [Cocina]  │
-│  │ [Reemplazar] [+Añadir]│  │ [Reemplazar] [+Añadir]│  │ [Reemplazar]... │  │
-│  └───────────────────────┘  └───────────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-#### Lista Detallada de las 20 Plantillas:
-1. **Cocina**:
-   - `cocina_bajo_mesada_120`: Bajo Mesada 2 Puertas + 3 Cajones ($1200 \times 850 \times 600\text{ mm}$).
-   - `cocina_alacena_80`: Alacena Aérea 2 Puertas con Repisa Interna ($800 \times 700 \times 320\text{ mm}$).
-   - `cocina_torre_horno`: Torre Despensero para Microondas y Horno ($600 \times 2100 \times 600\text{ mm}$).
-   - `cocina_esquinero_l`: Mueble Esquinero en L para Cocina ($900 \times 850 \times 900\text{ mm}$).
-   - `cocina_isla_desayunador`: Isla Central con Barra Desayunadora y Estantes ($1500 \times 900 \times 800\text{ mm}$).
-2. **Baño**:
-   - `bano_vanitory_cajon`: Vanitory Flotante con Cajón y Hueco Inferior ($700 \times 550 \times 450\text{ mm}$).
-   - `bano_gabinete_espejo`: Gabinete Aéreo con Puertas de Espejo ($600 \times 650 \times 160\text{ mm}$).
-   - `bano_columna_auxiliar`: Columna Torre de Baño Estrecha ($350 \times 1600 \times 300\text{ mm}$).
-3. **Closets y Dormitorio**:
-   - `closet_ropero_2cuerpos`: Closet 2 Cuerpos con Maletero, Perchero y Zapatero ($1600 \times 2200 \times 550\text{ mm}$).
-   - `dormitorio_comoda_4cajones`: Cómoda / Chifonier de 4 Cajones ($800 \times 950 \times 450\text{ mm}$).
-   - `dormitorio_mesa_noche`: Mesa de Noche / Buró 2 Cajones ($450 \times 550 \times 400\text{ mm}$).
-   - `dormitorio_zapatero_inclinado`: Mueble Zapatero Vertical ($700 \times 1200 \times 350\text{ mm}$).
-   - `dormitorio_cabecero_repisas`: Cabecero de Cama con Nichos y Repisas ($1600 \times 1000 \times 200\text{ mm}$).
-4. **Sala y TV**:
-   - `sala_rack_tv_panel`: Rack Flotante para TV de 65" con Panel Alistonado ($1800 \times 1400 \times 350\text{ mm}$).
-   - `sala_mesa_centro`: Mesa de Centro Rectangular con Revistero ($900 \times 420 \times 550\text{ mm}$).
-   - `sala_biblioteca_5niveles`: Biblioteca Modular de 5 Niveles ($800 \times 1800 \times 300\text{ mm}$).
-   - `sala_aparador_buffet`: Aparador Buffet 3 Puertas ($1400 \times 800 \times 400\text{ mm}$).
-5. **Oficina y Estudio**:
-   - `oficina_escritorio_l`: Escritorio Gerencial en L con Cajonera ($1400 \times 750 \times 1200\text{ mm}$).
-   - `oficina_home_office`: Escritorio Home Office con Repisa Aérea ($1000 \times 750 \times 500\text{ mm}$).
-   - `oficina_archivador_movil`: Cajonera Rodante de 3 Cajones ($450 \times 650 \times 500\text{ mm}$).
+### ¿Qué soluciona esta actualización?
+1. **Auditoría y Corrección Matemática de Plantillas**: Resolver inconsistencias geométricas, conteos de piezas dispares y asignaciones de materiales en todas las plantillas existentes, garantizando que cada mueble cargue con coordenadas exactas en 3D.
+2. **Plantillas Especializadas de Cajones**: Crear una categoría dedicada de módulos cajoneros y gaveteros (cajoneras de 3 y 4 cajones con correderas telescópicas, cajón individual armado con laterales/fondo/contrafrente, y gaveteros olleros de cocina).
+3. **Catálogo Rediseñado en Cuadrícula de 2 Columnas**: Sustituir el grid estrecho por un diseño amplio y espacioso de 2 columnas con tarjetas de alta legibilidad, información técnica destacada y **miniatura isométrica 3D coloreada** de cada mueble.
+4. **Acceso Directo a "Lienzo en Blanco" en la Cinta Superior**: Ubicar el botón "Lienzo en Blanco" junto al botón de "Plantillas" en la barra superior del modelador, con confirmación de seguridad para evitar pérdidas accidentales.
+5. **Corrección de Atajos de Teclado [Supr / Delete / Backspace]**: Conectar formalmente las teclas `Delete` y `Backspace` en el despachador de eventos del visor 3D para eliminar piezas seleccionadas instantáneamente con soporte de Deshacer (`Ctrl+Z`).
+6. **Catálogo Enriquecido de Melaminas y Texturas**: Añadir 10+ nuevos acabados de alta gama (Roble Miel, Nogal Terracota, Fresno Nórdico, Teca, Mármol Calacatta, Granito Oscuro, Negro Grafito, Verde Salvia, Terracota) con renderizado procedural en Three.js.
+7. **Animación y Movimiento 3D de Puertas y Cajones**: Permitir abrir y cerrar puertas (rotación de 90° sobre bisagras) y cajones (desplazamiento frontal de 300 mm en eje Z) mediante clic interactivo en la pieza o mediante botón global "Abrir / Cerrar Todo".
 
 ---
 
-### 3. Key Product Decisions & Trade-Offs
+## 2. Experiencia de Usuario y Diseño Visual
 
-- **Decisión 1: Eliminar la cinta superior y anclar el buscador en el panel lateral izquierdo**
-  - *Enfoque*: Quitar el carrusel superior horizontal de botones que ocupaba espacio vertical y comprimía el campo de búsqueda. Colocar el input de búsqueda en la cabecera de la columna izquierda con ancho del 100%.
-  - *Por qué*: Resuelve directamente el problema reportado por el usuario donde el botón de búsqueda no se podía escribir bien y simplifica la navegación en una sola lista vertical scrollable.
+### A. Catálogo de Plantillas Rediseñado (2 Columnas con Miniaturas Isométricas)
+- **Distribución Espaciosa**: Grid de 2 columnas (`grid grid-cols-1 md:grid-cols-2 gap-5`) en modal ancho `max-w-6xl`.
+- **Previsualización Isométrica SVG/Canvas**: Cada tarjeta cuenta con un contenedor superior de previsualización 3D isométrica a escala, con sombreado de caras, color real del material asignado (vetas de madera, blanco o piedra), divisiones visibles de puertas y cajones, y cotas visuales en milímetros.
+- **Acciones Duales en Cada Tarjeta**: Botones claros y de alto contraste:
+  - **"Reemplazar"** (Botón ámbar/esmeralda con icono `sync`): sustituye el modelo actual y centra la plantilla.
+  - **"Añadir al lado"** (Botón oscuro con icono `add_box`): calcula el borde derecho (`maxX + 200 mm`) y sitúa el nuevo mueble sin alterar lo existente.
+- **Categorías Refinadas**: Pestañas accesibles: `Todas`, `Cocina`, `Cajoneras y Cajones`, `Baño`, `Closets y Dormitorio`, `Sala TV`, `Oficina`.
 
-- **Decisión 2: Servicio Centralizado de Plantillas (`templates-catalog.service.ts`)**
-  - *Enfoque*: Crear un servicio dedicado que genera las piezas exactas con materiales, vetas, cantos y posiciones en 3D para las 20 plantillas.
-  - *Por qué*: Mantiene el código desacoplado, modular y permite reutilizar las plantillas tanto desde el botón de la barra superior como desde el modal interactivo de modulación.
+### B. Cinta Superior del Modelador
+- La barra superior del modelador 3D aloja:
+  1. Contador de piezas y área total en m².
+  2. Botón destacado **"Plantillas de Muebles"** (abre el catálogo en 2 columnas).
+  3. Botón directo **"Lienzo en Blanco"** (`delete_sweep`, estilo sutil rojo/gris con confirmación modal).
+  4. Conmutador de bandeja lateral 3D al 100% de pantalla.
 
-- **Decisión 3: Modo "Reemplazar" o "Añadir al lado (+X)"**
-  - *Enfoque*: Cuando el usuario selecciona "Añadir", el sistema calcula el desplazamiento en X (offset de $+100\text{ mm}$ después de la pieza más a la derecha del mueble actual) y genera nuevos IDs únicos para que ambos módulos coexistan en el mismo visor 3D.
-  - *Por qué*: Permite armar cocinas o habitaciones completas combinando varios módulos prediseñados (ej. Bajo mesada + Alacena + Torre).
+### C. Movimiento 3D de Puertas y Cajones
+- **Indicador Visual en Cursor**: Al pasar el cursor sobre una puerta o frente de cajón en modo inspección, el cursor cambia a puntero de interacción y muestra una etiqueta flotante: `"Clic para abrir"` o `"Clic para cerrar"`.
+- **Animación Fluida**:
+  - Puertas: pivotan 90° hacia afuera alrededor de su arista izquierda o derecha (o basculan hacia arriba si es alacena).
+  - Cajones: se deslizan suavemente hacia adelante en el eje Z (desplazamiento de 280-320 mm).
+- **Botón Global en la Barra 3D**: Botón con icono `meeting_room` / `door_sliding`: *"Abrir / Cerrar Mueble"* que abre o cierra todas las aberturas para inspeccionar estanterías y espacios interiores.
+
+### D. Eliminación Ágil con Atajos [Supr / Delete / Backspace]
+- Al tener una o varias piezas seleccionadas, presionar `Supr`, `Delete` o `Backspace` elimina la selección de inmediato, registrando el cambio en el historial de Deshacer (`Ctrl+Z`).
+- Notificación toast breve o feedback auditivo sutil confirmando la eliminación de la pieza.
 
 ---
 
-### 4. Technical Architecture & Data Strategy
+## 3. Decisiones Técnicas y Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          MODULE DESIGNER / HEADER                           │
-│   [ Plantillas de Mueble (20) ] ──────► Abre TemplatesCatalogModalComponent │
-└──────────────────────┬──────────────────────────────────┬───────────────────┘
-                       │                                  │
-                       ▼                                  ▼
-        ┌─────────────────────────────┐    ┌──────────────────────────────────┐
-        │  TemplatesCatalogService    │    │  DocumentationModalComponent     │
-        │  - 20 presets paramétricos  │    │  - Buscador integrado lateral izq│
-        │  - Cocina, Baño, Closets,   │    │  - Scroll vertical unificado     │
-        │    Sala TV, Oficina         │    │  - Búsqueda en pasos y atajos    │
-        │  - Offset 3D para "+Añadir" │    └──────────────────────────────────┘
-        └─────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        MODULE DESIGNER (3D CAD)                        │
+├────────────────────────────────────────────────────────────────────────┤
+│  Top Ribbon: [Plantillas (24)]  [Lienzo en Blanco]  [Bandeja Lateral]  │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│   ┌──────────────────────────────────┐  ┌───────────────────────────┐  │
+│   │   THREE.JS 3D VIEWPORT           │  │  PROPERTIES & DOCK PANEL  │  │
+│   │   - Renderizado con Melaminas    │  │  - Materiales y Texturas  │  │
+│   │     (Roble, Nogal, Mármol, Mate) │  │  - Tapacantos PVC         │  │
+│   │   - Apertura interactiva 3D:     │  │  - Lista de Piezas        │  │
+│   │     * Puertas: rotación 90°      │  │  - Taladros CNC           │  │
+│   │     * Cajones: slide +Z 300mm    │  └───────────────────────────┘  │
+│   │   - Atajo Delete/Supr activado   │                                 │
+│   │   - Botón global Abrir/Cerrar    │                                 │
+│   └──────────────────────────────────┘                                 │
+│                                                                        │
+├────────────────────────────────────────────────────────────────────────┤
+│   TEMPLATES MODAL (Grid 2 Columnas)                                    │
+│   - Tarjetas grandes con Miniatura Isométrica 3D Coloreada             │
+│   - Categorías: Cocina, Cajoneras, Baño, Closets, Sala TV, Oficina     │
+│   - Botones rápidos: [Reemplazar] y [Añadir al lado]                   │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Archivos Clave a Modificar / Crear:
-1. `src/app/services/templates-catalog.service.ts`: Modelado dimensional de las 20 plantillas completas con roles de pieza y cantos PVC.
-2. `src/app/components/templates-modal/templates-modal.ts` y `.html`: Modal interactivo de catálogo con tarjetas, vistas de dimensiones, filtros de categoría y botones "Cargar" o "Añadir (+)".
-3. `src/app/components/module-designer/module-designer.ts` y `.html`: Conectar el botón de plantillas al nuevo modal de catálogo.
-4. `src/app/components/documentation-modal/documentation-modal.html` y `.ts`: Reorganizar el buscador eliminando la cinta superior y colocándolo sobre la columna izquierda con scroll vertical.
+### Componentes Involucrados:
+1. `src/app/services/templates-catalog.service.ts`:
+   - Corrección matemática de las 20 plantillas existentes (dimensiones, coordenadas, orientaciones y piezas faltantes).
+   - Incorporación de 4 nuevas plantillas dedicadas de cajones (Cajonera 3 cajones, Cajonera 4 cajones chifonier, Cajón individual armado con caja completa, Gavetero ollero de cocina).
+   - Generador de miniaturas isométricas vectoriales coloreadas con los materiales de la plantilla.
+2. `src/app/components/templates-modal/`:
+   - Rediseño en grid de 2 columnas (`md:grid-cols-2`).
+   - Inserción de previsualización isométrica en la cabecera de cada tarjeta.
+   - Pestaña y filtro específico para la categoría `cajones`.
+3. `src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts`:
+   - Implementación del manejo de teclas `Delete` y `Backspace` en `handleViewerKeyDown`.
+   - Sistema de cinemática de apertura 3D:
+     - `openedPiecesState: Map<string, number>` (0 = cerrado, 1 = abierto).
+     - Detección de clics en puertas y frentes de cajón para alternar apertura con interpolación suave.
+     - Botón en toolbar 3D: `toggleOpenAllDoorsAndDrawers()`.
+     - Matriz de transformación para rotar puertas sobre sus bisagras y deslizar cajones hacia el frente.
+4. `src/app/services/project-storage.service.ts`:
+   - Ampliación del catálogo de materiales por defecto con maderas nobles (Roble Miel, Nogal Terracota, Teca, Fresno), piedras (Mármol Calacatta, Granito) y tonos mate (Negro Grafito, Verde Salvia, Terracota).
+5. `src/app/components/module-designer/module-designer.html`:
+   - Inclusión del botón directo "Lienzo en Blanco" en la cinta superior al lado de "Plantillas de Muebles".
+
+---
+
+## 4. Plan de Verificación
+
+1. **Prueba de Carga de Plantillas**:
+   - Cargar secuencialmente cada una de las plantillas (Cocina, Cajoneras, Baño, Closets, Sala TV, Oficina) verificando que todas las piezas aparezcan ensambladas sin desfasajes ni piezas flotantes.
+   - Probar tanto el modo "Reemplazar" como el modo "Añadir al lado" para ensamblar múltiples muebles contiguos.
+2. **Prueba de Miniaturas en Catálogo**:
+   - Abrir el modal de plantillas y comprobar la disposición en 2 columnas y el renderizado nítido de la miniatura isométrica en cada tarjeta.
+3. **Prueba del Atajo Supr / Delete / Backspace**:
+   - Seleccionar una pieza en el 3D y pulsar la tecla `Supr` o `Backspace`; verificar que la pieza se elimina y que `Ctrl+Z` la restaura.
+4. **Prueba de Apertura de Puertas y Cajones**:
+   - Hacer clic en una puerta para verificar su giro a 90° sobre las bisagras.
+   - Hacer clic en un cajón para verificar su extracción frontal.
+   - Activar el botón global "Abrir / Cerrar Todo" para verificar la apertura sincronizada de todo el mueble.
+5. **Prueba de Nuevos Materiales**:
+   - Aplicar los nuevos materiales (Roble Miel, Nogal, Mármol Calacatta, Negro Grafito) a las piezas y verificar su reflejo en el 3D, el desglose de piezas y el optimizador de corte.
+6. **Compilación y Linteo**:
+   - Ejecutar `compile_applet` y `lint_applet` para garantizar cero errores de TypeScript y AOT.

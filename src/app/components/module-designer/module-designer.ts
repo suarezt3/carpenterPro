@@ -26,7 +26,10 @@ import { FurnitureTemplate } from '../../services/templates-catalog.service';
   selector: 'app-module-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, Furniture3dViewerComponent, TechnicalSheetModalComponent, TemplatesModalComponent],
-  templateUrl: './module-designer.html'
+  templateUrl: './module-designer.html',
+  host: {
+    '(window:keydown)': 'handleGlobalKeyDown($event)'
+  }
 })
 export class ModuleDesignerComponent {
   private projectService = inject(ProjectStorageService);
@@ -47,6 +50,83 @@ export class ModuleDesignerComponent {
 
   // Technical Shop Sheet Modal
   readonly showTechnicalSheetModal = signal<boolean>(false);
+
+  // Toast feedback banner
+  readonly toastMessage = signal<string | null>(null);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  showToast(msg: string) {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastMessage.set(msg);
+    this.toastTimer = setTimeout(() => {
+      this.toastMessage.set(null);
+    }, 2800);
+  }
+
+  handleGlobalKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+
+    // Ctrl+Z / Cmd+Z: Deshacer
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      if (this.projectService.canUndo()) {
+        this.projectService.undo();
+        this.showToast('↺ Acción deshecha (Ctrl+Z)');
+      }
+      return;
+    }
+
+    // Ctrl+Y / Cmd+Y o Ctrl+Shift+Z: Rehacer
+    if (((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z'))) {
+      e.preventDefault();
+      if (this.projectService.canRedo()) {
+        this.projectService.redo();
+        this.showToast('↻ Acción rehecha (Ctrl+Y)');
+      }
+      return;
+    }
+
+    // Supr / Delete / Backspace: Eliminar pieza seleccionada inmediatamente con feedback
+    if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Del') {
+      const selIds = this.selectedPartIds();
+      const selId = this.selectedPartId();
+
+      if (selIds.length > 1) {
+        e.preventDefault();
+        const count = selIds.length;
+        for (const id of selIds) {
+          this.projectService.deletePart(id);
+        }
+        this.selectedPartIds.set([]);
+        this.selectedPartId.set(null);
+        this.activeDockTab.set('catalog');
+        this.showToast(`🗑️ ${count} piezas eliminadas (Ctrl+Z para restaurar)`);
+        return;
+      }
+
+      if (selId) {
+        e.preventDefault();
+        const part = this.currentParts().find(p => p.id === selId);
+        const partName = part ? part.name : 'Pieza';
+        this.projectService.deletePart(selId);
+        const remaining = this.currentParts().filter(p => p.id !== selId);
+        if (remaining.length > 0) {
+          this.selectedPartId.set(remaining[0].id);
+          this.selectedPartIds.set([remaining[0].id]);
+        } else {
+          this.selectedPartId.set(null);
+          this.selectedPartIds.set([]);
+          this.activeDockTab.set('catalog');
+        }
+        this.showToast(`🗑️ "${partName}" eliminada (Ctrl+Z para restaurar)`);
+        return;
+      }
+    }
+  }
 
   // Active dock tab: 'piece' (properties of selected part) or 'catalog' (add pieces & tree)
   readonly activeDockTab = signal<'piece' | 'catalog'>('catalog');

@@ -4,13 +4,14 @@ import { Part, Material } from '../models/melamine.models';
 export interface FurnitureTemplate {
   id: string;
   name: string;
-  category: 'cocina' | 'bano' | 'closets' | 'sala_tv' | 'oficina';
+  category: 'cocina' | 'cajones' | 'bano' | 'closets' | 'sala_tv' | 'oficina';
   categoryLabel: string;
   dimensions: { width: number; height: number; depth: number };
   description: string;
   icon: string;
   badge: string;
   partsCount: number;
+  previewColor?: { top: string; body: string; front: string; accent?: string };
   generateParts: (materials: Material[], offsetX?: number) => Part[];
 }
 
@@ -487,7 +488,337 @@ export class TemplatesCatalogService {
       }
     },
 
-    // --- 2. BAÑO ---
+    // --- 2. CAJONES Y CAJONERAS ---
+    {
+      id: 'cajonera_modulo_3cajones',
+      name: 'Cajonera Estándar 3 Cajones',
+      category: 'cajones',
+      categoryLabel: 'Cajoneras y Cajones',
+      dimensions: { width: 500, height: 720, depth: 500 },
+      description: 'Módulo cajonero de piso con zócalo, cubierta y 3 frentes de cajón con correderas telescópicas para dormitorio u oficina.',
+      icon: 'table_rows',
+      badge: '3 Cajones',
+      partsCount: 9,
+      generateParts: (mats, offsetX = 0) => {
+        const mat = this.getMaterial(mats, 'blanco');
+        const matTop = this.getMaterial(mats, 'roble');
+        const t = mat.thickness || 18;
+        return [
+          {
+            id: 'caj3_tapa_' + crypto.randomUUID().slice(0, 6),
+            name: 'TAPA SUPERIOR',
+            length: 500, width: 500, thickness: t, quantity: 1,
+            materialId: matTop.id, materialName: matTop.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 711, posZ: 0, orientation: 'horizontal', componentRole: 'top'
+          },
+          {
+            id: 'caj3_lat_izq_' + crypto.randomUUID().slice(0, 6),
+            name: 'LATERAL IZQUIERDO',
+            length: 684, width: 480, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX - 241, posY: 351, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_left'
+          },
+          {
+            id: 'caj3_lat_der_' + crypto.randomUUID().slice(0, 6),
+            name: 'LATERAL DERECHO',
+            length: 684, width: 480, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX + 241, posY: 351, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_right'
+          },
+          {
+            id: 'caj3_piso_' + crypto.randomUUID().slice(0, 6),
+            name: 'PISO INFERIOR',
+            length: 464, width: 480, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 79, posZ: 0, orientation: 'horizontal', componentRole: 'bottom'
+          },
+          {
+            id: 'caj3_zocalo_' + crypto.randomUUID().slice(0, 6),
+            name: 'ZÓCALO FRONTAL',
+            length: 464, width: 70, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 35, posZ: 200, orientation: 'vertical_xy', componentRole: 'plinth'
+          },
+          {
+            id: 'caj3_amarre_' + crypto.randomUUID().slice(0, 6),
+            name: 'FAJA AMARRE SUPERIOR',
+            length: 464, width: 80, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 693, posZ: -180, orientation: 'horizontal', componentRole: 'tie'
+          },
+          {
+            id: 'caj3_caj_1_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 1 (SUPERIOR)',
+            length: 460, width: 198, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 590, posZ: 241, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          },
+          {
+            id: 'caj3_caj_2_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 2 (MEDIO)',
+            length: 460, width: 198, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 390, posZ: 241, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          },
+          {
+            id: 'caj3_caj_3_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 3 (INFERIOR)',
+            length: 460, width: 198, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 190, posZ: 241, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          }
+        ];
+      }
+    },
+    {
+      id: 'cajonera_chifonier_4cajones',
+      name: 'Chifonier / Cajonera 4 Cajones Alta',
+      category: 'cajones',
+      categoryLabel: 'Cajoneras y Cajones',
+      dimensions: { width: 800, height: 950, depth: 450 },
+      description: 'Mueble vertical de 4 amplios cajones con gran capacidad para ropa, toallas y lencería con tapa engrosada.',
+      icon: 'layers',
+      badge: '4 Cajones',
+      partsCount: 10,
+      generateParts: (mats, offsetX = 0) => {
+        const mat = this.getMaterial(mats, 'blanco');
+        const matTop = this.getMaterial(mats, 'roble');
+        const t = mat.thickness || 18;
+        return [
+          {
+            id: 'chif_tapa_' + crypto.randomUUID().slice(0, 6),
+            name: 'TAPA SUPERIOR ENGROSADA',
+            length: 800, width: 450, thickness: t, quantity: 1,
+            materialId: matTop.id, materialName: matTop.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 941, posZ: 0, orientation: 'horizontal', componentRole: 'top'
+          },
+          {
+            id: 'chif_lat_izq_' + crypto.randomUUID().slice(0, 6),
+            name: 'LATERAL IZQUIERDO',
+            length: 914, width: 430, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX - 391, posY: 466, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_left'
+          },
+          {
+            id: 'chif_lat_der_' + crypto.randomUUID().slice(0, 6),
+            name: 'LATERAL DERECHO',
+            length: 914, width: 430, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX + 391, posY: 466, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_right'
+          },
+          {
+            id: 'chif_piso_' + crypto.randomUUID().slice(0, 6),
+            name: 'PISO INFERIOR',
+            length: 764, width: 430, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 79, posZ: 0, orientation: 'horizontal', componentRole: 'bottom'
+          },
+          {
+            id: 'chif_zocalo_' + crypto.randomUUID().slice(0, 6),
+            name: 'ZÓCALO',
+            length: 764, width: 70, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 35, posZ: 175, orientation: 'vertical_xy', componentRole: 'plinth'
+          },
+          {
+            id: 'chif_amarre_' + crypto.randomUUID().slice(0, 6),
+            name: 'FAJA AMARRE SUPERIOR',
+            length: 764, width: 90, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 923, posZ: -150, orientation: 'horizontal', componentRole: 'tie'
+          },
+          {
+            id: 'chif_caj_1_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 1 (SUPERIOR)',
+            length: 760, width: 200, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 805, posZ: 216, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          },
+          {
+            id: 'chif_caj_2_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 2',
+            length: 760, width: 200, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 595, posZ: 216, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          },
+          {
+            id: 'chif_caj_3_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 3',
+            length: 760, width: 200, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 385, posZ: 216, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          },
+          {
+            id: 'chif_caj_4_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 4 (INFERIOR)',
+            length: 760, width: 200, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 175, posZ: 216, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          }
+        ];
+      }
+    },
+    {
+      id: 'cajon_individual_armado',
+      name: 'Cajón Individual Completo Armado',
+      category: 'cajones',
+      categoryLabel: 'Cajoneras y Cajones',
+      dimensions: { width: 500, height: 180, depth: 450 },
+      description: 'Estructura técnica completa de cajón: Frente exterior de melamina 18mm, 2 costados, contrafrente y fondo ranurado con holguras reales para correderas telescópicas.',
+      icon: 'inbox',
+      badge: 'Despiece Cajón',
+      partsCount: 5,
+      generateParts: (mats, offsetX = 0) => {
+        const mat = this.getMaterial(mats, 'blanco');
+        const matFront = this.getMaterial(mats, 'roble') || mat;
+        const t = mat.thickness || 18;
+        return [
+          {
+            id: 'caj_ind_frente_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE EXTERIOR DE CAJÓN',
+            length: 500, width: 180, thickness: t, quantity: 1,
+            materialId: matFront.id, materialName: matFront.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 90, posZ: 216, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          },
+          {
+            id: 'caj_ind_lat_izq_' + crypto.randomUUID().slice(0, 6),
+            name: 'LATERAL / COSTADO IZQUIERDO CAJÓN',
+            length: 140, width: 430, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX - 215, posY: 75, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_left'
+          },
+          {
+            id: 'caj_ind_lat_der_' + crypto.randomUUID().slice(0, 6),
+            name: 'LATERAL / COSTADO DERECHO CAJÓN',
+            length: 140, width: 430, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX + 215, posY: 75, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_right'
+          },
+          {
+            id: 'caj_ind_contra_' + crypto.randomUUID().slice(0, 6),
+            name: 'CONTRAFRENTE TRASERO CAJÓN',
+            length: 412, width: 140, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 75, posZ: -206, orientation: 'vertical_xy', componentRole: 'back'
+          },
+          {
+            id: 'caj_ind_fondo_' + crypto.randomUUID().slice(0, 6),
+            name: 'FONDO DE CAJÓN (MDF 6mm)',
+            length: 422, width: 420, thickness: 6, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'none',
+            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 15, posZ: 0, orientation: 'horizontal', componentRole: 'bottom'
+          }
+        ];
+      }
+    },
+    {
+      id: 'cocina_gavetero_ollero',
+      name: 'Gavetero Ollero 2 Gavetas para Cocina',
+      category: 'cajones',
+      categoryLabel: 'Cajoneras y Cajones',
+      dimensions: { width: 900, height: 850, depth: 600 },
+      description: 'Módulo bajo de cocina reforzado con 2 grandes gavetas caceroleras de alta profundidad para ollas y electrodomésticos.',
+      icon: 'kitchen',
+      badge: 'Cacerolero Cocina',
+      partsCount: 8,
+      generateParts: (mats, offsetX = 0) => {
+        const mat = this.getMaterial(mats, 'blanco');
+        const matTop = this.getMaterial(mats, 'roble');
+        const t = mat.thickness || 18;
+        return [
+          {
+            id: 'oll_cubierta_' + crypto.randomUUID().slice(0, 6),
+            name: 'ENCIMERA / CUBIERTA',
+            length: 900, width: 600, thickness: t, quantity: 1,
+            materialId: matTop.id, materialName: matTop.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 841, posZ: 0, orientation: 'horizontal', componentRole: 'top'
+          },
+          {
+            id: 'oll_lat_izq_' + crypto.randomUUID().slice(0, 6),
+            name: 'LATERAL IZQUIERDO',
+            length: 814, width: 580, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX - 441, posY: 416, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_left'
+          },
+          {
+            id: 'oll_lat_der_' + crypto.randomUUID().slice(0, 6),
+            name: 'LATERAL DERECHO',
+            length: 814, width: 580, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX + 441, posY: 416, posZ: 0, orientation: 'vertical_yz', componentRole: 'side_right'
+          },
+          {
+            id: 'oll_piso_' + crypto.randomUUID().slice(0, 6),
+            name: 'PISO INFERIOR',
+            length: 864, width: 580, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 89, posZ: 0, orientation: 'horizontal', componentRole: 'bottom'
+          },
+          {
+            id: 'oll_zocalo_' + crypto.randomUUID().slice(0, 6),
+            name: 'ZÓCALO',
+            length: 864, width: 80, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 40, posZ: 250, orientation: 'vertical_xy', componentRole: 'plinth'
+          },
+          {
+            id: 'oll_amarre_del_' + crypto.randomUUID().slice(0, 6),
+            name: 'FAJA AMARRE DELANTERA',
+            length: 864, width: 100, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 823, posZ: 220, orientation: 'horizontal', componentRole: 'tie'
+          },
+          {
+            id: 'oll_gaveta_1_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE GAVETA 1 CACEROLERA (SUPERIOR)',
+            length: 860, width: 355, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 625, posZ: 291, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          },
+          {
+            id: 'oll_gaveta_2_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE GAVETA 2 OLLERA (INFERIOR)',
+            length: 860, width: 355, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX, posY: 265, posZ: 291, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          }
+        ];
+      }
+    },
+
+    // --- 3. BAÑO ---
     {
       id: 'bano_vanitory_flotante',
       name: 'Vanitory Flotante con Cajón y Repisa Inferior',
@@ -1491,7 +1822,7 @@ export class TemplatesCatalogService {
       category: 'oficina',
       categoryLabel: 'Oficina / Estudio',
       dimensions: { width: 1400, height: 750, depth: 1200 },
-      description: 'Puesto de trabajo ejecutivo en L con ala lateral de soporte y cajonera integrada.',
+      description: 'Puesto de trabajo ejecutivo en L con ala lateral de soporte y cajonera integrada de 3 cajones.',
       icon: 'desk',
       badge: 'Escritorio L',
       partsCount: 10,
@@ -1534,11 +1865,51 @@ export class TemplatesCatalogService {
           },
           {
             id: 'of_caj_lat_izq_' + crypto.randomUUID().slice(0, 6),
-            name: 'COSTADO CAJONERA RETORNO',
+            name: 'COSTADO INTERIOR CAJONERA RETORNO',
+            length: 732, width: 500, thickness: t, quantity: 1,
+            materialId: matBase.id, materialName: matBase.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX + 250, posY: 366, posZ: -550, orientation: 'vertical_yz', componentRole: 'divider'
+          },
+          {
+            id: 'of_caj_lat_der_' + crypto.randomUUID().slice(0, 6),
+            name: 'COSTADO EXTERIOR CAJONERA RETORNO',
             length: 732, width: 500, thickness: t, quantity: 1,
             materialId: matBase.id, materialName: matBase.name, grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX + 691, posY: 366, posZ: -550, orientation: 'vertical_yz', componentRole: 'side_right'
+          },
+          {
+            id: 'of_caj_piso_' + crypto.randomUUID().slice(0, 6),
+            name: 'PISO CAJONERA RETORNO',
+            length: 405, width: 500, thickness: t, quantity: 1,
+            materialId: matBase.id, materialName: matBase.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX + 470, posY: 80, posZ: -550, orientation: 'horizontal', componentRole: 'bottom'
+          },
+          {
+            id: 'of_caj_1_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 1 RETORNO',
+            length: 401, width: 195, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX + 470, posY: 610, posZ: -301, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          },
+          {
+            id: 'of_caj_2_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 2 RETORNO',
+            length: 401, width: 195, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX + 470, posY: 405, posZ: -301, orientation: 'vertical_xy', componentRole: 'drawer_front'
+          },
+          {
+            id: 'of_caj_3_' + crypto.randomUUID().slice(0, 6),
+            name: 'FRENTE CAJÓN 3 ARCHIVADOR RETORNO',
+            length: 401, width: 195, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX + 470, posY: 200, posZ: -301, orientation: 'vertical_xy', componentRole: 'drawer_front'
           }
         ];
       }
@@ -1596,6 +1967,14 @@ export class TemplatesCatalogService {
             materialId: mat.id, materialName: mat.name, grain: 'length',
             edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
             posX: offsetX, posY: 850, posZ: -120, orientation: 'horizontal', componentRole: 'shelf'
+          },
+          {
+            id: 'ho_repisa_inf_' + crypto.randomUUID().slice(0, 6),
+            name: 'ESTANTE ORGANIZADOR PASACABLES',
+            length: 964, width: 200, thickness: t, quantity: 1,
+            materialId: mat.id, materialName: mat.name, grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX, posY: 300, posZ: -140, orientation: 'horizontal', componentRole: 'shelf'
           }
         ];
       }
@@ -1784,6 +2163,7 @@ export class TemplatesCatalogService {
     return [
       { id: 'all', label: 'Todas las Plantillas', icon: 'auto_stories', count: this.templates.length },
       { id: 'cocina', label: 'Cocina', icon: 'countertops', count: this.templates.filter(t => t.category === 'cocina').length },
+      { id: 'cajones', label: 'Cajoneras y Cajones', icon: 'table_rows', count: this.templates.filter(t => t.category === 'cajones').length },
       { id: 'bano', label: 'Baño', icon: 'wash', count: this.templates.filter(t => t.category === 'bano').length },
       { id: 'closets', label: 'Closets y Dormitorio', icon: 'door_sliding', count: this.templates.filter(t => t.category === 'closets').length },
       { id: 'sala_tv', label: 'Sala TV y Estar', icon: 'tv', count: this.templates.filter(t => t.category === 'sala_tv').length },

@@ -4,9 +4,11 @@ import { ThemeService } from '../../services/theme.service';
 import { TemplatesCatalogService, FurnitureTemplate } from '../../services/templates-catalog.service';
 import { Material } from '../../models/melamine.models';
 
+import { TemplateThumbnailComponent } from '../template-thumbnail/template-thumbnail';
+
 @Component({
   selector: 'app-templates-modal',
-  imports: [CommonModule],
+  imports: [CommonModule, TemplateThumbnailComponent],
   templateUrl: './templates-modal.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

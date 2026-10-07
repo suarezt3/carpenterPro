@@ -22,6 +22,10 @@ interface PieceMeshData {
   mesh: THREE.Mesh;
   originalPos: THREE.Vector3;
   explodedOffset: THREE.Vector3;
+  isDoor?: boolean;
+  isDrawer?: boolean;
+  doorPivot?: THREE.Group;
+  hingeSide?: 'left' | 'right' | 'top';
 }
 
 interface GizmoHitData {
@@ -155,6 +159,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const ids = this.activeSelectedIds();
     return this.parts().filter(p => ids.includes(p.id));
   });
+
+  // Interactive 3D Doors & Drawers Open/Close State
+  readonly isAllOpen = signal<boolean>(false);
+  private openTargetMap = new Map<string, number>();
+  private openCurrentMap = new Map<string, number>();
 
   // Active Selected Part (primary)
   readonly selectedPart = computed(() => {
@@ -544,12 +553,55 @@ export class Furniture3dViewerComponent implements OnDestroy {
         pz * 0.45
       );
 
-      this.furnitureGroup.add(mesh);
+      const isDoor = part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA');
+      const isDrawer = part.componentRole === 'drawer_front' || 
+                       part.name.toUpperCase().includes('CAJON') || 
+                       part.name.toUpperCase().includes('CAJÓN') ||
+                       part.name.toUpperCase().includes('GAVETA') ||
+                       part.id.includes('caj_ind_');
+
+      let doorPivot: THREE.Group | undefined;
+      let hingeSide: 'left' | 'right' | 'top' = 'left';
+
+      if (isDoor) {
+        if (part.name.toUpperCase().includes('BASCULANTE') || part.name.toUpperCase().includes('ELEVABLE')) {
+          hingeSide = 'top';
+          doorPivot = new THREE.Group();
+          doorPivot.position.set(px, py + sy / 2, pz);
+          mesh.position.set(0, -sy / 2, 0);
+        } else if (part.name.toUpperCase().includes('DER') || (part.posX || 0) > 0) {
+          hingeSide = 'right';
+          doorPivot = new THREE.Group();
+          doorPivot.position.set(px + sx / 2, py, pz);
+          mesh.position.set(-sx / 2, 0, 0);
+        } else {
+          hingeSide = 'left';
+          doorPivot = new THREE.Group();
+          doorPivot.position.set(px - sx / 2, py, pz);
+          mesh.position.set(sx / 2, 0, 0);
+        }
+        doorPivot.add(mesh);
+        this.furnitureGroup.add(doorPivot);
+        mesh.userData = { part, isPiece: true, isDoor: true };
+      } else if (isDrawer) {
+        mesh.position.set(px, py, pz);
+        this.furnitureGroup.add(mesh);
+        mesh.userData = { part, isPiece: true, isDrawer: true };
+      } else {
+        mesh.position.set(px, py, pz);
+        this.furnitureGroup.add(mesh);
+        mesh.userData = { part, isPiece: true };
+      }
+
       this.pieceObjects.push({
         part,
         mesh,
-        originalPos: mesh.position.clone(),
-        explodedOffset
+        originalPos: new THREE.Vector3(px, py, pz),
+        explodedOffset,
+        isDoor,
+        isDrawer,
+        doorPivot,
+        hingeSide
       });
     }
 
@@ -1332,11 +1384,65 @@ export class Furniture3dViewerComponent implements OnDestroy {
       });
     }
 
+    const texType = assignedMat?.textureType;
+    let textureMap: THREE.CanvasTexture | null = null;
+    if (typeof document !== 'undefined' && (texType === 'wood' || texType === 'stone')) {
+      textureMap = this.getProceduralTexture(colorHex, texType);
+    }
+
     return new THREE.MeshStandardMaterial({
       color: new THREE.Color(colorHex),
-      roughness: assignedMat?.textureType === 'wood' ? 0.65 : 0.4,
-      metalness: 0.05
+      map: textureMap,
+      roughness: texType === 'wood' ? 0.65 : (texType === 'stone' ? 0.25 : 0.4),
+      metalness: texType === 'stone' ? 0.1 : 0.05
     });
+  }
+
+  private textureCache = new Map<string, THREE.CanvasTexture>();
+
+  private getProceduralTexture(colorHex: string, type: 'wood' | 'stone'): THREE.CanvasTexture {
+    const key = `${type}_${colorHex}`;
+    const cached = this.textureCache.get(key);
+    if (cached) return cached;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return new THREE.CanvasTexture(canvas);
+
+    ctx.fillStyle = colorHex;
+    ctx.fillRect(0, 0, 256, 256);
+
+    if (type === 'wood') {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      for (let i = 0; i < 256; i += 6) {
+        ctx.fillRect(0, i, 256, 1.5 + (i % 3));
+      }
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+      for (let i = 3; i < 256; i += 8) {
+        ctx.fillRect(0, i, 256, 1);
+      }
+    } else if (type === 'stone') {
+      ctx.strokeStyle = colorHex.toLowerCase() === '#262626' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(10, 30);
+      ctx.bezierCurveTo(80, 100, 160, 40, 240, 180);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(30, 150);
+      ctx.bezierCurveTo(110, 190, 180, 130, 230, 230);
+      ctx.stroke();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 2);
+    this.textureCache.set(key, tex);
+    return tex;
   }
 
   // Draw 3D dimension lines and text sprites matching reference image
@@ -2030,7 +2136,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (intersects.length > 0) {
       const topHit = intersects[0].object as THREE.Mesh;
       const part = topHit.userData['part'] as Part;
+      const isDoor = topHit.userData['isDoor'];
+      const isDrawer = topHit.userData['isDrawer'];
       if (part) {
+        if (!e.shiftKey && (isDoor || isDrawer)) {
+          this.togglePartOpen(part.id);
+        }
         if (e.shiftKey) {
           const cur = [...this.activeSelectedIds()];
           const idx = cur.indexOf(part.id);
@@ -3048,6 +3159,22 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return;
     }
 
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      const sel = this.selectedPart();
+      const selIds = this.selectedPartIds();
+      if (sel) {
+        e.preventDefault();
+        this.partDeleted.emit(sel.id);
+        return;
+      } else if (selIds.length > 0) {
+        e.preventDefault();
+        for (const id of selIds) {
+          this.partDeleted.emit(id);
+        }
+        return;
+      }
+    }
+
     const sel = this.selectedPart();
     if (!sel) return;
 
@@ -3384,8 +3511,69 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.controls.update();
   }
 
+  togglePartOpen(partId: string) {
+    const cur = this.openTargetMap.get(partId) || 0;
+    const next = cur > 0.5 ? 0 : 1;
+    this.openTargetMap.set(partId, next);
+
+    // Si es un cajón o despiece de cajón, sincronizar apertura de todas las piezas del mismo cajón
+    const targetPiece = this.pieceObjects.find(p => p.part.id === partId);
+    if (targetPiece?.isDrawer) {
+      const partsArr = targetPiece.part.id.split('_');
+      const basePrefix = partsArr.slice(0, 2).join('_');
+      for (const p of this.pieceObjects) {
+        if (p.isDrawer && (p.part.id.startsWith(basePrefix) || (targetPiece.part.id.includes('caj_ind_') && p.part.id.includes('caj_ind_')))) {
+          this.openTargetMap.set(p.part.id, next);
+        }
+      }
+    }
+
+    const allDoorsDrawers = this.pieceObjects.filter(p => p.isDoor || p.isDrawer);
+    if (allDoorsDrawers.length > 0) {
+      const allOpen = allDoorsDrawers.every(p => (this.openTargetMap.get(p.part.id) || 0) > 0.5);
+      this.isAllOpen.set(allOpen);
+    }
+  }
+
+  toggleAllDoorsAndDrawers() {
+    const next = !this.isAllOpen();
+    this.isAllOpen.set(next);
+    for (const p of this.pieceObjects) {
+      if (p.isDoor || p.isDrawer) {
+        this.openTargetMap.set(p.part.id, next ? 1 : 0);
+      }
+    }
+  }
+
+  private updateOpeningAnimations() {
+    for (const p of this.pieceObjects) {
+      if (!p.isDoor && !p.isDrawer) continue;
+      const tgt = this.openTargetMap.get(p.part.id) || 0;
+      let cur = this.openCurrentMap.get(p.part.id) || 0;
+      if (Math.abs(cur - tgt) > 0.001) {
+        cur += (tgt - cur) * 0.12;
+        this.openCurrentMap.set(p.part.id, cur);
+      } else {
+        cur = tgt;
+        this.openCurrentMap.set(p.part.id, cur);
+      }
+
+      if (p.isDoor && p.doorPivot) {
+        if (p.hingeSide === 'left') {
+          p.doorPivot.rotation.y = -cur * (Math.PI / 2.05);
+        } else if (p.hingeSide === 'right') {
+          p.doorPivot.rotation.y = cur * (Math.PI / 2.05);
+        } else if (p.hingeSide === 'top') {
+          p.doorPivot.rotation.x = cur * (Math.PI / 2.2);
+        }
+      } else if (p.isDrawer) {
+        p.mesh.position.z = p.originalPos.z + cur * 280;
+      }
+    }
+  }
+
   toggleOpenClose() {
-    this.isOpenFrentes.update(v => !v);
+    this.toggleAllDoorsAndDrawers();
   }
 
   toggleXRay() {
@@ -3415,6 +3603,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   private animate() {
     this.animationFrameId = requestAnimationFrame(() => this.animate());
+    this.updateOpeningAnimations();
     if (this.controls) {
       this.controls.update();
     }

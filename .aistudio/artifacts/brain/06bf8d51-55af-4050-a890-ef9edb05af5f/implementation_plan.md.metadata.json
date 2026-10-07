@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para reorganizar el modal de documentación con buscador integrado en la columna lateral izquierda y catálogo profesional de 20 plantillas de muebles (Cocina, Baño, Closets, Sala TV, Oficina) con opción de reemplazo o inserción contigua en el espacio 3D.",
-  "updatedAt": "2026-10-07T03:07:31.289396855Z",
+  "summary": "Plan integral para la corrección profunda de plantillas de muebles, nuevo catálogo en cuadrícula de 2 columnas con previsualizaciones isométricas 3D, plantillas especializadas para cajones, botón de lienzo en blanco en cinta superior, reparación del atajo Supr/Delete/Backspace para eliminar piezas, catálogo ampliado de maderas y melaminas (maderas nobles, mármol y mates), y funcionalidad interactiva de apertura y movimiento 3D de puertas y cajones.",
+  "updatedAt": "2026-10-07T13:22:11.324666354Z",
   "requestFeedback": true,
   "userFacing": true
 }

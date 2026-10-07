@@ -87,7 +87,7 @@ export interface Material {
   sheetCost: number;   // Precio por tablero entero
   hasGrain: boolean;   // Si tiene textura de veta
   colorHex: string;
-  textureType?: 'wood' | 'solid' | 'metal';
+  textureType?: 'wood' | 'solid' | 'metal' | 'stone';
 }
 
 export interface HardwareItem {

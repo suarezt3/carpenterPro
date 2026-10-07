@@ -16,14 +16,24 @@
     <!-- Quick Actions & Plantillas Menu -->
     <div class="flex items-center gap-2 shrink-0">
       
-      <!-- Botón Catálogo de 20 Plantillas de Muebles -->
+      <!-- Botón Catálogo de Plantillas de Muebles -->
       <button 
         type="button"
         (click)="openTemplatesModal()"
         class="h-7 px-3 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg flex items-center gap-1.5 transition shadow-2xs"
-        title="Explorar catálogo de 20 plantillas de muebles (Cocina, Baño, Closets, Sala TV, Oficina)">
+        title="Explorar catálogo de plantillas de muebles (Cocina, Cajoneras, Baño, Closets, Sala TV, Oficina)">
         <span class="material-icons text-sm">menu_book</span>
-        <span>Plantillas de Muebles (20)</span>
+        <span>Plantillas de Muebles</span>
+      </button>
+
+      <!-- Botón Lienzo en Blanco Directo -->
+      <button 
+        type="button" 
+        (click)="startBlank()"
+        class="h-7 px-2.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 flex items-center gap-1.5 transition shadow-2xs"
+        title="Limpiar el lienzo 3D e iniciar un nuevo mueble desde cero">
+        <span class="material-icons text-sm">delete_sweep</span>
+        <span>Lienzo en Blanco</span>
       </button>
 
       <!-- Toggle Right Sidebar Button -->
@@ -861,7 +871,7 @@
   </app-technical-sheet-modal>
 }
 
-<!-- MODAL: CATÁLOGO DE 20 PLANTILLAS DE MUEBLES -->
+<!-- MODAL: CATÁLOGO DE PLANTILLAS DE MUEBLES -->
 <app-templates-modal
   [isOpen]="showTemplatesModal()"
   [materials]="materials()"
@@ -869,3 +879,11 @@
   (templateSelected)="onTemplateSelected($event)"
   (startBlankRequested)="startBlank()">
 </app-templates-modal>
+
+<!-- FLOATING TOAST NOTIFICATION -->
+@if (toastMessage()) {
+  <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-950 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700/80 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-none">
+    <span class="material-icons text-amber-400 text-sm">notifications</span>
+    <span>{{ toastMessage() }}</span>
+  </div>
+}
