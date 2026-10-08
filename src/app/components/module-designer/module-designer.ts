@@ -23,13 +23,12 @@ import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
-import { TemplatesModalComponent } from '../templates-modal/templates-modal';
 import { FurnitureTemplate } from '../../services/templates-catalog.service';
 
 @Component({
   selector: 'app-module-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Furniture3dViewerComponent, TechnicalSheetModalComponent, TemplatesModalComponent],
+  imports: [ReactiveFormsModule, Furniture3dViewerComponent, TechnicalSheetModalComponent],
   templateUrl: './module-designer.html',
   host: {
     '(window:keydown)': 'handleGlobalKeyDown($event)'

@@ -13,19 +13,9 @@
       </div>
     </div>
 
-    <!-- Quick Actions & Plantillas Menu -->
+    <!-- Quick Actions Menu -->
     <div class="flex items-center gap-2 shrink-0">
       
-      <!-- Botón Catálogo de Plantillas de Muebles -->
-      <button 
-        type="button"
-        (click)="openTemplatesModal()"
-        class="h-7.5 px-3 text-xs font-semibold bg-stone-900 hover:bg-stone-800 text-stone-100 rounded-lg flex items-center gap-1.5 transition shadow-2xs border border-stone-800 cursor-pointer"
-        title="Explorar catálogo de plantillas de muebles">
-        <span class="material-icons text-sm text-amber-400">menu_book</span>
-        <span>Plantillas</span>
-      </button>
-
       <!-- Botón Lienzo en Blanco Directo -->
       <button 
         type="button" 
@@ -107,7 +97,7 @@
 
         @if (currentParts().length === 0) {
           <span class="text-xs text-slate-400 italic pl-2">
-            Lienzo vacío. Haz clic en "Plantillas" arriba para cargar un mueble o añade piezas desde la bandeja.
+            Lienzo vacío. Usa la herramienta de rectángulo 3D o añade piezas desde la bandeja lateral.
           </span>
         }
 
@@ -864,15 +854,6 @@
     (modalClose)="closeTechnicalSheet()">
   </app-technical-sheet-modal>
 }
-
-<!-- MODAL: CATÁLOGO DE PLANTILLAS DE MUEBLES -->
-<app-templates-modal
-  [isOpen]="showTemplatesModal()"
-  [materials]="materials()"
-  (modalClose)="closeTemplatesModal()"
-  (templateSelected)="onTemplateSelected($event)"
-  (startBlankRequested)="startBlank()">
-</app-templates-modal>
 
 <!-- FLOATING TOAST NOTIFICATION -->
 @if (toastMessage()) {

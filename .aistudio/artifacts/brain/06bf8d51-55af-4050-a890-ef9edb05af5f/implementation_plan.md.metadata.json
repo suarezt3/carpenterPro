@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para independizar la selección de color/textura de melamina y la asignación libre de espesor en el panel derecho, limpiando los nombres de materiales (sin sufijos de milímetros) y agregando tanto botones rápidos de taller como un campo numérico libre en milímetros.",
-  "updatedAt":  "2026-10-08T19:23:47.204412372Z",
+  "summary":  "Plan para desacoplar y descartar el módulo de plantillas de la interfaz de usuario, despejando la barra superior del diseñador 3D y preservando intactos los catálogos y lógica subyacente para su futuro replanteamiento.",
+  "updatedAt":  "2026-10-08T19:59:13.223416450Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
