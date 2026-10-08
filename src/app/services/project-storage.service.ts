@@ -3,7 +3,9 @@ import {
   FurnitureModule,
   HardwareItem,
   Material,
+  ParametricDrawerConfig,
   Part,
+  PartGroup,
   Project,
   ProjectSettings
 } from '../models/melamine.models';
@@ -84,6 +86,7 @@ export class ProjectStorageService {
   readonly materialsList = computed(() => this.currentProject().materials);
   readonly modulesList = computed(() => this.currentProject().modules);
   readonly partsList = computed(() => this.currentProject().parts);
+  readonly groupsList = computed(() => this.currentProject().groups || []);
   readonly hardwareList = computed(() => this.currentProject().hardware);
   readonly projectSettings = computed(() => this.currentProject().settings);
 
@@ -159,6 +162,9 @@ export class ProjectStorageService {
                 ...p,
                 materialName: cleanMaterialName(p.materialName)
               }));
+            }
+            if (!parsed.groups || !Array.isArray(parsed.groups)) {
+              parsed.groups = [];
             }
             return parsed;
           }
@@ -508,6 +514,7 @@ export class ProjectStorageService {
       materials: defaultMaterials,
       modules: [],
       parts: initialParts,
+      groups: [],
       hardware: initialHardware,
       laborCost: 350000,
       laborType: 'fixed',
@@ -949,10 +956,367 @@ export class ProjectStorageService {
   }
 
   deletePart(partId: string) {
-    this.updateProject(p => ({
-      ...p,
-      parts: p.parts.filter(pt => pt.id !== partId)
-    }));
+    this.updateProject(p => {
+      const remainingParts = p.parts.filter(pt => pt.id !== partId);
+      // Clean up empty groups if needed
+      const usedGroupIds = new Set(remainingParts.map(pt => pt.groupId).filter(Boolean));
+      const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
+      return {
+        ...p,
+        parts: remainingParts,
+        groups: filteredGroups
+      };
+    });
+  }
+
+  // --- GROUPS ACTIONS (CAJONES Y MODULARES) ---
+
+  createGroup(name: string, partIds: string[], type: 'drawer' | 'door_set' | 'assembly' | 'custom' = 'drawer', slideLength = 450): PartGroup {
+    const newGroup: PartGroup = {
+      id: 'grp_' + crypto.randomUUID().slice(0, 8),
+      name: name || `Cajón ${(this.groupsList().length) + 1}`,
+      type,
+      isOpen: false,
+      slideExtension: 0,
+      slideLength,
+      slideType: 'telescopic',
+      frontGap: 26
+    };
+
+    this.updateProject(p => {
+      const currentGroups = p.groups || [];
+      const updatedParts = p.parts.map(pt => {
+        if (partIds.includes(pt.id)) {
+          return {
+            ...pt,
+            groupId: newGroup.id,
+            groupName: newGroup.name
+          };
+        }
+        return pt;
+      });
+
+      return {
+        ...p,
+        groups: [...currentGroups, newGroup],
+        parts: updatedParts
+      };
+    });
+
+    return newGroup;
+  }
+
+  ungroup(groupId: string) {
+    this.updateProject(p => {
+      const currentGroups = (p.groups || []).filter(g => g.id !== groupId);
+      const updatedParts = p.parts.map(pt => {
+        if (pt.groupId === groupId) {
+          const copy = { ...pt };
+          delete copy.groupId;
+          delete copy.groupName;
+          return copy;
+        }
+        return pt;
+      });
+
+      return {
+        ...p,
+        groups: currentGroups,
+        parts: updatedParts
+      };
+    });
+  }
+
+  updateGroup(groupId: string, updates: Partial<PartGroup>) {
+    this.updateProject(p => {
+      const currentGroups = (p.groups || []).map(g => {
+        if (g.id === groupId) {
+          return { ...g, ...updates };
+        }
+        return g;
+      });
+
+      let updatedParts = p.parts;
+      if (updates.name) {
+        updatedParts = p.parts.map(pt => {
+          if (pt.groupId === groupId) {
+            return { ...pt, groupName: updates.name };
+          }
+          return pt;
+        });
+      }
+
+      return {
+        ...p,
+        groups: currentGroups,
+        parts: updatedParts
+      };
+    });
+  }
+
+  deleteGroup(groupId: string, deleteParts = false) {
+    this.updateProject(p => {
+      const currentGroups = (p.groups || []).filter(g => g.id !== groupId);
+      let updatedParts = p.parts;
+      if (deleteParts) {
+        updatedParts = p.parts.filter(pt => pt.groupId !== groupId);
+      } else {
+        updatedParts = p.parts.map(pt => {
+          if (pt.groupId === groupId) {
+            const copy = { ...pt };
+            delete copy.groupId;
+            delete copy.groupName;
+            return copy;
+          }
+          return pt;
+        });
+      }
+
+      return {
+        ...p,
+        groups: currentGroups,
+        parts: updatedParts
+      };
+    });
+  }
+
+  toggleGroupOpen(groupId: string) {
+    const group = (this.groupsList()).find(g => g.id === groupId);
+    if (!group) return;
+    const nextState = !group.isOpen;
+    this.updateGroup(groupId, {
+      isOpen: nextState,
+      slideExtension: nextState ? 1 : 0
+    });
+  }
+
+  setGroupSlideExtension(groupId: string, extension: number) {
+    const clamped = Math.max(0, Math.min(1, extension));
+    this.updateGroup(groupId, {
+      slideExtension: clamped,
+      isOpen: clamped > 0.05
+    });
+  }
+
+  moveGroup(groupId: string, deltaX: number, deltaY: number, deltaZ: number) {
+    this.updateProject(p => {
+      return {
+        ...p,
+        parts: p.parts.map(pt => {
+          if (pt.groupId === groupId) {
+            return {
+              ...pt,
+              posX: Math.round(((pt.posX ?? 0) + deltaX) * 10) / 10,
+              posY: Math.round(((pt.posY ?? 0) + deltaY) * 10) / 10,
+              posZ: Math.round(((pt.posZ ?? 0) + deltaZ) * 10) / 10
+            };
+          }
+          return pt;
+        })
+      };
+    });
+  }
+
+  addParametricDrawer(cfg: ParametricDrawerConfig): PartGroup {
+    const defaultMat = this.materialsList().find(m => m.id === cfg.materialId) || this.materialsList()[0];
+    const mdfMat = this.materialsList().find(m => m.id === cfg.bottomMaterialId || m.thickness === 3) || defaultMat;
+
+    const t = cfg.boxThickness || 15;
+    const bT = cfg.bottomThickness || 3;
+    const gap = cfg.slideGap ?? 26;
+    const boxWidth = Math.max(120, cfg.outerWidth - gap);
+    const boxLen = cfg.slideLength || 450;
+    const boxH = cfg.boxHeight || 140;
+
+    const basePosX = cfg.posX ?? 0;
+    const basePosY = cfg.posY ?? 100;
+    const basePosZ = cfg.posZ ?? 0;
+
+    const groupId = 'grp_caj_' + crypto.randomUUID().slice(0, 8);
+    const groupName = cfg.name || `Cajón ${(this.groupsList().length) + 1}`;
+
+    const newGroup: PartGroup = {
+      id: groupId,
+      name: groupName,
+      type: 'drawer',
+      isOpen: false,
+      slideExtension: 0,
+      slideLength: boxLen,
+      slideType: 'telescopic',
+      frontGap: gap
+    };
+
+    // 1. Lateral Izquierdo
+    const latIzq: Part = {
+      id: `${groupId}_lat_izq`,
+      name: `Lateral Izq (${groupName})`,
+      groupId,
+      groupName,
+      length: boxLen,
+      width: boxH,
+      thickness: t,
+      quantity: 1,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      grain: defaultMat?.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: basePosX - (boxWidth / 2) + (t / 2),
+      posY: basePosY + (boxH / 2),
+      posZ: basePosZ,
+      orientation: 'vertical_yz',
+      componentRole: 'drawer_box',
+      notes: `Corredera ${boxLen}mm`
+    };
+
+    // 2. Lateral Derecho
+    const latDer: Part = {
+      id: `${groupId}_lat_der`,
+      name: `Lateral Der (${groupName})`,
+      groupId,
+      groupName,
+      length: boxLen,
+      width: boxH,
+      thickness: t,
+      quantity: 1,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      grain: defaultMat?.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: basePosX + (boxWidth / 2) - (t / 2),
+      posY: basePosY + (boxH / 2),
+      posZ: basePosZ,
+      orientation: 'vertical_yz',
+      componentRole: 'drawer_box',
+      notes: `Corredera ${boxLen}mm`
+    };
+
+    // 3. Contra-frente (frente interior)
+    const testeraWidth = Math.max(80, boxWidth - (2 * t));
+    const contraFrente: Part = {
+      id: `${groupId}_contrafrente`,
+      name: `Contra-frente (${groupName})`,
+      groupId,
+      groupName,
+      length: testeraWidth,
+      width: boxH,
+      thickness: t,
+      quantity: 1,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      grain: defaultMat?.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: basePosX,
+      posY: basePosY + (boxH / 2),
+      posZ: basePosZ + (boxLen / 2) - (t / 2),
+      orientation: 'vertical_xy',
+      componentRole: 'drawer_box',
+      notes: 'Frente interior de caja'
+    };
+
+    // 4. Trasera de Cajón
+    const trasera: Part = {
+      id: `${groupId}_trasera`,
+      name: `Trasera (${groupName})`,
+      groupId,
+      groupName,
+      length: testeraWidth,
+      width: boxH,
+      thickness: t,
+      quantity: 1,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      grain: defaultMat?.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: basePosX,
+      posY: basePosY + (boxH / 2),
+      posZ: basePosZ - (boxLen / 2) + (t / 2),
+      orientation: 'vertical_xy',
+      componentRole: 'drawer_box',
+      notes: 'Trasera de caja'
+    };
+
+    // 5. Fondo MDF 3mm
+    const fondo: Part = {
+      id: `${groupId}_fondo_mdf`,
+      name: `Fondo MDF (${groupName})`,
+      groupId,
+      groupName,
+      length: boxWidth,
+      width: boxLen,
+      thickness: bT,
+      quantity: 1,
+      materialId: mdfMat ? mdfMat.id : 'mat_mdf_3',
+      materialName: mdfMat ? mdfMat.name : 'MDF Durolac Blanco',
+      grain: 'none',
+      edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+      posX: basePosX,
+      posY: basePosY + (bT / 2),
+      posZ: basePosZ,
+      orientation: 'horizontal',
+      componentRole: 'drawer_box',
+      notes: 'Fondo MDF 3mm para cajón'
+    };
+
+    const newParts: Part[] = [latIzq, latDer, contraFrente, trasera, fondo];
+
+    // 6. Frente exterior visto si se solicitó
+    if (cfg.includeFront) {
+      const fW = cfg.frontWidth || cfg.outerWidth;
+      const fH = cfg.frontHeight || (boxH + 40);
+      const frente: Part = {
+        id: `${groupId}_frente`,
+        name: `Frente Vista (${groupName})`,
+        groupId,
+        groupName,
+        length: fW,
+        width: fH,
+        thickness: t,
+        quantity: 1,
+        materialId: defaultMat ? defaultMat.id : 'mat-1',
+        materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+        grain: defaultMat?.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: basePosX,
+        posY: basePosY + (fH / 2) - 10,
+        posZ: basePosZ + (boxLen / 2) + (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'drawer_front',
+        hardwareConfig: {
+          isMovable: true,
+          movableType: 'drawer',
+          handleType: 'bar_modern',
+          handlePosition: 'centered',
+          slideType: 'telescopic',
+          isOpen: false
+        },
+        notes: 'Frente visto con tirador y cantos gruesos'
+      };
+      newParts.push(frente);
+    }
+
+    // Add hardware pair of telescopic slides
+    const slideHwItem: HardwareItem = {
+      id: 'hw_slide_' + crypto.randomUUID().slice(0, 8),
+      name: `Par Correderas Telescópicas ${boxLen}mm (${groupName})`,
+      category: 'slide',
+      unit: 'par',
+      quantity: 1,
+      unitCost: 18500,
+      notes: `Para ${groupName}`
+    };
+
+    this.updateProject(p => {
+      const curGroups = p.groups || [];
+      const curHw = p.hardware || [];
+      return {
+        ...p,
+        groups: [...curGroups, newGroup],
+        parts: [...p.parts, ...newParts],
+        hardware: [...curHw, slideHwItem]
+      };
+    });
+
+    return newGroup;
   }
 
   // --- MATERIALS ACTIONS ---

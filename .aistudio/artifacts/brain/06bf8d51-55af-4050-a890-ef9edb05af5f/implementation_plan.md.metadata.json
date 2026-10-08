@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para establecer el espesor por defecto en 15mm para todas las piezas nuevas del catálogo, rectángulos 3D dibujados interactivamente y piezas libres personalizadas, manteniendo el fondo trasero en MDF 3mm.",
-  "updatedAt":  "2026-10-08T20:39:35.049665193Z",
+  "summary":  "Plan de implementación para la creación modular de cajones y agrupación de piezas:\n1. Modelo de datos con PartGroup (id, nombre, tipo, extensión de corredera, estado de apertura) y groupId en Part.\n2. Funcionalidad de Agrupar y Desagrupar selecciones libres de piezas.\n3. Asistente Rápido de Cajón paramétrico (laterales, frente interior, trasera, fondo MDF 3mm y frente solapado con holguras para correderas telescópicas).\n4. Animación interactiva 3D con clic directo en el cajón y control deslizante en el panel.\n5. Organización visual en la lista de despiece con secciones desplegables por grupo/cajón sin alterar el cálculo de corte.",
+  "updatedAt":  "2026-10-08T21:18:36.752473009Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

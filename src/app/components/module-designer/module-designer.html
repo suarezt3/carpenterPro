@@ -53,6 +53,7 @@
           [parts]="currentParts()"
           [selectedPartId]="selectedPartId()"
           [selectedPartIds]="selectedPartIds()"
+          [partGroups]="groups()"
           [materials]="materials()"
           (partSelected)="onSelectPartFrom3D($event)"
           (partsSelected)="onPartsSelectedFrom3D($event)"
@@ -117,6 +118,17 @@
             </button>
           }
         </div>
+
+        @if (selectedPartIds().length >= 2) {
+          <button 
+            type="button" 
+            (click)="openGroupNamingModal()" 
+            class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition shrink-0"
+            title="Agrupar las piezas seleccionadas como un cajón o módulo">
+            <span class="material-icons text-xs">link</span>
+            <span>Agrupar ({{ selectedPartIds().length }})</span>
+          </button>
+        }
 
         @if (selectedPartId() || selectedPartIds().length > 0) {
           <button 
@@ -780,6 +792,15 @@
               </button>
             </div>
 
+            <!-- Crear Cajón Modular Asistente -->
+            <button 
+              type="button" 
+              (click)="openDrawerWizard()"
+              class="w-full py-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs">
+              <span class="material-icons text-sm">inbox</span>
+              <span>+ Crear Cajón Modular (Asistente)</span>
+            </button>
+
             <!-- Free custom piece -->
             <button 
               type="button" 
@@ -790,51 +811,208 @@
             </button>
           </div>
 
-          <!-- ASSEMBLY STRUCTURE / PIECES LIST -->
-          <div class="space-y-2 pt-2 border-t border-slate-200">
+          <!-- ASSEMBLY STRUCTURE / PIECES & GROUPS LIST -->
+          <div class="space-y-2.5 pt-2 border-t border-slate-200">
             <div class="flex items-center justify-between">
               <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
                 <span class="material-icons text-xs text-sky-600">format_list_numbered</span>
-                Piezas Actuales ({{ currentParts().length }})
+                Despiece Total ({{ currentParts().length }})
               </span>
               <span class="text-[10px] text-slate-400 font-mono">L × A × E</span>
             </div>
 
-            <div class="space-y-1 max-h-[280px] overflow-y-auto pr-1">
-              @for (part of currentParts(); track part.id) {
-                <div 
-                  [class]="selectedPartId() === part.id ? 'bg-sky-50 border-sky-300 text-sky-900 shadow-2xs' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-                  class="p-1.5 rounded-xl border flex items-center justify-between gap-2 transition text-xs">
-                  
-                  <button 
-                    type="button" 
-                    (click)="selectPartById(part.id)" 
-                    class="flex items-center gap-2 min-w-0 flex-1 text-left">
-                    <span 
-                      [class]="selectedPartId() === part.id ? 'bg-sky-500 text-white font-bold' : 'bg-white border border-slate-200 text-slate-600'"
-                      class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] shrink-0 font-mono">
-                      {{ $index + 1 }}
-                    </span>
-                    <div class="truncate">
-                      <p class="font-bold truncate text-[11px]">{{ part.name }}</p>
-                      <p class="font-mono text-[10px] text-slate-400">
-                        {{ part.length }} × {{ part.width }} × {{ part.thickness }} mm
-                      </p>
-                    </div>
-                  </button>
+            <!-- SECCIÓN 1: CAJONES Y GRUPOS MODULARES (SI EXISTEN) -->
+            @if (groupsWithParts().length > 0) {
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
+                    <span class="material-icons text-xs">folder_open</span>
+                    Cajones y Módulos ({{ groupsWithParts().length }})
+                  </span>
+                </div>
 
-                  <div class="flex items-center gap-1 shrink-0">
+                <div class="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  @for (grpItem of groupsWithParts(); track grpItem.group.id) {
+                    <div class="border border-indigo-200 bg-indigo-50/50 rounded-xl p-2 space-y-1.5 text-xs shadow-2xs">
+                      
+                      <!-- Header del Cajón -->
+                      <div class="flex items-center justify-between gap-1.5">
+                        <button 
+                          type="button" 
+                          (click)="toggleGroupAccordion(grpItem.group.id)" 
+                          class="flex items-center gap-1.5 min-w-0 flex-1 text-left">
+                          <span class="material-icons text-xs text-indigo-600 transition-transform"
+                            [class.rotate-90]="isGroupAccordionOpen(grpItem.group.id)">
+                            chevron_right
+                          </span>
+                          <span class="material-icons text-xs text-indigo-600">inbox</span>
+                          
+                          @if (renamingGroupId() === grpItem.group.id) {
+                            <input 
+                              type="text" 
+                              [value]="renamingGroupName()" 
+                              (input)="renamingGroupName.set($any($event.target).value)" 
+                              (click)="$event.stopPropagation()"
+                              (keydown.enter)="saveRenameGroup(grpItem.group.id)"
+                              (keydown.escape)="cancelRenameGroup()"
+                              class="text-xs font-bold px-1.5 py-0.5 bg-white border border-indigo-400 rounded text-slate-800 w-28 focus:outline-hidden" />
+                            <button type="button" (click)="saveRenameGroup(grpItem.group.id)" class="text-emerald-600 hover:text-emerald-700">
+                              <span class="material-icons text-xs">check</span>
+                            </button>
+                            <button type="button" (click)="cancelRenameGroup()" class="text-rose-500 hover:text-rose-600">
+                              <span class="material-icons text-xs">close</span>
+                            </button>
+                          } @else {
+                            <span class="font-bold text-indigo-950 truncate text-[11px]">{{ grpItem.group.name }}</span>
+                            <span class="text-[9px] text-indigo-600 font-semibold px-1 py-0.2 bg-indigo-100 rounded">
+                              {{ grpItem.parts.length }} pz
+                            </span>
+                          }
+                        </button>
+
+                        <!-- Botones de acción del grupo -->
+                        <div class="flex items-center gap-1 shrink-0">
+                          <button 
+                            type="button" 
+                            (click)="startRenameGroup(grpItem.group, $event)" 
+                            class="p-0.5 text-slate-400 hover:text-indigo-600 rounded transition" 
+                            title="Renombrar cajón">
+                            <span class="material-icons text-xs">edit</span>
+                          </button>
+                          <button 
+                            type="button" 
+                            (click)="selectEntireGroup(grpItem.group.id)" 
+                            class="p-0.5 text-slate-400 hover:text-indigo-600 rounded transition" 
+                            title="Seleccionar todo el cajón">
+                            <span class="material-icons text-xs">select_all</span>
+                          </button>
+                          <button 
+                            type="button" 
+                            (click)="ungroup(grpItem.group.id)" 
+                            class="p-0.5 text-slate-400 hover:text-amber-600 rounded transition" 
+                            title="Desagrupar (volver a piezas libres)">
+                            <span class="material-icons text-xs">link_off</span>
+                          </button>
+                          <button 
+                            type="button" 
+                            (click)="deleteGroup(grpItem.group.id, true)" 
+                            class="p-0.5 text-slate-400 hover:text-rose-600 rounded transition" 
+                            title="Eliminar cajón y sus piezas">
+                            <span class="material-icons text-xs">delete</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Control interactivo de Apertura / Deslizamiento 3D -->
+                      <div class="bg-white/90 border border-indigo-100 rounded-lg p-1.5 flex items-center justify-between gap-2">
+                        <button 
+                          type="button" 
+                          (click)="toggleGroupOpen(grpItem.group.id)" 
+                          [class]="grpItem.group.isOpen ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                          class="px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 transition shrink-0">
+                          <span class="material-icons text-[11px]">{{ grpItem.group.isOpen ? 'meeting_room' : 'door_sliding' }}</span>
+                          <span>{{ grpItem.group.isOpen ? 'Cerrar' : 'Abrir 3D' }}</span>
+                        </button>
+
+                        <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="100" 
+                            [value]="roundPercent(grpItem.group.slideExtension)" 
+                            (input)="onGroupSlideChange(grpItem.group.id, $event)" 
+                            class="w-full accent-indigo-600 h-1 bg-slate-200 rounded cursor-pointer" />
+                          <span class="text-[10px] font-mono text-indigo-700 font-bold shrink-0 w-8 text-right">
+                            {{ roundPercent(grpItem.group.slideExtension) }}%
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Mover en bloque cajón -->
+                      <div class="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                        <span>Mover cajón:</span>
+                        <div class="flex items-center gap-1 font-mono">
+                          <button type="button" (click)="moveGroup(grpItem.group.id, 'y', -50)" class="px-1.5 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-700" title="Bajar 50mm">↓ Y</button>
+                          <button type="button" (click)="moveGroup(grpItem.group.id, 'y', 50)" class="px-1.5 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-700" title="Subir 50mm">↑ Y</button>
+                          <button type="button" (click)="moveGroup(grpItem.group.id, 'x', -50)" class="px-1.5 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-700" title="Izquierda 50mm">← X</button>
+                          <button type="button" (click)="moveGroup(grpItem.group.id, 'x', 50)" class="px-1.5 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-700" title="Derecha 50mm">→ X</button>
+                        </div>
+                      </div>
+
+                      <!-- Sublista de piezas que componen este cajón -->
+                      @if (isGroupAccordionOpen(grpItem.group.id)) {
+                        <div class="space-y-1 pt-1 border-t border-indigo-100">
+                          @for (p of grpItem.parts; track p.id) {
+                            <div 
+                              [class]="selectedPartId() === p.id ? 'bg-indigo-100 text-indigo-900 font-medium' : 'bg-white text-slate-700'"
+                              class="p-1 rounded border border-slate-200/80 flex items-center justify-between gap-1 text-[11px]">
+                              <button type="button" (click)="selectPartById(p.id)" class="text-left flex-1 min-w-0 truncate">
+                                <span class="font-bold truncate">{{ p.name }}</span>
+                                <span class="font-mono text-[9px] text-slate-400 block">{{ p.length }}×{{ p.width }}×{{ p.thickness }}mm</span>
+                              </button>
+                              <button type="button" (click)="deletePartById(p.id, $event)" class="text-slate-400 hover:text-rose-500 p-0.5">
+                                <span class="material-icons text-[11px]">close</span>
+                              </button>
+                            </div>
+                          }
+                        </div>
+                      }
+
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- SECCIÓN 2: PIEZAS SUELTAS / SIN GRUPO -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                  <span class="material-icons text-xs">straighten</span>
+                  Piezas Sueltas / Estructura ({{ ungroupedParts().length }})
+                </span>
+              </div>
+
+              <div class="space-y-1 max-h-[220px] overflow-y-auto pr-1">
+                @for (part of ungroupedParts(); track part.id) {
+                  <div 
+                    [class]="selectedPartId() === part.id ? 'bg-sky-50 border-sky-300 text-sky-900 shadow-2xs' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+                    class="p-1.5 rounded-xl border flex items-center justify-between gap-2 transition text-xs">
+                    
                     <button 
                       type="button" 
-                      (click)="deletePartById(part.id, $event)" 
-                      class="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition"
-                      title="Eliminar esta pieza">
-                      <span class="material-icons text-xs">delete</span>
+                      (click)="selectPartById(part.id)" 
+                      class="flex items-center gap-2 min-w-0 flex-1 text-left">
+                      <span 
+                        [class]="selectedPartId() === part.id ? 'bg-sky-500 text-white font-bold' : 'bg-white border border-slate-200 text-slate-600'"
+                        class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] shrink-0 font-mono">
+                        {{ $index + 1 }}
+                      </span>
+                      <div class="truncate">
+                        <p class="font-bold truncate text-[11px]">{{ part.name }}</p>
+                        <p class="font-mono text-[10px] text-slate-400">
+                          {{ part.length }} × {{ part.width }} × {{ part.thickness }} mm
+                        </p>
+                      </div>
                     </button>
+
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button 
+                        type="button" 
+                        (click)="deletePartById(part.id, $event)" 
+                        class="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition"
+                        title="Eliminar esta pieza">
+                        <span class="material-icons text-xs">delete</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              }
+                }
+                @if (ungroupedParts().length === 0 && groupsWithParts().length > 0) {
+                  <p class="text-[11px] text-slate-400 italic text-center py-2">Todas las piezas están organizadas en cajones.</p>
+                }
+              </div>
             </div>
+
           </div>
 
         </div>
@@ -846,6 +1024,275 @@
   </div>
 
 </div>
+
+<!-- MODAL: ASISTENTE DE CAJÓN MODULAR -->
+@if (showDrawerWizard()) {
+  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-8">
+      
+      <!-- Header -->
+      <div class="px-6 py-4 bg-gradient-to-r from-sky-600 to-indigo-700 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
+            <span class="material-icons text-xl">inbox</span>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm tracking-tight">Asistente de Cajón Modular</h3>
+            <p class="text-[11px] text-sky-100">Genera las 5 o 6 piezas exactas ensambladas con holgura para correderas</p>
+          </div>
+        </div>
+        <button 
+          type="button" 
+          (click)="closeDrawerWizard()" 
+          class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center text-white/80 hover:text-white transition">
+          <span class="material-icons text-sm">close</span>
+        </button>
+      </div>
+
+      <!-- Form Body -->
+      <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+
+        <!-- Nombre e identificación -->
+        <div>
+          <span class="block text-xs font-bold text-slate-700 mb-1">Nombre del Cajón / Módulo</span>
+          <input 
+            type="text" 
+            [value]="drawerForm().name" 
+            (input)="updateDrawerFormField('name', $any($event.target).value)" 
+            class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" 
+            placeholder="ej. Cajón 1, Gaveta Superior" />
+        </div>
+
+        <!-- Dimensiones Principales (Ancho hueco, Fondo corredera, Alto de caja) -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          
+          <!-- Ancho Exterior / Hueco -->
+          <div>
+            <span class="block text-[11px] font-bold text-slate-700 mb-1">
+              Ancho Hueco (mm)
+            </span>
+            <input 
+              type="number" 
+              [value]="drawerForm().outerWidth" 
+              (input)="updateDrawerFormField('outerWidth', +$any($event.target).value)" 
+              class="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
+            <span class="text-[10px] text-slate-400">Luz exterior total</span>
+          </div>
+
+          <!-- Largo Corredera / Profundidad -->
+          <div>
+            <span class="block text-[11px] font-bold text-slate-700 mb-1">
+              Corredera (mm)
+            </span>
+            <input 
+              type="number" 
+              [value]="drawerForm().slideLength" 
+              (input)="updateDrawerFormField('slideLength', +$any($event.target).value)" 
+              class="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
+            <div class="flex items-center gap-1 mt-1">
+              <button type="button" (click)="updateDrawerFormField('slideLength', 350)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono">350</button>
+              <button type="button" (click)="updateDrawerFormField('slideLength', 400)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono">400</button>
+              <button type="button" (click)="updateDrawerFormField('slideLength', 450)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono">450</button>
+              <button type="button" (click)="updateDrawerFormField('slideLength', 500)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono">500</button>
+            </div>
+          </div>
+
+          <!-- Altura de Caja -->
+          <div>
+            <span class="block text-[11px] font-bold text-slate-700 mb-1">
+              Alto Caja (mm)
+            </span>
+            <input 
+              type="number" 
+              [value]="drawerForm().boxHeight" 
+              (input)="updateDrawerFormField('boxHeight', +$any($event.target).value)" 
+              class="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
+            <div class="flex items-center gap-1 mt-1">
+              <button type="button" (click)="updateDrawerFormField('boxHeight', 120)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono">120</button>
+              <button type="button" (click)="updateDrawerFormField('boxHeight', 140)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono">140</button>
+              <button type="button" (click)="updateDrawerFormField('boxHeight', 160)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono">160</button>
+              <button type="button" (click)="updateDrawerFormField('boxHeight', 180)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono">180</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Carpentry Standards (Holguras y Espesores) -->
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+              <span class="material-icons text-xs text-sky-600">tune</span>
+              Parámetros de Taller y Carpintería
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <span class="block text-[10px] text-slate-500 font-semibold mb-1">Luz Correderas (mm)</span>
+              <input 
+                type="number" 
+                [value]="drawerForm().slideGap" 
+                (input)="updateDrawerFormField('slideGap', +$any($event.target).value)" 
+                class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-slate-200 rounded-lg focus:outline-hidden" />
+              <span class="text-[9px] text-slate-400">13 mm cada lado (26 mm)</span>
+            </div>
+
+            <div>
+              <span class="block text-[10px] text-slate-500 font-semibold mb-1">Espesor Laterales (mm)</span>
+              <input 
+                type="number" 
+                [value]="drawerForm().boxThickness" 
+                (input)="updateDrawerFormField('boxThickness', +$any($event.target).value)" 
+                class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-slate-200 rounded-lg focus:outline-hidden" />
+              <span class="text-[9px] text-slate-400">Estándar 15 mm</span>
+            </div>
+
+            <div>
+              <span class="block text-[10px] text-slate-500 font-semibold mb-1">Espesor Fondo (mm)</span>
+              <input 
+                type="number" 
+                [value]="drawerForm().bottomThickness" 
+                (input)="updateDrawerFormField('bottomThickness', +$any($event.target).value)" 
+                class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-slate-200 rounded-lg focus:outline-hidden" />
+              <span class="text-[9px] text-slate-400">MDF 3 mm Durolac</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Frente Exterior Opcional -->
+        <div class="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-2">
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input 
+              type="checkbox" 
+              [checked]="drawerForm().includeFront" 
+              (change)="updateDrawerFormField('includeFront', $any($event.target).checked)" 
+              class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" />
+            <span class="text-xs font-bold text-indigo-950">Incluir Frente Exterior Solapado (Tapa Vista con Tirador)</span>
+          </label>
+
+          @if (drawerForm().includeFront) {
+            <div class="grid grid-cols-2 gap-3 pt-2 border-t border-indigo-100">
+              <div>
+                <span class="block text-[10px] font-semibold text-slate-600 mb-1">Alto Frente Visto (mm)</span>
+                <input 
+                  type="number" 
+                  [value]="drawerForm().frontHeight || 180" 
+                  (input)="updateDrawerFormField('frontHeight', +$any($event.target).value)" 
+                  class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-indigo-200 rounded-lg focus:outline-hidden" />
+              </div>
+              <div>
+                <span class="block text-[10px] font-semibold text-slate-600 mb-1">Ancho Frente Visto (mm)</span>
+                <input 
+                  type="number" 
+                  [value]="drawerForm().frontWidth || drawerForm().outerWidth" 
+                  (input)="updateDrawerFormField('frontWidth', +$any($event.target).value)" 
+                  class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-indigo-200 rounded-lg focus:outline-hidden" />
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Elevación Y inicial -->
+        <div class="flex items-center justify-between text-xs text-slate-600">
+          <span class="font-semibold">Elevación inicial (eje Y desde el suelo):</span>
+          <div class="flex items-center gap-2">
+            <input 
+              type="number" 
+              [value]="drawerForm().posY" 
+              (input)="updateDrawerFormField('posY', +$any($event.target).value)" 
+              class="w-24 px-2.5 py-1 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg text-right focus:outline-hidden" />
+            <span class="text-slate-400 font-mono">mm</span>
+          </div>
+        </div>
+
+        <!-- Previsualización de piezas calculadas -->
+        <div class="p-3 bg-slate-100 rounded-xl text-[11px] space-y-1">
+          <span class="font-bold text-slate-700 block text-xs">Desglose calculado automáticamente:</span>
+          <div class="text-slate-600 grid grid-cols-2 gap-1 font-mono text-[10px]">
+            <div>• 2× Laterales: {{ drawerForm().slideLength }} × {{ drawerForm().boxHeight }} × {{ drawerForm().boxThickness }} mm</div>
+            <div>• 1× Contra-frente: {{ drawerForm().outerWidth - drawerForm().slideGap - (2 * drawerForm().boxThickness) }} × {{ drawerForm().boxHeight }} mm</div>
+            <div>• 1× Trasera: {{ drawerForm().outerWidth - drawerForm().slideGap - (2 * drawerForm().boxThickness) }} × {{ drawerForm().boxHeight }} mm</div>
+            <div>• 1× Fondo MDF: {{ drawerForm().outerWidth - drawerForm().slideGap }} × {{ drawerForm().slideLength }} × {{ drawerForm().bottomThickness }} mm</div>
+          </div>
+          <p class="text-[10px] text-emerald-700 font-semibold pt-1">
+            ✓ Incluye 1 par de correderas telescópicas en la lista de herrajes.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5">
+        <button 
+          type="button" 
+          (click)="closeDrawerWizard()" 
+          class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
+          Cancelar
+        </button>
+        <button 
+          type="button" 
+          (click)="submitDrawerWizard()" 
+          class="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-sky-600/20 flex items-center gap-2 transition">
+          <span class="material-icons text-sm">check_circle</span>
+          <span>Crear y Ensamblar Cajón</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+}
+
+<!-- MODAL: AGRUPAR PIEZAS SELECCIONADAS -->
+@if (showGroupNamingModal()) {
+  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      
+      <div class="p-5 space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+            <span class="material-icons text-xl">link</span>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900">Agrupar Selección</h3>
+            <p class="text-xs text-slate-500">{{ selectedPartIds().length }} piezas seleccionadas</p>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-600">
+          Asigna un nombre a este conjunto para manipularlo como un solo bloque en 3D, moverlo y animar su apertura o cierre.
+        </p>
+
+        <div>
+          <span class="block text-xs font-bold text-slate-700 mb-1">Nombre del Grupo / Cajón</span>
+          <input 
+            type="text" 
+            [value]="newGroupNameInput()" 
+            (input)="newGroupNameInput.set($any($event.target).value)" 
+            (keydown.enter)="confirmCreateGroup()" 
+            class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-indigo-500 focus:outline-hidden" 
+            placeholder="ej. Cajón 1, Gaveta Central" />
+        </div>
+      </div>
+
+      <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+        <button 
+          type="button" 
+          (click)="closeGroupNamingModal()" 
+          class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
+          Cancelar
+        </button>
+        <button 
+          type="button" 
+          (click)="confirmCreateGroup()" 
+          class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+          <span class="material-icons text-xs">done</span>
+          <span>Agrupar Piezas</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+}
 
 <!-- MODAL: PLANO TÉCNICO 2D DE FABRICACIÓN (TALLER) -->
 @if (showTechnicalSheetModal()) {

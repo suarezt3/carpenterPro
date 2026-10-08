@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { 
   Part, 
+  PartGroup,
   Material, 
   DrillHole, 
   CollisionRecord, 
@@ -85,6 +86,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   parts = input<Part[]>([]);
   selectedPartId = input<string | null>(null);
   selectedPartIds = input<string[]>([]);
+  partGroups = input<PartGroup[]>([]);
   materials = input<Material[]>([]);
 
   // Outputs
@@ -654,8 +656,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
         ((part.name.toUpperCase().startsWith('CAJ') || part.name.toUpperCase().startsWith('GAVET')) && !isInternalBoxPart)
       );
 
-      // isDrawer: includes both the front and internal parts so they move synchronously
-      const isDrawer = isDrawerFront || (
+      // isDrawer: includes both the front and internal parts or any grouped drawer piece
+      const isPartInDrawerGroup = !!part.groupId;
+      const isDrawer = !isDoor && (
+        isPartInDrawerGroup ||
+        isDrawerFront || (
         isInternalBoxPart && (
           part.name.toUpperCase().includes('CAJON') ||
           part.name.toUpperCase().includes('CAJÓN') ||
@@ -663,7 +668,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
           part.id.includes('caj_') ||
           part.id.includes('gav_')
         )
-      );
+      ));
 
       let doorPivot: THREE.Group | undefined;
       let hingeSide: 'left' | 'right' | 'top' | 'bottom' = hw.openingDirection || 'left';
@@ -730,6 +735,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         // Check if separate box sub-parts already exist in the project parts list for this drawer
         const hasSeparateBoxParts = parts.some(other =>
           other.id !== part.id && (
+            (other.groupId && other.groupId === part.groupId) ||
             other.componentRole === 'drawer_box' ||
             (other.name.toUpperCase().includes('GAVETA') || 
              other.name.toUpperCase().includes('CAJÓN') || 
@@ -4518,41 +4524,51 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.openTargetMap.set(partId, next);
 
     const targetPiece = this.pieceObjects.find(p => p.part.id === partId);
-    if (targetPiece?.isDrawer) {
-      const targetY = targetPiece.originalPos.y;
-      const targetPart = targetPiece.part;
-
-      // Extract drawer instance identifier prefix if present
-      const boxSubKeywords = ['_frente_', '_lat_izq_', '_lat_der_', '_trasera_', '_frente_int_', '_fondo_'];
-      let specificPrefix = '';
-      for (const kw of boxSubKeywords) {
-        if (targetPart.id.includes(kw)) {
-          specificPrefix = targetPart.id.split(kw)[0];
-          break;
-        }
-      }
-      if (!specificPrefix && targetPart.id.includes('caj_ind_')) {
-        const match = targetPart.id.match(/caj_ind_\d+/);
-        if (match) specificPrefix = match[0];
-      }
-
-      // Synchronize ONLY sub-components that are part of the EXACT same physical drawer box
-      for (const p of this.pieceObjects) {
-        if (p.isDrawer && p.part.id !== partId) {
-          // If a specific drawer prefix is identified, match that exact prefix
-          if (specificPrefix && (p.part.id.startsWith(specificPrefix + '_') || p.part.id.includes(specificPrefix))) {
+    if (targetPiece) {
+      // 1. If part belongs to a PartGroup (e.g. modular drawer), synchronize ALL parts in that group
+      if (targetPiece.part.groupId) {
+        const gId = targetPiece.part.groupId;
+        for (const p of this.pieceObjects) {
+          if (p.part.groupId === gId) {
             this.openTargetMap.set(p.part.id, next);
-            continue;
           }
+        }
+      } else if (targetPiece.isDrawer) {
+        const targetY = targetPiece.originalPos.y;
+        const targetPart = targetPiece.part;
 
-          // Otherwise, match only if they are interior box sub-parts belonging to the same module and same Y level
-          const isAnotherFront = (p.part.componentRole === 'drawer_front' || p.part.name.toUpperCase().includes('FRENTE'));
-          const isAtSameElevation = Math.abs(p.originalPos.y - targetY) < 30;
-          const isSameModule = !targetPart.moduleId || p.part.moduleId === targetPart.moduleId;
+        // Extract drawer instance identifier prefix if present
+        const boxSubKeywords = ['_frente_', '_lat_izq_', '_lat_der_', '_trasera_', '_frente_int_', '_fondo_'];
+        let specificPrefix = '';
+        for (const kw of boxSubKeywords) {
+          if (targetPart.id.includes(kw)) {
+            specificPrefix = targetPart.id.split(kw)[0];
+            break;
+          }
+        }
+        if (!specificPrefix && targetPart.id.includes('caj_ind_')) {
+          const match = targetPart.id.match(/caj_ind_\d+/);
+          if (match) specificPrefix = match[0];
+        }
 
-          // Never trigger a different drawer front or a drawer at a different height!
-          if (!isAnotherFront && isAtSameElevation && isSameModule && !specificPrefix) {
-            this.openTargetMap.set(p.part.id, next);
+        // Synchronize ONLY sub-components that are part of the EXACT same physical drawer box
+        for (const p of this.pieceObjects) {
+          if (p.isDrawer && p.part.id !== partId) {
+            // If a specific drawer prefix is identified, match that exact prefix
+            if (specificPrefix && (p.part.id.startsWith(specificPrefix + '_') || p.part.id.includes(specificPrefix))) {
+              this.openTargetMap.set(p.part.id, next);
+              continue;
+            }
+
+            // Otherwise, match only if they are interior box sub-parts belonging to the same module and same Y level
+            const isAnotherFront = (p.part.componentRole === 'drawer_front' || p.part.name.toUpperCase().includes('FRENTE'));
+            const isAtSameElevation = Math.abs(p.originalPos.y - targetY) < 30;
+            const isSameModule = !targetPart.moduleId || p.part.moduleId === targetPart.moduleId;
+
+            // Never trigger a different drawer front or a drawer at a different height!
+            if (!isAnotherFront && isAtSameElevation && isSameModule && !specificPrefix) {
+              this.openTargetMap.set(p.part.id, next);
+            }
           }
         }
       }
@@ -4603,7 +4619,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         }
       } else if (p.isDrawer) {
         const expZ = p.explodedOffset.z * (this.explodedPercent() / 100);
-        const maxSlide = Math.min(380, Math.max(180, (p.part.width || 450) * 0.72));
+        // Uniform smooth slide travel for all parts in the drawer (320mm)
+        const maxSlide = 320;
         p.mesh.position.z = p.originalPos.z + expZ + cur * maxSlide;
       }
     }

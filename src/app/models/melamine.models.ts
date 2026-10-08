@@ -72,11 +72,43 @@ export interface PartHardwareConfig {
   isOpen?: boolean;
 }
 
+export interface PartGroup {
+  id: string;
+  name: string; // ej. "Cajón 1", "Cajón Inferior"
+  type: 'drawer' | 'door_set' | 'assembly' | 'custom';
+  isOpen?: boolean; // Estado abierto/cerrado
+  slideExtension?: number; // 0 (cerrado) a 1 (100% abierto)
+  slideLength?: number; // Largo de corredera en mm (ej. 400, 450, 500)
+  slideType?: SlideType; // Telescópica estándar, cierre suave, etc.
+  colorHex?: string;
+  frontGap?: number; // Holgura lateral para correderas (26mm total)
+}
+
+export interface ParametricDrawerConfig {
+  name: string; // ej. "Cajón 1"
+  outerWidth: number; // Ancho del hueco / exterior en mm (ej. 400)
+  slideLength: number; // Largo de corredera / profundidad del cajón en mm (ej. 450)
+  boxHeight: number; // Altura de caja del cajón en mm (ej. 140)
+  boxThickness: number; // Espesor de laterales/trasera (default: 15mm)
+  bottomThickness: number; // Espesor del fondo (default: 3mm MDF)
+  slideGap: number; // Holgura total correderas (default: 26mm = 13mm cada lado)
+  includeFront: boolean; // Si incluye frente/tapa exterior visto
+  frontHeight?: number; // Altura del frente exterior (mm)
+  frontWidth?: number; // Ancho del frente exterior (mm)
+  posX?: number; // Posición X inicial (centro)
+  posY?: number; // Posición Y inicial (elevación base)
+  posZ?: number; // Posición Z inicial (profundidad centro)
+  materialId?: string;
+  bottomMaterialId?: string;
+}
+
 export interface Part {
   id: string;
   name: string;
   moduleId?: string;
   moduleName?: string;
+  groupId?: string; // ID del grupo o cajón modular al que pertenece
+  groupName?: string; // Nombre del grupo (ej. "Cajón 1")
   length: number; // mm
   width: number;  // mm
   thickness: number; // mm
@@ -257,6 +289,7 @@ export interface Project {
   materials: Material[];
   modules: FurnitureModule[];
   parts: Part[];
+  groups?: PartGroup[];
   hardware: HardwareItem[];
   laborCost: number;
   laborType: 'percent' | 'fixed';

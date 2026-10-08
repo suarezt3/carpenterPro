@@ -13,6 +13,8 @@ import {
   EdgeBandingType,
   Material,
   Part,
+  PartGroup,
+  ParametricDrawerConfig,
   PartOrientation,
   DrillHole,
   PartHardwareConfig
@@ -50,6 +52,53 @@ export class ModuleDesignerComponent {
   readonly selectedPartIds = signal<string[]>([]);
   // Dynamic Clearance Info from 3D (Luz libre a elementos adyacentes)
   readonly clearanceInfo = signal<ClearanceInfo | null>(null);
+
+  // Groups / Cajones Modulares
+  readonly groups = this.projectService.groupsList;
+
+  // Grupos con sus piezas asociadas
+  readonly groupsWithParts = computed(() => {
+    const grps = this.groups();
+    const parts = this.currentParts();
+    return grps.map(g => ({
+      group: g,
+      parts: parts.filter(p => p.groupId === g.id)
+    }));
+  });
+
+  // Piezas libres / sin grupo
+  readonly ungroupedParts = computed(() => {
+    return this.currentParts().filter(p => !p.groupId);
+  });
+
+  // Collapsed / expanded groups in parts list
+  readonly openGroupCardIds = signal<Set<string>>(new Set());
+
+  // Drawer Wizard Modal State
+  readonly showDrawerWizard = signal<boolean>(false);
+  readonly drawerForm = signal<ParametricDrawerConfig>({
+    name: 'Cajón 1',
+    outerWidth: 400,
+    slideLength: 450,
+    boxHeight: 140,
+    boxThickness: 15,
+    bottomThickness: 3,
+    slideGap: 26,
+    includeFront: true,
+    frontHeight: 180,
+    frontWidth: 396,
+    posX: 0,
+    posY: 120,
+    posZ: 0
+  });
+
+  // Quick group naming modal state
+  readonly showGroupNamingModal = signal<boolean>(false);
+  readonly newGroupNameInput = signal<string>('Cajón 1');
+
+  // Inline group renaming
+  readonly renamingGroupId = signal<string | null>(null);
+  readonly renamingGroupName = signal<string>('');
 
   // Technical Shop Sheet Modal
   readonly showTechnicalSheetModal = signal<boolean>(false);
@@ -925,5 +974,157 @@ export class ModuleDesignerComponent {
 
   exportDxf() {
     this.dxfExporter.exportProjectToDxf(this.project());
+  }
+
+  // --- ACCORDION & GROUP DISPLAY ---
+  toggleGroupAccordion(groupId: string) {
+    const cur = new Set(this.openGroupCardIds());
+    if (cur.has(groupId)) {
+      cur.delete(groupId);
+    } else {
+      cur.add(groupId);
+    }
+    this.openGroupCardIds.set(cur);
+  }
+
+  isGroupAccordionOpen(groupId: string): boolean {
+    return this.openGroupCardIds().has(groupId);
+  }
+
+  // --- MODULAR DRAWER WIZARD ---
+  openDrawerWizard() {
+    const nextNum = (this.groups().length || 0) + 1;
+    const defaultMat = this.materials()[0];
+    const mdfMat = this.materials().find(m => m.thickness === 3) || defaultMat;
+    this.drawerForm.set({
+      name: `Cajón ${nextNum}`,
+      outerWidth: 400,
+      slideLength: 450,
+      boxHeight: 140,
+      boxThickness: 15,
+      bottomThickness: 3,
+      slideGap: 26,
+      includeFront: true,
+      frontHeight: 180,
+      frontWidth: 396,
+      posX: 0,
+      posY: 100 + (nextNum - 1) * 200,
+      posZ: 0,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      bottomMaterialId: mdfMat ? mdfMat.id : 'mat_mdf_3'
+    });
+    this.showDrawerWizard.set(true);
+  }
+
+  closeDrawerWizard() {
+    this.showDrawerWizard.set(false);
+  }
+
+  updateDrawerFormField<K extends keyof ParametricDrawerConfig>(field: K, value: ParametricDrawerConfig[K]) {
+    this.drawerForm.update(cur => ({ ...cur, [field]: value }));
+  }
+
+  submitDrawerWizard() {
+    const config = this.drawerForm();
+    const grp = this.projectService.addParametricDrawer(config);
+    this.showDrawerWizard.set(false);
+    this.selectEntireGroup(grp.id);
+    this.openGroupCardIds.update(s => new Set(s).add(grp.id));
+    this.showToast(`✨ ${grp.name} generado con 5-6 piezas ensambladas`);
+  }
+
+  // --- MANUAL GROUPING & UNGROUPING ---
+  openGroupNamingModal() {
+    const selCount = this.selectedPartIds().length;
+    if (selCount < 2) {
+      this.showToast('Selecciona al menos 2 piezas para agrupar (usa Shift+Clic en 3D o en lista)');
+      return;
+    }
+    const nextNum = (this.groups().length || 0) + 1;
+    this.newGroupNameInput.set(`Cajón ${nextNum}`);
+    this.showGroupNamingModal.set(true);
+  }
+
+  closeGroupNamingModal() {
+    this.showGroupNamingModal.set(false);
+  }
+
+  confirmCreateGroup() {
+    const name = this.newGroupNameInput().trim() || `Cajón ${(this.groups().length || 0) + 1}`;
+    const selIds = this.selectedPartIds();
+    if (selIds.length < 2) return;
+    const grp = this.projectService.createGroup(name, selIds, 'drawer');
+    this.showGroupNamingModal.set(false);
+    this.openGroupCardIds.update(s => new Set(s).add(grp.id));
+    this.showToast(`🔗 ${grp.name} agrupado (${selIds.length} piezas)`);
+  }
+
+  ungroup(groupId: string) {
+    const grp = this.groups().find(g => g.id === groupId);
+    const name = grp ? grp.name : 'Grupo';
+    this.projectService.ungroup(groupId);
+    this.showToast(`🔓 ${name} desagrupado (piezas libres)`);
+  }
+
+  async deleteGroup(groupId: string, deleteParts = true) {
+    const grp = this.groups().find(g => g.id === groupId);
+    const name = grp ? grp.name : 'Grupo';
+    const confirmed = await this.confirmService.ask({
+      title: `¿Eliminar ${name}?`,
+      message: `Se eliminará el grupo y ${deleteParts ? 'todas sus piezas ensambladas' : 'se liberarán las piezas'}.`,
+      confirmText: 'Sí, eliminar',
+      cancelText: 'Cancelar',
+      severity: 'danger'
+    });
+    if (!confirmed) return;
+    this.projectService.deleteGroup(groupId, deleteParts);
+    this.deselectAll();
+    this.showToast(`🗑️ ${name} eliminado`);
+  }
+
+  toggleGroupOpen(groupId: string) {
+    this.projectService.toggleGroupOpen(groupId);
+  }
+
+  onGroupSlideChange(groupId: string, event: Event) {
+    const val = Number((event.target as HTMLInputElement).value) / 100;
+    this.projectService.setGroupSlideExtension(groupId, val);
+  }
+
+  selectEntireGroup(groupId: string) {
+    const groupParts = this.currentParts().filter(p => p.groupId === groupId);
+    const ids = groupParts.map(p => p.id);
+    this.selectedPartIds.set(ids);
+    this.selectedPartId.set(ids[0] || null);
+  }
+
+  moveGroup(groupId: string, axis: 'x' | 'y' | 'z', amount: number) {
+    const dx = axis === 'x' ? amount : 0;
+    const dy = axis === 'y' ? amount : 0;
+    const dz = axis === 'z' ? amount : 0;
+    this.projectService.moveGroup(groupId, dx, dy, dz);
+  }
+
+  startRenameGroup(group: PartGroup, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    this.renamingGroupId.set(group.id);
+    this.renamingGroupName.set(group.name);
+  }
+
+  saveRenameGroup(groupId: string) {
+    const name = this.renamingGroupName().trim();
+    if (name) {
+      this.projectService.updateGroup(groupId, { name });
+      this.showToast(`✏️ Grupo renombrado a "${name}"`);
+    }
+    this.renamingGroupId.set(null);
+  }
+
+  cancelRenameGroup() {
+    this.renamingGroupId.set(null);
+  }
+
+  roundPercent(val?: number): number {
+    return Math.round((val || 0) * 100);
   }
 }
