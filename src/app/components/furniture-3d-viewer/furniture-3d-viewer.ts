@@ -200,6 +200,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return list.length > 0 ? list[0] : null;
   });
 
+  updateSelectedPartDimension(prop: 'length' | 'width' | 'thickness', rawVal: string | number) {
+    const part = this.selectedPart();
+    if (!part) return;
+    const val = Number(rawVal);
+    if (isNaN(val) || val <= 0) return;
+    this.partModified.emit({
+      part,
+      updates: { [prop]: Math.round(val) }
+    });
+  }
+
   readonly isMultiSelect = computed(() => this.activeSelectedIds().length > 1);
 
   // Three.js Core

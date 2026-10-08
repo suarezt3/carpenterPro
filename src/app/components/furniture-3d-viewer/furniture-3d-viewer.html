@@ -904,9 +904,9 @@
       }
     </div>
 
-    <!-- Right: SketchUp Measurements Box -->
-    <div class="flex items-center gap-1.5 shrink-0 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200 font-mono text-xs">
-      <span class="text-[10px] uppercase font-bold text-slate-400">Medidas:</span>
+    <!-- Right: SketchUp Measurements Box (Alto x Ancho - Espesor mm) -->
+    <div class="flex items-center gap-1.5 shrink-0 bg-slate-100 dark:bg-zinc-800 px-2.5 py-0.5 rounded border border-slate-300 dark:border-zinc-700 font-mono text-xs">
+      <span class="text-[10px] uppercase font-bold text-slate-500 dark:text-zinc-400">Medidas:</span>
       @if (pushPullDelta(); as pp) {
         <strong class="text-amber-600">{{ pp.axisName }} {{ pp.currentVal }} mm</strong>
       } @else if (rectDrawDims(); as rd) {
@@ -914,9 +914,41 @@
       } @else if (measureDistance(); as dist) {
         <strong class="text-sky-600">{{ dist.total }} mm</strong>
       } @else if (selectedPart(); as sel) {
-        <strong class="text-slate-800">{{ sel.length }} × {{ sel.width }} mm</strong>
+        <div class="flex items-center gap-1">
+          <!-- Alto / Largo -->
+          <input 
+            type="number"
+            min="10"
+            step="1"
+            [value]="sel.length"
+            (input)="updateSelectedPartDimension('length', $any($event.target).value)"
+            class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
+            title="Alto / Largo (mm)" />
+          <span class="text-slate-400 font-bold text-[11px]">×</span>
+          <!-- Ancho -->
+          <input 
+            type="number"
+            min="10"
+            step="1"
+            [value]="sel.width"
+            (input)="updateSelectedPartDimension('width', $any($event.target).value)"
+            class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
+            title="Ancho (mm)" />
+          <span class="text-slate-400 font-bold text-[11px]">-</span>
+          <!-- Espesor / Grosor -->
+          <input 
+            type="number"
+            min="3"
+            max="60"
+            step="1"
+            [value]="sel.thickness"
+            (input)="updateSelectedPartDimension('thickness', $any($event.target).value)"
+            class="w-11 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
+            title="Espesor / Grosor (mm)" />
+          <span class="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold">mm</span>
+        </div>
       } @else {
-        <span class="text-slate-400">— mm</span>
+        <span class="text-slate-400 text-[11px] italic">Selecciona una pieza</span>
       }
     </div>
 

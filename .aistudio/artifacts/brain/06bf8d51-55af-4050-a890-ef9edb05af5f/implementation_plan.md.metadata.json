@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de reubicación y diseño interactivo del módulo de Dimensiones de Corte a la esquina inferior derecha del lienzo 3D estilo SketchUp, con edición en tiempo real de Largo, Ancho y Espesor, y aligeramiento del panel derecho de propiedades.",
-  "updatedAt":  "2026-10-08T14:21:50.840601861Z",
+  "summary":  "Plan para integrar los 3 campos numéricos compactos directos de medidas (Alto × Ancho - Espesor mm) en la barra inferior del lienzo 3D exactamente en el recuadro indicado por el usuario, eliminar el módulo flotante superpuesto y suprimir totalmente la sección de dimensiones del panel lateral derecho.",
+  "updatedAt":  "2026-10-08T14:59:16.952052289Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
