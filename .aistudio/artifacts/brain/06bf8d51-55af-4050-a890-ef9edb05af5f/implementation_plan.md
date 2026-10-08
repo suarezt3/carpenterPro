@@ -1,40 +1,47 @@
-# Plan de Implementación: Medidas Compactas en Barra Inferior del Visor 3D y Limpieza del Panel Derecho
+# Plan de Implementación: Separación Limpia de Melamina y Espesor Libre
 
 ## 1. Contexto y Diagnóstico
-El usuario aclaró mediante capturas de pantalla exactamente dónde y cómo desea gestionar las medidas:
-1. **Ubicación exacta**: En la barra inferior del visor 3D (el recuadro rojo señalado en la barra de estado de herramientas de SketchUp), en lugar de tener un módulo flotante ocupando espacio sobre el modelo 3D.
-2. **Formato exacto**: 3 campos numéricos compactos directos editables: `Alto × Ancho - Espesor mm` (ejemplo: `1000 × 600 - 15 mm`).
-3. **Panel derecho**: Eliminar totalmente la sesión/sección de dimensiones de corte para quitarle peso y scroll innecesario.
-4. **Lienzo 3D limpio**: Retirar la caja flotante grande agregada anteriormente para dejar el lienzo 100% despejado.
+Actualmente, los nombres de las melaminas incluyen espesores fijos en su etiqueta (ej. `MDF / Durolac Blanco 3mm (Fondos)` o `Melamina Blanca 18mm`). Si el usuario cambia el espesor de la pieza a 15mm, se produce una contradicción visual confusa: el desplegable dice "3mm" mientras que la pieza tiene asignado "15mm".
+
+El usuario ha especificado:
+1. **Selector de Melamina**: Debe mostrar **únicamente el color o textura** (ej. *Blanco Frost*, *Roble Nebraska*, *MDF Durolac Blanco*) sin mención de milímetros.
+2. **Asignación de Espesor**: Debe ser completamente libre e independiente, combinando **botones rápidos de taller** (3, 15, 18, 36 mm) con un **campo numérico directo** en milímetros para ingresar cualquier valor deseado (ej. 6, 12, 16, 25 mm).
+3. **Persistencia y Reactividad**: Al cambiar de melamina no se debe forzar ni sobrescribir el espesor que el usuario ya definió para su pieza.
 
 ---
 
 ## 2. Modificaciones Propuestas
 
-### A. Barra Inferior de Medidas en `furniture-3d-viewer` (`furniture-3d-viewer.html` y `.ts`)
-- Reemplazar la caja estática de texto `Medidas: ...` en la esquina inferior derecha de la barra de estado por **3 campos numéricos compactos directos**:
-  - Campo 1: **Alto / Largo** (ej. `1000`), editable en tiempo real.
-  - Separador visual: `×`
-  - Campo 2: **Ancho** (ej. `600`), editable en tiempo real.
-  - Separador visual: `-`
-  - Campo 3: **Espesor / Grosor** (ej. `15`), editable en tiempo real.
-  - Sufijo: `mm`
-- **Comportamiento interactivo**:
-  - Al cambiar cualquier valor, se emite inmediatamente la actualización milimétrica en tiempo real a la pieza seleccionada (o con tecla Enter / evento `input`/`change`).
-  - Inputs con estilos CAD compactos (ancho pequeño ~50-60px, centrados, tipografía mono negra sobre fondo blanco/gris con borde sutil), idénticos al cajetín de medidas de SketchUp.
-  - Si una herramienta interactiva está activa (ej. cinta métrica o empujar/tirar), muestra las cotas correspondientes.
-  - Si no hay pieza seleccionada, muestra las dimensiones totales del mueble o campos inactivos/placeholder claros.
+### A. Limpieza de Nombres de Melamina en `project-storage.service.ts`
+- Actualizar el catálogo predeterminado de materiales para que los nombres sean puramente de diseño/color:
+  - `Melamina Roble Nebraska` (en vez de `Melamina Roble Nebraska 18mm`)
+  - `Melamina Nogal Terracota`
+  - `Melamina Blanco Frost`
+  - `MDF Durolac Blanco` (en vez de `MDF / Durolac Blanco 3mm (Fondos)`)
+  - etc.
+- Implementar una función de saneamiento para que los materiales ya guardados en `localStorage` también se limpien automáticamente de sufijos como `18mm`, `15mm`, `3mm`.
 
-### B. Limpieza del Lienzo 3D en `module-designer.html`
-- Retirar la tarjeta flotante grande superpuesta que se había colocado en la esquina inferior derecha del lienzo para no tapar el modelo ni las herramientas de zoom/órbita.
+### B. Ajuste de `onMaterialChange` en `module-designer.ts`
+- Modificar `onMaterialChange` para que **únicamente actualice `materialId` y `materialName`**, manteniendo intacto el `thickness` actual de la pieza salvo que sea una pieza nueva sin espesor.
 
-### C. Supresión Total de Dimensiones en el Panel Derecho (`module-designer.html`)
-- Eliminar por completo el bloque de dimensiones del panel lateral derecho, dejando únicamente el nombre de la pieza, el material, tapacantos, orientación y accesorios.
-- De esta manera el panel lateral queda sumamente ligero, enfocado y sin redundancia.
+### C. Rediseño de la Sección "Tablero & Espesor" en `module-designer.html`
+- **Desplegable de Melamina**:
+  - Mostrar solo `mat.name` (color/textura) junto a una muestra visual de color (círculo `colorHex`), sin el texto `({{ mat.thickness }} mm)`.
+- **Control de Espesor Libre y Rápido**:
+  - **Fila superior de control libre**: Campo de entrada numérico directo con botón de incremento/decremento `[ -1 ]` y `[ +1 ]`, permitiendo tipear cualquier espesor en milímetros con validación reactiva en tiempo real.
+  - **Botones rápidos de taller**: Conservar los accesos rápidos de 1 clic para los estándares más comunes (`3 mm`, `15 mm`, `18 mm`, `36 mm`), marcando como activo aquel que coincida con el espesor actual.
+  - Badge de estado claro en la cabecera mostrando el espesor actual de la pieza.
+
+### D. Armonización en `templates-catalog.service.ts`
+- Asegurar que las plantillas iniciales asignen nombres limpios de material sin sufijos numéricos.
 
 ---
 
 ## 3. Plan de Verificación
-1. **Linter**: Ejecutar `lint_applet` para garantizar que no existan errores de sintaxis ni variables faltantes.
-2. **Compilación**: Ejecutar `compile_applet` para verificar la compilación limpia de Angular.
-3. **Prueba visual**: Comprobar que en la barra inferior se muestre `[1000] × [600] - [15] mm`, que la edición reactiva funcione al tipear, que el lienzo 3D esté libre de cajas superpuestas y que el panel derecho no tenga la sección de dimensiones.
+1. **Linter**: Ejecutar `lint_applet` para asegurar ausencia de errores de sintaxis y tipos.
+2. **Compilación**: Ejecutar `compile_applet` para validar el empaquetado Angular.
+3. **Prueba funcional**:
+   - Abrir el panel derecho en una pieza seleccionada.
+   - Verificar que el selector muestre nombres limpios de color (ej. "MDF Durolac Blanco", "Blanco Frost").
+   - Cambiar de material y comprobar que el espesor de la pieza no se altere.
+   - Probar tanto los botones rápidos (15, 18 mm) como el campo numérico libre (ej. 12 mm) y comprobar que la pieza y el visor 3D se actualicen en tiempo real.

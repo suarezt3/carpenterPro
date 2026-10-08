@@ -797,9 +797,9 @@
                   type="button"
                   (click)="assignQuickMaterial(mat.id)"
                   [class]="part.materialId === mat.id ? 'bg-sky-50 text-sky-700 font-bold border border-sky-200' : 'hover:bg-white text-slate-700'"
-                  class="px-2 py-1 rounded-lg text-left truncate flex items-center justify-between">
-                  <span class="truncate">{{ mat.name }}</span>
-                  <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ mat.thickness }}mm</span>
+                  class="px-2 py-1.5 rounded-lg text-left truncate flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full border border-slate-300 shrink-0" [style.background-color]="mat.colorHex"></span>
+                  <span class="truncate text-xs">{{ mat.name }}</span>
                 </button>
               }
             </div>

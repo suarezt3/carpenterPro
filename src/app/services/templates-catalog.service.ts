@@ -25,7 +25,7 @@ export class TemplatesCatalogService {
     if (found) {
       return { id: found.id, name: found.name, thickness: found.thickness };
     }
-    const def = materials[0] || { id: 'mat_default', name: 'Melamina Blanca 18mm', thickness: 18 };
+    const def = materials[0] || { id: 'mat_default', name: 'Melamina Blanco Frost Mate', thickness: 18 };
     return { id: def.id, name: def.name, thickness: def.thickness };
   }
 
@@ -230,7 +230,7 @@ export class TemplatesCatalogService {
       generateParts: (mats, offsetX = 0) => {
         const matBody = this.getMaterial(mats, 'blanco');
         const matTop = this.getMaterial(mats, 'roble');
-        const matBottom = this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_6', name: 'MDF 6mm', thickness: 6 };
+        const matBottom = this.getMaterial(mats, 'durolac') || this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_3', name: 'MDF Durolac Blanco', thickness: 3 };
         const t = matBody.thickness || 18;
         const width = 600;
         const height = 750;

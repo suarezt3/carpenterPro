@@ -3929,8 +3929,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       part,
       updates: {
         materialId: mat.id,
-        materialName: mat.name,
-        thickness: mat.thickness
+        materialName: mat.name
       }
     });
     this.closeContextMenu();
@@ -3968,20 +3967,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const sel = this.selectedPart();
     if (!sel || isNaN(value) || value < 1) return;
     const val = Math.max(1, Math.round(value));
-    if (dim === 'thickness') {
-      const matchingMat = this.materials().find(m => m.thickness === val);
-      const updates: Partial<Part> = { thickness: val };
-      if (matchingMat) {
-        updates.materialId = matchingMat.id;
-        updates.materialName = matchingMat.name;
-      }
-      this.partModified.emit({ part: sel, updates });
-    } else {
-      this.partModified.emit({
-        part: sel,
-        updates: { [dim]: val }
-      });
-    }
+    this.partModified.emit({
+      part: sel,
+      updates: { [dim]: val }
+    });
   }
 
   adjustSelectedDimension(dim: 'length' | 'width' | 'thickness', delta: number) {

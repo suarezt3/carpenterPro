@@ -11,6 +11,7 @@ import { ProjectStorageService } from '../../services/project-storage.service';
 import {
   ComponentRole,
   EdgeBandingType,
+  Material,
   Part,
   PartOrientation,
   DrillHole,
@@ -179,6 +180,13 @@ export class ModuleDesignerComponent {
     const id = this.selectedPartId();
     if (!id) return null;
     return this.currentParts().find(p => p.id === id) || null;
+  });
+
+  // Active material object for selected part
+  readonly selectedPartMaterial = computed<Material | null>(() => {
+    const sel = this.selectedPart();
+    if (!sel) return null;
+    return this.materials().find(m => m.id === sel.materialId) || null;
   });
 
   // Computed multiple selected parts
@@ -425,7 +433,7 @@ export class ModuleDesignerComponent {
       thickness: partData.thickness || (defaultMat ? defaultMat.thickness : 18),
       quantity: 1,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
-      materialName: defaultMat ? defaultMat.name : 'Melamina Blanca 18mm',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Blanco Frost Mate',
       grain: 'length',
       edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
       posX: partData.posX ?? 0,
@@ -457,29 +465,21 @@ export class ModuleDesignerComponent {
     }
   }
 
-  // Sets material and automatically synchronizes the matching thickness & name
+  // Sets melamine color/texture without modifying the piece's custom thickness
   onMaterialChange(matId: string) {
     const mat = this.materials().find(m => m.id === matId);
     if (!mat) return;
     this.updateSelectedPart({
       materialId: mat.id,
-      materialName: mat.name,
-      thickness: mat.thickness
+      materialName: mat.name
     });
   }
 
-  // Quick thickness buttons that match or adapt the project material seamlessly
+  // Quick or free custom thickness adjustment without altering the assigned melamine
   onThicknessChange(thickness: number) {
-    const matchingMat = this.materials().find(m => m.thickness === thickness);
-    if (matchingMat) {
-      this.updateSelectedPart({
-        thickness,
-        materialId: matchingMat.id,
-        materialName: matchingMat.name
-      });
-    } else {
-      this.updateSelectedPart({ thickness });
-    }
+    if (isNaN(thickness) || thickness <= 0) return;
+    const t = Math.max(1, Math.min(100, Math.round(thickness)));
+    this.updateSelectedPart({ thickness: t });
   }
 
   adjustPartProperty(prop: 'length' | 'width' | 'thickness' | 'posX' | 'posY' | 'posZ', delta: number) {

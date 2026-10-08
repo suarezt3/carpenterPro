@@ -46,6 +46,15 @@ export function formatCurrencyValue(amount: number, currency = 'COP'): string {
   }
 }
 
+export function cleanMaterialName(name: string): string {
+  if (!name) return '';
+  return name
+    .replace(/\s*\d+\s*mm\s*(\(Fondos\))?/gi, '')
+    .replace(/\s*\(Fondos\)/gi, '')
+    .replace(/^MDF\s*\/\s*Durolac/i, 'MDF Durolac')
+    .trim();
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -134,9 +143,22 @@ export class ProjectStorageService {
             const demo = this.createDemoProject();
             if (!parsed.materials) parsed.materials = [];
             for (const dm of demo.materials) {
-              if (!parsed.materials.some((m: Material) => m.id === dm.id)) {
+              const existingIdx = parsed.materials.findIndex((m: Material) => m.id === dm.id);
+              if (existingIdx === -1) {
                 parsed.materials.push(dm);
+              } else {
+                parsed.materials[existingIdx].name = cleanMaterialName(parsed.materials[existingIdx].name);
               }
+            }
+            parsed.materials = parsed.materials.map((m: Material) => ({
+              ...m,
+              name: cleanMaterialName(m.name)
+            }));
+            if (parsed.parts && Array.isArray(parsed.parts)) {
+              parsed.parts = parsed.parts.map((p: Part) => ({
+                ...p,
+                materialName: cleanMaterialName(p.materialName)
+              }));
             }
             return parsed;
           }
@@ -151,7 +173,7 @@ export class ProjectStorageService {
   createDemoProject(): Project {
     const matRoble: Material = {
       id: 'mat_roble_18',
-      name: 'Melamina Roble Nebraska 18mm',
+      name: 'Melamina Roble Nebraska',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -163,7 +185,7 @@ export class ProjectStorageService {
 
     const matNogal: Material = {
       id: 'mat_nogal_18',
-      name: 'Melamina Nogal Terracota 18mm',
+      name: 'Melamina Nogal Terracota',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -175,7 +197,7 @@ export class ProjectStorageService {
 
     const matRobleMiel: Material = {
       id: 'mat_roblemiel_18',
-      name: 'Melamina Roble Miel Cálido 18mm',
+      name: 'Melamina Roble Miel Cálido',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -187,7 +209,7 @@ export class ProjectStorageService {
 
     const matTeca: Material = {
       id: 'mat_teca_18',
-      name: 'Melamina Teca Natural 18mm',
+      name: 'Melamina Teca Natural',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -199,7 +221,7 @@ export class ProjectStorageService {
 
     const matFresno: Material = {
       id: 'mat_fresno_18',
-      name: 'Melamina Fresno Nórdico Claro 18mm',
+      name: 'Melamina Fresno Nórdico Claro',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -211,7 +233,7 @@ export class ProjectStorageService {
 
     const matCalacatta: Material = {
       id: 'mat_calacatta_18',
-      name: 'Melamina Mármol Calacatta Blanco 18mm',
+      name: 'Melamina Mármol Calacatta Blanco',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -223,7 +245,7 @@ export class ProjectStorageService {
 
     const matGranito: Material = {
       id: 'mat_granito_18',
-      name: 'Melamina Granito Negro Absoluto 18mm',
+      name: 'Melamina Granito Negro Absoluto',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -235,7 +257,7 @@ export class ProjectStorageService {
 
     const matBlanco: Material = {
       id: 'mat_blanco_18',
-      name: 'Melamina Blanco Frost Mate 18mm',
+      name: 'Melamina Blanco Frost Mate',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -247,7 +269,7 @@ export class ProjectStorageService {
 
     const matGrafito: Material = {
       id: 'mat_grafito_18',
-      name: 'Melamina Negro Grafito Antihuella 18mm',
+      name: 'Melamina Negro Grafito Antihuella',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -259,7 +281,7 @@ export class ProjectStorageService {
 
     const matSalvia: Material = {
       id: 'mat_salvia_18',
-      name: 'Melamina Verde Salvia Mate 18mm',
+      name: 'Melamina Verde Salvia Mate',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -271,7 +293,7 @@ export class ProjectStorageService {
 
     const matTerracota: Material = {
       id: 'mat_terracota_18',
-      name: 'Melamina Terracota / Barro Cálido 18mm',
+      name: 'Melamina Terracota / Barro Cálido',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -283,7 +305,7 @@ export class ProjectStorageService {
 
     const matAntracita: Material = {
       id: 'mat_antracita_18',
-      name: 'Melamina Gris Antracita 18mm',
+      name: 'Melamina Gris Antracita',
       thickness: 18,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -295,7 +317,7 @@ export class ProjectStorageService {
 
     const matGris15: Material = {
       id: 'mat_gris_15',
-      name: 'Melamina Gris Perla 15mm',
+      name: 'Melamina Gris Perla',
       thickness: 15,
       sheetLength: 2440,
       sheetWidth: 1830,
@@ -307,7 +329,7 @@ export class ProjectStorageService {
 
     const matMdfFondo: Material = {
       id: 'mat_mdf_3',
-      name: 'MDF / Durolac Blanco 3mm (Fondos)',
+      name: 'MDF Durolac Blanco',
       thickness: 3,
       sheetLength: 2440,
       sheetWidth: 1830,

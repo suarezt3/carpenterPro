@@ -76,7 +76,7 @@
         [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-hidden focus:border-amber-500 cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-hidden focus:border-amber-500 cursor-pointer'">
         <option value="all">Todos los Materiales</option>
         @for (mat of materials(); track mat.id) {
-          <option [value]="mat.id">{{ mat.name }} ({{ mat.thickness }}mm)</option>
+          <option [value]="mat.id">{{ mat.name }}</option>
         }
       </select>
     </div>
@@ -310,7 +310,7 @@
                 formControlName="materialId"
                 [class]="themeService.isClassic() ? 'w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700' : 'w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white'">
                 @for (mat of materials(); track mat.id) {
-                  <option [value]="mat.id">{{ mat.name }} ({{ mat.thickness }}mm)</option>
+                  <option [value]="mat.id">{{ mat.name }}</option>
                 }
               </select>
             </div>

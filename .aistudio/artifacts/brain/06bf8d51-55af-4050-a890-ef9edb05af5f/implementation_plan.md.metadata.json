@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para integrar los 3 campos numéricos compactos directos de medidas (Alto × Ancho - Espesor mm) en la barra inferior del lienzo 3D exactamente en el recuadro indicado por el usuario, eliminar el módulo flotante superpuesto y suprimir totalmente la sección de dimensiones del panel lateral derecho.",
-  "updatedAt":  "2026-10-08T14:59:16.952052289Z",
+  "summary":  "Plan para independizar la selección de color/textura de melamina y la asignación libre de espesor en el panel derecho, limpiando los nombres de materiales (sin sufijos de milímetros) y agregando tanto botones rápidos de taller como un campo numérico libre en milímetros.",
+  "updatedAt":  "2026-10-08T19:23:47.204412372Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
