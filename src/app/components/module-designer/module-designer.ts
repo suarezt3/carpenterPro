@@ -429,14 +429,14 @@ export class ModuleDesignerComponent {
       name: partData.name || `Pieza ${this.currentParts().length + 1}`,
       length: partData.length || 600,
       width: partData.width || 400,
-      thickness: partData.thickness || (defaultMat ? defaultMat.thickness : 18),
+      thickness: partData.thickness || 15,
       quantity: 1,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
       materialName: defaultMat ? defaultMat.name : 'Melamina Blanco Frost Mate',
       grain: 'length',
       edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
       posX: partData.posX ?? 0,
-      posY: partData.posY ?? 9,
+      posY: partData.posY ?? 7.5,
       posZ: partData.posZ ?? 0,
       orientation: partData.orientation || 'horizontal',
       componentRole: 'free'
@@ -627,12 +627,12 @@ export class ModuleDesignerComponent {
     const whiteMat = mats.find(m => !m.hasGrain && m.thickness >= 15) || mats[0];
     const mdfMat = mats.find(m => m.thickness <= 6) || mats[0];
 
-    const defaultT = 18;
+    const defaultT = 15;
     let newPart: Part;
 
     const currentParts = this.currentParts();
     // Approximate reference bounds
-    const maxTopY = currentParts.reduce((max, p) => Math.max(max, (p.posY ?? 0) + (p.thickness || 18)), 850);
+    const maxTopY = currentParts.reduce((max, p) => Math.max(max, (p.posY ?? 0) + (p.thickness || 15)), 850);
 
     switch (role) {
       case 'top':

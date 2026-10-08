@@ -3298,13 +3298,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (L >= 60 && W >= 60) {
         const posX = Math.round((this.rectStartPoint.x + this.rectCurrentPoint.x) / 2);
         const posZ = Math.round((this.rectStartPoint.z + this.rectCurrentPoint.z) / 2);
-        const posY = this.rectStartPoint.y + 9;
+        const posY = this.rectStartPoint.y + 7.5;
 
         this.partCreated.emit({
           name: `Pieza Dibujada ${this.parts().length + 1}`,
           length: L,
           width: W,
-          thickness: 18,
+          thickness: 15,
           posX,
           posY,
           posZ,
@@ -3572,7 +3572,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     const length = Math.max(20, maxX - minX);
     const width = Math.max(20, maxZ - minZ);
-    const thickness = 18;
+    const thickness = 15;
 
     const centerX = (minX + maxX) / 2;
     const centerZ = (minZ + maxZ) / 2;
