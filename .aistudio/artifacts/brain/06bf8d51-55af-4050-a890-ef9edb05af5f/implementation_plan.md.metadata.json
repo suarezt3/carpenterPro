@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para la creación modular de cajones y agrupación de piezas:\n1. Modelo de datos con PartGroup (id, nombre, tipo, extensión de corredera, estado de apertura) y groupId en Part.\n2. Funcionalidad de Agrupar y Desagrupar selecciones libres de piezas.\n3. Asistente Rápido de Cajón paramétrico (laterales, frente interior, trasera, fondo MDF 3mm y frente solapado con holguras para correderas telescópicas).\n4. Animación interactiva 3D con clic directo en el cajón y control deslizante en el panel.\n5. Organización visual en la lista de despiece con secciones desplegables por grupo/cajón sin alterar el cálculo de corte.",
-  "updatedAt":  "2026-10-08T21:18:36.752473009Z",
+  "summary":  "Plan de corrección para el ensamble 3D de cajones modulares:\n1. Corrección de la orientación dimensional vertical_yz en el visor 3D para laterales de cajón (asignando altura en Y y profundidad de corredera en Z).\n2. Ensamble de taller sin colisiones: fondo MDF 3mm como base y los laterales, contra-frente y trasera asentados exactamente sobre él.\n3. Posicionamiento del frente exterior solapado hacia +Z con tirador centrado y correderas telescópicas perfectamente adosadas a las caras exteriores de los laterales.\n4. Sincronización en el motor de colisiones (JoineryEngine) para eliminar advertencias rojas.",
+  "updatedAt":  "2026-10-08T21:51:14.477872946Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

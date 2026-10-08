@@ -23,6 +23,7 @@ export type ComponentRole =
   | 'door' 
   | 'drawer_front' 
   | 'drawer_box'
+  | 'drawer_lateral'
   | 'plinth' 
   | 'tie'
   | 'free';

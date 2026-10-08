@@ -40,17 +40,34 @@ export class JoineryEngineService {
 
     const orient = part.orientation || 'horizontal';
     if (orient === 'vertical_yz') {
-      sx = t;
-      sy = L;
-      sz = W;
+      const isDrawerLateral = part.componentRole === 'drawer_box' ||
+        part.componentRole === 'drawer_lateral' ||
+        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+      if (isDrawerLateral && L > W) {
+        sx = t;
+        sy = W;
+        sz = L;
+      } else {
+        sx = t;
+        sy = L;
+        sz = W;
+      }
     } else if (orient === 'vertical_xy') {
-      const isDoor = part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA');
-      const isDrawer = part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('CAJÓN') || part.name.toUpperCase().includes('CAJON') || part.name.toUpperCase().includes('GAVETA');
-      if (isDoor && L > W) {
+      const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
+        !part.name.toUpperCase().includes('CAJ');
+      const isDrawerFront = part.componentRole === 'drawer_front';
+      const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
+        part.name.toUpperCase().includes('CONTRA') ||
+        part.name.toUpperCase().includes('TRASERA');
+      if (isDrawerBoxHead) {
+        sx = L;
+        sy = W;
+        sz = t;
+      } else if (isDoor && L > W) {
         sx = W;
         sy = L;
         sz = t;
-      } else if (isDrawer && W > L) {
+      } else if (isDrawerFront && W > L) {
         sx = W;
         sy = L;
         sz = t;

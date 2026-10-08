@@ -264,9 +264,23 @@ export class ModuleDesignerComponent {
       if (p.orientation === 'horizontal') {
         sx = p.length; sy = p.thickness; sz = p.width;
       } else if (p.orientation === 'vertical_yz') {
-        sx = p.thickness; sy = p.length; sz = p.width;
+        const isDrawerLateral = p.componentRole === 'drawer_box' ||
+          p.componentRole === 'drawer_lateral' ||
+          (p.name.toUpperCase().includes('LATERAL') && (p.name.toUpperCase().includes('CAJ') || !!p.groupId));
+        if (isDrawerLateral && (p.length || 0) > (p.width || 0)) {
+          sx = p.thickness || 15; sy = p.width; sz = p.length;
+        } else {
+          sx = p.thickness || 15; sy = p.length; sz = p.width;
+        }
       } else {
-        sx = p.length; sy = p.width; sz = p.thickness;
+        const isDrawerBoxHead = p.componentRole === 'drawer_box' ||
+          p.name.toUpperCase().includes('CONTRA') ||
+          p.name.toUpperCase().includes('TRASERA');
+        if (isDrawerBoxHead) {
+          sx = p.length; sy = p.width; sz = p.thickness || 15;
+        } else {
+          sx = p.length; sy = p.width; sz = p.thickness || 18;
+        }
       }
       const px = p.posX ?? 0;
       const py = p.posY ?? 0;
@@ -572,7 +586,10 @@ export class ModuleDesignerComponent {
 
     let sy = t;
     if (orientation === 'vertical_yz') {
-      sy = L;
+      const isDrawerLateral = current.componentRole === 'drawer_box' ||
+        current.componentRole === 'drawer_lateral' ||
+        (current.name.toUpperCase().includes('LATERAL') && (current.name.toUpperCase().includes('CAJ') || !!current.groupId));
+      sy = (isDrawerLateral && L > current.width) ? current.width : L;
     } else if (orientation === 'vertical_xy') {
       sy = current.width;
     }

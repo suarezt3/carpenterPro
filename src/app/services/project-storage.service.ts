@@ -1146,96 +1146,7 @@ export class ProjectStorageService {
       frontGap: gap
     };
 
-    // 1. Lateral Izquierdo
-    const latIzq: Part = {
-      id: `${groupId}_lat_izq`,
-      name: `Lateral Izq (${groupName})`,
-      groupId,
-      groupName,
-      length: boxLen,
-      width: boxH,
-      thickness: t,
-      quantity: 1,
-      materialId: defaultMat ? defaultMat.id : 'mat-1',
-      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
-      grain: defaultMat?.hasGrain ? 'length' : 'none',
-      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-      posX: basePosX - (boxWidth / 2) + (t / 2),
-      posY: basePosY + (boxH / 2),
-      posZ: basePosZ,
-      orientation: 'vertical_yz',
-      componentRole: 'drawer_box',
-      notes: `Corredera ${boxLen}mm`
-    };
-
-    // 2. Lateral Derecho
-    const latDer: Part = {
-      id: `${groupId}_lat_der`,
-      name: `Lateral Der (${groupName})`,
-      groupId,
-      groupName,
-      length: boxLen,
-      width: boxH,
-      thickness: t,
-      quantity: 1,
-      materialId: defaultMat ? defaultMat.id : 'mat-1',
-      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
-      grain: defaultMat?.hasGrain ? 'length' : 'none',
-      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-      posX: basePosX + (boxWidth / 2) - (t / 2),
-      posY: basePosY + (boxH / 2),
-      posZ: basePosZ,
-      orientation: 'vertical_yz',
-      componentRole: 'drawer_box',
-      notes: `Corredera ${boxLen}mm`
-    };
-
-    // 3. Contra-frente (frente interior)
-    const testeraWidth = Math.max(80, boxWidth - (2 * t));
-    const contraFrente: Part = {
-      id: `${groupId}_contrafrente`,
-      name: `Contra-frente (${groupName})`,
-      groupId,
-      groupName,
-      length: testeraWidth,
-      width: boxH,
-      thickness: t,
-      quantity: 1,
-      materialId: defaultMat ? defaultMat.id : 'mat-1',
-      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
-      grain: defaultMat?.hasGrain ? 'length' : 'none',
-      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-      posX: basePosX,
-      posY: basePosY + (boxH / 2),
-      posZ: basePosZ + (boxLen / 2) - (t / 2),
-      orientation: 'vertical_xy',
-      componentRole: 'drawer_box',
-      notes: 'Frente interior de caja'
-    };
-
-    // 4. Trasera de Cajón
-    const trasera: Part = {
-      id: `${groupId}_trasera`,
-      name: `Trasera (${groupName})`,
-      groupId,
-      groupName,
-      length: testeraWidth,
-      width: boxH,
-      thickness: t,
-      quantity: 1,
-      materialId: defaultMat ? defaultMat.id : 'mat-1',
-      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
-      grain: defaultMat?.hasGrain ? 'length' : 'none',
-      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-      posX: basePosX,
-      posY: basePosY + (boxH / 2),
-      posZ: basePosZ - (boxLen / 2) + (t / 2),
-      orientation: 'vertical_xy',
-      componentRole: 'drawer_box',
-      notes: 'Trasera de caja'
-    };
-
-    // 5. Fondo MDF 3mm
+    // 1. Fondo MDF 3mm (Colocado en la base inferior por debajo de la caja)
     const fondo: Part = {
       id: `${groupId}_fondo_mdf`,
       name: `Fondo MDF (${groupName})`,
@@ -1254,15 +1165,108 @@ export class ProjectStorageService {
       posZ: basePosZ,
       orientation: 'horizontal',
       componentRole: 'drawer_box',
-      notes: 'Fondo MDF 3mm para cajón'
+      notes: 'Fondo MDF 3mm colocado por debajo de la caja'
+    };
+
+    // Las 4 paredes de la caja (Laterales, contra-frente, trasera) asientan exactamente sobre el fondo
+    const boxCenterY = basePosY + bT + (boxH / 2);
+
+    // 2. Lateral Izquierdo
+    const latIzq: Part = {
+      id: `${groupId}_lat_izq`,
+      name: `Lateral Izq (${groupName})`,
+      groupId,
+      groupName,
+      length: boxLen,
+      width: boxH,
+      thickness: t,
+      quantity: 1,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      grain: defaultMat?.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: basePosX - (boxWidth / 2) + (t / 2),
+      posY: boxCenterY,
+      posZ: basePosZ,
+      orientation: 'vertical_yz',
+      componentRole: 'drawer_box',
+      notes: `Corredera ${boxLen}mm`
+    };
+
+    // 3. Lateral Derecho
+    const latDer: Part = {
+      id: `${groupId}_lat_der`,
+      name: `Lateral Der (${groupName})`,
+      groupId,
+      groupName,
+      length: boxLen,
+      width: boxH,
+      thickness: t,
+      quantity: 1,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      grain: defaultMat?.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: basePosX + (boxWidth / 2) - (t / 2),
+      posY: boxCenterY,
+      posZ: basePosZ,
+      orientation: 'vertical_yz',
+      componentRole: 'drawer_box',
+      notes: `Corredera ${boxLen}mm`
+    };
+
+    // 4. Contra-frente (frente interior ajustado entre laterales)
+    const testeraWidth = Math.max(80, boxWidth - (2 * t));
+    const contraFrente: Part = {
+      id: `${groupId}_contrafrente`,
+      name: `Contra-frente (${groupName})`,
+      groupId,
+      groupName,
+      length: testeraWidth,
+      width: boxH,
+      thickness: t,
+      quantity: 1,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      grain: defaultMat?.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: basePosX,
+      posY: boxCenterY,
+      posZ: basePosZ + (boxLen / 2) - (t / 2),
+      orientation: 'vertical_xy',
+      componentRole: 'drawer_box',
+      notes: 'Frente interior de caja'
+    };
+
+    // 5. Trasera de Cajón (ajustada entre laterales)
+    const trasera: Part = {
+      id: `${groupId}_trasera`,
+      name: `Trasera (${groupName})`,
+      groupId,
+      groupName,
+      length: testeraWidth,
+      width: boxH,
+      thickness: t,
+      quantity: 1,
+      materialId: defaultMat ? defaultMat.id : 'mat-1',
+      materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      grain: defaultMat?.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: basePosX,
+      posY: boxCenterY,
+      posZ: basePosZ - (boxLen / 2) + (t / 2),
+      orientation: 'vertical_xy',
+      componentRole: 'drawer_box',
+      notes: 'Trasera de caja'
     };
 
     const newParts: Part[] = [latIzq, latDer, contraFrente, trasera, fondo];
 
-    // 6. Frente exterior visto si se solicitó
-    if (cfg.includeFront) {
+    // 6. Frente exterior visto si se solicitó (por defecto activo)
+    const includeFront = cfg.includeFront !== false;
+    if (includeFront) {
       const fW = cfg.frontWidth || cfg.outerWidth;
-      const fH = cfg.frontHeight || (boxH + 40);
+      const fH = cfg.frontHeight || (boxH + bT + 30);
       const frente: Part = {
         id: `${groupId}_frente`,
         name: `Frente Vista (${groupName})`,
@@ -1277,7 +1281,7 @@ export class ProjectStorageService {
         grain: defaultMat?.hasGrain ? 'length' : 'none',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
         posX: basePosX,
-        posY: basePosY + (fH / 2) - 10,
+        posY: basePosY + (fH / 2),
         posZ: basePosZ + (boxLen / 2) + (t / 2),
         orientation: 'vertical_xy',
         componentRole: 'drawer_front',

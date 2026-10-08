@@ -575,18 +575,35 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       const orient = part.orientation || 'horizontal';
       if (orient === 'vertical_yz') {
-        sx = t;
-        sy = L;
-        sz = W;
+        const isDrawerLateral = part.componentRole === 'drawer_box' ||
+          part.componentRole === 'drawer_lateral' ||
+          (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+        if (isDrawerLateral && L > W) {
+          sx = t;
+          sy = W; // Altura real de la caja del cajón (ej. 140 mm)
+          sz = L; // Profundidad de la corredera / cajón (ej. 450 mm)
+        } else {
+          sx = t;
+          sy = L;
+          sz = W;
+        }
       } else if (orient === 'vertical_xy') {
-        const isDoor = part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA');
-        const isDrawer = part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('CAJÓN') || part.name.toUpperCase().includes('CAJON') || part.name.toUpperCase().includes('GAVETA');
-        if (isDoor && L > W) {
+        const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
+          !part.name.toUpperCase().includes('CAJ');
+        const isDrawerFront = part.componentRole === 'drawer_front';
+        const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
+          part.name.toUpperCase().includes('CONTRA') ||
+          part.name.toUpperCase().includes('TRASERA');
+        if (isDrawerBoxHead) {
+          sx = L;
+          sy = W;
+          sz = t;
+        } else if (isDoor && L > W) {
           // En carpintería, la veta/largo de una puerta corre verticalmente (altura en Y) y el ancho en X
           sx = W;
           sy = L;
           sz = t;
-        } else if (isDrawer && W > L) {
+        } else if (isDrawerFront && W > L) {
           sx = W;
           sy = L;
           sz = t;
@@ -736,11 +753,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const hasSeparateBoxParts = parts.some(other =>
           other.id !== part.id && (
             (other.groupId && other.groupId === part.groupId) ||
-            other.componentRole === 'drawer_box' ||
-            (other.name.toUpperCase().includes('GAVETA') || 
-             other.name.toUpperCase().includes('CAJÓN') || 
-             other.name.toUpperCase().includes('CAJON'))
-          ) && Math.abs((other.posY || 0) - (part.posY || 0)) < 35
+            (
+              (other.componentRole === 'drawer_box' ||
+               other.name.toUpperCase().includes('GAVETA') || 
+               other.name.toUpperCase().includes('CAJÓN') || 
+               other.name.toUpperCase().includes('CAJON')) &&
+              Math.abs((other.posY || 0) - (part.posY || 0)) < 150
+            )
+          )
         );
 
         // If it's a front plate without separate 3D box parts, attach complete 5-piece drawer box
@@ -958,13 +978,24 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
     } else if (orient === 'vertical_yz') {
-      // Length along Y (Height), Width along Z
-      const handleLPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16, 0), 0x2563eb, 'length', 1);
-      const handleLMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16, 0), 0x2563eb, 'length', -1);
-      const handleWPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0xf59e0b, 'width', 1);
-      const handleWMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0xf59e0b, 'width', -1);
-
-      group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
+      const isDrawerLateral = part.componentRole === 'drawer_box' ||
+        part.componentRole === 'drawer_lateral' ||
+        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+      if (isDrawerLateral && (part.length || 0) > (part.width || 0)) {
+        // En lateral de cajón: Length es profundidad en eje Z, Width es altura en eje Y
+        const handleLPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0x2563eb, 'length', 1);
+        const handleLMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0x2563eb, 'length', -1);
+        const handleWPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16), 0xf59e0b, 'width', 1);
+        const handleWMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16), 0xf59e0b, 'width', -1);
+        group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
+      } else {
+        // Length along Y (Height), Width along Z
+        const handleLPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16, 0), 0x2563eb, 'length', 1);
+        const handleLMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16, 0), 0x2563eb, 'length', -1);
+        const handleWPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0xf59e0b, 'width', 1);
+        const handleWMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0xf59e0b, 'width', -1);
+        group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
+      }
     } else {
       // Frontal (XY): Length along X, Width along Y
       const handleLPlus = createStretchHandle(new THREE.Vector3(sx / 2 + 16, 0, 0), 0x2563eb, 'length', 1);
@@ -1498,11 +1529,28 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const L = part.length;
         const W = part.width;
         let sx = L; let sy = t; let sz = W;
-        if (part.orientation === 'vertical_yz') { sx = t; sy = L; sz = W; }
-        else if (part.orientation === 'vertical_xy') {
-          if (item.isDoor && L > W) { sx = W; sy = L; sz = t; }
-          else if (item.isDrawer && W > L) { sx = W; sy = L; sz = t; }
-          else { sx = L; sy = W; sz = t; }
+        if (part.orientation === 'vertical_yz') {
+          const isDrawerLateral = part.componentRole === 'drawer_box' ||
+            part.componentRole === 'drawer_lateral' ||
+            (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+          if (isDrawerLateral && L > W) {
+            sx = t; sy = W; sz = L;
+          } else {
+            sx = t; sy = L; sz = W;
+          }
+        } else if (part.orientation === 'vertical_xy') {
+          const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
+            part.name.toUpperCase().includes('CONTRA') ||
+            part.name.toUpperCase().includes('TRASERA');
+          if (isDrawerBoxHead) {
+            sx = L; sy = W; sz = t;
+          } else if (item.isDoor && L > W) {
+            sx = W; sy = L; sz = t;
+          } else if (item.isDrawer && W > L) {
+            sx = W; sy = L; sz = t;
+          } else {
+            sx = L; sy = W; sz = t;
+          }
         }
         selectedDataList.push({
           part,
@@ -1993,7 +2041,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
     let leftX = (-sx / 2) + t + (railThickness / 2);
     let rightX = (sx / 2) - t - (railThickness / 2);
 
-    if (leftPanel && rightPanel) {
+    if (part.groupId) {
+      const groupLatIzq = allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ')));
+      const groupLatDer = allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER')));
+      if (groupLatIzq && groupLatDer) {
+        const px = part.posX ?? 0;
+        leftX = ((groupLatIzq.posX ?? 0) - ((groupLatIzq.thickness || 15) / 2) - px) - (railThickness / 2);
+        rightX = ((groupLatDer.posX ?? 0) + ((groupLatDer.thickness || 15) / 2) - px) + (railThickness / 2);
+      }
+    } else if (leftPanel && rightPanel) {
       const px = part.posX ?? 0;
       const leftInnerFaceX = (leftPanel.posX ?? 0) + ((leftPanel.thickness || 18) / 2);
       const rightInnerFaceX = (rightPanel.posX ?? 0) - ((rightPanel.thickness || 18) / 2);
@@ -3891,8 +3947,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const L = part.length;
     const orientation = part.orientation || 'horizontal';
     let sy = t;
-    if (orientation === 'vertical_yz') sy = L;
-    else if (orientation === 'vertical_xy') sy = part.width;
+    if (orientation === 'vertical_yz') {
+      const isDrawerLateral = part.componentRole === 'drawer_box' ||
+        part.componentRole === 'drawer_lateral' ||
+        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+      sy = (isDrawerLateral && L > part.width) ? part.width : L;
+    } else if (orientation === 'vertical_xy') {
+      sy = part.width;
+    }
 
     const updates: Partial<Part> = {};
     if (type === 'floor') {
@@ -4240,17 +4302,34 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     const orient = part.orientation || 'horizontal';
     if (orient === 'vertical_yz') {
-      sx = t;
-      sy = L;
-      sz = W;
+      const isDrawerLateral = part.componentRole === 'drawer_box' ||
+        part.componentRole === 'drawer_lateral' ||
+        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+      if (isDrawerLateral && L > W) {
+        sx = t;
+        sy = W;
+        sz = L;
+      } else {
+        sx = t;
+        sy = L;
+        sz = W;
+      }
     } else if (orient === 'vertical_xy') {
-      const isDoor = part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA');
-      const isDrawer = part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('CAJÓN') || part.name.toUpperCase().includes('CAJON') || part.name.toUpperCase().includes('GAVETA');
-      if (isDoor && L > W) {
+      const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
+        !part.name.toUpperCase().includes('CAJ');
+      const isDrawerFront = part.componentRole === 'drawer_front';
+      const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
+        part.name.toUpperCase().includes('CONTRA') ||
+        part.name.toUpperCase().includes('TRASERA');
+      if (isDrawerBoxHead) {
+        sx = L;
+        sy = W;
+        sz = t;
+      } else if (isDoor && L > W) {
         sx = W;
         sy = L;
         sz = t;
-      } else if (isDrawer && W > L) {
+      } else if (isDrawerFront && W > L) {
         sx = W;
         sy = L;
         sz = t;
