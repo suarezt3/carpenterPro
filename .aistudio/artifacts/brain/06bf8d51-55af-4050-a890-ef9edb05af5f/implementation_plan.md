@@ -1,99 +1,113 @@
-# Plan de Rediseño: Catálogo de Plantillas Profesional, Corrección de Herrajes 3D y Menú de Proyectos
+# Plan de Implementación: Módulo Flotante de Dimensiones de Corte en Lienzo 3D (Estilo SketchUp)
 
-Reestructuración integral y profesional del catálogo de plantillas, ajuste de paleta a tonos neutros cálidos y madera sobria, corrección de z-index del menú Proyecto en cabecera, eliminación definitiva de herrajes y correderas duplicadas en el visor 3D, y restricción a dos plantillas canónicas verificadas.
+Reubicación del módulo interactivo de «Dimensiones de Corte (mm)» desde el panel lateral derecho hacia la esquina inferior derecha del lienzo de trabajo 3D, permitiendo edición directa en tiempo real de Largo, Ancho y Espesor con botones de ajuste fino (±10 mm), aligerando la carga visual del inspector lateral.
 
-## Decisiones Confirmadas con el Usuario
+## Decisiones Críticas y Preferencias Confirmadas
 
 > [!IMPORTANT]
-> - **Alcance de Plantillas**: Restricción inicial a exactamente 2 plantillas limpias y funcionales:
->   1. **Cajonera de 3 Cajones**: Módulo bajo con 3 cajones de extracción individual, frentes limpios y proporciones de taller.
->   2. **Módulo Bajo de Cocina con 1 Puerta y Repisa**: Módulo canónico con 1 puerta batiente con bisagras cazoleta de 35 mm y repisa intermedia.
-> - **Paleta Visual**: Neutro cálido (gris pizarra / zinc suave con detalles sobrios en madera natural), eliminando el azul estridente y los contrastes duros.
-> - **Herrajes en Cajones**: Exactamente 1 tirador centrado en el frente exterior y 1 par de correderas interiores (izquierda y derecha), evitando la replicación en laterales, traseras o fondos.
-> - **Despliegue del Menú Proyecto**: Corrección del contenedor de cabecera para que el menú de proyectos flote libremente por encima de la cinta de trabajo sin quedar oculto.
+> Decisiones confirmadas por el usuario en la fase de clarificación previa:
+
+- **Ubicación en el Lienzo**: Esquina inferior derecha del visor 3D, integrado sobre la barra de estado al estilo tradicional de la caja de medidas (Measurements Box) de SketchUp.
+- **Formato Visual**: Caja fija siempre visible con los 3 campos editables directos (Largo, Ancho, Espesor), accesible inmediatamente sin necesidad de clics previos para desplegar.
+- **Modo de Aplicación**: Edición en tiempo real mientras el usuario escribe o hace clic en los botones de incremento/decremento (±10 mm y ±1 mm), reflejando la actualización geométrica 3D instantáneamente.
+- **Impacto en el Panel Derecho**: Se retira la tarjeta voluminosa de dimensiones de corte del inspector lateral derecho, aligerando el panel para dejar espacio limpio a Tapacantos, Ranuras, Materiales y Operaciones.
 
 ---
 
-## 1. Visión General & Objetivos
+## 1. Visión General y Experiencia de Usuario
 
-El objetivo es transformar la experiencia del catálogo y modelado 3D de un aspecto prototípico o sobrecargado a una herramienta CAD/CAM de carpintería profesional:
-- **Catálogo refinado y proporcional**: Botones compactos, navegación por categorías fluida sin flechas toscas ni barras de desplazamiento dobles, y tipografía técnica limpia.
-- **Visualizador 3D exacto**: Renderizado estricto de herrajes; los tiradores y correderas pertenecen exclusivamente al frente/ensamblaje del cajón y nunca a las piezas internas individuales (fondos, laterales, traseras).
-- **Z-Index y apilamiento DOM impecable**: El selector de proyectos en la cabecera superior debe ser 100% visible y utilizable sobre cualquier barra o cinta inferior.
+### ¿Qué hace esta mejora?
+Transforma el indicador estático de medidas de la esquina inferior derecha del visor 3D (`MEDIDAS: 2907 × 511 mm`) en un **HUD interactivo de entrada dimensional CAD** estilo SketchUp. Cuando el usuario selecciona una pieza en el modelo 3D:
+1. La caja de medidas en la esquina inferior derecha muestra los 3 campos paramétricos: **Largo (L)**, **Ancho (W)** y **Espesor (T)**.
+2. Cada campo permite escribir directamente el número o usar micro-botones de paso rápido (`-10`, `+10` mm) para ajustar con precisión de taller.
+3. El panel derecho de propiedades se descongestiona drásticamente, eliminando el módulo duplicado y reduciendo el scroll vertical.
+4. Si no hay pieza seleccionada, el HUD muestra las cotas envolventes del mueble o la guía de la herramienta activa (Empujar/Tirar, Cinta métrica o Rectángulo).
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│  LIENZO 3D (VIEWPORT PRINCIPAL)                                        │
+│                                                                        │
+│   [3D Model Display & Orbit Controls]                                  │
+│                                                                        │
+│                                                                        │
+│  ────────────────────────────────────────────────────────────────────  │
+│  [Herramienta activa: Seleccionar]     ┌────────────────────────────┐  │
+│                                        │ 📐 DIMENSIONES DE CORTE    │  │
+│                                        │  LARGO (L)  ANCHO (W)  ESP │  │
+│                                        │  [ 2907 ]   [ 511 ]   [18] │  │
+│                                        │  -10   +10  -10   +10      │  │
+│                                        └────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 2. Experiencia de Usuario y Diseño Visual
+## 2. Diseño Visual e Interfaz (UI/UX)
 
-### A. Paleta de Colores Profesional (Neutro Cálido & Madera Sobria)
-- **Superficie base y modal**: Slate / Zinc neutro cálido (`bg-stone-50` / `bg-slate-50` en fondos claros, `bg-white` en tarjetas, bordes sutiles `border-slate-200/80`).
-- **Acentos**: Tono madera cálida refinada (`amber-700/80` o `stone-700`) para elementos destacados en lugar de azul chillón.
-- **Acciones primarias**: Botón de reemplazo con fondo pizarra oscuro o madera tenue (`bg-slate-900 hover:bg-slate-800 text-white` o `bg-stone-800`), y botón secundario "Añadir al lado" con contorno fino (`border-slate-300 text-slate-700 hover:bg-slate-100`).
+### Paleta y Estilo Arquitectónico
+- **Estilo**: CAD HUD profesional con fondo translúcido nítido (`bg-white/95 backdrop-blur-md` en tema claro, `bg-stone-900/95 border-stone-800` en tema oscuro).
+- **Tipografía**: Fuente monoespaciada técnica (`JetBrains Mono` / `font-mono`) en negrita para números de cotas, con etiquetas de eje claras: `L` (Largo), `W` (Ancho/Fondo) y `T` (Espesor).
+- **Micro-interacciones**:
+  - Inputs numéricos con fondo suave (`bg-stone-50 hover:bg-white focus:bg-white focus:ring-1 focus:ring-stone-700`), sin bordes excesivos.
+  - Botones de paso rápido `-10` y `+10` discretos y compactos con respuesta táctil y prevención de eventos (`stopPropagation`) para no alterar la cámara 3D.
+  - Sombra sutil de elevación (`shadow-lg border border-stone-200/90`) para resaltar sobre el fondo de la rejilla 3D sin obstruir la vista del mueble.
 
-### B. Navegación de Categorías y Flechas
-- **Controles de desplazamiento**: Flechas compactas (`w-7 h-7`), integradas visualmente al contenedor con micro-interacciones suaves.
-- **Eliminación de scrollbar doble**: Ocultar el scrollbar nativo horizontal manteniendo el desplazamiento táctil/rueda (`scrollbar-none`).
-- **Pestañas de categoría**: Altura y padding equilibrados (`px-3 py-1.5 text-xs`), con contador numérico tipográfico sutil.
-
-### C. Menú Desplegable "Proyecto"
-- Establecer en `<app-header>` la clase `relative z-50` para evitar que el contenedor `<main>` o la barra de herramientas capture el contexto de apilamiento.
-- Ajustar el contenedor flex de la barra superior para permitir que el dropdown flotante (`absolute top-full z-50`) se dibuje por encima de cualquier cinta o viewport.
+### Estados del Componente
+1. **Con Pieza Seleccionada**: Muestra los 3 campos editables de la pieza activa (`selectedPart()`), vinculados bidireccionalmente a su geometría.
+2. **Con Múltiples Piezas (Grupo)**: Muestra el ancho y largo del bounding box del grupo seleccionado con opción de desplazamiento en bloque.
+3. **Sin Pieza Seleccionada**: Muestra las medidas globales exteriores del mueble (Ancho × Alto × Profundidad) en modo lectura de referencia.
 
 ---
 
-## 3. Arquitectura Técnica y Corrección de Herrajes 3D
+## 3. Decisiones Técnicas y Arquitectura
 
-### Diagrama de Flujo y Jerarquía
+### 1. Ubicación del Componente y Flujo de Eventos
+- El HUD se ubicará en `src/app/components/furniture-3d-viewer/furniture-3d-viewer.html` sustituyendo el chip estático en la barra inferior derecha.
+- Emitirá el output existente `partModified` hacia `module-designer.ts` y `project-storage.service.ts`, asegurando que el historial de Deshacer/Rehacer (`Undo`/`Redo`) y el despiece de corte se sincronicen de inmediato.
+- Los inputs numéricos incluyen filtros para evitar valores negativos o nulos (mínimo 1 mm, validación contra NaN).
+
+### 2. Diagrama de Arquitectura de Datos
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       MelamiPro Header                      │
-│   [Classic]  [Deshacer/Rehacer]  [Proyecto ▼ (z-index 50)]  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Flota sobre la cinta
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Barra de Herramientas 3D                    │
-│   [Modelador 3D]       [Plantillas (Modal)]  [Lienzo Vacío] │
+│                 ModuleDesignerComponent                     │
+│   (Maneja estado de selección: selectedPartId / selectedPart) │
 └──────────────────────────────┬──────────────────────────────┘
                                │
-               ┌───────────────┴───────────────┐
-               ▼                               ▼
-┌──────────────────────────────┐ ┌──────────────────────────────┐
-│  Plantilla 1: Cajonera 3C    │ │  Plantilla 2: Bajo 1 Puerta  │
-│  - 3 Frentes de cajón        │ │  - 1 Puerta batiente         │
-│  - 1 Tirador por frente      │ │  - Bisagras cazoleta 35mm    │
-│  - 1 Par de rieles laterales │ │  - Repisa regulable          │
-│  - Cajas de gaveta 5 piezas  │ │  - Laterales y fondo         │
-└──────────────────────────────┘ └──────────────────────────────┘
+            ┌──────────────────┴──────────────────┐
+            ▼                                     ▼
+┌──────────────────────────────┐      ┌──────────────────────────────┐
+│  Furniture3dViewerComponent  │      │   Right Properties Drawer    │
+│                              │      │                              │
+│  [Canvas WebGL Three.js]     │      │  [Identificación / Nombre]   │
+│                              │      │  [Tapacantos L1/L2/A1/A2]    │
+│  [Bottom-Right Corner HUD]   │◄────►│  [Material y Textura]        │
+│  - Input Largo (L) ±10mm     │      │  [Herrajes y Correderas]     │
+│  - Input Ancho (W) ±10mm     │      │  (Dimensiones removidas para │
+│  - Input Espesor (T)         │      │   eliminar peso y scroll)    │
+└──────────────┬───────────────┘      └──────────────────────────────┘
+               │
+               ▼ (Emite partModified)
+┌─────────────────────────────────────────────────────────────┐
+│                 ProjectStorageService                       │
+│    (Actualiza geometría en milímetros, despiece y cotas)     │
+└─────────────────────────────────────────────────────────────┘
 ```
-
-### Reglas Estrictas en el Renderizador 3D (`furniture-3d-viewer.ts`)
-1. **Detección Estricta de Frentes de Cajón**:
-   - `isDrawerFront` debe ser `true` únicamente si `componentRole === 'drawer_front'` o el nombre es específicamente "FRENTE DE CAJÓN".
-   - Piezas auxiliares como `Lateral Izq. Gaveta`, `Trasera Gaveta`, `Fondo Gaveta` **NO** deben ser marcadas como frente ni recibir tiradores ni juegos de correderas adicionales.
-2. **Evitar Duplicación de Cajas de Cajón**:
-   - Si la plantilla ya provee las 5 piezas físicas de la gaveta en el despiece, el visor no debe inyectar una segunda caja procedural dentro de la misma pieza.
-3. **Alineación de Correderas Telescópicas**:
-   - Las correderas se posicionan estrictamente en la cota interior de los costados del mueble con longitud acorde a la profundidad del mueble (ej. 450 mm o 400 mm).
 
 ---
 
-## 4. Plan de Ejecución Paso a Paso
+## 4. Fases de Ejecución
 
-1. **Corrección de Apilamiento del Menú "Proyecto"**:
-   - Modificar `app.html` y `header.html` para garantizar que el menú flotante tenga un z-index prioritario y no se recorte por `overflow-x-auto`.
-2. **Rediseño del Catálogo de Plantillas (`templates-modal.html` & `templates-modal.ts`)**:
-   - Sustituir la paleta azul chillón por una paleta neutra cálida profesional.
-   - Redimensionar y estilizar los botones de desplazamiento de categorías `<` y `>`.
-   - Limpiar el scroll horizontal (eliminar scrollbar antiestético manteniendo soporte de arrastre y rueda).
-   - Ajustar las tarjetas: dimensiones tipográficas acordes, botones de acción proporcionados.
-3. **Corrección en el Visor 3D (`furniture-3d-viewer.ts`)**:
-   - Aislar la generación de tiradores y correderas para que nunca se apliquen a piezas internas de gaveta (laterales, trasera, fondo).
-   - Asegurar exactamente 1 tirador frontal por cajón y un solo par de correderas por gaveta.
-4. **Configuración de las 2 Plantillas Iniciales en `templates-catalog.service.ts`**:
-   - Depurar el catálogo para dejar activas las dos plantillas solicitadas:
-     - **Cajonera Módulo 3 Cajones**: ancho 500 mm, alto 720 mm, prof 500 mm, con sus 3 frentes y gavetas bien calculadas.
-     - **Módulo Bajo Cocina con 1 Puerta y Repisa**: ancho 450 mm, alto 720 mm, prof 550 mm, con 1 puerta batiente y 1 repisa interior.
-5. **Verificación y Compilación**:
-   - Ejecutar verificación de compilación sin errores para asegurar estabilidad total.
+1. **Fase 1: Implementación del HUD en el Visor 3D**:
+   - Crear el componente visual en la esquina inferior derecha de `furniture-3d-viewer.html`.
+   - Conectar los métodos de modificación paramétrica `updatePartDimension(axis, value)` y `adjustDimensionStep(axis, delta)` en `furniture-3d-viewer.ts`.
+   - Asegurar que el foco en los inputs deshabilite temporalmente los atajos de teclado de la cámara (para que escribir números no dispare herramientas).
+
+2. **Fase 2: Aligeramiento del Panel Derecho en `module-designer.html`**:
+   - Retirar la sección voluminosa de «Dimensiones de Corte (mm)» de `module-designer.html`, dejando un resumen compacto de 1 línea de cotas y priorizando Tapacantos, Ranuras y Orientación.
+   - Verificar la coherencia estética en modo Claro (SketchUp Classic) y modo Oscuro (CAD Dark).
+
+3. **Fase 3: Validación y Pruebas**:
+   - Validar edición manual con teclado y con botones ±10 mm.
+   - Comprobar reflejo inmediato en el modelo 3D y en la lista de despiece.
+   - Ejecutar compilación (`compile_applet`) y verificación de lint (`lint_applet`).

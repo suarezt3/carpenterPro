@@ -54,6 +54,9 @@ export class ModuleDesignerComponent {
   // Technical Shop Sheet Modal
   readonly showTechnicalSheetModal = signal<boolean>(false);
 
+  // Floating Cutting Dimensions widget minimized state
+  readonly isDimensionsWidgetMinimized = signal<boolean>(false);
+
   // Toast feedback banner
   readonly toastMessage = signal<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -190,6 +193,65 @@ export class ModuleDesignerComponent {
     const sumMm2 = parts.reduce((acc, p) => acc + (p.length * p.width * p.quantity), 0);
     return (sumMm2 / 1_000_000).toFixed(2);
   });
+
+  // Overall furniture bounding box dimensions (Ancho × Alto × Fondo)
+  readonly overallDimensions = computed(() => {
+    const parts = this.currentParts();
+    if (parts.length === 0) return { width: 0, height: 0, depth: 0 };
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    for (const p of parts) {
+      let sx = p.length || 0;
+      let sy = p.width || 0;
+      let sz = p.thickness || 18;
+      if (p.orientation === 'horizontal') {
+        sx = p.length; sy = p.thickness; sz = p.width;
+      } else if (p.orientation === 'vertical_yz') {
+        sx = p.thickness; sy = p.length; sz = p.width;
+      } else {
+        sx = p.length; sy = p.width; sz = p.thickness;
+      }
+      const px = p.posX ?? 0;
+      const py = p.posY ?? 0;
+      const pz = p.posZ ?? 0;
+      minX = Math.min(minX, px - sx / 2);
+      maxX = Math.max(maxX, px + sx / 2);
+      minY = Math.min(minY, py - sy / 2);
+      maxY = Math.max(maxY, py + sy / 2);
+      minZ = Math.min(minZ, pz - sz / 2);
+      maxZ = Math.max(maxZ, pz + sz / 2);
+    }
+    return {
+      width: Math.round(maxX - minX),
+      height: Math.round(maxY - minY),
+      depth: Math.round(maxZ - minZ)
+    };
+  });
+
+  updatePartDimension(prop: 'length' | 'width' | 'thickness', rawVal: number | string) {
+    const val = Number(rawVal);
+    if (isNaN(val) || val <= 0) return;
+    if (prop === 'thickness') {
+      this.onThicknessChange(val);
+    } else {
+      this.updateSelectedPart({ [prop]: Math.round(val) });
+    }
+  }
+
+  swapDimensions() {
+    const sel = this.selectedPart();
+    if (!sel) return;
+    this.updateSelectedPart({
+      length: sel.width,
+      width: sel.length
+    });
+    this.showToast('🔄 Dimensiones intercambiadas (Largo ↔ Ancho)');
+  }
+
+  toggleDimensionsWidget() {
+    this.isDimensionsWidgetMinimized.update(v => !v);
+  }
 
   constructor() {
     // If project has parts, auto-select first part or 'desk_top' if present

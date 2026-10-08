@@ -74,6 +74,200 @@
           (dragStarted)="onDragStarted()"
           (clearanceCalculated)="onClearanceCalculated($event)">
         </app-furniture-3d-viewer>
+
+        <!-- FLOATING CUTTING DIMENSIONS WIDGET (Esquina Inferior Derecha - Estilo SketchUp Medidas) -->
+        <div class="absolute bottom-3 right-3 z-30 pointer-events-auto max-w-[340px] sm:max-w-[380px] w-[calc(100%-1.5rem)] select-none animate-in fade-in zoom-in-95 duration-150">
+          <div class="bg-white/95 dark:bg-stone-900/95 text-slate-800 dark:text-stone-100 backdrop-blur-md rounded-2xl border border-slate-200/90 dark:border-stone-700 shadow-2xl p-2.5 sm:p-3 flex flex-col gap-2">
+            
+            <!-- Header: Icon, Title, and Action Buttons -->
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-stone-800 pb-1.5">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="material-icons text-base text-sky-600 dark:text-sky-400 shrink-0">square_foot</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-stone-100 truncate">Dimensiones de Corte</span>
+                <span class="text-[9px] font-mono font-bold text-sky-700 bg-sky-50 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-1.5 py-0.2 rounded shrink-0">
+                  mm
+                </span>
+              </div>
+
+              <div class="flex items-center gap-1 shrink-0">
+                @if (selectedPart()) {
+                  <button 
+                    type="button" 
+                    (click)="swapDimensions()" 
+                    class="p-1 hover:bg-slate-100 dark:hover:bg-stone-800 text-slate-500 hover:text-slate-800 dark:hover:text-stone-200 rounded-lg transition"
+                    title="Invertir Largo ↔ Ancho">
+                    <span class="material-icons text-sm text-sky-600">swap_horiz</span>
+                  </button>
+                }
+
+                <button 
+                  type="button" 
+                  (click)="toggleDimensionsWidget()" 
+                  class="p-1 hover:bg-slate-100 dark:hover:bg-stone-800 text-slate-400 hover:text-slate-700 dark:hover:text-stone-300 rounded-lg transition"
+                  [title]="isDimensionsWidgetMinimized() ? 'Expandir panel de medidas' : 'Minimizar panel de medidas'">
+                  <span class="material-icons text-sm">{{ isDimensionsWidgetMinimized() ? 'unfold_more' : 'unfold_less' }}</span>
+                </button>
+              </div>
+            </div>
+
+            @if (!isDimensionsWidgetMinimized()) {
+              @if (selectedPart(); as sel) {
+                <!-- Subheader: Active Piece Name & Orientation -->
+                <div class="flex items-center justify-between text-xs pb-1 border-b border-slate-100/80 dark:border-stone-800/80">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+                    <span class="font-bold text-slate-900 dark:text-stone-100 truncate" [title]="sel.name">{{ sel.name }}</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-slate-400 shrink-0 uppercase tracking-tight">
+                    {{ sel.orientation === 'horizontal' ? 'Horizontal' : sel.orientation === 'vertical_yz' ? 'Lateral YZ' : 'Frontal XY' }}
+                  </span>
+                </div>
+
+                <!-- 3 Editable Columns: Largo, Ancho, Espesor -->
+                <div class="grid grid-cols-3 gap-1.5">
+                  <!-- Columna Largo -->
+                  <div class="bg-slate-50 dark:bg-stone-800/80 p-2 rounded-xl border border-slate-200/80 dark:border-stone-700 flex flex-col justify-between shadow-2xs">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Largo</span>
+                      <span class="text-[9px] font-mono text-sky-600 font-bold">L</span>
+                    </div>
+                    <input 
+                      type="number" 
+                      step="1"
+                      min="10"
+                      [value]="sel.length"
+                      (input)="updatePartDimension('length', $any($event.target).value)"
+                      class="w-full px-1.5 py-1 bg-white dark:bg-stone-900 hover:bg-white focus:bg-white border border-slate-200 dark:border-stone-700 rounded text-center text-xs font-black text-slate-900 dark:text-white font-mono focus:outline-hidden focus:border-sky-500 transition" />
+                    <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-200/60 dark:border-stone-700/60">
+                      <button 
+                        type="button" 
+                        (click)="adjustPartProperty('length', -10)" 
+                        class="px-1 py-0.5 hover:bg-slate-200 dark:hover:bg-stone-700 text-slate-600 dark:text-stone-300 text-[10px] font-mono rounded font-bold transition active:scale-95"
+                        title="-10 mm">-10</button>
+                      <span class="text-[9px] text-slate-400 font-mono">mm</span>
+                      <button 
+                        type="button" 
+                        (click)="adjustPartProperty('length', 10)" 
+                        class="px-1 py-0.5 hover:bg-slate-200 dark:hover:bg-stone-700 text-slate-600 dark:text-stone-300 text-[10px] font-mono rounded font-bold transition active:scale-95"
+                        title="+10 mm">+10</button>
+                    </div>
+                  </div>
+
+                  <!-- Columna Ancho -->
+                  <div class="bg-slate-50 dark:bg-stone-800/80 p-2 rounded-xl border border-slate-200/80 dark:border-stone-700 flex flex-col justify-between shadow-2xs">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Ancho</span>
+                      <span class="text-[9px] font-mono text-sky-600 font-bold">W</span>
+                    </div>
+                    <input 
+                      type="number" 
+                      step="1"
+                      min="10"
+                      [value]="sel.width"
+                      (input)="updatePartDimension('width', $any($event.target).value)"
+                      class="w-full px-1.5 py-1 bg-white dark:bg-stone-900 hover:bg-white focus:bg-white border border-slate-200 dark:border-stone-700 rounded text-center text-xs font-black text-slate-900 dark:text-white font-mono focus:outline-hidden focus:border-sky-500 transition" />
+                    <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-200/60 dark:border-stone-700/60">
+                      <button 
+                        type="button" 
+                        (click)="adjustPartProperty('width', -10)" 
+                        class="px-1 py-0.5 hover:bg-slate-200 dark:hover:bg-stone-700 text-slate-600 dark:text-stone-300 text-[10px] font-mono rounded font-bold transition active:scale-95"
+                        title="-10 mm">-10</button>
+                      <span class="text-[9px] text-slate-400 font-mono">mm</span>
+                      <button 
+                        type="button" 
+                        (click)="adjustPartProperty('width', 10)" 
+                        class="px-1 py-0.5 hover:bg-slate-200 dark:hover:bg-stone-700 text-slate-600 dark:text-stone-300 text-[10px] font-mono rounded font-bold transition active:scale-95"
+                        title="+10 mm">+10</button>
+                    </div>
+                  </div>
+
+                  <!-- Columna Espesor -->
+                  <div class="bg-slate-50 dark:bg-stone-800/80 p-2 rounded-xl border border-slate-200/80 dark:border-stone-700 flex flex-col justify-between shadow-2xs">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Espesor</span>
+                      <span class="text-[9px] font-mono text-sky-600 font-bold">T</span>
+                    </div>
+                    <input 
+                      type="number" 
+                      step="1"
+                      min="3"
+                      max="60"
+                      [value]="sel.thickness"
+                      (input)="updatePartDimension('thickness', $any($event.target).value)"
+                      class="w-full px-1.5 py-1 bg-white dark:bg-stone-900 hover:bg-white focus:bg-white border border-slate-200 dark:border-stone-700 rounded text-center text-xs font-black text-slate-900 dark:text-white font-mono focus:outline-hidden focus:border-sky-500 transition" />
+                    <div class="flex items-center justify-center gap-1 mt-1 pt-1 border-t border-slate-200/60 dark:border-stone-700/60">
+                      <button 
+                        type="button" 
+                        (click)="onThicknessChange(15)" 
+                        [class]="sel.thickness === 15 ? 'bg-sky-500 text-white font-bold' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-stone-700'" 
+                        class="px-1 py-0.5 text-[9px] font-mono rounded transition">15</button>
+                      <button 
+                        type="button" 
+                        (click)="onThicknessChange(18)" 
+                        [class]="sel.thickness === 18 ? 'bg-sky-500 text-white font-bold' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-stone-700'" 
+                        class="px-1 py-0.5 text-[9px] font-mono rounded transition">18</button>
+                      <button 
+                        type="button" 
+                        (click)="onThicknessChange(36)" 
+                        [class]="sel.thickness === 36 ? 'bg-sky-500 text-white font-bold' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-stone-700'" 
+                        class="px-1 py-0.5 text-[9px] font-mono rounded transition">36</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Footer Info Row -->
+                <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-stone-800 text-[10px] text-slate-500 dark:text-stone-400">
+                  <span class="font-mono font-medium">{{ ((sel.length * sel.width) / 1000000).toFixed(3) }} m² · {{ sel.quantity }} un.</span>
+                  <div class="flex items-center gap-1">
+                    <span class="text-slate-400">Veta:</span>
+                    <span class="font-bold text-slate-700 dark:text-stone-300 uppercase">{{ sel.grain === 'length' ? 'Largo' : sel.grain === 'width' ? 'Ancho' : 'Sin veta' }}</span>
+                  </div>
+                </div>
+
+              } @else {
+                <!-- State when no single part is selected: Overall Dimensions Box -->
+                <div class="space-y-2 py-1">
+                  <div class="flex items-center justify-between bg-slate-50 dark:bg-stone-800/80 p-2 rounded-xl border border-slate-200 dark:border-stone-700">
+                    <div class="text-center flex-1">
+                      <span class="text-[9px] uppercase font-bold text-slate-400 block">Ancho</span>
+                      <span class="text-xs font-mono font-black text-slate-900 dark:text-white">{{ overallDimensions().width }} mm</span>
+                    </div>
+                    <span class="text-slate-300">×</span>
+                    <div class="text-center flex-1">
+                      <span class="text-[9px] uppercase font-bold text-slate-400 block">Alto</span>
+                      <span class="text-xs font-mono font-black text-slate-900 dark:text-white">{{ overallDimensions().height }} mm</span>
+                    </div>
+                    <span class="text-slate-300">×</span>
+                    <div class="text-center flex-1">
+                      <span class="text-[9px] uppercase font-bold text-slate-400 block">Fondo</span>
+                      <span class="text-xs font-mono font-black text-slate-900 dark:text-white">{{ overallDimensions().depth }} mm</span>
+                    </div>
+                  </div>
+                  <p class="text-[11px] text-slate-500 dark:text-stone-400 leading-snug flex items-center gap-1.5">
+                    <span class="material-icons text-xs text-amber-500 shrink-0">touch_app</span>
+                    <span>Haz clic en cualquier pieza en el 3D para editar sus dimensiones de corte.</span>
+                  </p>
+                </div>
+              }
+            } @else {
+              <!-- Minimized Compact View -->
+              <div class="flex items-center justify-between text-xs font-mono">
+                @if (selectedPart(); as sel) {
+                  <div class="flex items-center gap-1.5 truncate">
+                    <span class="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0"></span>
+                    <span class="font-bold text-slate-800 dark:text-stone-100 truncate max-w-[120px]">{{ sel.name }}:</span>
+                    <span class="font-black text-sky-600 dark:text-sky-400">{{ sel.length }}×{{ sel.width }}×{{ sel.thickness }} mm</span>
+                  </div>
+                } @else {
+                  <span class="text-slate-500 dark:text-stone-400 font-semibold text-[11px]">
+                    Total: {{ overallDimensions().width }}×{{ overallDimensions().height }}×{{ overallDimensions().depth }} mm
+                  </span>
+                }
+              </div>
+            }
+
+          </div>
+        </div>
       </div>
 
       <!-- Floating expand button if sidebar is collapsed -->
@@ -210,94 +404,21 @@
                 placeholder="Nombre de la pieza" />
             </div>
 
-            <!-- SECTION 1: DIMENSIONES DE CORTE (Largo × Ancho × Espesor) - CUADRÍCULA COMPACTA CAD -->
-            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <span class="material-icons text-xs text-sky-600">square_foot</span>
-                  Dimensiones de Corte (mm)
-                </span>
-                <span class="text-[9px] font-mono font-bold text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
-                  CAD 3D
-                </span>
-              </div>
-
-              <!-- 3-COLUMNS CAD COMPACT GRID -->
-              <div class="grid grid-cols-3 gap-1.5">
-                <!-- Columna Largo -->
-                <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs">
-                  <div class="flex items-center justify-between mb-1">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Largo</span>
-                    <span class="text-[9px] font-mono text-sky-600 font-bold">L</span>
-                  </div>
-                  <input 
-                    type="number" 
-                    step="1"
-                    min="1"
-                    [value]="sel.length"
-                    (input)="updateSelectedPart({ length: +$any($event.target).value })"
-                    class="w-full px-1.5 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 transition" />
-                  <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
-                    <button 
-                      type="button" 
-                      (click)="adjustPartProperty('length', -10)" 
-                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-[9px] font-mono rounded font-bold transition"
-                      title="-10 mm">-10</button>
-                    <span class="text-[9px] text-slate-400 font-mono">mm</span>
-                    <button 
-                      type="button" 
-                      (click)="adjustPartProperty('length', 10)" 
-                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-[9px] font-mono rounded font-bold transition"
-                      title="+10 mm">+10</button>
-                  </div>
-                </div>
-
-                <!-- Columna Ancho -->
-                <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs">
-                  <div class="flex items-center justify-between mb-1">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Ancho</span>
-                    <span class="text-[9px] font-mono text-sky-600 font-bold">W</span>
-                  </div>
-                  <input 
-                    type="number" 
-                    step="1"
-                    min="1"
-                    [value]="sel.width"
-                    (input)="updateSelectedPart({ width: +$any($event.target).value })"
-                    class="w-full px-1.5 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 transition" />
-                  <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
-                    <button 
-                      type="button" 
-                      (click)="adjustPartProperty('width', -10)" 
-                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-[9px] font-mono rounded font-bold transition"
-                      title="-10 mm">-10</button>
-                    <span class="text-[9px] text-slate-400 font-mono">mm</span>
-                    <button 
-                      type="button" 
-                      (click)="adjustPartProperty('width', 10)" 
-                      class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-[9px] font-mono rounded font-bold transition"
-                      title="+10 mm">+10</button>
-                  </div>
-                </div>
-
-                <!-- Columna Espesor -->
-                <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs">
-                  <div class="flex items-center justify-between mb-1">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Espesor</span>
-                    <span class="text-[9px] font-mono text-sky-600 font-bold">T</span>
-                  </div>
-                  <input 
-                    type="number" 
-                    step="1"
-                    min="1"
-                    [value]="sel.thickness"
-                    (input)="onThicknessChange(+$any($event.target).value)"
-                    class="w-full px-1.5 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 transition" />
-                  <div class="flex items-center justify-center mt-1 pt-1 border-t border-slate-100">
-                    <span class="text-[9px] text-slate-500 font-mono font-bold">{{ sel.thickness }} mm</span>
-                  </div>
+            <!-- DIMENSIONES DE CORTE (Resumen Ligero en Bandeja - Edición activa directa en Lienzo 3D) -->
+            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex items-center justify-between shadow-2xs">
+              <div class="flex items-center gap-2">
+                <span class="material-icons text-base text-sky-600">square_foot</span>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight block">Dimensiones de Corte</span>
+                  <span class="text-xs font-mono font-black text-slate-900">
+                    {{ sel.length }} × {{ sel.width }} × {{ sel.thickness }} mm
+                  </span>
                 </div>
               </div>
+              <span class="text-[10px] font-semibold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-lg flex items-center gap-1" title="Editar en tiempo real en la caja de medidas en la esquina inferior derecha del lienzo 3D">
+                <span class="material-icons text-xs text-sky-600">edit</span>
+                <span>En Lienzo 3D</span>
+              </span>
             </div>
 
             <!-- SECTION: LUZ LIBRE Y HUECOS ÚTILES (CAD SKETCHUP) -->

@@ -3951,6 +3951,36 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
+  // --- BOTTOM-RIGHT CORNER CAD MEASUREMENTS HUD METHODS ---
+
+  updateSelectedDimension(dim: 'length' | 'width' | 'thickness', value: number) {
+    const sel = this.selectedPart();
+    if (!sel || isNaN(value) || value < 1) return;
+    const val = Math.max(1, Math.round(value));
+    if (dim === 'thickness') {
+      const matchingMat = this.materials().find(m => m.thickness === val);
+      const updates: Partial<Part> = { thickness: val };
+      if (matchingMat) {
+        updates.materialId = matchingMat.id;
+        updates.materialName = matchingMat.name;
+      }
+      this.partModified.emit({ part: sel, updates });
+    } else {
+      this.partModified.emit({
+        part: sel,
+        updates: { [dim]: val }
+      });
+    }
+  }
+
+  adjustSelectedDimension(dim: 'length' | 'width' | 'thickness', delta: number) {
+    const sel = this.selectedPart();
+    if (!sel) return;
+    const cur = Number(sel[dim] || 0);
+    const next = Math.max(1, Math.round(cur + delta));
+    this.updateSelectedDimension(dim, next);
+  }
+
   // --- PRECISION NUDGE & MAGNETIC SNAPPING METHODS ---
 
   setNudgeStep(step: number) {
