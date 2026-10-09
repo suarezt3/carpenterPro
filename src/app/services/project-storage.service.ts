@@ -1295,10 +1295,11 @@ export class ProjectStorageService {
     const dx = (frontPart.posX ?? 0) - cx;
     const dz = (frontPart.posZ ?? 0) - cz;
 
-    if (Math.abs(dx) > Math.abs(dz) && Math.abs(dx) > 10) {
-      return dx > 0 ? 'right' : 'left';
+    if (frontPart.orientation === 'vertical_yz') {
+      return (Math.abs(dx) > 10 ? dx >= 0 : (frontPart.posX ?? 0) >= 0) ? 'right' : 'left';
+    } else {
+      return (Math.abs(dz) > 10 ? dz >= 0 : (frontPart.posZ ?? 0) >= 0) ? 'front' : 'back';
     }
-    return dz >= 0 ? 'front' : 'back';
   }
 
 

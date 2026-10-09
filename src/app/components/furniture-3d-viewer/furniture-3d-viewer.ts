@@ -755,33 +755,24 @@ export class Furniture3dViewerComponent implements OnDestroy {
       let hingeGroup: THREE.Group | undefined;
       let slideGroup: THREE.Group | undefined;
 
-      // Determine slide axis and direction according to drawer front facing orientation
+      // Determine slide axis and direction according to drawer front facing orientation in 3D
+      let drawerFacing: 'front' | 'right' | 'back' | 'left' = 'front';
       let slideAxis: 'x' | 'y' | 'z' = 'z';
       let slideDir = 1;
       if (isDrawer) {
-        const associatedFront = parts.find(other =>
-          (other.componentRole === 'drawer_front' || other.name.toUpperCase().includes('FRENTE')) &&
-          ((other.groupId && other.groupId === part.groupId) || (part.id.includes('caj_') && other.id.includes('caj_') && Math.abs((other.posY || 0) - (part.posY || 0)) < 150))
-        );
-        const refPart = associatedFront || part;
-        const drawerParts = part.groupId ? parts.filter(p => p.groupId === part.groupId) : [part];
-        const avgX = drawerParts.reduce((s, p) => s + (p.posX ?? 0), 0) / drawerParts.length;
-        const avgZ = drawerParts.reduce((s, p) => s + (p.posZ ?? 0), 0) / drawerParts.length;
-
-        const frontX = refPart.posX ?? 0;
-        const frontZ = refPart.posZ ?? 0;
-        const diffX = frontX - avgX;
-        const diffZ = frontZ - avgZ;
-
-        if (refPart.orientation === 'vertical_yz') {
+        drawerFacing = this.getDrawerFacing(part, parts);
+        if (drawerFacing === 'right') {
           slideAxis = 'x';
-          slideDir = Math.abs(diffX) > 10 ? (diffX >= 0 ? 1 : -1) : ((refPart.posX ?? 0) >= 0 ? 1 : -1);
-        } else if (refPart.orientation === 'horizontal') {
-          slideAxis = 'y';
-          slideDir = (refPart.posY ?? 0) >= 0 ? 1 : -1;
+          slideDir = 1;
+        } else if (drawerFacing === 'left') {
+          slideAxis = 'x';
+          slideDir = -1;
+        } else if (drawerFacing === 'back') {
+          slideAxis = 'z';
+          slideDir = -1;
         } else {
           slideAxis = 'z';
-          slideDir = Math.abs(diffZ) > 10 ? (diffZ >= 0 ? 1 : -1) : 1;
+          slideDir = 1;
         }
       }
 
@@ -860,15 +851,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
         // If it's a front plate without separate 3D box parts, attach complete 5-piece drawer box
         if (isDrawerFront && !hasSeparateBoxParts) {
-          const drawerBoxMesh = this.createDrawerBoxMesh(part, sx, sy, sz);
+          const drawerBoxMesh = this.createDrawerBoxMesh(part, sx, sy, sz, drawerFacing);
           if (drawerBoxMesh) mesh.add(drawerBoxMesh);
         }
 
         // Hardware: 3D Handles & Telescopic Runners ONLY ON THE FRONT FACADE (selective)
         if (isDrawerFront && shouldRenderHardware) {
-          handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, false, 'top');
+          handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, false, 'top', drawerFacing);
           if (handleGroup) mesh.add(handleGroup);
-          slideGroup = this.createDrawerSlidesMesh(part, hw, sx, sy, sz);
+          slideGroup = this.createDrawerSlidesMesh(part, hw, sx, sy, sz, drawerFacing);
           if (slideGroup) mesh.add(slideGroup);
         }
 
@@ -877,7 +868,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
         if (curOpen > 0) {
           const maxSlide = Math.min(380, Math.max(180, (part.width || 450) * 0.72));
           if (slideAxis === 'x') mesh.position.x += curOpen * maxSlide * slideDir;
-          else if (slideAxis === 'y') mesh.position.y += curOpen * maxSlide * slideDir;
           else mesh.position.z += curOpen * maxSlide * slideDir;
         }
 
@@ -1720,6 +1710,40 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
+  private getDrawerFacing(part: Part, parts: Part[]): 'front' | 'right' | 'back' | 'left' {
+    // Find all parts belonging to this drawer (by groupId, prefix, or role)
+    const drawerParts = parts.filter(p =>
+      p.id !== part.id && (
+        (part.groupId && p.groupId === part.groupId) ||
+        (part.id.includes('caj_') && p.id.includes('caj_') && Math.abs((p.posY || 0) - (part.posY || 0)) < 150) ||
+        ((p.componentRole === 'drawer_box' || p.componentRole === 'drawer_lateral') && Math.abs((p.posY || 0) - (part.posY || 0)) < 150)
+      )
+    );
+
+    if (drawerParts.length > 0) {
+      const allPts = [part, ...drawerParts];
+      const minX = Math.min(...allPts.map(p => p.posX ?? 0));
+      const maxX = Math.max(...allPts.map(p => p.posX ?? 0));
+      const minZ = Math.min(...allPts.map(p => p.posZ ?? 0));
+      const maxZ = Math.max(...allPts.map(p => p.posZ ?? 0));
+      const cx = (minX + maxX) / 2;
+      const cz = (minZ + maxZ) / 2;
+
+      const dx = (part.posX ?? 0) - cx;
+      const dz = (part.posZ ?? 0) - cz;
+
+      if (part.orientation === 'vertical_yz') {
+        return (Math.abs(dx) > 10 ? dx >= 0 : (part.posX ?? 0) >= 0) ? 'right' : 'left';
+      }
+      return (Math.abs(dz) > 10 ? dz >= 0 : (part.posZ ?? 0) >= 0) ? 'front' : 'back';
+    }
+
+    if (part.orientation === 'vertical_yz') {
+      return (part.posX ?? 0) >= 0 ? 'right' : 'left';
+    }
+    return 'front';
+  }
+
   private createHandleMesh(
     part: Part,
     hw: PartHardwareConfig,
@@ -1727,7 +1751,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     sy: number,
     sz: number,
     isDoor: boolean,
-    hingeSide: 'left' | 'right' | 'top' | 'bottom'
+    hingeSide: 'left' | 'right' | 'top' | 'bottom',
+    drawerFacing: 'front' | 'right' | 'back' | 'left' = 'front'
   ): THREE.Group {
     const group = new THREE.Group();
     const handleType = hw.handleType || 'bar_modern';
@@ -1792,7 +1817,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       group.add(stem);
       group.add(head);
     } else if (handleType === 'profile_gola') {
-      const width = isDoor ? Math.max(80, sx * 0.85) : Math.max(100, sx - 24);
+      const isSideFacing = !isDoor && (drawerFacing === 'right' || drawerFacing === 'left');
+      const width = isDoor ? Math.max(80, sx * 0.85) : Math.max(100, (isSideFacing ? sz : sx) - 24);
       const profile = new THREE.Mesh(new THREE.BoxGeometry(width, 18, 14), handleMat);
       group.add(profile);
     } else if (handleType === 'cup_vintage') {
@@ -1819,10 +1845,56 @@ export class Furniture3dViewerComponent implements OnDestroy {
         group.position.set(0, sy / 2 - margin, sz / 2 + 15);
       }
     } else {
-      if (handleType !== 'knob_round' && handleType !== 'knob_square') {
-        group.rotation.z = Math.PI / 2;
+      // DRAWER HANDLE: Synchronized in all 4 rotational directions (0°, 90°, 180°, 270°)
+      if (handleType === 'profile_gola') {
+        if (drawerFacing === 'front') {
+          group.position.set(0, sy / 2 - 9, sz / 2 + 7);
+          group.rotation.set(0, 0, 0);
+        } else if (drawerFacing === 'back') {
+          group.position.set(0, sy / 2 - 9, -sz / 2 - 7);
+          group.rotation.set(0, Math.PI, 0);
+        } else if (drawerFacing === 'right') {
+          group.position.set(sx / 2 + 7, sy / 2 - 9, 0);
+          group.rotation.set(0, Math.PI / 2, 0);
+        } else if (drawerFacing === 'left') {
+          group.position.set(-sx / 2 - 7, sy / 2 - 9, 0);
+          group.rotation.set(0, -Math.PI / 2, 0);
+        }
+      } else {
+        const isBarOrCup = handleType !== 'knob_round' && handleType !== 'knob_square';
+
+        if (drawerFacing === 'front') {
+          // Faces +Z (0°): Front facade at +sz/2, bar horizontal along X
+          group.position.set(0, 0, sz / 2 + 15);
+          if (isBarOrCup) {
+            group.rotation.set(0, 0, Math.PI / 2);
+          } else {
+            group.rotation.set(0, 0, 0);
+          }
+        } else if (drawerFacing === 'back') {
+          // Faces -Z (180°): Front facade at -sz/2, bar horizontal along X
+          group.position.set(0, 0, -sz / 2 - 15);
+          if (isBarOrCup) {
+            group.rotation.set(0, Math.PI, Math.PI / 2);
+          } else {
+            group.rotation.set(0, Math.PI, 0);
+          }
+        } else if (drawerFacing === 'right') {
+          // Faces +X (90°): Front facade at +sx/2, bar horizontal along Z
+          group.position.set(sx / 2 + 15, 0, 0);
+          group.rotation.set(0, Math.PI / 2, 0);
+          if (isBarOrCup) {
+            group.rotateZ(Math.PI / 2);
+          }
+        } else if (drawerFacing === 'left') {
+          // Faces -X (270°): Front facade at -sx/2, bar horizontal along Z
+          group.position.set(-sx / 2 - 15, 0, 0);
+          group.rotation.set(0, -Math.PI / 2, 0);
+          if (isBarOrCup) {
+            group.rotateZ(Math.PI / 2);
+          }
+        }
       }
-      group.position.set(0, 0, sz / 2 + 15);
     }
 
     group.traverse(child => {
@@ -1915,11 +1987,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
     part: Part,
     sx: number,
     sy: number,
-    sz: number
+    sz: number,
+    drawerFacing: 'front' | 'right' | 'back' | 'left' = 'front'
   ): THREE.Group {
     const boxGroup = new THREE.Group();
     const t = 15; // standard drawer box wall thickness 15mm
-    const frontWidth = sx;
+    const isSideFacing = drawerFacing === 'right' || drawerFacing === 'left';
+    const frontWidth = isSideFacing ? sz : sx;
+    const frontThickness = isSideFacing ? sx : sz;
     const frontHeight = sy;
     const availableDepth = Math.max(250, (part.width || 450) - 25);
     const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
@@ -1961,7 +2036,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     };
 
     const centerY = - (frontHeight - boxHeight) * 0.15;
-    const centerZ = - (sz / 2) - (boxDepth / 2);
+    const centerZ = - (frontThickness / 2) - (boxDepth / 2);
 
     // 1. Lateral Izquierdo de la gaveta
     addBoxPart(
@@ -1986,7 +2061,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       new THREE.BoxGeometry(boxInnerWidth, boxHeight, t),
       0,
       centerY,
-      - (sz / 2) - boxDepth + (t / 2),
+      - (frontThickness / 2) - boxDepth + (t / 2),
       boxMat
     );
 
@@ -1995,7 +2070,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       new THREE.BoxGeometry(boxInnerWidth, boxHeight, t),
       0,
       centerY,
-      - (sz / 2) - (t / 2),
+      - (frontThickness / 2) - (t / 2),
       boxMat
     );
 
@@ -2009,6 +2084,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
       bottomMat
     );
 
+    // Orient whole box according to drawer facing
+    if (drawerFacing === 'back') {
+      boxGroup.rotation.y = Math.PI;
+    } else if (drawerFacing === 'right') {
+      boxGroup.rotation.y = Math.PI / 2;
+    } else if (drawerFacing === 'left') {
+      boxGroup.rotation.y = -Math.PI / 2;
+    }
+
     return boxGroup;
   }
 
@@ -2017,7 +2101,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     hw: PartHardwareConfig,
     sx: number,
     sy: number,
-    sz: number
+    sz: number,
+    drawerFacing: 'front' | 'right' | 'back' | 'left' = 'front'
   ): THREE.Group {
     const group = new THREE.Group();
     if (hw.slideType === 'none') return group;
@@ -2068,7 +2153,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       if (slideType === 'undermount') {
         // --- CORREDERA OCULTA BAJO CAJÓN (TANDEM) ---
-        // Mounted underneath drawer bottom channel
         const mainTrack = new THREE.Mesh(
           new THREE.BoxGeometry(18, railHeight, nominalLength),
           slideSteelMat
@@ -2152,20 +2236,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return slideAssembly;
     };
 
-    // Calculate strict internal positions inside cabinet carcass or modular drawer box
+    // Calculate positions relative to drawer lateral panels or carcass
     const allParts = this.parts();
-    const isVerticalYZ = part.orientation === 'vertical_yz';
+    const px = part.posX ?? 0;
+    const pz = part.posZ ?? 0;
+    const isSideFacing = drawerFacing === 'right' || drawerFacing === 'left';
 
     // 1. Find lateral box panels belonging to this drawer:
-    // First by groupId (if grouped)
-    let drawerLatIzq = part.groupId 
-      ? allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ'))) 
-      : undefined;
-    let drawerLatDer = part.groupId 
-      ? allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER'))) 
-      : undefined;
+    let drawerLatIzq: Part | undefined;
+    let drawerLatDer: Part | undefined;
 
-    // Second: if ungrouped, match by shared ID prefix (e.g. prefix before '_frente')
+    if (part.groupId) {
+      drawerLatIzq = allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ')));
+      drawerLatDer = allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER')));
+    }
+
     if (!drawerLatIzq || !drawerLatDer) {
       const prefix = part.id.includes('_frente') ? part.id.split('_frente')[0] : (part.id.includes('_front') ? part.id.split('_front')[0] : '');
       if (prefix) {
@@ -2174,56 +2259,27 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
-    // Third: match by spatial proximity (sub-parts of drawer box at same height Y)
-    if (!drawerLatIzq || !drawerLatDer) {
-      const py = part.posY ?? 0;
-      if (isVerticalYZ) {
-        const px = part.posX ?? 0;
-        if (!drawerLatIzq) {
-          drawerLatIzq = allParts.find(p => p.id !== part.id && (p.componentRole === 'drawer_box' || p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ')) &&
-            Math.abs((p.posY ?? 0) - py) < 150 && Math.abs((p.posX ?? 0) - px) < 600 && (p.posZ ?? 0) < (part.posZ ?? 0));
-        }
-        if (!drawerLatDer) {
-          drawerLatDer = allParts.find(p => p.id !== part.id && (p.componentRole === 'drawer_box' || p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER')) &&
-            Math.abs((p.posY ?? 0) - py) < 150 && Math.abs((p.posX ?? 0) - px) < 600 && (p.posZ ?? 0) > (part.posZ ?? 0));
-        }
-      } else {
-        const pz = part.posZ ?? 0;
-        if (!drawerLatIzq) {
-          drawerLatIzq = allParts.find(p => p.id !== part.id && (p.componentRole === 'drawer_box' || p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ')) &&
-            Math.abs((p.posY ?? 0) - py) < 150 && Math.abs((p.posZ ?? 0) - pz) < 600 && (p.posX ?? 0) < (part.posX ?? 0));
-        }
-        if (!drawerLatDer) {
-          drawerLatDer = allParts.find(p => p.id !== part.id && (p.componentRole === 'drawer_box' || p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER')) &&
-            Math.abs((p.posY ?? 0) - py) < 150 && Math.abs((p.posZ ?? 0) - pz) < 600 && (p.posX ?? 0) > (part.posX ?? 0));
-        }
-      }
+    let posY = -sy * 0.15;
+    if (slideType === 'undermount') {
+      posY = -sy / 2 + 14;
     }
 
-    const leftPanel = allParts.find(p => 
-      p.id !== part.id && (p.componentRole === 'side_left' || p.name.toUpperCase().includes('LATERAL IZQ')) &&
-      !p.id.includes('lat_izq') && Math.abs((p.posY ?? 0) - (part.posY ?? 0)) < 400
-    );
-    const rightPanel = allParts.find(p => 
-      p.id !== part.id && (p.componentRole === 'side_right' || p.name.toUpperCase().includes('LATERAL DER')) &&
-      !p.id.includes('lat_der') && Math.abs((p.posY ?? 0) - (part.posY ?? 0)) < 400
-    );
-
-    let posY = -sy * 0.15;
-
-    if (!isVerticalYZ) {
+    if (!isSideFacing) {
+      // --- DRAWER FACES FRONT (+Z) OR BACK (-Z) ---
+      // Front is in XY. Laterals have thickness along X.
       let leftX = 0;
       let rightX = 0;
+
       if (drawerLatIzq && drawerLatDer) {
-        const px = part.posX ?? 0;
-        leftX = ((drawerLatIzq.posX ?? 0) - ((drawerLatIzq.thickness || 15) / 2) - px) - (railThickness / 2);
-        rightX = ((drawerLatDer.posX ?? 0) + ((drawerLatDer.thickness || 15) / 2) - px) + (railThickness / 2);
-      } else if (leftPanel && rightPanel) {
-        const px = part.posX ?? 0;
-        const leftInnerFaceX = (leftPanel.posX ?? 0) + ((leftPanel.thickness || 18) / 2);
-        const rightInnerFaceX = (rightPanel.posX ?? 0) - ((rightPanel.thickness || 18) / 2);
-        leftX = (leftInnerFaceX - px) + (railThickness / 2);
-        rightX = (rightInnerFaceX - px) - (railThickness / 2);
+        const x1 = drawerLatIzq.posX ?? 0;
+        const x2 = drawerLatDer.posX ?? 0;
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        const t1 = (x1 === minX ? drawerLatIzq : drawerLatDer).thickness || 15;
+        const t2 = (x2 === maxX ? drawerLatDer : drawerLatIzq).thickness || 15;
+        // Mount strictly to outside faces of lateral panels
+        leftX = (minX - (t1 / 2) - px) - (railThickness / 2);
+        rightX = (maxX + (t2 / 2) - px) + (railThickness / 2);
       } else {
         const boxHalfWidth = Math.max(50, (sx / 2) - 13);
         leftX = -boxHalfWidth - (railThickness / 2);
@@ -2233,44 +2289,89 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (slideType === 'undermount') {
         leftX = (-sx / 2) + 28;
         rightX = (sx / 2) - 28;
-        posY = -sy / 2 + 14;
       }
 
-      const posZ = -sz / 2 - 2;
+      if (drawerFacing === 'front') {
+        // Faces +Z (0°): slides extend along -Z
+        const posZ = -sz / 2 - 2;
+        const leftSlide = createSingleSlideAssembly(true);
+        leftSlide.position.set(leftX, posY, posZ);
+        leftSlide.rotation.y = 0;
 
-      const leftSlide = createSingleSlideAssembly(true);
-      leftSlide.position.set(leftX, posY, posZ);
+        const rightSlide = createSingleSlideAssembly(false);
+        rightSlide.position.set(rightX, posY, posZ);
+        rightSlide.rotation.y = 0;
 
-      const rightSlide = createSingleSlideAssembly(false);
-      rightSlide.position.set(rightX, posY, posZ);
+        group.add(leftSlide);
+        group.add(rightSlide);
+      } else {
+        // Faces -Z (180°): slides extend along +Z
+        const posZ = sz / 2 + 2;
+        const leftSlide = createSingleSlideAssembly(false);
+        leftSlide.position.set(rightX, posY, posZ);
+        leftSlide.rotation.y = Math.PI;
 
-      group.add(leftSlide);
-      group.add(rightSlide);
+        const rightSlide = createSingleSlideAssembly(true);
+        rightSlide.position.set(leftX, posY, posZ);
+        rightSlide.rotation.y = Math.PI;
+
+        group.add(leftSlide);
+        group.add(rightSlide);
+      }
     } else {
+      // --- DRAWER FACES RIGHT (+X) OR LEFT (-X) ---
+      // Front is in YZ (thickness in X, width in Z). Laterals have thickness along Z.
       let leftZ = 0;
       let rightZ = 0;
+
       if (drawerLatIzq && drawerLatDer) {
-        const pz = part.posZ ?? 0;
-        leftZ = ((drawerLatIzq.posZ ?? 0) - ((drawerLatIzq.thickness || 15) / 2) - pz) - (railThickness / 2);
-        rightZ = ((drawerLatDer.posZ ?? 0) + ((drawerLatDer.thickness || 15) / 2) - pz) + (railThickness / 2);
+        const z1 = drawerLatIzq.posZ ?? 0;
+        const z2 = drawerLatDer.posZ ?? 0;
+        const minZ = Math.min(z1, z2);
+        const maxZ = Math.max(z1, z2);
+        const t1 = (z1 === minZ ? drawerLatIzq : drawerLatDer).thickness || 15;
+        const t2 = (z2 === maxZ ? drawerLatDer : drawerLatIzq).thickness || 15;
+        // Mount strictly to outside faces of lateral panels
+        leftZ = (minZ - (t1 / 2) - pz) - (railThickness / 2);
+        rightZ = (maxZ + (t2 / 2) - pz) + (railThickness / 2);
       } else {
         const boxHalfWidth = Math.max(50, (sz / 2) - 13);
         leftZ = -boxHalfWidth - (railThickness / 2);
         rightZ = boxHalfWidth + (railThickness / 2);
       }
 
-      const posX = -sx / 2 - 2;
+      if (slideType === 'undermount') {
+        leftZ = (-sz / 2) + 28;
+        rightZ = (sz / 2) - 28;
+      }
 
-      const leftSlide = createSingleSlideAssembly(true);
-      leftSlide.rotation.y = Math.PI / 2;
-      leftSlide.position.set(posX, posY, leftZ);
+      if (drawerFacing === 'right') {
+        // Faces +X (90°): slides start at -sx/2 - 2 and extend along -X (rotation.y = Math.PI / 2)
+        const posX = -sx / 2 - 2;
+        const leftSlide = createSingleSlideAssembly(false);
+        leftSlide.position.set(posX, posY, leftZ);
+        leftSlide.rotation.y = Math.PI / 2;
 
-      const rightSlide = createSingleSlideAssembly(false);
-      rightSlide.rotation.y = Math.PI / 2;
-      rightSlide.position.set(posX, posY, rightZ);
+        const rightSlide = createSingleSlideAssembly(true);
+        rightSlide.position.set(posX, posY, rightZ);
+        rightSlide.rotation.y = Math.PI / 2;
 
-      group.add(leftSlide);
-      group.add(rightSlide);
+        group.add(leftSlide);
+        group.add(rightSlide);
+      } else {
+        // Faces -X (270°): slides start at +sx/2 + 2 and extend along +X (rotation.y = -Math.PI / 2)
+        const posX = sx / 2 + 2;
+        const leftSlide = createSingleSlideAssembly(true);
+        leftSlide.position.set(posX, posY, rightZ);
+        leftSlide.rotation.y = -Math.PI / 2;
+
+        const rightSlide = createSingleSlideAssembly(false);
+        rightSlide.position.set(posX, posY, leftZ);
+        rightSlide.rotation.y = -Math.PI / 2;
+
+        group.add(leftSlide);
+        group.add(rightSlide);
+      }
     }
 
     group.traverse(child => {

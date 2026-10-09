@@ -695,6 +695,7 @@ export class ModuleDesignerComponent {
     let diff = faceAngles[targetFace] - faceAngles[curFace];
     if (diff === 270) diff = -90;
     if (diff === -270) diff = 90;
+    if (diff === -180) diff = 180;
 
     this.projectService.rotateGroupRigidly(groupId, diff as 90 | -90 | 180);
     this.showToast(`🧭 Frente orientado hacia: ${targetFace.toUpperCase()}`);
