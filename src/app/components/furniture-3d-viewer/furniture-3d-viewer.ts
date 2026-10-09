@@ -305,6 +305,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   // Dragging State
   private isDragging = false;
   private activeGizmoHit: GizmoHitData | null = null;
+  private isDirectPieceDrag = false;
+  private directPieceDragThresholdPassed = false;
   private dragStartPointer = { x: 0, y: 0 };
   private dragInitialPart: Part | null = null;
   private dragInitialParts: Part[] = [];
@@ -3372,15 +3374,40 @@ export class Furniture3dViewerComponent implements OnDestroy {
           }
         } else {
           // If part belongs to a group (e.g. modular drawer), select the entire group for block translation!
+          let partsToSelect: Part[] = [];
           if (part.groupId) {
-            const groupPartIds = this.parts()
-              .filter(p => p.groupId === part.groupId)
-              .map(p => p.id);
-            this.partsSelected.emit(groupPartIds);
+            const groupParts = this.parts().filter(p => p.groupId === part.groupId);
+            partsToSelect = groupParts.length > 0 ? groupParts : [part];
+            this.partsSelected.emit(partsToSelect.map(p => p.id));
             this.partSelected.emit(part);
           } else {
+            partsToSelect = [part];
             this.partsSelected.emit([part.id]);
             this.partSelected.emit(part);
+          }
+
+          // Direct Drag Support (SketchUp Style):
+          // If user clicked with left mouse button on an interactive part/group (or Move/Select tool is active)
+          // prepare direct dragging using a screen-facing plane passing through the hit point
+          if (e.button === 0 && (this.activeTool() === 'select' || this.activeTool() === 'move') && !isHandle) {
+            this.isDirectPieceDrag = true;
+            this.directPieceDragThresholdPassed = false;
+            this.dragStartPointer = { x: e.clientX, y: e.clientY };
+            this.dragInitialPart = { ...part };
+            this.dragInitialParts = partsToSelect.map(p => ({ ...p }));
+
+            // Setup camera-facing plane through the hit intersection point
+            const camDir = new THREE.Vector3();
+            this.camera.getWorldDirection(camDir);
+            const hitPoint = intersects[0].point.clone();
+            this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hitPoint);
+
+            const intersectPoint = new THREE.Vector3();
+            if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
+              this.dragPlaneIntersectionStart.copy(intersectPoint);
+            } else {
+              this.dragPlaneIntersectionStart.copy(hitPoint);
+            }
           }
         }
       }
@@ -3673,6 +3700,72 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return;
     }
 
+    // Direct Piece/Group Dragging (SketchUp style: click & drag any piece surface)
+    if (this.isDirectPieceDrag && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
+      const distFromStart = Math.hypot(e.clientX - this.dragStartPointer.x, e.clientY - this.dragStartPointer.y);
+      if (!this.directPieceDragThresholdPassed && distFromStart > 4) {
+        this.directPieceDragThresholdPassed = true;
+        this.dragStarted.emit();
+        this.controls.enabled = false;
+        canvas.style.cursor = 'grabbing';
+      }
+
+      if (this.directPieceDragThresholdPassed) {
+        const rect = canvas.getBoundingClientRect();
+        this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+
+        const currentIntersection = new THREE.Vector3();
+        if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersection)) {
+          const deltaWorld = currentIntersection.clone().sub(this.dragPlaneIntersectionStart);
+          const snap = 1; // 1 mm CAD precision
+          const dx = Math.round(deltaWorld.x / snap) * snap;
+          const dy = Math.round(deltaWorld.y / snap) * snap;
+          const dz = Math.round(deltaWorld.z / snap) * snap;
+
+          if (this.dragInitialParts.length > 1) {
+            // Group Drag: translate all pieces in group together
+            const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+            for (const p of this.dragInitialParts) {
+              const upd: Partial<Part> = {
+                posX: (p.posX ?? 0) + dx,
+                posY: Math.max(0, (p.posY ?? 0) + dy),
+                posZ: (p.posZ ?? 0) + dz
+              };
+              updatesList.push({ part: p, updates: upd });
+            }
+            this.multiplePartsModified.emit({ updates: updatesList });
+            if (updatesList.length > 0) {
+              this.partModified.emit(updatesList[0]);
+            }
+          } else if (this.dragInitialPart) {
+            // Single Part Drag: translate piece with optional magnetic snapping
+            const part = this.dragInitialPart;
+            let targetPos = {
+              x: (part.posX ?? 0) + dx,
+              y: Math.max(0, (part.posY ?? 0) + dy),
+              z: (part.posZ ?? 0) + dz
+            };
+
+            if (this.isMagneticSnap()) {
+              targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'x');
+              targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'y');
+              targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'z');
+            }
+
+            const updates: Partial<Part> = {
+              posX: targetPos.x,
+              posY: targetPos.y,
+              posZ: targetPos.z
+            };
+            this.partModified.emit({ part, updates });
+          }
+        }
+        return;
+      }
+    }
+
     // Hover cursor updates when not dragging
     if (this.activeTool() === 'push_pull') {
       this.updatePushPullHover(e);
@@ -3703,7 +3796,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       false
     );
     if (pieceIntersects.length > 0) {
-      canvas.style.cursor = 'pointer';
+      if (this.activeTool() === 'move') {
+        canvas.style.cursor = 'move';
+      } else {
+        canvas.style.cursor = 'pointer';
+      }
     } else {
       canvas.style.cursor = 'default';
     }
@@ -3786,6 +3883,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.clearPushPullHighlight();
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) canvas.style.cursor = 'default';
+    }
+
+    if (this.isDirectPieceDrag) {
+      this.isDirectPieceDrag = false;
+      this.directPieceDragThresholdPassed = false;
+      this.dragInitialPart = null;
+      this.dragInitialParts = [];
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) {
+        canvas.style.cursor = 'default';
+      }
     }
 
     if (this.isDragging) {
