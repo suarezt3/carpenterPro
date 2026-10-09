@@ -1,6 +1,6 @@
 {
-  "summary":  "Resumen de cambios completados: cinta de acciones reubicada a la derecha y tarjeta de información restaurada a la izquierda superior.",
-  "updatedAt":  "2026-10-09T16:26:21.735936789Z",
+  "summary":  "Implementación completada: se retiraron las flechas guía de traslación 3D tanto en piezas individuales como en grupos modulares, eliminando el ruido visual en el visor. Se mantuvieron intactos los tiradores de ajuste dimensional en los bordes y el cursor dinámico 'grab' para arrastre directo.",
+  "updatedAt":  "2026-10-09T16:58:30.329133399Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

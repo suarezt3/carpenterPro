@@ -922,15 +922,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     } else {
       this.clearanceCalculated.emit(null);
-      if (selectedDataList.length > 1 && (this.activeTool() === 'move' || this.activeTool() === 'select')) {
-        // Multiple pieces selected (Group Assembly) -> Centered Group Translation Gizmo
-        const centroid = this.calculateCentroid(selectedDataList.map(d => d.part));
-        this.buildGroupGizmo(centroid.x, centroid.y, centroid.z);
-      }
+      // Translation arrows for groups removed per user request (moved via direct mouse drag on parts)
     }
   }
 
-  // Create Interactive 3D Gizmo: Translation Arrows (X, Y, Z) and Edge Stretch Handles
+  // Create Interactive 3D Gizmo: Edge Stretch Handles (Translation is done cleanly via direct mouse drag)
   private buildGizmo(
     part: Part,
     px: number,
@@ -943,82 +939,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const group = new THREE.Group();
     group.position.set(px, py, pz);
 
-    const arrowLength = 160;
-    const coneRadius = 14;
-    const coneHeight = 36;
-    const cylRadius = 4;
-
-    // Helper to build translation axis arrow
-    const createAxisArrow = (
-      dirVector: THREE.Vector3,
-      colorHex: number,
-      axis: 'x' | 'y' | 'z',
-      dir: number
-    ) => {
-      const arrowGroup = new THREE.Group();
-
-      // Shaft
-      const shaftGeo = new THREE.CylinderGeometry(cylRadius, cylRadius, arrowLength, 12);
-      shaftGeo.translate(0, arrowLength / 2, 0);
-      const shaftMat = new THREE.MeshBasicMaterial({
-        color: colorHex,
-        depthTest: false,
-        transparent: true,
-        opacity: 0.95
-      });
-      const shaft = new THREE.Mesh(shaftGeo, shaftMat);
-
-      // Cone Head
-      const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 16);
-      coneGeo.translate(0, arrowLength + coneHeight / 2, 0);
-      const coneMat = new THREE.MeshBasicMaterial({
-        color: colorHex,
-        depthTest: false
-      });
-      const cone = new THREE.Mesh(coneGeo, coneMat);
-
-      // Hitbox for easy clicking
-      const hitGeo = new THREE.CylinderGeometry(coneRadius * 1.5, coneRadius * 1.5, arrowLength + coneHeight, 8);
-      hitGeo.translate(0, (arrowLength + coneHeight) / 2, 0);
-      const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-      const hitMesh = new THREE.Mesh(hitGeo, hitMat);
-
-      arrowGroup.add(shaft);
-      arrowGroup.add(cone);
-      arrowGroup.add(hitMesh);
-
-      // Orient arrow towards direction
-      arrowGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirVector);
-
-      const gizmoData: GizmoHitData = {
-        isGizmo: true,
-        type: 'axis',
-        axis,
-        dir
-      };
-      hitMesh.userData = { ...gizmoData, parentArrow: arrowGroup };
-      cone.userData = { ...gizmoData, parentArrow: arrowGroup };
-      shaft.userData = { ...gizmoData, parentArrow: arrowGroup };
-
-      this.gizmoHitMeshes.push(hitMesh, cone);
-      return arrowGroup;
-    };
-
-    // 1. Translation Arrows:
-    // X (Red / Bright Coral)
-    const arrowX = createAxisArrow(new THREE.Vector3(1, 0, 0), 0xef4444, 'x', 1);
-    group.add(arrowX);
-
-    // Y (Green / Emerald)
-    const arrowY = createAxisArrow(new THREE.Vector3(0, 1, 0), 0x10b981, 'y', 1);
-    group.add(arrowY);
-
-    // Z (Blue / Sky)
-    const arrowZ = createAxisArrow(new THREE.Vector3(0, 0, 1), 0x3b82f6, 'z', 1);
-    group.add(arrowZ);
-
-    // 2. Edge Stretch Handles (Tiradores de borde interactivos)
-    // Cubos/esferas en los bordes para alargar o ensanchar la pieza arrastrando directamente
+    // Edge Stretch Handles (Tiradores de borde interactivos)
+    // Cubos en los bordes para alargar o ensanchar la pieza arrastrando directamente
     const createStretchHandle = (
       pos: THREE.Vector3,
       colorHex: number,
@@ -1081,7 +1003,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       } else {
         // Length along Y (Height), Width along Z
         const handleLPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16, 0), 0x2563eb, 'length', 1);
-        const handleLMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16, 0), 0x2563eb, 'length', -1);
+        const handleLMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16), 0x2563eb, 'length', -1);
         const handleWPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0xf59e0b, 'width', 1);
         const handleWMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0xf59e0b, 'width', -1);
         group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
@@ -1090,92 +1012,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       // Frontal (XY): Length along X, Width along Y
       const handleLPlus = createStretchHandle(new THREE.Vector3(sx / 2 + 16, 0, 0), 0x2563eb, 'length', 1);
       const handleLMinus = createStretchHandle(new THREE.Vector3(-sx / 2 - 16, 0, 0), 0x2563eb, 'length', -1);
-      const handleWPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16, 0), 0xf59e0b, 'width', 1);
-      const handleWMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16, 0), 0xf59e0b, 'width', -1);
+      const handleWPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16), 0xf59e0b, 'width', 1);
+      const handleWMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16), 0xf59e0b, 'width', -1);
 
       group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
     }
-
-    group.renderOrder = 999;
-    this.gizmoGroup.add(group);
-  }
-
-  // Create Centered Translation Gizmo for Multiple Selected Pieces (Group/Drawer Assembly)
-  private buildGroupGizmo(px: number, py: number, pz: number) {
-    const group = new THREE.Group();
-    group.position.set(px, py, pz);
-
-    const arrowLength = 175;
-    const coneRadius = 15;
-    const coneHeight = 38;
-    const cylRadius = 4.5;
-
-    const createAxisArrow = (
-      dirVector: THREE.Vector3,
-      colorHex: number,
-      axis: 'x' | 'y' | 'z',
-      dir: number
-    ) => {
-      const arrowGroup = new THREE.Group();
-
-      const shaftGeo = new THREE.CylinderGeometry(cylRadius, cylRadius, arrowLength, 12);
-      shaftGeo.translate(0, arrowLength / 2, 0);
-      const shaftMat = new THREE.MeshBasicMaterial({
-        color: colorHex,
-        depthTest: false,
-        transparent: true,
-        opacity: 0.95
-      });
-      const shaft = new THREE.Mesh(shaftGeo, shaftMat);
-
-      const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 16);
-      coneGeo.translate(0, arrowLength + coneHeight / 2, 0);
-      const coneMat = new THREE.MeshBasicMaterial({
-        color: colorHex,
-        depthTest: false
-      });
-      const cone = new THREE.Mesh(coneGeo, coneMat);
-
-      const hitGeo = new THREE.CylinderGeometry(coneRadius * 1.6, coneRadius * 1.6, arrowLength + coneHeight, 8);
-      hitGeo.translate(0, (arrowLength + coneHeight) / 2, 0);
-      const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-      const hitMesh = new THREE.Mesh(hitGeo, hitMat);
-
-      arrowGroup.add(shaft);
-      arrowGroup.add(cone);
-      arrowGroup.add(hitMesh);
-      arrowGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirVector);
-
-      const gizmoData: GizmoHitData = {
-        isGizmo: true,
-        type: 'axis',
-        axis,
-        dir
-      };
-      hitMesh.userData = { ...gizmoData, parentArrow: arrowGroup };
-      cone.userData = { ...gizmoData, parentArrow: arrowGroup };
-      shaft.userData = { ...gizmoData, parentArrow: arrowGroup };
-
-      this.gizmoHitMeshes.push(hitMesh, cone);
-      return arrowGroup;
-    };
-
-    // Center Hub Marker showing grouped selection
-    const hubGeo = new THREE.SphereGeometry(14, 16, 16);
-    const hubMat = new THREE.MeshStandardMaterial({
-      color: 0x0284c7,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 0.6,
-      roughness: 0.2,
-      depthTest: false
-    });
-    const hub = new THREE.Mesh(hubGeo, hubMat);
-    group.add(hub);
-
-    // 3 Translation Arrows (X, Y, Z)
-    group.add(createAxisArrow(new THREE.Vector3(1, 0, 0), 0xef4444, 'x', 1));
-    group.add(createAxisArrow(new THREE.Vector3(0, 1, 0), 0x10b981, 'y', 1));
-    group.add(createAxisArrow(new THREE.Vector3(0, 0, 1), 0x3b82f6, 'z', 1));
 
     group.renderOrder = 999;
     this.gizmoGroup.add(group);
@@ -1705,10 +1546,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     } else {
       this.clearanceCalculated.emit(null);
-      if (selectedDataList.length > 1 && (this.activeTool() === 'move' || this.activeTool() === 'select')) {
-        const centroid = this.calculateCentroid(selectedDataList.map(d => d.part));
-        this.buildGroupGizmo(centroid.x, centroid.y, centroid.z);
-      }
+      // Group selection: translation arrows removed to eliminate visual clutter (moved via direct mouse drag)
     }
   }
 
@@ -3796,8 +3634,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       false
     );
     if (pieceIntersects.length > 0) {
-      if (this.activeTool() === 'move') {
-        canvas.style.cursor = 'move';
+      const topObj = pieceIntersects[0].object;
+      const topPart = topObj.userData?.['part'] as Part | undefined;
+      const isSelected = topPart && this.activeSelectedIds().includes(topPart.id);
+      if (this.activeTool() === 'move' || isSelected) {
+        canvas.style.cursor = 'grab';
       } else {
         canvas.style.cursor = 'pointer';
       }
