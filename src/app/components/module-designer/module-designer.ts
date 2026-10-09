@@ -653,6 +653,18 @@ export class ModuleDesignerComponent {
       this.rotateSelectedGroup(90);
     }
   }
+  rotateSelectedPart90(axis: 'x' | 'y' | 'z' = 'y') {
+    const sel = this.selectedPart();
+    if (!sel) return;
+    if (this.viewer3dRef()) {
+      this.viewer3dRef()!.rotatePart90(sel, axis);
+    } else {
+      if (axis === 'y') {
+        this.updateSelectedPart({ length: sel.width, width: sel.length });
+      }
+    }
+    this.showToast(`🔄 Pieza girada 90°`);
+  }
 
   duplicateSelectedGroup() {
     const groupId = this.activeSelectedGroupId();
@@ -759,6 +771,9 @@ export class ModuleDesignerComponent {
     const cloned = this.projectService.duplicatePart(selId);
     if (cloned) {
       this.selectedPartId.set(cloned.id);
+      this.selectedPartIds.set([cloned.id]);
+      this.activeDockTab.set('piece');
+      this.showToast(`📋 Se duplicó "${cloned.name}"`);
     }
   }
 

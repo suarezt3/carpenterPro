@@ -70,7 +70,7 @@
           (groupDuplicationRequested)="onGroupDuplicationRequested($event)">
         </app-furniture-3d-viewer>
 
-        <!-- BARRA FLOTANTE DE SELECCIÓN MÚLTIPLE SUPERIOR (Estilizada, compacta y uniforme) -->
+        <!-- BARRA FLOTANTE DE ACCIONES SUPERIOR (Grupo, Multiselección o Pieza Individual) -->
         @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
           <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-slate-900/95 text-white backdrop-blur-md px-2.5 py-1.5 rounded-2xl shadow-xl border border-white/10 animate-in fade-in slide-in-from-top-2 duration-150 pointer-events-auto max-w-[96vw] overflow-x-auto no-scrollbar whitespace-nowrap">
             <!-- Badge de Grupo / Piezas -->
@@ -205,6 +205,108 @@
               (click)="deselectAll()" 
               class="h-7 w-7 rounded-lg text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0"
               title="Deseleccionar piezas (Esc)">
+              <span class="material-icons text-sm">close</span>
+            </button>
+          </div>
+        } @else if (selectedPart(); as selPart) {
+          <!-- BARRA FLOTANTE PARA PIEZA INDIVIDUAL (Duplicar, Mover, Rotar, Orientación, Eliminar) -->
+          <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-slate-900/95 text-white backdrop-blur-md px-2.5 py-1.5 rounded-2xl shadow-xl border border-white/10 animate-in fade-in slide-in-from-top-2 duration-150 pointer-events-auto max-w-[96vw] overflow-x-auto no-scrollbar whitespace-nowrap">
+            <!-- Badge de Pieza Individual -->
+            <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 h-7 shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
+              <span class="material-icons text-sm text-sky-400">crop_square</span>
+              <span class="text-xs font-bold text-white truncate max-w-[120px]">{{ selPart.name }}</span>
+              <span class="text-[10px] text-slate-400 font-medium">({{ selPart.length }}×{{ selPart.width }}×{{ selPart.thickness }})</span>
+            </div>
+
+            <!-- Duplicar Pieza -->
+            <button 
+              type="button" 
+              (click)="duplicateSelectedPart()" 
+              class="h-7 px-2.5 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition shrink-0 shadow-xs"
+              title="Duplicar pieza individual">
+              <span class="material-icons text-xs">content_copy</span>
+              <span>Duplicar</span>
+            </button>
+
+            <!-- Mover en 3D -->
+            <button 
+              type="button" 
+              (click)="activateMoveToolOnViewer()" 
+              class="h-7 px-2.5 bg-sky-600/80 hover:bg-sky-500 active:scale-95 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition shrink-0 shadow-xs"
+              title="Mover pieza con flechas 3D">
+              <span class="material-icons text-xs">open_with</span>
+              <span>Mover</span>
+            </button>
+
+            <!-- Girar 90° (Horario y Antihorario) con atajo R -->
+            <div class="flex items-center bg-white/10 rounded-lg p-0.5 border border-white/10 h-7 shrink-0">
+              <button 
+                type="button" 
+                (click)="rotateSelectedPart90('z')" 
+                class="h-6 w-6 flex items-center justify-center hover:bg-white/20 text-slate-300 hover:text-white rounded transition"
+                title="Voltear / Girar en plano">
+                <span class="material-icons text-xs">rotate_left</span>
+              </button>
+              <button 
+                type="button" 
+                (click)="rotateSelectedPart90('y')" 
+                class="h-6 px-1.5 hover:bg-white/20 text-white rounded text-xs font-semibold flex items-center gap-1 transition"
+                title="Girar pieza 90° (intercambia largo y ancho) - Atajo: tecla R">
+                <span class="material-icons text-xs">rotate_right</span>
+                <span>90° (R)</span>
+              </button>
+            </div>
+
+            <!-- Selector de Orientación de la Pieza (Horizontal, Lateral, Frontal) -->
+            <div class="flex items-center gap-0.5 bg-white/10 rounded-lg p-0.5 border border-white/10 h-7 shrink-0 text-xs">
+              <span class="text-xs text-slate-300 font-medium px-1.5 flex items-center gap-1">
+                <span class="material-icons text-xs text-sky-400">explore</span>
+                <span>Orientación:</span>
+              </span>
+              <button 
+                type="button"
+                (click)="setPartOrientation('horizontal')"
+                [class]="(selPart.orientation || 'horizontal') === 'horizontal' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
+                class="h-6 px-2 rounded text-xs font-semibold transition"
+                title="Orientación Horizontal (plano XZ, ej. estante, base, tapa)">
+                Horizontal
+              </button>
+              <button 
+                type="button"
+                (click)="setPartOrientation('vertical_yz')"
+                [class]="selPart.orientation === 'vertical_yz' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
+                class="h-6 px-2 rounded text-xs font-semibold transition"
+                title="Orientación Lateral (plano YZ, ej. lateral izquierdo o derecho)">
+                Lateral (YZ)
+              </button>
+              <button 
+                type="button"
+                (click)="setPartOrientation('vertical_xy')"
+                [class]="selPart.orientation === 'vertical_xy' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
+                class="h-6 px-2 rounded text-xs font-semibold transition"
+                title="Orientación Frontal (plano XY, ej. frente, trasera o fondo)">
+                Frontal (XY)
+              </button>
+            </div>
+
+            <!-- Eliminar Pieza -->
+            <button 
+              type="button" 
+              (click)="deleteSelectedPart()" 
+              class="h-7 px-2.5 bg-rose-600/80 hover:bg-rose-600 active:scale-95 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition shrink-0 shadow-xs"
+              title="Eliminar pieza seleccionada (Supr)">
+              <span class="material-icons text-xs">delete</span>
+              <span>Eliminar</span>
+            </button>
+
+            <!-- Botón Cerrar / Deseleccionar -->
+            <div class="h-4 w-px bg-white/15 shrink-0 mx-0.5"></div>
+            <button 
+              type="button" 
+              (click)="deselectAll()" 
+              class="h-7 w-7 rounded-lg text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0"
+              title="Deseleccionar pieza (Esc)">
               <span class="material-icons text-sm">close</span>
             </button>
           </div>
@@ -662,103 +764,6 @@
                 </button>
               </div>
 
-            </div>
-
-            <!-- SECTION: ORIENTACIÓN ESPACIAL -->
-            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-800 block">
-                  @if (activeSelectedGroupName()) {
-                    Orientación del Cajón (Frente):
-                  } @else {
-                    Orientación de la Pieza:
-                  }
-                </span>
-                @if (activeSelectedGroupName()) {
-                  <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Bloque Rígido</span>
-                }
-              </div>
-
-              @if (activeSelectedGroupName()) {
-                <!-- Controles de frente del cajón completo en 3D -->
-                <div class="grid grid-cols-4 gap-1 text-[10px]">
-                  <button 
-                    type="button"
-                    (click)="setGroupFaceDirection('front')"
-                    [class]="currentGroupFacing() === 'front' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs"
-                    title="Cara frontal hacia el frente (Z+)">
-                    Frente (0°)
-                  </button>
-                  <button 
-                    type="button"
-                    (click)="setGroupFaceDirection('right')"
-                    [class]="currentGroupFacing() === 'right' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs"
-                    title="Cara frontal hacia la derecha (X+)">
-                    Der (90°)
-                  </button>
-                  <button 
-                    type="button"
-                    (click)="setGroupFaceDirection('back')"
-                    [class]="currentGroupFacing() === 'back' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs"
-                    title="Cara frontal hacia el fondo (Z-)">
-                    Atrás (180°)
-                  </button>
-                  <button 
-                    type="button"
-                    (click)="setGroupFaceDirection('left')"
-                    [class]="currentGroupFacing() === 'left' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs"
-                    title="Cara frontal hacia la izquierda (X-)">
-                    Izq (270°)
-                  </button>
-                </div>
-
-                <div class="grid grid-cols-2 gap-1.5 pt-1">
-                  <button 
-                    type="button"
-                    (click)="rotateSelectedGroup(-90)"
-                    class="py-1 px-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition"
-                    title="Girar cajón 90° antihorario">
-                    <span class="material-icons text-xs">rotate_left</span>
-                    <span>Girar -90°</span>
-                  </button>
-                  <button 
-                    type="button"
-                    (click)="rotateSelectedGroup(90)"
-                    class="py-1 px-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition"
-                    title="Girar cajón 90° horario (tecla R)">
-                    <span class="material-icons text-xs">rotate_right</span>
-                    <span>Girar +90° (R)</span>
-                  </button>
-                </div>
-              } @else {
-                <div class="grid grid-cols-3 gap-1 text-[10px]">
-                  <button 
-                    type="button"
-                    (click)="setPartOrientation('horizontal')"
-                    [class]="(sel.orientation || 'horizontal') === 'horizontal' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
-                    Horizontal
-                  </button>
-                  <button 
-                    type="button"
-                    (click)="setPartOrientation('vertical_yz')"
-                    [class]="sel.orientation === 'vertical_yz' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
-                    Lateral (YZ)
-                  </button>
-                  <button 
-                    type="button"
-                    (click)="setPartOrientation('vertical_xy')"
-                    [class]="sel.orientation === 'vertical_xy' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
-                    Frontal (XY)
-                  </button>
-                </div>
-              }
             </div>
 
             <!-- SECTION 4: TAPACANTOS INTELIGENTES (L1, L2, A1, A2) -->

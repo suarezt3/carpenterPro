@@ -866,7 +866,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         // Apply preserved open translation immediately
         const curOpen = this.openCurrentMap.get(part.id) || 0;
         if (curOpen > 0) {
-          const maxSlide = Math.min(380, Math.max(180, (part.width || 450) * 0.72));
+          const maxSlide = 320;
           if (slideAxis === 'x') mesh.position.x += curOpen * maxSlide * slideDir;
           else mesh.position.z += curOpen * maxSlide * slideDir;
         }
@@ -1711,37 +1711,87 @@ export class Furniture3dViewerComponent implements OnDestroy {
   }
 
   private getDrawerFacing(part: Part, parts: Part[]): 'front' | 'right' | 'back' | 'left' {
-    // Find all parts belonging to this drawer (by groupId, prefix, or role)
-    const drawerParts = parts.filter(p =>
-      p.id !== part.id && (
-        (part.groupId && p.groupId === part.groupId) ||
-        (part.id.includes('caj_') && p.id.includes('caj_') && Math.abs((p.posY || 0) - (part.posY || 0)) < 150) ||
-        ((p.componentRole === 'drawer_box' || p.componentRole === 'drawer_lateral') && Math.abs((p.posY || 0) - (part.posY || 0)) < 150)
-      )
-    );
-
-    if (drawerParts.length > 0) {
-      const allPts = [part, ...drawerParts];
-      const minX = Math.min(...allPts.map(p => p.posX ?? 0));
-      const maxX = Math.max(...allPts.map(p => p.posX ?? 0));
-      const minZ = Math.min(...allPts.map(p => p.posZ ?? 0));
-      const maxZ = Math.max(...allPts.map(p => p.posZ ?? 0));
-      const cx = (minX + maxX) / 2;
-      const cz = (minZ + maxZ) / 2;
-
-      const dx = (part.posX ?? 0) - cx;
-      const dz = (part.posZ ?? 0) - cz;
-
-      if (part.orientation === 'vertical_yz') {
-        return (Math.abs(dx) > 10 ? dx >= 0 : (part.posX ?? 0) >= 0) ? 'right' : 'left';
+    // 1. Gather all parts that belong to the SAME drawer assembly:
+    let drawerParts: Part[] = [];
+    if (part.groupId) {
+      drawerParts = parts.filter(p => p.groupId === part.groupId);
+    } else {
+      // Check for common drawer prefix in IDs (e.g., 'caj_ind_0_frente', 'caj_ind_0_lat_izq', etc.)
+      const boxSubKeywords = ['_frente', '_lat_izq', '_lat_der', '_contrafrente', '_trasera', '_frente_int', '_fondo'];
+      let prefix = '';
+      for (const kw of boxSubKeywords) {
+        if (part.id.includes(kw)) {
+          prefix = part.id.split(kw)[0];
+          break;
+        }
       }
-      return (Math.abs(dz) > 10 ? dz >= 0 : (part.posZ ?? 0) >= 0) ? 'front' : 'back';
+      if (!prefix && part.id.includes('caj_ind_')) {
+        const match = part.id.match(/caj_ind_\d+/);
+        if (match) prefix = match[0];
+      }
+
+      if (prefix) {
+        drawerParts = parts.filter(p => p.id.startsWith(prefix) || p.id.includes(prefix));
+      } else {
+        // Fallback: parts within similar vertical height and drawer naming
+        drawerParts = parts.filter(p =>
+          (p.id === part.id) ||
+          ((p.name.toUpperCase().includes('CAJ') || p.componentRole?.includes('drawer') || p.id.includes('caj_')) &&
+           Math.abs((p.posY || 0) - (part.posY || 0)) < 150)
+        );
+      }
+    }
+
+    if (drawerParts.length === 0) {
+      drawerParts = [part];
+    }
+
+    // 2. Find the FRONT plate of this drawer assembly
+    const frontPart = drawerParts.find(p =>
+      p.componentRole === 'drawer_front' ||
+      p.id.includes('_frente') ||
+      p.id.includes('_front') ||
+      p.name.toUpperCase().includes('FRENTE')
+    ) || (drawerParts.length === 1 ? drawerParts[0] : null);
+
+    // 3. Compute centroid of the entire drawer assembly
+    const minX = Math.min(...drawerParts.map(p => p.posX ?? 0));
+    const maxX = Math.max(...drawerParts.map(p => p.posX ?? 0));
+    const minZ = Math.min(...drawerParts.map(p => p.posZ ?? 0));
+    const maxZ = Math.max(...drawerParts.map(p => p.posZ ?? 0));
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+
+    if (frontPart) {
+      const dx = (frontPart.posX ?? 0) - cx;
+      const dz = (frontPart.posZ ?? 0) - cz;
+
+      if (frontPart.orientation === 'vertical_yz') {
+        // Front plate is parallel to YZ -> faces +X (right) or -X (left)
+        return (Math.abs(dx) > 10 ? dx >= 0 : (frontPart.posX ?? 0) >= 0) ? 'right' : 'left';
+      } else {
+        // Front plate is parallel to XY -> faces +Z (front) or -Z (back)
+        return (Math.abs(dz) > 10 ? dz >= 0 : (frontPart.posZ ?? 0) >= 0) ? 'front' : 'back';
+      }
+    }
+
+    // If no distinct front plate found (e.g., custom group), look at lateral panels:
+    const lateralPanels = drawerParts.filter(p =>
+      p.name.toUpperCase().includes('LATERAL') || p.componentRole === 'drawer_lateral'
+    );
+    if (lateralPanels.length >= 2) {
+      if (lateralPanels[0].orientation === 'vertical_xy') {
+        return (cx >= 0) ? 'right' : 'left';
+      }
+      if (lateralPanels[0].orientation === 'vertical_yz') {
+        return (cz >= 0) ? 'front' : 'back';
+      }
     }
 
     if (part.orientation === 'vertical_yz') {
       return (part.posX ?? 0) >= 0 ? 'right' : 'left';
     }
-    return 'front';
+    return (part.posZ ?? 0) >= 0 ? 'front' : 'back';
   }
 
   private createHandleMesh(
