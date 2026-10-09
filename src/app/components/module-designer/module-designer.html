@@ -75,19 +75,58 @@
           <div 
             [class]="isSidebarCollapsed() ? 'right-28' : 'right-3'"
             class="absolute top-3 z-30 flex items-center gap-1.5 bg-slate-900/95 text-white backdrop-blur-md px-2.5 py-1.5 rounded-2xl shadow-xl border border-white/10 animate-in fade-in slide-in-from-top-2 duration-150 pointer-events-auto max-w-[calc(100%-240px)] overflow-x-auto no-scrollbar whitespace-nowrap">
-            <!-- Badge de Grupo / Piezas -->
-            <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 h-7 shrink-0">
-              <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
-              @if (activeSelectedGroupName()) {
-                <span class="material-icons text-sm text-indigo-400">inbox</span>
-                <span class="text-xs font-bold text-white truncate max-w-[110px]">{{ activeSelectedGroupName() }}</span>
-                <span class="text-[10px] text-slate-400 font-medium">({{ selectedPartIds().length }})</span>
+            <!-- Badge de Grupo / Edición en Línea -->
+            @if (activeSelectedGroupName()) {
+              @if (renamingGroupId() === activeSelectedGroupId()) {
+                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-indigo-950/80 border border-indigo-400/50 h-7 shrink-0">
+                  <span class="material-icons text-xs text-indigo-400">edit</span>
+                  <input 
+                    type="text" 
+                    [value]="renamingGroupName()" 
+                    (input)="renamingGroupName.set($any($event.target).value)" 
+                    (click)="$event.stopPropagation()"
+                    (keydown.enter)="saveRenameActiveGroup()"
+                    (keydown.escape)="cancelRenameGroup()"
+                    class="text-xs font-bold px-1.5 py-0.5 bg-slate-900 border border-indigo-400/80 rounded text-white w-28 focus:outline-hidden focus:ring-1 focus:ring-indigo-400"
+                    placeholder="Nombre del cajón" />
+                  <button 
+                    type="button" 
+                    (click)="saveRenameActiveGroup()" 
+                    class="h-6 w-6 text-emerald-400 hover:text-emerald-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
+                    title="Guardar nombre (Enter)">
+                    <span class="material-icons text-xs">check</span>
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="cancelRenameGroup()" 
+                    class="h-6 w-6 text-rose-400 hover:text-rose-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
+                    title="Cancelar (Esc)">
+                    <span class="material-icons text-xs">close</span>
+                  </button>
+                </div>
               } @else {
+                <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 h-7 shrink-0">
+                  <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+                  <span class="material-icons text-sm text-indigo-400">inbox</span>
+                  <span class="text-xs font-bold text-white truncate max-w-[120px]">{{ activeSelectedGroupName() }}</span>
+                  <span class="text-[10px] text-slate-400 font-medium">({{ selectedPartIds().length }})</span>
+                  <button 
+                    type="button" 
+                    (click)="startRenameActiveGroup($event)" 
+                    class="ml-0.5 text-slate-400 hover:text-white hover:bg-white/15 p-0.5 rounded transition cursor-pointer"
+                    title="Renombrar este cajón o módulo">
+                    <span class="material-icons text-xs">edit</span>
+                  </button>
+                </div>
+              }
+            } @else {
+              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 h-7 shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
                 <span class="text-xs font-semibold text-white">
                   {{ selectedPartIds().length }} seleccionadas
                 </span>
-              }
-            </div>
+              </div>
+            }
 
             @if (!activeSelectedGroupName()) {
               <button 
@@ -215,13 +254,49 @@
           <div 
             [class]="isSidebarCollapsed() ? 'right-28' : 'right-3'"
             class="absolute top-3 z-30 flex items-center gap-1.5 bg-slate-900/95 text-white backdrop-blur-md px-2.5 py-1.5 rounded-2xl shadow-xl border border-white/10 animate-in fade-in slide-in-from-top-2 duration-150 pointer-events-auto max-w-[calc(100%-240px)] overflow-x-auto no-scrollbar whitespace-nowrap">
-            <!-- Badge de Pieza Individual -->
-            <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 h-7 shrink-0">
-              <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
-              <span class="material-icons text-sm text-sky-400">crop_square</span>
-              <span class="text-xs font-bold text-white truncate max-w-[120px]">{{ selPart.name }}</span>
-              <span class="text-[10px] text-slate-400 font-medium">({{ selPart.length }}×{{ selPart.width }}×{{ selPart.thickness }})</span>
-            </div>
+            <!-- Badge de Pieza Individual / Edición en Línea -->
+            @if (renamingPartId() === selPart.id) {
+              <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-sky-950/80 border border-sky-400/50 h-7 shrink-0">
+                <span class="material-icons text-xs text-sky-400">edit</span>
+                <input 
+                  type="text" 
+                  [value]="renamingPartName()" 
+                  (input)="renamingPartName.set($any($event.target).value)" 
+                  (click)="$event.stopPropagation()"
+                  (keydown.enter)="saveRenameSelectedPart()"
+                  (keydown.escape)="cancelRenamePart()"
+                  class="text-xs font-bold px-1.5 py-0.5 bg-slate-900 border border-sky-400/80 rounded text-white w-32 focus:outline-hidden focus:ring-1 focus:ring-sky-400"
+                  placeholder="Nombre de pieza" />
+                <button 
+                  type="button" 
+                  (click)="saveRenameSelectedPart()" 
+                  class="h-6 w-6 text-emerald-400 hover:text-emerald-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
+                  title="Guardar nombre (Enter)">
+                  <span class="material-icons text-xs">check</span>
+                </button>
+                <button 
+                  type="button" 
+                  (click)="cancelRenamePart()" 
+                  class="h-6 w-6 text-rose-400 hover:text-rose-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
+                  title="Cancelar (Esc)">
+                  <span class="material-icons text-xs">close</span>
+                </button>
+              </div>
+            } @else {
+              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 h-7 shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
+                <span class="material-icons text-sm text-sky-400">crop_square</span>
+                <span class="text-xs font-bold text-white truncate max-w-[120px]">{{ selPart.name }}</span>
+                <span class="text-[10px] text-slate-400 font-medium">({{ selPart.length }}×{{ selPart.width }}×{{ selPart.thickness }})</span>
+                <button 
+                  type="button" 
+                  (click)="startRenameSelectedPart($event)" 
+                  class="ml-0.5 text-slate-400 hover:text-white hover:bg-white/15 p-0.5 rounded transition cursor-pointer"
+                  title="Renombrar esta pieza">
+                  <span class="material-icons text-xs">edit</span>
+                </button>
+              </div>
+            }
 
             <!-- Duplicar Pieza -->
             <button 
@@ -1032,196 +1107,115 @@
               <span class="text-[10px] text-slate-400 font-mono">L × A × E</span>
             </div>
 
-            <!-- SECCIÓN 1: CAJONES Y GRUPOS MODULARES (SI EXISTEN) -->
-            @if (groupsWithParts().length > 0) {
-              <div class="space-y-1.5">
+            <!-- ACCESOS RÁPIDOS A CAJONES / MÓDULOS (SI EXISTEN) -->
+            @if (groups().length > 0) {
+              <div class="space-y-1.5 p-2 bg-indigo-50/60 border border-indigo-100 rounded-xl">
                 <div class="flex items-center justify-between">
                   <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
                     <span class="material-icons text-xs">folder_open</span>
-                    Cajones y Módulos ({{ groupsWithParts().length }})
+                    Cajones y Módulos ({{ groups().length }})
                   </span>
+                  <span class="text-[10px] text-indigo-500 font-medium">Clic para gestionar</span>
                 </div>
-
-                <div class="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                  @for (grpItem of groupsWithParts(); track grpItem.group.id) {
-                    <div class="border border-indigo-200 bg-indigo-50/50 rounded-xl p-2 space-y-1.5 text-xs shadow-2xs">
-                      
-                      <!-- Header del Cajón -->
-                      <div class="flex items-center justify-between gap-1.5">
-                        <button 
-                          type="button" 
-                          (click)="toggleGroupAccordion(grpItem.group.id)" 
-                          class="flex items-center gap-1.5 min-w-0 flex-1 text-left">
-                          <span class="material-icons text-xs text-indigo-600 transition-transform"
-                            [class.rotate-90]="isGroupAccordionOpen(grpItem.group.id)">
-                            chevron_right
-                          </span>
-                          <span class="material-icons text-xs text-indigo-600">inbox</span>
-                          
-                          @if (renamingGroupId() === grpItem.group.id) {
-                            <input 
-                              type="text" 
-                              [value]="renamingGroupName()" 
-                              (input)="renamingGroupName.set($any($event.target).value)" 
-                              (click)="$event.stopPropagation()"
-                              (keydown.enter)="saveRenameGroup(grpItem.group.id)"
-                              (keydown.escape)="cancelRenameGroup()"
-                              class="text-xs font-bold px-1.5 py-0.5 bg-white border border-indigo-400 rounded text-slate-800 w-28 focus:outline-hidden" />
-                            <button type="button" (click)="saveRenameGroup(grpItem.group.id)" class="text-emerald-600 hover:text-emerald-700">
-                              <span class="material-icons text-xs">check</span>
-                            </button>
-                            <button type="button" (click)="cancelRenameGroup()" class="text-rose-500 hover:text-rose-600">
-                              <span class="material-icons text-xs">close</span>
-                            </button>
-                          } @else {
-                            <span class="font-bold text-indigo-950 truncate text-[11px]">{{ grpItem.group.name }}</span>
-                            <span class="text-[9px] text-indigo-600 font-semibold px-1 py-0.2 bg-indigo-100 rounded">
-                              {{ grpItem.parts.length }} pz
-                            </span>
-                          }
-                        </button>
-
-                        <!-- Botones de acción del grupo -->
-                        <div class="flex items-center gap-1 shrink-0">
-                          <button 
-                            type="button" 
-                            (click)="startRenameGroup(grpItem.group, $event)" 
-                            class="p-0.5 text-slate-400 hover:text-indigo-600 rounded transition" 
-                            title="Renombrar cajón">
-                            <span class="material-icons text-xs">edit</span>
-                          </button>
-                          <button 
-                            type="button" 
-                            (click)="selectEntireGroup(grpItem.group.id)" 
-                            class="p-0.5 text-slate-400 hover:text-indigo-600 rounded transition" 
-                            title="Seleccionar todo el cajón">
-                            <span class="material-icons text-xs">select_all</span>
-                          </button>
-                          <button 
-                            type="button" 
-                            (click)="ungroup(grpItem.group.id)" 
-                            class="p-0.5 text-slate-400 hover:text-amber-600 rounded transition" 
-                            title="Desagrupar (volver a piezas libres)">
-                            <span class="material-icons text-xs">link_off</span>
-                          </button>
-                          <button 
-                            type="button" 
-                            (click)="deleteGroup(grpItem.group.id, true)" 
-                            class="p-0.5 text-slate-400 hover:text-rose-600 rounded transition" 
-                            title="Eliminar cajón y sus piezas">
-                            <span class="material-icons text-xs">delete</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <!-- Control interactivo de Apertura / Deslizamiento 3D -->
-                      <div class="bg-white/90 border border-indigo-100 rounded-lg p-1.5 flex items-center justify-between gap-2">
-                        <button 
-                          type="button" 
-                          (click)="toggleGroupOpen(grpItem.group.id)" 
-                          [class]="grpItem.group.isOpen ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
-                          class="px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 transition shrink-0">
-                          <span class="material-icons text-[11px]">{{ grpItem.group.isOpen ? 'meeting_room' : 'door_sliding' }}</span>
-                          <span>{{ grpItem.group.isOpen ? 'Cerrar' : 'Abrir 3D' }}</span>
-                        </button>
-
-                        <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                          <input 
-                            type="range" 
-                            min="0" 
-                            max="100" 
-                            [value]="roundPercent(grpItem.group.slideExtension)" 
-                            (input)="onGroupSlideChange(grpItem.group.id, $event)" 
-                            class="w-full accent-indigo-600 h-1 bg-slate-200 rounded cursor-pointer" />
-                          <span class="text-[10px] font-mono text-indigo-700 font-bold shrink-0 w-8 text-right">
-                            {{ roundPercent(grpItem.group.slideExtension) }}%
-                          </span>
-                        </div>
-                      </div>
-
-                      <!-- Mover en bloque cajón -->
-                      <div class="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
-                        <span>Mover cajón:</span>
-                        <div class="flex items-center gap-1 font-mono">
-                          <button type="button" (click)="moveGroup(grpItem.group.id, 'y', -50)" class="px-1.5 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-700" title="Bajar 50mm">↓ Y</button>
-                          <button type="button" (click)="moveGroup(grpItem.group.id, 'y', 50)" class="px-1.5 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-700" title="Subir 50mm">↑ Y</button>
-                          <button type="button" (click)="moveGroup(grpItem.group.id, 'x', -50)" class="px-1.5 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-700" title="Izquierda 50mm">← X</button>
-                          <button type="button" (click)="moveGroup(grpItem.group.id, 'x', 50)" class="px-1.5 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-100 text-slate-700" title="Derecha 50mm">→ X</button>
-                        </div>
-                      </div>
-
-                      <!-- Sublista de piezas que componen este cajón -->
-                      @if (isGroupAccordionOpen(grpItem.group.id)) {
-                        <div class="space-y-1 pt-1 border-t border-indigo-100">
-                          @for (p of grpItem.parts; track p.id) {
-                            <div 
-                              [class]="selectedPartId() === p.id ? 'bg-indigo-100 text-indigo-900 font-medium' : 'bg-white text-slate-700'"
-                              class="p-1 rounded border border-slate-200/80 flex items-center justify-between gap-1 text-[11px]">
-                              <button type="button" (click)="selectPartById(p.id)" class="text-left flex-1 min-w-0 truncate">
-                                <span class="font-bold truncate">{{ p.name }}</span>
-                                <span class="font-mono text-[9px] text-slate-400 block">{{ p.length }}×{{ p.width }}×{{ p.thickness }}mm</span>
-                              </button>
-                              <button type="button" (click)="deletePartById(p.id, $event)" class="text-slate-400 hover:text-rose-500 p-0.5">
-                                <span class="material-icons text-[11px]">close</span>
-                              </button>
-                            </div>
-                          }
-                        </div>
-                      }
-
-                    </div>
+                <div class="flex flex-wrap gap-1.5">
+                  @for (grp of groups(); track grp.id) {
+                    <button 
+                      type="button"
+                      (click)="selectEntireGroup(grp.id)"
+                      [class]="activeSelectedGroupId() === grp.id ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400/40 shadow-xs' : 'bg-white hover:bg-indigo-100 text-indigo-900 border border-indigo-200'"
+                      class="px-2 py-1 rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer"
+                      title="Seleccionar {{ grp.name }} para abrir, mover o renombrar en la cinta superior">
+                      <span class="material-icons text-xs" [class.text-indigo-300]="activeSelectedGroupId() === grp.id" [class.text-indigo-600]="activeSelectedGroupId() !== grp.id">inbox</span>
+                      <span class="truncate max-w-[130px]">{{ grp.name }}</span>
+                    </button>
                   }
                 </div>
               </div>
             }
 
-            <!-- SECCIÓN 2: PIEZAS SUELTAS / SIN GRUPO -->
-            <div class="space-y-1">
-              <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
-                  <span class="material-icons text-xs">straighten</span>
-                  Piezas Sueltas / Estructura ({{ ungroupedParts().length }})
-                </span>
-              </div>
-
-              <div class="space-y-1 max-h-[220px] overflow-y-auto pr-1">
-                @for (part of ungroupedParts(); track part.id) {
-                  <div 
-                    [class]="selectedPartId() === part.id ? 'bg-sky-50 border-sky-300 text-sky-900 shadow-2xs' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-                    class="p-1.5 rounded-xl border flex items-center justify-between gap-2 transition text-xs">
-                    
+            <!-- LISTA COMPLETA Y UNIFICADA DEL DESPIECE -->
+            <div class="space-y-1 max-h-[380px] overflow-y-auto pr-1">
+              @for (part of currentParts(); track part.id) {
+                <div 
+                  [class]="isPartSelected(part.id) ? 'bg-sky-50 border-sky-300 text-sky-900 shadow-2xs' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+                  class="p-1.5 rounded-xl border flex items-center justify-between gap-2 transition text-xs">
+                  
+                  @if (renamingPartId() === part.id) {
+                    <div class="flex items-center gap-1 min-w-0 flex-1 py-0.5">
+                      <span class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] shrink-0 font-mono bg-sky-500 text-white font-bold">
+                        {{ $index + 1 }}
+                      </span>
+                      <input 
+                        type="text" 
+                        [value]="renamingPartName()" 
+                        (input)="renamingPartName.set($any($event.target).value)" 
+                        (keydown.enter)="saveRenamePart(part.id)" 
+                        (keydown.escape)="cancelRenamePart()" 
+                        class="text-xs font-bold px-1.5 py-0.5 bg-white border border-sky-400 rounded text-slate-800 flex-1 min-w-0 focus:outline-hidden focus:ring-1 focus:ring-sky-400" 
+                        placeholder="Nombre de la pieza" />
+                      <button 
+                        type="button" 
+                        (click)="saveRenamePart(part.id)" 
+                        class="h-6 w-6 text-emerald-600 hover:text-emerald-700 hover:bg-slate-100 rounded flex items-center justify-center transition cursor-pointer" 
+                        title="Guardar nombre (Enter)">
+                        <span class="material-icons text-xs">check</span>
+                      </button>
+                      <button 
+                        type="button" 
+                        (click)="cancelRenamePart()" 
+                        class="h-6 w-6 text-rose-500 hover:text-rose-600 hover:bg-slate-100 rounded flex items-center justify-center transition cursor-pointer" 
+                        title="Cancelar (Esc)">
+                        <span class="material-icons text-xs">close</span>
+                      </button>
+                    </div>
+                  } @else {
                     <button 
                       type="button" 
-                      (click)="selectPartById(part.id)" 
-                      class="flex items-center gap-2 min-w-0 flex-1 text-left">
+                      (click)="selectPartById(part.id, $event)" 
+                      class="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer">
                       <span 
-                        [class]="selectedPartId() === part.id ? 'bg-sky-500 text-white font-bold' : 'bg-white border border-slate-200 text-slate-600'"
+                        [class]="isPartSelected(part.id) ? 'bg-sky-500 text-white font-bold' : 'bg-white border border-slate-200 text-slate-600'"
                         class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] shrink-0 font-mono">
                         {{ $index + 1 }}
                       </span>
-                      <div class="truncate">
-                        <p class="font-bold truncate text-[11px]">{{ part.name }}</p>
+                      <div class="truncate flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5">
+                          <p class="font-bold truncate text-[11px]">{{ part.name }}</p>
+                          @if (getGroupName(part.groupId); as gName) {
+                            <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 bg-indigo-100 text-indigo-800 rounded text-[9px] font-semibold shrink-0" title="Pertenece al cajón/módulo: {{ gName }}">
+                              <span class="material-icons text-[10px]">inbox</span>
+                              <span class="truncate max-w-[90px]">{{ gName }}</span>
+                            </span>
+                          }
+                        </div>
                         <p class="font-mono text-[10px] text-slate-400">
                           {{ part.length }} × {{ part.width }} × {{ part.thickness }} mm
                         </p>
                       </div>
                     </button>
 
-                    <div class="flex items-center gap-1 shrink-0">
+                    <div class="flex items-center gap-0.5 shrink-0">
+                      <button 
+                        type="button" 
+                        (click)="startRenamePart(part, $event)" 
+                        class="text-slate-400 hover:text-sky-600 p-1 rounded-lg transition cursor-pointer"
+                        title="Renombrar esta pieza">
+                        <span class="material-icons text-xs">edit</span>
+                      </button>
                       <button 
                         type="button" 
                         (click)="deletePartById(part.id, $event)" 
-                        class="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition"
+                        class="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition cursor-pointer"
                         title="Eliminar esta pieza">
                         <span class="material-icons text-xs">delete</span>
                       </button>
                     </div>
-                  </div>
-                }
-                @if (ungroupedParts().length === 0 && groupsWithParts().length > 0) {
-                  <p class="text-[11px] text-slate-400 italic text-center py-2">Todas las piezas están organizadas en cajones.</p>
-                }
-              </div>
+                  }
+                </div>
+              }
+              @if (currentParts().length === 0) {
+                <p class="text-[11px] text-slate-400 italic text-center py-4">No hay piezas añadidas en el mueble.</p>
+              }
             </div>
 
           </div>
@@ -1263,15 +1257,36 @@
       <!-- Form Body -->
       <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
 
-        <!-- Nombre e identificación -->
+        <!-- Nombre e identificación con validación de duplicados -->
         <div>
-          <span class="block text-xs font-bold text-slate-700 mb-1">Nombre del Cajón / Módulo</span>
+          <div class="flex items-center justify-between mb-1">
+            <span class="block text-xs font-bold text-slate-700">Nombre del Cajón / Módulo</span>
+            @if (isDrawerWizardNameDuplicate()) {
+              <span class="text-[10px] text-rose-500 font-semibold flex items-center gap-0.5">
+                <span class="material-icons text-xs">warning</span> Nombre ya en uso
+              </span>
+            }
+          </div>
           <input 
             type="text" 
             [value]="drawerForm().name" 
             (input)="updateDrawerFormField('name', $any($event.target).value)" 
-            class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" 
+            [class]="isDrawerWizardNameDuplicate() ? 'border-rose-400 bg-rose-50/40 text-rose-950 focus:border-rose-500' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-sky-500'"
+            class="w-full px-3 py-2 text-xs font-semibold border rounded-xl focus:outline-hidden" 
             placeholder="ej. Cajón 1, Gaveta Superior" />
+          @if (isDrawerWizardNameDuplicate()) {
+            <div class="mt-1 flex items-center justify-between text-[11px] text-rose-600 bg-rose-50 p-2 rounded-lg border border-rose-200">
+              <span class="flex items-center gap-1 font-medium">
+                <span class="material-icons text-xs">error</span> Ya existe un cajón con este nombre.
+              </span>
+              <button 
+                type="button" 
+                (click)="updateDrawerFormField('name', suggestedDrawerWizardName())" 
+                class="text-indigo-600 hover:text-indigo-800 font-bold underline cursor-pointer text-[11px]">
+                Usar: {{ suggestedDrawerWizardName() }}
+              </button>
+            </div>
+          }
         </div>
 
         <!-- Dimensiones Principales (Ancho hueco, Fondo corredera, Alto de caja) -->
@@ -1443,7 +1458,9 @@
         <button 
           type="button" 
           (click)="submitDrawerWizard()" 
-          class="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-sky-600/20 flex items-center gap-2 transition">
+          [disabled]="isDrawerWizardNameDuplicate() || !drawerForm().name.trim()"
+          [class]="isDrawerWizardNameDuplicate() || !drawerForm().name.trim() ? 'opacity-50 cursor-not-allowed bg-slate-400 text-white' : 'bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-md shadow-sky-600/20 cursor-pointer'"
+          class="px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition">
           <span class="material-icons text-sm">check_circle</span>
           <span>Crear y Ensamblar Cajón</span>
         </button>
@@ -1474,14 +1491,35 @@
         </p>
 
         <div>
-          <span class="block text-xs font-bold text-slate-700 mb-1">Nombre del Grupo / Cajón</span>
+          <div class="flex items-center justify-between mb-1">
+            <span class="block text-xs font-bold text-slate-700">Nombre del Grupo / Cajón</span>
+            @if (isNewGroupNameDuplicate()) {
+              <span class="text-[10px] text-rose-500 font-semibold flex items-center gap-0.5">
+                <span class="material-icons text-xs">warning</span> Nombre ya en uso
+              </span>
+            }
+          </div>
           <input 
             type="text" 
             [value]="newGroupNameInput()" 
             (input)="newGroupNameInput.set($any($event.target).value)" 
-            (keydown.enter)="confirmCreateGroup()" 
-            class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-indigo-500 focus:outline-hidden" 
+            (keydown.enter)="!isNewGroupNameDuplicate() && confirmCreateGroup()" 
+            [class]="isNewGroupNameDuplicate() ? 'border-rose-400 bg-rose-50/40 text-rose-950 focus:border-rose-500' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500'"
+            class="w-full px-3 py-2 text-xs font-semibold border rounded-xl focus:outline-hidden" 
             placeholder="ej. Cajón 1, Gaveta Central" />
+          @if (isNewGroupNameDuplicate()) {
+            <div class="mt-1 flex items-center justify-between text-[11px] text-rose-600 bg-rose-50 p-2 rounded-lg border border-rose-200">
+              <span class="flex items-center gap-1 font-medium">
+                <span class="material-icons text-xs">error</span> Ya existe un grupo con este nombre.
+              </span>
+              <button 
+                type="button" 
+                (click)="newGroupNameInput.set(suggestedUniqueGroupName())" 
+                class="text-indigo-600 hover:text-indigo-800 font-bold underline cursor-pointer text-[11px]">
+                Usar: {{ suggestedUniqueGroupName() }}
+              </button>
+            </div>
+          }
         </div>
       </div>
 
@@ -1489,13 +1527,15 @@
         <button 
           type="button" 
           (click)="closeGroupNamingModal()" 
-          class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
+          class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer">
           Cancelar
         </button>
         <button 
           type="button" 
           (click)="confirmCreateGroup()" 
-          class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+          [disabled]="isNewGroupNameDuplicate() || !newGroupNameInput().trim()"
+          [class]="isNewGroupNameDuplicate() || !newGroupNameInput().trim() ? 'opacity-50 cursor-not-allowed bg-slate-400 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm cursor-pointer'"
+          class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
           <span class="material-icons text-xs">done</span>
           <span>Agrupar Piezas</span>
         </button>

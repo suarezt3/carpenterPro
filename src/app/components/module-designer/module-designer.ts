@@ -133,6 +133,30 @@ export class ModuleDesignerComponent {
   readonly renamingGroupId = signal<string | null>(null);
   readonly renamingGroupName = signal<string>('');
 
+  // Inline part renaming
+  readonly renamingPartId = signal<string | null>(null);
+  readonly renamingPartName = signal<string>('');
+
+  readonly isNewGroupNameDuplicate = computed(() => {
+    const name = this.newGroupNameInput().trim();
+    if (!name) return false;
+    return this.isGroupNameTaken(name);
+  });
+
+  readonly suggestedUniqueGroupName = computed(() => {
+    return this.getNextUniqueGroupName('Cajón');
+  });
+
+  readonly isDrawerWizardNameDuplicate = computed(() => {
+    const name = this.drawerForm().name.trim();
+    if (!name) return false;
+    return this.isGroupNameTaken(name);
+  });
+
+  readonly suggestedDrawerWizardName = computed(() => {
+    return this.getNextUniqueGroupName('Cajón');
+  });
+
   // Technical Shop Sheet Modal
   readonly showTechnicalSheetModal = signal<boolean>(false);
 
@@ -432,10 +456,22 @@ export class ModuleDesignerComponent {
       this.selectedPartIds.set(cur);
       this.selectedPartId.set(cur.length > 0 ? cur[0] : null);
     } else {
+      const part = this.currentParts().find(p => p.id === id);
       this.selectedPartId.set(id);
-      this.selectedPartIds.set([id]);
+      if (part?.groupId) {
+        const groupParts = this.currentParts().filter(p => p.groupId === part.groupId);
+        this.selectedPartIds.set(groupParts.map(p => p.id));
+      } else {
+        this.selectedPartIds.set([id]);
+      }
       this.activeDockTab.set('piece');
     }
+  }
+
+  getGroupName(groupId?: string): string | null {
+    if (!groupId) return null;
+    const grp = this.groups().find(g => g.id === groupId);
+    return grp ? grp.name : null;
   }
 
   deselectPart() {
@@ -1079,6 +1115,9 @@ export class ModuleDesignerComponent {
         break;
     }
 
+    if (this.isPieceNameTaken(newPart.name)) {
+      newPart.name = this.getNextUniquePieceName(newPart.name);
+    }
     this.projectService.addPart(newPart);
     this.selectedPartId.set(newPart.id);
     this.activeDockTab.set('piece');
@@ -1167,11 +1206,11 @@ export class ModuleDesignerComponent {
 
   // --- MODULAR DRAWER WIZARD ---
   openDrawerWizard() {
-    const nextNum = (this.groups().length || 0) + 1;
+    const uniqueName = this.getNextUniqueGroupName('Cajón');
     const defaultMat = this.materials()[0];
     const mdfMat = this.materials().find(m => m.thickness === 3) || defaultMat;
     this.drawerForm.set({
-      name: `Cajón ${nextNum}`,
+      name: uniqueName,
       outerWidth: 400,
       slideLength: 450,
       boxHeight: 140,
@@ -1182,7 +1221,7 @@ export class ModuleDesignerComponent {
       frontHeight: 180,
       frontWidth: 396,
       posX: 0,
-      posY: 100 + (nextNum - 1) * 200,
+      posY: 100 + (this.groups().length) * 200,
       posZ: 0,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
       bottomMaterialId: mdfMat ? mdfMat.id : 'mat_mdf_3'
@@ -1200,7 +1239,17 @@ export class ModuleDesignerComponent {
 
   submitDrawerWizard() {
     const config = this.drawerForm();
-    const grp = this.projectService.addParametricDrawer(config);
+    const cleanName = config.name.trim();
+    if (!cleanName) {
+      this.showToast('⚠️ Ingresa un nombre para el cajón');
+      return;
+    }
+    if (this.isGroupNameTaken(cleanName)) {
+      const suggestion = this.getNextUniqueGroupName('Cajón');
+      this.showToast(`⚠️ Ya existe un cajón llamado "${cleanName}". Sugerencia: ${suggestion}`);
+      return;
+    }
+    const grp = this.projectService.addParametricDrawer({ ...config, name: cleanName });
     this.showDrawerWizard.set(false);
     this.selectEntireGroup(grp.id);
     this.openGroupCardIds.update(s => new Set(s).add(grp.id));
@@ -1214,8 +1263,8 @@ export class ModuleDesignerComponent {
       this.showToast('Selecciona al menos 2 piezas para agrupar (usa Shift+Clic en 3D o en lista)');
       return;
     }
-    const nextNum = (this.groups().length || 0) + 1;
-    this.newGroupNameInput.set(`Cajón ${nextNum}`);
+    const uniqueName = this.getNextUniqueGroupName('Cajón');
+    this.newGroupNameInput.set(uniqueName);
     this.showGroupNamingModal.set(true);
   }
 
@@ -1224,9 +1273,14 @@ export class ModuleDesignerComponent {
   }
 
   confirmCreateGroup() {
-    const name = this.newGroupNameInput().trim() || `Cajón ${(this.groups().length || 0) + 1}`;
+    const name = this.newGroupNameInput().trim() || this.getNextUniqueGroupName('Cajón');
     const selIds = this.selectedPartIds();
     if (selIds.length < 2) return;
+    if (this.isGroupNameTaken(name)) {
+      const suggestion = this.getNextUniqueGroupName('Cajón');
+      this.showToast(`⚠️ Ya existe un grupo o cajón llamado "${name}". Sugerencia: ${suggestion}`);
+      return;
+    }
     const grp = this.projectService.createGroup(name, selIds, 'drawer');
     this.showGroupNamingModal.set(false);
     this.openGroupCardIds.update(s => new Set(s).add(grp.id));
@@ -1277,6 +1331,12 @@ export class ModuleDesignerComponent {
   }
 
   toggleSelectedGroupOpen() {
+    const gId = this.activeSelectedGroupId();
+    if (gId) {
+      this.viewer3dRef()?.toggleGroupAnimation(gId);
+      this.projectService.toggleGroupOpen(gId);
+      return;
+    }
     const ids = this.selectedPartIds();
     const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId) || this.selectedPart();
     if (part?.groupId) {
@@ -1288,6 +1348,10 @@ export class ModuleDesignerComponent {
   }
 
   isGroupOpen(): boolean {
+    const gId = this.activeSelectedGroupId();
+    if (gId) {
+      return this.viewer3dRef()?.isGroupOpen(gId) ?? false;
+    }
     const ids = this.selectedPartIds();
     const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId) || this.selectedPart();
     if (part?.groupId) {
@@ -1313,6 +1377,21 @@ export class ModuleDesignerComponent {
     this.projectService.moveGroup(groupId, dx, dy, dz);
   }
 
+  startRenameActiveGroup(event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return;
+    const name = this.activeSelectedGroupName() || 'Cajón';
+    this.renamingGroupId.set(gId);
+    this.renamingGroupName.set(name);
+  }
+
+  saveRenameActiveGroup() {
+    const gId = this.renamingGroupId();
+    if (!gId) return;
+    this.saveRenameGroup(gId);
+  }
+
   startRenameGroup(group: PartGroup, event?: MouseEvent) {
     if (event) event.stopPropagation();
     this.renamingGroupId.set(group.id);
@@ -1321,15 +1400,103 @@ export class ModuleDesignerComponent {
 
   saveRenameGroup(groupId: string) {
     const name = this.renamingGroupName().trim();
-    if (name) {
-      this.projectService.updateGroup(groupId, { name });
-      this.showToast(`✏️ Grupo renombrado a "${name}"`);
+    if (!name) {
+      this.cancelRenameGroup();
+      return;
     }
+    if (this.isGroupNameTaken(name, groupId)) {
+      const suggestion = this.getNextUniqueGroupName(name);
+      this.showToast(`⚠️ Ya existe otro cajón llamado "${name}". Sugerencia: ${suggestion}`);
+      return;
+    }
+    this.projectService.updateGroup(groupId, { name });
+    this.showToast(`✏️ Grupo renombrado a "${name}"`);
     this.renamingGroupId.set(null);
   }
 
   cancelRenameGroup() {
     this.renamingGroupId.set(null);
+  }
+
+  isGroupNameTaken(name: string, excludeGroupId?: string | null): boolean {
+    const clean = name.trim().toLowerCase();
+    if (!clean) return false;
+    return this.groups().some(g => g.id !== excludeGroupId && g.name.trim().toLowerCase() === clean);
+  }
+
+  getNextUniqueGroupName(baseName = 'Cajón'): string {
+    const existing = this.groups().map(g => g.name.trim().toLowerCase());
+    let counter = 1;
+    while (existing.includes(`${baseName.toLowerCase()} ${counter}`)) {
+      counter++;
+    }
+    return `${baseName} ${counter}`;
+  }
+
+  isPieceNameTaken(name: string, excludePartId?: string | null): boolean {
+    const clean = name.trim().toLowerCase();
+    if (!clean) return false;
+    return this.currentParts().some(p => p.id !== excludePartId && p.name.trim().toLowerCase() === clean);
+  }
+
+  getNextUniquePieceName(baseName: string): string {
+    const cleanBase = baseName.trim().replace(/\s+\(Copia.*?\)$/i, '').replace(/\s+\d+$/, '').trim();
+    const existing = this.currentParts().map(p => p.name.trim().toLowerCase());
+    if (!existing.includes(cleanBase.toLowerCase())) {
+      return cleanBase;
+    }
+    let counter = 2;
+    while (existing.includes(`${cleanBase.toLowerCase()} ${counter}`)) {
+      counter++;
+    }
+    return `${cleanBase} ${counter}`;
+  }
+
+  // --- PIECE RENAMING (RIBBON & PARTS LIST) ---
+  startRenameSelectedPart(event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    const part = this.selectedPart();
+    if (!part) return;
+    this.renamingPartId.set(part.id);
+    this.renamingPartName.set(part.name);
+  }
+
+  saveRenameSelectedPart() {
+    const partId = this.renamingPartId();
+    if (!partId) return;
+    this.saveRenamePart(partId);
+  }
+
+  startRenamePart(part: Part, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    this.renamingPartId.set(part.id);
+    this.renamingPartName.set(part.name);
+  }
+
+  saveRenamePart(partId: string) {
+    const newName = this.renamingPartName().trim();
+    if (!newName) {
+      this.cancelRenamePart();
+      return;
+    }
+    const part = this.currentParts().find(p => p.id === partId);
+    if (!part) {
+      this.cancelRenamePart();
+      return;
+    }
+    if (this.isPieceNameTaken(newName, partId)) {
+      const suggestion = this.getNextUniquePieceName(newName);
+      this.showToast(`⚠️ Ya existe otra pieza llamada "${newName}". Sugerencia: ${suggestion}`);
+      return;
+    }
+    this.projectService.updatePart({ ...part, name: newName });
+    this.showToast(`✏️ Pieza renombrada a "${newName}"`);
+    this.renamingPartId.set(null);
+  }
+
+  cancelRenamePart() {
+    this.renamingPartId.set(null);
+    this.renamingPartName.set('');
   }
 
   roundPercent(val?: number): number {

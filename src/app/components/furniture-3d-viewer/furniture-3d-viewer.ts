@@ -4523,7 +4523,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
   toggleGroupAnimation(groupId: string) {
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length > 0) {
-      this.togglePartOpen(grpParts[0].id);
+      const cur = this.openTargetMap.get(grpParts[0].id) || 0;
+      const next = cur > 0.5 ? 0 : 1;
+      for (const gp of grpParts) {
+        this.openTargetMap.set(gp.id, next);
+      }
+      for (const p of this.pieceObjects) {
+        if (p.part.groupId === groupId) {
+          this.openTargetMap.set(p.part.id, next);
+        }
+      }
     }
   }
 

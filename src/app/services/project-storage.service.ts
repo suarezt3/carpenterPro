@@ -946,12 +946,24 @@ export class ProjectStorageService {
   }
 
   duplicatePart(partId: string): Part | null {
-    const part = this.currentProject().parts.find(p => p.id === partId);
+    const currentProj = this.currentProject();
+    const part = currentProj.parts.find(p => p.id === partId);
     if (!part) return null;
+
+    // Ensure strictly unique name
+    const existingNames = currentProj.parts.map(p => p.name.trim().toLowerCase());
+    const baseClean = part.name.replace(/\s+\(Copia.*?\)$/i, '').replace(/\s+\d+$/, '').trim();
+    let candidate = `${baseClean} 2`;
+    let counter = 2;
+    while (existingNames.includes(candidate.trim().toLowerCase())) {
+      counter++;
+      candidate = `${baseClean} ${counter}`;
+    }
+
     const clone: Part = {
       ...part,
       id: crypto.randomUUID(),
-      name: `${part.name} (Copia)`,
+      name: candidate,
       posX: (part.posX ?? 0) + 40,
       posY: part.posY ?? 0,
       posZ: (part.posZ ?? 0) + 20
@@ -1174,6 +1186,15 @@ export class ProjectStorageService {
       nextName = `${group.name} ${existingGroups.length + 1}`;
     }
 
+    // Ensure strict uniqueness across all existing group names
+    const existingGroupNames = existingGroups.map(g => g.name.trim().toLowerCase());
+    let groupCandidate = nextName;
+    let groupSuffix = 2;
+    while (existingGroupNames.includes(groupCandidate.trim().toLowerCase())) {
+      groupCandidate = `${nextName} ${groupSuffix++}`;
+    }
+    nextName = groupCandidate;
+
     const newGroupId = 'grp_' + crypto.randomUUID().slice(0, 8);
     const newGroup: PartGroup = {
       ...group,
@@ -1183,13 +1204,31 @@ export class ProjectStorageService {
       slideExtension: 0
     };
 
+    const existingPartNames = currentProj.parts.map(p => p.name.trim().toLowerCase());
     const newPartIds: string[] = [];
     const newParts: Part[] = groupParts.map(pt => {
       const newId = 'part_' + crypto.randomUUID().slice(0, 8) + '_' + (pt.componentRole || 'drawer');
       newPartIds.push(newId);
+
+      // Generate distinct part name based on the new group name
+      let partNameCandidate = pt.name;
+      if (group.name && pt.name.toLowerCase().includes(group.name.toLowerCase())) {
+        partNameCandidate = pt.name.replace(new RegExp(group.name, 'gi'), nextName);
+      } else {
+        partNameCandidate = `${pt.name} (${nextName})`;
+      }
+
+      let pCandidate = partNameCandidate;
+      let pCounter = 2;
+      while (existingPartNames.includes(pCandidate.trim().toLowerCase())) {
+        pCandidate = `${partNameCandidate} ${pCounter++}`;
+      }
+      existingPartNames.push(pCandidate.trim().toLowerCase());
+
       return {
         ...pt,
         id: newId,
+        name: pCandidate,
         groupId: newGroupId,
         groupName: nextName,
         posY: Math.round(((pt.posY ?? 0) + deltaY) * 10) / 10

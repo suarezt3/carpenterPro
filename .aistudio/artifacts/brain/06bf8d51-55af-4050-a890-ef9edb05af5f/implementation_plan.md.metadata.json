@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de rebranding e identidad SaaS: Transición a Modulr 3D Studio con nuevo isotipo modular tecnológico y retrocompatibilidad total.",
-  "updatedAt":  "2026-10-09T20:24:43.727113120Z",
+  "summary":  "Plan de implementación para garantizar la unicidad estricta de nombres en cajones y piezas:\n1. Validación y prevención de nombres duplicados para cajones y grupos (al crear desde wizard, al agrupar selección, al duplicar y al renombrar en la cinta).\n2. Generación inteligente del siguiente nombre único correlativo (ej. Cajón 1, Cajón 2, etc.) reutilizando espacios libres si un cajón fue desagrupado o eliminado.\n3. Habilitación de renombrado de piezas individuales tanto en la cinta superior flotante como en la lista de despiece total con edición en línea.\n4. Validación estricta de unicidad de nombres entre piezas del proyecto con bloqueo de guardado, indicador visual y alertas toast explicativas.",
+  "updatedAt":  "2026-10-09T21:29:27.365892416Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
