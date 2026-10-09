@@ -20,7 +20,7 @@ export class ThemeService {
         return saved;
       }
     }
-    // Default: SketchUp Classic (clean pearl-white and neutral gray)
+    // Default: Classic Light Studio (clean pearl-white and neutral gray)
     return 'sketchup_classic';
   }
 

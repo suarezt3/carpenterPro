@@ -126,7 +126,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly hiddenHardwareGroupIds = signal<Set<string>>(new Set<string>());
   readonly hiddenHardwarePartIds = signal<Set<string>>(new Set<string>());
 
-  // SketchUp CAD Palette & Push/Pull State
+  // CAD Palette & Push/Pull State
   readonly activeTool = signal<'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect'>('select');
   readonly pushPullDelta = signal<{ axisName: string; initialVal: number; currentVal: number; delta: number } | null>(null);
   readonly hoveredFaceInfo = signal<{ partName: string; faceLabel: string; dimLabel: string } | null>(null);
@@ -3224,7 +3224,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
             this.partSelected.emit(part);
           }
 
-          // Direct Drag Support (SketchUp Style):
+          // Direct Drag Support:
           // If user clicked with left mouse button on an interactive part/group (or Move/Select tool is active)
           // prepare direct dragging using a screen-facing plane passing through the hit point
           if (e.button === 0 && (this.activeTool() === 'select' || this.activeTool() === 'move') && !isHandle) {
@@ -3538,7 +3538,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return;
     }
 
-    // Direct Piece/Group Dragging (SketchUp style: click & drag any piece surface)
+    // Direct Piece/Group Dragging (click & drag any piece surface)
     if (this.isDirectPieceDrag && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
       const distFromStart = Math.hypot(e.clientX - this.dragStartPointer.x, e.clientY - this.dragStartPointer.y);
       if (!this.directPieceDragThresholdPassed && distFromStart > 4) {
@@ -3751,7 +3751,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
-  // --- SKETCHUP CAD TOOLS & PUSH/PULL FACE RAYCASTING ---
+  // --- CAD TOOLS & PUSH/PULL FACE RAYCASTING ---
 
   setActiveTool(tool: 'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect') {
     this.activeTool.set(tool);
@@ -4427,7 +4427,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return grpParts.every(p => active.includes(p.id));
   }
 
-  selectGroupInViewer(groupId: string) {
+  selectGroupInViewer(groupId: string, smoothFocus = true) {
     const grpParts = this.getPartsForGroup(groupId);
     const ids = grpParts.map(p => p.id);
     this.partsSelected.emit(ids);
@@ -4437,6 +4437,87 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (this.activeTool() !== 'move' && this.activeTool() !== 'select') {
       this.setActiveTool('move');
     }
+    if (smoothFocus) {
+      this.focusCameraOnGroup(groupId);
+    }
+  }
+
+  focusCameraOnGroup(groupId: string) {
+    if (!this.camera || !this.controls) return;
+    const grpParts = this.getPartsForGroup(groupId);
+    if (grpParts.length === 0) return;
+
+    // Calculate bounding box center and size across all meshes in the group
+    const box = new THREE.Box3();
+    let hasValidMesh = false;
+    for (const p of grpParts) {
+      const pieceObj = this.pieceObjects.find(po => po.part.id === p.id);
+      if (pieceObj && pieceObj.mesh) {
+        box.expandByObject(pieceObj.mesh);
+        hasValidMesh = true;
+      }
+    }
+
+    // Fallback if meshes are not yet resolved
+    if (!hasValidMesh || box.isEmpty()) {
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      let minZ = Infinity, maxZ = -Infinity;
+      for (const p of grpParts) {
+        const px = p.posX ?? 0;
+        const py = p.posY ?? 0;
+        const pz = p.posZ ?? 0;
+        const hl = (p.length || 200) / 2;
+        const hw = (p.width || 200) / 2;
+        minX = Math.min(minX, px - hl);
+        maxX = Math.max(maxX, px + hl);
+        minY = Math.min(minY, py);
+        maxY = Math.max(maxY, py + (p.thickness || 15));
+        minZ = Math.min(minZ, pz - hw);
+        maxZ = Math.max(maxZ, pz + hw);
+      }
+      box.min.set(minX, minY, minZ);
+      box.max.set(maxX, maxY, maxZ);
+    }
+
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z, 400);
+
+    // Target camera position maintaining current viewing angle or standard isometric distance
+    const currentCamOffset = this.camera.position.clone().sub(this.controls.target);
+    let desiredDir = currentCamOffset.clone().normalize();
+    if (desiredDir.lengthSq() < 0.001) {
+      desiredDir = new THREE.Vector3(1, 0.8, 1.2).normalize();
+    }
+    const focusDistance = Math.max(maxDim * 2.2, 900);
+    const targetCamPos = center.clone().add(desiredDir.multiplyScalar(focusDistance));
+
+    // Smooth animation over 400ms using requestAnimationFrame
+    const startTarget = this.controls.target.clone();
+    const startCamPos = this.camera.position.clone();
+    const startTime = performance.now();
+    const duration = 400; // ms
+
+    const animateFocus = (time: number) => {
+      const elapsed = time - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      // Ease out cubic
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      this.controls.target.lerpVectors(startTarget, center, ease);
+      this.camera.position.lerpVectors(startCamPos, targetCamPos, ease);
+      this.camera.lookAt(this.controls.target);
+      this.controls.update();
+
+      if (progress < 1) {
+        requestAnimationFrame(animateFocus);
+      }
+    };
+
+    requestAnimationFrame(animateFocus);
   }
 
   toggleGroupAnimation(groupId: string) {

@@ -77,19 +77,19 @@
       <!-- ZONE 3 (RIGHT): Action Buttons (Grouped Compact Menus, Anti-Overflow) -->
       <div class="flex items-center gap-1.5 shrink-0 justify-end">
 
-        <!-- Selector de Tema (SketchUp Classic Claro / Oscuro) -->
+        <!-- Selector de Tema (Modo Claro / Oscuro) -->
         <button
           type="button"
           (click)="themeService.toggleTheme()"
           [class]="themeService.isClassic() 
             ? 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs' 
             : 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-amber-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0'"
-          [title]="themeService.isClassic() ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo SketchUp Classic (Claro)'">
+          [title]="themeService.isClassic() ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro (Estudio)'">
           <span class="material-icons text-sm" [class.text-amber-500]="themeService.isClassic()" [class.text-amber-400]="!themeService.isClassic()">
             {{ themeService.isClassic() ? 'light_mode' : 'dark_mode' }}
           </span>
           <span class="whitespace-nowrap hidden xl:inline">
-            {{ themeService.isClassic() ? 'Classic' : 'Oscuro' }}
+            {{ themeService.isClassic() ? 'Claro' : 'Oscuro' }}
           </span>
         </button>
 

@@ -105,7 +105,7 @@ export class DocumentationModalComponent {
     {
       id: 'movimiento_directo_3d',
       category: 'herramientas_3d',
-      title: 'Movimiento por Arrastre Directo 3D (Estilo SketchUp)',
+      title: 'Movimiento por Arrastre Directo 3D',
       shortDesc: 'Mueve piezas individuales o grupos modulares (cajoneras) haciendo clic sostenido sobre cualquier superficie, sin flechas molestas en el centro.',
       icon: 'pan_tool',
       iconColor: 'text-indigo-600',
@@ -192,10 +192,10 @@ export class DocumentationModalComponent {
       id: 'push_pull_tool',
       category: 'herramientas_3d',
       title: 'Empujar / Tirar (Push/Pull) y Edición Directa 3D',
-      shortDesc: 'Redimensiona piezas estirando sus caras en tiempo real como en SketchUp con auto-alineación coplanar.',
+      shortDesc: 'Redimensiona piezas estirando sus caras en tiempo real con auto-alineación coplanar e imán inteligente.',
       icon: 'open_in_full',
       iconColor: 'text-amber-600',
-      badge: 'Estilo SketchUp',
+      badge: 'Modelado Dinámico',
       steps: [
         'Selecciona la herramienta "Empujar / Tirar" en la paleta izquierda o pulsa la tecla [ P ].',
         'Pasa el cursor sobre la cara de cualquier pieza que desees estirar o acortar (lateral, techo, estante, frente de cajón). La cara se resaltará con un plano traslúcido ámbar.',
@@ -294,7 +294,7 @@ export class DocumentationModalComponent {
       iconColor: 'text-emerald-600',
       badge: 'Productividad',
       steps: [
-        '• [ Clic sostenido + Arrastre ]: Mover pieza individual o grupo completo directamente en el espacio 3D (estilo SketchUp, sin flechas en el centro)',
+        '• [ Clic sostenido + Arrastre ]: Mover pieza individual o grupo completo directamente en el espacio 3D (arrastre fluido sin flechas en el centro)',
         '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar piezas',
         '• [ M ]: Cinta Métrica 3D con Imán Inteligente a vértices y aristas',
         '• [ P ]: Empujar / Tirar (Push/Pull) para estirar o encoger caras en tiempo real',
