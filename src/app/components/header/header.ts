@@ -304,7 +304,7 @@ export class HeaderComponent {
             this.showToast('¡Proyecto importado exitosamente!');
             this.showProjectsModal.set(false);
           } else {
-            this.showToast('Error: El archivo no tiene el formato válido de MelamiPro.');
+            this.showToast('Error: El archivo no tiene el formato válido de Modulr 3D Studio.');
           }
         }
       };

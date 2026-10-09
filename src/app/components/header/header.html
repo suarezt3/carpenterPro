@@ -4,12 +4,12 @@
       
       <!-- ZONE 1 (LEFT): Brand & Compact Project Name (Single-line, no bulky subtitle) -->
       <div class="flex items-center gap-2.5 min-w-0 shrink-0">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center text-white shadow-sm shadow-amber-900/20 shrink-0">
-          <span class="material-icons text-xl">carpenter</span>
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-sm shadow-indigo-900/25 ring-1 ring-white/20 shrink-0">
+          <span class="material-icons text-xl">view_in_ar</span>
         </div>
         <div class="flex items-center gap-1.5 min-w-0">
-          <span [class]="themeService.isClassic() ? 'font-bold tracking-tight text-slate-900 text-base whitespace-nowrap' : 'font-bold tracking-tight text-white text-base whitespace-nowrap'">Melami<span class="text-amber-500">Pro</span></span>
-          <span class="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-500/20 whitespace-nowrap">v2.0</span>
+          <span [class]="themeService.isClassic() ? 'font-bold tracking-tight text-slate-900 text-base whitespace-nowrap' : 'font-bold tracking-tight text-white text-base whitespace-nowrap'">Modul<span class="text-indigo-600 dark:text-indigo-400">r</span></span>
+          <span class="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 whitespace-nowrap">3D Studio</span>
           <span [class]="themeService.isClassic() ? 'text-slate-300 hidden md:inline' : 'text-zinc-600 hidden md:inline'">•</span>
           <span [class]="themeService.isClassic() ? 'text-xs text-slate-600 font-medium truncate max-w-[120px] lg:max-w-[180px] xl:max-w-[240px] hidden md:inline' : 'text-xs text-zinc-400 font-medium truncate max-w-[120px] lg:max-w-[180px] xl:max-w-[240px] hidden md:inline'" [title]="project().name + (project().clientName ? ' • ' + project().clientName : '')">
             {{ project().name }}

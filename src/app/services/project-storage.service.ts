@@ -1576,7 +1576,7 @@ export class ProjectStorageService {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${this.currentProject().name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_melamipro.json`;
+    a.download = `${this.currentProject().name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_modulr.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
