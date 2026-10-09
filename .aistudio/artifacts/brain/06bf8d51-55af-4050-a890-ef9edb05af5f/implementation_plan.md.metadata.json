@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de corrección para el ensamble 3D de cajones modulares:\n1. Corrección de la orientación dimensional vertical_yz en el visor 3D para laterales de cajón (asignando altura en Y y profundidad de corredera en Z).\n2. Ensamble de taller sin colisiones: fondo MDF 3mm como base y los laterales, contra-frente y trasera asentados exactamente sobre él.\n3. Posicionamiento del frente exterior solapado hacia +Z con tirador centrado y correderas telescópicas perfectamente adosadas a las caras exteriores de los laterales.\n4. Sincronización en el motor de colisiones (JoineryEngine) para eliminar advertencias rojas.",
-  "updatedAt":  "2026-10-08T21:51:14.477872946Z",
+  "summary":  "Plan para resolver la persistencia y selección de grupos de cajones, panel flotante de consulta en la cinta izquierda y reubicación del botón de agrupar en una barra flotante superior sin superposiciones.",
+  "updatedAt":  "2026-10-08T23:50:58.252361878Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

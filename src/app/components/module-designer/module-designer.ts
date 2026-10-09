@@ -71,6 +71,22 @@ export class ModuleDesignerComponent {
     return this.currentParts().filter(p => !p.groupId);
   });
 
+  // Nombre del grupo activo si todas las piezas seleccionadas pertenecen al mismo grupo
+  readonly activeSelectedGroupName = computed(() => {
+    const ids = this.selectedPartIds();
+    if (ids.length === 0) return null;
+    const parts = this.currentParts().filter(p => ids.includes(p.id));
+    const firstGroupId = parts[0]?.groupId;
+    if (firstGroupId && parts.length > 1 && parts.every(p => p.groupId === firstGroupId)) {
+      return parts[0]?.groupName || 'Cajón';
+    }
+    return null;
+  });
+
+  readonly isAnyGroupSelected = computed(() => {
+    return !!this.activeSelectedGroupName();
+  });
+
   // Collapsed / expanded groups in parts list
   readonly openGroupCardIds = signal<Set<string>>(new Set());
 
@@ -339,6 +355,12 @@ export class ModuleDesignerComponent {
   onSelectPartFrom3D(part: Part | null) {
     if (part) {
       this.selectedPartId.set(part.id);
+      if (part.groupId) {
+        const groupParts = this.currentParts().filter(p => p.groupId === part.groupId);
+        this.selectedPartIds.set(groupParts.map(p => p.id));
+      } else {
+        this.selectedPartIds.set([part.id]);
+      }
       this.activeDockTab.set('piece');
     } else {
       this.selectedPartId.set(null);
@@ -1113,6 +1135,26 @@ export class ModuleDesignerComponent {
     const ids = groupParts.map(p => p.id);
     this.selectedPartIds.set(ids);
     this.selectedPartId.set(ids[0] || null);
+  }
+
+  activateMoveToolOnViewer() {
+    this.viewer3dRef()?.setActiveTool('move');
+  }
+
+  toggleSelectedGroupOpen() {
+    const ids = this.selectedPartIds();
+    const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId);
+    if (part?.groupId) {
+      this.projectService.toggleGroupOpen(part.groupId);
+    }
+  }
+
+  ungroupSelected() {
+    const ids = this.selectedPartIds();
+    const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId);
+    if (part?.groupId) {
+      this.ungroup(part.groupId);
+    }
   }
 
   moveGroup(groupId: string, axis: 'x' | 'y' | 'z', amount: number) {

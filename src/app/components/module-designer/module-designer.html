@@ -63,8 +63,76 @@
           (partDeleted)="onPartDeletedFromViewer($event)"
           (partDuplicated)="onPartDuplicatedFromViewer($event)"
           (dragStarted)="onDragStarted()"
-          (clearanceCalculated)="onClearanceCalculated($event)">
+          (clearanceCalculated)="onClearanceCalculated($event)"
+          (groupUngroupRequested)="ungroup($event)"
+          (drawerWizardRequested)="openDrawerWizard()">
         </app-furniture-3d-viewer>
+
+        <!-- BARRA FLOTANTE DE SELECCIÓN MÚLTIPLE SUPERIOR (Cero superposición) -->
+        @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
+          <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-slate-900/90 text-white backdrop-blur-md px-3.5 py-1.5 rounded-2xl shadow-2xl border border-white/10 animate-in fade-in slide-in-from-top-2 duration-150 pointer-events-auto">
+            <div class="flex items-center gap-2 pr-2 border-r border-white/10">
+              <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+              @if (activeSelectedGroupName()) {
+                <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span class="material-icons text-sm text-indigo-400">inbox</span>
+                  <span>{{ activeSelectedGroupName() }}</span>
+                </span>
+                <span class="text-[11px] text-slate-300">({{ selectedPartIds().length }} piezas)</span>
+              } @else {
+                <span class="text-xs font-semibold text-white">
+                  {{ selectedPartIds().length }} piezas seleccionadas
+                </span>
+              }
+            </div>
+
+            @if (!activeSelectedGroupName()) {
+              <button 
+                type="button" 
+                (click)="openGroupNamingModal()" 
+                class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition shrink-0"
+                title="Agrupar las piezas seleccionadas como un cajón o módulo">
+                <span class="material-icons text-xs">link</span>
+                <span>Agrupar Selección (Cajón)</span>
+              </button>
+            } @else {
+              <button 
+                type="button" 
+                (click)="activateMoveToolOnViewer()" 
+                class="px-2.5 py-1 bg-sky-600/80 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition shrink-0"
+                title="Mover cajón completo con flechas 3D">
+                <span class="material-icons text-xs">open_with</span>
+                <span>Mover en Bloque</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="toggleSelectedGroupOpen()" 
+                class="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition shrink-0"
+                title="Abrir o cerrar cajón en 3D">
+                <span class="material-icons text-xs">door_sliding</span>
+                <span>Abrir / Cerrar</span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="ungroupSelected()" 
+                class="px-2 py-1 hover:bg-white/10 text-slate-300 hover:text-amber-400 rounded-xl text-xs font-medium flex items-center gap-1 transition shrink-0"
+                title="Desagrupar piezas para editarlas individualmente">
+                <span class="material-icons text-xs">link_off</span>
+                <span>Desagrupar</span>
+              </button>
+            }
+
+            <button 
+              type="button" 
+              (click)="deselectAll()" 
+              class="ml-1 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition shrink-0"
+              title="Deseleccionar piezas (Esc)">
+              <span class="material-icons text-sm">close</span>
+            </button>
+          </div>
+        }
       </div>
 
       <!-- Floating expand button if sidebar is collapsed -->
@@ -102,7 +170,7 @@
           </span>
         }
 
-        <div class="flex items-center gap-1.5 flex-1 min-w-0">
+        <div class="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-thin py-0.5">
           @for (part of currentParts(); track part.id) {
             <button 
               type="button" 
@@ -119,24 +187,13 @@
           }
         </div>
 
-        @if (selectedPartIds().length >= 2) {
-          <button 
-            type="button" 
-            (click)="openGroupNamingModal()" 
-            class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition shrink-0"
-            title="Agrupar las piezas seleccionadas como un cajón o módulo">
-            <span class="material-icons text-xs">link</span>
-            <span>Agrupar ({{ selectedPartIds().length }})</span>
-          </button>
-        }
-
         @if (selectedPartId() || selectedPartIds().length > 0) {
           <button 
             type="button" 
             (click)="deselectAll()" 
             class="text-[11px] text-slate-400 hover:text-slate-700 underline whitespace-nowrap px-1 shrink-0"
             title="Deseleccionar piezas">
-            Deseleccionar ({{ selectedPartIds().length }})
+            Deseleccionar ({{ selectedPartIds().length || 1 }})
           </button>
         }
       </div>

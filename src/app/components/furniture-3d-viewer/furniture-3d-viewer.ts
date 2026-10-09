@@ -101,6 +101,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   clearanceCalculated = output<ClearanceInfo | null>();
   collisionsDetected = output<CollisionRecord[]>();
   drillHolesUpdated = output<DrillHole[]>();
+  groupUngroupRequested = output<string>();
+  drawerWizardRequested = output<void>();
 
   // Canvas and Container refs
   canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas3d');
@@ -122,6 +124,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly hoveredFaceInfo = signal<{ partName: string; faceLabel: string; dimLabel: string } | null>(null);
   readonly showViewsDropdown = signal<boolean>(false);
   readonly showExplodedSlider = signal<boolean>(false);
+  readonly showGroupsFlyout = signal<boolean>(false);
 
   // Right-Click Context Menu State
   readonly contextMenuPos = signal<{ x: number; y: number } | null>(null);
@@ -3006,8 +3009,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
 
       if (part) {
-        // Clicking a 3D handle or clicking an unshifted door/drawer toggles opening animation
-        if (isHandle || (!e.shiftKey && (isDoor || isDrawer))) {
+        // Clicking a 3D handle toggles opening animation
+        if (isHandle) {
           this.togglePartOpen(part.id);
         }
         if (e.shiftKey) {
@@ -3022,8 +3025,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
           const first = cur.length > 0 ? (this.parts().find(p => p.id === cur[0]) || null) : null;
           this.partSelected.emit(first);
         } else {
-          this.partsSelected.emit([part.id]);
-          this.partSelected.emit(part);
+          // If part belongs to a group (e.g. modular drawer), select the entire group for block translation!
+          if (part.groupId) {
+            const groupPartIds = this.parts()
+              .filter(p => p.groupId === part.groupId)
+              .map(p => p.id);
+            this.partsSelected.emit(groupPartIds);
+            this.partSelected.emit(part);
+          } else {
+            this.partsSelected.emit([part.id]);
+            this.partSelected.emit(part);
+          }
         }
       }
     } else {
@@ -4061,6 +4073,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   toggleViewsDropdown() {
     this.showViewsDropdown.update(v => !v);
+    if (this.showViewsDropdown()) {
+      this.showGroupsFlyout.set(false);
+      this.showExplodedSlider.set(false);
+    }
   }
 
   closeViewsDropdown() {
@@ -4069,6 +4085,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   toggleExplodedSlider() {
     this.showExplodedSlider.update(v => !v);
+    if (this.showExplodedSlider()) {
+      this.showGroupsFlyout.set(false);
+      this.showViewsDropdown.set(false);
+    }
   }
 
   closeExplodedSlider() {
@@ -4084,6 +4104,78 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (target) {
       this.explodedPercent.set(Number(target.value));
     }
+  }
+
+  // --- CAJONES Y GRUPOS MODULARES EN CINTA IZQUIERDA ---
+
+  toggleGroupsFlyout() {
+    this.showGroupsFlyout.update(v => !v);
+    if (this.showGroupsFlyout()) {
+      this.closeViewsDropdown();
+      this.closeExplodedSlider();
+    }
+  }
+
+  closeGroupsFlyout() {
+    this.showGroupsFlyout.set(false);
+  }
+
+  getPartsForGroup(groupId: string): Part[] {
+    return this.parts().filter(p => p.groupId === groupId);
+  }
+
+  isGroupFullySelected(groupId: string): boolean {
+    const grpParts = this.getPartsForGroup(groupId);
+    if (grpParts.length === 0) return false;
+    const active = this.activeSelectedIds();
+    return grpParts.every(p => active.includes(p.id));
+  }
+
+  selectGroupInViewer(groupId: string) {
+    const grpParts = this.getPartsForGroup(groupId);
+    const ids = grpParts.map(p => p.id);
+    this.partsSelected.emit(ids);
+    if (grpParts.length > 0) {
+      this.partSelected.emit(grpParts[0]);
+    }
+    if (this.activeTool() !== 'move' && this.activeTool() !== 'select') {
+      this.setActiveTool('move');
+    }
+  }
+
+  toggleGroupAnimation(groupId: string) {
+    const grpParts = this.getPartsForGroup(groupId);
+    if (grpParts.length > 0) {
+      this.togglePartOpen(grpParts[0].id);
+    }
+  }
+
+  isGroupOpen(groupId: string): boolean {
+    const grpParts = this.getPartsForGroup(groupId);
+    if (grpParts.length === 0) return false;
+    const val = this.openTargetMap.get(grpParts[0].id) || 0;
+    return val > 0.5;
+  }
+
+  moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
+    const grpParts = this.getPartsForGroup(groupId);
+    if (grpParts.length === 0) return;
+    const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+    for (const p of grpParts) {
+      const upd: Partial<Part> = {};
+      if (axis === 'x') upd.posX = (p.posX ?? 0) + delta;
+      if (axis === 'y') upd.posY = Math.max(0, (p.posY ?? 0) + delta);
+      if (axis === 'z') upd.posZ = (p.posZ ?? 0) + delta;
+      updatesList.push({ part: p, updates: upd });
+    }
+    this.multiplePartsModified.emit({ updates: updatesList });
+    if (updatesList.length > 0) {
+      this.partModified.emit(updatesList[0]);
+    }
+  }
+
+  ungroupInViewer(groupId: string) {
+    this.groupUngroupRequested.emit(groupId);
   }
 
   formatCoord(val?: number): number {
