@@ -86,7 +86,12 @@ export class ProjectStorageService {
   readonly materialsList = computed(() => this.currentProject().materials);
   readonly modulesList = computed(() => this.currentProject().modules);
   readonly partsList = computed(() => this.currentProject().parts);
-  readonly groupsList = computed(() => this.currentProject().groups || []);
+  readonly groupsList = computed(() => {
+    const parts = this.currentProject().parts;
+    const groups = this.currentProject().groups || [];
+    const activeGroupIds = new Set(parts.map(p => p.groupId).filter(Boolean));
+    return groups.filter(g => activeGroupIds.has(g.id));
+  });
   readonly hardwareList = computed(() => this.currentProject().hardware);
   readonly projectSettings = computed(() => this.currentProject().settings);
 
@@ -969,6 +974,20 @@ export class ProjectStorageService {
     });
   }
 
+  deleteMultipleParts(partIds: string[]) {
+    const idsSet = new Set(partIds);
+    this.updateProject(p => {
+      const remainingParts = p.parts.filter(pt => !idsSet.has(pt.id));
+      const usedGroupIds = new Set(remainingParts.map(pt => pt.groupId).filter(Boolean));
+      const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
+      return {
+        ...p,
+        parts: remainingParts,
+        groups: filteredGroups
+      };
+    });
+  }
+
   // --- GROUPS ACTIONS (CAJONES Y MODULARES) ---
 
   createGroup(name: string, partIds: string[], type: 'drawer' | 'door_set' | 'assembly' | 'custom' = 'drawer', slideLength = 450): PartGroup {
@@ -1116,6 +1135,172 @@ export class ProjectStorageService {
       };
     });
   }
+
+  duplicateGroup(groupId: string): { newGroup: PartGroup; newPartIds: string[] } | null {
+    const currentProj = this.currentProject();
+    if (!currentProj) return null;
+
+    const group = (currentProj.groups || []).find(g => g.id === groupId);
+    if (!group) return null;
+
+    const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
+    if (groupParts.length === 0) return null;
+
+    // Determine vertical offset (+Y) to stack cleanly right above the original drawer
+    const frontPart = groupParts.find(p => p.componentRole === 'drawer_front' || p.id.includes('frente') || p.name.toUpperCase().includes('FRENTE')) || groupParts[0];
+    const frontHeight = frontPart.orientation === 'vertical_xy' 
+      ? (frontPart.width > 0 ? frontPart.width : frontPart.length) 
+      : (frontPart.orientation === 'vertical_yz' ? (frontPart.width > 0 ? frontPart.width : frontPart.length) : frontPart.width);
+    
+    const effectiveHeight = frontHeight && frontHeight > 40 ? frontHeight : 180;
+    const deltaY = Math.round(effectiveHeight + 15); // Stack above with 15mm clearance gap
+
+    // Auto-generate next group name (e.g. "Cajón 2", "Cajón 3")
+    const existingGroups = currentProj.groups || [];
+    let nextName = `${group.name} (Copia)`;
+    const match = group.name.match(/^(.*?caj[oó]n\s*)(\d+)/i);
+    if (match) {
+      const prefix = match[1];
+      let maxNum = parseInt(match[2], 10);
+      for (const g of existingGroups) {
+        const m = g.name.match(new RegExp(`^${prefix}(\\d+)`, 'i'));
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (n > maxNum) maxNum = n;
+        }
+      }
+      nextName = `${prefix}${maxNum + 1}`;
+    } else {
+      nextName = `${group.name} ${existingGroups.length + 1}`;
+    }
+
+    const newGroupId = 'grp_' + crypto.randomUUID().slice(0, 8);
+    const newGroup: PartGroup = {
+      ...group,
+      id: newGroupId,
+      name: nextName,
+      isOpen: false,
+      slideExtension: 0
+    };
+
+    const newPartIds: string[] = [];
+    const newParts: Part[] = groupParts.map(pt => {
+      const newId = 'part_' + crypto.randomUUID().slice(0, 8) + '_' + (pt.componentRole || 'drawer');
+      newPartIds.push(newId);
+      return {
+        ...pt,
+        id: newId,
+        groupId: newGroupId,
+        groupName: nextName,
+        posY: Math.round(((pt.posY ?? 0) + deltaY) * 10) / 10
+      };
+    });
+
+    this.updateProject(p => {
+      return {
+        ...p,
+        groups: [...(p.groups || []), newGroup],
+        parts: [...p.parts, ...newParts]
+      };
+    });
+
+    return { newGroup, newPartIds };
+  }
+
+  rotateGroupRigidly(groupId: string, angleDelta: 90 | -90 | 180) {
+    this.updateProject(p => {
+      const groupParts = p.parts.filter(pt => pt.groupId === groupId);
+      if (groupParts.length === 0) return p;
+
+      // Group centroid in (X, Z)
+      const minX = Math.min(...groupParts.map(pt => pt.posX ?? 0));
+      const maxX = Math.max(...groupParts.map(pt => pt.posX ?? 0));
+      const minZ = Math.min(...groupParts.map(pt => pt.posZ ?? 0));
+      const maxZ = Math.max(...groupParts.map(pt => pt.posZ ?? 0));
+      const cx = (minX + maxX) / 2;
+      const cz = (minZ + maxZ) / 2;
+
+      const updatedParts = p.parts.map(pt => {
+        if (pt.groupId !== groupId) return pt;
+
+        const dx = (pt.posX ?? 0) - cx;
+        const dz = (pt.posZ ?? 0) - cz;
+
+        let newDx = dx;
+        let newDz = dz;
+
+        if (angleDelta === 90) {
+          // Clockwise 90° (+Z -> +X, +X -> -Z, -Z -> -X, -X -> +Z)
+          newDx = dz;
+          newDz = -dx;
+        } else if (angleDelta === -90) {
+          // Counter-clockwise 90° (+Z -> -X, -X -> -Z, -Z -> +X, +X -> +Z)
+          newDx = -dz;
+          newDz = dx;
+        } else if (angleDelta === 180) {
+          newDx = -dx;
+          newDz = -dz;
+        }
+
+        const newPosX = Math.round(cx + newDx);
+        const newPosZ = Math.round(cz + newDz);
+
+        let newOrientation = pt.orientation;
+        let newLength = pt.length;
+        let newWidth = pt.width;
+
+        if (Math.abs(angleDelta) === 90) {
+          if (pt.orientation === 'vertical_xy') {
+            newOrientation = 'vertical_yz';
+          } else if (pt.orientation === 'vertical_yz') {
+            newOrientation = 'vertical_xy';
+          } else if (pt.orientation === 'horizontal') {
+            // Swap length and width for horizontal boards
+            newLength = pt.width;
+            newWidth = pt.length;
+          }
+        }
+
+        return {
+          ...pt,
+          posX: newPosX,
+          posZ: newPosZ,
+          orientation: newOrientation,
+          length: newLength,
+          width: newWidth
+        };
+      });
+
+      return {
+        ...p,
+        parts: updatedParts
+      };
+    });
+  }
+
+  getGroupFacingDirection(groupId: string): 'front' | 'right' | 'back' | 'left' {
+    const currentProj = this.currentProject();
+    if (!currentProj) return 'front';
+    const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
+    if (groupParts.length === 0) return 'front';
+
+    const minX = Math.min(...groupParts.map(pt => pt.posX ?? 0));
+    const maxX = Math.max(...groupParts.map(pt => pt.posX ?? 0));
+    const minZ = Math.min(...groupParts.map(pt => pt.posZ ?? 0));
+    const maxZ = Math.max(...groupParts.map(pt => pt.posZ ?? 0));
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+
+    const frontPart = groupParts.find(p => p.componentRole === 'drawer_front' || p.id.includes('frente') || p.name.toUpperCase().includes('FRENTE')) || groupParts[0];
+    const dx = (frontPart.posX ?? 0) - cx;
+    const dz = (frontPart.posZ ?? 0) - cz;
+
+    if (Math.abs(dx) > Math.abs(dz) && Math.abs(dx) > 10) {
+      return dx > 0 ? 'right' : 'left';
+    }
+    return dz >= 0 ? 'front' : 'back';
+  }
+
 
   addParametricDrawer(cfg: ParametricDrawerConfig): PartGroup {
     const defaultMat = this.materialsList().find(m => m.id === cfg.materialId) || this.materialsList()[0];

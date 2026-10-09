@@ -65,7 +65,9 @@
           (dragStarted)="onDragStarted()"
           (clearanceCalculated)="onClearanceCalculated($event)"
           (groupUngroupRequested)="ungroup($event)"
-          (drawerWizardRequested)="openDrawerWizard()">
+          (drawerWizardRequested)="openDrawerWizard()"
+          (groupRotationRequested)="onGroupRotationRequested($event)"
+          (groupDuplicationRequested)="onGroupDuplicationRequested($event)">
         </app-furniture-3d-viewer>
 
         <!-- BARRA FLOTANTE DE SELECCIÓN MÚLTIPLE SUPERIOR (Cero superposición) -->
@@ -96,6 +98,17 @@
                 <span>Agrupar Selección (Cajón)</span>
               </button>
             } @else {
+              <!-- Duplicar Cajón (Apilado Verticalmente) -->
+              <button 
+                type="button" 
+                (click)="duplicateSelectedGroup()" 
+                class="px-2.5 py-1 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition shrink-0 shadow-xs"
+                title="Duplicar cajón completo (crea una copia apilada arriba)">
+                <span class="material-icons text-xs">content_copy</span>
+                <span>Duplicar</span>
+              </button>
+
+              <!-- Mover en Bloque -->
               <button 
                 type="button" 
                 (click)="activateMoveToolOnViewer()" 
@@ -105,15 +118,73 @@
                 <span>Mover en Bloque</span>
               </button>
 
+              <!-- Abrir / Cerrar -->
               <button 
                 type="button" 
                 (click)="toggleSelectedGroupOpen()" 
-                class="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition shrink-0"
-                title="Abrir o cerrar cajón en 3D">
+                [class]="isGroupOpen() ? 'px-2.5 py-1 bg-amber-500/90 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition shrink-0 shadow-xs' : 'px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition shrink-0'"
+                title="Abrir o cerrar cajón completo en 3D">
                 <span class="material-icons text-xs">door_sliding</span>
-                <span>Abrir / Cerrar</span>
+                <span>{{ isGroupOpen() ? 'Cerrar Cajón' : 'Abrir Cajón' }}</span>
               </button>
 
+              <!-- Giro 90° (Horario y Antihorario) con atajo R -->
+              <div class="flex items-center gap-0.5 bg-white/5 rounded-xl p-0.5 border border-white/10 shrink-0">
+                <button 
+                  type="button" 
+                  (click)="rotateSelectedGroup(-90)" 
+                  class="p-1 hover:bg-white/20 text-slate-300 hover:text-white rounded-lg transition"
+                  title="Girar cajón 90° Antihorario (Izquierda)">
+                  <span class="material-icons text-xs">rotate_left</span>
+                </button>
+                <button 
+                  type="button" 
+                  (click)="rotateSelectedGroup(90)" 
+                  class="px-1.5 py-0.5 hover:bg-white/20 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                  title="Girar cajón 90° Horario (Derecha) - Atajo: tecla R">
+                  <span class="material-icons text-xs">rotate_right</span>
+                  <span>90° (R)</span>
+                </button>
+              </div>
+
+              <!-- Selector de Cara/Frente del Cajón -->
+              <div class="flex items-center gap-0.5 bg-white/5 rounded-xl p-0.5 border border-white/10 shrink-0 text-[11px]">
+                <span class="text-[10px] text-slate-400 font-medium px-1 uppercase tracking-wider">Frente:</span>
+                <button 
+                  type="button"
+                  (click)="setGroupFaceDirection('front')"
+                  [class]="currentGroupFacing() === 'front' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-300 hover:bg-white/10'"
+                  class="px-1.5 py-0.5 rounded-lg transition text-[10px]"
+                  title="Cara frontal hacia el frente (0°)">
+                  Frente
+                </button>
+                <button 
+                  type="button"
+                  (click)="setGroupFaceDirection('right')"
+                  [class]="currentGroupFacing() === 'right' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-300 hover:bg-white/10'"
+                  class="px-1.5 py-0.5 rounded-lg transition text-[10px]"
+                  title="Cara frontal hacia la derecha (90°)">
+                  Der
+                </button>
+                <button 
+                  type="button"
+                  (click)="setGroupFaceDirection('back')"
+                  [class]="currentGroupFacing() === 'back' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-300 hover:bg-white/10'"
+                  class="px-1.5 py-0.5 rounded-lg transition text-[10px]"
+                  title="Cara frontal hacia el fondo (180°)">
+                  Atrás
+                </button>
+                <button 
+                  type="button"
+                  (click)="setGroupFaceDirection('left')"
+                  [class]="currentGroupFacing() === 'left' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-300 hover:bg-white/10'"
+                  class="px-1.5 py-0.5 rounded-lg transition text-[10px]"
+                  title="Cara frontal hacia la izquierda (270°)">
+                  Izq
+                </button>
+              </div>
+
+              <!-- Desagrupar -->
               <button 
                 type="button" 
                 (click)="ungroupSelected()" 
@@ -590,30 +661,99 @@
 
             <!-- SECTION: ORIENTACIÓN ESPACIAL -->
             <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-              <span class="text-xs font-bold text-slate-800 block">Orientación de la Pieza:</span>
-              <div class="grid grid-cols-3 gap-1 text-[10px]">
-                <button 
-                  type="button"
-                  (click)="setPartOrientation('horizontal')"
-                  [class]="(sel.orientation || 'horizontal') === 'horizontal' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                  class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
-                  Horizontal
-                </button>
-                <button 
-                  type="button"
-                  (click)="setPartOrientation('vertical_yz')"
-                  [class]="sel.orientation === 'vertical_yz' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                  class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
-                  Lateral (YZ)
-                </button>
-                <button 
-                  type="button"
-                  (click)="setPartOrientation('vertical_xy')"
-                  [class]="sel.orientation === 'vertical_xy' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                  class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
-                  Frontal (XY)
-                </button>
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-800 block">
+                  @if (activeSelectedGroupName()) {
+                    Orientación del Cajón (Frente):
+                  } @else {
+                    Orientación de la Pieza:
+                  }
+                </span>
+                @if (activeSelectedGroupName()) {
+                  <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Bloque Rígido</span>
+                }
               </div>
+
+              @if (activeSelectedGroupName()) {
+                <!-- Controles de frente del cajón completo en 3D -->
+                <div class="grid grid-cols-4 gap-1 text-[10px]">
+                  <button 
+                    type="button"
+                    (click)="setGroupFaceDirection('front')"
+                    [class]="currentGroupFacing() === 'front' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs"
+                    title="Cara frontal hacia el frente (Z+)">
+                    Frente (0°)
+                  </button>
+                  <button 
+                    type="button"
+                    (click)="setGroupFaceDirection('right')"
+                    [class]="currentGroupFacing() === 'right' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs"
+                    title="Cara frontal hacia la derecha (X+)">
+                    Der (90°)
+                  </button>
+                  <button 
+                    type="button"
+                    (click)="setGroupFaceDirection('back')"
+                    [class]="currentGroupFacing() === 'back' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs"
+                    title="Cara frontal hacia el fondo (Z-)">
+                    Atrás (180°)
+                  </button>
+                  <button 
+                    type="button"
+                    (click)="setGroupFaceDirection('left')"
+                    [class]="currentGroupFacing() === 'left' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs"
+                    title="Cara frontal hacia la izquierda (X-)">
+                    Izq (270°)
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-1.5 pt-1">
+                  <button 
+                    type="button"
+                    (click)="rotateSelectedGroup(-90)"
+                    class="py-1 px-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition"
+                    title="Girar cajón 90° antihorario">
+                    <span class="material-icons text-xs">rotate_left</span>
+                    <span>Girar -90°</span>
+                  </button>
+                  <button 
+                    type="button"
+                    (click)="rotateSelectedGroup(90)"
+                    class="py-1 px-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition"
+                    title="Girar cajón 90° horario (tecla R)">
+                    <span class="material-icons text-xs">rotate_right</span>
+                    <span>Girar +90° (R)</span>
+                  </button>
+                </div>
+              } @else {
+                <div class="grid grid-cols-3 gap-1 text-[10px]">
+                  <button 
+                    type="button"
+                    (click)="setPartOrientation('horizontal')"
+                    [class]="(sel.orientation || 'horizontal') === 'horizontal' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
+                    Horizontal
+                  </button>
+                  <button 
+                    type="button"
+                    (click)="setPartOrientation('vertical_yz')"
+                    [class]="sel.orientation === 'vertical_yz' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
+                    Lateral (YZ)
+                  </button>
+                  <button 
+                    type="button"
+                    (click)="setPartOrientation('vertical_xy')"
+                    [class]="sel.orientation === 'vertical_xy' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="py-1.5 rounded-lg transition text-center font-medium shadow-2xs">
+                    Frontal (XY)
+                  </button>
+                </div>
+              }
             </div>
 
             <!-- SECTION 4: TAPACANTOS INTELIGENTES (L1, L2, A1, A2) -->

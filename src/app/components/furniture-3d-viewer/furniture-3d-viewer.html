@@ -149,13 +149,20 @@
       <span class="material-icons text-lg">visibility</span>
     </button>
 
-    <!-- 11.5. HERRAJES & ACCESORIOS 3D (TIRADORES, BISAGRAS, CORREDERAS) -->
+    <!-- 11.5. HERRAJES & ACCESORIOS 3D (TIRADORES, BISAGRAS, CORREDERAS SELECTIVOS) -->
     <button 
       type="button"
+      [disabled]="!hasHardwareSelected()"
       (click)="toggleHardware()"
-      [class]="showHardware() ? 'text-blue-600 bg-blue-50 ring-1 ring-blue-300 shadow-xs' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+      [class]="!hasHardwareSelected() 
+        ? 'opacity-35 cursor-not-allowed text-slate-300' 
+        : (isSelectedHardwareVisible() 
+            ? 'text-blue-600 bg-blue-50 ring-1 ring-blue-300 shadow-xs' 
+            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100')"
       class="w-9 h-9 rounded-xl flex items-center justify-center transition"
-      title="Herrajes 3D: Mostrar u ocultar tiradores/manijas, bisagras y correderas">
+      [title]="!hasHardwareSelected() 
+        ? 'Herrajes 3D: Selecciona un cajón o puerta para gestionar sus herrajes' 
+        : (isSelectedHardwareVisible() ? 'Ocultar herrajes 3D del cajón seleccionado' : 'Mostrar herrajes 3D del cajón seleccionado')">
       <span class="material-icons text-lg">hardware</span>
     </button>
 
@@ -210,13 +217,13 @@
       <button 
         type="button"
         (click)="toggleGroupsFlyout()"
-        [class]="showGroupsFlyout() ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-500/30 ring-2 ring-indigo-400' : (partGroups().length > 0 ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 ring-1 ring-indigo-300' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100')"
+        [class]="showGroupsFlyout() ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-500/30 ring-2 ring-indigo-400' : (activePartGroups().length > 0 ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 ring-1 ring-indigo-300' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100')"
         class="w-9 h-9 rounded-xl flex items-center justify-center transition relative"
         title="Cajones y Grupos Guardados: Administrar y seleccionar cajones completos para moverlos o animarlos">
         <span class="material-icons text-lg">inbox</span>
-        @if (partGroups().length > 0) {
+        @if (activePartGroups().length > 0) {
           <span class="absolute -top-1 -right-1 px-1 py-0.2 rounded-full text-[9px] font-bold bg-indigo-600 text-white leading-tight shadow-xs">
-            {{ partGroups().length }}
+            {{ activePartGroups().length }}
           </span>
         }
       </button>
@@ -231,7 +238,7 @@
               </div>
               <div>
                 <h4 class="font-bold text-xs text-slate-900 leading-tight">Cajones y Grupos</h4>
-                <p class="text-[10px] text-slate-500 font-medium">{{ partGroups().length }} guardados</p>
+                <p class="text-[10px] text-slate-500 font-medium">{{ activePartGroups().length }} guardados</p>
               </div>
             </div>
             <button 
@@ -244,7 +251,7 @@
           </div>
 
           <!-- Empty State -->
-          @if (partGroups().length === 0) {
+          @if (activePartGroups().length === 0) {
             <div class="py-4 px-2 text-center flex flex-col items-center gap-2">
               <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
                 <span class="material-icons text-2xl">inbox</span>
@@ -264,7 +271,7 @@
           } @else {
             <!-- List of Saved Groups -->
             <div class="flex flex-col gap-2.5">
-              @for (group of partGroups(); track group.id) {
+              @for (group of activePartGroups(); track group.id) {
                 @let isSel = isGroupFullySelected(group.id);
                 @let partsCount = getPartsForGroup(group.id).length;
                 @let isOpen = isGroupOpen(group.id);
@@ -297,6 +304,24 @@
                     </button>
 
                     <div class="flex items-center gap-0.5 shrink-0">
+                      <!-- Duplicate group button -->
+                      <button 
+                        type="button"
+                        (click)="duplicateGroupInViewer(group.id)"
+                        class="p-1 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
+                        title="Duplicar cajón (crea una copia apilada encima)">
+                        <span class="material-icons text-sm">content_copy</span>
+                      </button>
+
+                      <!-- Rotate 90 deg button -->
+                      <button 
+                        type="button"
+                        (click)="rotateGroupInViewer(group.id, 90)"
+                        class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                        title="Girar cajón 90° en 3D (Atajo: tecla R)">
+                        <span class="material-icons text-sm">rotate_right</span>
+                      </button>
+
                       <!-- Animate toggle -->
                       <button 
                         type="button"
@@ -318,12 +343,32 @@
                     </div>
                   </div>
 
-                  <!-- Quick Movement Controls (Arriba / Abajo) -->
+                  <!-- Quick Action Buttons (Duplicar Apilado & Girar) -->
                   <div class="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100">
                     <button 
                       type="button"
+                      (click)="duplicateGroupInViewer(group.id)"
+                      class="py-1 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold flex items-center justify-center gap-1 transition"
+                      title="Duplicar cajón apilado verticalmente">
+                      <span class="material-icons text-xs">content_copy</span>
+                      <span>Duplicar Arriba</span>
+                    </button>
+                    <button 
+                      type="button"
+                      (click)="rotateGroupInViewer(group.id, 90)"
+                      class="py-1 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold flex items-center justify-center gap-1 transition"
+                      title="Girar 90° en bloque (Atajo: tecla R)">
+                      <span class="material-icons text-xs">rotate_right</span>
+                      <span>Girar 90°</span>
+                    </button>
+                  </div>
+
+                  <!-- Quick Movement Controls (Arriba / Abajo) -->
+                  <div class="grid grid-cols-2 gap-1.5">
+                    <button 
+                      type="button"
                       (click)="moveGroupStep(group.id, 'y', 50)"
-                      class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-800 text-[11px] font-medium flex items-center justify-center gap-1 transition"
+                      class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium flex items-center justify-center gap-1 transition"
                       title="Subir cajón 50mm en eje vertical (Y)">
                       <span class="material-icons text-xs">arrow_upward</span>
                       <span>Subir 50mm</span>
@@ -331,7 +376,7 @@
                     <button 
                       type="button"
                       (click)="moveGroupStep(group.id, 'y', -50)"
-                      class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-800 text-[11px] font-medium flex items-center justify-center gap-1 transition"
+                      class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium flex items-center justify-center gap-1 transition"
                       title="Bajar cajón 50mm en eje vertical (Y)">
                       <span class="material-icons text-xs">arrow_downward</span>
                       <span>Bajar 50mm</span>
@@ -345,7 +390,7 @@
                     [class]="isSel ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-semibold'"
                     class="w-full py-1.5 px-2 rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow-xs">
                     <span class="material-icons text-xs">{{ isSel ? 'open_with' : 'near_me' }}</span>
-                    <span>{{ isSel ? 'Moviendo en Bloque (Usa flechas 3D)' : 'Seleccionar para Mover en Bloque' }}</span>
+                    <span>{{ isSel ? 'Cajón Activo (Mover o Girar en Bloque)' : 'Seleccionar este Cajón' }}</span>
                   </button>
                 </div>
               }

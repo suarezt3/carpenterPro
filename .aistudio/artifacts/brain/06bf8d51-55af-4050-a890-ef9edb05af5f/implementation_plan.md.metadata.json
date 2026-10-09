@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para resolver la persistencia y selección de grupos de cajones, panel flotante de consulta en la cinta izquierda y reubicación del botón de agrupar en una barra flotante superior sin superposiciones.",
-  "updatedAt":  "2026-10-08T23:50:58.252361878Z",
+  "summary":  "Plan integral para rotación rígida en 3D de cajones en todas las direcciones (con controles en cinta y tecla R), duplicación de cajones apilados verticalmente, menú desplegable interactivo de cajones guardados, y control selectivo de herrajes 3D por cajón individual.",
+  "updatedAt":  "2026-10-09T01:15:15.959252268Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

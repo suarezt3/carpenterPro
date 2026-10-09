@@ -60,10 +60,12 @@ export class ModuleDesignerComponent {
   readonly groupsWithParts = computed(() => {
     const grps = this.groups();
     const parts = this.currentParts();
-    return grps.map(g => ({
-      group: g,
-      parts: parts.filter(p => p.groupId === g.id)
-    }));
+    return grps
+      .map(g => ({
+        group: g,
+        parts: parts.filter(p => p.groupId === g.id)
+      }))
+      .filter(item => item.parts.length > 0);
   });
 
   // Piezas libres / sin grupo
@@ -71,20 +73,35 @@ export class ModuleDesignerComponent {
     return this.currentParts().filter(p => !p.groupId);
   });
 
-  // Nombre del grupo activo si todas las piezas seleccionadas pertenecen al mismo grupo
-  readonly activeSelectedGroupName = computed(() => {
+  // ID del grupo activo si la selección pertenece a un grupo
+  readonly activeSelectedGroupId = computed<string | null>(() => {
+    const sel = this.selectedPart();
+    if (sel?.groupId) return sel.groupId;
     const ids = this.selectedPartIds();
-    if (ids.length === 0) return null;
-    const parts = this.currentParts().filter(p => ids.includes(p.id));
-    const firstGroupId = parts[0]?.groupId;
-    if (firstGroupId && parts.length > 1 && parts.every(p => p.groupId === firstGroupId)) {
-      return parts[0]?.groupName || 'Cajón';
+    if (ids.length > 0) {
+      const parts = this.currentParts().filter(p => ids.includes(p.id));
+      const g = parts.find(p => p.groupId);
+      if (g?.groupId) return g.groupId;
     }
     return null;
   });
 
+  // Nombre del grupo activo si la selección pertenece a un grupo
+  readonly activeSelectedGroupName = computed(() => {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return null;
+    const grp = this.groups().find(g => g.id === gId);
+    return grp ? grp.name : 'Cajón';
+  });
+
   readonly isAnyGroupSelected = computed(() => {
-    return !!this.activeSelectedGroupName();
+    return !!this.activeSelectedGroupId();
+  });
+
+  readonly currentGroupFacing = computed<'front' | 'right' | 'back' | 'left'>(() => {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return 'front';
+    return this.projectService.getGroupFacingDirection(gId);
   });
 
   // Collapsed / expanded groups in parts list
@@ -169,9 +186,7 @@ export class ModuleDesignerComponent {
       if (selIds.length > 1) {
         e.preventDefault();
         const count = selIds.length;
-        for (const id of selIds) {
-          this.projectService.deletePart(id);
-        }
+        this.projectService.deleteMultipleParts(selIds);
         this.selectedPartIds.set([]);
         this.selectedPartId.set(null);
         this.activeDockTab.set('catalog');
@@ -354,6 +369,12 @@ export class ModuleDesignerComponent {
 
   onSelectPartFrom3D(part: Part | null) {
     if (part) {
+      // If we already have multiple parts selected and this part is one of them, do not reset multi-selection
+      if (this.selectedPartIds().length > 1 && this.selectedPartIds().includes(part.id)) {
+        this.selectedPartId.set(part.id);
+        this.activeDockTab.set('piece');
+        return;
+      }
       this.selectedPartId.set(part.id);
       if (part.groupId) {
         const groupParts = this.currentParts().filter(p => p.groupId === part.groupId);
@@ -371,7 +392,9 @@ export class ModuleDesignerComponent {
   onPartsSelectedFrom3D(partIds: string[]) {
     this.selectedPartIds.set(partIds);
     if (partIds.length > 0) {
-      this.selectedPartId.set(partIds[0]);
+      if (!this.selectedPartId() || !partIds.includes(this.selectedPartId()!)) {
+        this.selectedPartId.set(partIds[partIds.length - 1]);
+      }
       this.activeDockTab.set('piece');
     } else {
       this.selectedPartId.set(null);
@@ -427,6 +450,24 @@ export class ModuleDesignerComponent {
   updateSelectedPart(changes: Partial<Part>) {
     const current = this.selectedPart();
     if (!current) return;
+
+    // If changing spatial coordinates and the part belongs to a group, move the whole group together!
+    if (current.groupId && (changes.posX !== undefined || changes.posY !== undefined || changes.posZ !== undefined)) {
+      const dx = changes.posX !== undefined ? changes.posX - (current.posX ?? 0) : 0;
+      const dy = changes.posY !== undefined ? changes.posY - (current.posY ?? 0) : 0;
+      const dz = changes.posZ !== undefined ? changes.posZ - (current.posZ ?? 0) : 0;
+      if (dx !== 0 || dy !== 0 || dz !== 0) {
+        this.projectService.moveGroup(current.groupId, dx, dy, dz);
+        const nonPosChanges = { ...changes };
+        delete nonPosChanges.posX;
+        delete nonPosChanges.posY;
+        delete nonPosChanges.posZ;
+        if (Object.keys(nonPosChanges).length > 0) {
+          this.projectService.updatePart({ ...current, ...nonPosChanges });
+        }
+        return;
+      }
+    }
 
     const updated: Part = {
       ...current,
@@ -595,7 +636,85 @@ export class ModuleDesignerComponent {
   }
 
   setPartOrientation(orientation: PartOrientation) {
-    this.updateSelectedPart({ orientation });
+    const sel = this.selectedPart();
+    if (!sel) return;
+
+    const groupId = this.activeSelectedGroupId();
+    if (!groupId) {
+      this.updateSelectedPart({ orientation });
+      return;
+    }
+
+    if (orientation === 'vertical_xy') {
+      this.setGroupFaceDirection('front');
+    } else if (orientation === 'vertical_yz') {
+      this.setGroupFaceDirection('right');
+    } else {
+      this.rotateSelectedGroup(90);
+    }
+  }
+
+  duplicateSelectedGroup() {
+    const groupId = this.activeSelectedGroupId();
+    if (!groupId) return;
+    const result = this.projectService.duplicateGroup(groupId);
+    if (result) {
+      this.selectedPartIds.set(result.newPartIds);
+      if (result.newPartIds.length > 0) {
+        this.selectedPartId.set(result.newPartIds[0]);
+      }
+      this.activeDockTab.set('piece');
+      this.showToast(`📋 Se duplicó "${result.newGroup.name}" apilado verticalmente`);
+    }
+  }
+
+  rotateSelectedGroup(deltaAngle: 90 | -90 | 180 = 90) {
+    const groupId = this.activeSelectedGroupId();
+    if (!groupId) return;
+    this.projectService.rotateGroupRigidly(groupId, deltaAngle);
+    this.showToast(`🔄 Cajón girado ${deltaAngle > 0 ? '+' : ''}${deltaAngle}° en bloque`);
+  }
+
+  rotateSelectedGroup90() {
+    this.rotateSelectedGroup(90);
+  }
+
+  setGroupFaceDirection(targetFace: 'front' | 'right' | 'back' | 'left') {
+    const groupId = this.activeSelectedGroupId();
+    if (!groupId) return;
+    const curFace = this.projectService.getGroupFacingDirection(groupId);
+    if (curFace === targetFace) return;
+
+    const faceAngles: Record<'front' | 'right' | 'back' | 'left', number> = {
+      front: 0,
+      right: 90,
+      back: 180,
+      left: 270
+    };
+
+    let diff = faceAngles[targetFace] - faceAngles[curFace];
+    if (diff === 270) diff = -90;
+    if (diff === -270) diff = 90;
+
+    this.projectService.rotateGroupRigidly(groupId, diff as 90 | -90 | 180);
+    this.showToast(`🧭 Frente orientado hacia: ${targetFace.toUpperCase()}`);
+  }
+
+  onGroupRotationRequested(event: { groupId: string; deltaAngle: 90 | -90 | 180 }) {
+    this.projectService.rotateGroupRigidly(event.groupId, event.deltaAngle);
+    this.showToast(`🔄 Cajón girado ${event.deltaAngle > 0 ? '+' : ''}${event.deltaAngle}° (Atajo: tecla R)`);
+  }
+
+  onGroupDuplicationRequested(groupId: string) {
+    const result = this.projectService.duplicateGroup(groupId);
+    if (result) {
+      this.selectedPartIds.set(result.newPartIds);
+      if (result.newPartIds.length > 0) {
+        this.selectedPartId.set(result.newPartIds[0]);
+      }
+      this.activeDockTab.set('piece');
+      this.showToast(`📋 Se duplicó "${result.newGroup.name}" apilado verticalmente`);
+    }
   }
 
   alignPart(preset: 'floor' | 'centerX' | 'centerZ' | 'top') {
@@ -1143,10 +1262,24 @@ export class ModuleDesignerComponent {
 
   toggleSelectedGroupOpen() {
     const ids = this.selectedPartIds();
-    const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId);
+    const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId) || this.selectedPart();
     if (part?.groupId) {
+      this.viewer3dRef()?.toggleGroupAnimation(part.groupId);
       this.projectService.toggleGroupOpen(part.groupId);
+    } else if (part) {
+      this.viewer3dRef()?.togglePartOpen(part.id);
     }
+  }
+
+  isGroupOpen(): boolean {
+    const ids = this.selectedPartIds();
+    const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId) || this.selectedPart();
+    if (part?.groupId) {
+      return this.viewer3dRef()?.isGroupOpen(part.groupId) ?? false;
+    } else if (part) {
+      return this.viewer3dRef()?.isPartOpen(part.id) ?? false;
+    }
+    return false;
   }
 
   ungroupSelected() {
