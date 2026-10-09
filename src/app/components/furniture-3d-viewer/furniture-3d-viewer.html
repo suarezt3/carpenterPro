@@ -431,9 +431,9 @@
 
   </div>
 
-  <!-- BOTTOM-LEFT SELECTION BADGE (PLACED CLEANLY ABOVE CANVAS CONTROLS TO AVOID TOP RIBBON OVERLAP) -->
+  <!-- TOP-LEFT SELECTION BADGE (ALIGNED AT TOP-LEFT WHILE ACTIONS RIBBON IS AT TOP-RIGHT) -->
   @if (isMultiSelect()) {
-    <div class="absolute bottom-3 left-16 z-20 flex items-center gap-2.5 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md pointer-events-auto animate-in fade-in duration-150">
+    <div class="absolute top-3 left-16 z-20 flex items-center gap-2.5 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md pointer-events-auto animate-in fade-in duration-150">
       <div class="flex items-center gap-1.5">
         <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
         <span class="text-xs font-bold uppercase tracking-wider text-slate-700">GRUPO ({{ activeSelectedIds().length }}):</span>
@@ -447,7 +447,7 @@
       </button>
     </div>
   } @else if (selectedPart(); as sel) {
-    <div class="absolute bottom-3 left-16 z-20 flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md pointer-events-auto animate-in fade-in duration-150">
+    <div class="absolute top-3 left-16 z-20 flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md pointer-events-auto animate-in fade-in duration-150">
       <span class="w-2 h-2 rounded-full bg-sky-500"></span>
       <span class="text-xs font-bold text-slate-800">{{ sel.name }}:</span>
       <span class="text-xs font-mono font-bold text-sky-600">{{ sel.length }} × {{ sel.width }} mm</span>
@@ -464,7 +464,7 @@
 
   <!-- HIDDEN PIECES BANNER -->
   @if (hiddenPartIds().size > 0) {
-    <div class="absolute bottom-12 left-16 z-20 pointer-events-auto animate-in fade-in duration-150">
+    <div class="absolute top-12 left-16 z-20 pointer-events-auto animate-in fade-in duration-150">
       <div class="flex items-center gap-2 bg-amber-500/95 text-white backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md text-xs font-semibold">
         <span class="material-icons text-sm">visibility_off</span>
         <span>{{ hiddenPartIds().size }} pieza(s) oculta(s)</span>
@@ -595,7 +595,7 @@
 
   <!-- FLOATING MICRO-NUDGE HUD (CUADRO DE MICRO-AJUSTE EN ZOOM - CONSERVADO SEGÚN REQUERIMIENTO EXPLÍCITO) -->
   @if (selectedPart(); as sel) {
-    <div class="absolute bottom-14 left-16 z-20 pointer-events-auto flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+    <div class="absolute bottom-10 left-16 z-20 pointer-events-auto flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
       <div class="bg-white/95 text-slate-800 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200/90 shadow-xl flex flex-col gap-1.5 max-w-[320px]">
         
         <!-- Header: Title, Step selector, Magnetic Toggle -->
