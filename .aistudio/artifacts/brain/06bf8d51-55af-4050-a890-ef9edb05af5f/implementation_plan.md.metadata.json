@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementación completada: se retiraron las flechas guía de traslación 3D tanto en piezas individuales como en grupos modulares, eliminando el ruido visual en el visor. Se mantuvieron intactos los tiradores de ajuste dimensional en los bordes y el cursor dinámico 'grab' para arrastre directo.",
-  "updatedAt":  "2026-10-09T16:58:30.329133399Z",
+  "summary":  "Actualización completada de la sección de ayuda y documentación técnica: se integraron guías detalladas para el movimiento por arrastre directo 3D (estilo SketchUp), la cinta flotante de acciones rápidas superior derecha y la herramienta de dibujo de rectángulos 3D en el espacio [ R ], actualizando además la guía de atajos de teclado y empujar/tirar.",
+  "updatedAt":  "2026-10-09T19:25:27.806896174Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

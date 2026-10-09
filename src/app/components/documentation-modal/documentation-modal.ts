@@ -103,6 +103,92 @@ export class DocumentationModalComponent {
       ]
     },
     {
+      id: 'movimiento_directo_3d',
+      category: 'herramientas_3d',
+      title: 'Movimiento por Arrastre Directo 3D (Estilo SketchUp)',
+      shortDesc: 'Mueve piezas individuales o grupos modulares (cajoneras) haciendo clic sostenido sobre cualquier superficie, sin flechas molestas en el centro.',
+      icon: 'pan_tool',
+      iconColor: 'text-indigo-600',
+      badge: 'Interacción Natural',
+      steps: [
+        'Haz clic con el botón izquierdo sobre cualquier pieza o ensamble de grupo en el visor 3D.',
+        'Observa que el cursor cambia a una mano abierta ("grab") al posar sobre el elemento seleccionado, y a mano cerrada ("grabbing") al hacer clic.',
+        'Mantén presionado el botón izquierdo y arrastra el ratón suavemente hacia donde quieras mover la pieza o grupo en la escena.',
+        'Si la pieza pertenece a un grupo modular (ej. un cajón con frente, laterales, fondo y correderas), todas las piezas del bloque se desplazarán unidas y sincronizadas.',
+        'Las flechas de traslación axiales que antes se dibujaban en el centro han sido retiradas para darte un espacio de trabajo limpio, nítido y libre de ruido visual.',
+        'Para redimensionar la pieza (largo y ancho), utiliza los tiradores interactivos cúbicos (azul y ámbar) situados en los bordes exteriores de la pieza seleccionada.'
+      ],
+      tips: [
+        'Puedes presionar las flechas del teclado para ajustes milimétricos finos (1 mm o 10 mm manteniendo pulsada la tecla Shift).',
+        'En la esquina inferior izquierda dispones del panel flotante de "Micro-Ajuste en Zoom" para desplazar la pieza en coordenadas exactas en X, Y o Z.',
+        'Para deshacer cualquier movimiento presiona [ Ctrl + Z ] o el botón Deshacer.'
+      ],
+      technicalDetails: [
+        { label: 'Método de arrastre', value: 'Clic sostenido directo sobre la malla (Plano CAD coplanar)' },
+        { label: 'Movimiento grupal', value: 'Sincronizado para piezas con mismo groupId (cajones/módulos)' },
+        { label: 'Tiradores de borde', value: 'Cubos interactivos perimetrales (Largo en azul, Ancho en ámbar)' },
+        { label: 'Precisión CAD', value: 'Paso fino de 1 mm con soporte magnético' }
+      ]
+    },
+    {
+      id: 'cinta_acciones_flotante',
+      category: 'herramientas_3d',
+      title: 'Cinta Flotante de Acciones Rápidas y Gestión de Grupos',
+      shortDesc: 'Menú contextual superior derecho para duplicar, rotar 90°, abrir/cerrar, cambiar orientación y desagrupar bloques modulares al instante.',
+      icon: 'dashboard_customize',
+      iconColor: 'text-emerald-600',
+      badge: 'Barra Superior',
+      steps: [
+        'Al seleccionar cualquier pieza o grupo en el visor 3D, se despliega automáticamente la cinta oscura de acciones en la esquina superior derecha (top-3 right-3), respetando estrictamente los márgenes visuales sin tapar tu diseño.',
+        'Si seleccionas un grupo o cajón modular, la cinta te permite:',
+        '• "Duplicar": Crea una copia exacta de todo el módulo o cajón a un costado con sus herrajes y mecanizados.',
+        '• "Mover": Activa el cursor de traslación rápida para arrastrar el bloque completo.',
+        '• "Abrir / Cerrar": Extrae las correderas del cajón o gira la puerta del grupo para revisar su interior.',
+        '• "90° (R)": Rota el ensamble completo 90 grados en el plano horizontal.',
+        '• "Frente": Enfoca y selecciona de forma aislada la fachada frontal del cajón o puerta.',
+        '• "Desagrupar": Separa el ensamble en piezas individuales independientes para editar sus partes por separado.',
+        'Si seleccionas una pieza individual, dispones de: "Duplicar", "Mover", "90° (R)", "Orientación (Horizontal / Vertical)" y "Eliminar".',
+        'En la esquina opuesta (superior izquierda, top-3 left-16), se muestra la tarjeta informativa con el nombre de la pieza, sus medidas (L × A × E) o el recuento de piezas del grupo, ambas barras perfectamente alineadas y sin solaparse.'
+      ],
+      tips: [
+        'Ambas barras flotantes (info a la izquierda y acciones a la derecha) conservan un diseño minimalista que no obstruye la visibilidad del mueble 3D ni compite con los controles de cámara.',
+        'Puedes presionar [ Q ] como atajo de teclado para la rotación rápida de 90° de la pieza seleccionada.'
+      ],
+      technicalDetails: [
+        { label: 'Ubicación Acciones', value: 'Esquina superior derecha (top-3 right-3)' },
+        { label: 'Ubicación Info', value: 'Esquina superior izquierda (top-3 left-16)' },
+        { label: 'Operaciones Grupo', value: 'Duplicar, Mover, Abrir/Cerrar, 90° (R), Frente, Desagrupar' },
+        { label: 'Operaciones Pieza', value: 'Duplicar, Mover, 90° (R), Orientación H/V, Eliminar' }
+      ]
+    },
+    {
+      id: 'dibujo_rectangulo_3d',
+      category: 'herramientas_3d',
+      title: 'Dibujar Rectángulo 3D en el Lienzo CAD',
+      shortDesc: 'Traza placas y paneles rectangulares directamente en el suelo 3D o sobre caras de muebles con previsualización milimétrica dinámica.',
+      icon: 'crop_square',
+      iconColor: 'text-sky-600',
+      badge: 'Atajo [ R ]',
+      steps: [
+        'Activa la herramienta de dibujo presionando la tecla [ R ] en tu teclado o haciendo clic en el icono de rectángulo de la paleta izquierda.',
+        'Haz clic en el punto de inicio deseado (sobre el piso o sobre la superficie de una pieza existente).',
+        'Arrastra el ratón: verás una retícula traslúcida cian proyectada en 3D que indica en tiempo real las dimensiones del rectángulo (Largo × Ancho en milímetros) con snap por defecto de 10 mm.',
+        'Al soltar el clic, se creará instantáneamente una nueva pieza de melamina real con el espesor estándar del proyecto (15 mm o 18 mm).',
+        'La nueva pieza se incorpora de inmediato a la lista de piezas, al despiece general, al optimizador de corte y al cálculo de mecanizados CNC.',
+        'Si deseas cancelar el trazado en cualquier momento antes de soltar el clic, simplemente pulsa la tecla [ Esc ].'
+      ],
+      tips: [
+        'Una vez creada la pieza, puedes presionar [ P ] para usar la herramienta Empujar/Tirar y ajustar su espesor, o hacer clic y arrastrar para reubicarla.',
+        'El sistema previene la creación de micro-piezas accidentales exigiendo una dimensión mínima de 60 × 60 mm.'
+      ],
+      technicalDetails: [
+        { label: 'Atajo rápido', value: 'Tecla [ R ]' },
+        { label: 'Snap de dibujo', value: 'Incrementos de 10 mm durante el trazado' },
+        { label: 'Dimensión mínima', value: '60 mm x 60 mm (evita clics accidentales)' },
+        { label: 'Espesor inicial', value: '15 mm o 18 mm según la configuración activa' }
+      ]
+    },
+    {
       id: 'push_pull_tool',
       category: 'herramientas_3d',
       title: 'Empujar / Tirar (Push/Pull) y Edición Directa 3D',
@@ -118,6 +204,7 @@ export class DocumentationModalComponent {
         'Suelta el ratón para confirmar el nuevo tamaño de la pieza.'
       ],
       tips: [
+        'Recuerda: para mover de lugar una pieza completa, simplemente haz clic sostenido y arrástrala. Utiliza Empujar/Tirar [ P ] específicamente cuando desees alargar, ensanchar o variar espesores.',
         'No necesitas calcular restas matemáticas; estira el estante hasta tocar el lateral contiguo y el imán lo alineará exactamente.',
         'Todos los despieces y listas de corte se recalculan instantáneamente.'
       ],
@@ -207,21 +294,22 @@ export class DocumentationModalComponent {
       iconColor: 'text-emerald-600',
       badge: 'Productividad',
       steps: [
+        '• [ Clic sostenido + Arrastre ]: Mover pieza individual o grupo completo directamente en el espacio 3D (estilo SketchUp, sin flechas en el centro)',
         '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar piezas',
         '• [ M ]: Cinta Métrica 3D con Imán Inteligente a vértices y aristas',
         '• [ P ]: Empujar / Tirar (Push/Pull) para estirar o encoger caras en tiempo real',
-        '• [ Q ]: Rotar pieza seleccionada 90 grados en el plano',
-        '• [ R ]: Dibujar rectángulo 3D en el piso o sobre la cara de una pieza',
-        '• [ Supr / Delete / Backspace ]: Eliminar inmediatamente la pieza o grupo de piezas seleccionadas (con restauración vía Ctrl+Z)',
+        '• [ R ]: Dibujar rectángulo 3D en el piso con previsualización dinámica',
+        '• [ Q ]: Rotar pieza o ensamble seleccionado 90 grados en el plano horizontal',
+        '• [ Supr / Delete / Backspace ]: Eliminar inmediatamente la pieza o grupo seleccionado (con restauración vía Ctrl+Z)',
         '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer última acción o restauración de pieza eliminada',
         '• [ Ctrl + Y ] / [ Cmd + Shift + Z ]: Rehacer acción deshecha',
         '• [ Clic en Puerta o Cajón ]: Abrir o cerrar individualmente puertas (giro 90°) o extraer cajones en el visor 3D',
-        '• [ Botón Abrir / Cerrar ]: Apertura global sincronizada de todas las puertas y cajoneras del mueble',
+        '• [ Shift + Clic ]: Selección múltiple aditiva de piezas en el visor 3D para mover o duplicar en bloque',
         '• [ Flechas Teclado ]: Mover pieza seleccionada en incrementos milimétricos (1 mm o 10 mm con Shift)',
         '• [ Esc ]: Cancelar herramienta activa, limpiar selección o cerrar ventanas emergentes'
       ],
       tips: [
-        'Mantener pulsada la tecla Shift mientras haces clic te permite seleccionar múltiples piezas a la vez para moverlas o duplicarlas en bloque.'
+        'La cinta contextual superior derecha te brinda acceso rápido con un solo clic a: Duplicar, Mover, Abrir/Cerrar, 90° (R), Frente y Desagrupar.'
       ]
     }
   ];
