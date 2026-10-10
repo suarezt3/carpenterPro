@@ -1023,85 +1023,145 @@
               Selecciona una pieza para insertarla en el modelo 3D con medidas iniciales de taller:
             </p>
 
-            <div class="grid grid-cols-2 gap-1.5 text-xs">
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <!-- Techo / Cubierta -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('top')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-sky-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-sky-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ Techo / Barra</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-sky-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-sky-50 group-hover:bg-sky-100 border border-sky-200/60 flex items-center justify-center shrink-0 transition text-sky-600">
+                  <span class="material-icons text-base">table_bar</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-sky-700">Techo / Barra</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">1800 × 600 mm</span>
+                </div>
               </button>
 
+              <!-- Lateral Izquierdo -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('side_left')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-amber-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-amber-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ Lateral Izq.</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-amber-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-amber-50 group-hover:bg-amber-100 border border-amber-200/60 flex items-center justify-center shrink-0 transition text-amber-600">
+                  <span class="material-icons text-base">align_horizontal_left</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-amber-700">Lateral Izq.</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">850 × 580 mm</span>
+                </div>
               </button>
 
+              <!-- Lateral Derecho -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('side_right')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-amber-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-amber-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ Lateral Der.</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-amber-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-amber-50 group-hover:bg-amber-100 border border-amber-200/60 flex items-center justify-center shrink-0 transition text-amber-600">
+                  <span class="material-icons text-base">align_horizontal_right</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-amber-700">Lateral Der.</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">850 × 580 mm</span>
+                </div>
               </button>
 
+              <!-- Piso / Base -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('bottom')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-orange-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-orange-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ Piso / Base</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-orange-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-orange-50 group-hover:bg-orange-100 border border-orange-200/60 flex items-center justify-center shrink-0 transition text-orange-600">
+                  <span class="material-icons text-base">table_rows</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-orange-700">Piso / Base</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">1770 × 580 mm</span>
+                </div>
               </button>
 
+              <!-- División Vertical -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('divider')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-yellow-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-yellow-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ División Vert.</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-yellow-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-yellow-50 group-hover:bg-yellow-100 border border-yellow-200/60 flex items-center justify-center shrink-0 transition text-yellow-600">
+                  <span class="material-icons text-base">view_column</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-yellow-700">División Vert.</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">820 × 560 mm</span>
+                </div>
               </button>
 
+              <!-- Repisa Interior -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('shelf')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-emerald-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-emerald-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ Repisa Interior</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-emerald-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-emerald-50 group-hover:bg-emerald-100 border border-emerald-200/60 flex items-center justify-center shrink-0 transition text-emerald-600">
+                  <span class="material-icons text-base">horizontal_split</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-emerald-700">Repisa Interior</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">870 × 550 mm</span>
+                </div>
               </button>
 
+              <!-- Fondo Trasero -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('back')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-purple-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-purple-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ Fondo Trasero</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-purple-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-purple-50 group-hover:bg-purple-100 border border-purple-200/60 flex items-center justify-center shrink-0 transition text-purple-600">
+                  <span class="material-icons text-base">layers</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-purple-700">Fondo Trasero</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">1770 × 820 mm</span>
+                </div>
               </button>
 
+              <!-- Puerta Batiente -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('door')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-blue-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ Puerta Batiente</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-blue-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-blue-50 group-hover:bg-blue-100 border border-blue-200/60 flex items-center justify-center shrink-0 transition text-blue-600">
+                  <span class="material-icons text-base">meeting_room</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-blue-700">Puerta Batiente</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">816 × 430 mm</span>
+                </div>
               </button>
 
+              <!-- Frente Cajón -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('drawer_front')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-indigo-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ Frente Cajón</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-indigo-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-indigo-50 group-hover:bg-indigo-100 border border-indigo-200/60 flex items-center justify-center shrink-0 transition text-indigo-600">
+                  <span class="material-icons text-base">inbox</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-indigo-700">Frente Cajón</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">400 × 180 mm</span>
+                </div>
               </button>
 
+              <!-- Zócalo Piso -->
               <button 
                 type="button" 
                 (click)="addPieceFromCatalog('plinth')"
-                class="p-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-stone-400 rounded-xl text-left transition flex items-center gap-2 group shadow-2xs">
-                <span class="w-2.5 h-2.5 rounded bg-stone-500 group-hover:scale-125 transition"></span>
-                <span class="text-slate-800 font-medium">+ Zócalo Piso</span>
+                class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-stone-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
+                <div class="w-7 h-7 rounded-md bg-stone-50 group-hover:bg-stone-100 border border-stone-200/60 flex items-center justify-center shrink-0 transition text-stone-600">
+                  <span class="material-icons text-base">border_bottom</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-stone-700">Zócalo Piso</span>
+                  <span class="text-[10px] text-slate-500 font-mono block mt-0.5 leading-none">1770 × 80 mm</span>
+                </div>
               </button>
             </div>
 
@@ -1109,7 +1169,7 @@
             <button 
               type="button" 
               (click)="openDrawerWizard()"
-              class="w-full py-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs">
+              class="w-full py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs active:scale-[0.99] cursor-pointer">
               <span class="material-icons text-sm">inbox</span>
               <span>+ Crear Cajón Modular (Asistente)</span>
             </button>
@@ -1118,7 +1178,7 @@
             <button 
               type="button" 
               (click)="addPieceFromCatalog('free')"
-              class="w-full py-2 bg-slate-50 hover:bg-white border border-dashed border-slate-300 hover:border-sky-500 rounded-xl text-xs font-semibold text-slate-700 transition flex items-center justify-center gap-1.5 shadow-2xs">
+              class="w-full py-2 bg-slate-50 hover:bg-white border border-dashed border-slate-300 hover:border-sky-500 rounded-lg text-xs font-semibold text-slate-700 transition flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.99] cursor-pointer">
               <span class="material-icons text-sm text-sky-600">add</span>
               <span>+ Añadir Pieza Libre Personalizada</span>
             </button>

@@ -1,100 +1,51 @@
-# Funcionalidad de Ocultar y Mostrar Piezas y Grupos Modulares
+# Rediseño Profesional del Catálogo de Piezas
 
-Permitir ocultar temporalmente piezas individuales (techos, laterales, fondos) o grupos completos (cajones, módulos) para despejar la vista y facilitar el trabajo interior en el mueble 3D, con restauración inmediata mediante el botón "Mostrar Todo" y controles individuales en la lista de despiece.
+Modernización y estilización del catálogo de piezas en la bandeja lateral de diseño, transformando los botones excesivamente redondeados en **tarjetas técnicas rectangulares profesionales** con radio equilibrado (`rounded-lg` de 8px), iconos distintivos de carpintería y subtítulos dimensionales.
 
 ---
 
-### Decisiones Críticas y Revisión del Usuario
+## Decisiones Críticas Acordadas con el Usuario
 
 > [!IMPORTANT]
-> - **Ubicación de controles (Confirmado por el usuario)**:
->   - En la **cinta superior flotante**: Botón dedicado "Ocultar" (`visibility_off`) cuando se tiene seleccionada una pieza individual o un grupo modular.
->   - En la **lista lateral de despiece**: Icono de ojo interactivo (`visibility` / `visibility_off`) en cada fila de pieza para alternar su visibilidad individualmente sin necesidad de seleccionarla en el 3D.
-> - **Restauración de elementos ocultos (Confirmado por el usuario)**:
->   - Botón visible y accesible **"Mostrar Todo"** (`visibility`) tanto en la cabecera del visor 3D como en la cabecera de la lista de despiece lateral, indicando el número de piezas ocultas (ej. *"Mostrar Todo (2)"*).
->   - Clic directo en el icono de ojo apagado de cualquier pieza en la lista lateral para restaurar solo esa pieza.
-> - **Atajo de teclado de productividad**: Tecla `H` (Hide) para ocultar la pieza o grupo seleccionado al instante, y `Alt+H` o botón flotante para restaurar todo.
+> 1. **Estilo de las Piezas:** Tarjetas técnicas rectangulares redondeadas (`rounded-lg`) con icono distintivo y subtítulo dimensional de taller (L × A mm orientativo).
+> 2. **Radio de Redondeo:** Curvatura moderada profesional de 8px (`rounded-lg`) en botones y tarjetas (ni circulares ni excesivamente cuadradas).
+> 3. **Distribución Espacial:** Cuadrícula de 2 columnas balanceada con tarjetas enriquecidas (icono distintivo, nombre de la pieza y orientación/dimensión de taller).
+> 4. **Botones de Asistente y Pieza Libre:** Adaptados al mismo radio uniforme de 8px (`rounded-lg`) con diseño sobrio y moderno para conservar consistencia en toda la bandeja.
 
 ---
 
-### 1. Visión General y Concepto Central
+## 1. Alcance y Transformación Visual
 
-- **Qué hace**: Oculta la geometría 3D de una pieza o grupo seleccionado sin borrarla ni alterar el proyecto, la lista de corte, los costos ni sus coordenadas milimétricas XYZ. Cuando la pieza está oculta, el usuario puede seleccionar piezas internas (como repisas intermedias, divisiones o correderas) que antes estaban bloqueadas visualmente por la tapa, techo o laterales.
-- **Audiencia / Beneficio**: Diseñadores y carpinteros de melamina que configuran interiores de muebles y cajones, eliminando la frustración de tener caras o techos que tapan el área de trabajo interior.
+### A. Estructura de las Tarjetas Técnicas (2 Columnas)
+Cada elemento del catálogo se convierte en una tarjeta técnica interactiva con:
+- **Radio consistente:** `rounded-lg` (8px).
+- **Contenedor visual:** Fondo `bg-slate-50 hover:bg-white`, borde sobrio `border border-slate-200/90 hover:border-sky-400 hover:shadow-xs active:scale-[0.98] transition-all`.
+- **Icono técnico temático:**
+  - *Techo / Barra:* Icono `horizontal_rule` / `roofing` con acento azul cielo (`text-sky-600 bg-sky-50`).
+  - *Lateral Izq.:* Icono `dock` / `align_horizontal_left` con acento ámbar (`text-amber-600 bg-amber-50`).
+  - *Lateral Der.:* Icono `dock` / `align_horizontal_right` con acento ámbar (`text-amber-600 bg-amber-50`).
+  - *Piso / Base:* Icono `table_rows` con acento naranja (`text-orange-600 bg-orange-50`).
+  - *División Vert.:* Icono `view_column` con acento amarillo cálido (`text-yellow-600 bg-yellow-50`).
+  - *Repisa Interior:* Icono `view_headline` con acento esmeralda (`text-emerald-600 bg-emerald-50`).
+  - *Fondo Trasero:* Icono `texture` / `flip_to_back` con acento violeta (`text-purple-600 bg-purple-50`).
+  - *Puerta Batiente:* Icono `meeting_room` / `door_front` con acento azul (`text-blue-600 bg-blue-50`).
+  - *Frente Cajón:* Icono `inbox` con acento índigo (`text-indigo-600 bg-indigo-50`).
+  - *Zócalo Piso:* Icono `border_bottom` con acento piedra (`text-stone-600 bg-stone-50`).
+- **Jerarquía tipográfica:**
+  - Título principal en negrita de alta legibilidad (`text-xs font-semibold text-slate-800`).
+  - Subtítulo técnico dimensional en fuente monoespaciada (`text-[10px] text-slate-500 font-mono`).
 
----
-
-### 2. Experiencia de Usuario y Diseño Visual
-
-#### Flujo 1: Ocultar una pieza o grupo desde la cinta superior flotante
-1. El usuario hace clic en el techo, frente o lateral del mueble en el visor 3D.
-2. Aparece la cinta superior con las acciones de la pieza o cajón.
-3. El usuario pulsa el nuevo botón **"Ocultar"** (icono `visibility_off`, botón con estilo ámbar/slate sutil) o presiona la tecla `H`.
-4. La pieza/grupo desaparece visualmente del canvas 3D al instante, permitiendo ver el interior del mueble.
-5. Se muestra un indicador flotante no invasivo en la parte superior: *"N pieza(s) oculta(s) · Mostrar Todo"*.
-
-#### Flujo 2: Ocultar y desocultar desde la lista lateral de despiece
-1. En la pestaña de piezas, cada fila cuenta con un icono de ojo discreto a la derecha.
-2. Si la pieza está visible, el ojo es gris sutil (`visibility`).
-3. Si la pieza está oculta:
-   - El fondo de la fila adopta un tono atenuado con borde sutilmente punteado.
-   - El icono cambia a `visibility_off` en color ámbar.
-   - Al pulsar el ojo, la pieza reaparece en 3D en su posición exacta.
-
-#### Flujo 3: Restauración global rápida
-1. El usuario pulsa **"Mostrar Todo"** en el aviso flotante del visor 3D o en la cabecera del panel lateral.
-2. Todas las piezas ocultas vuelven a mostrarse simultáneamente, conservando sus materiales, cantos y ensambles.
+### B. Botones de Acción Especial
+- **+ Crear Cajón Modular (Asistente):** Estilizado con `rounded-lg`, degradado sobrio y altura equilibrada.
+- **+ Añadir Pieza Libre Personalizada:** Estilizado con `rounded-lg` y borde punteado elegante.
 
 ---
 
-### 3. Decisiones de Producto y Compensaciones
+## 2. Archivos a Modificar
 
-- **Decisión 1: Ocultamiento visual no destructivo**
-  - *Enfoque*: El estado de ocultamiento se gestiona mediante un conjunto reactivo `hiddenPartIds: Set<string>`.
-  - *Por qué*: Garantiza que las piezas nunca salgan de la memoria del proyecto, los cómputos de corte ni la exportación PDF/Excel. Solo se apaga su renderizado en la escena Three.js (`mesh.visible = false`).
-  - *Alternativa descartada*: Marcar un atributo persistente `part.isDeleted = true`; descartada porque provocaría recálculos de ensamble y riesgo de pérdida de datos.
+1. `src/app/components/module-designer/module-designer.html`:
+   - Sustituir los botones redondeados (`rounded-xl` con círculos simples) en la sección `#TAB 2: PIECE CATALOG` por las nuevas tarjetas técnicas enriquecidas (`rounded-lg`) con iconos distintivos y subtítulos dimensionales.
+   - Ajustar el radio de los botones del Asistente de Cajón y Pieza Libre a `rounded-lg`.
 
-- **Decisión 2: Sincronización bidireccional entre Visor 3D y Diseñador**
-  - *Enfoque*: Centralizar `hiddenPartIds` en `ModuleDesigner` y comunicarlo de forma reactiva al `Furniture3DViewer`.
-  - *Por qué*: Permite que tanto la cinta de acciones, el menú contextual 3D, el cartel flotante y la lista lateral compartan exactamente el mismo estado en tiempo real.
-
----
-
-### 4. Arquitectura Técnica y Estrategia de Datos
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        ModuleDesigner Component                        │
-│                                                                        │
-│  State: hiddenPartIds = signal<Set<string>>(new Set())                 │
-│  Methods: hidePart(), hideGroup(), togglePartVisibility(), showAll()   │
-└───────────────────────┬────────────────────────┬───────────────────────┘
-                        │                        │
-         ┌──────────────▼──────────────┐  ┌──────▼─────────────────────┐
-         │     Floating Top Ribbon     │  │   Lateral Despiece List    │
-         ├─────────────────────────────┤  ├────────────────────────────┤
-         │ [Ocultar Pieza/Grupo]       │  │ Eye button on each row     │
-         │ [Mostrar Todo (N)] badge    │  │ Muted styling when hidden  │
-         └──────────────┬──────────────┘  └────────────────────────────┘
-                        │
-         ┌──────────────▼──────────────┐
-         │    Furniture3DViewer (3D)   │
-         ├─────────────────────────────┤
-         │ Three.js mesh.visible sync  │
-         │ Raycaster ignores hidden    │
-         │ Floating 3D notice banner   │
-         └─────────────────────────────┘
-```
-
-- **Mapeo de Componentes y Estado**:
-  - `furniture-3d-viewer.ts`:
-    - Conectar la entrada/sincronización de `hiddenPartIds`.
-    - Garantizar que el raycaster de selección omita las mallas ocultas (`mesh.visible === false`).
-  - `module-designer.ts`:
-    - Definir métodos `hideSelectedPart()`, `hideActiveGroup()`, `togglePartVisibility(id)`, `showAllParts()`.
-    - Atajos de teclado: `H` para ocultar la selección actual.
-  - `module-designer.html`:
-    - Agregar botón "Ocultar" en la cinta de piezas y en la cinta de grupos.
-    - Agregar botón flotante "Mostrar Todo" cuando `hiddenPartIds().size > 0`.
-    - Agregar icono de ojo en cada fila de pieza y estilo visual diferenciado.
-  - Validación completa con `lint_applet` y `compile_applet`.
+2. Verificación de compilación:
+   - Ejecutar `lint_applet` para garantizar que la sintaxis y tipos del template sean estrictamente válidos.
