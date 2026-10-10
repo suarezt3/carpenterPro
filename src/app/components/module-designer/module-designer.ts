@@ -157,6 +157,10 @@ export class ModuleDesignerComponent {
     return this.getNextUniqueGroupName('Cajón');
   });
 
+  // Visibility (Ocultar / Mostrar piezas y grupos)
+  readonly hiddenPartIds = signal<Set<string>>(new Set());
+  readonly hiddenPartsCount = computed(() => this.hiddenPartIds().size);
+
   // Technical Shop Sheet Modal
   readonly showTechnicalSheetModal = signal<boolean>(false);
 
@@ -235,6 +239,26 @@ export class ModuleDesignerComponent {
         this.showToast(`🗑️ "${partName}" eliminada (Ctrl+Z para restaurar)`);
         return;
       }
+    }
+
+    // Tecla 'H' o 'h' (sin modificadores): Ocultar pieza seleccionada o grupo seleccionado
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'h' || e.key === 'H')) {
+      if (this.isAnyGroupSelected()) {
+        e.preventDefault();
+        this.hideActiveGroup();
+        return;
+      } else if (this.selectedPartId()) {
+        e.preventDefault();
+        this.hideSelectedPart();
+        return;
+      }
+    }
+
+    // Alt+H: Mostrar todas las piezas ocultas
+    if (e.altKey && (e.key === 'h' || e.key === 'H')) {
+      e.preventDefault();
+      this.showAllParts();
+      return;
     }
   }
 
@@ -1501,5 +1525,141 @@ export class ModuleDesignerComponent {
 
   roundPercent(val?: number): number {
     return Math.round((val || 0) * 100);
+  }
+
+  // --- VISIBILIDAD DE PIEZAS Y GRUPOS ---
+
+  isPartHidden(partId: string): boolean {
+    return this.hiddenPartIds().has(partId);
+  }
+
+  isGroupHidden(groupId: string): boolean {
+    const groupParts = this.currentParts().filter(p => p.groupId === groupId);
+    if (groupParts.length === 0) return false;
+    return groupParts.every(p => this.hiddenPartIds().has(p.id));
+  }
+
+  isGroupPartiallyHidden(groupId: string): boolean {
+    const groupParts = this.currentParts().filter(p => p.groupId === groupId);
+    if (groupParts.length === 0) return false;
+    const hiddenCount = groupParts.filter(p => this.hiddenPartIds().has(p.id)).length;
+    return hiddenCount > 0 && hiddenCount < groupParts.length;
+  }
+
+  hideSelectedPart() {
+    const selId = this.selectedPartId();
+    if (!selId) return;
+    const part = this.currentParts().find(p => p.id === selId);
+    const partName = part ? part.name : 'Pieza';
+    
+    const next = new Set(this.hiddenPartIds());
+    next.add(selId);
+    this.hiddenPartIds.set(next);
+
+    // Sincronizar visor 3D
+    this.viewer3dRef()?.hidePartById(selId);
+
+    // Deseleccionar la pieza oculta para evitar manipulaciones invisibles
+    this.selectedPartId.set(null);
+    this.selectedPartIds.set([]);
+    this.activeDockTab.set('catalog');
+
+    this.showToast(`👁️ "${partName}" oculta temporalmente (Alt+H para mostrar)`);
+  }
+
+  hideActiveGroup() {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return;
+    const group = this.groups().find(g => g.id === gId);
+    const groupName = group ? group.name : 'Grupo';
+    const groupParts = this.currentParts().filter(p => p.groupId === gId);
+    if (groupParts.length === 0) return;
+
+    const next = new Set(this.hiddenPartIds());
+    const partIds = groupParts.map(p => p.id);
+    for (const id of partIds) {
+      next.add(id);
+    }
+    this.hiddenPartIds.set(next);
+
+    // Sincronizar visor 3D
+    this.viewer3dRef()?.hidePartsByIds(partIds);
+
+    // Deseleccionar grupo
+    this.deselectAll();
+
+    this.showToast(`👁️ "${groupName}" oculto (${groupParts.length} piezas). Alt+H para mostrar`);
+  }
+
+  togglePartVisibility(partId: string, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    const part = this.currentParts().find(p => p.id === partId);
+    const partName = part ? part.name : 'Pieza';
+
+    const next = new Set(this.hiddenPartIds());
+    if (next.has(partId)) {
+      next.delete(partId);
+      this.hiddenPartIds.set(next);
+      this.viewer3dRef()?.showPartById(partId);
+      this.showToast(`👁️ "${partName}" visible`);
+    } else {
+      next.add(partId);
+      this.hiddenPartIds.set(next);
+      this.viewer3dRef()?.hidePartById(partId);
+      if (this.selectedPartId() === partId) {
+        this.selectedPartId.set(null);
+        this.selectedPartIds.set([]);
+        this.activeDockTab.set('catalog');
+      }
+      this.showToast(`👁️ "${partName}" oculta`);
+    }
+  }
+
+  toggleGroupVisibility(groupId: string, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    const group = this.groups().find(g => g.id === groupId);
+    const groupName = group ? group.name : 'Grupo';
+    const groupParts = this.currentParts().filter(p => p.groupId === groupId);
+    if (groupParts.length === 0) return;
+
+    const partIds = groupParts.map(p => p.id);
+    const allHidden = partIds.every(id => this.hiddenPartIds().has(id));
+
+    const next = new Set(this.hiddenPartIds());
+    if (allHidden) {
+      // Mostrar todo el grupo
+      for (const id of partIds) {
+        next.delete(id);
+      }
+      this.hiddenPartIds.set(next);
+      this.viewer3dRef()?.showPartsByIds(partIds);
+      this.showToast(`👁️ "${groupName}" visible`);
+    } else {
+      // Ocultar todo el grupo
+      for (const id of partIds) {
+        next.add(id);
+      }
+      this.hiddenPartIds.set(next);
+      this.viewer3dRef()?.hidePartsByIds(partIds);
+      if (this.activeSelectedGroupId() === groupId) {
+        this.deselectAll();
+      }
+      this.showToast(`👁️ "${groupName}" oculto`);
+    }
+  }
+
+  showAllParts() {
+    const prevCount = this.hiddenPartIds().size;
+    if (prevCount === 0) {
+      this.showToast('Todas las piezas ya son visibles');
+      return;
+    }
+    this.hiddenPartIds.set(new Set());
+    this.viewer3dRef()?.showAllParts();
+    this.showToast(`👁️ Se restauraron ${prevCount} pieza(s) ocultas`);
+  }
+
+  onHiddenPartsChangedFromViewer(hiddenIds: string[]) {
+    this.hiddenPartIds.set(new Set(hiddenIds));
   }
 }

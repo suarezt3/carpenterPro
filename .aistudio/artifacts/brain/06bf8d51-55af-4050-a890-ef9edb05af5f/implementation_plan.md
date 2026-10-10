@@ -1,78 +1,100 @@
-# Retiro Limpio de los Botones de Cámara y Despiece Explosionado 3D
+# Funcionalidad de Ocultar y Mostrar Piezas y Grupos Modulares
 
-Retiro seguro y sin efectos colaterales de los botones de **Vistas de Cámara** (`videocam`) y **Despiece Explosionado** (`burst_mode`) de la barra de herramientas vertical del visor 3D para dejar la interfaz despejada, limpia y enfocada, preservando el 100% de las funciones actuales de ensamble, cotas y animación de cajones.
+Permitir ocultar temporalmente piezas individuales (techos, laterales, fondos) o grupos completos (cajones, módulos) para despejar la vista y facilitar el trabajo interior en el mueble 3D, con restauración inmediata mediante el botón "Mostrar Todo" y controles individuales en la lista de despiece.
 
 ---
 
 ### Decisiones Críticas y Revisión del Usuario
 
 > [!IMPORTANT]
-> - **Confirmado por el usuario**: Retirar tanto el botón de vistas de cámara como el botón de despiece explosionado 3D para dejar la barra de herramientas limpia.
-> - **Garantía de no regresión**: El visor 3D continuará permitiendo orbitar, rotar, hacer zoom y reencuadrar con el botón de centrado de cámara (`filter_center_focus`), mientras que las piezas permanecerán en ensamble físico milimétrico real sin alterar ningún cálculo de despiece ni animación.
+> - **Ubicación de controles (Confirmado por el usuario)**:
+>   - En la **cinta superior flotante**: Botón dedicado "Ocultar" (`visibility_off`) cuando se tiene seleccionada una pieza individual o un grupo modular.
+>   - En la **lista lateral de despiece**: Icono de ojo interactivo (`visibility` / `visibility_off`) en cada fila de pieza para alternar su visibilidad individualmente sin necesidad de seleccionarla en el 3D.
+> - **Restauración de elementos ocultos (Confirmado por el usuario)**:
+>   - Botón visible y accesible **"Mostrar Todo"** (`visibility`) tanto en la cabecera del visor 3D como en la cabecera de la lista de despiece lateral, indicando el número de piezas ocultas (ej. *"Mostrar Todo (2)"*).
+>   - Clic directo en el icono de ojo apagado de cualquier pieza en la lista lateral para restaurar solo esa pieza.
+> - **Atajo de teclado de productividad**: Tecla `H` (Hide) para ocultar la pieza o grupo seleccionado al instante, y `Alt+H` o botón flotante para restaurar todo.
 
 ---
 
 ### 1. Visión General y Concepto Central
 
-- **Qué hace**: Elimina dos controles en desuso de la barra de herramientas vertical izquierda del visor 3D (`furniture-3d-viewer`). Esto reduce la carga cognitiva y evita confusiones para el usuario, enfocando la barra en las herramientas esenciales de diseño y comprobación técnica (ensamble, cotas 3D, mecanizados CNC, herrajes y animación de apertura).
-- **Audiencia / Beneficio**: Diseñadores y fabricantes de muebles de melamina que requieren un espacio de trabajo 3D claro, profesional y libre de botones redundantes o inoperativos.
+- **Qué hace**: Oculta la geometría 3D de una pieza o grupo seleccionado sin borrarla ni alterar el proyecto, la lista de corte, los costos ni sus coordenadas milimétricas XYZ. Cuando la pieza está oculta, el usuario puede seleccionar piezas internas (como repisas intermedias, divisiones o correderas) que antes estaban bloqueadas visualmente por la tapa, techo o laterales.
+- **Audiencia / Beneficio**: Diseñadores y carpinteros de melamina que configuran interiores de muebles y cajones, eliminando la frustración de tener caras o techos que tapan el área de trabajo interior.
 
 ---
 
 ### 2. Experiencia de Usuario y Diseño Visual
 
-- **Flujo de Usuario**:
-  - Al ingresar al visor 3D o al diseñador de módulos, la barra flotante vertical izquierda se presenta más compacta y estilizada.
-  - La navegación 3D se realiza de forma natural y fluida:
-    - Clic izquierdo + arrastrar: Orbitar libremente alrededor del mueble.
-    - Clic derecho + arrastrar: Desplazamiento panorámico (pan).
-    - Rueda del ratón: Zoom milimétrico.
-    - Botón de centrado (`filter_center_focus` / tecla Z): Reencuadra el mueble completo en perspectiva isométrica óptima.
-  - La apertura y cierre de cajones se sigue accionando directamente desde el botón de animación (`door_sliding` / `meeting_room`) o haciendo clic directo en el cajón en 3D o en la cinta superior flotante.
-- **Jerarquía y Estilo Visual**:
-  - Se mantienen los mismos tokens de diseño (esquinas redondeadas `rounded-xl`, estados hover sutiles `bg-slate-100`, indicadores activos con acentos de color indigo/sky).
-  - Los separadores visuales se ajustan para que las herramientas queden agrupadas coherentemente por familias funcionales (Modelado/Medición → Inspección técnica → Simulación interactiva → Sistema).
+#### Flujo 1: Ocultar una pieza o grupo desde la cinta superior flotante
+1. El usuario hace clic en el techo, frente o lateral del mueble en el visor 3D.
+2. Aparece la cinta superior con las acciones de la pieza o cajón.
+3. El usuario pulsa el nuevo botón **"Ocultar"** (icono `visibility_off`, botón con estilo ámbar/slate sutil) o presiona la tecla `H`.
+4. La pieza/grupo desaparece visualmente del canvas 3D al instante, permitiendo ver el interior del mueble.
+5. Se muestra un indicador flotante no invasivo en la parte superior: *"N pieza(s) oculta(s) · Mostrar Todo"*.
+
+#### Flujo 2: Ocultar y desocultar desde la lista lateral de despiece
+1. En la pestaña de piezas, cada fila cuenta con un icono de ojo discreto a la derecha.
+2. Si la pieza está visible, el ojo es gris sutil (`visibility`).
+3. Si la pieza está oculta:
+   - El fondo de la fila adopta un tono atenuado con borde sutilmente punteado.
+   - El icono cambia a `visibility_off` en color ámbar.
+   - Al pulsar el ojo, la pieza reaparece en 3D en su posición exacta.
+
+#### Flujo 3: Restauración global rápida
+1. El usuario pulsa **"Mostrar Todo"** en el aviso flotante del visor 3D o en la cabecera del panel lateral.
+2. Todas las piezas ocultas vuelven a mostrarse simultáneamente, conservando sus materiales, cantos y ensambles.
 
 ---
 
 ### 3. Decisiones de Producto y Compensaciones
 
-- **Decisión 1: Retiro de Vistas de Cámara fijas (`videocam`)**
-  - *Enfoque*: Quitar el botón y su popover de la barra vertical.
-  - *Por qué*: El usuario ya orbita libremente en cualquier ángulo en el espacio tridimensional y cuenta con el botón de centrado y reseteo (`resetCamera`) para volver a la perspectiva general.
-  - *Alternativa descartada*: Conservar vistas ortogonales fijas en la barra; descartada porque el usuario confirmó que prefiere una barra limpia y libre de menús innecesarios.
+- **Decisión 1: Ocultamiento visual no destructivo**
+  - *Enfoque*: El estado de ocultamiento se gestiona mediante un conjunto reactivo `hiddenPartIds: Set<string>`.
+  - *Por qué*: Garantiza que las piezas nunca salgan de la memoria del proyecto, los cómputos de corte ni la exportación PDF/Excel. Solo se apaga su renderizado en la escena Three.js (`mesh.visible = false`).
+  - *Alternativa descartada*: Marcar un atributo persistente `part.isDeleted = true`; descartada porque provocaría recálculos de ensamble y riesgo de pérdida de datos.
 
-- **Decisión 2: Retiro del Despiece Explosionado (`burst_mode`)**
-  - *Enfoque*: Quitar el botón y su deslizador de separación porcentual.
-  - *Por qué*: La separación artificial de piezas entraba en conflicto con los nuevos grupos de cajones ensamblados y no aportaba valor en la fabricación real del mueble.
-  - *Seguridad*: Al mantenerse `explodedPercent = 0`, el mueble siempre se visualiza en su ensamble exacto de fabricación.
+- **Decisión 2: Sincronización bidireccional entre Visor 3D y Diseñador**
+  - *Enfoque*: Centralizar `hiddenPartIds` en `ModuleDesigner` y comunicarlo de forma reactiva al `Furniture3DViewer`.
+  - *Por qué*: Permite que tanto la cinta de acciones, el menú contextual 3D, el cartel flotante y la lista lateral compartan exactamente el mismo estado en tiempo real.
 
 ---
 
 ### 4. Arquitectura Técnica y Estrategia de Datos
 
 ```
-┌────────────────────────────────────────────────────────┐
-│             Furniture3DViewer (Toolbar)                │
-├────────────────────────────────────────────────────────┤
-│  [1] Seleccionar / Mover / Empujar-Tirar / Rotar 90°   │
-│  [2] Rectángulo 3D / Cinta Métrica                     │
-│  ─────────────────────────────── (Separador)           │
-│  [3] Mecanizados CNC / Cotas 3D / Luz Libre / Rayos X  │
-│  [4] Herrajes 3D (Tiradores, Bisagras, Correderas)     │
-│  ─────────────────────────────── (Separador)           │
-│  [5] Abrir / Cerrar Puertas y Cajones (Animación 3D)   │
-│  [6] Cajones y Grupos Guardados                        │
-│  ─────────────────────────────── (Separador)           │
-│  [7] Modo Claro/Oscuro CAD                             │
-│  [8] Centrar y Reiniciar Cámara (filter_center_focus)  │
-└────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        ModuleDesigner Component                        │
+│                                                                        │
+│  State: hiddenPartIds = signal<Set<string>>(new Set())                 │
+│  Methods: hidePart(), hideGroup(), togglePartVisibility(), showAll()   │
+└───────────────────────┬────────────────────────┬───────────────────────┘
+                        │                        │
+         ┌──────────────▼──────────────┐  ┌──────▼─────────────────────┐
+         │     Floating Top Ribbon     │  │   Lateral Despiece List    │
+         ├─────────────────────────────┤  ├────────────────────────────┤
+         │ [Ocultar Pieza/Grupo]       │  │ Eye button on each row     │
+         │ [Mostrar Todo (N)] badge    │  │ Muted styling when hidden  │
+         └──────────────┬──────────────┘  └────────────────────────────┘
+                        │
+         ┌──────────────▼──────────────┐
+         │    Furniture3DViewer (3D)   │
+         ├─────────────────────────────┤
+         │ Three.js mesh.visible sync  │
+         │ Raycaster ignores hidden    │
+         │ Floating 3D notice banner   │
+         └─────────────────────────────┘
 ```
 
 - **Mapeo de Componentes y Estado**:
-  - En `furniture-3d-viewer.html`:
-    - Se remueve el bloque de popover `toggleViewsDropdown()` y sus botones asociados (líneas 76–105).
-    - Se remueve el bloque de flyout `toggleExplodedSlider()` y su slider de porcentaje (líneas 183–213).
-  - En `furniture-3d-viewer.ts`:
-    - Se preservan las funciones de control de escena y cámara (`resetCamera()`, `setViewPreset()`) de modo que ningún enlace interno o llamada existente genere advertencias o roturas.
-  - Validación con `compile_applet` y `lint_applet` para garantizar cero errores de TypeScript y compilación perfecta.
+  - `furniture-3d-viewer.ts`:
+    - Conectar la entrada/sincronización de `hiddenPartIds`.
+    - Garantizar que el raycaster de selección omita las mallas ocultas (`mesh.visible === false`).
+  - `module-designer.ts`:
+    - Definir métodos `hideSelectedPart()`, `hideActiveGroup()`, `togglePartVisibility(id)`, `showAllParts()`.
+    - Atajos de teclado: `H` para ocultar la selección actual.
+  - `module-designer.html`:
+    - Agregar botón "Ocultar" en la cinta de piezas y en la cinta de grupos.
+    - Agregar botón flotante "Mostrar Todo" cuando `hiddenPartIds().size > 0`.
+    - Agregar icono de ojo en cada fila de pieza y estilo visual diferenciado.
+  - Validación completa con `lint_applet` y `compile_applet`.

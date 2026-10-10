@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para retirar de forma limpia y segura los botones de Vistas de Cámara y Despiece Explosionado 3D de la barra de herramientas del visor 3D, manteniendo la barra limpia y preservando intactas todas las funcionalidades existentes sin efectos secundarios.",
-  "updatedAt":  "2026-10-10T13:26:36.468519581Z",
+  "summary":  "Plan de implementación para la funcionalidad de ocultar y mostrar piezas y grupos (cajones/módulos) en el visor 3D, cinta superior flotante y lista lateral de despiece.",
+  "updatedAt":  "2026-10-10T14:01:24.098432585Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

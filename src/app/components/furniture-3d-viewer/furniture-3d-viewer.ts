@@ -107,6 +107,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   drawerWizardRequested = output<void>();
   groupRotationRequested = output<{ groupId: string; deltaAngle: 90 | -90 | 180 }>();
   groupDuplicationRequested = output<string>();
+  hiddenPartsChanged = output<string[]>();
 
   // Canvas and Container refs
   canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas3d');
@@ -4280,6 +4281,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   isolatePart(part: Part) {
     const allOther = new Set(this.parts().filter(p => p.id !== part.id).map(p => p.id));
     this.hiddenPartIds.set(allOther);
+    this.hiddenPartsChanged.emit(Array.from(allOther));
     this.closeContextMenu();
   }
 
@@ -4287,12 +4289,70 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const next = new Set(this.hiddenPartIds());
     next.add(part.id);
     this.hiddenPartIds.set(next);
+    this.hiddenPartsChanged.emit(Array.from(next));
     this.clearSelection();
     this.closeContextMenu();
   }
 
+  hidePartById(partId: string) {
+    const next = new Set(this.hiddenPartIds());
+    next.add(partId);
+    this.hiddenPartIds.set(next);
+    this.hiddenPartsChanged.emit(Array.from(next));
+    if (this.selectedPartId() === partId) {
+      this.clearSelection();
+    }
+  }
+
+  showPartById(partId: string) {
+    const next = new Set(this.hiddenPartIds());
+    next.delete(partId);
+    this.hiddenPartIds.set(next);
+    this.hiddenPartsChanged.emit(Array.from(next));
+  }
+
+  togglePartVisibility(partId: string) {
+    const next = new Set(this.hiddenPartIds());
+    if (next.has(partId)) {
+      next.delete(partId);
+    } else {
+      next.add(partId);
+      if (this.selectedPartId() === partId) {
+        this.clearSelection();
+      }
+    }
+    this.hiddenPartIds.set(next);
+    this.hiddenPartsChanged.emit(Array.from(next));
+  }
+
+  hidePartsByIds(partIds: string[]) {
+    const next = new Set(this.hiddenPartIds());
+    for (const id of partIds) {
+      next.add(id);
+    }
+    this.hiddenPartIds.set(next);
+    this.hiddenPartsChanged.emit(Array.from(next));
+    this.clearSelection();
+  }
+
+  showPartsByIds(partIds: string[]) {
+    const next = new Set(this.hiddenPartIds());
+    for (const id of partIds) {
+      next.delete(id);
+    }
+    this.hiddenPartIds.set(next);
+    this.hiddenPartsChanged.emit(Array.from(next));
+  }
+
+  setHiddenParts(ids: Set<string> | string[]) {
+    const s = new Set(ids);
+    this.hiddenPartIds.set(s);
+    this.hiddenPartsChanged.emit(Array.from(s));
+  }
+
   showAllParts() {
     this.hiddenPartIds.set(new Set());
+    this.hiddenPartsChanged.emit([]);
     this.closeContextMenu();
   }
 
