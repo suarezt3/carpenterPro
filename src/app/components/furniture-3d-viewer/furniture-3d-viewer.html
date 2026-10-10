@@ -72,37 +72,7 @@
 
     <div class="w-6 h-px bg-slate-200 mx-auto my-0.5"></div>
 
-    <!-- 7. CAMERA PRESETS POPOVER -->
-    <div class="relative">
-      <button 
-        type="button"
-        (click)="toggleViewsDropdown()"
-        class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
-        title="Vistas de Cámara (Iso 3D, Frontal, Lateral, Planta)">
-        <span class="material-icons text-lg">videocam</span>
-      </button>
 
-      @if (showViewsDropdown()) {
-        <div class="absolute left-11 top-0 z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 min-w-[130px] animate-in fade-in zoom-in-95 text-xs font-semibold text-slate-700">
-          <button (click)="setViewPreset('iso'); closeViewsDropdown()" class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left">
-            <span class="material-icons text-xs text-sky-500">view_in_ar</span>
-            <span>3D Isométrica</span>
-          </button>
-          <button (click)="setViewPreset('front'); closeViewsDropdown()" class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left">
-            <span class="material-icons text-xs text-emerald-500">crop_square</span>
-            <span>Frontal</span>
-          </button>
-          <button (click)="setViewPreset('side'); closeViewsDropdown()" class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left">
-            <span class="material-icons text-xs text-amber-500">view_sidebar</span>
-            <span>Lateral</span>
-          </button>
-          <button (click)="setViewPreset('top'); closeViewsDropdown()" class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-2 text-left">
-            <span class="material-icons text-xs text-purple-500">dashboard</span>
-            <span>Planta</span>
-          </button>
-        </div>
-      }
-    </div>
 
     <!-- 8. DRILL HOLES (MECANIZADOS CNC) TOGGLE -->
     <button 
@@ -179,38 +149,7 @@
       }
     </button>
 
-    <!-- 13. DESPIECE EXPLOSIONADO FLYOUT -->
-    <div class="relative">
-      <button 
-        type="button"
-        (click)="toggleExplodedSlider()"
-        [class]="explodedPercent() > 0 ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-        class="w-9 h-9 rounded-xl flex items-center justify-center transition"
-        title="Despiece Explosionado 3D">
-        <span class="material-icons text-lg">burst_mode</span>
-      </button>
 
-      @if (showExplodedSlider()) {
-        <div class="absolute left-11 top-0 z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 flex flex-col gap-2 w-52 animate-in fade-in zoom-in-95 text-xs text-slate-700">
-          <div class="flex items-center justify-between font-bold">
-            <span>Separación 3D</span>
-            <span class="font-mono text-sky-600">{{ explodedPercent() }}%</span>
-          </div>
-          <input 
-            type="range" 
-            min="0" 
-            max="100" 
-            [value]="explodedPercent()"
-            (input)="onExplodedSliderInput($event)"
-            class="w-full accent-sky-500 cursor-pointer h-1.5 bg-slate-200 rounded-lg" />
-          @if (explodedPercent() > 0) {
-            <button (click)="resetExploded()" class="text-[11px] text-sky-600 hover:underline text-right">
-              Unir Mueble
-            </button>
-          }
-        </div>
-      }
-    </div>
 
     <!-- 14. CAJONES Y GRUPOS GUARDADOS (BOTÓN DE APERTURA) -->
     <div class="relative">
