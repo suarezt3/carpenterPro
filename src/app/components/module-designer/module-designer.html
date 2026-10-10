@@ -16,6 +16,45 @@
     <!-- Quick Actions Menu -->
     <div class="flex items-center gap-2 shrink-0">
       
+      <!-- SELECTOR DE MODO DUAL: MÓDULO vs HABITACIÓN 3D -->
+      <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 shadow-2xs">
+        <button 
+          type="button" 
+          (click)="setWorkspaceMode('module')"
+          [class]="workspaceMode() === 'module' 
+            ? 'bg-white text-slate-900 font-semibold shadow-2xs' 
+            : 'text-slate-500 hover:text-slate-800 font-medium'"
+          class="h-6.5 px-2.5 text-xs rounded-md flex items-center gap-1.5 transition cursor-pointer"
+          title="Modo Taller: Vista aislada para diseñar y despiezar el mueble">
+          <span class="material-icons text-sm" [class.text-sky-600]="workspaceMode() === 'module'">view_in_ar</span>
+          <span>Módulo</span>
+        </button>
+
+        <button 
+          type="button" 
+          (click)="setWorkspaceMode('room')"
+          [class]="workspaceMode() === 'room' 
+            ? 'bg-sky-600 text-white font-semibold shadow-2xs' 
+            : 'text-slate-500 hover:text-slate-800 font-medium'"
+          class="h-6.5 px-2.5 text-xs rounded-md flex items-center gap-1.5 transition cursor-pointer"
+          title="Modo Habitación: Contexto espacial arquitectónico con paredes, piso y texturas reales">
+          <span class="material-icons text-sm" [class.text-white]="workspaceMode() === 'room'">roofing</span>
+          <span>Habitación 3D</span>
+        </button>
+      </div>
+
+      <!-- Botón Configurar Entorno (Visible en Modo Habitación) -->
+      @if (workspaceMode() === 'room') {
+        <button 
+          type="button" 
+          (click)="openRoomSettings()"
+          class="h-7 px-2.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer animate-in fade-in"
+          title="Configurar medidas de paredes, piso y catálogo de texturas">
+          <span class="material-icons text-sm text-sky-600">tune</span>
+          <span class="hidden sm:inline">Configurar Entorno</span>
+        </button>
+      }
+
       <!-- Botón Lienzo en Blanco Directo -->
       <button 
         type="button" 
@@ -23,7 +62,7 @@
         class="h-7.5 px-2.5 text-xs font-medium text-stone-700 bg-white hover:bg-stone-100 rounded-lg border border-stone-300 flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
         title="Limpiar el lienzo 3D e iniciar un nuevo mueble desde cero">
         <span class="material-icons text-sm text-stone-400">delete_sweep</span>
-        <span>Lienzo en Blanco</span>
+        <span class="hidden md:inline">Lienzo en Blanco</span>
       </button>
 
       <!-- Toggle Right Sidebar Button -->
@@ -55,6 +94,8 @@
           [selectedPartIds]="selectedPartIds()"
           [partGroups]="groups()"
           [materials]="materials()"
+          [workspaceMode]="workspaceMode()"
+          [roomConfig]="roomConfig()"
           (partSelected)="onSelectPartFrom3D($event)"
           (partsSelected)="onPartsSelectedFrom3D($event)"
           (partModified)="onPartModifiedFromViewer($event)"
@@ -68,8 +109,68 @@
           (drawerWizardRequested)="openDrawerWizard()"
           (groupRotationRequested)="onGroupRotationRequested($event)"
           (groupDuplicationRequested)="onGroupDuplicationRequested($event)"
-          (hiddenPartsChanged)="onHiddenPartsChangedFromViewer($event)">
+          (hiddenPartsChanged)="onHiddenPartsChangedFromViewer($event)"
+          (roomConfigModified)="updateRoomConfig($event)"
+          (wallSelected)="onWallSelected($event)">
         </app-furniture-3d-viewer>
+
+        <!-- Indicador Flotante de Modo Habitación 3D (Esquina Superior Izquierda del Visor) -->
+        @if (workspaceMode() === 'room') {
+          <div class="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-1.5 bg-slate-900/90 text-white backdrop-blur-md px-3 py-1.5 rounded-lg shadow-lg border border-white/10 text-xs pointer-events-auto max-w-[calc(100%-100px)]">
+            <span class="material-icons text-sky-400 text-sm">roofing</span>
+            <span class="font-medium text-slate-200">
+              <span class="font-bold text-white">{{ roomConfig().layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta' }}</span>
+            </span>
+            <span class="text-slate-500">·</span>
+            <span class="text-slate-300 font-mono">{{ roomConfig().mainWallLength }} mm</span>
+
+            <!-- Control Interactivo del Muro Seleccionado en 3D -->
+            @if (selectedWall(); as wall) {
+              <div class="flex items-center gap-1 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2 py-0.5 rounded text-[11px] font-semibold animate-in fade-in duration-100">
+                <span class="material-icons text-[12px] text-sky-400">straighten</span>
+                <span>{{ wall === 'main' ? 'Muro Principal' : 'Muro Lateral L' }}:</span>
+                <span class="font-mono text-white">{{ wall === 'main' ? roomConfig().mainWallLength : roomConfig().sideWallLength }} mm</span>
+                <button 
+                  type="button" 
+                  (click)="wall === 'main' ? stretchMainWall(-200) : stretchSideWall(-200)"
+                  class="px-1.5 py-0.2 bg-white/10 hover:bg-white/20 rounded text-[10px] font-bold transition cursor-pointer"
+                  title="Encoger muro 200 mm">-200</button>
+                <button 
+                  type="button" 
+                  (click)="wall === 'main' ? stretchMainWall(200) : stretchSideWall(200)"
+                  class="px-1.5 py-0.2 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-bold transition cursor-pointer"
+                  title="Estirar muro 200 mm">+200</button>
+              </div>
+            }
+
+            @if (roomConfig().wallOffsetX !== 0 || roomConfig().wallOffsetZ !== 0) {
+              <button 
+                type="button" 
+                (click)="alignWallsToEdge()" 
+                class="px-1.5 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded text-[10px] font-semibold transition flex items-center gap-0.5 cursor-pointer"
+                title="Alinear muros al borde del piso para aprovechar todo el espacio">
+                <span class="material-icons text-[11px]">align_horizontal_left</span>
+                <span>Al Borde</span>
+              </button>
+            }
+
+            <button 
+              type="button" 
+              (click)="openRoomSettings()" 
+              class="ml-0.5 px-2 py-0.5 bg-white/10 hover:bg-white/20 text-sky-300 rounded font-semibold text-[11px] transition flex items-center gap-1 cursor-pointer"
+              title="Ajustar medidas de paredes, posición y texturas">
+              <span class="material-icons text-xs">tune</span>
+              <span>Ajustar</span>
+            </button>
+            <button 
+              type="button" 
+              (click)="frameRoomCamera()" 
+              class="px-1.5 py-0.5 bg-white/10 hover:bg-white/20 text-slate-300 rounded text-[11px] transition flex items-center gap-0.5 cursor-pointer"
+              title="Centrar vista en la habitación">
+              <span class="material-icons text-xs">center_focus_strong</span>
+            </button>
+          </div>
+        }
 
         <!-- BARRA FLOTANTE DE ACCIONES SUPERIOR (Grupo, Multiselección o Pieza Individual) - ALINEADA A LA DERECHA -->
         @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
@@ -1675,6 +1776,465 @@
     [project]="project()"
     (modalClose)="closeTechnicalSheet()">
   </app-technical-sheet-modal>
+}
+
+<!-- MODAL: CONFIGURACIÓN DE HABITACIÓN 3D Y TEXTURAS ARQUITECTÓNICAS -->
+@if (showRoomSettingsModal()) {
+  <div class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl sm:max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+      
+      <!-- Modal Header -->
+      <div class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80 shrink-0 min-w-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+            <span class="material-icons text-lg">roofing</span>
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-sm font-bold text-slate-800 leading-tight truncate">Configuración de Habitación 3D</h3>
+            <p class="text-[11px] text-slate-500 leading-tight mt-0.5 truncate">Entorno arquitectónico, muros modulares y texturas</p>
+          </div>
+        </div>
+        <button 
+          type="button" 
+          (click)="closeRoomSettings()" 
+          class="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer shrink-0"
+          title="Cerrar modal">
+          <span class="material-icons text-base">close</span>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable, NO horizontal overflow) -->
+      <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 space-y-4 sm:space-y-5 text-xs text-slate-700 divide-y divide-slate-100 min-w-0">
+        
+        <!-- 1. DISPOSICIÓN DE PAREDES (LAYOUT) -->
+        <div class="space-y-2 min-w-0">
+          <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <span class="material-icons text-xs text-sky-600">view_quilt</span>
+            Disposición de Paredes
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 min-w-0 w-full">
+            <button 
+              type="button" 
+              (click)="setRoomLayout('single_wall')"
+              [class]="roomConfig().layout === 'single_wall' 
+                ? 'bg-sky-50 border-sky-400 text-sky-950 ring-1 ring-sky-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2.5 sm:p-3 border rounded-xl text-left transition flex items-start gap-2.5 cursor-pointer shadow-2xs min-w-0 overflow-hidden">
+              <span class="material-icons text-sky-600 text-lg mt-0.5 shrink-0">horizontal_rule</span>
+              <div class="min-w-0 flex-1">
+                <span class="font-bold block text-xs truncate">Pared Recta (Frontal)</span>
+                <span class="text-[10px] text-slate-500 block mt-0.5 leading-tight">Muro lineal frontal para cocina o sala</span>
+              </div>
+            </button>
+
+            <button 
+              type="button" 
+              (click)="setRoomLayout('l_shape')"
+              [class]="roomConfig().layout === 'l_shape' 
+                ? 'bg-sky-50 border-sky-400 text-sky-950 ring-1 ring-sky-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2.5 sm:p-3 border rounded-xl text-left transition flex items-start gap-2.5 cursor-pointer shadow-2xs min-w-0 overflow-hidden">
+              <span class="material-icons text-sky-600 text-lg mt-0.5 shrink-0">corner_down_right</span>
+              <div class="min-w-0 flex-1">
+                <span class="font-bold block text-xs truncate">Esquina en L</span>
+                <span class="text-[10px] text-slate-500 block mt-0.5 leading-tight">Frontal + Lateral L para rincón o cocina</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. MEDIDAS Y COTAS PARAMÉTRICAS (MM) -->
+        <div class="space-y-2.5 pt-4 min-w-0">
+          <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <span class="material-icons text-xs text-sky-600">straighten</span>
+            Dimensiones de los Muros (Milímetros)
+          </span>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 min-w-0">
+            <!-- Longitud Muro Principal -->
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1 min-w-0">
+              <span class="text-[11px] font-semibold text-slate-600 block truncate">Muro Principal (X)</span>
+              <div class="flex items-center gap-1.5">
+                <input 
+                  type="number" 
+                  [value]="roomConfig().mainWallLength" 
+                  (input)="updateRoomConfig({ mainWallLength: +$any($event.target).value })"
+                  step="100" 
+                  min="1200" 
+                  max="10000"
+                  class="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 focus:outline-hidden focus:border-sky-500" />
+                <span class="text-[10px] text-slate-400 font-mono shrink-0">mm</span>
+              </div>
+            </div>
+
+            <!-- Longitud Retorno L (si aplica) -->
+            @if (roomConfig().layout === 'l_shape') {
+              <div class="p-2.5 bg-sky-50/50 rounded-lg border border-sky-200 space-y-1 min-w-0">
+                <span class="text-[11px] font-semibold text-sky-800 block truncate">Muro Lateral L (Z)</span>
+                <div class="flex items-center gap-1.5">
+                  <input 
+                    type="number" 
+                    [value]="roomConfig().sideWallLength" 
+                    (input)="updateRoomConfig({ sideWallLength: +$any($event.target).value })"
+                    step="100" 
+                    min="1000" 
+                    max="8000"
+                    class="w-full px-2 py-1 bg-white border border-sky-300 rounded text-xs font-mono font-bold text-sky-900 focus:outline-hidden focus:border-sky-500" />
+                  <span class="text-[10px] text-sky-500 font-mono shrink-0">mm</span>
+                </div>
+              </div>
+            }
+
+            <!-- Altura de Techo -->
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1 min-w-0">
+              <span class="text-[11px] font-semibold text-slate-600 block truncate">Altura Techo (Y)</span>
+              <div class="flex items-center gap-1.5">
+                <input 
+                  type="number" 
+                  [value]="roomConfig().wallHeight" 
+                  (input)="updateRoomConfig({ wallHeight: +$any($event.target).value })"
+                  step="50" 
+                  min="1800" 
+                  max="4000"
+                  class="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 focus:outline-hidden focus:border-sky-500" />
+                <span class="text-[10px] text-slate-400 font-mono shrink-0">mm</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2.5. MODULARIDAD Y POSICIÓN DE MUROS (DESPLAZAMIENTO X / Z) -->
+        <div class="space-y-2.5 pt-4 min-w-0">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span class="material-icons text-xs text-indigo-600">open_with</span>
+              Posición Modular de Muros (Desplazamiento X / Z)
+            </span>
+            <button 
+              type="button" 
+              (click)="alignWallsToEdge()"
+              class="px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-md text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+              title="Alinear muros al borde posterior e izquierdo del piso para aprovechar todo el espacio">
+              <span class="material-icons text-xs text-sky-600">align_horizontal_left</span>
+              <span>Alinear al Borde (0, 0)</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 min-w-0">
+            <!-- Desfase Lateral X -->
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5 min-w-0">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-semibold text-slate-600">Desfase Lateral (Eje X)</span>
+                <span class="text-[10px] font-mono text-slate-400">{{ roomConfig().wallOffsetX }} mm</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button 
+                  type="button" 
+                  (click)="nudgeWalls(-100, 0)" 
+                  class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-300 rounded text-xs font-mono font-bold text-slate-700 transition cursor-pointer"
+                  title="Mover 100 mm a la izquierda">-100</button>
+                <input 
+                  type="number" 
+                  [value]="roomConfig().wallOffsetX" 
+                  (input)="updateRoomConfig({ wallOffsetX: +$any($event.target).value })"
+                  step="50" 
+                  class="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 text-center focus:outline-hidden focus:border-sky-500" />
+                <button 
+                  type="button" 
+                  (click)="nudgeWalls(100, 0)" 
+                  class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-300 rounded text-xs font-mono font-bold text-slate-700 transition cursor-pointer"
+                  title="Mover 100 mm a la derecha">+100</button>
+              </div>
+            </div>
+
+            <!-- Desfase Fondo Z -->
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5 min-w-0">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-semibold text-slate-600">Desfase Fondo (Eje Z)</span>
+                <span class="text-[10px] font-mono text-slate-400">{{ roomConfig().wallOffsetZ }} mm</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button 
+                  type="button" 
+                  (click)="nudgeWalls(0, -100)" 
+                  class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-300 rounded text-xs font-mono font-bold text-slate-700 transition cursor-pointer"
+                  title="Mover 100 mm hacia atrás">-100</button>
+                <input 
+                  type="number" 
+                  [value]="roomConfig().wallOffsetZ" 
+                  (input)="updateRoomConfig({ wallOffsetZ: +$any($event.target).value })"
+                  step="50" 
+                  class="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 text-center focus:outline-hidden focus:border-sky-500" />
+                <button 
+                  type="button" 
+                  (click)="nudgeWalls(0, 100)" 
+                  class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-300 rounded text-xs font-mono font-bold text-slate-700 transition cursor-pointer"
+                  title="Mover 100 mm hacia adelante">+100</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Acciones Rápidas para Estirar / Encoger Muros -->
+          <div class="p-2.5 bg-sky-50/50 rounded-lg border border-sky-200/80 flex flex-wrap items-center justify-between gap-2 min-w-0">
+            <span class="text-[11px] font-semibold text-sky-900 flex items-center gap-1">
+              <span class="material-icons text-xs text-sky-600">aspect_ratio</span>
+              Ajuste Rápido de Longitud:
+            </span>
+            <div class="flex items-center gap-1">
+              <span class="text-[10px] font-medium text-slate-500 mr-0.5">Muro X:</span>
+              <button 
+                type="button" 
+                (click)="stretchMainWall(-200)" 
+                class="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-slate-300 rounded text-[10px] font-bold transition cursor-pointer">-200</button>
+              <button 
+                type="button" 
+                (click)="stretchMainWall(200)" 
+                class="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-slate-300 rounded text-[10px] font-bold transition cursor-pointer">+200</button>
+              <button 
+                type="button" 
+                (click)="stretchMainWall(500)" 
+                class="px-1.5 py-0.5 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-bold transition cursor-pointer">+500</button>
+            </div>
+            @if (roomConfig().layout === 'l_shape') {
+              <div class="flex items-center gap-1">
+                <span class="text-[10px] font-medium text-sky-800 mr-0.5">Muro L:</span>
+                <button 
+                  type="button" 
+                  (click)="stretchSideWall(-200)" 
+                  class="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-slate-300 rounded text-[10px] font-bold transition cursor-pointer">-200</button>
+                <button 
+                  type="button" 
+                  (click)="stretchSideWall(200)" 
+                  class="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-slate-300 rounded text-[10px] font-bold transition cursor-pointer">+200</button>
+                <button 
+                  type="button" 
+                  (click)="stretchSideWall(500)" 
+                  class="px-1.5 py-0.5 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-bold transition cursor-pointer">+500</button>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- 3. CATÁLOGO DE TEXTURAS DE PISO -->
+        <div class="space-y-2.5 pt-4">
+          <span class="text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span class="material-icons text-xs text-amber-600">texture</span>
+              Acabado del Piso
+            </span>
+            <span class="text-[10px] text-slate-400 font-normal">Texturas procedurales Three.js con relieve</span>
+          </span>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 min-w-0">
+            <!-- Roble Natural -->
+            <button 
+              type="button" 
+              (click)="setFloorMaterial('wood_light')"
+              [class]="roomConfig().floorMaterial === 'wood_light' 
+                ? 'bg-amber-50/80 border-amber-400 text-amber-950 ring-1 ring-amber-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#d8c29d] border border-amber-300 shrink-0 shadow-2xs"></div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Roble Claro</span>
+                <span class="text-[10px] text-slate-500 block truncate">Madera con duelas</span>
+              </div>
+            </button>
+
+            <!-- Nogal Oscuro -->
+            <button 
+              type="button" 
+              (click)="setFloorMaterial('wood_walnut')"
+              [class]="roomConfig().floorMaterial === 'wood_walnut' 
+                ? 'bg-amber-50/80 border-amber-400 text-amber-950 ring-1 ring-amber-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#5c4033] border border-amber-900 shrink-0 shadow-2xs"></div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Nogal Oscuro</span>
+                <span class="text-[10px] text-slate-500 block truncate">Madera profunda</span>
+              </div>
+            </button>
+
+            <!-- Porcelanato Blanco Mármol -->
+            <button 
+              type="button" 
+              (click)="setFloorMaterial('marble_white')"
+              [class]="roomConfig().floorMaterial === 'marble_white' 
+                ? 'bg-sky-50/80 border-sky-400 text-sky-950 ring-1 ring-sky-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#f8f9fa] border border-slate-300 shrink-0 shadow-2xs"></div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Mármol Carrara</span>
+                <span class="text-[10px] text-slate-500 block truncate">Porcelanato pulido</span>
+              </div>
+            </button>
+
+            <!-- Concreto Industrial -->
+            <button 
+              type="button" 
+              (click)="setFloorMaterial('concrete_gray')"
+              [class]="roomConfig().floorMaterial === 'concrete_gray' 
+                ? 'bg-slate-100 border-slate-400 text-slate-900 ring-1 ring-slate-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#a6adb4] border border-slate-400 shrink-0 shadow-2xs"></div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Concreto Gris</span>
+                <span class="text-[10px] text-slate-500 block truncate">Cemento pulido</span>
+              </div>
+            </button>
+
+            <!-- Grafito Oscuro -->
+            <button 
+              type="button" 
+              (click)="setFloorMaterial('tile_dark')"
+              [class]="roomConfig().floorMaterial === 'tile_dark' 
+                ? 'bg-slate-100 border-slate-700 text-slate-900 ring-1 ring-slate-400' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#272b30] border border-slate-700 shrink-0 shadow-2xs"></div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Grafito Oscuro</span>
+                <span class="text-[10px] text-slate-500 block truncate">Baldosas 60×60 cm</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. CATÁLOGO DE TEXTURAS DE PAREDES -->
+        <div class="space-y-2.5 pt-4">
+          <span class="text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span class="material-icons text-xs text-sky-600">wallpaper</span>
+              Acabado de Muros y Paredes
+            </span>
+            <span class="text-[10px] text-slate-400 font-normal">Escala milimétrica con juntas</span>
+          </span>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 min-w-0">
+            <!-- Azulejo Subway Blanco -->
+            <button 
+              type="button" 
+              (click)="setWallMaterial('subway_tile_white')"
+              [class]="roomConfig().wallMaterial === 'subway_tile_white' 
+                ? 'bg-sky-50/80 border-sky-400 text-sky-950 ring-1 ring-sky-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#f8f9fa] border border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0 shadow-2xs">🧱</div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Azulejo Metro Blanco</span>
+                <span class="text-[10px] text-slate-500 block truncate">Subway cerámico</span>
+              </div>
+            </button>
+
+            <!-- Azulejo Verde Esmeralda -->
+            <button 
+              type="button" 
+              (click)="setWallMaterial('subway_tile_emerald')"
+              [class]="roomConfig().wallMaterial === 'subway_tile_emerald' 
+                ? 'bg-emerald-50/80 border-emerald-400 text-emerald-950 ring-1 ring-emerald-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#0c5037] border border-emerald-700 shrink-0 shadow-2xs"></div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Azulejo Esmeralda</span>
+                <span class="text-[10px] text-slate-500 block truncate">Verde artesanal vitrificado</span>
+              </div>
+            </button>
+
+            <!-- Yeso Blanco Cálido -->
+            <button 
+              type="button" 
+              (click)="setWallMaterial('plaster_warm')"
+              [class]="roomConfig().wallMaterial === 'plaster_warm' 
+                ? 'bg-amber-50/80 border-amber-400 text-amber-950 ring-1 ring-amber-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#f4f1ea] border border-amber-200 shrink-0 shadow-2xs"></div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Yeso Liso Cálido</span>
+                <span class="text-[10px] text-slate-500 block truncate">Pintura mate neutral</span>
+              </div>
+            </button>
+
+            <!-- Concreto Arquitectónico -->
+            <button 
+              type="button" 
+              (click)="setWallMaterial('concrete_smooth')"
+              [class]="roomConfig().wallMaterial === 'concrete_smooth' 
+                ? 'bg-slate-100 border-slate-400 text-slate-900 ring-1 ring-slate-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#c5cbd0] border border-slate-400 shrink-0 shadow-2xs"></div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Concreto Visto</span>
+                <span class="text-[10px] text-slate-500 block truncate">Estilo contemporáneo</span>
+              </div>
+            </button>
+
+            <!-- Listones de Madera Nórdicos -->
+            <button 
+              type="button" 
+              (click)="setWallMaterial('vertical_slats_wood')"
+              [class]="roomConfig().wallMaterial === 'vertical_slats_wood' 
+                ? 'bg-amber-50/80 border-amber-400 text-amber-950 ring-1 ring-amber-300' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
+              <div class="w-6 h-6 rounded bg-[#c8a97e] border border-amber-300 flex items-center justify-center text-[10px] font-bold text-amber-900 shrink-0 shadow-2xs">🥢</div>
+              <div class="min-w-0">
+                <span class="font-bold block text-xs truncate">Listones Madera</span>
+                <span class="text-[10px] text-slate-500 block truncate">Panel acústico roble</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 5. OPCIONES TÉCNICAS ARQUITECTÓNICAS -->
+        <div class="pt-4 flex flex-wrap items-center justify-between gap-3">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              [checked]="roomConfig().showFloorGrid" 
+              (change)="toggleFloorGrid()"
+              class="rounded text-sky-600 focus:ring-sky-500 w-4 h-4" />
+            <span class="text-xs font-semibold text-slate-700">Rejilla de suelo milimétrica (cada 500 mm)</span>
+          </label>
+
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              [checked]="roomConfig().showSkirting" 
+              (change)="toggleSkirting()"
+              class="rounded text-sky-600 focus:ring-sky-500 w-4 h-4" />
+            <span class="text-xs font-semibold text-slate-700">Zócalos / Rodapiés sanitarios (100 mm)</span>
+          </label>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
+        <button 
+          type="button" 
+          (click)="frameRoomCamera()" 
+          class="h-8 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
+          <span class="material-icons text-sm text-sky-600">center_focus_strong</span>
+          <span>Centrar Vista</span>
+        </button>
+
+        <button 
+          type="button" 
+          (click)="closeRoomSettings()" 
+          class="h-8 px-4 text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-lg flex items-center gap-1.5 transition shadow-xs cursor-pointer">
+          <span class="material-icons text-sm">check</span>
+          <span>Aplicar Cambios</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
 }
 
 <!-- FLOATING TOAST NOTIFICATION -->

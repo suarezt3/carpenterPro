@@ -27,10 +27,14 @@ import {
   HandleFinish,
   HingeType,
   SlideType,
-  OpeningDirection
+  OpeningDirection,
+  WorkspaceMode,
+  RoomConfiguration,
+  DEFAULT_ROOM_CONFIG
 } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
+import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 
 interface PieceMeshData {
   part: Part;
@@ -90,6 +94,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   selectedPartIds = input<string[]>([]);
   partGroups = input<PartGroup[]>([]);
   materials = input<Material[]>([]);
+  workspaceMode = input<WorkspaceMode>('module');
+  roomConfig = input<RoomConfiguration>(DEFAULT_ROOM_CONFIG);
 
   // Outputs
   partSelected = output<Part | null>();
@@ -108,6 +114,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
   groupRotationRequested = output<{ groupId: string; deltaAngle: 90 | -90 | 180 }>();
   groupDuplicationRequested = output<string>();
   hiddenPartsChanged = output<string[]>();
+  roomConfigModified = output<Partial<RoomConfiguration>>();
+  wallSelected = output<'main' | 'side' | null>();
+  readonly selectedWallType = signal<'main' | 'side' | null>(null);
 
   // Canvas and Container refs
   canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas3d');
@@ -296,6 +305,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private pushPullHighlightGroup = new THREE.Group();
   private gridHelper: THREE.GridHelper | null = null;
   private floorMesh: THREE.Mesh | null = null;
+  private roomGroup = new THREE.Group();
 
   // Mesh & Raycast Tracking
   private pieceObjects: PieceMeshData[] = [];
@@ -313,6 +323,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private dragInitialParts: Part[] = [];
   private dragPlane = new THREE.Plane();
   private dragPlaneIntersectionStart = new THREE.Vector3();
+  private isWallDragging = false;
+  private initialWallOffsetX = 0;
+  private initialWallOffsetZ = 0;
+  private wallGizmoGroup = new THREE.Group();
+  private wallGizmoHitMeshes: THREE.Mesh[] = [];
+  private isWallGizmoDragging = false;
+  private activeWallGizmoHit: { isWallGizmo: boolean; type: 'wall_move' | 'wall_stretch'; axis?: 'x' | 'z'; wallTarget?: 'main' | 'side' } | null = null;
+  private initialWallLength = 0;
 
   // Right-Click vs Pan/Orbit Detection State
   private rightPointerDownPos: { x: number; y: number } | null = null;
@@ -376,6 +394,25 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const exp = this.explodedPercent();
       this.updateExplodedOffsets(exp);
     });
+
+    // 4. Update architectural room scene when workspaceMode or roomConfig changes
+    effect(() => {
+      const mode = this.workspaceMode();
+      const config = this.roomConfig();
+      if (this.scene) {
+        this.updateRoomScene(mode, config);
+      }
+    });
+
+    // 5. Update wall selection highlight & 3D Gizmo when selectedWallType, roomConfig or workspaceMode changes
+    effect(() => {
+      const wallType = this.selectedWallType();
+      const config = this.roomConfig();
+      const mode = this.workspaceMode();
+      if (this.scene) {
+        this.updateWallGizmo(wallType, config, mode);
+      }
+    });
   }
 
   private initThree() {
@@ -430,6 +467,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.drillGroup);
     this.scene.add(this.pushPullHighlightGroup);
     this.scene.add(this.rectPreviewGroup);
+    this.scene.add(this.roomGroup);
+    this.scene.add(this.wallGizmoGroup);
+
+    // Initial Room Environment Setup
+    if (this.workspaceMode() === 'room') {
+      this.updateRoomScene('room', this.roomConfig());
+    }
 
     // Initial Scene Build
     this.buildFurnitureScene(
@@ -3123,6 +3167,35 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
+    // 0.8 Check if clicking on Wall Gizmo (Axis translation arrow or Edge stretch handle)
+    if (this.workspaceMode() === 'room' && this.wallGizmoHitMeshes.length > 0) {
+      const wallGizmoIntersects = this.raycaster.intersectObjects(this.wallGizmoHitMeshes, true);
+      if (wallGizmoIntersects.length > 0) {
+        const hitObj = wallGizmoIntersects[0].object;
+        const hitData = hitObj.userData as {
+          isWallGizmo: boolean;
+          type: 'wall_move' | 'wall_stretch';
+          axis?: 'x' | 'z';
+          wallTarget?: 'main' | 'side';
+        };
+        if (hitData && hitData.isWallGizmo) {
+          this.isWallGizmoDragging = true;
+          this.activeWallGizmoHit = hitData;
+          this.dragStartPointer = { x: e.clientX, y: e.clientY };
+          this.initialWallOffsetX = this.roomConfig().wallOffsetX ?? 0;
+          this.initialWallOffsetZ = this.roomConfig().wallOffsetZ ?? 0;
+          this.initialWallLength = hitData.wallTarget === 'main'
+            ? this.roomConfig().mainWallLength
+            : this.roomConfig().sideWallLength;
+          this.controls.enabled = false;
+          canvas.style.cursor = hitData.type === 'wall_stretch' ? 'ew-resize' : 'grabbing';
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
+
     // 1. Check if clicking on Gizmo translation arrow or stretch handle
     if (this.gizmoHitMeshes.length > 0) {
       const gizmoIntersects = this.raycaster.intersectObjects(this.gizmoHitMeshes, true);
@@ -3251,6 +3324,25 @@ export class Furniture3dViewerComponent implements OnDestroy {
         }
       }
     } else {
+      // If in room mode, check if clicked on a wall
+      if (this.workspaceMode() === 'room') {
+        const roomHits = this.raycaster.intersectObjects(this.roomGroup.children, true);
+        const wallHit = roomHits.find(h => h.object.userData?.['isWall']);
+        if (wallHit) {
+          const wallType = wallHit.object.userData['wallType'] as 'main' | 'side';
+          this.selectedWallType.set(wallType);
+          this.wallSelected.emit(wallType);
+          this.isWallDragging = true;
+          this.dragStartPointer = { x: e.clientX, y: e.clientY };
+          this.initialWallOffsetX = this.roomConfig().wallOffsetX ?? 0;
+          this.initialWallOffsetZ = this.roomConfig().wallOffsetZ ?? 0;
+          this.controls.enabled = false;
+          if (canvas) canvas.style.cursor = 'move';
+          return;
+        }
+      }
+      this.selectedWallType.set(null);
+      this.wallSelected.emit(null);
       // Clicked background -> deselect
       this.partsSelected.emit([]);
       this.partSelected.emit(null);
@@ -3268,6 +3360,64 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (dist > 5) {
         this.rightPointerDragged = true;
       }
+    }
+
+    // Direct Room Wall Dragging (X / Z translation)
+    if (this.isWallDragging) {
+      const dx = (e.clientX - this.dragStartPointer.x) * 1.5;
+      const dy = (e.clientY - this.dragStartPointer.y) * 1.5;
+      const camAngle = this.controls.getAzimuthalAngle();
+      const sin = Math.sin(camAngle);
+      const cos = Math.cos(camAngle);
+      const moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
+      const moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
+
+      const newOffsetX = this.initialWallOffsetX + moveX;
+      const newOffsetZ = this.initialWallOffsetZ + moveZ;
+      this.roomConfigModified.emit({
+        wallOffsetX: newOffsetX,
+        wallOffsetZ: newOffsetZ
+      });
+      return;
+    }
+
+    // Direct Wall Gizmo Dragging (Axis Translation or Edge Stretch)
+    if (this.isWallGizmoDragging && this.activeWallGizmoHit) {
+      const hit = this.activeWallGizmoHit;
+      const dx = (e.clientX - this.dragStartPointer.x) * 1.5;
+      const dy = (e.clientY - this.dragStartPointer.y) * 1.5;
+      const camAngle = this.controls.getAzimuthalAngle();
+      const sin = Math.sin(camAngle);
+      const cos = Math.cos(camAngle);
+
+      if (hit.type === 'wall_move') {
+        if (hit.axis === 'x') {
+          const moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
+          this.roomConfigModified.emit({
+            wallOffsetX: this.initialWallOffsetX + moveX
+          });
+        } else {
+          const moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
+          this.roomConfigModified.emit({
+            wallOffsetZ: this.initialWallOffsetZ + moveZ
+          });
+        }
+      } else if (hit.type === 'wall_stretch') {
+        if (hit.wallTarget === 'main') {
+          const stretchX = Math.round((dx * cos + dy * sin) / 50) * 50;
+          const nextL = Math.max(1200, Math.min(10000, this.initialWallLength + stretchX));
+          this.roomConfigModified.emit({
+            mainWallLength: nextL
+          });
+        } else {
+          const stretchZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
+          const nextL = Math.max(1000, Math.min(8000, this.initialWallLength + stretchZ));
+          this.roomConfigModified.emit({
+            sideWallLength: nextL
+          });
+        }
+      }
+      return;
     }
 
     // 0.05. Measurement Tape Live Dragging & Magnetic Snapping
@@ -3737,6 +3887,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (canvas) {
         canvas.style.cursor = 'default';
       }
+    }
+
+    if (this.isWallDragging) {
+      this.isWallDragging = false;
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+    }
+
+    if (this.isWallGizmoDragging) {
+      this.isWallGizmoDragging = false;
+      this.activeWallGizmoHit = null;
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
     }
 
     if (this.isDragging) {
@@ -5325,12 +5490,406 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
+  // ==========================================
+  // ENTORNO ARQUITECTÓNICO (HABITACIÓN 3D / COCINA)
+  // ==========================================
+
+  private updateRoomScene(mode: WorkspaceMode, config: RoomConfiguration) {
+    if (!this.scene) return;
+
+    if (mode !== 'room') {
+      this.roomGroup.visible = false;
+      if (this.floorMesh) this.floorMesh.visible = true;
+      if (this.gridHelper) this.gridHelper.visible = true;
+      return;
+    }
+
+    this.roomGroup.visible = true;
+    if (this.floorMesh) this.floorMesh.visible = false;
+    if (this.gridHelper) this.gridHelper.visible = false;
+
+    // Limpiar geometrías y mallas anteriores del entorno
+    while (this.roomGroup.children.length > 0) {
+      const child = this.roomGroup.children[0] as THREE.Mesh;
+      this.roomGroup.remove(child);
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach(m => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    }
+
+    const {
+      layout,
+      mainWallLength,
+      sideWallLength,
+      wallHeight,
+      wallThickness,
+      floorWidth,
+      floorDepth,
+      floorMaterial,
+      wallMaterial,
+      showFloorGrid,
+      showSkirting,
+      wallOffsetX,
+      wallOffsetZ
+    } = config;
+
+    const offX = wallOffsetX ?? 0;
+    const offZ = wallOffsetZ ?? 0;
+
+    // Dimensión de piso requerida para cubrir la habitación sin dejar espacio muerto detrás
+    const effectiveFloorWidth = Math.max(floorWidth || 5000, mainWallLength + 1000);
+    const effectiveFloorDepth = Math.max(floorDepth || 5000, (layout === 'l_shape' ? sideWallLength : 2000) + 1500);
+
+    // ALINEACIÓN EXACTA AL BORDE:
+    // La cara posterior del muro principal queda exactamente en Z = offZ (borde posterior del piso)
+    // La cara lateral exterior del muro en L queda exactamente en X = offX (borde izquierdo del piso)
+    // El piso se extiende hacia el frente (+Z) y hacia la derecha (+X)
+    const floorCenterX = offX + effectiveFloorWidth / 2;
+    const floorCenterZ = offZ + effectiveFloorDepth / 2;
+
+    // 1. PISO ARQUITECTÓNICO TEXTURIZADO (Alineado al ras de los muros)
+    const floorGeo = new THREE.PlaneGeometry(effectiveFloorWidth, effectiveFloorDepth);
+    const floorMat = ProceduralTextureFactory.getFloorMaterial(floorMaterial, effectiveFloorWidth, effectiveFloorDepth);
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(floorCenterX, -0.5, floorCenterZ);
+    floor.receiveShadow = true;
+    floor.userData = { isFloor: true };
+    this.roomGroup.add(floor);
+
+    // Rejilla técnica milimétrica superpuesta sobre el piso (si está activa)
+    if (showFloorGrid) {
+      const gridSpan = Math.max(effectiveFloorWidth, effectiveFloorDepth);
+      const divisions = Math.max(10, Math.round(gridSpan / 500));
+      const roomGrid = new THREE.GridHelper(gridSpan, divisions, 0x0284c7, 0x64748b);
+      roomGrid.position.set(floorCenterX, 0.2, floorCenterZ);
+      if (roomGrid.material instanceof THREE.Material) {
+        roomGrid.material.opacity = 0.22;
+        roomGrid.material.transparent = true;
+      }
+      this.roomGroup.add(roomGrid);
+    }
+
+    // 2. MURO PRINCIPAL (Back Wall a lo largo de X)
+    // Cara posterior en Z = offZ (borde del piso), cara frontal interior en Z = offZ + wallThickness
+    const mainWallGeo = new THREE.BoxGeometry(mainWallLength, wallHeight, wallThickness);
+    const mainWallMat = ProceduralTextureFactory.getWallMaterial(wallMaterial, mainWallLength, wallHeight);
+    const mainWall = new THREE.Mesh(mainWallGeo, mainWallMat);
+    mainWall.position.set(
+      offX + mainWallLength / 2, 
+      wallHeight / 2, 
+      offZ + wallThickness / 2
+    );
+    mainWall.castShadow = true;
+    mainWall.receiveShadow = true;
+    mainWall.userData = { isWall: true, wallType: 'main' };
+    this.roomGroup.add(mainWall);
+
+    // 3. MURO LATERAL EN L (Side Wall a lo largo de Z si layout === 'l_shape')
+    // Cara exterior izquierda en X = offX (borde del piso), cara interior derecha en X = offX + wallThickness
+    if (layout === 'l_shape') {
+      const sideWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, sideWallLength);
+      const sideWallMat = ProceduralTextureFactory.getWallMaterial(wallMaterial, sideWallLength, wallHeight);
+      const sideWall = new THREE.Mesh(sideWallGeo, sideWallMat);
+      sideWall.position.set(
+        offX + wallThickness / 2, 
+        wallHeight / 2, 
+        offZ + wallThickness + sideWallLength / 2
+      );
+      sideWall.castShadow = true;
+      sideWall.receiveShadow = true;
+      sideWall.userData = { isWall: true, wallType: 'side' };
+      this.roomGroup.add(sideWall);
+    }
+
+    // 4. ZÓCALOS / RODAPIÉS SANITARIOS (100mm de alto)
+    if (showSkirting) {
+      const skirtingH = 100;
+      const skirtingT = 16;
+      const skirtingMat = new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        roughness: 0.25,
+        metalness: 0.05
+      });
+
+      // Zócalo muro principal
+      const mainSkirtingGeo = new THREE.BoxGeometry(mainWallLength, skirtingH, skirtingT);
+      const mainSkirting = new THREE.Mesh(mainSkirtingGeo, skirtingMat);
+      mainSkirting.position.set(
+        offX + mainWallLength / 2, 
+        skirtingH / 2, 
+        offZ + wallThickness + skirtingT / 2
+      );
+      mainSkirting.castShadow = true;
+      mainSkirting.receiveShadow = true;
+      this.roomGroup.add(mainSkirting);
+
+      // Zócalo muro lateral
+      if (layout === 'l_shape') {
+        const sideSkirtingGeo = new THREE.BoxGeometry(skirtingT, skirtingH, sideWallLength);
+        const sideSkirting = new THREE.Mesh(sideSkirtingGeo, skirtingMat);
+        sideSkirting.position.set(
+          offX + wallThickness + skirtingT / 2, 
+          skirtingH / 2, 
+          offZ + wallThickness + sideWallLength / 2
+        );
+        sideSkirting.castShadow = true;
+        sideSkirting.receiveShadow = true;
+        this.roomGroup.add(sideSkirting);
+      }
+    }
+  }
+
+  frameRoomView() {
+    if (!this.camera || !this.controls) return;
+    const config = this.roomConfig();
+    const offX = config.wallOffsetX ?? 0;
+    const offZ = config.wallOffsetZ ?? 0;
+    const targetX = offX + config.mainWallLength / 2;
+    const targetY = config.wallHeight * 0.45;
+    const targetZ = offZ + (config.layout === 'l_shape' ? config.sideWallLength / 2.5 : 800);
+
+    const startTarget = this.controls.target.clone();
+    const startCamPos = this.camera.position.clone();
+    const targetCenter = new THREE.Vector3(targetX, targetY, targetZ);
+    const targetCamPos = new THREE.Vector3(
+      targetX + 2200,
+      targetY + 1400,
+      targetZ + (config.layout === 'l_shape' ? config.sideWallLength : 2500) + 1200
+    );
+
+    const startTime = performance.now();
+    const duration = 500; // ms
+
+    const animateTransition = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      this.controls.target.lerpVectors(startTarget, targetCenter, ease);
+      this.camera.position.lerpVectors(startCamPos, targetCamPos, ease);
+      this.controls.update();
+
+      if (progress < 1) {
+        requestAnimationFrame(animateTransition);
+      }
+    };
+
+    requestAnimationFrame(animateTransition);
+  }
+
+  // --- WALL SELECTION HIGHLIGHT & 3D GIZMO ---
+
+  private updateWallGizmo(
+    wallType: 'main' | 'side' | null,
+    config: RoomConfiguration,
+    mode: WorkspaceMode
+  ) {
+    // Clear previous wall gizmos
+    while (this.wallGizmoGroup.children.length > 0) {
+      const child = this.wallGizmoGroup.children[0] as THREE.Mesh;
+      this.wallGizmoGroup.remove(child);
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material.dispose();
+      }
+    }
+    this.wallGizmoHitMeshes = [];
+
+    if (mode !== 'room' || !wallType) {
+      return;
+    }
+
+    const {
+      layout,
+      mainWallLength,
+      sideWallLength,
+      wallHeight,
+      wallThickness,
+      wallOffsetX,
+      wallOffsetZ
+    } = config;
+
+    const offX = wallOffsetX ?? 0;
+    const offZ = wallOffsetZ ?? 0;
+
+    let posX = 0;
+    const posY = wallHeight / 2;
+    let posZ = 0;
+    let sizeX = 0;
+    const sizeY = wallHeight;
+    let sizeZ = 0;
+
+    if (wallType === 'main') {
+      sizeX = mainWallLength;
+      sizeZ = wallThickness;
+      posX = offX + mainWallLength / 2;
+      posZ = offZ + wallThickness / 2;
+    } else if (wallType === 'side' && layout === 'l_shape') {
+      sizeX = wallThickness;
+      sizeZ = sideWallLength;
+      posX = offX + wallThickness / 2;
+      posZ = offZ + wallThickness + sideWallLength / 2;
+    } else {
+      return;
+    }
+
+    // 1. Highlight Outline Mesh around selected wall
+    const outlineGeo = new THREE.BoxGeometry(sizeX + 8, sizeY + 8, sizeZ + 8);
+    const edgesGeo = new THREE.EdgesGeometry(outlineGeo);
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      linewidth: 3,
+      depthTest: false
+    });
+    const outlineLines = new THREE.LineSegments(edgesGeo, lineMat);
+    outlineLines.position.set(posX, posY, posZ);
+    outlineLines.renderOrder = 998;
+    this.wallGizmoGroup.add(outlineLines);
+
+    // 2. Gizmo: Translation Arrows in X (Lateral) and Z (Depth)
+    const arrowLen = 220;
+    const arrowRadius = 14;
+    const arrowHeadLen = 60;
+    const arrowHeadRadius = 26;
+
+    const createArrowMesh = (
+      colorHex: number,
+      axis: 'x' | 'z',
+      origin: THREE.Vector3
+    ) => {
+      const arrowGroup = new THREE.Group();
+      arrowGroup.position.copy(origin);
+
+      const shaftGeo = new THREE.CylinderGeometry(arrowRadius, arrowRadius, arrowLen, 16);
+      const headGeo = new THREE.ConeGeometry(arrowHeadRadius, arrowHeadLen, 16);
+      const mat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity: 0.45,
+        roughness: 0.2,
+        depthTest: false
+      });
+
+      const shaft = new THREE.Mesh(shaftGeo, mat);
+      const head = new THREE.Mesh(headGeo, mat);
+
+      if (axis === 'x') {
+        shaft.rotation.z = -Math.PI / 2;
+        shaft.position.x = arrowLen / 2;
+        head.rotation.z = -Math.PI / 2;
+        head.position.x = arrowLen + arrowHeadLen / 2;
+      } else {
+        shaft.rotation.x = Math.PI / 2;
+        shaft.position.z = arrowLen / 2;
+        head.rotation.x = Math.PI / 2;
+        head.position.z = arrowLen + arrowHeadLen / 2;
+      }
+
+      arrowGroup.add(shaft, head);
+
+      // Hit collider box
+      const hitBoxGeo = new THREE.BoxGeometry(
+        axis === 'x' ? arrowLen + arrowHeadLen : 40,
+        40,
+        axis === 'z' ? arrowLen + arrowHeadLen : 40
+      );
+      const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+      const hitMesh = new THREE.Mesh(hitBoxGeo, hitMat);
+      hitMesh.position.set(
+        axis === 'x' ? (arrowLen + arrowHeadLen) / 2 : 0,
+        0,
+        axis === 'z' ? (arrowLen + arrowHeadLen) / 2 : 0
+      );
+      hitMesh.userData = {
+        isWallGizmo: true,
+        type: 'wall_move',
+        axis,
+        wallTarget: wallType
+      };
+      arrowGroup.add(hitMesh);
+      this.wallGizmoHitMeshes.push(hitMesh);
+
+      return arrowGroup;
+    };
+
+    const gizmoAnchor = new THREE.Vector3(posX, wallHeight + 120, posZ);
+    const arrowX = createArrowMesh(0xef4444, 'x', gizmoAnchor);
+    const arrowZ = createArrowMesh(0x0284c7, 'z', gizmoAnchor);
+    this.wallGizmoGroup.add(arrowX, arrowZ);
+
+    // 3. Stretch Handle at free end of wall (Cube handle)
+    const handleSize = 36;
+    const handleGeo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
+    const handleMat = new THREE.MeshStandardMaterial({
+      color: 0x10b981,
+      emissive: 0x10b981,
+      emissiveIntensity: 0.4,
+      roughness: 0.2,
+      depthTest: false
+    });
+    const handleMesh = new THREE.Mesh(handleGeo, handleMat);
+    const handleEdge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(handleGeo),
+      new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
+    );
+    handleMesh.add(handleEdge);
+
+    if (wallType === 'main') {
+      handleMesh.position.set(
+        offX + mainWallLength + handleSize / 2 + 10,
+        wallHeight / 2,
+        offZ + wallThickness / 2
+      );
+    } else {
+      handleMesh.position.set(
+        offX + wallThickness / 2,
+        wallHeight / 2,
+        offZ + wallThickness + sideWallLength + handleSize / 2 + 10
+      );
+    }
+
+    handleMesh.userData = {
+      isWallGizmo: true,
+      type: 'wall_stretch',
+      axis: wallType === 'main' ? 'x' : 'z',
+      wallTarget: wallType
+    };
+    handleMesh.renderOrder = 999;
+    this.wallGizmoGroup.add(handleMesh);
+    this.wallGizmoHitMeshes.push(handleMesh);
+  }
+
   ngOnDestroy() {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
+    }
+    while (this.roomGroup.children.length > 0) {
+      const child = this.roomGroup.children[0] as THREE.Mesh;
+      this.roomGroup.remove(child);
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material.dispose();
+      }
+    }
+    while (this.wallGizmoGroup.children.length > 0) {
+      const child = this.wallGizmoGroup.children[0] as THREE.Mesh;
+      this.wallGizmoGroup.remove(child);
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material.dispose();
+      }
     }
     if (this.renderer) {
       this.renderer.dispose();

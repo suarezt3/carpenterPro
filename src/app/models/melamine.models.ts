@@ -297,4 +297,55 @@ export interface Project {
   profitMarginPercent: number;
   taxPercent: number;
   updatedAt: string;
+  roomConfig?: RoomConfiguration;
 }
+
+export type WorkspaceMode = 'module' | 'room';
+
+export type RoomLayoutType = 'single_wall' | 'l_shape';
+
+export type FloorMaterialType = 
+  | 'wood_light' 
+  | 'wood_walnut' 
+  | 'marble_white' 
+  | 'concrete_gray' 
+  | 'tile_dark';
+
+export type WallMaterialType = 
+  | 'subway_tile_white' 
+  | 'subway_tile_emerald' 
+  | 'plaster_warm' 
+  | 'concrete_smooth' 
+  | 'vertical_slats_wood';
+
+export interface RoomConfiguration {
+  layout: RoomLayoutType;
+  mainWallLength: number;      // Longitud en mm (ej. 3600)
+  sideWallLength: number;      // Longitud en mm para L (ej. 2400)
+  wallHeight: number;          // Altura en mm (ej. 2600)
+  wallThickness: number;       // Espesor en mm (ej. 150)
+  floorWidth: number;          // Ancho de piso en mm (ej. 5000)
+  floorDepth: number;          // Profundidad de piso en mm (ej. 5000)
+  floorMaterial: FloorMaterialType;
+  wallMaterial: WallMaterialType;
+  showFloorGrid: boolean;      // Rejilla técnica milimétrica superpuesta
+  showSkirting: boolean;       // Zócalo o rodapié inferior
+  wallOffsetX: number;         // Desfase modular X en mm (posición del muro)
+  wallOffsetZ: number;         // Desfase modular Z en mm (hacia el fondo)
+}
+
+export const DEFAULT_ROOM_CONFIG: RoomConfiguration = {
+  layout: 'l_shape',
+  mainWallLength: 3600,
+  sideWallLength: 2400,
+  wallHeight: 2600,
+  wallThickness: 150,
+  floorWidth: 5000,
+  floorDepth: 5000,
+  floorMaterial: 'wood_light',
+  wallMaterial: 'subway_tile_white',
+  showFloorGrid: true,
+  showSkirting: true,
+  wallOffsetX: 0,
+  wallOffsetZ: 0,
+};

@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de diseño y rediseño profesional para el Catálogo de Piezas con tarjetas técnicas rectangulares (rounded-lg / 8px), icono distintivo, subtítulo dimensional de taller y bordes balanceados.",
-  "updatedAt":  "2026-10-10T14:34:24.493845299Z",
+  "summary":  "Plan para optimizar el entorno 3D: muros modulares con desplazamiento X/Z y gizmo de arrastre, eliminación del espacio muerto detrás de las paredes mediante alineación automática al borde del piso, y corrección del desbordamiento horizontal en el modal de configuración.",
+  "updatedAt":  "2026-10-10T15:55:45.205011587Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

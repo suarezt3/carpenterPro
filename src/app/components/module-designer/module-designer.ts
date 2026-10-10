@@ -17,7 +17,13 @@ import {
   ParametricDrawerConfig,
   PartOrientation,
   DrillHole,
-  PartHardwareConfig
+  PartHardwareConfig,
+  WorkspaceMode,
+  RoomConfiguration,
+  RoomLayoutType,
+  FloorMaterialType,
+  WallMaterialType,
+  DEFAULT_ROOM_CONFIG
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -160,6 +166,12 @@ export class ModuleDesignerComponent {
   // Visibility (Ocultar / Mostrar piezas y grupos)
   readonly hiddenPartIds = signal<Set<string>>(new Set());
   readonly hiddenPartsCount = computed(() => this.hiddenPartIds().size);
+
+  // Architectural 3D Room / Kitchen Environment Mode
+  readonly workspaceMode = signal<WorkspaceMode>('module');
+  readonly roomConfig = signal<RoomConfiguration>(DEFAULT_ROOM_CONFIG);
+  readonly showRoomSettingsModal = signal<boolean>(false);
+  readonly selectedWall = signal<'main' | 'side' | null>(null);
 
   // Technical Shop Sheet Modal
   readonly showTechnicalSheetModal = signal<boolean>(false);
@@ -1661,5 +1673,97 @@ export class ModuleDesignerComponent {
 
   onHiddenPartsChangedFromViewer(hiddenIds: string[]) {
     this.hiddenPartIds.set(new Set(hiddenIds));
+  }
+
+  // --- MODO HABITACIÓN Y ESPACIO ARQUITECTÓNICO ---
+
+  setWorkspaceMode(mode: WorkspaceMode) {
+    this.workspaceMode.set(mode);
+    if (mode === 'room') {
+      setTimeout(() => {
+        this.viewer3dRef()?.frameRoomView();
+      }, 60);
+      this.showToast('🏠 Modo Habitación 3D activado');
+    } else {
+      this.showToast('🪵 Modo Módulo Individual activado');
+    }
+  }
+
+  toggleWorkspaceMode() {
+    this.setWorkspaceMode(this.workspaceMode() === 'module' ? 'room' : 'module');
+  }
+
+  openRoomSettings() {
+    this.showRoomSettingsModal.set(true);
+  }
+
+  closeRoomSettings() {
+    this.showRoomSettingsModal.set(false);
+  }
+
+  updateRoomConfig(updates: Partial<RoomConfiguration>) {
+    this.roomConfig.update(c => ({ ...c, ...updates }));
+  }
+
+  setRoomLayout(layout: RoomLayoutType) {
+    this.updateRoomConfig({ layout });
+    this.showToast(`📐 Disposición: ${layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta'}`);
+  }
+
+  setFloorMaterial(mat: FloorMaterialType) {
+    this.updateRoomConfig({ floorMaterial: mat });
+    this.showToast('✨ Material de piso actualizado');
+  }
+
+  setWallMaterial(mat: WallMaterialType) {
+    this.updateRoomConfig({ wallMaterial: mat });
+    this.showToast('🎨 Material de pared actualizado');
+  }
+
+  toggleFloorGrid() {
+    this.updateRoomConfig({ showFloorGrid: !this.roomConfig().showFloorGrid });
+  }
+
+  toggleSkirting() {
+    this.updateRoomConfig({ showSkirting: !this.roomConfig().showSkirting });
+  }
+
+  frameRoomCamera() {
+    this.viewer3dRef()?.frameRoomView();
+  }
+
+  alignWallsToEdge() {
+    this.updateRoomConfig({ wallOffsetX: 0, wallOffsetZ: 0 });
+    this.showToast('📐 Muros alineados al borde exacto del piso');
+  }
+
+  nudgeWalls(dx: number, dz: number) {
+    const curX = this.roomConfig().wallOffsetX ?? 0;
+    const curZ = this.roomConfig().wallOffsetZ ?? 0;
+    this.updateRoomConfig({
+      wallOffsetX: curX + dx,
+      wallOffsetZ: curZ + dz
+    });
+  }
+
+  stretchMainWall(delta: number) {
+    const curL = this.roomConfig().mainWallLength;
+    const nextL = Math.max(1200, Math.min(10000, curL + delta));
+    this.updateRoomConfig({ mainWallLength: nextL });
+    this.showToast(`📏 Muro Principal: ${nextL} mm`);
+  }
+
+  stretchSideWall(delta: number) {
+    const curL = this.roomConfig().sideWallLength;
+    const nextL = Math.max(1000, Math.min(8000, curL + delta));
+    this.updateRoomConfig({ sideWallLength: nextL });
+    this.showToast(`📏 Muro Lateral: ${nextL} mm`);
+  }
+
+  onWallSelected(wall: 'main' | 'side' | null) {
+    this.selectedWall.set(wall);
+    if (wall) {
+      this.showToast(`🧱 Seleccionado: ${wall === 'main' ? 'Muro Principal' : 'Muro Lateral L'}`);
+    }
   }
 }
