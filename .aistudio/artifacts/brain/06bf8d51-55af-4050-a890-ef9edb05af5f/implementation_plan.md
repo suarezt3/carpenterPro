@@ -1,96 +1,89 @@
-# Refinamiento del Entorno 3D: Posición de Cintas, Amplitud Espacial y Tarjeta Esquina en L
+# Catálogo Extendido de Acabados Arquitectónicos (Pisos y Muros 3D)
 
-Plan de mejora para resolver los tres problemas visuales y conceptuales detectados en la Fase 1 del entorno de Habitación 3D: **eliminación de solapamientos entre barras flotantes**, **claridad y ampliación del espacio de trabajo arquitectónico hasta 12+ metros**, y **corrección visual total de la tarjeta 'Esquina en L'**.
+Plan para dotar al módulo de configuración de entorno 3D de un catálogo profesional y realista de acabados para pisos y paredes, inspirado en fabricantes líderes como Corona y Holztek, organizado por pestañas temáticas con renderizado procedural Three.js en tiempo real.
 
----
-
-## User Review & Critical Decisions
+### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Decisiones confirmadas por el usuario:
->
-> 1. **Ubicación de la Cinta Flotante de Habitación:** Ubicarla de modo que **nunca se solape con la cinta vertical de herramientas** (columna izquierda `left-3`), ni con la **cinta de acciones de piezas/grupos seleccionados** (extremo derecho `right-3`). Se posicionará en `left-16` con ancho delimitado, colapsándose a modo compacto cuando haya piezas seleccionadas para garantizar cero interferencias visuales.
-> 2. **Amplitud y Funcionamiento Espacial de la Habitación 3D:** Piso y muros 100% paramétricos ampliables **hasta 10-12 metros o más**, asegurando que el entorno sea suficiente tanto para una cocina compacta como para cocinas grandes con islas o espacios abiertos. En Modo Habitación, la escena se enfoca exclusivamente en el piso arquitectónico útil, sin cuadrículas fantasma detrás de las paredes.
-> 3. **Tarjeta 'Esquina en L' en el Modal:** Estructurar la tarjeta con un distintivo icono arquitectónico en L, título prominente **"Esquina en L"** y subtítulo explicativo **"Pared frontal + lateral en L"**, eliminando cualquier bug de renderizado en blanco.
+> Se han incorporado las respuestas acordadas para estructurar el catálogo y maximizar la variedad estética sin comprometer el rendimiento:
+
+- **Confirmed Decision 1 (Organización por Pestañas)**: La interfaz del selector de acabados tendrá pestañas claras de categoría para Pisos (*Porcelanatos/Cemento, Maderas, Cerámica/Mármol*) y para Paredes (*Ladrillo, Cerámica/Subway, Mármol/Piedra, Madera/Acústico*).
+- **Confirmed Decision 2 (Colecciones de Piso)**: Inclusión de acabados inspirados en Corona y Holztek (Porcelanatos *Concrete Gris Pro*, *Boss Arena*, *Madrid Oro*, duelas de madera *Guayacán Miel*, *Roble Nórdico*, *Nogal Americano* y baldosas gran formato).
+- **Confirmed Decision 3 (Revestimientos de Muro)**: Incorporación de ladrillo a la vista clásico y blanco decapado, baldosas *Subway/Metro* biseladas, mármol *Calacatta Gold*, salpicadero de cocina con juntas definidas y paneles de listones.
+- **Open Choice (Texturas Procedurales en Canvas vs Imágenes Externas)**: Se mantiene la arquitectura de texturas generadas con HTML5 Canvas en memoria. Esto garantiza cero caídas de red, carga instantánea, mapas de relieve (*bump map*) calibrados al milímetro y compatibilidad total con la escala de la habitación sin distorsión.
 
 ---
 
-## 1. Overview & Core Concept
+### 1. Overview & Core Concept
 
-- **Problema 1 (Solapamiento de Cintas):** La barra superior de Modo Habitación estaba en `top-3 left-3`, exactamente en las mismas coordenadas de la paleta vertical CAD (`top-3 left-3`), pisando los iconos de selección y movimiento.
-- **Problema 2 (Espacio y Cuadrantes):** El visor mostraba una cuadrícula neutra centrada en `(0,0)`, haciendo parecer que los muros solo ocupaban un cuadrante y generando dudas sobre si el espacio era suficiente.
-- **Problema 3 (Tarjeta en Blanco):** En el modal de configuración, la tarjeta de "Esquina en L" aparecía vacía sin texto ni icono visible.
-
----
-
-## 2. User Experience & Visual Design
-
-### A. Desacoplamiento de Cintas y Barras Flotantes
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [Paleta CAD]  [Barra Habitación 3D: L-Shape 3600mm]           [Acciones Pieza/Grupo]   │
-│  top-3        top-3 left-16 (despejada)                        top-3 right-3           │
-│  left-3       (se compacta si hay piezas seleccionadas)        (cuando hay selección)  │
-│  │                                                                                     │
-│  ▼                                                                                     │
-│  [Herramientas]                                                                        │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
-- **Nueva posición:** `top-3 left-16 sm:left-18 z-20`. Deja 64px de holgura libre respecto a la paleta CAD vertical.
-- **Comportamiento inteligente:** Si el usuario tiene una pieza o grupo seleccionado (aparece la barra en `right-3`), la barra de habitación reduce su ancho o muestra un badge condensado `🏠 Habitación 3D` para no competir por espacio horizontal.
-
-### B. Espacio Arquitectónico Realista y Escalable
-- **Explicación al usuario:** El espacio es 100% ilimitado y paramétrico. No está restringido a un solo cuadrante:
-  - Longitud de muro principal: ajustable desde 1,200 mm hasta **12,000 mm (12 metros)**.
-  - Longitud de muro lateral en L: ajustable desde 1,000 mm hasta **10,000 mm (10 metros)**.
-  - Piso arquitectónico: se adapta dinámicamente para cubrir el 100% del área de los muros más un margen frontal de maniobra.
-- **Presets Rápidos en el Modal:**
-  - *Cocina Lineal Compacta:* 3,000 mm
-  - *Cocina Estándar con Retorno:* 4,200 mm × 2,400 mm
-  - *Cocina Amplia con Isla:* 6,000 mm × 4,000 mm
-  - *Gran Salón / Espacio Abierto:* 8,500 mm × 6,000 mm
-- **Eliminación de cuadrícula residual:** Al activar Modo Habitación, la cuadrícula genérica central de taller se oculta completamente, mostrando únicamente el suelo texturizado real y su rejilla milimétrica propia.
-
-### C. Tarjeta 'Esquina en L' Totalmente Visible y Robusta
-- Rediseño con contenedor `min-w-0`, `flex-1`, badge con icono tipográfico/SVG en L (`corner_down_right` / insignia `L`), tipografía con color contrastado `text-slate-900` y subtítulo nítido que no colapsa bajo ninguna resolución de pantalla.
+- **What It Does**: Transforma el selector de pisos y paredes de una cuadrícula simple de 5 opciones fijas a un catálogo enriquecido con más de 20 acabados de alta definición distribuidos en categorías temáticas y marcas de referencia reconocidas.
+- **Target Audience / Persona**: Diseñadores de cocinas, carpinteros, arquitectos de interiores y clientes finales que desean visualizar sus muebles modulares en un contexto realista idéntico a los materiales del mercado local.
+- **Key Value**: Elimina la sensación de prototipo genérico; permite contrastar el color de la melamina y los herrajes contra texturas auténticas de porcelanato, ladrillo rústico, mármoles y maderas cálidas.
 
 ---
 
-## 3. Technical Architecture & File Changes
+### 2. User Experience & Visual Design
+
+- **Estructura Visual de Pestañas**:
+  - En el modal/panel de **Ajustar Habitación**, la sección de materiales se optimiza con pestañas segmentadas sin saturar la pantalla.
+  - Cada pestaña filtra dinámicamente las tarjetas de materiales con miniatura de textura, nombre comercial del acabado, fabricante/colección de referencia y especificación de formato (ej. 60×60 cm, 20×120 cm, biselado 10×20 cm).
+- **Diseño de Tarjetas de Acabado**:
+  - Miniatura circular/cuadrada con preview fiel del patrón y brillo.
+  - Tipografía limpia con el nombre del modelo y etiqueta sutil de la colección (ej. *Corona Concrete ARD*, *Holztek Roble Nórdico*, *Brick Terracota Rústico*).
+  - Indicador visual de selección activa con borde contrastante y check arquitectónico.
+- **Interacción y Feedback**:
+  - Al hacer clic en cualquier acabado, la escena 3D Three.js actualiza de inmediato el material, mapa difuso y relieve de las paredes o del suelo sin recargas ni parpadeos.
+
+---
+
+### 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Generación Procedural Avanzada (Canvas 2D -> WebGL)**
+  - *Chosen Approach*: Extender `ProceduralTextureFactory` para sintetizar con gran detalle los nuevos patrones: ladrillo visto con llagas y rugosidad, mármol con vetas doradas/grises, porcelanatos micro-granulados y duelas laminadas.
+  - *Why*: Cero dependencias de servidores externos o URLs de imágenes que expiran; control total sobre la escala de repetición (`wrapS`/`wrapT`) según el tamaño real en milímetros de la habitación.
+  - *Alternatives Considered*: Descargar imágenes JPG/PNG de la web; se descartó para evitar bloqueos por CORS, lentitud de red y problemas de licencia o links caídos.
+- **Decision 2: Modelo de Datos Extensible en `melamine.models.ts`**
+  - *Chosen Approach*: Ampliar los tipos `FloorMaterialType` y `WallMaterialType` con identificadores semánticos unívocos manteniendo retrocompatibilidad con proyectos existentes.
+
+---
+
+### 4. Technical Architecture & Data Strategy *(Technical Reference)*
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        ModuleDesignerComponent (HTML & TS)                             │
-│                                                                                        │
-│  1. Floating Ribbon Positioning:                                                       │
-│     - Move from 'top-3 left-3' -> 'top-3 left-16 sm:left-20'                           │
-│     - Responsive max-w constraint to avoid collision with right-3 action bar           │
-│                                                                                        │
-│  2. Modal 'Esquina en L' Card Fix:                                                     │
-│     - Replace missing/unsupported icon with robust architectural L badge               │
-│     - Ensure text-slate-800/sky-950 and explicit layout classes                        │
-│                                                                                        │
-│  3. Space Presets & Scaling:                                                           │
-│     - Add quick room dimension presets (Compacta, Estándar, Isla, Abierta)             │
-│     - Expand max slider/input range up to 12000 mm                                     │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-                                            │
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                       Furniture3dViewerComponent (TS)                                  │
-│                                                                                        │
-│  1. Pure Architectural Floor Framing:                                                  │
-│     - Ensure workshop GridHelper is 100% hidden in room mode                           │
-│     - Center camera framing nicely on room bounds                                      │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        ModuleDesigner Component                        │
+│  - roomConfig (Signal<RoomConfiguration>)                              │
+│  - activeFloorTab ('all' | 'cement' | 'wood' | 'marble')               │
+│  - activeWallTab ('all' | 'brick' | 'tile' | 'marble' | 'wood')        │
+└─────────────────────────────────┬──────────────────────────────────────┘
+                                  │ emite actualizaciones
+                                  ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Furniture3DViewer Component                     │
+│  - updateRoomScene()                                                   │
+│  - floorMesh.material  ◄─── ProceduralTextureFactory.getFloorMaterial() │
+│  - wallMeshes.material ◄─── ProceduralTextureFactory.getWallMaterial()  │
+└─────────────────────────────────┬──────────────────────────────────────┘
+                                  │ genera texturas
+                                  ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       ProceduralTextureFactory                         │
+│  - drawBrickWall()         (Ladrillo visto arcilla y blanco)           │
+│  - drawSubwayTiles()       (Metro blanco, negro mate, esmeralda)       │
+│  - drawCalacattaGold()     (Mármol blanco vetas doradas Corona)        │
+│  - drawPorcelainCement()   (Concrete Gris Pro, Boss Arena)             │
+│  - drawWoodDuelas()        (Guayacán Miel, Roble Nórdico, Nogal)       │
+│  - drawKitchenBacksplash() (Mosaico geométrico y cuarzo)               │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Archivos Involucrados:
-1. `src/app/components/module-designer/module-designer.html`:
-   - Corregir posición de la barra de habitación a `top-3 left-16 sm:left-20`.
-   - Reemplazar el botón de "Esquina en L" para asegurar visibilidad total de título, icono y descripción.
-   - Añadir botones de presets de tamaño de habitación (3m, 4.5m, 6m, 8m).
-2. `src/app/components/module-designer/module-designer.ts`:
-   - Añadir método `applyRoomPreset(type: 'compact' | 'standard' | 'island' | 'open')`.
-3. `src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts`:
-   - Asegurar que la cuadrícula global de taller no se superponga ni muestre cuadrantes vacíos en Modo Habitación.
+#### Catálogo de Acabados a Implementar:
+1. **Pisos (Floors)**:
+   - *Porcelanatos y Cemento*: Concrete Gris Pro (Corona), Boss Arena (Corona), Grafito Industrial, Cemento Blanco Pulido.
+   - *Maderas y Laminados*: Roble Nórdico (Holztek), Guayacán Miel (Corona), Nogal Americano Clásico, Haya Clara Escandinava.
+   - *Mármol y Piedras*: Mármol Calacatta Oro (Corona), Mármol Carrara Gris, Travertino Clásico, Piedra Pizarra Negra.
+2. **Muros y Salpicaderos (Walls)**:
+   - *Ladrillos*: Ladrillo Visto Arcilla Rústico, Ladrillo Blanco Decapado Estilo Loft.
+   - *Cerámica y Metro*: Azulejo Metro Blanco Biselado, Azulejo Metro Negro Carbón, Azulejo Esmeralda Artesanal.
+   - *Mármoles y Cuarzo*: Mármol Blanco Calacatta, Cuarzo Gris Neutro Pulido.
+   - *Paneles y Revestimientos*: Listones Acústicos de Roble, Cemento Encofrado Visto, Yeso Cálido Mate.

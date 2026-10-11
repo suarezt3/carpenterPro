@@ -2163,179 +2163,174 @@
           </div>
         </div>
 
-        <!-- 3. CATÁLOGO DE TEXTURAS DE PISO -->
-        <div class="space-y-2.5 pt-4">
-          <span class="text-xs font-bold text-slate-800 flex items-center justify-between">
-            <span class="flex items-center gap-1.5">
+        <!-- 3. CATÁLOGO EXPANDIDO DE ACABADOS DE PISO -->
+        <div class="space-y-3 pt-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <span class="material-icons text-xs text-amber-600">texture</span>
               Acabado del Piso
+              <span class="text-[10px] font-normal text-slate-400">({{ filteredFloorCatalog().length }} modelos)</span>
             </span>
-            <span class="text-[10px] text-slate-400 font-normal">Texturas procedurales Three.js con relieve</span>
-          </span>
+            
+            <!-- Pestañas de Categoría de Piso -->
+            <div class="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg text-[11px] overflow-x-auto">
+              <button 
+                type="button" 
+                (click)="setFloorCategory('all')"
+                [class]="activeFloorCategory() === 'all' 
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs' 
+                  : 'text-slate-600 hover:text-slate-900 font-medium'"
+                class="px-2 py-0.5 rounded-md transition cursor-pointer whitespace-nowrap">
+                Todos
+              </button>
+              <button 
+                type="button" 
+                (click)="setFloorCategory('cement')"
+                [class]="activeFloorCategory() === 'cement' 
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs' 
+                  : 'text-slate-600 hover:text-slate-900 font-medium'"
+                class="px-2 py-0.5 rounded-md transition cursor-pointer whitespace-nowrap">
+                Porcelanatos & Cemento
+              </button>
+              <button 
+                type="button" 
+                (click)="setFloorCategory('wood')"
+                [class]="activeFloorCategory() === 'wood' 
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs' 
+                  : 'text-slate-600 hover:text-slate-900 font-medium'"
+                class="px-2 py-0.5 rounded-md transition cursor-pointer whitespace-nowrap">
+                Maderas & SPC
+              </button>
+              <button 
+                type="button" 
+                (click)="setFloorCategory('marble')"
+                [class]="activeFloorCategory() === 'marble' 
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs' 
+                  : 'text-slate-600 hover:text-slate-900 font-medium'"
+                class="px-2 py-0.5 rounded-md transition cursor-pointer whitespace-nowrap">
+                Mármol & Piedra
+              </button>
+            </div>
+          </div>
 
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 min-w-0">
-            <!-- Roble Natural -->
-            <button 
-              type="button" 
-              (click)="setFloorMaterial('wood_light')"
-              [class]="roomConfig().floorMaterial === 'wood_light' 
-                ? 'bg-amber-50/80 border-amber-400 text-amber-950 ring-1 ring-amber-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#d8c29d] border border-amber-300 shrink-0 shadow-2xs"></div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Roble Claro</span>
-                <span class="text-[10px] text-slate-500 block truncate">Madera con duelas</span>
-              </div>
-            </button>
+          <!-- Cuadrícula de Acabados de Piso -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 min-w-0 max-h-60 overflow-y-auto pr-1">
+            @for (item of filteredFloorCatalog(); track item.id) {
+              <button 
+                type="button" 
+                (click)="setFloorMaterial(item.id)"
+                [class]="roomConfig().floorMaterial === item.id 
+                  ? 'bg-amber-50/80 border-amber-500 text-amber-950 ring-2 ring-amber-400/40 shadow-xs' 
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/80'"
+                class="p-2 border rounded-xl text-left transition flex items-start gap-2.5 cursor-pointer relative group">
+                
+                <!-- Muestra de textura/color -->
+                <div 
+                  class="w-8 h-8 rounded-lg shrink-0 border border-black/10 shadow-2xs mt-0.5 flex items-center justify-center text-xs font-semibold"
+                  [style.backgroundColor]="item.swatchBg">
+                  @if (roomConfig().floorMaterial === item.id) {
+                    <span class="material-icons text-xs text-amber-600 bg-white/95 rounded-full p-0.5 shadow-2xs">check</span>
+                  }
+                </div>
 
-            <!-- Nogal Oscuro -->
-            <button 
-              type="button" 
-              (click)="setFloorMaterial('wood_walnut')"
-              [class]="roomConfig().floorMaterial === 'wood_walnut' 
-                ? 'bg-amber-50/80 border-amber-400 text-amber-950 ring-1 ring-amber-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#5c4033] border border-amber-900 shrink-0 shadow-2xs"></div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Nogal Oscuro</span>
-                <span class="text-[10px] text-slate-500 block truncate">Madera profunda</span>
-              </div>
-            </button>
-
-            <!-- Porcelanato Blanco Mármol -->
-            <button 
-              type="button" 
-              (click)="setFloorMaterial('marble_white')"
-              [class]="roomConfig().floorMaterial === 'marble_white' 
-                ? 'bg-sky-50/80 border-sky-400 text-sky-950 ring-1 ring-sky-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#f8f9fa] border border-slate-300 shrink-0 shadow-2xs"></div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Mármol Carrara</span>
-                <span class="text-[10px] text-slate-500 block truncate">Porcelanato pulido</span>
-              </div>
-            </button>
-
-            <!-- Concreto Industrial -->
-            <button 
-              type="button" 
-              (click)="setFloorMaterial('concrete_gray')"
-              [class]="roomConfig().floorMaterial === 'concrete_gray' 
-                ? 'bg-slate-100 border-slate-400 text-slate-900 ring-1 ring-slate-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#a6adb4] border border-slate-400 shrink-0 shadow-2xs"></div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Concreto Gris</span>
-                <span class="text-[10px] text-slate-500 block truncate">Cemento pulido</span>
-              </div>
-            </button>
-
-            <!-- Grafito Oscuro -->
-            <button 
-              type="button" 
-              (click)="setFloorMaterial('tile_dark')"
-              [class]="roomConfig().floorMaterial === 'tile_dark' 
-                ? 'bg-slate-100 border-slate-700 text-slate-900 ring-1 ring-slate-400' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#272b30] border border-slate-700 shrink-0 shadow-2xs"></div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Grafito Oscuro</span>
-                <span class="text-[10px] text-slate-500 block truncate">Baldosas 60×60 cm</span>
-              </div>
-            </button>
+                <div class="min-w-0 flex-1">
+                  <span class="font-bold block text-xs truncate leading-snug">{{ item.name }}</span>
+                  <span class="text-[10px] text-slate-500 block truncate">{{ item.brand }} · {{ item.format }}</span>
+                  <span class="text-[9px] text-slate-400 block truncate leading-tight mt-0.5">{{ item.description }}</span>
+                </div>
+              </button>
+            }
           </div>
         </div>
 
-        <!-- 4. CATÁLOGO DE TEXTURAS DE PAREDES -->
-        <div class="space-y-2.5 pt-4">
-          <span class="text-xs font-bold text-slate-800 flex items-center justify-between">
-            <span class="flex items-center gap-1.5">
+        <!-- 4. CATÁLOGO EXPANDIDO DE ACABADOS DE PAREDES Y MUROS -->
+        <div class="space-y-3 pt-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <span class="material-icons text-xs text-sky-600">wallpaper</span>
               Acabado de Muros y Paredes
+              <span class="text-[10px] font-normal text-slate-400">({{ filteredWallCatalog().length }} modelos)</span>
             </span>
-            <span class="text-[10px] text-slate-400 font-normal">Escala milimétrica con juntas</span>
-          </span>
 
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 min-w-0">
-            <!-- Azulejo Subway Blanco -->
-            <button 
-              type="button" 
-              (click)="setWallMaterial('subway_tile_white')"
-              [class]="roomConfig().wallMaterial === 'subway_tile_white' 
-                ? 'bg-sky-50/80 border-sky-400 text-sky-950 ring-1 ring-sky-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#f8f9fa] border border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0 shadow-2xs">🧱</div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Azulejo Metro Blanco</span>
-                <span class="text-[10px] text-slate-500 block truncate">Subway cerámico</span>
-              </div>
-            </button>
+            <!-- Pestañas de Categoría de Muro -->
+            <div class="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg text-[11px] overflow-x-auto">
+              <button 
+                type="button" 
+                (click)="setWallCategory('all')"
+                [class]="activeWallCategory() === 'all' 
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs' 
+                  : 'text-slate-600 hover:text-slate-900 font-medium'"
+                class="px-2 py-0.5 rounded-md transition cursor-pointer whitespace-nowrap">
+                Todos
+              </button>
+              <button 
+                type="button" 
+                (click)="setWallCategory('brick')"
+                [class]="activeWallCategory() === 'brick' 
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs' 
+                  : 'text-slate-600 hover:text-slate-900 font-medium'"
+                class="px-2 py-0.5 rounded-md transition cursor-pointer whitespace-nowrap">
+                Ladrillos
+              </button>
+              <button 
+                type="button" 
+                (click)="setWallCategory('tile')"
+                [class]="activeWallCategory() === 'tile' 
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs' 
+                  : 'text-slate-600 hover:text-slate-900 font-medium'"
+                class="px-2 py-0.5 rounded-md transition cursor-pointer whitespace-nowrap">
+                Cerámica & Metro
+              </button>
+              <button 
+                type="button" 
+                (click)="setWallCategory('marble')"
+                [class]="activeWallCategory() === 'marble' 
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs' 
+                  : 'text-slate-600 hover:text-slate-900 font-medium'"
+                class="px-2 py-0.5 rounded-md transition cursor-pointer whitespace-nowrap">
+                Mármol & Salpicadero
+              </button>
+              <button 
+                type="button" 
+                (click)="setWallCategory('panel')"
+                [class]="activeWallCategory() === 'panel' 
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs' 
+                  : 'text-slate-600 hover:text-slate-900 font-medium'"
+                class="px-2 py-0.5 rounded-md transition cursor-pointer whitespace-nowrap">
+                Paneles & Lisos
+              </button>
+            </div>
+          </div>
 
-            <!-- Azulejo Verde Esmeralda -->
-            <button 
-              type="button" 
-              (click)="setWallMaterial('subway_tile_emerald')"
-              [class]="roomConfig().wallMaterial === 'subway_tile_emerald' 
-                ? 'bg-emerald-50/80 border-emerald-400 text-emerald-950 ring-1 ring-emerald-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#0c5037] border border-emerald-700 shrink-0 shadow-2xs"></div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Azulejo Esmeralda</span>
-                <span class="text-[10px] text-slate-500 block truncate">Verde artesanal vitrificado</span>
-              </div>
-            </button>
+          <!-- Cuadrícula de Acabados de Pared -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 min-w-0 max-h-60 overflow-y-auto pr-1">
+            @for (item of filteredWallCatalog(); track item.id) {
+              <button 
+                type="button" 
+                (click)="setWallMaterial(item.id)"
+                [class]="roomConfig().wallMaterial === item.id 
+                  ? 'bg-sky-50/80 border-sky-500 text-sky-950 ring-2 ring-sky-400/40 shadow-xs' 
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/80'"
+                class="p-2 border rounded-xl text-left transition flex items-start gap-2.5 cursor-pointer relative group">
+                
+                <!-- Muestra de textura/color -->
+                <div 
+                  class="w-8 h-8 rounded-lg shrink-0 border border-black/10 shadow-2xs mt-0.5 flex items-center justify-center text-xs font-semibold"
+                  [style.backgroundColor]="item.swatchBg">
+                  @if (roomConfig().wallMaterial === item.id) {
+                    <span class="material-icons text-xs text-sky-600 bg-white/95 rounded-full p-0.5 shadow-2xs">check</span>
+                  } @else if (item.swatchIcon) {
+                    <span class="text-xs">{{ item.swatchIcon }}</span>
+                  }
+                </div>
 
-            <!-- Yeso Blanco Cálido -->
-            <button 
-              type="button" 
-              (click)="setWallMaterial('plaster_warm')"
-              [class]="roomConfig().wallMaterial === 'plaster_warm' 
-                ? 'bg-amber-50/80 border-amber-400 text-amber-950 ring-1 ring-amber-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#f4f1ea] border border-amber-200 shrink-0 shadow-2xs"></div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Yeso Liso Cálido</span>
-                <span class="text-[10px] text-slate-500 block truncate">Pintura mate neutral</span>
-              </div>
-            </button>
-
-            <!-- Concreto Arquitectónico -->
-            <button 
-              type="button" 
-              (click)="setWallMaterial('concrete_smooth')"
-              [class]="roomConfig().wallMaterial === 'concrete_smooth' 
-                ? 'bg-slate-100 border-slate-400 text-slate-900 ring-1 ring-slate-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#c5cbd0] border border-slate-400 shrink-0 shadow-2xs"></div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Concreto Visto</span>
-                <span class="text-[10px] text-slate-500 block truncate">Estilo contemporáneo</span>
-              </div>
-            </button>
-
-            <!-- Listones de Madera Nórdicos -->
-            <button 
-              type="button" 
-              (click)="setWallMaterial('vertical_slats_wood')"
-              [class]="roomConfig().wallMaterial === 'vertical_slats_wood' 
-                ? 'bg-amber-50/80 border-amber-400 text-amber-950 ring-1 ring-amber-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
-              class="p-2 border rounded-lg text-left transition flex items-center gap-2 cursor-pointer shadow-2xs">
-              <div class="w-6 h-6 rounded bg-[#c8a97e] border border-amber-300 flex items-center justify-center text-[10px] font-bold text-amber-900 shrink-0 shadow-2xs">🥢</div>
-              <div class="min-w-0">
-                <span class="font-bold block text-xs truncate">Listones Madera</span>
-                <span class="text-[10px] text-slate-500 block truncate">Panel acústico roble</span>
-              </div>
-            </button>
+                <div class="min-w-0 flex-1">
+                  <span class="font-bold block text-xs truncate leading-snug">{{ item.name }}</span>
+                  <span class="text-[10px] text-slate-500 block truncate">{{ item.brand }} · {{ item.format }}</span>
+                  <span class="text-[9px] text-slate-400 block truncate leading-tight mt-0.5">{{ item.description }}</span>
+                </div>
+              </button>
+            }
           </div>
         </div>
 

@@ -305,18 +305,306 @@ export type WorkspaceMode = 'module' | 'room';
 export type RoomLayoutType = 'single_wall' | 'l_shape';
 
 export type FloorMaterialType = 
-  | 'wood_light' 
-  | 'wood_walnut' 
-  | 'marble_white' 
+  // Porcelanatos y Cemento
   | 'concrete_gray' 
-  | 'tile_dark';
+  | 'concrete_arena' 
+  | 'concrete_white' 
+  | 'tile_dark'
+  // Maderas y Laminados
+  | 'wood_light' 
+  | 'wood_guayacan' 
+  | 'wood_walnut' 
+  | 'wood_haya'
+  // Mármoles y Piedras
+  | 'marble_white' 
+  | 'marble_calacatta_gold' 
+  | 'travertine_beige' 
+  | 'stone_slate_black';
 
 export type WallMaterialType = 
+  // Ladrillos
+  | 'brick_clay' 
+  | 'brick_white'
+  // Azulejos y Cerámica
   | 'subway_tile_white' 
   | 'subway_tile_emerald' 
-  | 'plaster_warm' 
+  | 'subway_tile_black'
+  // Mármoles, Cuarzo y Salpicaderos
+  | 'marble_wall_calacatta' 
+  | 'kitchen_backsplash_quartz' 
+  | 'kitchen_backsplash_mosaic'
+  // Revestimientos Continuos y Listones
+  | 'vertical_slats_wood' 
   | 'concrete_smooth' 
-  | 'vertical_slats_wood';
+  | 'plaster_warm';
+
+export type FloorFinishCategory = 'all' | 'cement' | 'wood' | 'marble';
+export type WallFinishCategory = 'all' | 'brick' | 'tile' | 'marble' | 'panel';
+
+export interface FinishCatalogItem<T> {
+  id: T;
+  name: string;
+  brand: string;
+  format: string;
+  category: string;
+  tag: string;
+  swatchBg: string;
+  swatchIcon?: string;
+  description: string;
+}
+
+export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
+  // Porcelanatos y Cemento
+  {
+    id: 'concrete_gray',
+    name: 'Concrete Gris Pro',
+    brand: 'Corona Porcelatech',
+    format: '60×60 cm',
+    category: 'cement',
+    tag: 'Alta Resistencia',
+    swatchBg: '#a6adb4',
+    description: 'Cemento pulido industrial gris neutro ARD Pro',
+  },
+  {
+    id: 'concrete_arena',
+    name: 'Boss Arena Cálido',
+    brand: 'Corona Porcelatech',
+    format: '60×60 cm',
+    category: 'cement',
+    tag: 'Mate Sedoso',
+    swatchBg: '#c8bead',
+    description: 'Microcemento cálido con matices arena natural',
+  },
+  {
+    id: 'concrete_white',
+    name: 'Cemento Blanco Ártico',
+    brand: 'Corona Pro',
+    format: '60×120 cm',
+    category: 'cement',
+    tag: 'Luminoso',
+    swatchBg: '#e5e7eb',
+    description: 'Hormigón blanco contemporáneo micropulido',
+  },
+  {
+    id: 'tile_dark',
+    name: 'Grafito Industrial ARD',
+    brand: 'Corona ARD® Pro',
+    format: '60×60 cm',
+    category: 'cement',
+    tag: 'Antideslizante',
+    swatchBg: '#272b30',
+    description: 'Porcelanato antracita oscuro de alto tráfico',
+  },
+
+  // Maderas y Laminados
+  {
+    id: 'wood_light',
+    name: 'Roble Nórdico Natural',
+    brand: 'Holztek SPC',
+    format: '20×120 cm Duela',
+    category: 'wood',
+    tag: 'Impermeable',
+    swatchBg: '#d8c29d',
+    description: 'Madera clara con veta sincronizada natural',
+  },
+  {
+    id: 'wood_guayacan',
+    name: 'Guayacán Hobo Miel',
+    brand: 'Corona Madera',
+    format: '20×120 cm Duela',
+    category: 'wood',
+    tag: 'Vetas Cálidas',
+    swatchBg: '#c19a6b',
+    description: 'Vetas intensas de madera tropical dorada',
+  },
+  {
+    id: 'wood_walnut',
+    name: 'Nogal Americano Clásico',
+    brand: 'Holztek SPC',
+    format: '20×120 cm Duela',
+    category: 'wood',
+    tag: 'Elegancia',
+    swatchBg: '#5c4033',
+    description: 'Tono café profundo con textura de duela noble',
+  },
+  {
+    id: 'wood_haya',
+    name: 'Haya Clara Escandinava',
+    brand: 'Holztek',
+    format: '20×120 cm Duela',
+    category: 'wood',
+    tag: 'Minimalista',
+    swatchBg: '#e6d7c3',
+    description: 'Madera sutilmente blanqueada y limpia',
+  },
+
+  // Mármoles y Piedras
+  {
+    id: 'marble_white',
+    name: 'Carrara Blanco Puro',
+    brand: 'Corona Rectificado',
+    format: '60×120 cm',
+    category: 'marble',
+    tag: 'Brillo Espejo',
+    swatchBg: '#f8f9fa',
+    description: 'Porcelanato blanco pulido con vetas grises',
+  },
+  {
+    id: 'marble_calacatta_gold',
+    name: 'Madrid Oro Calacatta',
+    brand: 'Corona Rect. Pulido',
+    format: '60×120 cm',
+    category: 'marble',
+    tag: 'Gold Luxury',
+    swatchBg: '#faf7f0',
+    description: 'Fondo blanco con vetas doradas y cobrizas',
+  },
+  {
+    id: 'travertine_beige',
+    name: 'Travertino Clásico Romano',
+    brand: 'Corona Estructurado',
+    format: '60×60 cm',
+    category: 'marble',
+    tag: 'Textura Piedra',
+    swatchBg: '#ded4c3',
+    description: 'Piedra calcárea con textura mineral porosa',
+  },
+  {
+    id: 'stone_slate_black',
+    name: 'Pizarra Negra Alpina',
+    brand: 'Corona Estructurado',
+    format: '60×60 cm',
+    category: 'marble',
+    tag: 'Relieve Hendido',
+    swatchBg: '#1e2227',
+    description: 'Piedra volcánica oscura con relieve hendido',
+  },
+];
+
+export const WALL_FINISHES_CATALOG: FinishCatalogItem<WallMaterialType>[] = [
+  // Ladrillos
+  {
+    id: 'brick_clay',
+    name: 'Ladrillo Arcilla Rústico',
+    brand: 'Caravista Rústico',
+    format: '24×6 cm con Llaga',
+    category: 'brick',
+    tag: 'Industrial Loft',
+    swatchBg: '#b85d38',
+    swatchIcon: '🧱',
+    description: 'Ladrillo visto cocido con mortero gris claro',
+  },
+  {
+    id: 'brick_white',
+    name: 'Ladrillo Blanco Loft',
+    brand: 'Loft Decapado',
+    format: '24×6 cm con Llaga',
+    category: 'brick',
+    tag: 'Nórdico Loft',
+    swatchBg: '#eeebe6',
+    swatchIcon: '🧱',
+    description: 'Ladrillo pintado blanco desgastado con relieve',
+  },
+
+  // Cerámica y Subway Tiles
+  {
+    id: 'subway_tile_white',
+    name: 'Azulejo Metro Blanco',
+    brand: 'Corona Revestimientos',
+    format: '10×20 cm Biselado',
+    category: 'tile',
+    tag: 'Clásico Cocina',
+    swatchBg: '#f8f9fa',
+    swatchIcon: '✨',
+    description: 'Subway tile biselado brillante con junta gris',
+  },
+  {
+    id: 'subway_tile_emerald',
+    name: 'Azulejo Verde Esmeralda',
+    brand: 'Cerámica Artesanal',
+    format: '10×20 cm Vitrificado',
+    category: 'tile',
+    tag: 'Esmalte Joya',
+    swatchBg: '#0c5037',
+    description: 'Verde artesanal esmaltado con reflejo vitrificado',
+  },
+  {
+    id: 'subway_tile_black',
+    name: 'Metro Carbón Mate',
+    brand: 'Corona Pro',
+    format: '10×20 cm Biselado',
+    category: 'tile',
+    tag: 'Contemporáneo',
+    swatchBg: '#212529',
+    description: 'Subway negro satinado con relieve biselado',
+  },
+
+  // Mármoles, Cuarzo y Salpicaderos
+  {
+    id: 'marble_wall_calacatta',
+    name: 'Mármol Calacatta Continuo',
+    brand: 'Corona Gran Formato',
+    format: '120×260 cm Bookmatch',
+    category: 'marble',
+    tag: 'Sin Juntas',
+    swatchBg: '#faf9f6',
+    description: 'Placas pulidas continuas con vetas Calacatta',
+  },
+  {
+    id: 'kitchen_backsplash_quartz',
+    name: 'Cuarzo Gris Neutro Cocina',
+    brand: 'Superficie Sólida',
+    format: 'Salpicadero Continuo',
+    category: 'marble',
+    tag: 'Anti-Grasa',
+    swatchBg: '#cbd5e1',
+    description: 'Salpicadero continuo satinado para zona de cocción',
+  },
+  {
+    id: 'kitchen_backsplash_mosaic',
+    name: 'Mosaico Hexagonal Sandalo',
+    brand: 'Corona Decorativo',
+    format: 'Hexágono 15×15 cm',
+    category: 'marble',
+    tag: 'Geométrico',
+    swatchBg: '#e2d9cc',
+    description: 'Geometría hexagonal moderna para salpicadero',
+  },
+
+  // Paneles y Revestimientos
+  {
+    id: 'vertical_slats_wood',
+    name: 'Listones Acústicos Roble',
+    brand: 'Palillería Nórdica',
+    format: 'Listones 25×12 mm',
+    category: 'panel',
+    tag: 'Tendencia Cocina',
+    swatchBg: '#c8a97e',
+    swatchIcon: '🥢',
+    description: 'Fondo negro fonoabsorbente con palillería roble',
+  },
+  {
+    id: 'concrete_smooth',
+    name: 'Cemento Visto Encofrado',
+    brand: 'Hormigón Arquitectónico',
+    format: 'Paneles 120×60 cm',
+    category: 'panel',
+    tag: 'Brutalista',
+    swatchBg: '#c5cbd0',
+    description: 'Hormigón visto con marcas de encofrado',
+  },
+  {
+    id: 'plaster_warm',
+    name: 'Yeso Liso Cálido',
+    brand: 'Pintura Lavable Cocina',
+    format: 'Pared Continua',
+    category: 'panel',
+    tag: 'Neutral Mate',
+    swatchBg: '#f4f1ea',
+    description: 'Pintura satinada lavable blanca rota sin textura',
+  },
+];
+
 
 export interface RoomConfiguration {
   layout: RoomLayoutType;

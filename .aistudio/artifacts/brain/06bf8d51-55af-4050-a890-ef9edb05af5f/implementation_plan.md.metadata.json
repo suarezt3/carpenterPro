@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de solución para los tres detalles identificados en la Habitación 3D:\n1. Reubicación de la barra flotante de la habitación 3D para evitar solapamiento con la cinta vertical de herramientas (left-3) y la barra de piezas/grupos seleccionados (right-3).\n2. Clarificación y ampliación del espacio de trabajo de la habitación 3D: soporte paramétrico ampliado hasta 12 metros, eliminación de cuadrículas vacías detrás de las paredes y presets de tamaño de cocina.\n3. Corrección definitiva de la tarjeta de 'Esquina en L' en el modal de configuración con icono arquitectónico e información completa sin cortes.",
-  "updatedAt":  "2026-10-10T23:44:45.754877906Z",
+  "summary":  "Plan de implementación para el catálogo expandido de acabados de pisos y muros en la habitación 3D, incorporando colecciones reales inspiradas en Corona y Holztek con pestañas por categoría y texturas procedurales de alta definición.",
+  "updatedAt":  "2026-10-11T00:59:17.554831109Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -24,7 +24,11 @@ import {
   RoomLayoutType,
   FloorMaterialType,
   WallMaterialType,
-  DEFAULT_ROOM_CONFIG
+  DEFAULT_ROOM_CONFIG,
+  FLOOR_FINISHES_CATALOG,
+  WALL_FINISHES_CATALOG,
+  FloorFinishCategory,
+  WallFinishCategory
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -173,6 +177,24 @@ export class ModuleDesignerComponent {
   readonly roomConfig = signal<RoomConfiguration>(DEFAULT_ROOM_CONFIG);
   readonly showRoomSettingsModal = signal<boolean>(false);
   readonly selectedWall = signal<'main' | 'side' | null>(null);
+
+  // Finish Catalogs (Corona & Holztek collections)
+  readonly floorCatalog = FLOOR_FINISHES_CATALOG;
+  readonly wallCatalog = WALL_FINISHES_CATALOG;
+  readonly activeFloorCategory = signal<FloorFinishCategory>('all');
+  readonly activeWallCategory = signal<WallFinishCategory>('all');
+
+  readonly filteredFloorCatalog = computed(() => {
+    const cat = this.activeFloorCategory();
+    if (cat === 'all') return this.floorCatalog;
+    return this.floorCatalog.filter(item => item.category === cat);
+  });
+
+  readonly filteredWallCatalog = computed(() => {
+    const cat = this.activeWallCategory();
+    if (cat === 'all') return this.wallCatalog;
+    return this.wallCatalog.filter(item => item.category === cat);
+  });
 
   // Technical Shop Sheet Modal
   readonly showTechnicalSheetModal = signal<boolean>(false);
@@ -1745,6 +1767,14 @@ export class ModuleDesignerComponent {
   setWallMaterial(mat: WallMaterialType) {
     this.updateRoomConfig({ wallMaterial: mat });
     this.showToast('🎨 Material de pared actualizado');
+  }
+
+  setFloorCategory(cat: FloorFinishCategory) {
+    this.activeFloorCategory.set(cat);
+  }
+
+  setWallCategory(cat: WallFinishCategory) {
+    this.activeWallCategory.set(cat);
   }
 
   toggleFloorGrid() {
