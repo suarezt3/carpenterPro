@@ -500,6 +500,22 @@
             <span class="text-slate-500">·</span>
             <span class="text-slate-300 font-mono">{{ roomConfig().mainWallLength }} mm</span>
 
+            <!-- Badge de Imán Inteligente a Paredes -->
+            <div class="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-[11px] font-semibold text-emerald-300 shadow-2xs" title="Imán inteligente activo a 30 mm para piezas, muebles y equipos">
+              <span class="material-icons text-[12px] text-emerald-400">auto_fix_high</span>
+              <span>Imán Paredes (30mm)</span>
+            </div>
+
+            <!-- Botón Mover Mueble Completo -->
+            <button 
+              type="button" 
+              (click)="moveEntireFurniture()" 
+              class="px-2.5 py-0.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-lg text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer shadow-xs"
+              title="Seleccionar todo el mueble y activar arrastre para alinearlo magnéticamente a las paredes">
+              <span class="material-icons text-[12px]">open_with</span>
+              <span>Mover Mueble</span>
+            </button>
+
             <!-- Control Interactivo del Muro Seleccionado en 3D -->
             @if (selectedWall(); as wall) {
               <div class="flex items-center gap-1 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2 py-0.5 rounded-lg text-[11px] font-semibold animate-in fade-in duration-100">

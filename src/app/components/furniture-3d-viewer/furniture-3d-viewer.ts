@@ -75,6 +75,32 @@ export interface ClearanceInfo {
   rightNeighborName: string | null;
 }
 
+export interface WallSnapResult {
+  isSnappedX: boolean;
+  isSnappedZ: boolean;
+  correctedX: number;
+  correctedZ: number;
+  deltaX: number;
+  deltaZ: number;
+  snappedWallType?: 'main' | 'side' | 'corner';
+  contactGuide?: {
+    mainWallContact?: {
+      xStart: number;
+      xEnd: number;
+      yMin: number;
+      yMax: number;
+      z: number;
+    };
+    sideWallContact?: {
+      zStart: number;
+      zEnd: number;
+      yMin: number;
+      yMax: number;
+      x: number;
+    };
+  };
+}
+
 @Component({
   selector: 'app-furniture-3d-viewer',
   imports: [],
@@ -314,6 +340,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private gridHelper: THREE.GridHelper | null = null;
   private floorMesh: THREE.Mesh | null = null;
   private roomGroup = new THREE.Group();
+  private wallSnapGuideGroup = new THREE.Group();
   private appliancesGroup = new THREE.Group();
   private applianceGizmoGroup = new THREE.Group();
 
@@ -496,6 +523,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.pushPullHighlightGroup);
     this.scene.add(this.rectPreviewGroup);
     this.scene.add(this.roomGroup);
+    this.scene.add(this.wallSnapGuideGroup);
     this.scene.add(this.wallGizmoGroup);
     this.scene.add(this.appliancesGroup);
     this.scene.add(this.applianceGizmoGroup);
@@ -3420,10 +3448,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
         } else {
           // If part belongs to a group (e.g. modular drawer), select the entire group for block translation!
           let partsToSelect: Part[] = [];
+          const curIds = this.activeSelectedIds();
           if (part.groupId) {
             const groupParts = this.parts().filter(p => p.groupId === part.groupId);
             partsToSelect = groupParts.length > 0 ? groupParts : [part];
             this.partsSelected.emit(partsToSelect.map(p => p.id));
+            this.partSelected.emit(part);
+          } else if (curIds.includes(part.id) && curIds.length > 1) {
+            partsToSelect = this.parts().filter(p => curIds.includes(p.id));
+            this.partsSelected.emit(curIds);
             this.partSelected.emit(part);
           } else {
             partsToSelect = [part];
@@ -3570,8 +3603,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
         // --- CONTACT MAGNET (Imán dinámico: adherir al aproximarse y soltar al alejarse) ---
         const config = this.roomConfig();
         const parts = this.parts();
-        const halfAppW = app.width / 2;
-        const halfAppD = app.depth / 2;
+        const rot = ((app.rotation || 0) % 360 + 360) % 360;
+        const isRotated90 = rot === 90 || rot === 270;
+        const appDimX = isRotated90 ? (app.depth || 600) : (app.width || 600);
+        const appDimZ = isRotated90 ? (app.width || 600) : (app.depth || 600);
+        const halfAppW = appDimX / 2;
+        const halfAppD = appDimZ / 2;
 
         // 1. Detección de mesada o pieza horizontal bajo la huella (X, Z) del equipo
         let hasCountertopUnderneath = false;
@@ -3605,18 +3642,38 @@ export class Furniture3dViewerComponent implements OnDestroy {
           newY = rawY; // Elevación vertical libre hacia arriba o hacia abajo con el ratón
         }
 
-        // 2. Imán a Pared Posterior (Main Wall): adherir si está cerca y soltar al alejar
-        const backWallInnerZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + halfAppD;
-        if (Math.abs(rawZ - backWallInnerZ) <= 80) {
-          newZ = Math.round(backWallInnerZ);
-        }
+        // 2 & 3. Imán inteligente de paredes (Muro posterior y muro en L con umbral fino de 30 mm y guía visual)
+        if (this.isMagneticSnap()) {
+          const appMinX = rawX - halfAppW;
+          const appMaxX = rawX + halfAppW;
+          const appMinZ = rawZ - halfAppD;
+          const appMaxZ = rawZ + halfAppD;
+          const appMinY = newY;
+          const appMaxY = newY + (app.height || 850);
 
-        // 3. Imán a Pared Lateral en L (Side Wall): adherir si está cerca y soltar al alejar
-        if (config.layout === 'l_shape') {
-          const sideWallInnerX = (config.wallOffsetX || 0) + (config.wallThickness || 150) + halfAppW;
-          if (Math.abs(rawX - sideWallInnerX) <= 80) {
-            newX = Math.round(sideWallInnerX);
+          const wallSnap = this.calculateWallSnap({
+            minX: appMinX,
+            maxX: appMaxX,
+            minY: appMinY,
+            maxY: appMaxY,
+            minZ: appMinZ,
+            maxZ: appMaxZ
+          }, 30);
+
+          if (wallSnap.isSnappedZ) {
+            newZ = Math.round(rawZ + wallSnap.deltaZ);
           }
+          if (wallSnap.isSnappedX) {
+            newX = Math.round(rawX + wallSnap.deltaX);
+          }
+
+          if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
+            this.renderWallSnapGuides(wallSnap);
+          } else {
+            this.clearWallSnapGuides();
+          }
+        } else {
+          this.clearWallSnapGuides();
         }
 
         this.applianceModified.emit({
@@ -3849,25 +3906,71 @@ export class Furniture3dViewerComponent implements OnDestroy {
         if (hit.type === 'axis') {
           if (this.dragInitialParts.length > 1) {
             // Group Translation for multiple selected pieces (drawer/cabinet)
-            let delta = 0;
+            let deltaX = 0;
+            let deltaY = 0;
+            let deltaZ = 0;
             if (hit.axis === 'x') {
-              delta = Math.round(deltaWorld.x / snap) * snap;
+              deltaX = Math.round(deltaWorld.x / snap) * snap;
             } else if (hit.axis === 'y') {
-              delta = Math.round(deltaWorld.y / snap) * snap;
+              deltaY = Math.round(deltaWorld.y / snap) * snap;
             } else if (hit.axis === 'z') {
-              delta = Math.round(deltaWorld.z / snap) * snap;
+              deltaZ = Math.round(deltaWorld.z / snap) * snap;
+            }
+
+            if (this.isMagneticSnap() && (hit.axis === 'x' || hit.axis === 'z')) {
+              let grpMinX = Infinity;
+              let grpMaxX = -Infinity;
+              let grpMinY = Infinity;
+              let grpMaxY = -Infinity;
+              let grpMinZ = Infinity;
+              let grpMaxZ = -Infinity;
+
+              for (const p of this.dragInitialParts) {
+                const pBounds = this.getPartBounds(p, {
+                  x: (p.posX ?? 0) + deltaX,
+                  y: Math.max(0, (p.posY ?? 0) + deltaY),
+                  z: (p.posZ ?? 0) + deltaZ
+                });
+                grpMinX = Math.min(grpMinX, pBounds.minX);
+                grpMaxX = Math.max(grpMaxX, pBounds.maxX);
+                grpMinY = Math.min(grpMinY, pBounds.minY);
+                grpMaxY = Math.max(grpMaxY, pBounds.maxY);
+                grpMinZ = Math.min(grpMinZ, pBounds.minZ);
+                grpMaxZ = Math.max(grpMaxZ, pBounds.maxZ);
+              }
+
+              const wallSnap = this.calculateWallSnap({
+                minX: grpMinX,
+                maxX: grpMaxX,
+                minY: grpMinY,
+                maxY: grpMaxY,
+                minZ: grpMinZ,
+                maxZ: grpMaxZ
+              }, 30);
+
+              if (hit.axis === 'z' && wallSnap.isSnappedZ) {
+                deltaZ += wallSnap.deltaZ;
+              }
+              if (hit.axis === 'x' && wallSnap.isSnappedX) {
+                deltaX += wallSnap.deltaX;
+              }
+
+              if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
+                this.renderWallSnapGuides(wallSnap);
+              } else {
+                this.clearWallSnapGuides();
+              }
+            } else {
+              this.clearWallSnapGuides();
             }
 
             const updatesList: { part: Part; updates: Partial<Part> }[] = [];
             for (const p of this.dragInitialParts) {
-              const upd: Partial<Part> = {};
-              if (hit.axis === 'x') {
-                upd.posX = (p.posX ?? 0) + delta;
-              } else if (hit.axis === 'y') {
-                upd.posY = Math.max(0, (p.posY ?? 0) + delta);
-              } else if (hit.axis === 'z') {
-                upd.posZ = (p.posZ ?? 0) + delta;
-              }
+              const upd: Partial<Part> = {
+                posX: (p.posX ?? 0) + deltaX,
+                posY: Math.max(0, (p.posY ?? 0) + deltaY),
+                posZ: (p.posZ ?? 0) + deltaZ
+              };
               updatesList.push({ part: p, updates: upd });
             }
             this.multiplePartsModified.emit({ updates: updatesList });
@@ -3889,6 +3992,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
               targetPos.x += steppedDelta;
               if (this.isMagneticSnap()) {
                 targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'x');
+                const pBounds = this.getPartBounds(part, targetPos);
+                const wallSnap = this.calculateWallSnap(pBounds, 30);
+                if (wallSnap.isSnappedX) {
+                  targetPos.x += wallSnap.deltaX;
+                  this.renderWallSnapGuides(wallSnap);
+                } else {
+                  this.clearWallSnapGuides();
+                }
+              } else {
+                this.clearWallSnapGuides();
               }
               updates.posX = targetPos.x;
             } else if (hit.axis === 'y') {
@@ -3898,11 +4011,22 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'y');
               }
               updates.posY = targetPos.y;
+              this.clearWallSnapGuides();
             } else if (hit.axis === 'z') {
               const steppedDelta = Math.round(deltaWorld.z / snap) * snap;
               targetPos.z += steppedDelta;
               if (this.isMagneticSnap()) {
                 targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'z');
+                const pBounds = this.getPartBounds(part, targetPos);
+                const wallSnap = this.calculateWallSnap(pBounds, 30);
+                if (wallSnap.isSnappedZ) {
+                  targetPos.z += wallSnap.deltaZ;
+                  this.renderWallSnapGuides(wallSnap);
+                } else {
+                  this.clearWallSnapGuides();
+                }
+              } else {
+                this.clearWallSnapGuides();
               }
               updates.posZ = targetPos.z;
             }
@@ -3981,13 +4105,64 @@ export class Furniture3dViewerComponent implements OnDestroy {
           const dz = Math.round(deltaWorld.z / snap) * snap;
 
           if (this.dragInitialParts.length > 1) {
-            // Group Drag: translate all pieces in group together
+            // Group Drag: translate all pieces in group together with smart wall snap
+            let effDx = dx;
+            let effDy = dy;
+            let effDz = dz;
+
+            if (this.isMagneticSnap()) {
+              let grpMinX = Infinity;
+              let grpMaxX = -Infinity;
+              let grpMinY = Infinity;
+              let grpMaxY = -Infinity;
+              let grpMinZ = Infinity;
+              let grpMaxZ = -Infinity;
+
+              for (const p of this.dragInitialParts) {
+                const pBounds = this.getPartBounds(p, {
+                  x: (p.posX ?? 0) + effDx,
+                  y: Math.max(0, (p.posY ?? 0) + effDy),
+                  z: (p.posZ ?? 0) + effDz
+                });
+                grpMinX = Math.min(grpMinX, pBounds.minX);
+                grpMaxX = Math.max(grpMaxX, pBounds.maxX);
+                grpMinY = Math.min(grpMinY, pBounds.minY);
+                grpMaxY = Math.max(grpMaxY, pBounds.maxY);
+                grpMinZ = Math.min(grpMinZ, pBounds.minZ);
+                grpMaxZ = Math.max(grpMaxZ, pBounds.maxZ);
+              }
+
+              const wallSnap = this.calculateWallSnap({
+                minX: grpMinX,
+                maxX: grpMaxX,
+                minY: grpMinY,
+                maxY: grpMaxY,
+                minZ: grpMinZ,
+                maxZ: grpMaxZ
+              }, 30);
+
+              if (wallSnap.isSnappedZ) {
+                effDz += wallSnap.deltaZ;
+              }
+              if (wallSnap.isSnappedX) {
+                effDx += wallSnap.deltaX;
+              }
+
+              if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
+                this.renderWallSnapGuides(wallSnap);
+              } else {
+                this.clearWallSnapGuides();
+              }
+            } else {
+              this.clearWallSnapGuides();
+            }
+
             const updatesList: { part: Part; updates: Partial<Part> }[] = [];
             for (const p of this.dragInitialParts) {
               const upd: Partial<Part> = {
-                posX: (p.posX ?? 0) + dx,
-                posY: Math.max(0, (p.posY ?? 0) + dy),
-                posZ: (p.posZ ?? 0) + dz
+                posX: (p.posX ?? 0) + effDx,
+                posY: Math.max(0, (p.posY ?? 0) + effDy),
+                posZ: (p.posZ ?? 0) + effDz
               };
               updatesList.push({ part: p, updates: upd });
             }
@@ -3996,7 +4171,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
               this.partModified.emit(updatesList[0]);
             }
           } else if (this.dragInitialPart) {
-            // Single Part Drag: translate piece with optional magnetic snapping
+            // Single Part Drag: translate piece with optional magnetic snapping & wall snap
             const part = this.dragInitialPart;
             let targetPos = {
               x: (part.posX ?? 0) + dx,
@@ -4008,6 +4183,24 @@ export class Furniture3dViewerComponent implements OnDestroy {
               targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'x');
               targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'y');
               targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'z');
+
+              const partBounds = this.getPartBounds(part, targetPos);
+              const wallSnap = this.calculateWallSnap(partBounds, 30);
+
+              if (wallSnap.isSnappedZ) {
+                targetPos.z += wallSnap.deltaZ;
+              }
+              if (wallSnap.isSnappedX) {
+                targetPos.x += wallSnap.deltaX;
+              }
+
+              if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
+                this.renderWallSnapGuides(wallSnap);
+              } else {
+                this.clearWallSnapGuides();
+              }
+            } else {
+              this.clearWallSnapGuides();
             }
 
             const updates: Partial<Part> = {
@@ -4224,6 +4417,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) canvas.style.cursor = 'default';
     }
+
+    this.clearWallSnapGuides();
   }
 
   // --- CAD TOOLS & PUSH/PULL FACE RAYCASTING ---
@@ -5494,6 +5689,237 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return proposedPos;
   }
 
+  private calculateWallSnap(
+    bounds: {
+      minX: number;
+      maxX: number;
+      minY: number;
+      maxY: number;
+      minZ: number;
+      maxZ: number;
+    },
+    threshold = 30
+  ): WallSnapResult {
+    const config = this.roomConfig();
+    const offX = config.wallOffsetX || 0;
+    const offZ = config.wallOffsetZ || 0;
+    const wallThickness = config.wallThickness || 150;
+    const mainWallLength = config.mainWallLength || 3600;
+    const sideWallLength = config.sideWallLength || 2400;
+    const layout = config.layout || 'straight';
+
+    let deltaX = 0;
+    let deltaZ = 0;
+    let isSnappedX = false;
+    let isSnappedZ = false;
+
+    // 1. MURO PRINCIPAL (Back Wall a lo largo de X)
+    // Su cara frontal interior está en Z = offZ + wallThickness
+    const mainWallInnerZ = offZ + wallThickness;
+    const mainWallMinX = offX;
+    const mainWallMaxX = offX + mainWallLength;
+
+    // Verificar si el elemento está en el tramo horizontal del muro (con tolerancia de 100mm)
+    const inMainWallSpan = bounds.maxX >= mainWallMinX - 100 && bounds.minX <= mainWallMaxX + 100;
+    if (inMainWallSpan) {
+      const distZ = bounds.minZ - mainWallInnerZ;
+      if (Math.abs(distZ) <= threshold) {
+        deltaZ = mainWallInnerZ - bounds.minZ;
+        isSnappedZ = true;
+      }
+    }
+
+    // 2. MURO LATERAL EN L (Side Wall a lo largo de Z si layout === 'l_shape')
+    const sideWallInnerX = offX + wallThickness;
+    if (layout === 'l_shape') {
+      const sideWallMinZ = offZ + wallThickness;
+      const sideWallMaxZ = offZ + wallThickness + sideWallLength;
+
+      const inSideWallSpan = bounds.maxZ >= sideWallMinZ - 100 && bounds.minZ <= sideWallMaxZ + 100;
+      if (inSideWallSpan) {
+        const distX = bounds.minX - sideWallInnerX;
+        if (Math.abs(distX) <= threshold) {
+          deltaX = sideWallInnerX - bounds.minX;
+          isSnappedX = true;
+        }
+      }
+    }
+
+    const res: WallSnapResult = {
+      isSnappedX,
+      isSnappedZ,
+      correctedX: bounds.minX + deltaX,
+      correctedZ: bounds.minZ + deltaZ,
+      deltaX,
+      deltaZ,
+      snappedWallType: isSnappedX && isSnappedZ ? 'corner' : (isSnappedZ ? 'main' : (isSnappedX ? 'side' : undefined))
+    };
+
+    if (isSnappedX || isSnappedZ) {
+      res.contactGuide = {};
+      if (isSnappedZ) {
+        res.contactGuide.mainWallContact = {
+          xStart: Math.max(mainWallMinX, bounds.minX + deltaX),
+          xEnd: Math.min(mainWallMaxX, bounds.maxX + deltaX),
+          yMin: Math.max(0, bounds.minY),
+          yMax: Math.max(bounds.minY + 20, bounds.maxY),
+          z: mainWallInnerZ + 0.8
+        };
+      }
+      if (isSnappedX) {
+        res.contactGuide.sideWallContact = {
+          zStart: Math.max(offZ + wallThickness, bounds.minZ + deltaZ),
+          zEnd: Math.min(offZ + wallThickness + sideWallLength, bounds.maxZ + deltaZ),
+          yMin: Math.max(0, bounds.minY),
+          yMax: Math.max(bounds.minY + 20, bounds.maxY),
+          x: sideWallInnerX + 0.8
+        };
+      }
+    }
+
+    return res;
+  }
+
+  private clearWallSnapGuides() {
+    while (this.wallSnapGuideGroup.children.length > 0) {
+      const obj = this.wallSnapGuideGroup.children[0];
+      if (obj instanceof THREE.Mesh) {
+        if (obj.geometry) obj.geometry.dispose();
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach(m => m.dispose());
+        } else if (obj.material) {
+          obj.material.dispose();
+        }
+      } else if (obj instanceof THREE.Sprite) {
+        if (obj.material.map) obj.material.map.dispose();
+        if (obj.material) obj.material.dispose();
+      }
+      this.wallSnapGuideGroup.remove(obj);
+    }
+  }
+
+  private renderWallSnapGuides(snapResult: WallSnapResult) {
+    this.clearWallSnapGuides();
+    if (!snapResult.contactGuide) return;
+
+    const { mainWallContact, sideWallContact } = snapResult.contactGuide;
+
+    // Laser neon seam material
+    const laserMat = new THREE.MeshBasicMaterial({
+      color: 0x06b6d4,
+      transparent: true,
+      opacity: 0.95
+    });
+    // Soft glowing highlight rectangle on the wall surface
+    const washMat = new THREE.MeshBasicMaterial({
+      color: 0x06b6d4,
+      transparent: true,
+      opacity: 0.18,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+
+    if (mainWallContact) {
+      const { xStart, xEnd, yMin, yMax, z } = mainWallContact;
+      const width = Math.max(10, xEnd - xStart);
+      const height = Math.max(10, yMax - yMin);
+      const centerX = (xStart + xEnd) / 2;
+      const centerY = (yMin + yMax) / 2;
+
+      // 1. Resplandor translúcido sobre el muro
+      const washGeo = new THREE.PlaneGeometry(width, height);
+      const washMesh = new THREE.Mesh(washGeo, washMat);
+      washMesh.position.set(centerX, centerY, z);
+      this.wallSnapGuideGroup.add(washMesh);
+
+      // 2. Líneas láser superior e inferior de contacto
+      const lineT = 3.5;
+      const topSeamGeo = new THREE.BoxGeometry(width, lineT, 1.5);
+      const topSeam = new THREE.Mesh(topSeamGeo, laserMat);
+      topSeam.position.set(centerX, yMax, z + 0.3);
+      this.wallSnapGuideGroup.add(topSeam);
+
+      const bottomSeamGeo = new THREE.BoxGeometry(width, lineT, 1.5);
+      const bottomSeam = new THREE.Mesh(bottomSeamGeo, laserMat);
+      bottomSeam.position.set(centerX, yMin, z + 0.3);
+      this.wallSnapGuideGroup.add(bottomSeam);
+
+      // 3. Badge flotante en 3D
+      const labelText = sideWallContact ? '🧲 Muros en Escuadra · 0 mm' : '🧲 Muro Posterior · 0 mm';
+      const badgeSprite = this.createWallSnapBadge(labelText);
+      badgeSprite.position.set(centerX, Math.min(2500, yMax + 75), z + 1.2);
+      this.wallSnapGuideGroup.add(badgeSprite);
+    }
+
+    if (sideWallContact) {
+      const { zStart, zEnd, yMin, yMax, x } = sideWallContact;
+      const depth = Math.max(10, zEnd - zStart);
+      const height = Math.max(10, yMax - yMin);
+      const centerZ = (zStart + zEnd) / 2;
+      const centerY = (yMin + yMax) / 2;
+
+      // 1. Resplandor translúcido sobre el muro lateral
+      const washGeo = new THREE.PlaneGeometry(depth, height);
+      const washMesh = new THREE.Mesh(washGeo, washMat);
+      washMesh.rotation.y = Math.PI / 2;
+      washMesh.position.set(x, centerY, centerZ);
+      this.wallSnapGuideGroup.add(washMesh);
+
+      // 2. Líneas láser superior e inferior
+      const lineT = 3.5;
+      const topSeamGeo = new THREE.BoxGeometry(1.5, lineT, depth);
+      const topSeam = new THREE.Mesh(topSeamGeo, laserMat);
+      topSeam.position.set(x + 0.3, yMax, centerZ);
+      this.wallSnapGuideGroup.add(topSeam);
+
+      const bottomSeamGeo = new THREE.BoxGeometry(1.5, lineT, depth);
+      const bottomSeam = new THREE.Mesh(bottomSeamGeo, laserMat);
+      bottomSeam.position.set(x + 0.3, yMin, centerZ);
+      this.wallSnapGuideGroup.add(bottomSeam);
+
+      if (!mainWallContact) {
+        const badgeSprite = this.createWallSnapBadge('🧲 Muro Lateral L · 0 mm');
+        badgeSprite.position.set(x + 1.2, Math.min(2500, yMax + 75), centerZ);
+        this.wallSnapGuideGroup.add(badgeSprite);
+      }
+    }
+  }
+
+  private createWallSnapBadge(text: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 76;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Soft rounded pill background
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      // Text with cyan accent
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(300, 57, 1);
+    return sprite;
+  }
+
   private applyMagneticSnapToStretch(
     part: Part,
     targetDimension: 'length' | 'width' | 'thickness',
@@ -6426,6 +6852,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const child = this.applianceGizmoGroup.children[0];
       this.applianceGizmoGroup.remove(child);
     }
+    this.clearWallSnapGuides();
     if (this.renderer) {
       this.renderer.dispose();
     }

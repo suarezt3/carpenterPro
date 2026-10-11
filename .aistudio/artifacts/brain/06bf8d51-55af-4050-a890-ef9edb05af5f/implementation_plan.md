@@ -1,52 +1,109 @@
-# Plan de Implementación: Elevación Libre 3D con Ratón e Imán Dinámico de Contacto
+# Imán Inteligente de Paredes Interiores para Piezas, Grupos, Muebles y Equipos 3D
 
-Permitir que cualquier electrodoméstico o equipo seleccionado pueda moverse libremente en todas las dimensiones con el ratón (desplazamiento horizontal y elevación vertical directa hacia arriba y abajo), conservando el imán inteligente que se adhiere suavemente al acercarse a superficies (suelo, mesadas, paredes) y se libera de forma natural cuando el usuario aleja el cursor.
+Sistema unificado de adherencia magnética perimétrica hacia las caras internas de los muros arquitectónicos (muro posterior y muro en escuadra en L), asegurando alineación precisa de piezas individuales, conjuntos/grupos, muebles completos y electrodomésticos con un umbral de proximidad de 30 mm y guía visual luminosa interactiva.
 
----
+### User Review & Critical Decisions
 
-## 1. Diagnóstico del Comportamiento Actual
-- **Causa del bloqueo de altura**: En `furniture-3d-viewer.ts`, el plano de intersección de arrastre del equipo (`this.dragPlane`) estaba configurado como un plano horizontal rígido (`Vector3(0, 1, 0)`) a la altura previa del equipo, y en `onPointerMove` la coordenada $Y$ se fijaba a `initialPos.y`, impidiendo que el movimiento vertical del ratón en la pantalla elevara o descendiera el equipo.
-- **Comportamiento deseado**: 
-  - Al arrastrar el ratón hacia arriba/abajo en la pantalla, el equipo debe subir y bajar en el espacio 3D de manera fluida y predecible.
-  - Al pasar cerca de superficies de apoyo (suelo a $Y = 0$, o mesadas horizontales a la cota superior del mueble), el imán debe aplicar un "snap magnético" (zona de atracción de ~120 mm) fijando la base.
-  - Si el usuario continúa moviendo el ratón alejándose de la superficie, el imán se suelta automáticamente permitiendo continuar la elevación libre.
-
----
-
-## 2. Cambios Arquitectónicos y Algorítmicos
-
-### A. Plano de Arrastre 3D Orientado a la Cámara (`furniture-3d-viewer.ts`)
-- Configurar `this.dragPlane` en `onPointerDown` perpendicular a la dirección visual de la cámara (`camDir.negate()`) pasando por la posición del equipo.
-- Esto proyecta con precisión milimétrica los movimientos del cursor 2D de la pantalla en vectores $(X, Y, Z)$ reales en el espacio 3D del taller/cocina:
-  $$\Delta \mathbf{P} = \mathbf{P}_{\text{intersect}} - \mathbf{P}_{\text{start}}$$
-  $$\text{targetX} = \text{initialPos.x} + \Delta P_x$$
-  $$\text{targetY} = \max(0, \text{initialPos.y} + \Delta P_y)$$
-  $$\text{targetZ} = \text{initialPos.z} + \Delta P_z$$
-
-### B. Imán Dinámico con Zona de Atracción y Desenganche Suave
-- **Imán a Suelo ($Y = 0$)**:
-  - Si el ratón baja el equipo y $\text{targetY} \le 110\text{ mm}$, se adhiere magnéticamente a la base ($Y = 0$).
-  - Si el ratón se desplaza hacia arriba superando ese umbral, se despega suavemente y sigue la elevación del ratón.
-- **Imán a Mesadas y Módulos de Muebles**:
-  - Detectar si la proyección horizontal $(X, Z)$ del equipo se sitúa sobre alguna pieza horizontal del mueble (mesada, repisa o tapa).
-  - Calcular la cota superior de apoyo $Y_{\text{mesada}} = p.posY + p.thickness / 2$.
-  - Si $|\text{targetY} - Y_{\text{mesada}}| \le 130\text{ mm}$, la base del equipo se adhiere magnéticamente a $Y_{\text{mesada}}$.
-  - Si el usuario mueve el ratón más de $130\text{ mm}$ por encima o por debajo de la mesada, el imán se libera fluidamente.
-- **Imán a Pared Posterior y Lateral**:
-  - Pared posterior: adherencia a la cara interior del muro si la distancia es $\le 80\text{ mm}$; se desengancha al alejar el ratón hacia el frente.
-  - Muro lateral en L: adherencia a la cara interior izquierda si la distancia es $\le 80\text{ mm}$.
-
-### C. Feedback Visual 3D Durante la Elevación
-- El anillo de proyección en el suelo se actualiza en tiempo real mostrando la huella vertical del equipo.
-- Actualización suave en el visor 3D sin saltos bruscos.
+> [!IMPORTANT]
+> **Decisiones Confirmadas con el Usuario en la Fase de Clarificación:**
+> - **Tipo de Alineación:** Pegar la cara trasera del elemento al muro manteniendo su rotación actual (sin forzar giros arbitrarios).
+> - **Sensibilidad y Umbral:** Imán suave de precisión fina a **30 mm de distancia**. Se adhiere al aproximarse a menos de 30 mm y se desengancha limpiamente al mover el cursor hacia afuera.
+> - **Feedback Visual en 3D:** Línea guía sutil y resplandor perimétrico iluminado sobre la cara interna del muro activo cuando la adherencia magnética entra en contacto.
 
 ---
 
-## 3. Plan de Verificación y Pruebas
-1. **Prueba de Elevación Libre**:
-   - Seleccionar cualquier electrodoméstico (nevera, horno, microondas, fregadero) y arrastrar con el ratón hacia arriba y hacia abajo en la pantalla: comprobar que el equipo se eleva y desciende libremente.
-2. **Prueba de Imán en Suelo y Mesada**:
-   - Bajar el equipo hacia el piso: verificar que se fija a $Y = 0$. Mover el ratón hacia arriba: verificar que se despega sin atascarse.
-   - Mover el equipo sobre un mueble bajo: verificar que al acercarse a la altura de la mesada se posa exactamente sobre la cara superior. Elevarlo más arriba: comprobar que se desengancha de la mesada.
-3. **Prueba de Compilación y Calidad**:
-   - Ejecutar `compile_applet` y `lint_applet` para garantizar 0 errores de compilación y cumplimiento de estándares.
+### 1. Overview & Core Concept
+
+- **Qué hace:** Proporciona un motor de cálculo magnético común que detecta las caras interiores de las paredes de la habitación (`mainWall` en el plano posterior Z y `sideWall` en el plano lateral X) durante cualquier operación de arrastre en 3D.
+- **Elementos Soportados:**
+  1. **Piezas Individuales:** Al arrastrar directamente una melamina sobre la escena o al desplazarla con el manipulador.
+  2. **Conjuntos de Piezas (Grupos / Multiselección):** Al arrastrar un grupo de piezas (ej. un cajón completo, módulos de estantes o gabinetes seleccionados), el bounding box colectivo calcula su plano trasero y lo ajusta al milímetro contra el muro.
+  3. **Muebles Completos:** Al mover el cuerpo total del mueble en modo habitación (`workspaceMode = 'room'`).
+  4. **Equipos y Electrodomésticos:** Neveras, campanas, hornos, lavaplatos, cocinas y microondas se adhieren al ras de la cara interior de la pared sin incrustarse dentro del espesor constructivo del muro.
+- **Beneficio Principal:** Elimina la necesidad de calcular manualmente espesores de pared o posicionamientos milimétricos en X y Z; los elementos se acoplan de forma natural, exacta y visualmente clara contra la pared.
+
+---
+
+### 2. User Experience & Visual Design
+
+- **Flujo de Interacción:**
+  1. El usuario hace clic sobre una pieza, grupo o electrodoméstico y lo arrastra libremente en el espacio 3D.
+  2. Al aproximar la cara trasera o el borde del objeto a menos de 30 mm de la cara interior del muro (posterior o lateral), el objeto "salta" suavemente y queda pegado al ras de la superficie interior.
+  3. En ese instante, se activa una **guía visual luminosa (laser snap line)** en color cian/esmeralda sutil sobre la línea de contacto del muro, acompañada por un resplandor translúcido elegante en el muro activo.
+  4. Si el usuario continúa moviendo el ratón alejándose más de 30 mm, el objeto se desengancha de inmediato, volviendo al arrastre libre y apagando la guía visual.
+  5. Al soltar el botón del ratón, la posición final queda consolidada con precisión milimétrica.
+
+```
+Arrastre libre (cursor) ---> [Distancia <= 30 mm] ---> Imán activo + Línea guía sutil
+                                                       │
+                                                       ├── Cara trasera pegada al ras
+                                                       └── Desenganche al alejar cursor
+```
+
+- **Estética & Motion:**
+  - Línea guía de contacto con grosor controlado y sutil pulso de opacidad.
+  - Indicador de distancia mínima (ej. `Muro Posterior · 0 mm`) para confirmación visual sin estorbar la perspectiva de trabajo.
+
+---
+
+### 3. Key Product Decisions & Trade-Offs
+
+- **Cálculo de la Cara Interna del Muro:**
+  - *Enfoque:* La cara frontal interior del muro posterior se ubica con precisión en $Z_{\text{inner}} = \text{wallOffsetZ} + \text{wallThickness}$ (considerando zócalo de 16 mm si está activo). La cara interior del muro lateral en L se ubica en $X_{\text{inner}} = \text{wallOffsetX} + \text{wallThickness}$.
+  - *Por qué:* El código previo en ciertas secciones dividía erróneamente el espesor por 2, provocando que los objetos quedasen metidos dentro del tabique. La corrección geométrica garantiza que queden exactamente a ras.
+- **Bounding Box Dinámico Orientado:**
+  - *Enfoque:* Para cualquier conjunto de piezas o electrodoméstico con rotación, se calcula su envolvente tridimensional exterior mínima y máxima para obtener el punto de contacto más atrasado.
+  - *Alternativas Consideradas:* Forzar la rotación del mueble a 0° o 90° automáticamente. Se descartó porque el usuario prefirió mantener la orientación actual establecida.
+
+---
+
+### 4. Technical Architecture & Data Strategy
+
+```
+┌────────────────────────────────────────────────────────┐
+│               Furniture 3D Viewer                      │
+│                                                        │
+│  ┌────────────────────────┐  ┌──────────────────────┐  │
+│  │   Direct Drag Engine   │  │ Appliance Drag Eng.  │  │
+│  │  (Parts / Groups)      │  │ (Kitchen Appliances) │  │
+│  └───────────┬────────────┘  └──────────┬───────────┘  │
+│              │                          │              │
+│              ▼                          ▼              │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │      Smart Wall Snap Calculation Engine          │  │
+│  │  - Back Wall Inner Face (Z = offsetZ + thickness)│  │
+│  │  - Side Wall Inner Face (X = offsetX + thickness)│  │
+│  │  - 30 mm Proximity Threshold                     │  │
+│  └──────────────────────────┬───────────────────────┘  │
+│                             │                          │
+│                             ▼                          │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │          Snap Visual Feedback Manager            │  │
+│  │  - Dynamic Laser Guideline Mesh (Cyan/Emerald)   │  │
+│  │  - Active Wall Contact Highlight                 │  │
+│  └──────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────┘
+```
+
+#### Plan de Modificaciones:
+
+1. **Motor Central de Imán de Muros (`calculateWallSnap`):**
+   - Implementar un método reutilizable en `Furniture3dViewerComponent` que reciba los límites o dimensiones del elemento (minX, maxX, minZ, maxZ, posición actual) y devuelva:
+     - Posición corregida en X y Z si está a $\le 30\text{ mm}$ de cualquiera de los muros internos.
+     - Bandera booleana indicando si el imán posterior o lateral está activo.
+     - Puntos 3D de la línea de contacto para el feedback visual.
+
+2. **Integración en Arrastre de Piezas y Conjuntos de Piezas (`onPointerMove`):**
+   - En el arrastre directo de pieza individual (`this.dragInitialPart`), aplicar el imán de muro además del imán entre piezas.
+   - En el arrastre directo de grupos de piezas / multiselección (`this.dragInitialParts.length > 1`), calcular la caja envolvente de todo el conjunto y aplicar el imán al bloque rígido completo.
+
+3. **Integración en Electrodomésticos y Equipos (`isApplianceDragging`):**
+   - Corregir el cálculo de la cara interna del muro posterior ($Z_{\text{inner}} = \text{wallOffsetZ} + \text{wallThickness} + \text{halfDepth}$) y lateral ($X_{\text{inner}} = \text{wallOffsetX} + \text{wallThickness} + \text{halfWidth}$).
+   - Reemplazar el umbral fijo por 30 mm con desenganche dinámico.
+
+4. **Feedback Visual de Resplandor y Línea Guía:**
+   - Crear un grupo Three.js dedicado (`wallSnapGuideGroup`) que dibuje una línea luminosa sutil (resplandor cian) a lo largo del muro en la zona de contacto cuando el imán esté adherido.
+   - Limpiar automáticamente las guías cuando el elemento se aleje o al soltar el ratón (`onPointerUp`).
+
+5. **Verificación y Compilación:**
+   - Ejecutar `compile_applet` para asegurar cero errores de tipos o sintaxis.

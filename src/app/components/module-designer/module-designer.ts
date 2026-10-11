@@ -2028,4 +2028,10 @@ export class ModuleDesignerComponent {
       this.showToast(`🧱 Seleccionado: ${wall === 'main' ? 'Muro Principal' : 'Muro Lateral L'}`);
     }
   }
+
+  moveEntireFurniture() {
+    this.selectAllParts();
+    this.activateMoveToolOnViewer();
+    this.showToast('🧲 Mueble completo listo: arrástralo libremente hacia las paredes con imán inteligente');
+  }
 }
