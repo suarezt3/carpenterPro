@@ -114,9 +114,9 @@
           (wallSelected)="onWallSelected($event)">
         </app-furniture-3d-viewer>
 
-        <!-- Indicador Flotante de Modo Habitación 3D (Esquina Superior Izquierda del Visor) -->
+        <!-- Indicador Flotante de Modo Habitación 3D (Ubicado en la parte inferior izquierda, sin sobreponerse con la paleta vertical de herramientas ni con la cinta de acciones superior) -->
         @if (workspaceMode() === 'room') {
-          <div class="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-1.5 bg-slate-900/90 text-white backdrop-blur-md px-3 py-1.5 rounded-lg shadow-lg border border-white/10 text-xs pointer-events-auto max-w-[calc(100%-100px)]">
+          <div class="absolute bottom-10 left-16 sm:left-20 z-30 flex flex-wrap items-center gap-1.5 bg-slate-900/95 text-white backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-2xl border border-white/10 text-xs pointer-events-auto max-w-[calc(100%-80px)] animate-in fade-in slide-in-from-bottom-2 duration-150">
             <span class="material-icons text-sky-400 text-sm">roofing</span>
             <span class="font-medium text-slate-200">
               <span class="font-bold text-white">{{ roomConfig().layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta' }}</span>
@@ -126,7 +126,7 @@
 
             <!-- Control Interactivo del Muro Seleccionado en 3D -->
             @if (selectedWall(); as wall) {
-              <div class="flex items-center gap-1 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2 py-0.5 rounded text-[11px] font-semibold animate-in fade-in duration-100">
+              <div class="flex items-center gap-1 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2 py-0.5 rounded-lg text-[11px] font-semibold animate-in fade-in duration-100">
                 <span class="material-icons text-[12px] text-sky-400">straighten</span>
                 <span>{{ wall === 'main' ? 'Muro Principal' : 'Muro Lateral L' }}:</span>
                 <span class="font-mono text-white">{{ wall === 'main' ? roomConfig().mainWallLength : roomConfig().sideWallLength }} mm</span>
@@ -147,8 +147,8 @@
               <button 
                 type="button" 
                 (click)="alignWallsToEdge()" 
-                class="px-1.5 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded text-[10px] font-semibold transition flex items-center gap-0.5 cursor-pointer"
-                title="Alinear muros al borde del piso para aprovechar todo el espacio">
+                class="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 cursor-pointer border border-amber-500/30"
+                title="Alinear muros al borde posterior e izquierdo del piso para aprovechar todo el espacio">
                 <span class="material-icons text-[11px]">align_horizontal_left</span>
                 <span>Al Borde</span>
               </button>
@@ -157,15 +157,15 @@
             <button 
               type="button" 
               (click)="openRoomSettings()" 
-              class="ml-0.5 px-2 py-0.5 bg-white/10 hover:bg-white/20 text-sky-300 rounded font-semibold text-[11px] transition flex items-center gap-1 cursor-pointer"
-              title="Ajustar medidas de paredes, posición y texturas">
+              class="ml-0.5 px-2.5 py-0.5 bg-white/10 hover:bg-white/20 text-sky-300 rounded-lg font-semibold text-[11px] transition flex items-center gap-1 cursor-pointer"
+              title="Ajustar medidas de paredes, dimensiones de suelo, posición y texturas">
               <span class="material-icons text-xs">tune</span>
-              <span>Ajustar</span>
+              <span>Ajustar Habitación</span>
             </button>
             <button 
               type="button" 
               (click)="frameRoomCamera()" 
-              class="px-1.5 py-0.5 bg-white/10 hover:bg-white/20 text-slate-300 rounded text-[11px] transition flex items-center gap-0.5 cursor-pointer"
+              class="px-2 py-0.5 bg-white/10 hover:bg-white/20 text-slate-300 rounded-lg text-[11px] transition flex items-center gap-0.5 cursor-pointer"
               title="Centrar vista en la habitación">
               <span class="material-icons text-xs">center_focus_strong</span>
             </button>
@@ -1808,36 +1808,56 @@
         
         <!-- 1. DISPOSICIÓN DE PAREDES (LAYOUT) -->
         <div class="space-y-2 min-w-0">
-          <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <span class="material-icons text-xs text-sky-600">view_quilt</span>
-            Disposición de Paredes
-          </span>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 min-w-0 w-full">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span class="material-icons text-xs text-sky-600">view_quilt</span>
+              Disposición de Paredes
+            </span>
+            <span class="text-[10px] text-slate-400 font-medium">Configuración de muros arquitectónicos</span>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2 sm:gap-2.5 min-w-0 w-full">
+            <!-- Pared Recta (Frontal) -->
             <button 
               type="button" 
               (click)="setRoomLayout('single_wall')"
               [class]="roomConfig().layout === 'single_wall' 
-                ? 'bg-sky-50 border-sky-400 text-sky-950 ring-1 ring-sky-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+                ? 'bg-sky-50/90 border-sky-400 text-sky-950 ring-1 ring-sky-300 shadow-xs' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'"
               class="p-2.5 sm:p-3 border rounded-xl text-left transition flex items-start gap-2.5 cursor-pointer shadow-2xs min-w-0 overflow-hidden">
-              <span class="material-icons text-sky-600 text-lg mt-0.5 shrink-0">horizontal_rule</span>
+              <div class="w-7 h-7 rounded-lg bg-sky-100/80 text-sky-700 flex items-center justify-center shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                </svg>
+              </div>
               <div class="min-w-0 flex-1">
-                <span class="font-bold block text-xs truncate">Pared Recta (Frontal)</span>
-                <span class="text-[10px] text-slate-500 block mt-0.5 leading-tight">Muro lineal frontal para cocina o sala</span>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-bold text-xs text-slate-900 truncate">Pared Frontal</span>
+                  <span class="text-[9px] font-semibold px-1.5 py-0.2 bg-slate-200/80 text-slate-600 rounded">1 Muro</span>
+                </div>
+                <span class="text-[10px] text-slate-500 block mt-0.5 leading-tight truncate">Muro lineal único de apoyo</span>
               </div>
             </button>
 
+            <!-- Esquina en L (Frontal + Lateral) -->
             <button 
               type="button" 
               (click)="setRoomLayout('l_shape')"
               [class]="roomConfig().layout === 'l_shape' 
-                ? 'bg-sky-50 border-sky-400 text-sky-950 ring-1 ring-sky-300' 
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'"
+                ? 'bg-sky-50/90 border-sky-400 text-sky-950 ring-1 ring-sky-300 shadow-xs' 
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'"
               class="p-2.5 sm:p-3 border rounded-xl text-left transition flex items-start gap-2.5 cursor-pointer shadow-2xs min-w-0 overflow-hidden">
-              <span class="material-icons text-sky-600 text-lg mt-0.5 shrink-0">corner_down_right</span>
+              <div class="w-7 h-7 rounded-lg bg-sky-100/80 text-sky-700 flex items-center justify-center shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 4v16h16" />
+                </svg>
+              </div>
               <div class="min-w-0 flex-1">
-                <span class="font-bold block text-xs truncate">Esquina en L</span>
-                <span class="text-[10px] text-slate-500 block mt-0.5 leading-tight">Frontal + Lateral L para rincón o cocina</span>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-bold text-xs text-slate-900 truncate">Esquina en L</span>
+                  <span class="text-[9px] font-bold px-1.5 py-0.2 bg-sky-500 text-white rounded">En Escuadra</span>
+                </div>
+                <span class="text-[10px] text-slate-500 block mt-0.5 leading-tight truncate">Frontal + Lateral L (90°)</span>
               </div>
             </button>
           </div>
@@ -1861,7 +1881,7 @@
                   (input)="updateRoomConfig({ mainWallLength: +$any($event.target).value })"
                   step="100" 
                   min="1200" 
-                  max="10000"
+                  max="12000"
                   class="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 focus:outline-hidden focus:border-sky-500" />
                 <span class="text-[10px] text-slate-400 font-mono shrink-0">mm</span>
               </div>
@@ -1878,7 +1898,7 @@
                     (input)="updateRoomConfig({ sideWallLength: +$any($event.target).value })"
                     step="100" 
                     min="1000" 
-                    max="8000"
+                    max="12000"
                     class="w-full px-2 py-1 bg-white border border-sky-300 rounded text-xs font-mono font-bold text-sky-900 focus:outline-hidden focus:border-sky-500" />
                   <span class="text-[10px] text-sky-500 font-mono shrink-0">mm</span>
                 </div>
@@ -1895,11 +1915,91 @@
                   (input)="updateRoomConfig({ wallHeight: +$any($event.target).value })"
                   step="50" 
                   min="1800" 
-                  max="4000"
+                  max="4500"
                   class="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 focus:outline-hidden focus:border-sky-500" />
                 <span class="text-[10px] text-slate-400 font-mono shrink-0">mm</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- 2.2. DIMENSIONES DEL SUELO / ENTORNO (AMPLIABLE HASTA 12+ METROS) -->
+        <div class="space-y-2.5 pt-4 min-w-0">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span class="material-icons text-xs text-indigo-600">crop_free</span>
+              Dimensiones del Suelo / Entorno (Expandible)
+            </span>
+            <span class="text-[10px] text-indigo-600 font-semibold">Hasta 12+ metros</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 min-w-0">
+            <!-- Ancho Suelo -->
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1 min-w-0">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-semibold text-slate-600">Ancho del Suelo (Eje X)</span>
+                <span class="text-[10px] font-mono text-slate-400">{{ ((roomConfig().floorWidth || 5000) / 1000).toFixed(1) }} m</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <input 
+                  type="number" 
+                  [value]="roomConfig().floorWidth || 5000" 
+                  (input)="updateRoomConfig({ floorWidth: +$any($event.target).value })"
+                  step="500" 
+                  min="3000" 
+                  max="15000"
+                  class="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 focus:outline-hidden focus:border-sky-500" />
+                <span class="text-[10px] text-slate-400 font-mono shrink-0">mm</span>
+              </div>
+            </div>
+
+            <!-- Profundidad Suelo -->
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1 min-w-0">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-semibold text-slate-600">Profundidad del Suelo (Eje Z)</span>
+                <span class="text-[10px] font-mono text-slate-400">{{ ((roomConfig().floorDepth || 5000) / 1000).toFixed(1) }} m</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <input 
+                  type="number" 
+                  [value]="roomConfig().floorDepth || 5000" 
+                  (input)="updateRoomConfig({ floorDepth: +$any($event.target).value })"
+                  step="500" 
+                  min="3000" 
+                  max="15000"
+                  class="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 focus:outline-hidden focus:border-sky-500" />
+                <span class="text-[10px] text-slate-400 font-mono shrink-0">mm</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Presets rápidos de suelo -->
+          <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span class="text-[10px] text-slate-500 font-medium mr-1">Preajustes Rápidos:</span>
+            <button 
+              type="button" 
+              (click)="setFloorDimensions(5000, 5000)"
+              class="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] font-semibold text-slate-700 transition cursor-pointer">
+              5 × 5 m (Estándar)
+            </button>
+            <button 
+              type="button" 
+              (click)="setFloorDimensions(8000, 6000)"
+              class="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] font-semibold text-slate-700 transition cursor-pointer">
+              8 × 6 m (Cocina Amplia)
+            </button>
+            <button 
+              type="button" 
+              (click)="setFloorDimensions(10000, 8000)"
+              class="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] font-semibold text-slate-700 transition cursor-pointer">
+              10 × 8 m (Salón / Cocina)
+            </button>
+            <button 
+              type="button" 
+              (click)="setFloorDimensions(12000, 10000)"
+              class="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] font-semibold text-slate-700 transition cursor-pointer">
+              12 × 10 m (Gran Proyecto)
+            </button>
           </div>
         </div>
 

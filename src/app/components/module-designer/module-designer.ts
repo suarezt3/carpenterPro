@@ -1755,9 +1755,17 @@ export class ModuleDesignerComponent {
 
   stretchSideWall(delta: number) {
     const curL = this.roomConfig().sideWallLength;
-    const nextL = Math.max(1000, Math.min(8000, curL + delta));
+    const nextL = Math.max(1000, Math.min(10000, curL + delta));
     this.updateRoomConfig({ sideWallLength: nextL });
     this.showToast(`📏 Muro Lateral: ${nextL} mm`);
+  }
+
+  setFloorDimensions(width: number, depth: number) {
+    this.updateRoomConfig({
+      floorWidth: width,
+      floorDepth: depth
+    });
+    this.showToast(`📐 Suelo ampliado: ${(width / 1000).toFixed(1)} × ${(depth / 1000).toFixed(1)} m`);
   }
 
   onWallSelected(wall: 'main' | 'side' | null) {

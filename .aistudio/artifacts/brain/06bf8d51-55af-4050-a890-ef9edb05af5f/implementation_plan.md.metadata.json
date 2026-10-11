@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para optimizar el entorno 3D: muros modulares con desplazamiento X/Z y gizmo de arrastre, eliminación del espacio muerto detrás de las paredes mediante alineación automática al borde del piso, y corrección del desbordamiento horizontal en el modal de configuración.",
-  "updatedAt":  "2026-10-10T15:55:45.205011587Z",
+  "summary":  "Plan de solución para los tres detalles identificados en la Habitación 3D:\n1. Reubicación de la barra flotante de la habitación 3D para evitar solapamiento con la cinta vertical de herramientas (left-3) y la barra de piezas/grupos seleccionados (right-3).\n2. Clarificación y ampliación del espacio de trabajo de la habitación 3D: soporte paramétrico ampliado hasta 12 metros, eliminación de cuadrículas vacías detrás de las paredes y presets de tamaño de cocina.\n3. Corrección definitiva de la tarjeta de 'Esquina en L' en el modal de configuración con icono arquitectónico e información completa sin cortes.",
+  "updatedAt":  "2026-10-10T23:44:45.754877906Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
