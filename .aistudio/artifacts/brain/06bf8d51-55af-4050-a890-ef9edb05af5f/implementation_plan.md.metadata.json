@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para la interacción directa con el ratón en electrodomésticos: arrastre libre con imán inteligente, redimensionado interactivo mediante tiradores 3D en las caras de la caja y eliminación rápida con la tecla Delete.",
-  "updatedAt":  "2026-10-11T14:19:33.233602151Z",
+  "summary":  "Plan de implementación para permitir el movimiento 3D libre con elevación (subir y bajar) directa del equipo con el ratón, manteniendo la adherencia magnética inteligente a pisos, mesadas y paredes al aproximarse y soltar al alejar el cursor.",
+  "updatedAt":  "2026-10-11T19:01:31.123091510Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

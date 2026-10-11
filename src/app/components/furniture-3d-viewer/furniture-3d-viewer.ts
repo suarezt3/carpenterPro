@@ -3343,14 +3343,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
             this.dragStarted.emit();
             this.controls.enabled = false;
 
-            // Plano horizontal de deslizamiento a la altura actual del equipo
-            this.dragPlane.set(new THREE.Vector3(0, 1, 0), -foundApp.position.y);
+            // Plano orientado a la cámara pasando por el centro del equipo para permitir desplazamiento 3D libre y elevación directa
+            const camDir = new THREE.Vector3();
+            this.camera.getWorldDirection(camDir);
+            const appCenterPos = new THREE.Vector3(
+              foundApp.position.x,
+              foundApp.position.y + foundApp.height / 2,
+              foundApp.position.z
+            );
+            this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), appCenterPos);
 
             const intersectPoint = new THREE.Vector3();
             if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
               this.dragPlaneIntersectionStart.copy(intersectPoint);
             } else {
-              this.dragPlaneIntersectionStart.set(foundApp.position.x, foundApp.position.y, foundApp.position.z);
+              this.dragPlaneIntersectionStart.copy(appCenterPos);
             }
 
             canvas.style.cursor = 'grabbing';
@@ -3552,18 +3559,22 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const deltaWorld = currentIntersect.clone().sub(this.dragPlaneIntersectionStart);
         const app = this.draggingAppliance;
         const initialPos = this.dragInitialAppliancePos;
-        let newX = Math.round(initialPos.x + deltaWorld.x);
-        let newY = initialPos.y;
-        let newZ = Math.round(initialPos.z + deltaWorld.z);
+        const rawX = Math.round(initialPos.x + deltaWorld.x);
+        const rawY = Math.max(0, Math.round(initialPos.y + deltaWorld.y));
+        const rawZ = Math.round(initialPos.z + deltaWorld.z);
 
-        // --- CONTACT MAGNET (Imán de contacto a mesadas, piso y paredes) ---
+        let newX = rawX;
+        let newY = rawY;
+        let newZ = rawZ;
+
+        // --- CONTACT MAGNET (Imán dinámico: adherir al aproximarse y soltar al alejarse) ---
         const config = this.roomConfig();
         const parts = this.parts();
         const halfAppW = app.width / 2;
         const halfAppD = app.depth / 2;
 
-        // 1. Detección inteligente de superficie horizontal de apoyo (Mesada vs Piso)
-        let snappedToCountertop = false;
+        // 1. Detección de mesada o pieza horizontal bajo la huella (X, Z) del equipo
+        let hasCountertopUnderneath = false;
         let highestCountertopY = 0;
 
         for (const p of parts) {
@@ -3574,37 +3585,36 @@ export class Furniture3dViewerComponent implements OnDestroy {
             const pHalfW = (p.width || 0) / 2;
             const pTopY = (p.posY ?? 0) + (p.thickness || 18) / 2;
 
-            // Coincidencia o solapamiento en el plano horizontal XZ
-            const overlapX = (newX - halfAppW < pX + pHalfL) && (newX + halfAppW > pX - pHalfL);
-            const overlapZ = (newZ - halfAppD < pZ + pHalfW) && (newZ + halfAppD > pZ - pHalfW);
+            // Coincidencia en el plano horizontal XZ (con margen de aproximación de 40mm)
+            const overlapX = (newX - halfAppW < pX + pHalfL + 40) && (newX + halfAppW > pX - pHalfL - 40);
+            const overlapZ = (newZ - halfAppD < pZ + pHalfW + 40) && (newZ + halfAppD > pZ - pHalfW - 40);
 
             if (overlapX && overlapZ && pTopY > highestCountertopY) {
               highestCountertopY = pTopY;
-              snappedToCountertop = true;
+              hasCountertopUnderneath = true;
             }
           }
         }
 
-        if (snappedToCountertop) {
+        // Adherencia suave a mesadas y pisos con desenganche natural al alejar el ratón
+        if (hasCountertopUnderneath && Math.abs(rawY - highestCountertopY) <= 130) {
           newY = highestCountertopY;
-        } else if (app.mountType === 'floor' || app.type === 'refrigerator') {
-          newY = 0;
-        } else if (app.type === 'hood') {
-          newY = 1500;
-        } else if (newY < 250) {
-          newY = 0; // Adherencia limpia al piso si se arrastra cerca del suelo
+        } else if (rawY <= 110) {
+          newY = 0; // Adherencia limpia al suelo si está a menos de 110mm de la base
+        } else {
+          newY = rawY; // Elevación vertical libre hacia arriba o hacia abajo con el ratón
         }
 
-        // 2. Imán a Pared Posterior (Main Wall)
+        // 2. Imán a Pared Posterior (Main Wall): adherir si está cerca y soltar al alejar
         const backWallInnerZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + halfAppD;
-        if (Math.abs(newZ - backWallInnerZ) < 80) {
+        if (Math.abs(rawZ - backWallInnerZ) <= 80) {
           newZ = Math.round(backWallInnerZ);
         }
 
-        // 3. Imán a Pared Lateral en L (Side Wall)
+        // 3. Imán a Pared Lateral en L (Side Wall): adherir si está cerca y soltar al alejar
         if (config.layout === 'l_shape') {
           const sideWallInnerX = (config.wallOffsetX || 0) + (config.wallThickness || 150) + halfAppW;
-          if (Math.abs(newX - sideWallInnerX) < 80) {
+          if (Math.abs(rawX - sideWallInnerX) <= 80) {
             newX = Math.round(sideWallInnerX);
           }
         }
@@ -6243,6 +6253,37 @@ export class Furniture3dViewerComponent implements OnDestroy {
         ringMesh.rotation.x = -Math.PI / 2;
         ringMesh.position.set(app.position.x, Math.max(1, app.position.y + 1), app.position.z);
         this.applianceGizmoGroup.add(ringMesh);
+
+        // Si el equipo está elevado sobre el suelo, dibujar proyección en el piso y línea plomada vertical
+        if (app.position.y > 30) {
+          const groundRingMat = new THREE.MeshBasicMaterial({
+            color: 0x64748b,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.28,
+            depthTest: false
+          });
+          const groundRing = new THREE.Mesh(ringGeo, groundRingMat);
+          groundRing.rotation.x = -Math.PI / 2;
+          groundRing.position.set(app.position.x, 1, app.position.z);
+          this.applianceGizmoGroup.add(groundRing);
+
+          // Línea plomada vertical que conecta la base del equipo al piso
+          const plumbPoints = [
+            new THREE.Vector3(app.position.x, 1, app.position.z),
+            new THREE.Vector3(app.position.x, app.position.y, app.position.z)
+          ];
+          const plumbGeo = new THREE.BufferGeometry().setFromPoints(plumbPoints);
+          const plumbMat = new THREE.LineDashedMaterial({
+            color: 0x0284c7,
+            dashSize: 25,
+            gapSize: 15,
+            depthTest: false
+          });
+          const plumbLine = new THREE.Line(plumbGeo, plumbMat);
+          plumbLine.computeLineDistances();
+          this.applianceGizmoGroup.add(plumbLine);
+        }
 
         // Tiradores interactivos 3D en las caras de la caja envolvente (Face Handles para Ancho, Alto, Profundidad)
         const handleParent = new THREE.Group();
