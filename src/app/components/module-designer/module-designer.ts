@@ -28,7 +28,12 @@ import {
   FLOOR_FINISHES_CATALOG,
   WALL_FINISHES_CATALOG,
   FloorFinishCategory,
-  WallFinishCategory
+  WallFinishCategory,
+  ApplianceItem,
+  AppliancePreset,
+  ApplianceFinish,
+  APPLIANCES_CATALOG_PRESETS,
+  APPLIANCE_FINISH_OPTIONS
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -48,10 +53,12 @@ import { FurnitureTemplate } from '../../services/templates-catalog.service';
   }
 })
 export class ModuleDesignerComponent {
-  private projectService = inject(ProjectStorageService);
+  readonly projectService = inject(ProjectStorageService);
   private confirmService = inject(ConfirmDialogService);
   private joineryEngine = inject(JoineryEngineService);
   private dxfExporter = inject(DxfExporterService);
+
+  readonly viewer3d = viewChild<Furniture3dViewerComponent>('viewer3d');
 
   readonly project = this.projectService.currentProject;
   readonly materials = this.projectService.materialsList;
@@ -241,8 +248,18 @@ export class ModuleDesignerComponent {
       return;
     }
 
-    // Supr / Delete / Backspace: Eliminar pieza seleccionada inmediatamente con feedback
+    // Supr / Delete / Backspace: Eliminar pieza o electrodoméstico seleccionado inmediatamente con feedback
     if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Del') {
+      const selAppId = this.selectedApplianceId();
+      if (selAppId) {
+        e.preventDefault();
+        const app = this.selectedAppliance();
+        const appName = app ? app.name : 'Equipo';
+        this.projectService.removeAppliance(selAppId);
+        this.showToast(`🗑️ "${appName}" eliminado (Delete)`);
+        return;
+      }
+
       const selIds = this.selectedPartIds();
       const selId = this.selectedPartId();
 
@@ -297,8 +314,188 @@ export class ModuleDesignerComponent {
     }
   }
 
-  // Active dock tab: 'piece' (properties of selected part) or 'catalog' (add pieces & tree)
-  readonly activeDockTab = signal<'piece' | 'catalog'>('catalog');
+  // Active dock tab: 'piece' (properties of selected part), 'catalog' (add pieces & tree), or 'appliances' (catalog & parametric 3D controls)
+  readonly activeDockTab = signal<'piece' | 'catalog' | 'appliances'>('catalog');
+
+  // Electrodomésticos y Accesorios 3D
+  readonly appliances = this.projectService.appliancesList;
+  readonly selectedApplianceId = this.projectService.selectedApplianceId;
+  readonly selectedAppliance = this.projectService.selectedAppliance;
+  readonly appliancesCatalog = APPLIANCES_CATALOG_PRESETS;
+  readonly applianceFinishOptions = APPLIANCE_FINISH_OPTIONS;
+  readonly activeApplianceCategory = signal<'all' | 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave'>('all');
+
+  readonly filteredAppliances = computed(() => {
+    const cat = this.activeApplianceCategory();
+    if (cat === 'all') return this.appliancesCatalog;
+    return this.appliancesCatalog.filter(a => a.category === cat);
+  });
+
+  addApplianceFromPreset(preset: AppliancePreset) {
+    const config = this.roomConfig();
+    const posX = 0;
+    let posY = 0;
+    let posZ = 0;
+
+    if (preset.defaultMountType === 'floor') {
+      posY = 0;
+      posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+    } else if (preset.defaultMountType === 'countertop') {
+      const parts = this.currentParts();
+      let highestY = 0;
+      for (const p of parts) {
+        if (p.orientation === 'horizontal') {
+          const top = (p.posY || 0) + (p.thickness || 18) / 2;
+          if (top > highestY) highestY = top;
+        }
+      }
+      posY = highestY > 0 ? highestY : 880;
+      posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+    } else if (preset.defaultMountType === 'wall') {
+      posY = preset.type === 'hood' ? 1500 : 1200;
+      posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+    } else if (preset.defaultMountType === 'built_in') {
+      posY = 800;
+      posZ = preset.defaultDepth / 2;
+    }
+
+    const newApp: ApplianceItem = {
+      id: 'appliance_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      type: preset.type,
+      name: preset.name,
+      brand: preset.brand,
+      modelCode: preset.modelCode,
+      width: preset.defaultWidth,
+      depth: preset.defaultDepth,
+      height: preset.defaultHeight,
+      finish: preset.defaultFinish,
+      position: { x: posX, y: posY, z: posZ },
+      rotation: 0,
+      mountType: preset.defaultMountType,
+      price: preset.defaultPrice,
+      includeInBudget: true,
+      notes: preset.description
+    };
+
+    this.projectService.addAppliance(newApp);
+    this.deselectPart();
+    this.activeDockTab.set('appliances');
+    this.showToast(`✨ ${newApp.name} añadido`);
+  }
+
+  selectAppliance(id: string | null) {
+    this.projectService.selectAppliance(id);
+    if (id) {
+      this.selectedPartId.set(null);
+      this.selectedPartIds.set([]);
+      this.activeDockTab.set('appliances');
+    }
+  }
+
+  updateApplianceDimension(prop: 'width' | 'depth' | 'height', val: number | string) {
+    const sel = this.selectedAppliance();
+    const num = Number(val);
+    if (!sel || isNaN(num) || num <= 0) return;
+    this.projectService.updateAppliance(sel.id, { [prop]: Math.round(num) });
+  }
+
+  updateAppliancePosition(axis: 'x' | 'y' | 'z', delta: number) {
+    const sel = this.selectedAppliance();
+    if (!sel) return;
+    const currentPos = { ...sel.position };
+    currentPos[axis] = Math.round(currentPos[axis] + delta);
+    this.projectService.updateAppliance(sel.id, { position: currentPos });
+  }
+
+  setAppliancePositionDirect(axis: 'x' | 'y' | 'z', val: number | string) {
+    const sel = this.selectedAppliance();
+    const num = Number(val);
+    if (!sel || isNaN(num)) return;
+    const currentPos = { ...sel.position };
+    currentPos[axis] = Math.round(num);
+    this.projectService.updateAppliance(sel.id, { position: currentPos });
+  }
+
+  updateApplianceFinish(finish: ApplianceFinish) {
+    const sel = this.selectedAppliance();
+    if (!sel) return;
+    this.projectService.updateAppliance(sel.id, { finish });
+    const finishLabel = finish === 'stainless_steel' ? 'Acero Inox' : finish === 'black_matte' ? 'Negro Mate' : 'Blanco Brillante';
+    this.showToast(`🎨 Acabado cambiado a ${finishLabel}`);
+  }
+
+  rotateAppliance(delta: 90 | -90 | 180) {
+    const sel = this.selectedAppliance();
+    if (!sel) return;
+    let nextRot = (sel.rotation + delta) % 360;
+    if (nextRot < 0) nextRot += 360;
+    this.projectService.updateAppliance(sel.id, { rotation: nextRot });
+  }
+
+  snapSelectedAppliance(target: 'floor' | 'countertop' | 'wall' | 'auto') {
+    const sel = this.selectedAppliance();
+    const viewer = this.viewer3d();
+    if (!sel || !viewer) return;
+    viewer.snapApplianceToContact(sel, target);
+    const targetLabel = target === 'floor' ? 'el suelo' : target === 'countertop' ? 'la mesada' : target === 'wall' ? 'la pared' : 'superficie';
+    this.showToast(`🧲 Imán: adherido a ${targetLabel}`);
+  }
+
+  duplicateSelectedAppliance() {
+    const sel = this.selectedAppliance();
+    if (!sel) return;
+    this.projectService.duplicateAppliance(sel.id);
+    this.showToast(`📋 Copia de "${sel.name}" creada`);
+  }
+
+  deleteSelectedAppliance() {
+    const sel = this.selectedAppliance();
+    if (!sel) return;
+    const name = sel.name;
+    this.projectService.removeAppliance(sel.id);
+    this.showToast(`🗑️ "${name}" retirado`);
+  }
+
+  toggleApplianceBudgetInclusion() {
+    const sel = this.selectedAppliance();
+    if (!sel) return;
+    this.projectService.updateAppliance(sel.id, { includeInBudget: !sel.includeInBudget });
+  }
+
+  updateAppliancePrice(price: number | string) {
+    const sel = this.selectedAppliance();
+    const num = Number(price);
+    if (!sel || isNaN(num) || num < 0) return;
+    this.projectService.updateAppliance(sel.id, { price: Math.round(num) });
+  }
+
+  updateApplianceName(name: string) {
+    const sel = this.selectedAppliance();
+    if (!sel || !name.trim()) return;
+    this.projectService.updateAppliance(sel.id, { name: name.trim() });
+  }
+
+  onApplianceSelectedFrom3D(app: ApplianceItem | null) {
+    if (app) {
+      this.projectService.selectAppliance(app.id);
+      this.selectedPartId.set(null);
+      this.selectedPartIds.set([]);
+      this.activeDockTab.set('appliances');
+    } else {
+      this.projectService.selectAppliance(null);
+    }
+  }
+
+  onApplianceModifiedFromViewer(evt: { appliance: ApplianceItem; updates: Partial<ApplianceItem> }) {
+    this.projectService.updateAppliance(evt.appliance.id, evt.updates);
+  }
+
+  onApplianceDeletedFromViewer(id: string) {
+    const app = this.appliances().find(a => a.id === id);
+    const name = app ? app.name : 'Equipo';
+    this.projectService.removeAppliance(id);
+    this.showToast(`🗑️ "${name}" eliminado (Delete)`);
+  }
 
   // Sidebar collapse toggle for 100% full-screen 3D modeling
   readonly isSidebarCollapsed = signal<boolean>(false);

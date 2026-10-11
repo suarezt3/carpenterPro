@@ -7,7 +7,8 @@ import {
   Part,
   PartGroup,
   Project,
-  ProjectSettings
+  ProjectSettings,
+  ApplianceItem
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { SupabaseService, CloudProjectRecord } from './supabase.service';
@@ -93,7 +94,67 @@ export class ProjectStorageService {
     return groups.filter(g => activeGroupIds.has(g.id));
   });
   readonly hardwareList = computed(() => this.currentProject().hardware);
+  readonly appliancesList = computed<ApplianceItem[]>(() => this.currentProject().appliances || []);
+  readonly selectedApplianceId = signal<string | null>(null);
+  readonly selectedAppliance = computed<ApplianceItem | null>(() => {
+    const id = this.selectedApplianceId();
+    if (!id) return null;
+    return (this.appliancesList() || []).find(a => a.id === id) || null;
+  });
   readonly projectSettings = computed(() => this.currentProject().settings);
+
+  addAppliance(appliance: ApplianceItem) {
+    this.pushSnapshot();
+    this.updateProject(p => ({
+      ...p,
+      appliances: [...(p.appliances || []), appliance]
+    }));
+    this.selectedApplianceId.set(appliance.id);
+  }
+
+  updateAppliance(id: string, updates: Partial<ApplianceItem>) {
+    this.pushSnapshot();
+    this.updateProject(p => ({
+      ...p,
+      appliances: (p.appliances || []).map(a => a.id === id ? { ...a, ...updates } : a)
+    }));
+  }
+
+  removeAppliance(id: string) {
+    this.pushSnapshot();
+    if (this.selectedApplianceId() === id) {
+      this.selectedApplianceId.set(null);
+    }
+    this.updateProject(p => ({
+      ...p,
+      appliances: (p.appliances || []).filter(a => a.id !== id)
+    }));
+  }
+
+  duplicateAppliance(id: string) {
+    const existing = (this.currentProject().appliances || []).find(a => a.id === id);
+    if (!existing) return;
+    this.pushSnapshot();
+    const copy: ApplianceItem = {
+      ...existing,
+      id: 'appliance_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      name: `${existing.name} (Copia)`,
+      position: {
+        x: existing.position.x + 80,
+        y: existing.position.y,
+        z: existing.position.z + 80
+      }
+    };
+    this.updateProject(p => ({
+      ...p,
+      appliances: [...(p.appliances || []), copy]
+    }));
+    this.selectedApplianceId.set(copy.id);
+  }
+
+  selectAppliance(id: string | null) {
+    this.selectedApplianceId.set(id);
+  }
 
   formatCurrency(amount: number): string {
     return formatCurrencyValue(amount, this.projectSettings().currency);
@@ -170,6 +231,9 @@ export class ProjectStorageService {
             }
             if (!parsed.groups || !Array.isArray(parsed.groups)) {
               parsed.groups = [];
+            }
+            if (!parsed.appliances || !Array.isArray(parsed.appliances)) {
+              parsed.appliances = [];
             }
             return parsed;
           }
@@ -521,6 +585,7 @@ export class ProjectStorageService {
       parts: initialParts,
       groups: [],
       hardware: initialHardware,
+      appliances: [],
       laborCost: 350000,
       laborType: 'fixed',
       profitMarginPercent: 25,

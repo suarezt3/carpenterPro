@@ -34,7 +34,7 @@
   </div>
 
   <!-- Main Financial Summary Cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
     
     <!-- Tableros -->
     <div [class]="themeService.isClassic() ? 'p-4 bg-white border border-slate-200 rounded-2xl shadow-xs' : 'p-4 bg-zinc-900 border border-zinc-800 rounded-2xl'">
@@ -70,6 +70,18 @@
         {{ format(hardwareCostTotal()) }}
       </p>
       <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-1' : 'text-[11px] text-zinc-500 mt-1'">{{ hardware().length }} ítems listados</p>
+    </div>
+
+    <!-- Electrodomésticos y Equipamiento 3D -->
+    <div [class]="themeService.isClassic() ? 'p-4 bg-white border border-slate-200 rounded-2xl shadow-xs' : 'p-4 bg-zinc-900 border border-zinc-800 rounded-2xl'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1'">
+        <span class="font-semibold uppercase tracking-wider">Electrodomésticos</span>
+        <span class="material-icons text-emerald-600 text-sm">kitchen</span>
+      </div>
+      <p [class]="themeService.isClassic() ? 'text-xl font-bold text-slate-800 font-mono' : 'text-xl font-bold text-white font-mono'">
+        {{ format(appliancesCostTotal()) }}
+      </p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-1' : 'text-[11px] text-zinc-500 mt-1'">{{ appliancesBudgetList().length }} equipos cotizados</p>
     </div>
 
     <!-- Mano de Obra -->
@@ -261,6 +273,86 @@
         </div>
       </div>
 
+      <!-- 4. ELECTRODOMÉSTICOS Y EQUIPAMIENTO 3D -->
+      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg'">
+        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+          <h3 [class]="themeService.isClassic() ? 'text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
+            <span class="material-icons text-emerald-600 text-base">kitchen</span>
+            4. Electrodomésticos & Equipamiento 3D
+          </h3>
+          <span [class]="themeService.isClassic() ? 'text-xs text-slate-500 font-mono font-semibold' : 'text-xs text-zinc-400 font-mono'">
+            Subtotal: {{ format(appliancesCostTotal()) }}
+          </span>
+        </div>
+
+        @if (appliances().length === 0) {
+          <div [class]="themeService.isClassic() ? 'text-center py-6 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200' : 'text-center py-6 px-4 bg-zinc-950 rounded-xl border border-dashed border-zinc-800'">
+            <span class="material-icons text-2xl text-slate-400">kitchen</span>
+            <p [class]="themeService.isClassic() ? 'text-xs text-slate-500 mt-1' : 'text-xs text-zinc-400 mt-1'">No hay electrodomésticos colocados en el diseño 3D.</p>
+            <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">Puedes añadirlos desde la pestaña "Equipos" en el Modelador 3D.</p>
+          </div>
+        } @else {
+          <div [class]="themeService.isClassic() ? 'overflow-x-auto border border-slate-200 rounded-xl' : 'overflow-x-auto border border-zinc-800 rounded-xl'">
+            <table class="w-full text-left text-xs">
+              <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold'">
+                <tr>
+                  <th class="py-2.5 px-3">Equipo / Modelo</th>
+                  <th class="py-2.5 px-2">Dimensiones</th>
+                  <th class="py-2.5 px-2">Acabado</th>
+                  <th class="py-2.5 px-2 text-center">Incluir</th>
+                  <th class="py-2.5 px-3 text-right">Precio Unitario</th>
+                  <th class="py-2.5 px-3 text-right">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
+                @for (app of appliances(); track app.id) {
+                  <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80' : 'hover:bg-zinc-800/40'">
+                    <td class="py-2.5 px-3">
+                      <div class="flex items-center gap-2">
+                        <span class="material-icons text-emerald-600 text-sm">
+                          {{ app.type === 'refrigerator' ? 'kitchen' : (app.type === 'sink' ? 'wash' : (app.type === 'hood' ? 'air' : (app.type === 'cooktop' ? 'mode_heat' : 'microwave'))) }}
+                        </span>
+                        <div>
+                          <p [class]="themeService.isClassic() ? 'font-bold text-slate-800 text-xs' : 'font-bold text-white text-xs'">{{ app.name }}</p>
+                          <p [class]="themeService.isClassic() ? 'text-[10px] text-slate-400' : 'text-[10px] text-zinc-400'">{{ app.brand || 'Estándar' }} · {{ app.modelCode || app.type }}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td [class]="themeService.isClassic() ? 'py-2.5 px-2 font-mono text-[11px] text-slate-600' : 'py-2.5 px-2 font-mono text-[11px] text-zinc-300'">
+                      {{ app.width }}×{{ app.depth }}×{{ app.height }} mm
+                    </td>
+                    <td class="py-2.5 px-2 text-[11px]">
+                      <span [class]="themeService.isClassic() ? 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700' : 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-800 text-zinc-300'">
+                        {{ app.finish === 'stainless_steel' ? 'Acero Inox' : (app.finish === 'black_matte' ? 'Negro Mate' : 'Blanco Cristal') }}
+                      </span>
+                    </td>
+                    <td class="py-2.5 px-2 text-center">
+                      <input 
+                        type="checkbox" 
+                        [checked]="app.includeInBudget"
+                        (change)="toggleApplianceBudget(app.id, $any($event.target).checked)"
+                        class="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                        title="Incluir este electrodoméstico en el presupuesto" />
+                    </td>
+                    <td class="py-2.5 px-3 text-right">
+                      <input 
+                        type="number" 
+                        step="10000"
+                        [value]="app.price"
+                        (change)="updateApplianceBudgetPrice(app.id, $any($event.target).value)"
+                        [class]="themeService.isClassic() ? 'w-24 px-1.5 py-0.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-24 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
+                    </td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold" [class.text-emerald-700]="app.includeInBudget" [class.text-slate-400]="!app.includeInBudget">
+                      {{ app.includeInBudget ? format(app.price) : 'Excluido' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
     </div>
 
     <!-- RIGHT COLUMN: Price Calculation & Quotation Export (4 cols) -->
@@ -429,6 +521,29 @@
           }
         </div>
       </div>
+
+      <!-- Electrodomésticos y Equipamiento Suministrado -->
+      @if (appliancesBudgetList().length > 0) {
+        <div class="py-4 border-b border-zinc-200">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-700 mb-3 flex items-center gap-1.5">
+            <span class="material-icons text-sm text-emerald-600">kitchen</span>
+            Electrodomésticos y Equipamiento Incluido:
+          </h4>
+          <div class="space-y-1.5">
+            @for (app of appliancesBudgetList(); track app.id) {
+              <div class="p-2.5 bg-zinc-50 rounded-lg flex items-center justify-between text-xs">
+                <div>
+                  <span class="font-bold text-zinc-900">{{ app.name }}</span>
+                  <span class="text-zinc-500 text-[11px] block">
+                    {{ app.brand || 'Línea de Empotrar' }} · {{ app.width }}×{{ app.depth }}×{{ app.height }} mm · Acabado: {{ app.finish === 'stainless_steel' ? 'Acero Inox' : (app.finish === 'black_matte' ? 'Negro Mate' : 'Blanco Cristal') }}
+                  </span>
+                </div>
+                <span class="font-mono font-bold text-zinc-800">{{ format(app.price) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
 
       <!-- Total Quotation Price -->
       <div class="py-6 flex justify-end">

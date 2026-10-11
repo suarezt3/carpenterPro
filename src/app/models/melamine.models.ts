@@ -298,6 +298,7 @@ export interface Project {
   taxPercent: number;
   updatedAt: string;
   roomConfig?: RoomConfiguration;
+  appliances?: ApplianceItem[];
 }
 
 export type WorkspaceMode = 'module' | 'room';
@@ -637,3 +638,480 @@ export const DEFAULT_ROOM_CONFIG: RoomConfiguration = {
   wallOffsetX: 0,
   wallOffsetZ: 0,
 };
+
+// ==========================================
+// FASE 2: REPOSITORIO DE ELECTRODOMÉSTICOS Y ACCESORIOS 3D
+// ==========================================
+
+export type ApplianceType = 
+  | 'refrigerator' 
+  | 'oven' 
+  | 'cooktop' 
+  | 'hood' 
+  | 'sink' 
+  | 'microwave';
+
+export type ApplianceFinish = 
+  | 'stainless_steel' 
+  | 'black_matte' 
+  | 'white_gloss';
+
+export type ApplianceMountType = 
+  | 'floor' 
+  | 'countertop' 
+  | 'wall' 
+  | 'built_in';
+
+export interface AppliancePosition {
+  x: number; // en mm (eje horizontal)
+  y: number; // en mm (altura desde el suelo)
+  z: number; // en mm (profundidad en sala)
+}
+
+export interface ApplianceItem {
+  id: string;
+  type: ApplianceType;
+  name: string;
+  brand?: string;
+  modelCode?: string;
+  width: number;       // en mm (eje X)
+  depth: number;       // en mm (eje Z)
+  height: number;      // en mm (eje Y)
+  finish: ApplianceFinish;
+  position: AppliancePosition;
+  rotation: number;    // en grados: 0, 90, 180, 270
+  mountType: ApplianceMountType;
+  price: number;       // Costo para presupuesto
+  includeInBudget: boolean;
+  notes?: string;
+}
+
+export interface AppliancePreset {
+  id: string;
+  type: ApplianceType;
+  name: string;
+  category: 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave';
+  categoryLabel: string;
+  brand: string;
+  modelCode: string;
+  defaultWidth: number;
+  defaultDepth: number;
+  defaultHeight: number;
+  minWidth: number;
+  maxWidth: number;
+  minDepth: number;
+  maxDepth: number;
+  minHeight: number;
+  maxHeight: number;
+  defaultMountType: ApplianceMountType;
+  defaultFinish: ApplianceFinish;
+  defaultPrice: number;
+  icon: string;
+  description: string;
+  recommendedHeights?: number[];
+  standardWidths?: number[];
+}
+
+export const APPLIANCE_FINISH_OPTIONS: { id: ApplianceFinish; label: string; color: string; metallic: number; roughness: number }[] = [
+  { id: 'stainless_steel', label: 'Acero Inox Cepillado', color: '#c8cbd0', metallic: 0.85, roughness: 0.28 },
+  { id: 'black_matte', label: 'Negro Mate Premium', color: '#1e2022', metallic: 0.20, roughness: 0.55 },
+  { id: 'white_gloss', label: 'Blanco Cristal Brillante', color: '#f5f6f8', metallic: 0.05, roughness: 0.15 },
+];
+
+export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
+  // 1. NEVERAS / REFRIGERADORES
+  {
+    id: 'preset_fridge_french',
+    type: 'refrigerator',
+    name: 'Nevera French Door (Doble Puerta)',
+    category: 'cold',
+    categoryLabel: 'Refrigeración',
+    brand: 'Whirlpool / Samsung',
+    modelCode: 'RF-6500-SS',
+    defaultWidth: 910,
+    defaultDepth: 750,
+    defaultHeight: 1780,
+    minWidth: 800,
+    maxWidth: 1100,
+    minDepth: 650,
+    maxDepth: 900,
+    minHeight: 1650,
+    maxHeight: 2000,
+    defaultMountType: 'floor',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 4200000,
+    icon: 'kitchen',
+    description: 'Refrigerador de gran formato con dispensador frontal, doble puerta batiente y gaveta congelador inferior.',
+    standardWidths: [850, 910, 950]
+  },
+  {
+    id: 'preset_fridge_bottom_mount',
+    type: 'refrigerator',
+    name: 'Nevera Combi / Bottom Mount 70cm',
+    category: 'cold',
+    categoryLabel: 'Refrigeración',
+    brand: 'Bosch / Mabe',
+    modelCode: 'KGN-49X-BM',
+    defaultWidth: 700,
+    defaultDepth: 680,
+    defaultHeight: 1850,
+    minWidth: 600,
+    maxWidth: 800,
+    minDepth: 600,
+    maxDepth: 750,
+    minHeight: 1600,
+    maxHeight: 2000,
+    defaultMountType: 'floor',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 2850000,
+    icon: 'kitchen',
+    description: 'Nevera vertical europea con refrigerador superior a nivel visual y congelador en la parte baja.',
+    standardWidths: [600, 700, 750]
+  },
+  {
+    id: 'preset_fridge_compact',
+    type: 'refrigerator',
+    name: 'Nevera Top Mount Estándar 60cm',
+    category: 'cold',
+    categoryLabel: 'Refrigeración',
+    brand: 'Haceb / Electrolux',
+    modelCode: 'TM-310-LT',
+    defaultWidth: 600,
+    defaultDepth: 650,
+    defaultHeight: 1650,
+    minWidth: 540,
+    maxWidth: 680,
+    minDepth: 550,
+    maxDepth: 700,
+    minHeight: 1450,
+    maxHeight: 1780,
+    defaultMountType: 'floor',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 1650000,
+    icon: 'kitchen',
+    description: 'Nevera clásica de 2 puertas compacta, idónea para cocinas medianas o apartamentos modernos.',
+    standardWidths: [550, 600, 650]
+  },
+
+  // 2. HORNOS
+  {
+    id: 'preset_oven_60cm',
+    type: 'oven',
+    name: 'Horno Eléctrico Empotrable 60cm',
+    category: 'cooking',
+    categoryLabel: 'Cocción',
+    brand: 'Teka / Bosch',
+    modelCode: 'HLB-840-BK',
+    defaultWidth: 595,
+    defaultDepth: 570,
+    defaultHeight: 595,
+    minWidth: 550,
+    maxWidth: 650,
+    minDepth: 500,
+    maxDepth: 620,
+    minHeight: 550,
+    maxHeight: 650,
+    defaultMountType: 'built_in',
+    defaultFinish: 'black_matte',
+    defaultPrice: 1950000,
+    icon: 'microwave',
+    description: 'Horno multifunción con panel touch LED, tirador tubular horizontal y puerta de triple vidrio ahumado.',
+    standardWidths: [595, 600]
+  },
+  {
+    id: 'preset_oven_tower_75cm',
+    type: 'oven',
+    name: 'Horno Pro Gran Capacidad 75cm',
+    category: 'cooking',
+    categoryLabel: 'Cocción',
+    brand: 'Smeg / KitchenAid',
+    modelCode: 'PRO-750-SS',
+    defaultWidth: 750,
+    defaultDepth: 580,
+    defaultHeight: 600,
+    minWidth: 700,
+    maxWidth: 900,
+    minDepth: 520,
+    maxDepth: 640,
+    minHeight: 580,
+    maxHeight: 650,
+    defaultMountType: 'built_in',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 3400000,
+    icon: 'microwave',
+    description: 'Horno empotrable extra ancho para torre de hornos o bajo encimera con convección forzada.',
+    standardWidths: [750, 900]
+  },
+
+  // 3. ESTUFAS Y ANAFES (CUBIERTAS DE COCCIÓN)
+  {
+    id: 'preset_cooktop_induction_60cm',
+    type: 'cooktop',
+    name: 'Anafe Vitrocerámico / Inducción 60cm',
+    category: 'cooking',
+    categoryLabel: 'Cocción',
+    brand: 'Franke / Bosch',
+    modelCode: 'PUE-611-IND',
+    defaultWidth: 590,
+    defaultDepth: 520,
+    defaultHeight: 60,
+    minWidth: 500,
+    maxWidth: 700,
+    minDepth: 480,
+    maxDepth: 550,
+    minHeight: 45,
+    maxHeight: 90,
+    defaultMountType: 'countertop',
+    defaultFinish: 'black_matte',
+    defaultPrice: 1780000,
+    icon: 'mode_heat',
+    description: 'Placa de inducción extraplana con 4 zonas concéntricas de cocción y controles táctiles frontales.',
+    standardWidths: [590, 600]
+  },
+  {
+    id: 'preset_cooktop_gas_5burners',
+    type: 'cooktop',
+    name: 'Estufa de Gas 5 Hornillas en Acero Inox 86cm',
+    category: 'cooking',
+    categoryLabel: 'Cocción',
+    brand: 'Challenger / Haceb',
+    modelCode: 'SQ-860-GAS',
+    defaultWidth: 860,
+    defaultDepth: 510,
+    defaultHeight: 65,
+    minWidth: 750,
+    maxWidth: 950,
+    minDepth: 480,
+    maxDepth: 540,
+    minHeight: 50,
+    maxHeight: 90,
+    defaultMountType: 'countertop',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 1250000,
+    icon: 'mode_heat',
+    description: 'Cubierta de empotrar en acero inoxidable con 5 quemadores italianos, parrilas de hierro fundido y quemador Wok.',
+    standardWidths: [750, 860, 900]
+  },
+  {
+    id: 'preset_cooktop_domino_compact',
+    type: 'cooktop',
+    name: 'Anafe Dominó 2 Puestos 30cm',
+    category: 'cooking',
+    categoryLabel: 'Cocción',
+    brand: 'Teka / Cata',
+    modelCode: 'DOM-302-BK',
+    defaultWidth: 300,
+    defaultDepth: 520,
+    defaultHeight: 55,
+    minWidth: 280,
+    maxWidth: 350,
+    minDepth: 480,
+    maxDepth: 530,
+    minHeight: 45,
+    maxHeight: 70,
+    defaultMountType: 'countertop',
+    defaultFinish: 'black_matte',
+    defaultPrice: 790000,
+    icon: 'mode_heat',
+    description: 'Cubierta modular compacta de 2 puestos en cristal templado negro para islas o cocinas pequeñas.',
+    standardWidths: [300]
+  },
+
+  // 4. CAMPANAS EXTRACTORAS
+  {
+    id: 'preset_hood_t_shape_90cm',
+    type: 'hood',
+    name: 'Campana Isla / Pared T-Invertida 90cm',
+    category: 'extraction',
+    categoryLabel: 'Extracción',
+    brand: 'Cata / Challenger',
+    modelCode: 'ISL-90-GLS',
+    defaultWidth: 900,
+    defaultDepth: 500,
+    defaultHeight: 520,
+    minWidth: 750,
+    maxWidth: 1050,
+    minDepth: 450,
+    maxDepth: 550,
+    minHeight: 350,
+    maxHeight: 850,
+    defaultMountType: 'wall',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 1450000,
+    icon: 'air',
+    description: 'Campana extractora de pared con ducto telescópico, iluminación LED, filtros de aluminio y botonera táctil.',
+    standardWidths: [750, 900]
+  },
+  {
+    id: 'preset_hood_pyramidal_60cm',
+    type: 'hood',
+    name: 'Campana Piramidal Clásica 60cm',
+    category: 'extraction',
+    categoryLabel: 'Extracción',
+    brand: 'Haceb / Teka',
+    modelCode: 'PIR-60-SS',
+    defaultWidth: 600,
+    defaultDepth: 500,
+    defaultHeight: 480,
+    minWidth: 550,
+    maxWidth: 650,
+    minDepth: 450,
+    maxDepth: 520,
+    minHeight: 320,
+    maxHeight: 750,
+    defaultMountType: 'wall',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 850000,
+    icon: 'air',
+    description: 'Campana con forma piramidal de 60cm, de alta potencia y fácil desmontaje de rejillas filtrantes.',
+    standardWidths: [600]
+  },
+  {
+    id: 'preset_hood_telescopic_built_in',
+    type: 'hood',
+    name: 'Campana Telescópica Empotrada en Mueble 60cm',
+    category: 'extraction',
+    categoryLabel: 'Extracción',
+    brand: 'Franke / Bosch',
+    modelCode: 'TL-62-EM',
+    defaultWidth: 600,
+    defaultDepth: 310,
+    defaultHeight: 220,
+    minWidth: 550,
+    maxWidth: 650,
+    minDepth: 280,
+    maxDepth: 350,
+    minHeight: 180,
+    maxHeight: 300,
+    defaultMountType: 'built_in',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 920000,
+    icon: 'air',
+    description: 'Campana retráctil que se oculta dentro del mueble aéreo superior con frente extraíble de acero.',
+    standardWidths: [600]
+  },
+
+  // 5. FREGADEROS / LAVAPLATOS
+  {
+    id: 'preset_sink_single_drainer',
+    type: 'sink',
+    name: 'Lavaplatos 1 Pozo Grande + Escurridor 80cm',
+    category: 'washing',
+    categoryLabel: 'Lavaplatos',
+    brand: 'Corona / Franke',
+    modelCode: 'LVP-8048-DX',
+    defaultWidth: 800,
+    defaultDepth: 480,
+    defaultHeight: 210,
+    minWidth: 700,
+    maxWidth: 950,
+    minDepth: 440,
+    maxDepth: 520,
+    minHeight: 180,
+    maxHeight: 240,
+    defaultMountType: 'countertop',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 650000,
+    icon: 'wash',
+    description: 'Poceta profunda con zona de escurridor acanalado, grifo monomando cuello de cisne y canastilla antirreboce.',
+    standardWidths: [780, 800, 860]
+  },
+  {
+    id: 'preset_sink_double_bowl',
+    type: 'sink',
+    name: 'Lavaplatos Doble Pozo Acero Inox 84cm',
+    category: 'washing',
+    categoryLabel: 'Lavaplatos',
+    brand: 'Teka / Blanco',
+    modelCode: 'DB-840-INX',
+    defaultWidth: 840,
+    defaultDepth: 480,
+    defaultHeight: 220,
+    minWidth: 750,
+    maxWidth: 950,
+    minDepth: 450,
+    maxDepth: 530,
+    minHeight: 180,
+    maxHeight: 250,
+    defaultMountType: 'countertop',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 890000,
+    icon: 'wash',
+    description: 'Doble cubeta de acero inoxidable satinado calibre 18 para lavado y enjuague simultáneo con grifería giratoria.',
+    standardWidths: [800, 840, 900]
+  },
+  {
+    id: 'preset_sink_compact_square',
+    type: 'sink',
+    name: 'Lavaplatos Pozo Cuadrado Submontar 50cm',
+    category: 'washing',
+    categoryLabel: 'Lavaplatos',
+    brand: 'Corona / Grohe',
+    modelCode: 'LVP-SQR-50',
+    defaultWidth: 500,
+    defaultDepth: 450,
+    defaultHeight: 210,
+    minWidth: 400,
+    maxWidth: 600,
+    minDepth: 400,
+    maxDepth: 500,
+    minHeight: 180,
+    maxHeight: 230,
+    defaultMountType: 'countertop',
+    defaultFinish: 'black_matte',
+    defaultPrice: 580000,
+    icon: 'wash',
+    description: 'Diseño minimalista con radio 10mm en esquinas, desagüe oculto y grifo de diseño elegante.',
+    standardWidths: [450, 500, 550]
+  },
+
+  // 6. MICROONDAS
+  {
+    id: 'preset_micro_builtin_trim',
+    type: 'microwave',
+    name: 'Microondas Empotrado con Marco Trim 60cm',
+    category: 'microwave',
+    categoryLabel: 'Microondas',
+    brand: 'Samsung / Panasonic',
+    modelCode: 'MW-TRIM-32L',
+    defaultWidth: 595,
+    defaultDepth: 390,
+    defaultHeight: 388,
+    minWidth: 520,
+    maxWidth: 650,
+    minDepth: 340,
+    maxDepth: 460,
+    minHeight: 350,
+    maxHeight: 450,
+    defaultMountType: 'built_in',
+    defaultFinish: 'black_matte',
+    defaultPrice: 1100000,
+    icon: 'microwave',
+    description: 'Horno microondas con marco de integración en acero o cristal negro a juego con la torre de hornos.',
+    standardWidths: [595]
+  },
+  {
+    id: 'preset_micro_countertop',
+    type: 'microwave',
+    name: 'Microondas de Sobremesa / Nicho 48cm',
+    category: 'microwave',
+    categoryLabel: 'Microondas',
+    brand: 'LG / Haceb',
+    modelCode: 'MW-NEO-25L',
+    defaultWidth: 485,
+    defaultDepth: 370,
+    defaultHeight: 290,
+    minWidth: 440,
+    maxWidth: 550,
+    minDepth: 320,
+    maxDepth: 420,
+    minHeight: 260,
+    maxHeight: 340,
+    defaultMountType: 'countertop',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 550000,
+    icon: 'microwave',
+    description: 'Microondas portátil compacto para instalar sobre encimera o en nicho abierto de alacena.',
+    standardWidths: [485, 520]
+  }
+];

@@ -96,6 +96,13 @@ export class BudgetViewComponent {
     return this.hardware().reduce((sum, h) => sum + (h.quantity * h.unitCost), 0);
   });
 
+  // Appliances / Equipamiento 3D
+  readonly appliances = computed(() => this.projectService.appliancesList());
+  readonly appliancesBudgetList = computed(() => this.appliances().filter(a => a.includeInBudget));
+  readonly appliancesCostTotal = computed(() => {
+    return this.appliancesBudgetList().reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+  });
+
   // Direct materials cost
   readonly totalMaterialsCost = computed(() => {
     return (
@@ -114,10 +121,18 @@ export class BudgetViewComponent {
     return p.laborCost;
   });
 
-  // Production Cost (Materials + Labor)
+  // Production Cost (Materials + Equipos + Labor)
   readonly productionCost = computed(() => {
-    return this.totalMaterialsCost() + this.laborTotal();
+    return this.totalMaterialsCost() + this.appliancesCostTotal() + this.laborTotal();
   });
+
+  updateApplianceBudgetPrice(id: string, newCost: number | string) {
+    this.projectService.updateAppliance(id, { price: Number(newCost) || 0 });
+  }
+
+  toggleApplianceBudget(id: string, include: boolean) {
+    this.projectService.updateAppliance(id, { includeInBudget: include });
+  }
 
   // Profit Margin
   readonly profitAmount = computed(() => {

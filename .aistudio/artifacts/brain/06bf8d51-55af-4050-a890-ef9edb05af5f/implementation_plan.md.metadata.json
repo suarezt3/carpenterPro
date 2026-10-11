@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para el catálogo expandido de acabados de pisos y muros en la habitación 3D, incorporando colecciones reales inspiradas en Corona y Holztek con pestañas por categoría y texturas procedurales de alta definición.",
-  "updatedAt":  "2026-10-11T00:59:17.554831109Z",
+  "summary":  "Plan de implementación para la interacción directa con el ratón en electrodomésticos: arrastre libre con imán inteligente, redimensionado interactivo mediante tiradores 3D en las caras de la caja y eliminación rápida con la tecla Delete.",
+  "updatedAt":  "2026-10-11T14:19:33.233602151Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

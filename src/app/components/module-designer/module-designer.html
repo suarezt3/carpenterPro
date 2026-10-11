@@ -96,6 +96,8 @@
           [materials]="materials()"
           [workspaceMode]="workspaceMode()"
           [roomConfig]="roomConfig()"
+          [appliances]="appliances()"
+          [selectedApplianceId]="selectedApplianceId()"
           (partSelected)="onSelectPartFrom3D($event)"
           (partsSelected)="onPartsSelectedFrom3D($event)"
           (partModified)="onPartModifiedFromViewer($event)"
@@ -111,7 +113,10 @@
           (groupDuplicationRequested)="onGroupDuplicationRequested($event)"
           (hiddenPartsChanged)="onHiddenPartsChangedFromViewer($event)"
           (roomConfigModified)="updateRoomConfig($event)"
-          (wallSelected)="onWallSelected($event)">
+          (wallSelected)="onWallSelected($event)"
+          (applianceSelected)="onApplianceSelectedFrom3D($event)"
+          (applianceModified)="onApplianceModifiedFromViewer($event)"
+          (applianceDeleted)="onApplianceDeletedFromViewer($event)">
         </app-furniture-3d-viewer>
 
         <!-- HUD SUPERIOR IZQUIERDO: Medidas de la Pieza o Grupo Seleccionado (Ahí arribita a la izquierda) -->
@@ -659,6 +664,21 @@
               class="flex-1 py-1.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
               <span class="material-icons text-sm">add_circle</span>
               <span>Catálogo</span>
+            </button>
+
+            <button 
+              type="button" 
+              (click)="activeDockTab.set('appliances')"
+              [class]="activeDockTab() === 'appliances' ? 'bg-white text-emerald-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
+              class="flex-1 py-1.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
+              title="Repositorio y catálogo 3D de electrodomésticos y accesorios">
+              <span class="material-icons text-sm">kitchen</span>
+              <span>Equipos</span>
+              @if (appliances().length > 0) {
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+                  {{ appliances().length }}
+                </span>
+              }
             </button>
           </div>
 
@@ -1488,6 +1508,444 @@
               }
               @if (currentParts().length === 0) {
                 <p class="text-[11px] text-slate-400 italic text-center py-4">No hay piezas añadidas en el mueble.</p>
+              }
+            </div>
+
+          </div>
+
+        </div>
+      }
+
+      <!-- TAB 3: ELECTRODOMÉSTICOS Y ACCESORIOS 3D -->
+      @if (activeDockTab() === 'appliances') {
+        <div class="p-3.5 space-y-4 overflow-y-auto flex-1 min-h-0 text-slate-800">
+
+          <!-- SECTION 1: SELECTED APPLIANCE PARAMETRIC INSPECTOR -->
+          @if (selectedAppliance(); as selApp) {
+            <div class="p-3 bg-emerald-50/70 border border-emerald-200/90 rounded-2xl space-y-3.5 shadow-2xs animate-in fade-in duration-150">
+              
+              <!-- Inspector Header -->
+              <div class="flex items-center justify-between border-b border-emerald-200/80 pb-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="material-icons text-emerald-700 text-base">kitchen</span>
+                  <div class="min-w-0">
+                    <span class="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">Equipo Seleccionado</span>
+                    <input 
+                      type="text" 
+                      [value]="selApp.name" 
+                      (change)="updateApplianceName($any($event.target).value)"
+                      class="text-xs font-bold text-slate-900 bg-transparent border-b border-dashed border-emerald-400 focus:border-emerald-600 focus:outline-none px-0.5 truncate w-full"
+                      title="Editar nombre del electrodoméstico" />
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-1 shrink-0">
+                  <button 
+                    type="button" 
+                    (click)="duplicateSelectedAppliance()"
+                    class="p-1 text-slate-500 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg transition cursor-pointer"
+                    title="Duplicar este electrodoméstico">
+                    <span class="material-icons text-xs">content_copy</span>
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="deleteSelectedAppliance()"
+                    class="p-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                    title="Eliminar este electrodoméstico">
+                    <span class="material-icons text-xs">delete</span>
+                  </button>
+                  <button 
+                    type="button" 
+                    (click)="selectAppliance(null)"
+                    class="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition cursor-pointer"
+                    title="Deseleccionar">
+                    <span class="material-icons text-xs">close</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dimensions (Ancho, Profundidad, Alto) Parametric Controls -->
+              <div class="space-y-2">
+                <span class="text-[11px] font-bold text-slate-700 block uppercase tracking-wider">
+                  Dimensiones Paramétricas (mm)
+                </span>
+                
+                <div class="grid grid-cols-3 gap-1.5 text-center">
+                  <!-- Ancho X -->
+                  <div class="bg-white p-1.5 rounded-xl border border-emerald-100 shadow-2xs">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase block">Ancho (X)</span>
+                    <div class="flex items-center justify-center gap-1 mt-0.5">
+                      <input 
+                        type="number" 
+                        [value]="selApp.width"
+                        (change)="updateApplianceDimension('width', $any($event.target).value)"
+                        class="w-14 text-center font-mono font-bold text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded py-0.5" />
+                    </div>
+                    <div class="flex items-center justify-center gap-1 mt-1">
+                      <button 
+                        type="button" 
+                        (click)="updateApplianceDimension('width', selApp.width - 20)"
+                        class="text-[10px] px-1 py-0.2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold cursor-pointer">-20</button>
+                      <button 
+                        type="button" 
+                        (click)="updateApplianceDimension('width', selApp.width + 20)"
+                        class="text-[10px] px-1 py-0.2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold cursor-pointer">+20</button>
+                    </div>
+                  </div>
+
+                  <!-- Profundidad Z -->
+                  <div class="bg-white p-1.5 rounded-xl border border-emerald-100 shadow-2xs">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase block">Prof (Z)</span>
+                    <div class="flex items-center justify-center gap-1 mt-0.5">
+                      <input 
+                        type="number" 
+                        [value]="selApp.depth"
+                        (change)="updateApplianceDimension('depth', $any($event.target).value)"
+                        class="w-14 text-center font-mono font-bold text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded py-0.5" />
+                    </div>
+                    <div class="flex items-center justify-center gap-1 mt-1">
+                      <button 
+                        type="button" 
+                        (click)="updateApplianceDimension('depth', selApp.depth - 20)"
+                        class="text-[10px] px-1 py-0.2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold cursor-pointer">-20</button>
+                      <button 
+                        type="button" 
+                        (click)="updateApplianceDimension('depth', selApp.depth + 20)"
+                        class="text-[10px] px-1 py-0.2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold cursor-pointer">+20</button>
+                    </div>
+                  </div>
+
+                  <!-- Alto Y -->
+                  <div class="bg-white p-1.5 rounded-xl border border-emerald-100 shadow-2xs">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase block">Alto (Y)</span>
+                    <div class="flex items-center justify-center gap-1 mt-0.5">
+                      <input 
+                        type="number" 
+                        [value]="selApp.height"
+                        (change)="updateApplianceDimension('height', $any($event.target).value)"
+                        class="w-14 text-center font-mono font-bold text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded py-0.5" />
+                    </div>
+                    <div class="flex items-center justify-center gap-1 mt-1">
+                      <button 
+                        type="button" 
+                        (click)="updateApplianceDimension('height', selApp.height - 20)"
+                        class="text-[10px] px-1 py-0.2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold cursor-pointer">-20</button>
+                      <button 
+                        type="button" 
+                        (click)="updateApplianceDimension('height', selApp.height + 20)"
+                        class="text-[10px] px-1 py-0.2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold cursor-pointer">+20</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Selector de Acabados Visuales (Acero Inox, Negro Mate, Blanco Brillante) -->
+              <div class="space-y-1.5">
+                <span class="text-[11px] font-bold text-slate-700 block uppercase tracking-wider">
+                  Acabado Visual
+                </span>
+                <div class="grid grid-cols-3 gap-1.5">
+                  @for (opt of applianceFinishOptions; track opt.id) {
+                    <button 
+                      type="button" 
+                      (click)="updateApplianceFinish(opt.id)"
+                      [class]="selApp.finish === opt.id 
+                        ? 'border-emerald-600 bg-white ring-1 ring-emerald-500 font-bold text-slate-900' 
+                        : 'border-slate-200 bg-white/70 hover:bg-white text-slate-600 font-medium'"
+                      class="p-2 rounded-xl border flex flex-col items-center gap-1.5 transition text-[10px] cursor-pointer">
+                      <span 
+                        class="w-5 h-5 rounded-full border border-black/15 shadow-2xs" 
+                        [style.background-color]="opt.color"></span>
+                      <span class="truncate w-full text-center leading-tight">{{ opt.label }}</span>
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <!-- Imán de Contacto Interactivo (Adherencia Automática a Pisos, Mesadas y Paredes) -->
+              <div class="space-y-1.5">
+                <span class="text-[11px] font-bold text-emerald-900 block uppercase tracking-wider flex items-center gap-1">
+                  <span class="material-icons text-xs text-emerald-600">tune</span>
+                  Imán de Contacto Automático
+                </span>
+                <div class="grid grid-cols-3 gap-1">
+                  <button 
+                    type="button" 
+                    (click)="snapSelectedAppliance('floor')"
+                    class="py-1.5 px-2 bg-white hover:bg-emerald-100/60 border border-emerald-200 rounded-xl text-[10px] font-bold text-slate-700 flex items-center justify-center gap-1 transition cursor-pointer"
+                    title="Adherir al suelo (Y=0 mm)">
+                    <span class="material-icons text-xs text-emerald-600">vertical_align_bottom</span>
+                    <span>Al Piso</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    (click)="snapSelectedAppliance('countertop')"
+                    class="py-1.5 px-2 bg-white hover:bg-emerald-100/60 border border-emerald-200 rounded-xl text-[10px] font-bold text-slate-700 flex items-center justify-center gap-1 transition cursor-pointer"
+                    title="Adherir sobre la mesada o mueble bajo más alto">
+                    <span class="material-icons text-xs text-sky-600">table_bar</span>
+                    <span>A Mesada</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    (click)="snapSelectedAppliance('wall')"
+                    class="py-1.5 px-2 bg-white hover:bg-emerald-100/60 border border-emerald-200 rounded-xl text-[10px] font-bold text-slate-700 flex items-center justify-center gap-1 transition cursor-pointer"
+                    title="Adherir cara trasera a la pared principal">
+                    <span class="material-icons text-xs text-amber-600">border_all</span>
+                    <span>A Pared</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Posición 3D Numérica & Rotación -->
+              <div class="space-y-1.5 pt-1 border-t border-emerald-200/60">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Posición & Giro en Sala
+                  </span>
+                  <!-- Botón Girar 90° -->
+                  <div class="flex items-center gap-1">
+                    <button 
+                      type="button" 
+                      (click)="rotateAppliance(90)"
+                      class="px-2 py-0.5 bg-white hover:bg-emerald-100 border border-emerald-200 rounded-lg text-[10px] font-bold text-emerald-800 flex items-center gap-1 transition cursor-pointer"
+                      title="Girar 90 grados hacia la derecha">
+                      <span class="material-icons text-xs">rotate_right</span>
+                      <span>Girar 90°</span>
+                    </button>
+                    <span class="text-[10px] font-mono font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                      {{ selApp.rotation }}°
+                    </span>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-1.5 text-center">
+                  <!-- Pos X -->
+                  <div class="bg-white p-1 rounded-xl border border-slate-200">
+                    <span class="text-[9px] text-slate-400 block font-bold">X (mm)</span>
+                    <input 
+                      type="number" 
+                      [value]="selApp.position.x" 
+                      (change)="setAppliancePositionDirect('x', $any($event.target).value)"
+                      class="w-full text-center font-mono font-bold text-xs bg-transparent focus:outline-none" />
+                    <div class="flex justify-center gap-1 mt-0.5">
+                      <button (click)="updateAppliancePosition('x', -50)" class="text-[9px] px-1 bg-slate-100 hover:bg-slate-200 rounded font-bold cursor-pointer">-50</button>
+                      <button (click)="updateAppliancePosition('x', 50)" class="text-[9px] px-1 bg-slate-100 hover:bg-slate-200 rounded font-bold cursor-pointer">+50</button>
+                    </div>
+                  </div>
+
+                  <!-- Pos Y -->
+                  <div class="bg-white p-1 rounded-xl border border-slate-200">
+                    <span class="text-[9px] text-slate-400 block font-bold">Y (Altura)</span>
+                    <input 
+                      type="number" 
+                      [value]="selApp.position.y" 
+                      (change)="setAppliancePositionDirect('y', $any($event.target).value)"
+                      class="w-full text-center font-mono font-bold text-xs bg-transparent focus:outline-none" />
+                    <div class="flex justify-center gap-1 mt-0.5">
+                      <button (click)="updateAppliancePosition('y', -50)" class="text-[9px] px-1 bg-slate-100 hover:bg-slate-200 rounded font-bold cursor-pointer">-50</button>
+                      <button (click)="updateAppliancePosition('y', 50)" class="text-[9px] px-1 bg-slate-100 hover:bg-slate-200 rounded font-bold cursor-pointer">+50</button>
+                    </div>
+                  </div>
+
+                  <!-- Pos Z -->
+                  <div class="bg-white p-1 rounded-xl border border-slate-200">
+                    <span class="text-[9px] text-slate-400 block font-bold">Z (Prof)</span>
+                    <input 
+                      type="number" 
+                      [value]="selApp.position.z" 
+                      (change)="setAppliancePositionDirect('z', $any($event.target).value)"
+                      class="w-full text-center font-mono font-bold text-xs bg-transparent focus:outline-none" />
+                    <div class="flex justify-center gap-1 mt-0.5">
+                      <button (click)="updateAppliancePosition('z', -50)" class="text-[9px] px-1 bg-slate-100 hover:bg-slate-200 rounded font-bold cursor-pointer">-50</button>
+                      <button (click)="updateAppliancePosition('z', 50)" class="text-[9px] px-1 bg-slate-100 hover:bg-slate-200 rounded font-bold cursor-pointer">+50</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Presupuesto e Integración Financiera -->
+              <div class="p-2.5 bg-white rounded-xl border border-emerald-100 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                    <span class="material-icons text-xs text-amber-500">payments</span>
+                    Costo en Presupuesto
+                  </span>
+                  <label class="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-slate-600">
+                    <input 
+                      type="checkbox" 
+                      [checked]="selApp.includeInBudget" 
+                      (change)="toggleApplianceBudgetInclusion()"
+                      class="w-3.5 h-3.5 text-emerald-600 rounded" />
+                    <span>Cotizar</span>
+                  </label>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    [value]="selApp.price" 
+                    (change)="updateAppliancePrice($any($event.target).value)"
+                    class="flex-1 font-mono font-bold text-xs px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
+                    placeholder="Precio..." />
+                  <span class="text-[11px] font-mono font-bold text-emerald-700">
+                    {{ projectService.formatCurrency(selApp.price) }}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          }
+
+          <!-- SECTION 2: APPLIANCES CURRENTLY PLACED IN THE SCENE -->
+          @if (appliances().length > 0) {
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                  <span class="material-icons text-xs text-emerald-600">inventory_2</span>
+                  Equipos en el Proyecto ({{ appliances().length }})
+                </span>
+                <span class="text-[10px] text-slate-400">Clic para seleccionar</span>
+              </div>
+
+              <div class="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+                @for (app of appliances(); track app.id) {
+                  <div 
+                    (click)="selectAppliance(app.id)"
+                    (keydown.enter)="selectAppliance(app.id)"
+                    tabindex="0"
+                    role="button"
+                    [class]="selectedApplianceId() === app.id 
+                      ? 'border-emerald-500 bg-emerald-50/80 shadow-2xs font-bold' 
+                      : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 font-normal'"
+                    class="p-2 rounded-xl border flex items-center justify-between gap-2 transition cursor-pointer text-xs">
+                    
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="material-icons text-sm" [class.text-emerald-600]="selectedApplianceId() === app.id">
+                        {{ app.type === 'refrigerator' ? 'kitchen' : (app.type === 'sink' ? 'wash' : (app.type === 'hood' ? 'air' : (app.type === 'cooktop' ? 'mode_heat' : 'microwave'))) }}
+                      </span>
+                      <div class="truncate">
+                        <p class="truncate text-[11px] leading-tight text-slate-800">{{ app.name }}</p>
+                        <p class="text-[10px] font-mono text-slate-400">
+                          {{ app.width }}×{{ app.depth }}×{{ app.height }} mm · {{ app.finish === 'stainless_steel' ? 'Inox' : (app.finish === 'black_matte' ? 'Negro' : 'Blanco') }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <span class="text-[10px] font-mono font-semibold" [class.text-emerald-700]="app.includeInBudget" [class.text-slate-400]="!app.includeInBudget">
+                        {{ app.includeInBudget ? projectService.formatCurrency(app.price) : 'No cotizado' }}
+                      </span>
+                      <button 
+                        type="button" 
+                        (click)="projectService.removeAppliance(app.id); $event.stopPropagation()"
+                        class="p-1 text-slate-400 hover:text-rose-600 transition"
+                        title="Eliminar del 3D">
+                        <span class="material-icons text-xs">delete</span>
+                      </button>
+                    </div>
+
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- SECTION 3: APPLIANCES CATALOG & PRESETS -->
+          <div class="space-y-2 pt-2 border-t border-slate-200">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                <span class="material-icons text-xs text-sky-600">apps</span>
+                Catálogo de Electrodomésticos
+              </span>
+              <span class="text-[10px] text-slate-400">6 Familias 3D</span>
+            </div>
+
+            <!-- Categories Tabs -->
+            <div class="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+              <button 
+                type="button" 
+                (click)="activeApplianceCategory.set('all')"
+                [class]="activeApplianceCategory() === 'all' ? 'bg-slate-900 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
+                class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer">
+                Todos
+              </button>
+              <button 
+                type="button" 
+                (click)="activeApplianceCategory.set('cold')"
+                [class]="activeApplianceCategory() === 'cold' ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
+                class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer">
+                Refrigeración
+              </button>
+              <button 
+                type="button" 
+                (click)="activeApplianceCategory.set('cooking')"
+                [class]="activeApplianceCategory() === 'cooking' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
+                class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer">
+                Cocción
+              </button>
+              <button 
+                type="button" 
+                (click)="activeApplianceCategory.set('extraction')"
+                [class]="activeApplianceCategory() === 'extraction' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
+                class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer">
+                Extracción
+              </button>
+              <button 
+                type="button" 
+                (click)="activeApplianceCategory.set('washing')"
+                [class]="activeApplianceCategory() === 'washing' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
+                class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer">
+                Lavaplatos
+              </button>
+              <button 
+                type="button" 
+                (click)="activeApplianceCategory.set('microwave')"
+                [class]="activeApplianceCategory() === 'microwave' ? 'bg-purple-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
+                class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer">
+                Microondas
+              </button>
+            </div>
+
+            <!-- Preset Cards Grid -->
+            <div class="space-y-2 pt-1">
+              @for (preset of filteredAppliances(); track preset.id) {
+                <div class="p-2.5 bg-white border border-slate-200 hover:border-emerald-300 hover:shadow-xs rounded-2xl transition space-y-2 group">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                      <div class="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-emerald-50 text-slate-600 group-hover:text-emerald-700 flex items-center justify-center shrink-0 transition">
+                        <span class="material-icons text-base">{{ preset.icon }}</span>
+                      </div>
+                      <div class="min-w-0">
+                        <h4 class="font-bold text-[11px] text-slate-800 leading-tight">{{ preset.name }}</h4>
+                        <p class="text-[10px] text-slate-400">{{ preset.brand }} · {{ preset.modelCode }}</p>
+                      </div>
+                    </div>
+
+                    <button 
+                      type="button" 
+                      (click)="addApplianceFromPreset(preset)"
+                      class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg flex items-center gap-1 transition shadow-2xs shrink-0 cursor-pointer">
+                      <span class="material-icons text-xs">add</span>
+                      <span>Añadir 3D</span>
+                    </button>
+                  </div>
+
+                  <!-- Specs line -->
+                  <div class="flex items-center justify-between text-[10px] bg-slate-50 px-2 py-1 rounded-lg">
+                    <span class="font-mono text-slate-600 font-medium">
+                      {{ preset.defaultWidth }} × {{ preset.defaultDepth }} × {{ preset.defaultHeight }} mm
+                    </span>
+                    <span class="font-mono font-bold text-emerald-700">
+                      {{ projectService.formatCurrency(preset.defaultPrice) }}
+                    </span>
+                  </div>
+
+                  <p class="text-[10px] text-slate-500 leading-tight">
+                    {{ preset.description }}
+                  </p>
+                </div>
               }
             </div>
 

@@ -30,11 +30,13 @@ import {
   OpeningDirection,
   WorkspaceMode,
   RoomConfiguration,
-  DEFAULT_ROOM_CONFIG
+  DEFAULT_ROOM_CONFIG,
+  ApplianceItem
 } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
+import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
 
 interface PieceMeshData {
   part: Part;
@@ -87,6 +89,7 @@ export interface ClearanceInfo {
 export class Furniture3dViewerComponent implements OnDestroy {
   private joineryEngine = inject(JoineryEngineService);
   readonly hardwareCatalog = inject(HardwareCatalogService);
+  private appliance3dBuilder = inject(Appliance3dBuilderService);
 
   // Inputs
   parts = input<Part[]>([]);
@@ -96,6 +99,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   materials = input<Material[]>([]);
   workspaceMode = input<WorkspaceMode>('module');
   roomConfig = input<RoomConfiguration>(DEFAULT_ROOM_CONFIG);
+  appliances = input<ApplianceItem[]>([]);
+  selectedApplianceId = input<string | null>(null);
 
   // Outputs
   partSelected = output<Part | null>();
@@ -117,6 +122,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
   roomConfigModified = output<Partial<RoomConfiguration>>();
   wallSelected = output<'main' | 'side' | null>();
   readonly selectedWallType = signal<'main' | 'side' | null>(null);
+  applianceSelected = output<ApplianceItem | null>();
+  applianceModified = output<{ appliance: ApplianceItem; updates: Partial<ApplianceItem> }>();
+  applianceDeleted = output<string>();
 
   // Canvas and Container refs
   canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas3d');
@@ -306,6 +314,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private gridHelper: THREE.GridHelper | null = null;
   private floorMesh: THREE.Mesh | null = null;
   private roomGroup = new THREE.Group();
+  private appliancesGroup = new THREE.Group();
+  private applianceGizmoGroup = new THREE.Group();
 
   // Mesh & Raycast Tracking
   private pieceObjects: PieceMeshData[] = [];
@@ -331,6 +341,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private isWallGizmoDragging = false;
   private activeWallGizmoHit: { isWallGizmo: boolean; type: 'wall_move' | 'wall_stretch'; axis?: 'x' | 'z'; wallTarget?: 'main' | 'side' } | null = null;
   private initialWallLength = 0;
+
+  // Appliance Direct Drag & 3D Resize State
+  private isApplianceDragging = false;
+  private isApplianceResizing = false;
+  private draggingAppliance: ApplianceItem | null = null;
+  private dragInitialAppliancePos = { x: 0, y: 0, z: 0 };
+  private dragInitialApplianceDim = { width: 0, depth: 0, height: 0 };
+  private activeApplianceHandle: { axis: 'x' | 'y' | 'z'; direction: 1 | -1 } | null = null;
+  private applianceHandleHitMeshes: THREE.Mesh[] = [];
 
   // Right-Click vs Pan/Orbit Detection State
   private rightPointerDownPos: { x: number; y: number } | null = null;
@@ -413,6 +432,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.updateWallGizmo(wallType, config, mode);
       }
     });
+
+    // 6. Update 3D Appliances when appliances or selectedApplianceId change
+    effect(() => {
+      const appls = this.appliances();
+      const selId = this.selectedApplianceId();
+      if (this.scene) {
+        this.updateAppliancesScene(appls, selId);
+      }
+    });
   }
 
   private initThree() {
@@ -469,6 +497,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.rectPreviewGroup);
     this.scene.add(this.roomGroup);
     this.scene.add(this.wallGizmoGroup);
+    this.scene.add(this.appliancesGroup);
+    this.scene.add(this.applianceGizmoGroup);
+
+    // Initial Appliances Setup
+    this.updateAppliancesScene(this.appliances(), this.selectedApplianceId());
 
     // Initial Room Environment Setup
     if (this.workspaceMode() === 'room') {
@@ -3237,6 +3270,99 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
+    // 1.3 Check if clicking on an Appliance Resize Handle (3D Face Handles)
+    if (this.applianceHandleHitMeshes.length > 0) {
+      const handleIntersects = this.raycaster.intersectObjects(this.applianceHandleHitMeshes, true);
+      if (handleIntersects.length > 0) {
+        const hit = handleIntersects[0].object as THREE.Mesh;
+        const handleData = hit.userData;
+        if (handleData && handleData['isApplianceHandle']) {
+          this.isApplianceResizing = true;
+          this.draggingAppliance = handleData['appliance'];
+          this.activeApplianceHandle = {
+            axis: handleData['axis'],
+            direction: handleData['direction']
+          };
+          this.dragInitialAppliancePos = { ...handleData['appliance'].position };
+          this.dragInitialApplianceDim = {
+            width: handleData['appliance'].width,
+            height: handleData['appliance'].height,
+            depth: handleData['appliance'].depth
+          };
+          this.dragStartPointer = { x: e.clientX, y: e.clientY };
+          this.dragStarted.emit();
+          this.controls.enabled = false;
+
+          // Camera-facing drag plane through the handle position
+          const camDir = new THREE.Vector3();
+          this.camera.getWorldDirection(camDir);
+          const handlePos = hit.position.clone();
+          this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), handlePos);
+
+          const intersectPoint = new THREE.Vector3();
+          if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
+            this.dragPlaneIntersectionStart.copy(intersectPoint);
+          } else {
+            this.dragPlaneIntersectionStart.copy(handlePos);
+          }
+
+          canvas.style.cursor = 'crosshair';
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
+
+    // 1.5 Check if clicking on an Appliance in 3D (Select & Free Mouse Drag)
+    if (this.appliancesGroup.children.length > 0) {
+      const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
+      if (appIntersects.length > 0) {
+        let hitObj: THREE.Object3D | null = appIntersects[0].object;
+        let foundApp: ApplianceItem | null = null;
+        while (hitObj && hitObj !== this.appliancesGroup && hitObj !== this.scene) {
+          if (hitObj.userData?.['appliance']) {
+            foundApp = hitObj.userData['appliance'];
+            break;
+          }
+          hitObj = hitObj.parent;
+        }
+        if (foundApp) {
+          this.applianceSelected.emit(foundApp);
+          this.partSelected.emit(null);
+          this.partsSelected.emit([]);
+          this.selectedWallType.set(null);
+          this.wallSelected.emit(null);
+
+          // Iniciar arrastre libre inmediato del equipo con el ratón
+          if (e.button === 0) {
+            this.isApplianceDragging = true;
+            this.draggingAppliance = { ...foundApp };
+            this.dragInitialAppliancePos = { ...foundApp.position };
+            this.dragStartPointer = { x: e.clientX, y: e.clientY };
+            this.dragStarted.emit();
+            this.controls.enabled = false;
+
+            // Plano horizontal de deslizamiento a la altura actual del equipo
+            this.dragPlane.set(new THREE.Vector3(0, 1, 0), -foundApp.position.y);
+
+            const intersectPoint = new THREE.Vector3();
+            if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
+              this.dragPlaneIntersectionStart.copy(intersectPoint);
+            } else {
+              this.dragPlaneIntersectionStart.set(foundApp.position.x, foundApp.position.y, foundApp.position.z);
+            }
+
+            canvas.style.cursor = 'grabbing';
+          }
+
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
+
     // 2. Normal Piece & Handle selection (with Shift-Click multi-selection)
     const targets: THREE.Object3D[] = [];
     for (const item of this.pieceObjects) {
@@ -3346,6 +3472,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       // Clicked background -> deselect
       this.partsSelected.emit([]);
       this.partSelected.emit(null);
+      this.applianceSelected.emit(null);
     }
   }
 
@@ -3360,6 +3487,136 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (dist > 5) {
         this.rightPointerDragged = true;
       }
+    }
+
+    // Direct Appliance 3D Face Handle Resizing (Tiradores interactivos en las caras de la caja 3D)
+    if (this.isApplianceResizing && this.draggingAppliance && this.activeApplianceHandle) {
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      const currentIntersect = new THREE.Vector3();
+      if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersect)) {
+        const deltaWorld = currentIntersect.clone().sub(this.dragPlaneIntersectionStart);
+        const { axis, direction } = this.activeApplianceHandle;
+        const initialDim = this.dragInitialApplianceDim;
+        const initialPos = this.dragInitialAppliancePos;
+        const updates: Partial<ApplianceItem> = {};
+
+        if (axis === 'x') {
+          const delta = deltaWorld.x * direction;
+          const nextW = Math.max(200, Math.min(2500, Math.round(initialDim.width + delta)));
+          const actualDeltaW = nextW - initialDim.width;
+          updates.width = nextW;
+          updates.position = {
+            ...initialPos,
+            x: Math.round(initialPos.x + (actualDeltaW / 2) * direction)
+          };
+        } else if (axis === 'y') {
+          const delta = deltaWorld.y * direction;
+          const nextH = Math.max(100, Math.min(2500, Math.round(initialDim.height + delta)));
+          updates.height = nextH;
+          // Al tirar hacia arriba del tirador superior, la base queda anclada
+          updates.position = {
+            ...initialPos
+          };
+        } else if (axis === 'z') {
+          const delta = deltaWorld.z * direction;
+          const nextD = Math.max(150, Math.min(1500, Math.round(initialDim.depth + delta)));
+          const actualDeltaD = nextD - initialDim.depth;
+          updates.depth = nextD;
+          updates.position = {
+            ...initialPos,
+            z: Math.round(initialPos.z + (actualDeltaD / 2) * direction)
+          };
+        }
+
+        this.applianceModified.emit({
+          appliance: this.draggingAppliance,
+          updates
+        });
+      }
+      return;
+    }
+
+    // Direct Appliance Free Dragging with Smart Contact Magnet (Arrastre plano con imán automático a pisos, mesadas y paredes)
+    if (this.isApplianceDragging && this.draggingAppliance) {
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      const currentIntersect = new THREE.Vector3();
+      if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersect)) {
+        const deltaWorld = currentIntersect.clone().sub(this.dragPlaneIntersectionStart);
+        const app = this.draggingAppliance;
+        const initialPos = this.dragInitialAppliancePos;
+        let newX = Math.round(initialPos.x + deltaWorld.x);
+        let newY = initialPos.y;
+        let newZ = Math.round(initialPos.z + deltaWorld.z);
+
+        // --- CONTACT MAGNET (Imán de contacto a mesadas, piso y paredes) ---
+        const config = this.roomConfig();
+        const parts = this.parts();
+        const halfAppW = app.width / 2;
+        const halfAppD = app.depth / 2;
+
+        // 1. Detección inteligente de superficie horizontal de apoyo (Mesada vs Piso)
+        let snappedToCountertop = false;
+        let highestCountertopY = 0;
+
+        for (const p of parts) {
+          if (p.orientation === 'horizontal') {
+            const pX = p.posX ?? 0;
+            const pZ = p.posZ ?? 0;
+            const pHalfL = (p.length || 0) / 2;
+            const pHalfW = (p.width || 0) / 2;
+            const pTopY = (p.posY ?? 0) + (p.thickness || 18) / 2;
+
+            // Coincidencia o solapamiento en el plano horizontal XZ
+            const overlapX = (newX - halfAppW < pX + pHalfL) && (newX + halfAppW > pX - pHalfL);
+            const overlapZ = (newZ - halfAppD < pZ + pHalfW) && (newZ + halfAppD > pZ - pHalfW);
+
+            if (overlapX && overlapZ && pTopY > highestCountertopY) {
+              highestCountertopY = pTopY;
+              snappedToCountertop = true;
+            }
+          }
+        }
+
+        if (snappedToCountertop) {
+          newY = highestCountertopY;
+        } else if (app.mountType === 'floor' || app.type === 'refrigerator') {
+          newY = 0;
+        } else if (app.type === 'hood') {
+          newY = 1500;
+        } else if (newY < 250) {
+          newY = 0; // Adherencia limpia al piso si se arrastra cerca del suelo
+        }
+
+        // 2. Imán a Pared Posterior (Main Wall)
+        const backWallInnerZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + halfAppD;
+        if (Math.abs(newZ - backWallInnerZ) < 80) {
+          newZ = Math.round(backWallInnerZ);
+        }
+
+        // 3. Imán a Pared Lateral en L (Side Wall)
+        if (config.layout === 'l_shape') {
+          const sideWallInnerX = (config.wallOffsetX || 0) + (config.wallThickness || 150) + halfAppW;
+          if (Math.abs(newX - sideWallInnerX) < 80) {
+            newX = Math.round(sideWallInnerX);
+          }
+        }
+
+        this.applianceModified.emit({
+          appliance: app,
+          updates: {
+            position: { x: newX, y: newY, z: newZ }
+          }
+        });
+      }
+      return;
     }
 
     // Direct Room Wall Dragging (X / Z translation)
@@ -3780,6 +4037,31 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
+    // Hover feedback for 3D appliance resize handles
+    if (this.applianceHandleHitMeshes.length > 0) {
+      const handleIntersects = this.raycaster.intersectObjects(this.applianceHandleHitMeshes, true);
+      if (handleIntersects.length > 0) {
+        const hit = handleIntersects[0].object.userData;
+        if (hit && hit['axis'] === 'x') {
+          canvas.style.cursor = 'ew-resize';
+        } else if (hit && hit['axis'] === 'y') {
+          canvas.style.cursor = 'ns-resize';
+        } else {
+          canvas.style.cursor = 'nwse-resize';
+        }
+        return;
+      }
+    }
+
+    // Hover feedback for appliances
+    if (this.appliancesGroup.children.length > 0) {
+      const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
+      if (appIntersects.length > 0) {
+        canvas.style.cursor = 'grab';
+        return;
+      }
+    }
+
     const pieceIntersects = this.raycaster.intersectObjects(
       this.pieceObjects.map(p => p.mesh),
       false
@@ -3914,6 +4196,23 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (canvas) {
         canvas.style.cursor = 'default';
       }
+    }
+
+    if (this.isApplianceDragging) {
+      this.isApplianceDragging = false;
+      this.draggingAppliance = null;
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+    }
+
+    if (this.isApplianceResizing) {
+      this.isApplianceResizing = false;
+      this.draggingAppliance = null;
+      this.activeApplianceHandle = null;
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
     }
   }
 
@@ -4943,7 +5242,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return;
     }
 
-    if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Del') {
+      const selAppId = this.selectedApplianceId();
+      if (selAppId) {
+        e.preventDefault();
+        this.applianceDeleted.emit(selAppId);
+        return;
+      }
       const sel = this.selectedPart();
       const selIds = this.selectedPartIds();
       if (sel) {
@@ -5866,6 +6171,187 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.wallGizmoHitMeshes.push(handleMesh);
   }
 
+  // ==========================================
+  // GESTIÓN Y RENDERIZADO 3D DE ELECTRODOMÉSTICOS
+  // ==========================================
+
+  private updateAppliancesScene(appls: ApplianceItem[], selectedId: string | null) {
+    if (!this.scene) return;
+
+    // 1. Limpiar mallas de electrodomésticos anteriores
+    while (this.appliancesGroup.children.length > 0) {
+      const child = this.appliancesGroup.children[0];
+      this.appliancesGroup.remove(child);
+      child.traverse(c => {
+        if (c instanceof THREE.Mesh) {
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) {
+            if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+            else c.material.dispose();
+          }
+        }
+      });
+    }
+
+    // 2. Limpiar gizmos y cajas de selección de electrodomésticos
+    while (this.applianceGizmoGroup.children.length > 0) {
+      const child = this.applianceGizmoGroup.children[0];
+      this.applianceGizmoGroup.remove(child);
+      child.traverse(c => {
+        if (c instanceof THREE.Mesh || c instanceof THREE.LineSegments) {
+          if (c.geometry) c.geometry.dispose();
+        }
+      });
+    }
+    this.applianceHandleHitMeshes = [];
+
+    // 3. Reconstruir cada electrodoméstico
+    for (const app of appls) {
+      const appGroup = this.appliance3dBuilder.buildApplianceGroup(app);
+      appGroup.position.set(app.position.x, app.position.y, app.position.z);
+      appGroup.rotation.y = THREE.MathUtils.degToRad(app.rotation || 0);
+      this.appliancesGroup.add(appGroup);
+
+      // Si es el electrodoméstico seleccionado, dibujar contorno técnico, aro de suelo y tiradores 3D
+      if (app.id === selectedId) {
+        const rotRad = THREE.MathUtils.degToRad(app.rotation || 0);
+
+        // Marco de alambre técnico azul cobalto
+        const boxGeo = new THREE.BoxGeometry(app.width + 6, app.height + 6, app.depth + 6);
+        const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+        const lineMat = new THREE.LineBasicMaterial({
+          color: 0x0284c7, // sky-600
+          linewidth: 2,
+          depthTest: false
+        });
+        const boxLines = new THREE.LineSegments(edgesGeo, lineMat);
+        boxLines.position.set(app.position.x, app.position.y + app.height / 2, app.position.z);
+        boxLines.rotation.y = rotRad;
+        this.applianceGizmoGroup.add(boxLines);
+
+        // Anillo de proyección en el plano de apoyo
+        const haloRadius = Math.max(app.width, app.depth) * 0.48;
+        const ringGeo = new THREE.RingGeometry(haloRadius - 15, haloRadius, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0x0284c7,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.4,
+          depthTest: false
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.rotation.x = -Math.PI / 2;
+        ringMesh.position.set(app.position.x, Math.max(1, app.position.y + 1), app.position.z);
+        this.applianceGizmoGroup.add(ringMesh);
+
+        // Tiradores interactivos 3D en las caras de la caja envolvente (Face Handles para Ancho, Alto, Profundidad)
+        const handleParent = new THREE.Group();
+        handleParent.position.set(app.position.x, app.position.y, app.position.z);
+        handleParent.rotation.y = rotRad;
+        this.applianceGizmoGroup.add(handleParent);
+
+        const handleSize = 34;
+        const handleGeo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
+        const handleEdgeGeo = new THREE.EdgesGeometry(handleGeo);
+
+        const addHandle = (
+          axis: 'x' | 'y' | 'z',
+          direction: 1 | -1,
+          localX: number,
+          localY: number,
+          localZ: number,
+          color: number
+        ) => {
+          const mat = new THREE.MeshStandardMaterial({
+            color,
+            emissive: color,
+            emissiveIntensity: 0.45,
+            roughness: 0.15,
+            metalness: 0.2,
+            depthTest: false
+          });
+          const mesh = new THREE.Mesh(handleGeo, mat);
+          const edges = new THREE.LineSegments(
+            handleEdgeGeo,
+            new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
+          );
+          mesh.add(edges);
+          mesh.position.set(localX, localY, localZ);
+          mesh.renderOrder = 999;
+          mesh.userData = {
+            isApplianceHandle: true,
+            appliance: app,
+            axis,
+            direction
+          };
+          handleParent.add(mesh);
+          this.applianceHandleHitMeshes.push(mesh);
+        };
+
+        const halfW = app.width / 2;
+        const halfH = app.height / 2;
+        const halfD = app.depth / 2;
+
+        // Tiradores laterales de Ancho (Rojos en caras X)
+        addHandle('x', 1, halfW + 18, halfH, 0, 0xef4444);
+        addHandle('x', -1, -halfW - 18, halfH, 0, 0xef4444);
+
+        // Tirador superior de Altura (Esmeralda en cara Y)
+        addHandle('y', 1, 0, app.height + 18, 0, 0x10b981);
+
+        // Tiradores frontales y traseros de Profundidad (Celeste/Azul en caras Z)
+        addHandle('z', 1, 0, halfH, halfD + 18, 0x0284c7);
+        addHandle('z', -1, 0, halfH, -halfD - 18, 0x0284c7);
+      }
+    }
+  }
+
+  /**
+   * Adherencia inteligente (imán de contacto) a piso, mesada o pared
+   */
+  snapApplianceToContact(appliance: ApplianceItem, target: 'floor' | 'countertop' | 'wall' | 'auto') {
+    const parts = this.parts();
+    const config = this.roomConfig();
+    const newX = appliance.position.x;
+    let newY = appliance.position.y;
+    let newZ = appliance.position.z;
+
+    const actualTarget = target === 'auto' ? appliance.mountType : target;
+
+    if (actualTarget === 'floor') {
+      newY = 0;
+    } else if (actualTarget === 'countertop') {
+      // Buscar la mesada o pieza horizontal más alta en la cocina/módulo
+      let highestY = 0;
+      for (const p of parts) {
+        if (p.orientation === 'horizontal') {
+          const top = (p.posY || 0) + (p.thickness || 18) / 2;
+          if (top > highestY) {
+            highestY = top;
+          }
+        }
+      }
+      newY = highestY > 0 ? highestY : 880;
+    } else if (actualTarget === 'wall') {
+      // Ajustar cara posterior contra el muro principal
+      const wallBackZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (appliance.depth / 2);
+      newZ = wallBackZ;
+      if (appliance.type === 'hood') {
+        newY = 1500; // Altura estándar ergonómica de extracción
+      }
+    } else if (actualTarget === 'built_in') {
+      // En torre o nicho de mueble
+      newZ = (appliance.depth / 2);
+    }
+
+    this.applianceModified.emit({
+      appliance,
+      updates: {
+        position: { x: Math.round(newX), y: Math.round(newY), z: Math.round(newZ) }
+      }
+    });
+  }
+
   ngOnDestroy() {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
@@ -5890,6 +6376,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
         if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
         else child.material.dispose();
       }
+    }
+    while (this.appliancesGroup.children.length > 0) {
+      const child = this.appliancesGroup.children[0];
+      this.appliancesGroup.remove(child);
+    }
+    while (this.applianceGizmoGroup.children.length > 0) {
+      const child = this.applianceGizmoGroup.children[0];
+      this.applianceGizmoGroup.remove(child);
     }
     if (this.renderer) {
       this.renderer.dispose();
