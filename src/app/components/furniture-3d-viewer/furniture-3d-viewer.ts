@@ -82,7 +82,7 @@ export interface WallSnapResult {
   correctedZ: number;
   deltaX: number;
   deltaZ: number;
-  snappedWallType?: 'main' | 'side' | 'corner';
+  snappedWallType?: 'main' | 'side' | 'right_side' | 'corner' | 'right_corner';
   contactGuide?: {
     mainWallContact?: {
       xStart: number;
@@ -92,6 +92,13 @@ export interface WallSnapResult {
       z: number;
     };
     sideWallContact?: {
+      zStart: number;
+      zEnd: number;
+      yMin: number;
+      yMax: number;
+      x: number;
+    };
+    rightWallContact?: {
       zStart: number;
       zEnd: number;
       yMin: number;
@@ -3601,7 +3608,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
         let newZ = rawZ;
 
         // --- CONTACT MAGNET (Imán dinámico: adherir al aproximarse y soltar al alejarse) ---
-        const config = this.roomConfig();
         const parts = this.parts();
         const rot = ((app.rotation || 0) % 360 + 360) % 360;
         const isRotated90 = rot === 90 || rot === 270;
@@ -4107,7 +4113,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
           if (this.dragInitialParts.length > 1) {
             // Group Drag: translate all pieces in group together with smart wall snap
             let effDx = dx;
-            let effDy = dy;
+            const effDy = dy;
             let effDz = dz;
 
             if (this.isMagneticSnap()) {
@@ -5729,9 +5735,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
-    // 2. MURO LATERAL EN L (Side Wall a lo largo de Z si layout === 'l_shape')
+    // 2. MURO LATERAL IZQUIERDO (L y U)
+    let isLeftSnapped = false;
+    let isRightSnapped = false;
     const sideWallInnerX = offX + wallThickness;
-    if (layout === 'l_shape') {
+
+    if (layout === 'l_shape' || layout === 'u_shape') {
       const sideWallMinZ = offZ + wallThickness;
       const sideWallMaxZ = offZ + wallThickness + sideWallLength;
 
@@ -5741,8 +5750,40 @@ export class Furniture3dViewerComponent implements OnDestroy {
         if (Math.abs(distX) <= threshold) {
           deltaX = sideWallInnerX - bounds.minX;
           isSnappedX = true;
+          isLeftSnapped = true;
         }
       }
+    }
+
+    // 3. MURO LATERAL DERECHO (Solo U)
+    const rightWallLength = config.rightWallLength || sideWallLength;
+    const rightWallInnerX = offX + mainWallLength - wallThickness;
+    if (layout === 'u_shape' && !isLeftSnapped) {
+      const rightWallMinZ = offZ + wallThickness;
+      const rightWallMaxZ = offZ + wallThickness + rightWallLength;
+
+      const inRightWallSpan = bounds.maxZ >= rightWallMinZ - 100 && bounds.minZ <= rightWallMaxZ + 100;
+      if (inRightWallSpan) {
+        const distX = rightWallInnerX - bounds.maxX;
+        if (Math.abs(distX) <= threshold) {
+          deltaX = rightWallInnerX - bounds.maxX;
+          isSnappedX = true;
+          isRightSnapped = true;
+        }
+      }
+    }
+
+    let snappedWallType: 'main' | 'side' | 'right_side' | 'corner' | 'right_corner' | undefined = undefined;
+    if (isSnappedZ && isLeftSnapped) {
+      snappedWallType = 'corner';
+    } else if (isSnappedZ && isRightSnapped) {
+      snappedWallType = 'right_corner';
+    } else if (isSnappedZ) {
+      snappedWallType = 'main';
+    } else if (isLeftSnapped) {
+      snappedWallType = 'side';
+    } else if (isRightSnapped) {
+      snappedWallType = 'right_side';
     }
 
     const res: WallSnapResult = {
@@ -5752,7 +5793,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       correctedZ: bounds.minZ + deltaZ,
       deltaX,
       deltaZ,
-      snappedWallType: isSnappedX && isSnappedZ ? 'corner' : (isSnappedZ ? 'main' : (isSnappedX ? 'side' : undefined))
+      snappedWallType
     };
 
     if (isSnappedX || isSnappedZ) {
@@ -5766,13 +5807,22 @@ export class Furniture3dViewerComponent implements OnDestroy {
           z: mainWallInnerZ + 0.8
         };
       }
-      if (isSnappedX) {
+      if (isLeftSnapped) {
         res.contactGuide.sideWallContact = {
           zStart: Math.max(offZ + wallThickness, bounds.minZ + deltaZ),
           zEnd: Math.min(offZ + wallThickness + sideWallLength, bounds.maxZ + deltaZ),
           yMin: Math.max(0, bounds.minY),
           yMax: Math.max(bounds.minY + 20, bounds.maxY),
           x: sideWallInnerX + 0.8
+        };
+      }
+      if (isRightSnapped) {
+        res.contactGuide.rightWallContact = {
+          zStart: Math.max(offZ + wallThickness, bounds.minZ + deltaZ),
+          zEnd: Math.min(offZ + wallThickness + rightWallLength, bounds.maxZ + deltaZ),
+          yMin: Math.max(0, bounds.minY),
+          yMax: Math.max(bounds.minY + 20, bounds.maxY),
+          x: rightWallInnerX - 0.8
         };
       }
     }
@@ -5878,8 +5928,42 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.wallSnapGuideGroup.add(bottomSeam);
 
       if (!mainWallContact) {
-        const badgeSprite = this.createWallSnapBadge('🧲 Muro Lateral L · 0 mm');
+        const badgeSprite = this.createWallSnapBadge('🧲 Muro Lateral Izquierdo · 0 mm');
         badgeSprite.position.set(x + 1.2, Math.min(2500, yMax + 75), centerZ);
+        this.wallSnapGuideGroup.add(badgeSprite);
+      }
+    }
+
+    const { rightWallContact } = snapResult.contactGuide;
+    if (rightWallContact) {
+      const { zStart, zEnd, yMin, yMax, x } = rightWallContact;
+      const depth = Math.max(10, zEnd - zStart);
+      const height = Math.max(10, yMax - yMin);
+      const centerZ = (zStart + zEnd) / 2;
+      const centerY = (yMin + yMax) / 2;
+
+      // 1. Resplandor translúcido sobre el muro lateral derecho
+      const washGeo = new THREE.PlaneGeometry(depth, height);
+      const washMesh = new THREE.Mesh(washGeo, washMat);
+      washMesh.rotation.y = -Math.PI / 2;
+      washMesh.position.set(x, centerY, centerZ);
+      this.wallSnapGuideGroup.add(washMesh);
+
+      // 2. Líneas láser superior e inferior
+      const lineT = 3.5;
+      const topSeamGeo = new THREE.BoxGeometry(1.5, lineT, depth);
+      const topSeam = new THREE.Mesh(topSeamGeo, laserMat);
+      topSeam.position.set(x - 0.3, yMax, centerZ);
+      this.wallSnapGuideGroup.add(topSeam);
+
+      const bottomSeamGeo = new THREE.BoxGeometry(1.5, lineT, depth);
+      const bottomSeam = new THREE.Mesh(bottomSeamGeo, laserMat);
+      bottomSeam.position.set(x - 0.3, yMin, centerZ);
+      this.wallSnapGuideGroup.add(bottomSeam);
+
+      if (!mainWallContact) {
+        const badgeSprite = this.createWallSnapBadge('🧲 Muro Lateral Derecho U · 0 mm');
+        badgeSprite.position.set(x - 1.2, Math.min(2500, yMax + 75), centerZ);
         this.wallSnapGuideGroup.add(badgeSprite);
       }
     }
@@ -6283,12 +6367,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const offZ = wallOffsetZ ?? 0;
 
     // Dimensión de piso requerida para cubrir la habitación sin dejar espacio muerto detrás
+    const effectiveSideLength = (layout === 'l_shape' || layout === 'u_shape')
+      ? Math.max(sideWallLength, config.rightWallLength || sideWallLength)
+      : 2000;
     const effectiveFloorWidth = Math.max(floorWidth || 5000, mainWallLength + 1000);
-    const effectiveFloorDepth = Math.max(floorDepth || 5000, (layout === 'l_shape' ? sideWallLength : 2000) + 1500);
+    const effectiveFloorDepth = Math.max(floorDepth || 5000, effectiveSideLength + 1500);
 
     // ALINEACIÓN EXACTA AL BORDE:
     // La cara posterior del muro principal queda exactamente en Z = offZ (borde posterior del piso)
-    // La cara lateral exterior del muro en L queda exactamente en X = offX (borde izquierdo del piso)
+    // La cara lateral exterior del muro en L/U queda exactamente en X = offX (borde izquierdo del piso)
     // El piso se extiende hacia el frente (+Z) y hacia la derecha (+X)
     const floorCenterX = offX + effectiveFloorWidth / 2;
     const floorCenterZ = offZ + effectiveFloorDepth / 2;
@@ -6331,9 +6418,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     mainWall.userData = { isWall: true, wallType: 'main' };
     this.roomGroup.add(mainWall);
 
-    // 3. MURO LATERAL EN L (Side Wall a lo largo de Z si layout === 'l_shape')
-    // Cara exterior izquierda en X = offX (borde del piso), cara interior derecha en X = offX + wallThickness
-    if (layout === 'l_shape') {
+    // 3. MURO LATERAL IZQUIERDO (L y U a lo largo de Z)
+    if (layout === 'l_shape' || layout === 'u_shape') {
       const sideWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, sideWallLength);
       const sideWallMat = ProceduralTextureFactory.getWallMaterial(wallMaterial, sideWallLength, wallHeight);
       const sideWall = new THREE.Mesh(sideWallGeo, sideWallMat);
@@ -6348,7 +6434,24 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.roomGroup.add(sideWall);
     }
 
-    // 4. ZÓCALOS / RODAPIÉS SANITARIOS (100mm de alto)
+    // 4. MURO LATERAL DERECHO (Solo U a lo largo de Z)
+    if (layout === 'u_shape') {
+      const rightLength = config.rightWallLength || sideWallLength;
+      const rightWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, rightLength);
+      const rightWallMat = ProceduralTextureFactory.getWallMaterial(wallMaterial, rightLength, wallHeight);
+      const rightWall = new THREE.Mesh(rightWallGeo, rightWallMat);
+      rightWall.position.set(
+        offX + mainWallLength - wallThickness / 2,
+        wallHeight / 2,
+        offZ + wallThickness + rightLength / 2
+      );
+      rightWall.castShadow = true;
+      rightWall.receiveShadow = true;
+      rightWall.userData = { isWall: true, wallType: 'right_side' };
+      this.roomGroup.add(rightWall);
+    }
+
+    // 5. ZÓCALOS / RODAPIÉS SANITARIOS (100mm de alto)
     if (showSkirting) {
       const skirtingH = 100;
       const skirtingT = 16;
@@ -6370,8 +6473,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       mainSkirting.receiveShadow = true;
       this.roomGroup.add(mainSkirting);
 
-      // Zócalo muro lateral
-      if (layout === 'l_shape') {
+      // Zócalo muro lateral izquierdo
+      if (layout === 'l_shape' || layout === 'u_shape') {
         const sideSkirtingGeo = new THREE.BoxGeometry(skirtingT, skirtingH, sideWallLength);
         const sideSkirting = new THREE.Mesh(sideSkirtingGeo, skirtingMat);
         sideSkirting.position.set(
@@ -6383,6 +6486,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
         sideSkirting.receiveShadow = true;
         this.roomGroup.add(sideSkirting);
       }
+
+      // Zócalo muro lateral derecho (U)
+      if (layout === 'u_shape') {
+        const rightLength = config.rightWallLength || sideWallLength;
+        const rightSkirtingGeo = new THREE.BoxGeometry(skirtingT, skirtingH, rightLength);
+        const rightSkirting = new THREE.Mesh(rightSkirtingGeo, skirtingMat);
+        rightSkirting.position.set(
+          offX + mainWallLength - wallThickness - skirtingT / 2,
+          skirtingH / 2,
+          offZ + wallThickness + rightLength / 2
+        );
+        rightSkirting.castShadow = true;
+        rightSkirting.receiveShadow = true;
+        this.roomGroup.add(rightSkirting);
+      }
     }
   }
 
@@ -6391,9 +6509,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const config = this.roomConfig();
     const offX = config.wallOffsetX ?? 0;
     const offZ = config.wallOffsetZ ?? 0;
+    const sideLen = (config.layout === 'l_shape' || config.layout === 'u_shape')
+      ? Math.max(config.sideWallLength, config.rightWallLength || config.sideWallLength)
+      : 800;
     const targetX = offX + config.mainWallLength / 2;
     const targetY = config.wallHeight * 0.45;
-    const targetZ = offZ + (config.layout === 'l_shape' ? config.sideWallLength / 2.5 : 800);
+    const targetZ = offZ + (config.layout === 'single_wall' ? 800 : sideLen / 2.5);
 
     const startTarget = this.controls.target.clone();
     const startCamPos = this.camera.position.clone();
@@ -6401,7 +6522,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const targetCamPos = new THREE.Vector3(
       targetX + 2200,
       targetY + 1400,
-      targetZ + (config.layout === 'l_shape' ? config.sideWallLength : 2500) + 1200
+      targetZ + (config.layout === 'single_wall' ? 2500 : sideLen) + 1200
     );
 
     const startTime = performance.now();

@@ -1953,7 +1953,8 @@ export class ModuleDesignerComponent {
 
   setRoomLayout(layout: RoomLayoutType) {
     this.updateRoomConfig({ layout });
-    this.showToast(`📐 Disposición: ${layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta'}`);
+    const label = layout === 'u_shape' ? 'Distribución en U' : layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta';
+    this.showToast(`📐 Disposición: ${label}`);
   }
 
   setFloorMaterial(mat: FloorMaterialType) {

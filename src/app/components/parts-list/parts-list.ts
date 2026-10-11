@@ -21,6 +21,13 @@ export class PartsListComponent {
   readonly parts = this.projectService.partsList;
   readonly materials = this.projectService.materialsList;
   readonly modules = this.projectService.modulesList;
+  readonly appliances = this.projectService.appliancesList;
+  readonly totalAppliancesCost = computed(() => 
+    this.appliances().reduce((sum, a) => sum + (Number(a.price) || 0), 0)
+  );
+
+  // Tabs: Melamina vs Equipamiento/Accesorios
+  activeTab = signal<'melamine' | 'appliances'>('melamine');
 
   // Filters
   filterModuleId = signal<string>('all');
@@ -235,5 +242,25 @@ export class PartsListComponent {
 
   exportCsv() {
     this.projectService.exportPartsCsv();
+  }
+
+  formatCurrency(amount: number): string {
+    return this.projectService.formatCurrency(amount);
+  }
+
+  async deleteAppliance(applianceId: string) {
+    const app = this.appliances().find(a => a.id === applianceId);
+    const name = app ? `"${app.name}"` : 'este equipo';
+    const confirmed = await this.confirmService.ask({
+      title: '¿Eliminar equipo del proyecto?',
+      message: `Se eliminará ${name} de la lista de equipamiento y de la escena 3D.`,
+      confirmText: 'Eliminar Equipo',
+      cancelText: 'Cancelar',
+      severity: 'danger'
+    });
+
+    if (confirmed) {
+      this.projectService.removeAppliance(applianceId);
+    }
   }
 }

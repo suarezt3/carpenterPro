@@ -303,7 +303,7 @@ export interface Project {
 
 export type WorkspaceMode = 'module' | 'room';
 
-export type RoomLayoutType = 'single_wall' | 'l_shape';
+export type RoomLayoutType = 'single_wall' | 'l_shape' | 'u_shape';
 
 export type FloorMaterialType = 
   // Porcelanatos y Cemento
@@ -358,43 +358,43 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
   // Porcelanatos y Cemento
   {
     id: 'concrete_gray',
-    name: 'Concrete Gris Pro',
-    brand: 'Corona Porcelatech',
-    format: '60×60 cm',
+    name: 'Porcelanato Gris Cemento',
+    brand: 'Corona Porcelatech®',
+    format: '60×60 cm Rectificado',
     category: 'cement',
-    tag: 'Alta Resistencia',
+    tag: 'Porcelanato Satinado',
     swatchBg: '#a6adb4',
-    description: 'Cemento pulido industrial gris neutro ARD Pro',
+    description: 'Porcelanato arquitectónico rectificado gris neutro de alta resistencia',
   },
   {
     id: 'concrete_arena',
-    name: 'Boss Arena Cálido',
-    brand: 'Corona Porcelatech',
-    format: '60×60 cm',
+    name: 'Porcelanato Arena Cálido',
+    brand: 'Corona Porcelatech®',
+    format: '60×60 cm Rectificado',
     category: 'cement',
-    tag: 'Mate Sedoso',
+    tag: 'Porcelanato Sedoso',
     swatchBg: '#c8bead',
-    description: 'Microcemento cálido con matices arena natural',
+    description: 'Porcelanato mate satinado con textura sedosa arena natural',
   },
   {
     id: 'concrete_white',
-    name: 'Cemento Blanco Ártico',
-    brand: 'Corona Pro',
-    format: '60×120 cm',
+    name: 'Porcelanato Blanco Pulido',
+    brand: 'Corona Porcelatech Pro',
+    format: '60×120 cm Gran Formato',
     category: 'cement',
-    tag: 'Luminoso',
+    tag: 'Porcelanato Luminoso',
     swatchBg: '#e5e7eb',
-    description: 'Hormigón blanco contemporáneo micropulido',
+    description: 'Porcelanato blanco ártico micropulido contemporáneo',
   },
   {
     id: 'tile_dark',
-    name: 'Grafito Industrial ARD',
-    brand: 'Corona ARD® Pro',
-    format: '60×60 cm',
+    name: 'Porcelanato Grafito Antracita',
+    brand: 'Corona Porcelatech ARD®',
+    format: '60×60 cm Rectificado',
     category: 'cement',
-    tag: 'Antideslizante',
+    tag: 'Porcelanato Pro',
     swatchBg: '#272b30',
-    description: 'Porcelanato antracita oscuro de alto tráfico',
+    description: 'Porcelanato técnico antracita oscuro de alto tráfico',
   },
 
   // Maderas y Laminados
@@ -610,7 +610,8 @@ export const WALL_FINISHES_CATALOG: FinishCatalogItem<WallMaterialType>[] = [
 export interface RoomConfiguration {
   layout: RoomLayoutType;
   mainWallLength: number;      // Longitud en mm (ej. 3600)
-  sideWallLength: number;      // Longitud en mm para L (ej. 2400)
+  sideWallLength: number;      // Longitud en mm para L o lateral izquierdo (ej. 2400)
+  rightWallLength?: number;     // Longitud en mm para lateral derecho en U (ej. 2400)
   wallHeight: number;          // Altura en mm (ej. 2600)
   wallThickness: number;       // Espesor en mm (ej. 150)
   floorWidth: number;          // Ancho de piso en mm (ej. 5000)
@@ -627,12 +628,13 @@ export const DEFAULT_ROOM_CONFIG: RoomConfiguration = {
   layout: 'l_shape',
   mainWallLength: 3600,
   sideWallLength: 2400,
+  rightWallLength: 2400,
   wallHeight: 2600,
   wallThickness: 150,
   floorWidth: 5000,
   floorDepth: 5000,
-  floorMaterial: 'wood_light',
-  wallMaterial: 'subway_tile_white',
+  floorMaterial: 'concrete_gray',
+  wallMaterial: 'kitchen_backsplash_quartz',
   showFloorGrid: true,
   showSkirting: true,
   wallOffsetX: 0,
