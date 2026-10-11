@@ -114,96 +114,34 @@
           (wallSelected)="onWallSelected($event)">
         </app-furniture-3d-viewer>
 
-        <!-- HUD SUPERIOR IZQUIERDO: Medidas de Piezas / Grupos y Cinta de Habitación 3D
-             (Ubicado en top-3 a la derecha de la paleta vertical; en la misma línea que las cotas/medidas de las piezas, al lado derecho, sin tapar Micro-Ajuste en Zoom abajo) -->
-        <div class="absolute top-3 left-16 sm:left-18 z-30 flex items-center gap-2 pointer-events-auto flex-wrap max-w-[calc(100%-240px)]">
-          <!-- 1. Medidas de la Pieza o Grupo Seleccionado (Ahí arribita) -->
-          @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
-            <div class="flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-xs">
-              <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-              <span class="font-bold uppercase tracking-wider text-slate-700">GRUPO ({{ selectedPartIds().length }}):</span>
-              <span class="font-semibold text-amber-600">Arrastre sincronizado</span>
-              <button 
-                type="button" 
-                (click)="deselectAll()" 
-                class="text-xs text-slate-400 hover:text-slate-800 underline ml-1 cursor-pointer">
-                Deseleccionar
-              </button>
-            </div>
-          } @else if (selectedPart(); as sel) {
-            <div class="flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-xs">
-              <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-              <span class="font-bold text-slate-800">{{ sel.name }}:</span>
-              <span class="font-mono font-bold text-sky-600">{{ sel.length }} × {{ sel.width }} mm</span>
-              <span class="font-mono text-slate-400 text-[11px]">({{ sel.thickness }}mm)</span>
-              <button 
-                type="button" 
-                (click)="deselectAll()" 
-                class="text-slate-400 hover:text-slate-800 ml-1 cursor-pointer"
-                title="Deseleccionar">
-                <span class="material-icons text-xs">close</span>
-              </button>
-            </div>
-          }
-
-          <!-- 2. Cinta de Habitación 3D (En esa misma línea horizontal, justo al lado derecho de las medidas de las piezas) -->
-          @if (workspaceMode() === 'room') {
-            <div class="flex flex-wrap items-center gap-1.5 bg-slate-900/95 text-white backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-xl border border-white/10 text-xs">
-              <span class="material-icons text-sky-400 text-sm">roofing</span>
-              <span class="font-medium text-slate-200">
-                <span class="font-bold text-white">{{ roomConfig().layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta' }}</span>
-              </span>
-              <span class="text-slate-500">·</span>
-              <span class="text-slate-300 font-mono">{{ roomConfig().mainWallLength }} mm</span>
-
-              <!-- Control Interactivo del Muro Seleccionado en 3D -->
-              @if (selectedWall(); as wall) {
-                <div class="flex items-center gap-1 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2 py-0.5 rounded-lg text-[11px] font-semibold animate-in fade-in duration-100">
-                  <span class="material-icons text-[12px] text-sky-400">straighten</span>
-                  <span>{{ wall === 'main' ? 'Muro Principal' : 'Muro Lateral L' }}:</span>
-                  <span class="font-mono text-white">{{ wall === 'main' ? roomConfig().mainWallLength : roomConfig().sideWallLength }} mm</span>
-                  <button 
-                    type="button" 
-                    (click)="wall === 'main' ? stretchMainWall(-200) : stretchSideWall(-200)"
-                    class="px-1.5 py-0.2 bg-white/10 hover:bg-white/20 rounded text-[10px] font-bold transition cursor-pointer"
-                    title="Encoger muro 200 mm">-200</button>
-                  <button 
-                    type="button" 
-                    (click)="wall === 'main' ? stretchMainWall(200) : stretchSideWall(200)"
-                    class="px-1.5 py-0.2 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-bold transition cursor-pointer"
-                    title="Estirar muro 200 mm">+200</button>
-                </div>
-              }
-
-              @if (roomConfig().wallOffsetX !== 0 || roomConfig().wallOffsetZ !== 0) {
-                <button 
-                  type="button" 
-                  (click)="alignWallsToEdge()" 
-                  class="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 cursor-pointer border border-amber-500/30"
-                  title="Alinear muros al borde posterior e izquierdo del piso para aprovechar todo el espacio">
-                  <span class="material-icons text-[11px]">align_horizontal_left</span>
-                  <span>Al Borde</span>
-                </button>
-              }
-
-              <button 
-                type="button" 
-                (click)="openRoomSettings()" 
-                class="ml-0.5 px-2.5 py-0.5 bg-white/10 hover:bg-white/20 text-sky-300 rounded-lg font-semibold text-[11px] transition flex items-center gap-1 cursor-pointer"
-                title="Ajustar medidas de paredes, dimensiones de suelo, posición y texturas">
-                <span class="material-icons text-xs">tune</span>
-                <span>Ajustar Habitación</span>
-              </button>
-              <button 
-                type="button" 
-                (click)="frameRoomCamera()" 
-                class="px-2 py-0.5 bg-white/10 hover:bg-white/20 text-slate-300 rounded-lg text-[11px] transition flex items-center gap-0.5 cursor-pointer"
-                title="Centrar vista en la habitación">
-                <span class="material-icons text-xs">center_focus_strong</span>
-              </button>
-            </div>
-          }
-        </div>
+        <!-- HUD SUPERIOR IZQUIERDO: Medidas de la Pieza o Grupo Seleccionado (Ahí arribita a la izquierda) -->
+        @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
+          <div class="absolute top-3 left-16 sm:left-18 z-30 flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-xs pointer-events-auto">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <span class="font-bold uppercase tracking-wider text-slate-700">GRUPO ({{ selectedPartIds().length }}):</span>
+            <span class="font-semibold text-amber-600">Arrastre sincronizado</span>
+            <button 
+              type="button" 
+              (click)="deselectAll()" 
+              class="text-xs text-slate-400 hover:text-slate-800 underline ml-1 cursor-pointer">
+              Deseleccionar
+            </button>
+          </div>
+        } @else if (selectedPart(); as sel) {
+          <div class="absolute top-3 left-16 sm:left-18 z-30 flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-xs pointer-events-auto">
+            <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+            <span class="font-bold text-slate-800">{{ sel.name }}:</span>
+            <span class="font-mono font-bold text-sky-600">{{ sel.length }} × {{ sel.width }} mm</span>
+            <span class="font-mono text-slate-400 text-[11px]">({{ sel.thickness }}mm)</span>
+            <button 
+              type="button" 
+              (click)="deselectAll()" 
+              class="text-slate-400 hover:text-slate-800 ml-1 cursor-pointer"
+              title="Deseleccionar">
+              <span class="material-icons text-xs">close</span>
+            </button>
+          </div>
+        }
 
         <!-- BARRA FLOTANTE DE ACCIONES SUPERIOR (Grupo, Multiselección o Pieza Individual) - ALINEADA A LA DERECHA -->
         @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
@@ -544,6 +482,76 @@
               <span class="material-icons text-sm">close</span>
             </button>
           </div>
+        }
+
+        <!-- CINTA DE CONFIGURAR ENTORNO / AJUSTAR HABITACIÓN 3D
+             (Ubicada en la esquina inferior derecha, justo encima donde se editan las medidas de las piezas en la barra de estado CAD) -->
+        @if (workspaceMode() === 'room') {
+          <div class="absolute bottom-9 right-3 z-30 pointer-events-auto flex items-center gap-1.5 bg-slate-900/95 text-white backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-xl border border-white/10 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[calc(100%-24px)] flex-wrap">
+            <span class="material-icons text-sky-400 text-sm">roofing</span>
+            <span class="font-medium text-slate-200">
+              <span class="font-bold text-white">{{ roomConfig().layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta' }}</span>
+            </span>
+            <span class="text-slate-500">·</span>
+            <span class="text-slate-300 font-mono">{{ roomConfig().mainWallLength }} mm</span>
+
+            <!-- Control Interactivo del Muro Seleccionado en 3D -->
+            @if (selectedWall(); as wall) {
+              <div class="flex items-center gap-1 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2 py-0.5 rounded-lg text-[11px] font-semibold animate-in fade-in duration-100">
+                <span class="material-icons text-[12px] text-sky-400">straighten</span>
+                <span>{{ wall === 'main' ? 'Muro Principal' : 'Muro Lateral L' }}:</span>
+                <span class="font-mono text-white">{{ wall === 'main' ? roomConfig().mainWallLength : roomConfig().sideWallLength }} mm</span>
+                <button 
+                  type="button" 
+                  (click)="wall === 'main' ? stretchMainWall(-200) : stretchSideWall(-200)"
+                  class="px-1.5 py-0.2 bg-white/10 hover:bg-white/20 rounded text-[10px] font-bold transition cursor-pointer"
+                  title="Encoger muro 200 mm">-200</button>
+                <button 
+                  type="button" 
+                  (click)="wall === 'main' ? stretchMainWall(200) : stretchSideWall(200)"
+                  class="px-1.5 py-0.2 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-bold transition cursor-pointer"
+                  title="Estirar muro 200 mm">+200</button>
+              </div>
+            }
+
+            @if (roomConfig().wallOffsetX !== 0 || roomConfig().wallOffsetZ !== 0) {
+              <button 
+                type="button" 
+                (click)="alignWallsToEdge()" 
+                class="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 cursor-pointer border border-amber-500/30"
+                title="Alinear muros al borde posterior e izquierdo del piso para aprovechar todo el espacio">
+                <span class="material-icons text-[11px]">align_horizontal_left</span>
+                <span>Al Borde</span>
+              </button>
+            }
+
+            <button 
+              type="button" 
+              (click)="openRoomSettings()" 
+              class="ml-0.5 px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="Ajustar medidas de paredes, dimensiones de suelo, posición y texturas">
+              <span class="material-icons text-xs">tune</span>
+              <span>Ajustar Habitación</span>
+            </button>
+            <button 
+              type="button" 
+              (click)="frameRoomCamera()" 
+              class="px-2 py-1 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white rounded-lg text-xs transition flex items-center gap-1 cursor-pointer"
+              title="Centrar vista en la habitación">
+              <span class="material-icons text-xs">center_focus_strong</span>
+              <span class="hidden sm:inline">Centrar</span>
+            </button>
+          </div>
+        } @else {
+          <!-- Acceso directo en la esquina inferior derecha para abrir o ajustar el entorno de la habitación -->
+          <button 
+            type="button" 
+            (click)="setWorkspaceMode('room'); openRoomSettings()"
+            class="absolute bottom-9 right-3 z-30 pointer-events-auto flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-900 text-slate-300 hover:text-white backdrop-blur-md px-2.5 py-1 rounded-xl shadow-lg border border-white/10 text-xs transition cursor-pointer"
+            title="Configurar entorno y ajustar habitación 3D">
+            <span class="material-icons text-sky-400 text-xs">roofing</span>
+            <span>Configurar Entorno</span>
+          </button>
         }
       </div>
 
