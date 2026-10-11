@@ -1,6 +1,7 @@
 /* Fonts: Material Icons + Plus Jakarta Sans & JetBrains Mono */
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @import "tailwindcss";
 
 @layer base {
@@ -16,14 +17,68 @@
 }
 
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
+  @page {
+    size: landscape;
+    margin: 8mm;
   }
-  .print\:hidden {
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Ocultar elementos globales de la aplicación al imprimir */
+  header, app-header, nav, footer, .print\:hidden {
     display: none !important;
   }
-  @page {
-    margin: 10mm;
+
+  main {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    display: block !important;
+  }
+
+  /* Ajuste óptimo del contenedor del plano de corte para encajar al 100% en la página sin cortarse */
+  #print-sheet-wrapper {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #print-sheet-canvas-container {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+    padding: 6px !important;
+    overflow: visible !important;
+    min-height: auto !important;
+    height: auto !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+
+  #print-sheet-inner-zoom {
+    transform: none !important;
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+  }
+
+  .print-board-svg {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: 140mm !important;
+    box-shadow: none !important;
+    border: 1.5px solid #0f172a !important;
   }
 }

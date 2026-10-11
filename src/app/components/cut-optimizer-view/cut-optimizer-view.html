@@ -1,5 +1,4 @@
 <div class="w-full px-3 sm:px-6 py-4 space-y-5">
-
   <!-- Optimization Global Stats Banner -->
   <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg'">
     <div [class]="themeService.isClassic() ? 'flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100' : 'flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-zinc-800'">
@@ -16,13 +15,70 @@
         </p>
       </div>
 
-      <div class="flex items-center gap-3">
+      <!-- Action Buttons: Print & Download Menu -->
+      <div class="flex items-center gap-2.5 print:hidden">
+        <!-- BOTÓN IMPRIMIR DIAGRAMA -->
         <button 
           (click)="printCurrentSheet()"
-          [class]="themeService.isClassic() ? 'px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium text-xs rounded-xl flex items-center gap-2 transition' : 'px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-xl flex items-center gap-2 transition'">
+          [class]="themeService.isClassic() ? 'px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium text-xs rounded-xl flex items-center gap-2 transition shadow-xs' : 'px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-xl flex items-center gap-2 transition shadow-xs'">
           <span class="material-icons text-sm text-amber-500">print</span>
           <span>Imprimir Diagrama</span>
         </button>
+
+        <!-- BOTÓN DESCARGAR CON MENÚ DESPLEGABLE (PNG & PDF) -->
+        <div class="relative">
+          <button 
+            (click)="toggleDownloadMenu()"
+            [disabled]="isExporting()"
+            [class]="themeService.isClassic() ? 'px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-2 transition shadow-sm' : 'px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-2 transition shadow-sm'">
+            @if (isExporting()) {
+              <span class="material-icons text-sm animate-spin">refresh</span>
+              <span>Procesando...</span>
+            } @else {
+              <span class="material-icons text-sm">download</span>
+              <span>Descargar</span>
+              <span class="material-icons text-xs">expand_more</span>
+            }
+          </button>
+
+          <!-- Menú Flotante de Opciones de Descarga -->
+          @if (isDownloadMenuOpen()) {
+            <div 
+              (mouseleave)="closeDownloadMenu()"
+              [class]="themeService.isClassic() ? 'absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1.5 animate-in fade-in zoom-in-95' : 'absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 py-1.5 animate-in fade-in zoom-in-95'">
+              
+              <div [class]="themeService.isClassic() ? 'px-3 py-1.5 border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400 tracking-wider' : 'px-3 py-1.5 border-b border-zinc-800 text-[10px] uppercase font-bold text-zinc-500 tracking-wider'">
+                Formato de Exportación
+              </div>
+
+              <!-- Opción 1: PNG Alta Resolución -->
+              <button 
+                (click)="downloadCurrentSheetAsPng()"
+                [class]="themeService.isClassic() ? 'w-full text-left px-3.5 py-2.5 flex items-center gap-3 hover:bg-amber-50 text-slate-800 text-xs transition' : 'w-full text-left px-3.5 py-2.5 flex items-center gap-3 hover:bg-zinc-800 text-zinc-200 text-xs transition'">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 flex items-center justify-center shrink-0">
+                  <span class="material-icons text-base">image</span>
+                </div>
+                <div>
+                  <div class="font-bold">PNG en Alta Resolución</div>
+                  <div [class]="themeService.isClassic() ? 'text-[10px] text-slate-400' : 'text-[10px] text-zinc-400'">Ultra HD (2800px) con membrete</div>
+                </div>
+              </button>
+
+              <!-- Opción 2: PDF Apaisado Técnico -->
+              <button 
+                (click)="downloadCurrentSheetAsPdf()"
+                [class]="themeService.isClassic() ? 'w-full text-left px-3.5 py-2.5 flex items-center gap-3 hover:bg-amber-50 text-slate-800 text-xs transition' : 'w-full text-left px-3.5 py-2.5 flex items-center gap-3 hover:bg-zinc-800 text-zinc-200 text-xs transition'">
+                <div class="w-8 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-600 flex items-center justify-center shrink-0">
+                  <span class="material-icons text-base">picture_as_pdf</span>
+                </div>
+                <div>
+                  <div class="font-bold">PDF Apaisado de Taller</div>
+                  <div [class]="themeService.isClassic() ? 'text-[10px] text-slate-400' : 'text-[10px] text-zinc-400'">Plano técnico completo en 1 página</div>
+                </div>
+              </button>
+            </div>
+          }
+        </div>
       </div>
     </div>
 
@@ -74,8 +130,8 @@
   </div>
 
   @if (optimizationResult().sheets.length > 0) {
-    <!-- SHEET TABS SELECTOR -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+    <!-- SHEET TABS SELECTOR (Oculto al imprimir) -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none print:hidden">
       @for (sheet of optimizationResult().sheets; track sheet.sheetIndex; let sIdx = $index) {
         <button 
           (click)="selectSheet(sIdx)"
@@ -94,10 +150,27 @@
 
     <!-- MAIN BOARD VIEWER -->
     @if (currentSheet(); as sheet) {
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg space-y-4'">
+      <div 
+        id="print-sheet-wrapper"
+        [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg space-y-4'">
         
+        <!-- Membrete Técnico de Impresión (Visible SOLO al imprimir en papel o guardar en PDF) -->
+        <div class="hidden print:flex flex-row justify-between items-end border-b-2 border-slate-900 pb-2 mb-2">
+          <div>
+            <h1 class="text-lg font-black text-slate-900 tracking-tight">PLANO DE CORTE TÉCNICO • TABLERO #{{ sheet.sheetIndex }}</h1>
+            <p class="text-xs text-slate-600">
+              <strong>Proyecto:</strong> {{ project().name || 'Proyecto Cocina' }} &nbsp;|&nbsp; 
+              <strong>Material:</strong> {{ sheet.material.name }} ({{ sheet.material.thickness }} mm)
+            </p>
+          </div>
+          <div class="text-right text-xs font-mono font-bold text-slate-900">
+            <div>Dimensión: {{ sheet.length }} × {{ sheet.width }} mm</div>
+            <div class="text-sky-700">Aprovechamiento: {{ sheet.efficiencyPercent }}% • Piezas: {{ sheet.placedParts.length }} • Sierra: {{ sheet.cutLengthMeters }} ml</div>
+          </div>
+        </div>
+
         <!-- Sheet Header Info & Zoom Controls -->
-        <div [class]="themeService.isClassic() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800'">
+        <div [class]="themeService.isClassic() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 print:hidden' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800 print:hidden'">
           <div>
             <div class="flex items-center gap-2">
               <h3 [class]="themeService.isClassic() ? 'text-base font-bold text-slate-800' : 'text-base font-bold text-white'">
@@ -112,8 +185,8 @@
             </p>
           </div>
 
-          <!-- Controls -->
-          <div class="flex items-center gap-2">
+          <!-- Zoom Controls (Ocultos al imprimir) -->
+          <div class="flex items-center gap-2 print:hidden">
             <button 
               (click)="zoomOut()" 
               [class]="themeService.isClassic() ? 'p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200' : 'p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700'" 
@@ -137,9 +210,14 @@
         </div>
 
         <!-- SVG SHEET CANVAS -->
-        <div [class]="themeService.isClassic() ? 'w-full bg-slate-100 rounded-xl border border-slate-200 overflow-auto p-4 flex justify-center items-center min-h-[420px]' : 'w-full bg-zinc-950 rounded-xl border border-zinc-800 overflow-auto p-4 flex justify-center items-center min-h-[420px]'">
+        <div 
+          id="print-sheet-canvas-container"
+          [class]="themeService.isClassic() ? 'w-full bg-slate-100 rounded-xl border border-slate-200 overflow-auto p-4 flex justify-center items-center min-h-[420px]' : 'w-full bg-zinc-950 rounded-xl border border-zinc-800 overflow-auto p-4 flex justify-center items-center min-h-[420px]'">
           
-          <div [style.transform]="'scale(' + zoomLevel() + ')'" class="origin-center transition-transform duration-200">
+          <div 
+            id="print-sheet-inner-zoom"
+            [style.transform]="'scale(' + zoomLevel() + ')'" 
+            class="origin-center transition-transform duration-200">
             
             @let canvasW = 1000;
             @let canvasH = (sheet.width / sheet.length) * 1000;
@@ -147,10 +225,12 @@
             @let trimPx = settings().trimMargin * scaleFactor;
 
             <svg 
-              [attr.width]="canvasW" 
-              [attr.height]="canvasH" 
-              [attr.viewBox]="'0 0 ' + canvasW + ' ' + canvasH" 
-              [class]="themeService.isClassic() ? 'shadow-lg border-2 border-slate-300 rounded select-none bg-slate-200' : 'shadow-2xl border-2 border-zinc-700 rounded select-none bg-zinc-900'">
+              id="sheet-cut-diagram-svg"
+              [attr.width]="canvasW"
+              [attr.height]="canvasH"
+              [attr.viewBox]="'0 0 ' + canvasW + ' ' + canvasH"
+              class="print-board-svg shadow-2xl border-2 border-zinc-700 rounded select-none bg-zinc-900"
+              style="display: block; max-width: 100%;">
               
               <defs>
                 <!-- Wood grain texture for sheet pieces -->
@@ -179,129 +259,125 @@
                   stroke="#ef4444" 
                   stroke-dasharray="4,4" 
                   stroke-width="1" />
-                <text [attr.x]="trimPx + 4" [attr.y]="trimPx + 10" font-size="8" fill="#ef4444" font-weight="bold">
-                  Refilado {{ settings().trimMargin }}mm
-                </text>
               }
 
-              <!-- Retazos / Scraps sobrantes -->
-              @for (scrap of sheet.leftovers; track scrap.id) {
+              <!-- SOBRANTES / RETAZOS ÚTILES (HATCHED) -->
+              @for (scrap of sheet.leftovers; track scrap.x + '-' + scrap.y) {
                 @let sx = scrap.x * scaleFactor;
                 @let sy = scrap.y * scaleFactor;
                 @let sw = scrap.length * scaleFactor;
                 @let sh = scrap.width * scaleFactor;
-                @if (sw > 3 && sh > 3) {
+                
+                <g>
                   <rect 
                     [attr.x]="sx" 
                     [attr.y]="sy" 
                     [attr.width]="sw" 
                     [attr.height]="sh" 
                     fill="url(#scrapHatch)" 
-                    stroke="#94a3b8" 
-                    stroke-width="0.8" />
-                  @if (scrap.usable && sw > 50 && sh > 30) {
-                    <rect [attr.x]="sx + 4" [attr.y]="sy + 4" width="76" height="16" rx="2" fill="#0f172a" opacity="0.9" />
-                    <text [attr.x]="sx + 8" [attr.y]="sy + 15" font-size="8" font-weight="bold" fill="#38bdf8">
-                      Retazo: {{ scrap.length }}×{{ scrap.width }}
+                    opacity="0.35" 
+                    stroke="#64748b" 
+                    stroke-width="0.5" />
+
+                  <!-- Etiqueta de Retazo si es suficientemente grande -->
+                  @if (sw > 50 && sh > 30) {
+                    <text 
+                      [attr.x]="sx + (sw / 2)" 
+                      [attr.y]="sy + (sh / 2)" 
+                      text-anchor="middle" 
+                      font-size="7" 
+                      fill="#94a3b8" 
+                      font-family="monospace">
+                      Retazo ({{ scrap.length }}×{{ scrap.width }})
                     </text>
                   }
-                }
+                </g>
               }
 
               <!-- PIEZAS COLOCADAS -->
-              @for (placed of sheet.placedParts; track placed.tag; let pIdx = $index) {
+              @for (placed of sheet.placedParts; track placed.tag) {
                 @let px = placed.x * scaleFactor;
                 @let py = placed.y * scaleFactor;
                 @let pw = placed.length * scaleFactor;
                 @let ph = placed.width * scaleFactor;
-                
+
                 <g 
-                  class="cursor-pointer group"
+                  class="cursor-pointer transition-opacity"
                   (mouseenter)="hoveredPart.set(placed)"
                   (mouseleave)="hoveredPart.set(null)">
                   
-                  <!-- Rectángulo de la pieza con textura -->
+                  <!-- Fondo de la pieza -->
                   <rect 
                     [attr.x]="px" 
                     [attr.y]="py" 
                     [attr.width]="pw" 
                     [attr.height]="ph" 
                     fill="url(#sheetWoodTexture)" 
-                    stroke="#334155" 
+                    stroke="#000000" 
                     stroke-width="1.2" />
 
-                  <!-- BORDES DE TAPACANTO (Líneas de colores sobre los lados enchapados) -->
+                  <!-- Resalte interactivo si está hovered -->
+                  @if (hoveredPart()?.tag === placed.tag) {
+                    <rect 
+                      [attr.x]="px" 
+                      [attr.y]="py" 
+                      [attr.width]="pw" 
+                      [attr.height]="ph" 
+                      fill="#f59e0b" 
+                      opacity="0.3" 
+                      stroke="#fbbf24" 
+                      stroke-width="2" />
+                  }
+
+                  <!-- Indicadores de tapacantos (borde de color) -->
                   <!-- Largo 1 (Arriba) -->
                   @if (placed.part.edges.l1 !== 'none') {
-                    <line 
-                      [attr.x1]="px" 
-                      [attr.y1]="py + 1" 
-                      [attr.x2]="px + pw" 
-                      [attr.y2]="py + 1" 
-                      [attr.stroke]="placed.part.edges.l1 === 'thick' ? '#f59e0b' : '#06b6d4'" 
-                      [attr.stroke-width]="placed.part.edges.l1 === 'thick' ? '3' : '1.8'" />
+                    <line [attr.x1]="px" [attr.y1]="py + 1" [attr.x2]="px + pw" [attr.y2]="py + 1" 
+                          [attr.stroke]="placed.part.edges.l1 === 'thick' ? '#06b6d4' : '#38bdf8'" 
+                          [attr.stroke-width]="placed.part.edges.l1 === 'thick' ? '3' : '1.5'" />
                   }
                   <!-- Largo 2 (Abajo) -->
                   @if (placed.part.edges.l2 !== 'none') {
-                    <line 
-                      [attr.x1]="px" 
-                      [attr.y1]="py + ph - 1" 
-                      [attr.x2]="px + pw" 
-                      [attr.y2]="py + ph - 1" 
-                      [attr.stroke]="placed.part.edges.l2 === 'thick' ? '#f59e0b' : '#06b6d4'" 
-                      [attr.stroke-width]="placed.part.edges.l2 === 'thick' ? '3' : '1.8'" />
+                    <line [attr.x1]="px" [attr.y1]="py + ph - 1" [attr.x2]="px + pw" [attr.y2]="py + ph - 1" 
+                          [attr.stroke]="placed.part.edges.l2 === 'thick' ? '#06b6d4' : '#38bdf8'" 
+                          [attr.stroke-width]="placed.part.edges.l2 === 'thick' ? '3' : '1.5'" />
                   }
                   <!-- Ancho 1 (Izquierda) -->
                   @if (placed.part.edges.a1 !== 'none') {
-                    <line 
-                      [attr.x1]="px + 1" 
-                      [attr.y1]="py" 
-                      [attr.x2]="px + 1" 
-                      [attr.y2]="py + ph" 
-                      [attr.stroke]="placed.part.edges.a1 === 'thick' ? '#f59e0b' : '#06b6d4'" 
-                      [attr.stroke-width]="placed.part.edges.a1 === 'thick' ? '3' : '1.8'" />
+                    <line [attr.x1]="px + 1" [attr.y1]="py" [attr.x2]="px + 1" [attr.y2]="py + ph" 
+                          [attr.stroke]="placed.part.edges.a1 === 'thick' ? '#f97316' : '#fb923c'" 
+                          [attr.stroke-width]="placed.part.edges.a1 === 'thick' ? '3' : '1.5'" />
                   }
                   <!-- Ancho 2 (Derecha) -->
                   @if (placed.part.edges.a2 !== 'none') {
-                    <line 
-                      [attr.x1]="px + pw - 1" 
-                      [attr.y1]="py" 
-                      [attr.x2]="px + pw - 1" 
-                      [attr.y2]="py + ph" 
-                      [attr.stroke]="placed.part.edges.a2 === 'thick' ? '#f59e0b' : '#06b6d4'" 
-                      [attr.stroke-width]="placed.part.edges.a2 === 'thick' ? '3' : '1.8'" />
+                    <line [attr.x1]="px + pw - 1" [attr.y1]="py" [attr.x2]="px + pw - 1" [attr.y2]="py + ph" 
+                          [attr.stroke]="placed.part.edges.a2 === 'thick' ? '#f97316' : '#fb923c'" 
+                          [attr.stroke-width]="placed.part.edges.a2 === 'thick' ? '3' : '1.5'" />
                   }
 
-                  <!-- ETIQUETAS INTERIORES DE LA PIEZA (Tag, Nombre, Medidas) -->
-                  @if (pw > 40 && ph > 25) {
-                    <!-- Tag badge P1, P2... -->
-                    <rect 
-                      [attr.x]="px + 3" 
-                      [attr.y]="py + 3" 
-                      width="20" 
-                      height="12" 
-                      rx="2" 
-                      fill="#09090b" 
-                      opacity="0.85" />
+                  <!-- Textos dentro de la pieza si cabe -->
+                  @if (pw > 30 && ph > 18) {
+                    <!-- Tag identificador -->
                     <text 
-                      [attr.x]="px + 13" 
-                      [attr.y]="py + 11.5" 
-                      text-anchor="middle" 
-                      font-size="7.5" 
+                      [attr.x]="px + 6" 
+                      [attr.y]="py + 12" 
+                      font-size="9" 
                       font-weight="bold" 
-                      fill="#f59e0b">
+                      fill="#ffffff"
+                      style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
                       {{ placed.tag }}
                     </text>
 
                     <!-- Nombre de la pieza -->
-                    @if (pw > 70 && ph > 35) {
+                    @if (pw > 70 && ph > 32) {
                       <text 
                         [attr.x]="px + (pw / 2)" 
                         [attr.y]="py + (ph / 2) - 3" 
                         text-anchor="middle" 
                         font-size="8.5" 
                         font-weight="bold" 
-                        fill="#ffffff">
+                        fill="#ffffff"
+                        style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
                         {{ placed.part.name }}
                       </text>
                     }
@@ -314,7 +390,8 @@
                       font-size="8" 
                       font-family="monospace" 
                       font-weight="bold" 
-                      fill="#fde68a">
+                      fill="#fde68a"
+                      style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
                       {{ placed.length }} × {{ placed.width }}
                     </text>
 
@@ -359,8 +436,8 @@
                   </text>
                 </g>
               }
-            </svg>
 
+            </svg>
           </div>
         </div>
 
@@ -432,7 +509,6 @@
             </table>
           </div>
         </div>
-
       </div>
     }
   } @else {
@@ -442,5 +518,4 @@
       <p [class]="themeService.isClassic() ? 'text-xs text-slate-400 mt-1' : 'text-xs text-zinc-500 mt-1'">Agrega módulos en el Diseñador o piezas en la pestaña de Despiece para generar los diagramas de corte.</p>
     </div>
   }
-
 </div>

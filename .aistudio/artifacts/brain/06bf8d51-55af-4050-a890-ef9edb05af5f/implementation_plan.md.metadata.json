@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para el imán inteligente de paredes interiores en el visor 3D, cubriendo piezas individuales, conjuntos/grupos de piezas, módulos de muebles y electrodomésticos con adherencia de 30 mm y guía visual con resplandor sutil.",
-  "updatedAt":  "2026-10-11T20:39:30.032289312Z",
+  "summary":  "Plan de implementación para habilitar el menú de descarga directa (PNG de alta resolución y PDF) y corregir la visualización completa del diagrama de corte al imprimir o guardar como PDF en orientación horizontal apaisada sin cortes ni barras de desplazamiento.",
+  "updatedAt":  "2026-10-11T22:00:26.701428469Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
