@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  ElementRef,
   inject,
   signal,
   viewChild
@@ -518,6 +519,32 @@ export class ModuleDesignerComponent {
 
   readonly hardwareCatalog = inject(HardwareCatalogService);
   readonly viewer3dRef = viewChild<Furniture3dViewerComponent>('viewer3d');
+  readonly chipsScrollContainer = viewChild<ElementRef<HTMLDivElement>>('chipsScrollContainer');
+
+  /**
+   * Permite realizar scroll lateral suave en la cinta de piezas usando la rueda del ratón (mouse wheel).
+   * Convierte automáticamente el desplazamiento vertical deltaY en desplazamiento horizontal scrollLeft.
+   */
+  onPiecesBarWheel(event: WheelEvent) {
+    const el = this.chipsScrollContainer()?.nativeElement;
+    if (!el) return;
+    if (Math.abs(event.deltaY) > 0 || Math.abs(event.deltaX) > 0) {
+      event.preventDefault();
+      const delta = Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+      el.scrollLeft += delta;
+    }
+  }
+
+  onChipsScrollWheel(event: WheelEvent, container?: HTMLElement) {
+    const el = container || (event.currentTarget as HTMLElement) || this.chipsScrollContainer()?.nativeElement;
+    if (!el) return;
+    if (Math.abs(event.deltaY) > 0 || Math.abs(event.deltaX) > 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      const delta = Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+      el.scrollLeft += delta;
+    }
+  }
 
   updateSelectedPart(changes: Partial<Part>) {
     const current = this.selectedPart();
