@@ -1149,6 +1149,46 @@
               }
             </div>
 
+            <!-- SECTION 4.5: ACOPLAR PATAS DE MESA A ESTA PIEZA -->
+            <div class="p-2.5 bg-gradient-to-r from-teal-50/80 to-slate-50 border border-teal-200/90 rounded-xl space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-teal-900 flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-teal-600">table_bar</span>
+                  Convertir en Mesa (Añadir 4 Patas)
+                </span>
+                <span class="text-[9px] font-bold text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded uppercase">Accesorios 3D</span>
+              </div>
+              <p class="text-[10px] text-slate-500 leading-tight">
+                Instala 4 patas directamente bajo las 4 esquinas de esta pieza:
+              </p>
+              <div class="grid grid-cols-3 gap-1">
+                <button 
+                  type="button" 
+                  (click)="attachTableLegsToSelectedPart('hairpin')"
+                  class="p-1.5 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
+                  <span class="material-icons text-sm text-slate-900">table_bar</span>
+                  <span class="text-[10px] font-bold text-slate-800 leading-none">Horquilla</span>
+                  <span class="text-[8px] text-slate-400 font-mono">Hairpin 72cm</span>
+                </button>
+                <button 
+                  type="button" 
+                  (click)="attachTableLegsToSelectedPart('cylindrical_inox')"
+                  class="p-1.5 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
+                  <span class="material-icons text-sm text-sky-600">view_column</span>
+                  <span class="text-[10px] font-bold text-slate-800 leading-none">Inox Ø60</span>
+                  <span class="text-[8px] text-slate-400 font-mono">Regulable</span>
+                </button>
+                <button 
+                  type="button" 
+                  (click)="attachTableLegsToSelectedPart('scandinavian_wood')"
+                  class="p-1.5 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
+                  <span class="material-icons text-sm text-amber-700">park</span>
+                  <span class="text-[10px] font-bold text-slate-800 leading-none">Nórdica</span>
+                  <span class="text-[8px] text-slate-400 font-mono">Madera + Oro</span>
+                </button>
+              </div>
+            </div>
+
             <!-- SECTION 5: ACTIONS (Duplicar / Eliminar) -->
             <div class="pt-1 flex items-center gap-2">
               <button 
@@ -1367,6 +1407,73 @@
               <span class="material-icons text-sm text-sky-600">add</span>
               <span>+ Añadir Pieza Libre Personalizada</span>
             </button>
+
+            <!-- ACCESORIOS DE MOBILIARIO: PATAS DE MESA Y MUEBLES -->
+            <div class="mt-2.5 p-2.5 bg-gradient-to-br from-teal-50/70 to-slate-50 border border-teal-200/80 rounded-xl space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span class="material-icons text-xs text-teal-600">table_bar</span>
+                  Accesorios: Patas de Mesa y Mueble
+                </span>
+                <span class="text-[10px] text-teal-700 bg-teal-100/70 font-semibold px-1.5 py-0.5 rounded">3 Estilos 3D</span>
+              </div>
+              <p class="text-[11px] text-slate-500 leading-tight">
+                Inserta juegos de patas o soportes independientes con modelado paramétrico:
+              </p>
+
+              <div class="grid grid-cols-2 gap-1.5 text-xs">
+                <!-- Horquilla Metal Hairpin -->
+                <button 
+                  type="button" 
+                  (click)="attachTableLegsToSelectedPart('hairpin')"
+                  class="p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-lg text-left transition flex items-center gap-2 group cursor-pointer shadow-2xs">
+                  <div class="w-6 h-6 rounded-md bg-slate-900 text-white flex items-center justify-center shrink-0">
+                    <span class="material-icons text-xs">table_bar</span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-teal-700 text-[11px]">Horquilla (4 uds)</span>
+                    <span class="text-[9px] text-slate-400 font-mono block">Hairpin 720mm</span>
+                  </div>
+                </button>
+
+                <!-- Cilíndrica Inox -->
+                <button 
+                  type="button" 
+                  (click)="attachTableLegsToSelectedPart('cylindrical_inox')"
+                  class="p-2 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-400 rounded-lg text-left transition flex items-center gap-2 group cursor-pointer shadow-2xs">
+                  <div class="w-6 h-6 rounded-md bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center shrink-0">
+                    <span class="material-icons text-xs">view_column</span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-sky-700 text-[11px]">Cilíndrica Inox</span>
+                    <span class="text-[9px] text-slate-400 font-mono block">Ø60 Regulable</span>
+                  </div>
+                </button>
+
+                <!-- Madera Cónica Nórdica -->
+                <button 
+                  type="button" 
+                  (click)="attachTableLegsToSelectedPart('scandinavian_wood')"
+                  class="p-2 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-lg text-left transition flex items-center gap-2 group cursor-pointer shadow-2xs">
+                  <div class="w-6 h-6 rounded-md bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center shrink-0">
+                    <span class="material-icons text-xs">park</span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-amber-800 text-[11px]">Madera Nórdica</span>
+                    <span class="text-[9px] text-slate-400 font-mono block">Cónica + Oro</span>
+                  </div>
+                </button>
+
+                <!-- Ver más en catálogo de accesorios -->
+                <button 
+                  type="button" 
+                  (click)="activeDockTab.set('appliances'); activeApplianceCategory.set('legs')"
+                  class="p-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-center transition flex items-center justify-center gap-1 group cursor-pointer shadow-2xs text-[11px] font-bold">
+                  <span class="material-icons text-xs">open_in_new</span>
+                  <span>Catálogo 3D</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- ASSEMBLY STRUCTURE / PIECES & GROUPS LIST -->
@@ -1839,12 +1946,12 @@
                     
                     <div class="flex items-center gap-2 min-w-0">
                       <span class="material-icons text-sm" [class.text-emerald-600]="selectedApplianceId() === app.id">
-                        {{ app.type === 'refrigerator' ? 'kitchen' : (app.type === 'sink' ? 'wash' : (app.type === 'hood' ? 'air' : (app.type === 'cooktop' ? 'mode_heat' : 'microwave'))) }}
+                        {{ getApplianceIcon(app.type) }}
                       </span>
                       <div class="truncate">
                         <p class="truncate text-[11px] leading-tight text-slate-800">{{ app.name }}</p>
                         <p class="text-[10px] font-mono text-slate-400">
-                          {{ app.width }}×{{ app.depth }}×{{ app.height }} mm · {{ app.finish === 'stainless_steel' ? 'Inox' : (app.finish === 'black_matte' ? 'Negro' : 'Blanco') }}
+                          {{ app.width }}×{{ app.depth }}×{{ app.height }} mm · {{ app.finish === 'stainless_steel' ? 'Inox' : (app.finish === 'black_matte' ? 'Negro' : (app.finish === 'white_gloss' ? 'Blanco' : (app.finish === 'gold_brass' ? 'Dorado' : (app.finish === 'natural_wood' ? 'Madera' : 'Rojo')))) }}
                         </p>
                       </div>
                     </div>
@@ -1873,9 +1980,9 @@
             <div class="flex items-center justify-between">
               <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
                 <span class="material-icons text-xs text-sky-600">apps</span>
-                Catálogo de Electrodomésticos
+                Catálogo de Electrodomésticos y Accesorios
               </span>
-              <span class="text-[10px] text-slate-400">6 Familias 3D</span>
+              <span class="text-[10px] text-slate-400">8 Familias 3D & Herrajes</span>
             </div>
 
             <!-- Categories Tabs -->
@@ -1886,6 +1993,22 @@
                 [class]="activeApplianceCategory() === 'all' ? 'bg-slate-900 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
                 class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer">
                 Todos
+              </button>
+              <button 
+                type="button" 
+                (click)="activeApplianceCategory.set('legs')"
+                [class]="activeApplianceCategory() === 'legs' ? 'bg-teal-700 text-white font-bold shadow-2xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
+                class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer flex items-center gap-1">
+                <span class="material-icons text-[11px]">table_bar</span>
+                <span>Patas Mesa</span>
+              </button>
+              <button 
+                type="button" 
+                (click)="activeApplianceCategory.set('coffee')"
+                [class]="activeApplianceCategory() === 'coffee' ? 'bg-amber-700 text-white font-bold shadow-2xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
+                class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer flex items-center gap-1">
+                <span class="material-icons text-[11px]">coffee</span>
+                <span>Cafeteras</span>
               </button>
               <button 
                 type="button" 

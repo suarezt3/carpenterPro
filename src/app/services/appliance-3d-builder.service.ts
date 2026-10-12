@@ -63,6 +63,15 @@ export class Appliance3dBuilderService {
       case 'microwave':
         this.buildMicrowave(group, w, h, d, bodyMat, accentMat, darkGlassMat, chromeMat, ledBlueMat);
         break;
+      case 'coffee_maker':
+        this.buildCoffeeMaker(group, w, h, d, bodyMat, accentMat, chromeMat, darkGlassMat, ledOrangeMat);
+        break;
+      case 'table_leg':
+        this.buildTableLeg(group, appliance, w, h, d, bodyMat, accentMat, chromeMat);
+        break;
+      case 'table_legs_set':
+        this.buildTableLegsSet(group, appliance, w, h, d, bodyMat, accentMat, chromeMat);
+        break;
       default:
         this.buildGenericBox(group, w, h, d, bodyMat);
     }
@@ -114,6 +123,30 @@ export class Appliance3dBuilderService {
           metalness: 0.08,
           roughness: 0.15
         });
+      case 'gold_brass':
+        return new THREE.MeshStandardMaterial({
+          color: 0xd4af37,
+          metalness: 0.88,
+          roughness: 0.25
+        });
+      case 'natural_wood':
+        return new THREE.MeshStandardMaterial({
+          color: 0xc19a6b,
+          metalness: 0.05,
+          roughness: 0.70
+        });
+      case 'retro_red':
+        return new THREE.MeshStandardMaterial({
+          color: 0x991b1b,
+          metalness: 0.35,
+          roughness: 0.30
+        });
+      default:
+        return new THREE.MeshStandardMaterial({
+          color: 0x94a3b8,
+          metalness: 0.5,
+          roughness: 0.4
+        });
     }
   }
 
@@ -123,6 +156,20 @@ export class Appliance3dBuilderService {
         color: 0x33363a,
         metalness: 0.4,
         roughness: 0.4
+      });
+    }
+    if (finish === 'natural_wood') {
+      return new THREE.MeshStandardMaterial({
+        color: 0xd4af37,
+        metalness: 0.85,
+        roughness: 0.25
+      });
+    }
+    if (finish === 'retro_red') {
+      return new THREE.MeshStandardMaterial({
+        color: 0xefefef,
+        metalness: 0.90,
+        roughness: 0.20
       });
     }
     return new THREE.MeshStandardMaterial({
@@ -677,4 +724,596 @@ export class Appliance3dBuilderService {
     mesh.position.set(0, h / 2, 0);
     group.add(mesh);
   }
+
+  // --- 7. CAFETERA ESPRESSO DE SOBREMESA / ENCIMERA ---
+
+  private buildCoffeeMaker(
+    group: THREE.Group,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material,
+    darkGlassMat: THREE.Material,
+    ledMat: THREE.Material
+  ) {
+    // 1. Base Footing & Drip Basin
+    const footH = 12;
+    const footR = 10;
+    const footOffsets = [
+      { x: -w / 2 + 25, z: -d / 2 + 25 },
+      { x: w / 2 - 25, z: -d / 2 + 25 },
+      { x: -w / 2 + 25, z: d / 2 - 25 },
+      { x: w / 2 - 25, z: d / 2 - 25 }
+    ];
+    for (const fo of footOffsets) {
+      const footGeo = new THREE.CylinderGeometry(footR * 0.8, footR, footH, 16);
+      const footMesh = new THREE.Mesh(footGeo, accentMat);
+      footMesh.position.set(fo.x, footH / 2, fo.z);
+      group.add(footMesh);
+    }
+
+    // Lower Drip Tray Assembly (Front lower 1/4)
+    const dripTrayH = 34;
+    const dripTrayD = d * 0.46;
+    const dripTrayW = w * 0.92;
+    const dripTrayPosZ = (d / 2) - (dripTrayD / 2);
+
+    const dripBaseGeo = new THREE.BoxGeometry(dripTrayW, dripTrayH, dripTrayD);
+    const dripBase = new THREE.Mesh(dripBaseGeo, bodyMat);
+    dripBase.position.set(0, footH + dripTrayH / 2, dripTrayPosZ);
+    group.add(dripBase);
+
+    // Perforated Chrome Drip Grid
+    const gridGeo = new THREE.BoxGeometry(dripTrayW - 12, 4, dripTrayD - 12);
+    const gridMesh = new THREE.Mesh(gridGeo, chromeMat);
+    gridMesh.position.set(0, footH + dripTrayH + 2, dripTrayPosZ);
+    group.add(gridMesh);
+
+    // Decorative drain slots on grid
+    const slotCount = 6;
+    const slotStep = (dripTrayW - 36) / (slotCount + 1);
+    for (let i = 1; i <= slotCount; i++) {
+      const slotX = - (dripTrayW - 36) / 2 + i * slotStep;
+      const slotGeo = new THREE.BoxGeometry(2, 4.5, dripTrayD * 0.6);
+      const slotMesh = new THREE.Mesh(slotGeo, accentMat);
+      slotMesh.position.set(slotX, footH + dripTrayH + 2.2, dripTrayPosZ);
+      group.add(slotMesh);
+    }
+
+    // 2. Main Machine Chassis / Body
+    const bodyBaseY = footH;
+    const mainBodyH = h - footH;
+    const rearBodyD = d * 0.54;
+    const rearBodyPosZ = - (d / 2) + (rearBodyD / 2);
+
+    // Rear Tower / Boiler section
+    const rearGeo = new THREE.BoxGeometry(w, mainBodyH, rearBodyD);
+    const rearMesh = new THREE.Mesh(rearGeo, bodyMat);
+    rearMesh.position.set(0, bodyBaseY + mainBodyH / 2, rearBodyPosZ);
+    group.add(rearMesh);
+
+    // Upper Overhanging Head Unit (houses group head & control panel)
+    const headH = mainBodyH * 0.44;
+    const headD = d * 0.44;
+    const headW = w * 0.96;
+    const headPosZ = dripTrayPosZ - 2;
+    const headPosY = h - headH / 2;
+
+    const headGeo = new THREE.BoxGeometry(headW, headH, headD);
+    const headMesh = new THREE.Mesh(headGeo, bodyMat);
+    headMesh.position.set(0, headPosY, headPosZ);
+    group.add(headMesh);
+
+    // 3. Front Control Panel Facia
+    const faciaThick = 6;
+    const faciaH = headH * 0.52;
+    const faciaGeo = new THREE.BoxGeometry(headW - 8, faciaH, faciaThick);
+    const faciaMesh = new THREE.Mesh(faciaGeo, chromeMat);
+    faciaMesh.position.set(0, h - faciaH / 2 - 8, headPosZ + headD / 2 + faciaThick / 2);
+    group.add(faciaMesh);
+
+    // Analog Pressure Gauge (Barometer dial 9 bar)
+    const gaugeR = Math.min(22, faciaH * 0.38);
+    const gaugeRimGeo = new THREE.CylinderGeometry(gaugeR, gaugeR, 6, 24);
+    const gaugeRim = new THREE.Mesh(gaugeRimGeo, chromeMat);
+    gaugeRim.rotation.x = Math.PI / 2;
+    gaugeRim.position.set(0, h - faciaH / 2 - 8, headPosZ + headD / 2 + faciaThick + 3);
+    group.add(gaugeRim);
+
+    const gaugeFaceGeo = new THREE.CylinderGeometry(gaugeR * 0.85, gaugeR * 0.85, 6.2, 24);
+    const gaugeFaceMat = new THREE.MeshStandardMaterial({ color: 0xfefefe, roughness: 0.2 });
+    const gaugeFace = new THREE.Mesh(gaugeFaceGeo, gaugeFaceMat);
+    gaugeFace.rotation.x = Math.PI / 2;
+    gaugeFace.position.set(0, h - faciaH / 2 - 8, headPosZ + headD / 2 + faciaThick + 3.2);
+    group.add(gaugeFace);
+
+    // Gauge Needle
+    const needleGeo = new THREE.BoxGeometry(gaugeR * 0.65, 1.5, 6.6);
+    const needleMat = new THREE.MeshBasicMaterial({ color: 0x991b1b });
+    const needle = new THREE.Mesh(needleGeo, needleMat);
+    needle.rotation.z = Math.PI / 4;
+    needle.position.set(0, h - faciaH / 2 - 8, headPosZ + headD / 2 + faciaThick + 3.5);
+    group.add(needle);
+
+    // Push Buttons with LED rings (Power, 1-Cup, 2-Cups, Steam)
+    const btnCount = 4;
+    const btnSpacing = (headW * 0.72) / (btnCount + 1);
+    for (let i = 1; i <= btnCount; i++) {
+      if (i === 2 || i === 3) continue; // Leave center space for pressure gauge
+      const btnX = - (headW * 0.72) / 2 + i * btnSpacing;
+      const btnGeo = new THREE.CylinderGeometry(6, 6, 8, 16);
+      const btnMesh = new THREE.Mesh(btnGeo, chromeMat);
+      btnMesh.rotation.x = Math.PI / 2;
+      btnMesh.position.set(btnX, h - faciaH / 2 - 8, headPosZ + headD / 2 + faciaThick + 4);
+      group.add(btnMesh);
+
+      const ledRing = new THREE.Mesh(new THREE.RingGeometry(6.2, 7.5, 16), ledMat);
+      ledRing.position.set(btnX, h - faciaH / 2 - 8, headPosZ + headD / 2 + faciaThick + 4.2);
+      group.add(ledRing);
+    }
+
+    // 4. Group Head & Portafilter (Portafiltro profesional)
+    const groupHeadY = h - headH;
+    const groupHeadGeo = new THREE.CylinderGeometry(28, 30, 24, 24);
+    const groupHead = new THREE.Mesh(groupHeadGeo, chromeMat);
+    groupHead.position.set(0, groupHeadY + 6, headPosZ + 10);
+    group.add(groupHead);
+
+    // Portafilter Basket Collar
+    const basketGeo = new THREE.CylinderGeometry(26, 24, 18, 24);
+    const basket = new THREE.Mesh(basketGeo, chromeMat);
+    basket.position.set(0, groupHeadY - 10, headPosZ + 10);
+    group.add(basket);
+
+    // Dual Pouring Spouts (Picos de erogación dobles)
+    const spoutLeftGeo = new THREE.CylinderGeometry(3.5, 2, 16, 12);
+    const spoutLeft = new THREE.Mesh(spoutLeftGeo, chromeMat);
+    spoutLeft.rotation.z = -0.15;
+    spoutLeft.position.set(-8, groupHeadY - 24, headPosZ + 10);
+    group.add(spoutLeft);
+
+    const spoutRightGeo = new THREE.CylinderGeometry(3.5, 2, 16, 12);
+    const spoutRight = new THREE.Mesh(spoutRightGeo, chromeMat);
+    spoutRight.rotation.z = 0.15;
+    spoutRight.position.set(8, groupHeadY - 24, headPosZ + 10);
+    group.add(spoutRight);
+
+    // Portafilter Handle (Ergonomic handle angled forward-right)
+    const handleLen = 85;
+    const handleGeo = new THREE.CylinderGeometry(8, 10, handleLen, 16);
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.6 });
+    const handle = new THREE.Mesh(handleGeo, handleMat);
+    handle.rotation.x = Math.PI / 2;
+    handle.rotation.y = -0.3; // slightly angled to the right for natural barista grip
+    handle.position.set(16, groupHeadY - 8, headPosZ + 10 + handleLen / 2 + 16);
+    group.add(handle);
+
+    // Chrome butt cap on handle
+    const capGeo = new THREE.SphereGeometry(9, 16, 16);
+    const cap = new THREE.Mesh(capGeo, chromeMat);
+    cap.position.set(16 + Math.sin(0.3) * handleLen, groupHeadY - 8, headPosZ + 10 + handleLen + 16);
+    group.add(cap);
+
+    // 5. Steam Wand (Lanceta / Tubo de vapor orientable)
+    const wandPivotX = -w / 2 + 22;
+    const wandPivotY = h - headH + 8;
+    const wandPivotZ = headPosZ + 8;
+
+    const wandBall = new THREE.Mesh(new THREE.SphereGeometry(8, 16, 16), chromeMat);
+    wandBall.position.set(wandPivotX, wandPivotY, wandPivotZ);
+    group.add(wandBall);
+
+    const wandUpperGeo = new THREE.CylinderGeometry(4, 4, 35, 12);
+    const wandUpper = new THREE.Mesh(wandUpperGeo, chromeMat);
+    wandUpper.rotation.z = 0.25;
+    wandUpper.position.set(wandPivotX - 5, wandPivotY - 16, wandPivotZ);
+    group.add(wandUpper);
+
+    // Rubber heat grip on steam wand
+    const gripGeo = new THREE.CylinderGeometry(5.5, 5.5, 18, 12);
+    const grip = new THREE.Mesh(gripGeo, accentMat);
+    grip.rotation.z = 0.25;
+    grip.position.set(wandPivotX - 5, wandPivotY - 16, wandPivotZ);
+    group.add(grip);
+
+    // Wand lower pipe and nozzle tip
+    const wandLowerGeo = new THREE.CylinderGeometry(3.5, 2.5, 42, 12);
+    const wandLower = new THREE.Mesh(wandLowerGeo, chromeMat);
+    wandLower.rotation.x = 0.2;
+    wandLower.position.set(wandPivotX - 10, wandPivotY - 44, wandPivotZ + 8);
+    group.add(wandLower);
+
+    // 6. Top Cup Warming Surface & Perimeter Chrome Guard Rail
+    const railMat = chromeMat;
+    const topY = h;
+    const railH = 14;
+
+    // Warming plate surface
+    const plateGeo = new THREE.BoxGeometry(w * 0.9, 3, d * 0.75);
+    const plate = new THREE.Mesh(plateGeo, chromeMat);
+    plate.position.set(0, topY + 1.5, -d * 0.05);
+    group.add(plate);
+
+    // Rear Rail
+    const railRearGeo = new THREE.CylinderGeometry(2.5, 2.5, w * 0.88, 12);
+    const railRear = new THREE.Mesh(railRearGeo, railMat);
+    railRear.rotation.z = Math.PI / 2;
+    railRear.position.set(0, topY + railH, -d / 2 + 20);
+    group.add(railRear);
+
+    // Left & Right Rails
+    const railSideGeo = new THREE.CylinderGeometry(2.5, 2.5, d * 0.65, 12);
+    const railLeft = new THREE.Mesh(railSideGeo, railMat);
+    railLeft.rotation.x = Math.PI / 2;
+    railLeft.position.set(-w / 2 + 15, topY + railH, -d * 0.05);
+    group.add(railLeft);
+
+    const railRight = new THREE.Mesh(railSideGeo, railMat);
+    railRight.rotation.x = Math.PI / 2;
+    railRight.position.set(w / 2 - 15, topY + railH, -d * 0.05);
+    group.add(railRight);
+
+    // 7. Ceramic Espresso Cups on Drip Tray (under spouts)
+    const cupMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15 });
+    const cupOffsets = [{ x: -14 }, { x: 14 }];
+    for (const co of cupOffsets) {
+      // Cup body
+      const cupGeo = new THREE.CylinderGeometry(14, 10, 24, 20);
+      const cup = new THREE.Mesh(cupGeo, cupMat);
+      cup.position.set(co.x, footH + dripTrayH + 16, headPosZ + 10);
+      group.add(cup);
+
+      // Cup handle
+      const cupHandleGeo = new THREE.TorusGeometry(6, 1.8, 8, 16, Math.PI);
+      const cupHandle = new THREE.Mesh(cupHandleGeo, cupMat);
+      cupHandle.rotation.y = co.x > 0 ? 0 : Math.PI;
+      cupHandle.position.set(co.x + (co.x > 0 ? 13 : -13), footH + dripTrayH + 16, headPosZ + 10);
+      group.add(cupHandle);
+    }
+
+    // 8. Rear Water Reservoir (Depósito acrílico ahumado)
+    const tankH = mainBodyH * 0.75;
+    const tankD = rearBodyD * 0.35;
+    const tankW = w * 0.78;
+    const tankGeo = new THREE.BoxGeometry(tankW, tankH, tankD);
+    const tank = new THREE.Mesh(tankGeo, darkGlassMat);
+    tank.position.set(0, bodyBaseY + tankH / 2 + 20, - (d / 2) + tankD / 2 + 6);
+    group.add(tank);
+  }
+
+  // --- 8. ACCESORIOS DE MOBILIARIO: PATAS DE MESA Y MUEBLES ---
+
+  private buildTableLeg(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const style = this.determineLegStyle(appliance);
+    this.buildSingleLeg(group, style, w, h, d, bodyMat, accentMat, chromeMat);
+  }
+
+  private buildTableLegsSet(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const style = this.determineLegStyle(appliance);
+    // Inset from outer boundary edges
+    const insetX = Math.min(50, w * 0.12);
+    const insetZ = Math.min(50, d * 0.12);
+
+    const halfW = w / 2 - insetX;
+    const halfZ = d / 2 - insetZ;
+
+    // 4 Symmetrical outer corners:
+    // splayX and splayZ point directly outward to the exterior corners:
+    // Front-Left:  X negative, Z positive
+    // Front-Right: X positive, Z positive
+    // Rear-Left:   X negative, Z negative
+    // Rear-Right:  X positive, Z negative
+    const corners = [
+      { x: -halfW, z: halfZ, splayX: -1, splayZ: 1 },   // Front-Left
+      { x: halfW, z: halfZ, splayX: 1, splayZ: 1 },     // Front-Right
+      { x: -halfW, z: -halfZ, splayX: -1, splayZ: -1 }, // Rear-Left
+      { x: halfW, z: -halfZ, splayX: 1, splayZ: -1 },   // Rear-Right
+    ];
+
+    for (const c of corners) {
+      const legSubGroup = new THREE.Group();
+      legSubGroup.position.set(c.x, 0, c.z);
+      this.buildSingleLeg(
+        legSubGroup,
+        style,
+        120, // localized footprint width
+        h,
+        120, // localized footprint depth
+        bodyMat,
+        accentMat,
+        chromeMat,
+        c.splayX,
+        c.splayZ
+      );
+      group.add(legSubGroup);
+    }
+  }
+
+  private determineLegStyle(appliance: ApplianceItem): 'hairpin' | 'cylindrical_inox' | 'scandinavian_wood' {
+    const text = `${appliance.id} ${appliance.name} ${appliance.modelCode || ''} ${appliance.notes || ''}`.toLowerCase();
+    if (text.includes('hairpin') || text.includes('horquilla') || text.includes('varilla')) {
+      return 'hairpin';
+    }
+    if (text.includes('cylind') || text.includes('cilind') || text.includes('inox') || text.includes('tubular')) {
+      return 'cylindrical_inox';
+    }
+    if (text.includes('scand') || text.includes('nordic') || text.includes('wood') || text.includes('madera') || text.includes('conic')) {
+      return 'scandinavian_wood';
+    }
+    // Default by finish if applicable
+    if (appliance.finish === 'natural_wood') return 'scandinavian_wood';
+    if (appliance.finish === 'stainless_steel') return 'cylindrical_inox';
+    return 'hairpin';
+  }
+
+  private buildSingleLeg(
+    targetGroup: THREE.Group,
+    style: 'hairpin' | 'cylindrical_inox' | 'scandinavian_wood',
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material,
+    splayX = 0,
+    splayZ = 0
+  ) {
+    switch (style) {
+      case 'hairpin':
+        this.buildHairpinMesh(targetGroup, h, bodyMat, accentMat, splayX, splayZ);
+        break;
+      case 'cylindrical_inox':
+        this.buildCylindricalMesh(targetGroup, h, chromeMat, accentMat);
+        break;
+      case 'scandinavian_wood':
+        this.buildScandinavianMesh(targetGroup, h, bodyMat, accentMat, splayX, splayZ);
+        break;
+    }
+  }
+
+  // A) Pata Horquilla / Hairpin Metal (Triple varilla con inclinación estética y pletina en escuadra)
+  private buildHairpinMesh(
+    group: THREE.Group,
+    h: number,
+    steelMat: THREE.Material,
+    accentMat: THREE.Material,
+    splayX: number,
+    splayZ: number
+  ) {
+    const dirX = splayX !== 0 ? Math.sign(splayX) : 1;
+    const dirZ = splayZ !== 0 ? Math.sign(splayZ) : 1;
+
+    const plateSize = 90;
+    const plateThick = 4;
+    const rodR = 5.5; // Ø11mm solid steel rod
+
+    // Top Mounting Plate (L-shaped bracket along the corner edges)
+    const plateGroup = new THREE.Group();
+    plateGroup.position.set(0, h - plateThick / 2, 0);
+
+    const plateWing1 = new THREE.Mesh(new THREE.BoxGeometry(plateSize, plateThick, 30), steelMat);
+    plateWing1.position.set((dirX * plateSize) / 2 - dirX * 15, 0, 0);
+    plateGroup.add(plateWing1);
+
+    const plateWing2 = new THREE.Mesh(new THREE.BoxGeometry(30, plateThick, plateSize), steelMat);
+    plateWing2.position.set(0, 0, (dirZ * plateSize) / 2 - dirZ * 15);
+    plateGroup.add(plateWing2);
+
+    // Countersunk mounting screw holes
+    const holeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const holeOffsets = [
+      { x: dirX * 25, z: 0 },
+      { x: dirX * 65, z: 0 },
+      { x: 0, z: dirZ * 25 },
+      { x: 0, z: dirZ * 65 }
+    ];
+    for (const ho of holeOffsets) {
+      const hole = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, plateThick + 0.5, 12), holeMat);
+      hole.position.set(ho.x, 0, ho.z);
+      plateGroup.add(hole);
+    }
+    group.add(plateGroup);
+
+    // Hairpin Rods & Bottom Loop:
+    // Outward splay angle (~8 degrees) towards exterior corner (dirX, dirZ)
+    const splayAngle = 0.14;
+    const footSpread = Math.tan(splayAngle) * (h - 20);
+    const bottomPos = new THREE.Vector3(dirX * footSpread, 10, dirZ * footSpread);
+
+    // Silicone / Rubber Floor Protector Pad (Regatón antiarañazos)
+    const padGeo = new THREE.CylinderGeometry(16, 16, 8, 20);
+    const pad = new THREE.Mesh(padGeo, accentMat);
+    pad.position.set(bottomPos.x, 4, bottomPos.z);
+    group.add(pad);
+
+    // Bottom Hairpin U-Turn / Loop
+    const loopGeo = new THREE.TorusGeometry(12, rodR, 12, 24, Math.PI);
+    const loop = new THREE.Mesh(loopGeo, steelMat);
+    loop.rotation.x = Math.PI / 2;
+    const angleRad = Math.atan2(dirZ, dirX);
+    loop.rotation.z = angleRad + Math.PI / 2;
+    loop.position.set(bottomPos.x, 10, bottomPos.z);
+    group.add(loop);
+
+    // 3 Structural heavy-duty steel rods connecting top bracket to bottom loop:
+    const topPoints = [
+      new THREE.Vector3(dirX * 60, h - plateThick, 0),
+      new THREE.Vector3(0, h - plateThick, dirZ * 60),
+      new THREE.Vector3(dirX * 25, h - plateThick, dirZ * 25) // central rod
+    ];
+
+    const upAxis = new THREE.Vector3(0, 1, 0);
+    for (let i = 0; i < topPoints.length; i++) {
+      const topP = topPoints[i];
+      const botP = bottomPos.clone();
+      if (i === 0) botP.x += dirX * 6;
+      else if (i === 1) botP.z += dirZ * 6;
+
+      const delta = botP.clone().sub(topP);
+      const rodLength = delta.length();
+      const midPoint = topP.clone().add(botP).multiplyScalar(0.5);
+
+      const rodGeo = new THREE.CylinderGeometry(rodR, rodR, rodLength, 16);
+      const rod = new THREE.Mesh(rodGeo, steelMat);
+      rod.position.copy(midPoint);
+      rod.quaternion.setFromUnitVectors(upAxis, delta.clone().normalize());
+      group.add(rod);
+    }
+  }
+
+  // B) Pata Cilíndrica Inox Regulable Ø60mm (Tubo cepillado + brida superior + regatón roscado)
+  private buildCylindricalMesh(
+    group: THREE.Group,
+    h: number,
+    chromeMat: THREE.Material,
+    accentMat: THREE.Material
+  ) {
+    const tubeR = 30; // Ø60mm tube
+    const plateSize = 90;
+    const plateThick = 4;
+    const levelerH = 26;
+    const tubeH = h - plateThick - levelerH;
+
+    // 1. Top Mounting Flange Plate
+    const topPlateGeo = new THREE.BoxGeometry(plateSize, plateThick, plateSize);
+    const topPlate = new THREE.Mesh(topPlateGeo, chromeMat);
+    topPlate.position.set(0, h - plateThick / 2, 0);
+    group.add(topPlate);
+
+    // 4 Fixing screw holes on plate
+    const holeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const holeD = plateSize / 2 - 14;
+    const holes = [
+      { x: -holeD, z: -holeD },
+      { x: holeD, z: -holeD },
+      { x: -holeD, z: holeD },
+      { x: holeD, z: holeD }
+    ];
+    for (const ho of holes) {
+      const hMesh = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, plateThick + 0.5, 12), holeMat);
+      hMesh.position.set(ho.x, h - plateThick / 2, ho.z);
+      group.add(hMesh);
+    }
+
+    // 2. Main Stainless Steel Column Tube
+    const tubeGeo = new THREE.CylinderGeometry(tubeR, tubeR, tubeH, 32);
+    const tube = new THREE.Mesh(tubeGeo, chromeMat);
+    tube.position.set(0, levelerH + tubeH / 2, 0);
+    group.add(tube);
+
+    // Decorative polished collar at base of tube
+    const collarGeo = new THREE.CylinderGeometry(tubeR + 2, tubeR + 2, 10, 32);
+    const collar = new THREE.Mesh(collarGeo, chromeMat);
+    collar.position.set(0, levelerH + 5, 0);
+    group.add(collar);
+
+    // 3. Adjustable Threaded Leveler Foot (Regatón roscado regulable)
+    const threadGeo = new THREE.CylinderGeometry(12, 12, levelerH, 20);
+    const thread = new THREE.Mesh(threadGeo, chromeMat);
+    thread.position.set(0, levelerH / 2, 0);
+    group.add(thread);
+
+    const footBaseGeo = new THREE.CylinderGeometry(tubeR - 2, tubeR + 1, 14, 32);
+    const footBase = new THREE.Mesh(footBaseGeo, accentMat);
+    footBase.position.set(0, 7, 0);
+    group.add(footBase);
+  }
+
+  // C) Pata Cónica Madera Nórdica Escandinava (Cono torneado + placa horizontal de fijación + regatón dorado)
+  private buildScandinavianMesh(
+    group: THREE.Group,
+    h: number,
+    woodMat: THREE.Material,
+    goldMat: THREE.Material,
+    splayX: number,
+    splayZ: number
+  ) {
+    const topR = 24;   // Ø48mm at top
+    const botR = 13;   // Ø26mm at bottom (elegante conicidad)
+    const plateSize = 76;
+    const plateThick = 4.5;
+
+    // 1. Top Mounting Plate (Placa metálica horizontal de fijación enrasada a la cota h)
+    const plateGeo = new THREE.BoxGeometry(plateSize, plateThick, plateSize);
+    const plate = new THREE.Mesh(plateGeo, goldMat);
+    plate.position.set(0, h - plateThick / 2, 0);
+    group.add(plate);
+
+    // Decorative mounting screw heads
+    const screwMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const screwOffset = plateSize / 2 - 12;
+    for (const sx of [-screwOffset, screwOffset]) {
+      for (const sz of [-screwOffset, screwOffset]) {
+        const screw = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, plateThick + 0.4, 12), screwMat);
+        screw.position.set(sx, h - plateThick / 2, sz);
+        group.add(screw);
+      }
+    }
+
+    // 2. Pivote de inclinación situado exactamente en la cara inferior de la pletina de montaje
+    const pivotY = h - plateThick;
+    const legContainer = new THREE.Group();
+    legContainer.position.set(0, pivotY, 0);
+
+    const hasSplay = splayX !== 0 || splayZ !== 0;
+    const splayAngle = hasSplay ? 0.14 : 0; // Inclinación simétrica de ~8 grados
+    // Longitud axial de la pata para que alcance exactamente y = 0 en el suelo
+    const totalLegLen = pivotY / Math.cos(splayAngle);
+    const ferruleH = Math.min(52, totalLegLen * 0.12);
+    const feltH = 4;
+    const woodH = totalLegLen - ferruleH - feltH;
+
+    // Cono de madera maciza (se extiende hacia abajo a lo largo del eje local -Y)
+    const legGeo = new THREE.CylinderGeometry(topR, botR * 1.05, woodH, 32);
+    const legMesh = new THREE.Mesh(legGeo, woodMat);
+    legMesh.position.set(0, -woodH / 2, 0);
+    legContainer.add(legMesh);
+
+    // Casquillo dorado decorativo inferior (Ferrule)
+    const ferruleGeo = new THREE.CylinderGeometry(botR * 1.05, botR, ferruleH, 32);
+    const ferrule = new THREE.Mesh(ferruleGeo, goldMat);
+    ferrule.position.set(0, -woodH - ferruleH / 2, 0);
+    legContainer.add(ferrule);
+
+    // Regatón protector de suelo en fieltro negro
+    const feltMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 });
+    const feltGeo = new THREE.CylinderGeometry(botR * 0.92, botR * 0.92, feltH, 24);
+    const felt = new THREE.Mesh(feltGeo, feltMat);
+    felt.position.set(0, -woodH - ferruleH - feltH / 2, 0);
+    legContainer.add(felt);
+
+    // Inclinación cónica simétrica hacia la diagonal exterior de cada esquina
+    if (hasSplay) {
+      const len = Math.hypot(splayX, splayZ);
+      const ux = splayX / len;
+      const uz = splayZ / len;
+      // Eje de rotación en el plano XZ perpendicular a la dirección exterior (ux, uz):
+      // (-uz, 0, ux) rota el vector (0, -1, 0) hacia la dirección (ux, -cos(theta), uz)
+      const rotAxis = new THREE.Vector3(-uz, 0, ux).normalize();
+      legContainer.setRotationFromAxisAngle(rotAxis, splayAngle);
+    }
+
+    group.add(legContainer);
+  }
 }
+

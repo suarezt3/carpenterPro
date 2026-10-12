@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para habilitar el menú de descarga directa (PNG de alta resolución y PDF) y corregir la visualización completa del diagrama de corte al imprimir o guardar como PDF en orientación horizontal apaisada sin cortes ni barras de desplazamiento.",
-  "updatedAt":  "2026-10-11T22:00:26.701428469Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Plan de implementación para la corrección geométrica de alineación e inclinación cónica uniforme de las patas de mesa (madera nórdica, horquilla y cilíndrica) y la integración del imán inteligente de anclaje vertical con resaltado visual 3D al arrastrar piezas sobre las patas.",
+  "updatedAt": "2026-10-12T14:40:00.474409977Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

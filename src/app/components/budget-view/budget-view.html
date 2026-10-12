@@ -310,7 +310,7 @@
                     <td class="py-2.5 px-3">
                       <div class="flex items-center gap-2">
                         <span class="material-icons text-emerald-600 text-sm">
-                          {{ app.type === 'refrigerator' ? 'kitchen' : (app.type === 'sink' ? 'wash' : (app.type === 'hood' ? 'air' : (app.type === 'cooktop' ? 'mode_heat' : 'microwave'))) }}
+                          {{ app.type === 'refrigerator' ? 'kitchen' : (app.type === 'sink' ? 'wash' : (app.type === 'hood' ? 'air' : (app.type === 'cooktop' ? 'mode_heat' : (app.type === 'coffee_maker' ? 'coffee' : (app.type === 'table_leg' || app.type === 'table_legs_set' ? 'table_bar' : 'microwave'))))) }}
                         </span>
                         <div>
                           <p [class]="themeService.isClassic() ? 'font-bold text-slate-800 text-xs' : 'font-bold text-white text-xs'">{{ app.name }}</p>
@@ -323,7 +323,7 @@
                     </td>
                     <td class="py-2.5 px-2 text-[11px]">
                       <span [class]="themeService.isClassic() ? 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700' : 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-800 text-zinc-300'">
-                        {{ app.finish === 'stainless_steel' ? 'Acero Inox' : (app.finish === 'black_matte' ? 'Negro Mate' : 'Blanco Cristal') }}
+                        {{ app.finish === 'stainless_steel' ? 'Acero Inox' : (app.finish === 'black_matte' ? 'Negro Mate' : (app.finish === 'white_gloss' ? 'Blanco Cristal' : (app.finish === 'gold_brass' ? 'Latón Dorado' : (app.finish === 'natural_wood' ? 'Madera Roble' : (app.finish === 'retro_red' ? 'Rojo Barista' : app.finish))))) }}
                       </span>
                     </td>
                     <td class="py-2.5 px-2 text-center">

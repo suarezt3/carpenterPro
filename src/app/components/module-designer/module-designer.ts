@@ -32,6 +32,7 @@ import {
   ApplianceItem,
   AppliancePreset,
   ApplianceFinish,
+  ApplianceType,
   APPLIANCES_CATALOG_PRESETS,
   APPLIANCE_FINISH_OPTIONS
 } from '../../models/melamine.models';
@@ -323,7 +324,7 @@ export class ModuleDesignerComponent {
   readonly selectedAppliance = this.projectService.selectedAppliance;
   readonly appliancesCatalog = APPLIANCES_CATALOG_PRESETS;
   readonly applianceFinishOptions = APPLIANCE_FINISH_OPTIONS;
-  readonly activeApplianceCategory = signal<'all' | 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave'>('all');
+  readonly activeApplianceCategory = signal<'all' | 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs'>('all');
 
   readonly filteredAppliances = computed(() => {
     const cat = this.activeApplianceCategory();
@@ -331,26 +332,98 @@ export class ModuleDesignerComponent {
     return this.appliancesCatalog.filter(a => a.category === cat);
   });
 
+  getApplianceIcon(type: ApplianceType): string {
+    switch (type) {
+      case 'refrigerator': return 'kitchen';
+      case 'sink': return 'wash';
+      case 'hood': return 'air';
+      case 'cooktop': return 'mode_heat';
+      case 'microwave': return 'microwave';
+      case 'coffee_maker': return 'coffee';
+      case 'table_leg':
+      case 'table_legs_set': return 'table_bar';
+      case 'oven':
+      default: return 'microwave';
+    }
+  }
+
   addApplianceFromPreset(preset: AppliancePreset) {
     const config = this.roomConfig();
-    const posX = 0;
+    const selPart = this.selectedPart();
+    let posX = 0;
     let posY = 0;
     let posZ = 0;
+    let targetWidth = preset.defaultWidth;
+    let targetDepth = preset.defaultDepth;
+    let targetHeight = preset.defaultHeight;
 
-    if (preset.defaultMountType === 'floor') {
+    if (preset.type === 'table_legs_set') {
+      // Si hay una pieza horizontal seleccionada (cubierta o mesa), acopla el juego de patas a sus medidas
+      if (selPart && (selPart.orientation === 'horizontal' || !selPart.orientation)) {
+        targetWidth = selPart.length;
+        targetDepth = selPart.width;
+        posX = selPart.posX || 0;
+        posZ = selPart.posZ || 0;
+        posY = 0;
+        const partUnderside = (selPart.posY || 738) - (selPart.thickness || 18) / 2;
+        if (partUnderside > 150) {
+          targetHeight = partUnderside;
+        }
+      } else {
+        posY = 0;
+        posZ = 0;
+      }
+    } else if (preset.type === 'table_leg') {
+      if (selPart) {
+        posX = (selPart.posX || 0) + (selPart.length / 2 - 40);
+        posZ = (selPart.posZ || 0) + (selPart.width / 2 - 40);
+        posY = 0;
+        const partUnderside = (selPart.posY || 738) - (selPart.thickness || 18) / 2;
+        if (partUnderside > 150) {
+          targetHeight = partUnderside;
+        }
+      } else {
+        posY = 0;
+        posZ = 0;
+      }
+    } else if (preset.type === 'coffee_maker') {
+      // Si hay una cubierta o pieza seleccionada, sitúa la cafetera exactamente encima de ella
+      if (selPart) {
+        posX = selPart.posX || 0;
+        posY = (selPart.posY || 0) + (selPart.thickness || 18) / 2;
+        posZ = selPart.posZ || 0;
+      } else {
+        const parts = this.currentParts();
+        let highestY = 0;
+        for (const p of parts) {
+          if (p.orientation === 'horizontal') {
+            const top = (p.posY || 0) + (p.thickness || 18) / 2;
+            if (top > highestY) highestY = top;
+          }
+        }
+        posY = highestY > 0 ? highestY : 880;
+        posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+      }
+    } else if (preset.defaultMountType === 'floor') {
       posY = 0;
       posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
     } else if (preset.defaultMountType === 'countertop') {
-      const parts = this.currentParts();
-      let highestY = 0;
-      for (const p of parts) {
-        if (p.orientation === 'horizontal') {
-          const top = (p.posY || 0) + (p.thickness || 18) / 2;
-          if (top > highestY) highestY = top;
+      if (selPart && (selPart.orientation === 'horizontal' || !selPart.orientation)) {
+        posX = selPart.posX || 0;
+        posY = (selPart.posY || 0) + (selPart.thickness || 18) / 2;
+        posZ = selPart.posZ || 0;
+      } else {
+        const parts = this.currentParts();
+        let highestY = 0;
+        for (const p of parts) {
+          if (p.orientation === 'horizontal') {
+            const top = (p.posY || 0) + (p.thickness || 18) / 2;
+            if (top > highestY) highestY = top;
+          }
         }
+        posY = highestY > 0 ? highestY : 880;
+        posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
       }
-      posY = highestY > 0 ? highestY : 880;
-      posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
     } else if (preset.defaultMountType === 'wall') {
       posY = preset.type === 'hood' ? 1500 : 1200;
       posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
@@ -365,9 +438,9 @@ export class ModuleDesignerComponent {
       name: preset.name,
       brand: preset.brand,
       modelCode: preset.modelCode,
-      width: preset.defaultWidth,
-      depth: preset.defaultDepth,
-      height: preset.defaultHeight,
+      width: targetWidth,
+      depth: targetDepth,
+      height: targetHeight,
       finish: preset.defaultFinish,
       position: { x: posX, y: posY, z: posZ },
       rotation: 0,
@@ -381,6 +454,18 @@ export class ModuleDesignerComponent {
     this.deselectPart();
     this.activeDockTab.set('appliances');
     this.showToast(`✨ ${newApp.name} añadido`);
+  }
+
+  // Acción rápida: Añadir juego de 4 patas directamente a la pieza / mesa seleccionada
+  attachTableLegsToSelectedPart(style: 'hairpin' | 'cylindrical_inox' | 'scandinavian_wood' = 'hairpin') {
+    const presetId = style === 'hairpin' 
+      ? 'preset_legs_hairpin_set' 
+      : (style === 'cylindrical_inox' ? 'preset_legs_cylindrical_inox_set' : 'preset_legs_scandinavian_wood_set');
+    const preset = this.appliancesCatalog.find(p => p.id === presetId);
+    if (!preset) return;
+
+    this.addApplianceFromPreset(preset);
+    this.showToast(`🛠️ Juego de patas (${style === 'hairpin' ? 'Horquilla' : (style === 'cylindrical_inox' ? 'Inox' : 'Nórdica')}) añadido a la mesa`);
   }
 
   selectAppliance(id: string | null) {
@@ -1566,10 +1651,8 @@ export class ModuleDesignerComponent {
     if (selIds.length < 2) return;
 
     const selParts = this.currentParts().filter(p => selIds.includes(p.id));
-    const isDrawerLike = selParts.some(p => 
-      p.name.toUpperCase().includes('CAJ') || 
-      p.name.toUpperCase().includes('GAVET') || 
-      p.componentRole?.includes('drawer')
+    const isDrawerLike = selParts.length >= 4 && selParts.every(p => 
+      p.componentRole?.includes('drawer') || p.id.includes('caj_ind_')
     );
     const baseDefault = isDrawerLike ? 'Cajón' : 'Conjunto';
     const name = this.newGroupNameInput().trim() || this.getNextUniqueGroupName(baseDefault);

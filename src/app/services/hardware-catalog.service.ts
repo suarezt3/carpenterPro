@@ -7,7 +7,8 @@ import {
   OpeningDirection, 
   PartHardwareConfig, 
   Part, 
-  HardwareItem 
+  HardwareItem,
+  ApplianceItem
 } from '../models/melamine.models';
 
 export interface HandleOption {
@@ -41,10 +42,91 @@ export interface SlideOption {
   icon: string;
 }
 
+export interface TableLegHardwareOption {
+  id: string;
+  name: string;
+  style: 'hairpin' | 'cylindrical_inox' | 'scandinavian_wood';
+  height: number;
+  description: string;
+  unitCost: number;
+  icon: string;
+  finish: string;
+  material: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class HardwareCatalogService {
+
+  readonly tableLegOptions: TableLegHardwareOption[] = [
+    {
+      id: 'hw_leg_hairpin_720',
+      name: 'Pata Horquilla Triple Varilla 72cm (Negro Mate)',
+      style: 'hairpin',
+      height: 720,
+      description: 'Acero macizo electroestático de 12mm con pletina de 3 orificios y regatón de goma.',
+      unitCost: 12.00,
+      icon: 'table_bar',
+      finish: 'Negro Mate',
+      material: 'Acero'
+    },
+    {
+      id: 'hw_leg_hairpin_400',
+      name: 'Pata Horquilla Doble Varilla 40cm (Mesa Centro)',
+      style: 'hairpin',
+      height: 400,
+      description: 'Ideal para mesas de centro, mesas ratonas y muebles de TV modernos.',
+      unitCost: 9.00,
+      icon: 'table_bar',
+      finish: 'Negro Mate',
+      material: 'Acero'
+    },
+    {
+      id: 'hw_leg_cylindrical_720',
+      name: 'Pata Cilíndrica Inox Ø60mm Regulable 720mm',
+      style: 'cylindrical_inox',
+      height: 720,
+      description: 'Tubo de acero inoxidable cepillado con base roscada niveladora (+25mm) y brida superior.',
+      unitCost: 9.50,
+      icon: 'table_bar',
+      finish: 'Inox Satinado',
+      material: 'Acero Inox'
+    },
+    {
+      id: 'hw_leg_cylindrical_100',
+      name: 'Pata Cilíndrica Inox 100mm para Mueble Bajo',
+      style: 'cylindrical_inox',
+      height: 100,
+      description: 'Pata niveladora para zócalos de muebles bajos de cocina y alacenas.',
+      unitCost: 4.50,
+      icon: 'table_bar',
+      finish: 'Inox Satinado',
+      material: 'Acero Inox'
+    },
+    {
+      id: 'hw_leg_scandinavian_720',
+      name: 'Pata Cónica Madera Haya Nórdica 72cm Casquillo Dorado',
+      style: 'scandinavian_wood',
+      height: 720,
+      description: 'Madera de haya maciza torneada con placa metálica inclinada 10° y casquillo de latón dorado.',
+      unitCost: 11.50,
+      icon: 'table_bar',
+      finish: 'Madera Natural + Oro',
+      material: 'Madera Maciza'
+    },
+    {
+      id: 'hw_leg_scandinavian_400',
+      name: 'Pata Cónica Madera Haya Nórdica 40cm (Mesa Auxiliar)',
+      style: 'scandinavian_wood',
+      height: 400,
+      description: 'Pata baja escandinava para mesas auxiliares, mesitas de noche y muebles nórdicos.',
+      unitCost: 8.50,
+      icon: 'table_bar',
+      finish: 'Madera Natural + Oro',
+      material: 'Madera Maciza'
+    }
+  ];
 
   readonly handleOptions: HandleOption[] = [
     {
@@ -301,7 +383,7 @@ export class HardwareCatalogService {
   }
 
   // Genera lista consolidada de herrajes requeridos para presupuesto y compra
-  computeRequiredHardwareList(parts: Part[]): HardwareItem[] {
+  computeRequiredHardwareList(parts: Part[], appliances: ApplianceItem[] = []): HardwareItem[] {
     let hingesStraight = 0;
     let hingesGas = 0;
     let drawersCount = 0;
@@ -380,6 +462,57 @@ export class HardwareCatalogService {
         unitCost: 3.50,
         notes: 'Incluye tornillos pasantes M4'
       });
+    }
+
+    // Patas de mesa y soportes presentes en electrodomésticos / accesorios
+    for (const app of appliances) {
+      if (app.type === 'table_legs_set') {
+        const isHairpin = app.name.toLowerCase().includes('horquilla') || app.name.toLowerCase().includes('hairpin');
+        const isWood = app.name.toLowerCase().includes('madera') || app.name.toLowerCase().includes('nórdica') || app.name.toLowerCase().includes('cónica');
+        const isLow = app.height <= 450;
+        
+        let legName = 'Juego de 4 Patas Cilíndricas Inox Regulables 72cm';
+        let unitCost = 35.00;
+        if (isHairpin) {
+          legName = isLow ? 'Juego de 4 Patas Horquilla Hairpin 40cm (Mesa Centro)' : 'Juego de 4 Patas Horquilla Hairpin 72cm';
+          unitCost = isLow ? 30.00 : 45.00;
+        } else if (isWood) {
+          legName = isLow ? 'Juego de 4 Patas Cónicas Madera Nórdica 40cm' : 'Juego de 4 Patas Cónicas Madera Nórdica 72cm';
+          unitCost = isLow ? 32.00 : 42.00;
+        }
+
+        items.push({
+          id: `hw_set_${app.id}`,
+          name: legName,
+          category: 'support',
+          unit: 'juego (4 uds)',
+          quantity: 1,
+          unitCost,
+          notes: `Accesorios para mesa (${app.width}×${app.depth}×${app.height}mm)`
+        });
+      } else if (app.type === 'table_leg') {
+        const isHairpin = app.name.toLowerCase().includes('horquilla') || app.name.toLowerCase().includes('hairpin');
+        const isWood = app.name.toLowerCase().includes('madera') || app.name.toLowerCase().includes('nórdica');
+        let legName = 'Pata Cilíndrica Inox Regulable Ø60mm';
+        let unitCost = 9.00;
+        if (isHairpin) {
+          legName = 'Pata Horquilla Industrial Hairpin 72cm';
+          unitCost = 11.50;
+        } else if (isWood) {
+          legName = 'Pata Cónica Madera Nórdica con Regatón';
+          unitCost = 10.50;
+        }
+
+        items.push({
+          id: `hw_leg_${app.id}`,
+          name: legName,
+          category: 'support',
+          unit: 'und',
+          quantity: 1,
+          unitCost,
+          notes: `Pata individual de soporte (${app.height}mm)`
+        });
+      }
     }
 
     return items;

@@ -348,6 +348,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private floorMesh: THREE.Mesh | null = null;
   private roomGroup = new THREE.Group();
   private wallSnapGuideGroup = new THREE.Group();
+  private legSnapGuideGroup = new THREE.Group();
   private appliancesGroup = new THREE.Group();
   private applianceGizmoGroup = new THREE.Group();
 
@@ -531,6 +532,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.rectPreviewGroup);
     this.scene.add(this.roomGroup);
     this.scene.add(this.wallSnapGuideGroup);
+    this.scene.add(this.legSnapGuideGroup);
     this.scene.add(this.wallGizmoGroup);
     this.scene.add(this.appliancesGroup);
     this.scene.add(this.applianceGizmoGroup);
@@ -750,19 +752,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
       let sy = t;
       let sz = W;
 
-      const isDrawerGroup = !!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer');
-      const isDrawerPart = isDrawerGroup || 
-        part.componentRole === 'drawer_front' || 
-        part.componentRole === 'drawer_box' || 
-        part.componentRole === 'drawer_lateral' || 
-        part.name.toUpperCase().includes('CAJ') || 
-        part.name.toUpperCase().includes('GAVET') ||
-        part.id.includes('caj_');
+      // Only generated modular drawer subcomponents have specific dimensional mapping:
+      const isModularDrawerPart = 
+        (part.componentRole === 'drawer_front' || 
+         part.componentRole === 'drawer_box' || 
+         part.componentRole === 'drawer_lateral') &&
+        (part.id.includes('caj_ind_') || part.id.includes('caj_'));
 
       const orient = part.orientation || 'horizontal';
       if (orient === 'vertical_yz') {
-        if (isDrawerPart) {
-          // In vertical_yz for ANY drawer part: thickness along X, height in Y, width/depth along Z
+        if (isModularDrawerPart) {
+          // In vertical_yz for modular drawer parts: thickness along X, height in Y, width/depth along Z
           sx = t;
           sy = Math.min(L, W);
           sz = Math.max(L, W);
@@ -772,9 +772,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
           sz = W;
         }
       } else if (orient === 'vertical_xy') {
-        const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) && !isDrawerPart;
-        if (isDrawerPart) {
-          // In vertical_xy for ANY drawer part: width/depth along X, height in Y, thickness along Z
+        const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) && !isModularDrawerPart;
+        if (isModularDrawerPart) {
+          // In vertical_xy for modular drawer parts: width/depth along X, height in Y, thickness along Z
           sx = Math.max(L, W);
           sy = Math.min(L, W);
           sz = t;
@@ -850,7 +850,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       );
 
       // isDrawer: includes both the front and internal parts or any grouped drawer piece
-      const isPartInDrawerGroup = isDrawerGroup;
+      const isPartInDrawerGroup = !!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer');
       const isDrawer = !isDoor && (
         isPartInDrawerGroup ||
         isDrawerFront || (
@@ -3924,51 +3924,73 @@ export class Furniture3dViewerComponent implements OnDestroy {
               deltaZ = Math.round(deltaWorld.z / snap) * snap;
             }
 
-            if (this.isMagneticSnap() && (hit.axis === 'x' || hit.axis === 'z')) {
-              let grpMinX = Infinity;
-              let grpMaxX = -Infinity;
-              let grpMinY = Infinity;
-              let grpMaxY = -Infinity;
-              let grpMinZ = Infinity;
-              let grpMaxZ = -Infinity;
+            if (this.isMagneticSnap()) {
+              if (hit.axis === 'x' || hit.axis === 'z') {
+                let grpMinX = Infinity;
+                let grpMaxX = -Infinity;
+                let grpMinY = Infinity;
+                let grpMaxY = -Infinity;
+                let grpMinZ = Infinity;
+                let grpMaxZ = -Infinity;
 
-              for (const p of this.dragInitialParts) {
-                const pBounds = this.getPartBounds(p, {
-                  x: (p.posX ?? 0) + deltaX,
-                  y: Math.max(0, (p.posY ?? 0) + deltaY),
-                  z: (p.posZ ?? 0) + deltaZ
-                });
-                grpMinX = Math.min(grpMinX, pBounds.minX);
-                grpMaxX = Math.max(grpMaxX, pBounds.maxX);
-                grpMinY = Math.min(grpMinY, pBounds.minY);
-                grpMaxY = Math.max(grpMaxY, pBounds.maxY);
-                grpMinZ = Math.min(grpMinZ, pBounds.minZ);
-                grpMaxZ = Math.max(grpMaxZ, pBounds.maxZ);
-              }
+                for (const p of this.dragInitialParts) {
+                  const pBounds = this.getPartBounds(p, {
+                    x: (p.posX ?? 0) + deltaX,
+                    y: Math.max(0, (p.posY ?? 0) + deltaY),
+                    z: (p.posZ ?? 0) + deltaZ
+                  });
+                  grpMinX = Math.min(grpMinX, pBounds.minX);
+                  grpMaxX = Math.max(grpMaxX, pBounds.maxX);
+                  grpMinY = Math.min(grpMinY, pBounds.minY);
+                  grpMaxY = Math.max(grpMaxY, pBounds.maxY);
+                  grpMinZ = Math.min(grpMinZ, pBounds.minZ);
+                  grpMaxZ = Math.max(grpMaxZ, pBounds.maxZ);
+                }
 
-              const wallSnap = this.calculateWallSnap({
-                minX: grpMinX,
-                maxX: grpMaxX,
-                minY: grpMinY,
-                maxY: grpMaxY,
-                minZ: grpMinZ,
-                maxZ: grpMaxZ
-              }, 30);
+                const wallSnap = this.calculateWallSnap({
+                  minX: grpMinX,
+                  maxX: grpMaxX,
+                  minY: grpMinY,
+                  maxY: grpMaxY,
+                  minZ: grpMinZ,
+                  maxZ: grpMaxZ
+                }, 30);
 
-              if (hit.axis === 'z' && wallSnap.isSnappedZ) {
-                deltaZ += wallSnap.deltaZ;
-              }
-              if (hit.axis === 'x' && wallSnap.isSnappedX) {
-                deltaX += wallSnap.deltaX;
-              }
+                if (hit.axis === 'z' && wallSnap.isSnappedZ) {
+                  deltaZ += wallSnap.deltaZ;
+                }
+                if (hit.axis === 'x' && wallSnap.isSnappedX) {
+                  deltaX += wallSnap.deltaX;
+                }
 
-              if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
-                this.renderWallSnapGuides(wallSnap);
-              } else {
-                this.clearWallSnapGuides();
+                if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
+                  this.renderWallSnapGuides(wallSnap);
+                } else {
+                  this.clearWallSnapGuides();
+                }
+              } else if (hit.axis === 'y') {
+                // Check magnetic snap of lowest horizontal part in group to table legs
+                const horizontalParts = this.dragInitialParts.filter(p => p.orientation === 'horizontal')
+                  .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0));
+                const lowestPart = horizontalParts.length > 0 ? horizontalParts[0] : this.dragInitialParts[0];
+                if (lowestPart) {
+                  const testPos = {
+                    x: (lowestPart.posX ?? 0) + deltaX,
+                    y: Math.max(0, (lowestPart.posY ?? 0) + deltaY),
+                    z: (lowestPart.posZ ?? 0) + deltaZ
+                  };
+                  const legSnap = this.applyTableLegSnap(lowestPart, testPos);
+                  if (legSnap.isSnapped && legSnap.snappedLeg) {
+                    deltaY = legSnap.pos.y - (lowestPart.posY ?? 0);
+                    this.renderLegSnapGuides(legSnap.snappedLeg, lowestPart, legSnap.legTopY, legSnap.pos);
+                  } else {
+                    this.clearLegSnapGuides();
+                  }
+                }
               }
             } else {
               this.clearWallSnapGuides();
+              this.clearLegSnapGuides();
             }
 
             const updatesList: { part: Part; updates: Partial<Part> }[] = [];
@@ -3985,7 +4007,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
               this.partModified.emit(updatesList[0]);
             }
           } else if (this.dragInitialPart) {
-            // Single Part Axis Translation with magnetic face snapping
+            // Single Part Axis Translation with magnetic face snapping & table leg snapping
             const part = this.dragInitialPart;
             const updates: Partial<Part> = {};
             let targetPos = {
@@ -3999,6 +4021,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
               targetPos.x += steppedDelta;
               if (this.isMagneticSnap()) {
                 targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'x');
+                const legSnap = this.applyTableLegSnap(part, targetPos);
+                if (legSnap.isSnapped && legSnap.snappedLeg) {
+                  targetPos = legSnap.pos;
+                  this.renderLegSnapGuides(legSnap.snappedLeg, part, legSnap.legTopY, targetPos);
+                } else {
+                  this.clearLegSnapGuides();
+                }
+
                 const pBounds = this.getPartBounds(part, targetPos);
                 const wallSnap = this.calculateWallSnap(pBounds, 30);
                 if (wallSnap.isSnappedX) {
@@ -4009,6 +4039,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 }
               } else {
                 this.clearWallSnapGuides();
+                this.clearLegSnapGuides();
               }
               updates.posX = targetPos.x;
             } else if (hit.axis === 'y') {
@@ -4016,6 +4047,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
               targetPos.y = Math.max(0, targetPos.y + steppedDelta);
               if (this.isMagneticSnap()) {
                 targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'y');
+                const legSnap = this.applyTableLegSnap(part, targetPos);
+                if (legSnap.isSnapped && legSnap.snappedLeg) {
+                  targetPos = legSnap.pos;
+                  this.renderLegSnapGuides(legSnap.snappedLeg, part, legSnap.legTopY, targetPos);
+                } else {
+                  this.clearLegSnapGuides();
+                }
+              } else {
+                this.clearLegSnapGuides();
               }
               updates.posY = targetPos.y;
               this.clearWallSnapGuides();
@@ -4024,6 +4064,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
               targetPos.z += steppedDelta;
               if (this.isMagneticSnap()) {
                 targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'z');
+                const legSnap = this.applyTableLegSnap(part, targetPos);
+                if (legSnap.isSnapped && legSnap.snappedLeg) {
+                  targetPos = legSnap.pos;
+                  this.renderLegSnapGuides(legSnap.snappedLeg, part, legSnap.legTopY, targetPos);
+                } else {
+                  this.clearLegSnapGuides();
+                }
+
                 const pBounds = this.getPartBounds(part, targetPos);
                 const wallSnap = this.calculateWallSnap(pBounds, 30);
                 if (wallSnap.isSnappedZ) {
@@ -4034,6 +4082,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 }
               } else {
                 this.clearWallSnapGuides();
+                this.clearLegSnapGuides();
               }
               updates.posZ = targetPos.z;
             }
@@ -4114,7 +4163,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
           if (this.dragInitialParts.length > 1) {
             // Group Drag: translate all pieces in group together with smart wall snap
             let effDx = dx;
-            const effDy = dy;
+            let effDy = dy;
             let effDz = dz;
 
             if (this.isMagneticSnap()) {
@@ -4137,6 +4186,27 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 grpMaxY = Math.max(grpMaxY, pBounds.maxY);
                 grpMinZ = Math.min(grpMinZ, pBounds.minZ);
                 grpMaxZ = Math.max(grpMaxZ, pBounds.maxZ);
+              }
+
+              // Check table legs magnetic snap for group
+              const horizontalParts = this.dragInitialParts.filter(p => p.orientation === 'horizontal')
+                .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0));
+              const lowestPart = horizontalParts.length > 0 ? horizontalParts[0] : this.dragInitialParts[0];
+              if (lowestPart) {
+                const testPos = {
+                  x: (lowestPart.posX ?? 0) + effDx,
+                  y: Math.max(0, (lowestPart.posY ?? 0) + effDy),
+                  z: (lowestPart.posZ ?? 0) + effDz
+                };
+                const legSnap = this.applyTableLegSnap(lowestPart, testPos);
+                if (legSnap.isSnapped && legSnap.snappedLeg) {
+                  effDy = legSnap.pos.y - (lowestPart.posY ?? 0);
+                  if (legSnap.pos.x !== testPos.x) effDx = legSnap.pos.x - (lowestPart.posX ?? 0);
+                  if (legSnap.pos.z !== testPos.z) effDz = legSnap.pos.z - (lowestPart.posZ ?? 0);
+                  this.renderLegSnapGuides(legSnap.snappedLeg, lowestPart, legSnap.legTopY, legSnap.pos);
+                } else {
+                  this.clearLegSnapGuides();
+                }
               }
 
               const wallSnap = this.calculateWallSnap({
@@ -4162,6 +4232,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
               }
             } else {
               this.clearWallSnapGuides();
+              this.clearLegSnapGuides();
             }
 
             const updatesList: { part: Part; updates: Partial<Part> }[] = [];
@@ -4191,6 +4262,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
               targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'y');
               targetPos = this.applyMagneticSnapToPosition(part, targetPos, 'z');
 
+              const legSnap = this.applyTableLegSnap(part, targetPos);
+              if (legSnap.isSnapped && legSnap.snappedLeg) {
+                targetPos = legSnap.pos;
+                this.renderLegSnapGuides(legSnap.snappedLeg, part, legSnap.legTopY, targetPos);
+              } else {
+                this.clearLegSnapGuides();
+              }
+
               const partBounds = this.getPartBounds(part, targetPos);
               const wallSnap = this.calculateWallSnap(partBounds, 30);
 
@@ -4208,6 +4287,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
               }
             } else {
               this.clearWallSnapGuides();
+              this.clearLegSnapGuides();
             }
 
             const updates: Partial<Part> = {
@@ -4426,6 +4506,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
 
     this.clearWallSnapGuides();
+    this.clearLegSnapGuides();
   }
 
   // --- CAD TOOLS & PUSH/PULL FACE RAYCASTING ---
@@ -5325,6 +5406,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   clearSelection() {
     this.partsSelected.emit([]);
     this.partSelected.emit(null);
+    this.clearLegSnapGuides();
   }
 
   toggleMeasureMode() {
@@ -5382,6 +5464,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     if (this.isMagneticSnap()) {
       targetPos = this.applyMagneticSnapToPosition(sel, targetPos, axis);
+      const legSnap = this.applyTableLegSnap(sel, targetPos);
+      if (legSnap.isSnapped) {
+        targetPos = legSnap.pos;
+      }
     }
 
     const updates: Partial<Part> = {};
@@ -6002,6 +6088,186 @@ export class Furniture3dViewerComponent implements OnDestroy {
     });
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(300, 57, 1);
+    return sprite;
+  }
+
+  // --- SMART MAGNETIC SNAP & SUPPORT OVER TABLE LEGS ---
+
+  private applyTableLegSnap(
+    part: Part,
+    proposedPos: { x: number; y: number; z: number }
+  ): { pos: { x: number; y: number; z: number }; isSnapped: boolean; snappedLeg: ApplianceItem | null; legTopY: number } {
+    const defaultRes = { pos: proposedPos, isSnapped: false, snappedLeg: null, legTopY: 0 };
+    if (!this.isMagneticSnap()) return defaultRes;
+
+    const legs = this.appliances().filter(a => a.type === 'table_leg' || a.type === 'table_legs_set');
+    if (legs.length === 0) return defaultRes;
+
+    const movingBounds = this.getPartBounds(part, proposedPos);
+    const movingHalfH = movingBounds.sy / 2;
+    const proposedMinY = proposedPos.y - movingHalfH;
+
+    for (const leg of legs) {
+      const legBaseY = leg.position.y ?? 0;
+      const legHeight = leg.height || 720;
+      const legTopY = legBaseY + legHeight;
+
+      // Footprint in horizontal plane (X, Z) with catchment margin
+      const rot = ((leg.rotation || 0) % 360 + 360) % 360;
+      const isRot90 = rot === 90 || rot === 270;
+      const legDimX = isRot90 ? (leg.depth || 600) : (leg.width || 600);
+      const legDimZ = isRot90 ? (leg.width || 600) : (leg.depth || 600);
+      const halfW = legDimX / 2;
+      const halfD = legDimZ / 2;
+      const legMinX = (leg.position.x ?? 0) - halfW;
+      const legMaxX = (leg.position.x ?? 0) + halfW;
+      const legMinZ = (leg.position.z ?? 0) - halfD;
+      const legMaxZ = (leg.position.z ?? 0) + halfD;
+
+      // Check horizontal overlap with catchment margin (80 mm)
+      const catchment = 80;
+      const overlapX = movingBounds.minX <= legMaxX + catchment && movingBounds.maxX >= legMinX - catchment;
+      const overlapZ = movingBounds.minZ <= legMaxZ + catchment && movingBounds.maxZ >= legMinZ - catchment;
+
+      if (!overlapX || !overlapZ) continue;
+
+      // Distance from the bottom of the piece to the top face of the leg
+      const distFromTop = proposedMinY - legTopY;
+
+      // Proximity magnet: within 80mm above top face, OR downward drag attempting to penetrate below
+      // Enforce: locks to leg top face and avoids sinking below
+      const isApproachingAbove = distFromTop >= 0 && distFromTop <= 80;
+      const isAttemptingToSink = distFromTop < 0 && distFromTop >= -220;
+
+      if (isApproachingAbove || isAttemptingToSink) {
+        const snappedY = legTopY + movingHalfH;
+        let snappedX = proposedPos.x;
+        let snappedZ = proposedPos.z;
+
+        // Auto-centering snap when piece center aligns near leg center (+/- 35mm)
+        if (Math.abs(proposedPos.x - leg.position.x) <= 35) {
+          snappedX = leg.position.x;
+        }
+        if (Math.abs(proposedPos.z - leg.position.z) <= 35) {
+          snappedZ = leg.position.z;
+        }
+
+        return {
+          pos: { x: snappedX, y: snappedY, z: snappedZ },
+          isSnapped: true,
+          snappedLeg: leg,
+          legTopY
+        };
+      }
+    }
+
+    return defaultRes;
+  }
+
+  private clearLegSnapGuides() {
+    while (this.legSnapGuideGroup.children.length > 0) {
+      const obj = this.legSnapGuideGroup.children[0];
+      if (obj instanceof THREE.Mesh) {
+        if (obj.geometry) obj.geometry.dispose();
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach(m => m.dispose());
+        } else if (obj.material) {
+          obj.material.dispose();
+        }
+      } else if (obj instanceof THREE.LineSegments) {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material instanceof THREE.Material) obj.material.dispose();
+      } else if (obj instanceof THREE.Sprite) {
+        if (obj.material.map) obj.material.map.dispose();
+        if (obj.material) obj.material.dispose();
+      }
+      this.legSnapGuideGroup.remove(obj);
+    }
+  }
+
+  private renderLegSnapGuides(leg: ApplianceItem, part: Part, legTopY: number, targetPos: { x: number; y: number; z: number }) {
+    this.clearLegSnapGuides();
+
+    const partBounds = this.getPartBounds(part, targetPos);
+    const rot = ((leg.rotation || 0) % 360 + 360) % 360;
+    const isRot90 = rot === 90 || rot === 270;
+    const legDimX = isRot90 ? (leg.depth || 600) : (leg.width || 600);
+    const legDimZ = isRot90 ? (leg.width || 600) : (leg.depth || 600);
+
+    // Calculate contact rectangle
+    const minX = Math.max(partBounds.minX, leg.position.x - legDimX / 2);
+    const maxX = Math.min(partBounds.maxX, leg.position.x + legDimX / 2);
+    const minZ = Math.max(partBounds.minZ, leg.position.z - legDimZ / 2);
+    const maxZ = Math.min(partBounds.maxZ, leg.position.z + legDimZ / 2);
+
+    const contactW = Math.max(80, maxX - minX);
+    const contactD = Math.max(80, maxZ - minZ);
+    const centerX = (minX + maxX) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+
+    // 1. Translucent glowing wash at the support contact plane
+    const washGeo = new THREE.PlaneGeometry(contactW, contactD);
+    const washMat = new THREE.MeshBasicMaterial({
+      color: 0x10b981,
+      transparent: true,
+      opacity: 0.28,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    const washMesh = new THREE.Mesh(washGeo, washMat);
+    washMesh.rotation.x = -Math.PI / 2;
+    washMesh.position.set(centerX, legTopY + 0.6, centerZ);
+    this.legSnapGuideGroup.add(washMesh);
+
+    // 2. High-visibility emerald laser boundary line
+    const boxGeo = new THREE.BoxGeometry(contactW, 3, contactD);
+    const edgeLinesGeo = new THREE.EdgesGeometry(boxGeo);
+    const laserMat = new THREE.LineBasicMaterial({
+      color: 0x34d399,
+      linewidth: 3,
+      depthTest: false
+    });
+    const perimeterLines = new THREE.LineSegments(edgeLinesGeo, laserMat);
+    perimeterLines.position.set(centerX, legTopY + 0.8, centerZ);
+    this.legSnapGuideGroup.add(perimeterLines);
+
+    // 3. Technical floating 3D badge with elevation and zero clearance
+    const badgeText = `🧲 Apoyo en Patas de Mesa · Cota Superior (${legTopY} mm)`;
+    const badgeSprite = this.createLegSnapBadge(badgeText);
+    badgeSprite.position.set(centerX, Math.max(legTopY + 80, partBounds.maxY + 60), centerZ);
+    this.legSnapGuideGroup.add(badgeSprite);
+  }
+
+  private createLegSnapBadge(text: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    canvas.width = 460;
+    canvas.height = 76;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(6, 78, 59, 0.95)';
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#6ee7b7';
+      ctx.font = 'bold 21px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(340, 56, 1);
     return sprite;
   }
 

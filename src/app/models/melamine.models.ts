@@ -651,12 +651,18 @@ export type ApplianceType =
   | 'cooktop' 
   | 'hood' 
   | 'sink' 
-  | 'microwave';
+  | 'microwave'
+  | 'coffee_maker'
+  | 'table_leg'
+  | 'table_legs_set';
 
 export type ApplianceFinish = 
   | 'stainless_steel' 
   | 'black_matte' 
-  | 'white_gloss';
+  | 'white_gloss'
+  | 'gold_brass'
+  | 'natural_wood'
+  | 'retro_red';
 
 export type ApplianceMountType = 
   | 'floor' 
@@ -692,7 +698,7 @@ export interface AppliancePreset {
   id: string;
   type: ApplianceType;
   name: string;
-  category: 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave';
+  category: 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs';
   categoryLabel: string;
   brand: string;
   modelCode: string;
@@ -718,6 +724,9 @@ export const APPLIANCE_FINISH_OPTIONS: { id: ApplianceFinish; label: string; col
   { id: 'stainless_steel', label: 'Acero Inox Cepillado', color: '#c8cbd0', metallic: 0.85, roughness: 0.28 },
   { id: 'black_matte', label: 'Negro Mate Premium', color: '#1e2022', metallic: 0.20, roughness: 0.55 },
   { id: 'white_gloss', label: 'Blanco Cristal Brillante', color: '#f5f6f8', metallic: 0.05, roughness: 0.15 },
+  { id: 'gold_brass', label: 'Latón Dorado Cepillado', color: '#d4af37', metallic: 0.88, roughness: 0.25 },
+  { id: 'natural_wood', label: 'Madera Roble / Haya', color: '#c19a6b', metallic: 0.05, roughness: 0.70 },
+  { id: 'retro_red', label: 'Rojo Carmesí Barista', color: '#991b1b', metallic: 0.35, roughness: 0.30 },
 ];
 
 export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
@@ -1115,5 +1124,249 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     icon: 'microwave',
     description: 'Microondas portátil compacto para instalar sobre encimera o en nicho abierto de alacena.',
     standardWidths: [485, 520]
+  },
+
+  // 7. CAFETERAS ESPRESSO DE COCINA
+  {
+    id: 'preset_espresso_barista_pro',
+    type: 'coffee_maker',
+    name: 'Cafetera Espresso Barista Pro 38cm',
+    category: 'coffee',
+    categoryLabel: 'Cafeteras',
+    brand: 'Breville / DeLonghi',
+    modelCode: 'BES878-SS',
+    defaultWidth: 380,
+    defaultDepth: 360,
+    defaultHeight: 410,
+    minWidth: 300,
+    maxWidth: 460,
+    minDepth: 300,
+    maxDepth: 460,
+    minHeight: 320,
+    maxHeight: 480,
+    defaultMountType: 'countertop',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 2850000,
+    icon: 'coffee',
+    description: 'Cafetera espresso italiana sobre encimera con doble salida de café, portafiltro profesional, manómetro analógico, lanceta de vapor inox y bandeja calientatazas superior.',
+    standardWidths: [380]
+  },
+  {
+    id: 'preset_espresso_compact',
+    type: 'coffee_maker',
+    name: 'Cafetera Espresso Compacta 26cm',
+    category: 'coffee',
+    categoryLabel: 'Cafeteras',
+    brand: 'Smeg / Oster',
+    modelCode: 'EC-685-BK',
+    defaultWidth: 260,
+    defaultDepth: 330,
+    defaultHeight: 330,
+    minWidth: 220,
+    maxWidth: 320,
+    minDepth: 280,
+    maxDepth: 380,
+    minHeight: 280,
+    maxHeight: 380,
+    defaultMountType: 'countertop',
+    defaultFinish: 'black_matte',
+    defaultPrice: 1250000,
+    icon: 'coffee',
+    description: 'Cafetera espresso slim para mesada de cocina con vaporizador de leche, panel frontal con pulsadores LED y bandeja de goteo en inox.',
+    standardWidths: [260]
+  },
+  {
+    id: 'preset_espresso_retro_red',
+    type: 'coffee_maker',
+    name: 'Cafetera Espresso Vintage Retro 32cm',
+    category: 'coffee',
+    categoryLabel: 'Cafeteras',
+    brand: 'Ariete / SMEG',
+    modelCode: 'VNT-1389-RD',
+    defaultWidth: 320,
+    defaultDepth: 340,
+    defaultHeight: 360,
+    minWidth: 260,
+    maxWidth: 380,
+    minDepth: 280,
+    maxDepth: 400,
+    minHeight: 300,
+    maxHeight: 420,
+    defaultMountType: 'countertop',
+    defaultFinish: 'retro_red',
+    defaultPrice: 1980000,
+    icon: 'coffee',
+    description: 'Cafetera espresso estilo retro de sobremesa con reloj termómetro central, detalles cromados y chasis carmesí de colección.',
+    standardWidths: [320]
+  },
+
+  // 8. ACCESORIOS Y PATAS DE MESA Y MOBILIARIO
+  {
+    id: 'preset_legs_hairpin_set',
+    type: 'table_legs_set',
+    name: 'Juego de 4 Patas Horquilla (Hairpin) 72cm',
+    category: 'legs',
+    categoryLabel: 'Patas de Mesa',
+    brand: 'MelamiPro Hardware',
+    modelCode: 'HP-720-TRI',
+    defaultWidth: 800,
+    defaultDepth: 1200,
+    defaultHeight: 720,
+    minWidth: 400,
+    maxWidth: 2400,
+    minDepth: 400,
+    maxDepth: 1400,
+    minHeight: 350,
+    maxHeight: 950,
+    defaultMountType: 'floor',
+    defaultFinish: 'black_matte',
+    defaultPrice: 180000,
+    icon: 'table_bar',
+    description: 'Juego de 4 patas metálicas estilo horquilla (Hairpin) de triple varilla maciza con inclinación estética y pletina triangular de anclaje para mesas de comedor y escritorios.',
+    standardWidths: [800, 900, 1000]
+  },
+  {
+    id: 'preset_legs_cylindrical_inox_set',
+    type: 'table_legs_set',
+    name: 'Juego de 4 Patas Cilíndricas Inox 72cm Regulables',
+    category: 'legs',
+    categoryLabel: 'Patas de Mesa',
+    brand: 'MelamiPro Hardware',
+    modelCode: 'CYL-60-720-SS',
+    defaultWidth: 800,
+    defaultDepth: 1200,
+    defaultHeight: 720,
+    minWidth: 400,
+    maxWidth: 2400,
+    minDepth: 400,
+    maxDepth: 1400,
+    minHeight: 350,
+    maxHeight: 950,
+    defaultMountType: 'floor',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 140000,
+    icon: 'table_bar',
+    description: 'Juego de 4 patas tubulares de acero inoxidable Ø60mm con base roscada niveladora regulable (+25mm) y pletina de montaje reforzada.',
+    standardWidths: [800, 900, 1000]
+  },
+  {
+    id: 'preset_legs_scandinavian_wood_set',
+    type: 'table_legs_set',
+    name: 'Juego de 4 Patas Cónicas Madera Nórdica 72cm',
+    category: 'legs',
+    categoryLabel: 'Patas de Mesa',
+    brand: 'MelamiPro Hardware',
+    modelCode: 'WD-CONIC-720',
+    defaultWidth: 800,
+    defaultDepth: 1200,
+    defaultHeight: 720,
+    minWidth: 400,
+    maxWidth: 2400,
+    minDepth: 400,
+    maxDepth: 1400,
+    minHeight: 350,
+    maxHeight: 950,
+    defaultMountType: 'floor',
+    defaultFinish: 'natural_wood',
+    defaultPrice: 165000,
+    icon: 'table_bar',
+    description: 'Juego de 4 patas cónicas de madera maciza estilo nórdico escandinavo con ángulo de inclinación 10°, placa metálica de fijación y regatón dorado latón.',
+    standardWidths: [800, 900, 1000]
+  },
+  {
+    id: 'preset_legs_hairpin_single',
+    type: 'table_leg',
+    name: 'Pata Horquilla Industrial Hairpin 72cm (Individual)',
+    category: 'legs',
+    categoryLabel: 'Patas de Mesa',
+    brand: 'MelamiPro Hardware',
+    modelCode: 'HP-720-IND',
+    defaultWidth: 120,
+    defaultDepth: 120,
+    defaultHeight: 720,
+    minWidth: 80,
+    maxWidth: 200,
+    minDepth: 80,
+    maxDepth: 200,
+    minHeight: 300,
+    maxHeight: 900,
+    defaultMountType: 'floor',
+    defaultFinish: 'black_matte',
+    defaultPrice: 45000,
+    icon: 'table_bar',
+    description: 'Pata individual estilo horquilla hairpin de varilla de acero electroestático para ubicar libremente en esquinas o centros.',
+    standardWidths: [120]
+  },
+  {
+    id: 'preset_legs_cylindrical_single',
+    type: 'table_leg',
+    name: 'Pata Cilíndrica Inox Ø60mm Regulable (Individual)',
+    category: 'legs',
+    categoryLabel: 'Patas de Mesa',
+    brand: 'MelamiPro Hardware',
+    modelCode: 'CYL-60-IND',
+    defaultWidth: 100,
+    defaultDepth: 100,
+    defaultHeight: 720,
+    minWidth: 60,
+    maxWidth: 150,
+    minDepth: 60,
+    maxDepth: 150,
+    minHeight: 100,
+    maxHeight: 900,
+    defaultMountType: 'floor',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 35000,
+    icon: 'table_bar',
+    description: 'Pata individual cilíndrica de acero inoxidable con nivelador roscado para soporte perimetral o patas de refuerzo central.',
+    standardWidths: [100]
+  },
+  {
+    id: 'preset_legs_scandinavian_single',
+    type: 'table_leg',
+    name: 'Pata Cónica Madera Nórdica con Regatón Dorado (Individual)',
+    category: 'legs',
+    categoryLabel: 'Patas de Mesa',
+    brand: 'MelamiPro Hardware',
+    modelCode: 'WD-CONIC-IND',
+    defaultWidth: 90,
+    defaultDepth: 90,
+    defaultHeight: 720,
+    minWidth: 60,
+    maxWidth: 140,
+    minDepth: 60,
+    maxDepth: 140,
+    minHeight: 200,
+    maxHeight: 900,
+    defaultMountType: 'floor',
+    defaultFinish: 'natural_wood',
+    defaultPrice: 42000,
+    icon: 'table_bar',
+    description: 'Pata individual cónica de madera torneada con casquillo dorado para muebles escandinavos, mesas auxiliares o cómodas.',
+    standardWidths: [90]
+  },
+  {
+    id: 'preset_legs_coffee_hairpin_set',
+    type: 'table_legs_set',
+    name: 'Juego de 4 Patas Hairpin Mesa de Centro 40cm',
+    category: 'legs',
+    categoryLabel: 'Patas de Mesa',
+    brand: 'MelamiPro Hardware',
+    modelCode: 'HP-400-SET',
+    defaultWidth: 600,
+    defaultDepth: 900,
+    defaultHeight: 400,
+    minWidth: 300,
+    maxWidth: 1600,
+    minDepth: 300,
+    maxDepth: 1200,
+    minHeight: 250,
+    maxHeight: 500,
+    defaultMountType: 'floor',
+    defaultFinish: 'black_matte',
+    defaultPrice: 120000,
+    icon: 'table_bar',
+    description: 'Juego de 4 patas horquilla bajas de 40cm ideales para mesas ratonas de living, mesas de centro y muebles bajos de TV.',
+    standardWidths: [600]
   }
 ];
