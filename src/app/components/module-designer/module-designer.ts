@@ -1545,7 +1545,14 @@ export class ModuleDesignerComponent {
       this.showToast('Selecciona al menos 2 piezas para agrupar (usa Shift+Clic en 3D o en lista)');
       return;
     }
-    const uniqueName = this.getNextUniqueGroupName('Cajón');
+    const selParts = this.currentParts().filter(p => this.selectedPartIds().includes(p.id));
+    const isDrawerLike = selParts.some(p => 
+      p.name.toUpperCase().includes('CAJ') || 
+      p.name.toUpperCase().includes('GAVET') || 
+      p.componentRole?.includes('drawer')
+    );
+    const baseDefault = isDrawerLike ? 'Cajón' : 'Conjunto';
+    const uniqueName = this.getNextUniqueGroupName(baseDefault);
     this.newGroupNameInput.set(uniqueName);
     this.showGroupNamingModal.set(true);
   }
@@ -1555,15 +1562,26 @@ export class ModuleDesignerComponent {
   }
 
   confirmCreateGroup() {
-    const name = this.newGroupNameInput().trim() || this.getNextUniqueGroupName('Cajón');
     const selIds = this.selectedPartIds();
     if (selIds.length < 2) return;
+
+    const selParts = this.currentParts().filter(p => selIds.includes(p.id));
+    const isDrawerLike = selParts.some(p => 
+      p.name.toUpperCase().includes('CAJ') || 
+      p.name.toUpperCase().includes('GAVET') || 
+      p.componentRole?.includes('drawer')
+    );
+    const baseDefault = isDrawerLike ? 'Cajón' : 'Conjunto';
+    const name = this.newGroupNameInput().trim() || this.getNextUniqueGroupName(baseDefault);
+
     if (this.isGroupNameTaken(name)) {
-      const suggestion = this.getNextUniqueGroupName('Cajón');
-      this.showToast(`⚠️ Ya existe un grupo o cajón llamado "${name}". Sugerencia: ${suggestion}`);
+      const suggestion = this.getNextUniqueGroupName(baseDefault);
+      this.showToast(`⚠️ Ya existe un grupo llamado "${name}". Sugerencia: ${suggestion}`);
       return;
     }
-    const grp = this.projectService.createGroup(name, selIds, 'drawer');
+
+    const groupType: 'drawer' | 'assembly' = isDrawerLike ? 'drawer' : 'assembly';
+    const grp = this.projectService.createGroup(name, selIds, groupType);
     this.showGroupNamingModal.set(false);
     this.openGroupCardIds.update(s => new Set(s).add(grp.id));
     this.showToast(`🔗 ${grp.name} agrupado (${selIds.length} piezas)`);

@@ -750,7 +750,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       let sy = t;
       let sz = W;
 
-      const isDrawerPart = !!part.groupId || 
+      const isDrawerGroup = !!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer');
+      const isDrawerPart = isDrawerGroup || 
         part.componentRole === 'drawer_front' || 
         part.componentRole === 'drawer_box' || 
         part.componentRole === 'drawer_lateral' || 
@@ -849,7 +850,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       );
 
       // isDrawer: includes both the front and internal parts or any grouped drawer piece
-      const isPartInDrawerGroup = !!part.groupId;
+      const isPartInDrawerGroup = isDrawerGroup;
       const isDrawer = !isDoor && (
         isPartInDrawerGroup ||
         isDrawerFront || (
@@ -1105,7 +1106,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     } else if (orient === 'vertical_yz') {
       const isDrawerLateral = part.componentRole === 'drawer_box' ||
         part.componentRole === 'drawer_lateral' ||
-        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))));
       if (isDrawerLateral && (part.length || 0) > (part.width || 0)) {
         // En lateral de cajón: Length es profundidad en eje Z, Width es altura en eje Y
         const handleLPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0x2563eb, 'length', 1);
@@ -1605,7 +1606,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         if (part.orientation === 'vertical_yz') {
           const isDrawerLateral = part.componentRole === 'drawer_box' ||
             part.componentRole === 'drawer_lateral' ||
-            (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+            (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))));
           if (isDrawerLateral && L > W) {
             sx = t; sy = W; sz = L;
           } else {
@@ -4934,7 +4935,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (orientation === 'vertical_yz') {
       const isDrawerLateral = part.componentRole === 'drawer_box' ||
         part.componentRole === 'drawer_lateral' ||
-        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))));
       sy = (isDrawerLateral && L > part.width) ? part.width : L;
     } else if (orientation === 'vertical_xy') {
       sy = part.width;
@@ -5547,7 +5548,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (orient === 'vertical_yz') {
       const isDrawerLateral = part.componentRole === 'drawer_box' ||
         part.componentRole === 'drawer_lateral' ||
-        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))));
       if (isDrawerLateral && L > W) {
         sx = t;
         sy = W;
