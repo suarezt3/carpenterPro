@@ -128,6 +128,11 @@ export interface Part {
   orientation?: PartOrientation; // horizontal o vertical
   componentRole?: ComponentRole;
   hardwareConfig?: PartHardwareConfig;
+  // Geometría paramétrica CAD (forma rectangular estándar, circular o dibujo libre)
+  shapeType?: 'rectangle' | 'circle' | 'freehand';
+  radius?: number; // mm (para piezas circulares)
+  diameter?: number; // mm (para piezas circulares)
+  contourPoints?: { x: number; y: number }[]; // Puntos del polígono 2D en mm para piezas de forma libre
 }
 
 export type FurnitureModuleType =

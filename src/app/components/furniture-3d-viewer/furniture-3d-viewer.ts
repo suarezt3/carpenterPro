@@ -178,7 +178,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly hiddenHardwarePartIds = signal<Set<string>>(new Set<string>());
 
   // CAD Palette & Push/Pull State
-  readonly activeTool = signal<'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect'>('select');
+  readonly activeTool = signal<'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect' | 'draw_circle' | 'draw_freehand'>('select');
   readonly pushPullDelta = signal<{ axisName: string; initialVal: number; currentVal: number; delta: number } | null>(null);
   readonly hoveredFaceInfo = signal<{ partName: string; faceLabel: string; dimLabel: string } | null>(null);
   readonly showViewsDropdown = signal<boolean>(false);
@@ -204,6 +204,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private rectStartPoint: THREE.Vector3 | null = null;
   private rectCurrentPoint: THREE.Vector3 | null = null;
   private rectPreviewGroup = new THREE.Group();
+
+  // Draw 3D Circle Tool State
+  readonly isDrawingCircle = signal<boolean>(false);
+  readonly circleDrawDims = signal<{ radius: number; diameter: number } | null>(null);
+  private circleCenterPoint: THREE.Vector3 | null = null;
+  private circleCurrentPoint: THREE.Vector3 | null = null;
+  private circlePreviewGroup = new THREE.Group();
+
+  // Draw Freehand (Mano Alzada) Tool State
+  readonly isDrawingFreehand = signal<boolean>(false);
+  readonly freehandStats = signal<{ pointCount: number; perimeter: number } | null>(null);
+  private freehandPlaneY = 0;
+  private freehandPoints: THREE.Vector3[] = [];
+  private freehandPreviewGroup = new THREE.Group();
 
   // Collisions & Joinery Signals
   readonly detectedCollisions = signal<CollisionRecord[]>([]);
@@ -530,6 +544,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.drillGroup);
     this.scene.add(this.pushPullHighlightGroup);
     this.scene.add(this.rectPreviewGroup);
+    this.scene.add(this.circlePreviewGroup);
+    this.scene.add(this.freehandPreviewGroup);
     this.scene.add(this.roomGroup);
     this.scene.add(this.wallSnapGuideGroup);
     this.scene.add(this.legSnapGuideGroup);
@@ -801,8 +817,31 @@ export class Furniture3dViewerComponent implements OnDestroy {
         selectedDataList.push({ part, px, py, pz, sx, sy, sz });
       }
 
-      // Geometry with bevel or box
-      const geometry = new THREE.BoxGeometry(sx, sy, sz);
+      // Geometry according to shapeType: circle, freehand or standard box
+      let geometry: THREE.BufferGeometry;
+      if (part.shapeType === 'circle') {
+        const radius = part.radius || Math.max(10, (part.length || 600) / 2);
+        // Cylinder oriented with vertical axis along Y, height equals thickness (sy)
+        geometry = new THREE.CylinderGeometry(radius, radius, sy, 48);
+      } else if (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) {
+        const shape = new THREE.Shape();
+        const pts = part.contourPoints;
+        shape.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          shape.lineTo(pts[i].x, pts[i].y);
+        }
+        shape.closePath();
+        // Extrude along Z in local shape space, then rotate to lie in horizontal XZ plane
+        const extrudeGeom = new THREE.ExtrudeGeometry(shape, {
+          depth: sy,
+          bevelEnabled: false
+        });
+        extrudeGeom.rotateX(Math.PI / 2);
+        extrudeGeom.center();
+        geometry = extrudeGeom;
+      } else {
+        geometry = new THREE.BoxGeometry(sx, sy, sz);
+      }
       const material = this.createPieceMaterial(part, isSelected, mats, xRay, isColliding);
 
       const mesh = new THREE.Mesh(geometry, material);
@@ -3077,6 +3116,55 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
+    // 0.21. Draw 3D Circle Tool
+    if (this.activeTool() === 'draw_circle') {
+      const allFloorAndParts = [
+        ...(this.floorMesh ? [this.floorMesh] : []),
+        ...this.pieceObjects.map(p => p.mesh)
+      ];
+      const floorIntersects = this.raycaster.intersectObjects(allFloorAndParts, false);
+      if (floorIntersects.length > 0) {
+        const pt = floorIntersects[0].point;
+        const snap = 10;
+        this.circleCenterPoint = new THREE.Vector3(
+          Math.round(pt.x / snap) * snap,
+          Math.round(pt.y),
+          Math.round(pt.z / snap) * snap
+        );
+        this.circleCurrentPoint = this.circleCenterPoint.clone();
+        this.isDrawingCircle.set(true);
+        this.controls.enabled = false;
+        canvas.style.cursor = 'crosshair';
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
+    // 0.22. Draw Freehand (Dibujo Libre) Tool
+    if (this.activeTool() === 'draw_freehand') {
+      const allFloorAndParts = [
+        ...(this.floorMesh ? [this.floorMesh] : []),
+        ...this.pieceObjects.map(p => p.mesh)
+      ];
+      const floorIntersects = this.raycaster.intersectObjects(allFloorAndParts, false);
+      if (floorIntersects.length > 0) {
+        const pt = floorIntersects[0].point;
+        this.freehandPlaneY = Math.round(pt.y);
+        this.freehandPoints = [
+          new THREE.Vector3(Math.round(pt.x), this.freehandPlaneY, Math.round(pt.z))
+        ];
+        this.isDrawingFreehand.set(true);
+        this.controls.enabled = false;
+        this.freehandStats.set({ pointCount: 1, perimeter: 0 });
+        this.renderFreehandPreview();
+        canvas.style.cursor = 'crosshair';
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
     // 0.3. Rotate 90° Tool
     if (this.activeTool() === 'rotate_90') {
       const intersects = this.raycaster.intersectObjects(
@@ -3846,6 +3934,72 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return;
     }
 
+    // 0.11. Draw 3D Circle Live Preview
+    if (this.isDrawingCircle() && this.circleCenterPoint) {
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      const drawPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.circleCenterPoint.y);
+      const intersectPt = new THREE.Vector3();
+      if (this.raycaster.ray.intersectPlane(drawPlane, intersectPt)) {
+        const snap = 10;
+        this.circleCurrentPoint = new THREE.Vector3(
+          Math.round(intersectPt.x / snap) * snap,
+          this.circleCenterPoint.y,
+          Math.round(intersectPt.z / snap) * snap
+        );
+
+        const dx = this.circleCurrentPoint.x - this.circleCenterPoint.x;
+        const dz = this.circleCurrentPoint.z - this.circleCenterPoint.z;
+        const radius = Math.round(Math.sqrt(dx * dx + dz * dz));
+        const diameter = radius * 2;
+        this.circleDrawDims.set({ radius, diameter });
+        this.renderCirclePreview();
+      }
+      return;
+    }
+
+    // 0.12. Draw Freehand (Dibujo Libre) Live Preview
+    if (this.isDrawingFreehand() && this.freehandPoints.length > 0) {
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      const drawPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.freehandPlaneY);
+      const intersectPt = new THREE.Vector3();
+      if (this.raycaster.ray.intersectPlane(drawPlane, intersectPt)) {
+        const lastPt = this.freehandPoints[this.freehandPoints.length - 1];
+        const distFromLast = Math.hypot(intersectPt.x - lastPt.x, intersectPt.z - lastPt.z);
+        // Only append if moved at least 12mm to maintain smooth sampling
+        if (distFromLast >= 12) {
+          const newPt = new THREE.Vector3(
+            Math.round(intersectPt.x),
+            this.freehandPlaneY,
+            Math.round(intersectPt.z)
+          );
+          this.freehandPoints.push(newPt);
+
+          // Calculate current perimeter
+          let perim = 0;
+          for (let i = 1; i < this.freehandPoints.length; i++) {
+            perim += Math.hypot(
+              this.freehandPoints[i].x - this.freehandPoints[i - 1].x,
+              this.freehandPoints[i].z - this.freehandPoints[i - 1].z
+            );
+          }
+          this.freehandStats.set({
+            pointCount: this.freehandPoints.length,
+            perimeter: Math.round(perim)
+          });
+          this.renderFreehandPreview();
+        }
+      }
+      return;
+    }
+
     // 0. Push/Pull Active Dragging
     if (this.isPushPulling && this.pushPullData) {
       const rect = canvas.getBoundingClientRect();
@@ -4558,6 +4712,100 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return;
     }
 
+    // Pointer Up: Complete Draw 3D Circle
+    if (this.isDrawingCircle() && this.circleCenterPoint && this.circleCurrentPoint) {
+      const dx = this.circleCurrentPoint.x - this.circleCenterPoint.x;
+      const dz = this.circleCurrentPoint.z - this.circleCenterPoint.z;
+      const R = Math.round(Math.sqrt(dx * dx + dz * dz));
+
+      if (R >= 30) {
+        const diameter = R * 2;
+        const posX = Math.round(this.circleCenterPoint.x);
+        const posZ = Math.round(this.circleCenterPoint.z);
+        const posY = this.circleCenterPoint.y + 7.5;
+
+        this.partCreated.emit({
+          name: `Pieza Circular ${this.parts().length + 1} (Ø${diameter})`,
+          length: diameter,
+          width: diameter,
+          thickness: 15,
+          posX,
+          posY,
+          posZ,
+          orientation: 'horizontal',
+          shapeType: 'circle',
+          radius: R,
+          diameter
+        });
+
+        // Switch to Push/Pull for immediate height extrude
+        this.setActiveTool('push_pull');
+      }
+
+      this.isDrawingCircle.set(false);
+      this.circleCenterPoint = null;
+      this.circleCurrentPoint = null;
+      this.circleDrawDims.set(null);
+      this.clearCirclePreview();
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+      return;
+    }
+
+    // Pointer Up: Complete Draw Freehand (Dibujo Libre)
+    if (this.isDrawingFreehand() && this.freehandPoints.length >= 3) {
+      const pts2D = this.freehandPoints.map(p => ({ x: p.x, y: p.z }));
+      const smoothed = this.smoothPolygonPoints(pts2D);
+
+      if (smoothed.length >= 3) {
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        for (const p of smoothed) {
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y < minZ) minZ = p.y;
+          if (p.y > maxZ) maxZ = p.y;
+        }
+
+        const length = Math.max(60, Math.round(maxX - minX));
+        const width = Math.max(60, Math.round(maxZ - minZ));
+        const centerX = Math.round((minX + maxX) / 2);
+        const centerZ = Math.round((minZ + maxZ) / 2);
+        const posY = this.freehandPlaneY + 7.5;
+
+        // Localized contour points centered at (0, 0)
+        const localContour = smoothed.map(p => ({
+          x: Math.round((p.x - centerX) * 10) / 10,
+          y: Math.round((p.y - centerZ) * 10) / 10
+        }));
+
+        this.partCreated.emit({
+          name: `Pieza Libre ${this.parts().length + 1}`,
+          length,
+          width,
+          thickness: 15,
+          posX: centerX,
+          posY,
+          posZ: centerZ,
+          orientation: 'horizontal',
+          shapeType: 'freehand',
+          contourPoints: localContour
+        });
+
+        // Switch to Push/Pull for immediate height extrude
+        this.setActiveTool('push_pull');
+      }
+
+      this.isDrawingFreehand.set(false);
+      this.freehandPoints = [];
+      this.freehandStats.set(null);
+      this.clearFreehandPreview();
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+      return;
+    }
+
     if (this.isMeasuringDrag) {
       this.isMeasuringDrag = false;
       this.controls.enabled = true;
@@ -4663,7 +4911,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   // --- CAD TOOLS & PUSH/PULL FACE RAYCASTING ---
 
-  setActiveTool(tool: 'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect') {
+  setActiveTool(tool: 'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect' | 'draw_circle' | 'draw_freehand') {
     this.activeTool.set(tool);
     if (tool === 'measure') {
       this.isMeasureMode.set(true);
@@ -4678,6 +4926,19 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.rectCurrentPoint = null;
       this.rectDrawDims.set(null);
     }
+    if (tool !== 'draw_circle') {
+      this.clearCirclePreview();
+      this.isDrawingCircle.set(false);
+      this.circleCenterPoint = null;
+      this.circleCurrentPoint = null;
+      this.circleDrawDims.set(null);
+    }
+    if (tool !== 'draw_freehand') {
+      this.clearFreehandPreview();
+      this.isDrawingFreehand.set(false);
+      this.freehandPoints = [];
+      this.freehandStats.set(null);
+    }
     if (tool === 'rotate_90' && this.selectedPart()) {
       // If a part is already selected and user activates rotate, rotate it 90 deg immediately
       this.rotatePart90(this.selectedPart()!, 'y');
@@ -4686,7 +4947,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.hoveredFaceInfo.set(null);
     const canvas = this.canvasRef()?.nativeElement;
     if (canvas) {
-      canvas.style.cursor = tool === 'draw_rect' ? 'crosshair' : 'default';
+      canvas.style.cursor = (tool === 'draw_rect' || tool === 'draw_circle' || tool === 'draw_freehand') ? 'crosshair' : 'default';
     }
   }
 
@@ -4881,6 +5142,115 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const obj = this.rectPreviewGroup.children[0];
       this.rectPreviewGroup.remove(obj);
     }
+  }
+
+  // --- 3D CIRCLE PREVIEW METHODS ---
+
+  private renderCirclePreview() {
+    this.clearCirclePreview();
+    if (!this.circleCenterPoint || !this.circleCurrentPoint) return;
+
+    const dx = this.circleCurrentPoint.x - this.circleCenterPoint.x;
+    const dz = this.circleCurrentPoint.z - this.circleCenterPoint.z;
+    const radius = Math.max(20, Math.round(Math.sqrt(dx * dx + dz * dz)));
+    const thickness = 15;
+    const centerY = this.circleCenterPoint.y + thickness / 2;
+
+    const geom = new THREE.CylinderGeometry(radius, radius, thickness, 48);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x0284c7,
+      transparent: true,
+      opacity: 0.35,
+      depthTest: false
+    });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(this.circleCenterPoint.x, centerY, this.circleCenterPoint.z);
+
+    const edges = new THREE.EdgesGeometry(geom);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x0284c7, linewidth: 2, depthTest: false });
+    const wireframe = new THREE.LineSegments(edges, lineMat);
+    mesh.add(wireframe);
+
+    // Dynamic radius guide line from center to current point
+    const lineGeom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(dx, 0, dz)
+    ]);
+    const radiusLine = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: 0x0369a1, linewidth: 3, depthTest: false }));
+    mesh.add(radiusLine);
+
+    this.circlePreviewGroup.add(mesh);
+  }
+
+  private clearCirclePreview() {
+    while (this.circlePreviewGroup.children.length > 0) {
+      const obj = this.circlePreviewGroup.children[0];
+      this.circlePreviewGroup.remove(obj);
+    }
+  }
+
+  // --- 3D FREEHAND (DIBUJO LIBRE) PREVIEW METHODS ---
+
+  private renderFreehandPreview() {
+    this.clearFreehandPreview();
+    if (this.freehandPoints.length < 2) return;
+
+    const linePoints = this.freehandPoints.map(p => new THREE.Vector3(p.x, p.y + 2, p.z));
+    const lineGeom = new THREE.BufferGeometry().setFromPoints(linePoints);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x0284c7, linewidth: 3, depthTest: false });
+    const line = new THREE.Line(lineGeom, lineMat);
+    this.freehandPreviewGroup.add(line);
+
+    // Start point marker (dot)
+    const dotGeom = new THREE.SphereGeometry(6, 16, 16);
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0x10b981, depthTest: false });
+    const dotMesh = new THREE.Mesh(dotGeom, dotMat);
+    dotMesh.position.copy(linePoints[0]);
+    this.freehandPreviewGroup.add(dotMesh);
+  }
+
+  private clearFreehandPreview() {
+    while (this.freehandPreviewGroup.children.length > 0) {
+      const obj = this.freehandPreviewGroup.children[0];
+      this.freehandPreviewGroup.remove(obj);
+    }
+  }
+
+  // Chaikin-like polygon smoothing / decimation helper for freehand contours
+  private smoothPolygonPoints(rawPoints: { x: number; y: number }[]): { x: number; y: number }[] {
+    if (rawPoints.length < 4) return rawPoints;
+
+    // 1. Decimate points closer than 15mm to eliminate jitter
+    const minDistance = 15;
+    const filtered: { x: number; y: number }[] = [rawPoints[0]];
+    for (let i = 1; i < rawPoints.length; i++) {
+      const prev = filtered[filtered.length - 1];
+      const cur = rawPoints[i];
+      const dist = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+      if (dist >= minDistance) {
+        filtered.push(cur);
+      }
+    }
+
+    if (filtered.length < 4) return filtered;
+
+    // 2. Chaikin algorithm smoothing iteration
+    const smoothed: { x: number; y: number }[] = [];
+    const len = filtered.length;
+    for (let i = 0; i < len; i++) {
+      const p0 = filtered[i];
+      const p1 = filtered[(i + 1) % len];
+      smoothed.push({
+        x: Math.round((0.75 * p0.x + 0.25 * p1.x) * 10) / 10,
+        y: Math.round((0.75 * p0.y + 0.25 * p1.y) * 10) / 10
+      });
+      smoothed.push({
+        x: Math.round((0.25 * p0.x + 0.75 * p1.x) * 10) / 10,
+        y: Math.round((0.25 * p0.y + 0.75 * p1.y) * 10) / 10
+      });
+    }
+
+    return smoothed;
   }
 
   // --- RIGHT-CLICK CONTEXT MENU ACTIONS ---

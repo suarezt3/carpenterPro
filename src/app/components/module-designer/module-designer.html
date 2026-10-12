@@ -736,6 +736,58 @@
                 (input)="updateSelectedPart({ name: $any($event.target).value })"
                 class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-hidden focus:border-sky-500 focus:bg-white"
                 placeholder="Nombre de la pieza" />
+
+              <!-- Shape Badge & Parametric Diameter Controller if Circular -->
+              @if (sel.shapeType === 'circle') {
+                <div class="p-2.5 bg-sky-50/80 border border-sky-200 rounded-xl space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-sky-900 flex items-center gap-1">
+                      <span class="material-icons text-xs text-sky-600">radio_button_unchecked</span>
+                      Pieza Circular (Tapa Cilíndrica)
+                    </span>
+                    <span class="text-[10px] font-mono font-bold bg-sky-100 text-sky-800 px-2 py-0.5 rounded">
+                      Ø {{ sel.diameter || sel.length }} mm
+                    </span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span class="text-[10px] text-slate-500 font-medium">Diámetro (Ø mm):</span>
+                      <input 
+                        type="number"
+                        min="20"
+                        step="10"
+                        [value]="sel.diameter || sel.length"
+                        (input)="updateSelectedPart({ diameter: +$any($event.target).value, radius: Math.round(+$any($event.target).value / 2), length: +$any($event.target).value, width: +$any($event.target).value })"
+                        class="w-full mt-0.5 px-2 py-1 bg-white border border-sky-200 rounded-lg text-center font-bold text-slate-900 font-mono focus:outline-hidden focus:border-sky-500" />
+                    </div>
+                    <div>
+                      <span class="text-[10px] text-slate-500 font-medium">Radio (R mm):</span>
+                      <input 
+                        type="number"
+                        min="10"
+                        step="5"
+                        [value]="sel.radius || Math.round((sel.diameter || sel.length) / 2)"
+                        (input)="updateSelectedPart({ radius: +$any($event.target).value, diameter: (+$any($event.target).value) * 2, length: (+$any($event.target).value) * 2, width: (+$any($event.target).value) * 2 })"
+                        class="w-full mt-0.5 px-2 py-1 bg-white border border-sky-200 rounded-lg text-center font-bold text-slate-900 font-mono focus:outline-hidden focus:border-sky-500" />
+                    </div>
+                  </div>
+                </div>
+              } @else if (sel.shapeType === 'freehand') {
+                <div class="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-1">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-emerald-900 flex items-center gap-1">
+                      <span class="material-icons text-xs text-emerald-600">gesture</span>
+                      Geometría de Dibujo Libre
+                    </span>
+                    <span class="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                      {{ sel.contourPoints?.length || 0 }} vértices
+                    </span>
+                  </div>
+                  <p class="text-[10px] text-emerald-700 leading-tight">
+                    Polígono libre extruido paramétricamente a {{ sel.thickness }} mm con caja envolvente de corte de {{ sel.length }} × {{ sel.width }} mm.
+                  </p>
+                </div>
+              }
             </div>
 
             <!-- SECTION: LUZ LIBRE Y HUECOS ÚTILES -->

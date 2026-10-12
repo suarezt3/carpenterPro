@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para el imán inteligente bidireccional entre piezas sueltas y grupos, aumento del umbral de atracción a 25 mm, y resolución de prioridad direccional (arriba/abajo) entre la estructura superior y las patas inferiores.",
-  "updatedAt": "2026-10-12T14:59:02.411778507Z",
+  "summary": "Plan detallado de implementación para las dos nuevas herramientas CAD en el visor 3D: Herramienta Circular (cilíndrica / mesa redonda con cota de radio y diámetro en vivo) y Herramienta de Dibujo Libre a Mano Alzada (trazado continuo en plano horizontal con polígono cerrado suavizado y extrusión de espesor paramétrico). Incluye integración en la paleta lateral de herramientas, atajos de teclado, HUD de cotas en vivo, soporte en el modelo Part con geometría cilíndrica y extruida, e inspector de propiedades.",
+  "updatedAt": "2026-10-12T16:16:01.511756575Z",
   "requestFeedback": true,
   "userFacing": true
 }

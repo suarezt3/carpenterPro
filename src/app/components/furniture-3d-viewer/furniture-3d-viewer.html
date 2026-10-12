@@ -56,8 +56,28 @@
       (click)="setActiveTool('draw_rect')"
       [class]="activeTool() === 'draw_rect' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
       class="w-9 h-9 rounded-xl flex items-center justify-center transition"
-      title="Dibujar Rectángulo 3D (R): Dibuja un rectángulo en el suelo o sobre una cara para crear una pieza y luego usar Empujar/Tirar">
+      title="Dibujar Rectángulo 3D (R): Dibuja un rectángulo en el plano horizontal para crear una pieza rectangular">
       <span class="material-icons text-lg">crop_square</span>
+    </button>
+
+    <!-- 5.1. DRAW 3D CIRCLE TOOL -->
+    <button 
+      type="button"
+      (click)="setActiveTool('draw_circle')"
+      [class]="activeTool() === 'draw_circle' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Dibujar Círculo 3D (C): Arrastra desde el centro para definir el radio y crear una pieza o mesa redonda">
+      <span class="material-icons text-lg">radio_button_unchecked</span>
+    </button>
+
+    <!-- 5.2. DRAW FREEHAND (MANO ALZADA) TOOL -->
+    <button 
+      type="button"
+      (click)="setActiveTool('draw_freehand')"
+      [class]="activeTool() === 'draw_freehand' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      title="Dibujo Libre a Mano Alzada (F): Trazo continuo que se suaviza y extruye en un polígono tridimensional">
+      <span class="material-icons text-lg">gesture</span>
     </button>
 
     <!-- 6. MEASURE TAPE TOOL -->
@@ -977,6 +997,22 @@
 
         <button 
           type="button"
+          (click)="setActiveTool('draw_circle'); closeContextMenu()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          <span class="material-icons text-sm text-sky-500">radio_button_unchecked</span>
+          <span>Dibujar Círculo 3D (C)</span>
+        </button>
+
+        <button 
+          type="button"
+          (click)="setActiveTool('draw_freehand'); closeContextMenu()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          <span class="material-icons text-sm text-sky-500">gesture</span>
+          <span>Dibujo Libre a Mano Alzada (F)</span>
+        </button>
+
+        <button 
+          type="button"
           (click)="setActiveTool('push_pull'); closeContextMenu()"
           class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
           <span class="material-icons text-sm text-amber-500">open_in_full</span>
@@ -1012,6 +1048,12 @@
       } @else if (activeTool() === 'draw_rect') {
         <span class="material-icons text-sm text-sky-500">crop_square</span>
         <span><strong>Dibujar Rectángulo 3D (R):</strong> Haz clic y arrastra en el suelo para definir el largo y ancho de una nueva pieza.</span>
+      } @else if (activeTool() === 'draw_circle') {
+        <span class="material-icons text-sm text-sky-500">radio_button_unchecked</span>
+        <span><strong>Dibujar Círculo 3D (C):</strong> Haz clic en el centro y arrastra para definir el radio/diámetro de la pieza circular.</span>
+      } @else if (activeTool() === 'draw_freehand') {
+        <span class="material-icons text-sm text-sky-500">gesture</span>
+        <span><strong>Dibujo Libre a Mano Alzada (F):</strong> Mantén presionado y traza la forma deseada en el suelo; al soltar se cerrará y extruirá.</span>
       } @else if (activeTool() === 'rotate_90') {
         <span class="material-icons text-sm text-amber-500">rotate_right</span>
         <span><strong>Rotar 90° (Q):</strong> Haz clic sobre cualquier pieza para girarla 90° en el plano horizontal.</span>
@@ -1034,6 +1076,10 @@
         <strong class="text-amber-600">{{ pp.axisName }} {{ pp.currentVal }} mm</strong>
       } @else if (rectDrawDims(); as rd) {
         <strong class="text-sky-600">{{ rd.length }} × {{ rd.width }} mm</strong>
+      } @else if (circleDrawDims(); as cd) {
+        <strong class="text-sky-600">Ø {{ cd.diameter }} mm (R {{ cd.radius }})</strong>
+      } @else if (freehandStats(); as fh) {
+        <strong class="text-sky-600">{{ fh.pointCount }} pts • Perím {{ fh.perimeter }} mm</strong>
       } @else if (measureDistance(); as dist) {
         <strong class="text-sky-600">{{ dist.total }} mm</strong>
       } @else if (selectedPart(); as sel) {

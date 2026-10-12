@@ -72,6 +72,9 @@ export class ModuleDesignerComponent {
   // Dynamic Clearance Info from 3D (Luz libre a elementos adyacentes)
   readonly clearanceInfo = signal<ClearanceInfo | null>(null);
 
+  // Template utilities
+  readonly Math = Math;
+
   // Groups / Cajones Modulares
   readonly groups = this.projectService.groupsList;
 
@@ -968,7 +971,11 @@ export class ModuleDesignerComponent {
       posY: partData.posY ?? 7.5,
       posZ: partData.posZ ?? 0,
       orientation: partData.orientation || 'horizontal',
-      componentRole: 'free'
+      componentRole: 'free',
+      shapeType: partData.shapeType || 'rectangle',
+      radius: partData.radius,
+      diameter: partData.diameter,
+      contourPoints: partData.contourPoints
     };
     this.projectService.addPart(newPart);
     this.selectedPartId.set(newPart.id);
