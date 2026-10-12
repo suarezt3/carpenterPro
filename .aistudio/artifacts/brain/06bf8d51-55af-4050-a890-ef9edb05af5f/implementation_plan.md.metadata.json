@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para la corrección geométrica de alineación e inclinación cónica uniforme de las patas de mesa (madera nórdica, horquilla y cilíndrica) y la integración del imán inteligente de anclaje vertical con resaltado visual 3D al arrastrar piezas sobre las patas.",
-  "updatedAt": "2026-10-12T14:40:00.474409977Z",
+  "summary": "Plan de implementación para el imán inteligente bidireccional entre piezas sueltas y grupos, aumento del umbral de atracción a 25 mm, y resolución de prioridad direccional (arriba/abajo) entre la estructura superior y las patas inferiores.",
+  "updatedAt": "2026-10-12T14:59:02.411778507Z",
   "requestFeedback": true,
   "userFacing": true
 }

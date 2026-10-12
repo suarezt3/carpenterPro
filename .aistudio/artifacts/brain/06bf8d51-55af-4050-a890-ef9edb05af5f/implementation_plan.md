@@ -1,53 +1,54 @@
-# Plan de Implementación: Corrección Geométrica de Patas y Anclaje Magnético Inteligente
+# Plan de Implementación: Imán Inteligente Pieza-Grupo y Prioridad Direccional
 
-## 1. Contexto y Objetivos
+## 1. Contexto y Diagnóstico del Problema
 
-A partir de las respuestas del usuario y la revisión del visor 3D:
-1. **Alineación e Inclinación Cónica Simétrica y Uniforme**:
-   - Las patas de madera escandinava/nórdica y los juegos de 4 patas presentan desalineación desde vistas cenital (desde arriba) y laterales debido al orden de rotaciones Euler (XYZ) y a que el pivote de inclinación no estaba anclado a la cota superior del plato de fijación.
-   - Corregir el cálculo trigonométrico en las 4 esquinas exteriores (`Front-Left`, `Front-Right`, `Rear-Left`, `Rear-Right`) para que la inclinación cónica apunte radialmente hacia afuera de forma 100% simétrica, manteniendo la placa metálica de fijación horizontal y nivelada con la superficie de apoyo.
-   - Verificar y asegurar también la geometría simétrica de las patas tipo horquilla (*hairpin*) con alas en escuadra y las cilíndricas en acero inoxidable.
-2. **Imán Inteligente de Apoyo sobre Patas (Smart Magnetic Snap)**:
-   - Al arrastrar una pieza (por ejemplo, la tapa o base de una mesa) en el visor 3D sobre o cerca de una pata o juego de patas, detectar la proximidad y atraer automáticamente la cara inferior de la pieza a la cota superior exacta de la pata (`legTopY = leg.position.y + leg.height`).
-   - Evitar que la pieza sobrepase la pata hacia abajo (bloqueo vertical anti-penetración).
-   - Proporcionar retroalimentación visual inmediata en el canvas 3D mediante una guía láser/resaltado de atracción magnética y un indicador flotante cuando el imán inteligente se engancha.
+1. **Fallo de Atracción entre Pieza Suelta y Grupo**:
+   - Cuando las piezas están agrupadas, la traslación de grupos no realizaba comprobación de imán contra piezas sueltas u otros grupos.
+   - Para piezas individuales, el umbral de detección en `applyMagneticSnapToPosition` estaba fijado en solo `12 mm`. Al mover el ratón con velocidad normal, los incrementos de píxeles superaban los 12 mm, saltándose la detección.
+   - El usuario prefiere que la pieza se mantenga como entidad independiente (sin fusionarse automáticamente al grupo) pero alineada con precisión milimétrica mediante el imán.
+   - Se requiere un umbral uniforme de atracción de `25 mm` para un agarre suave y predecible.
+
+2. **Conflicto entre Mesa Superior y Patas Inferiores (Pieza Intermedia)**:
+   - Al mover una pieza situada entre las patas (abajo) y el tablero/grupo (arriba), el imán de las patas aplicaba una zona de captura descendente que sobrescribía la posición vertical calculada por el imán de piezas.
+   - Al halar hacia arriba, el sistema saltaba el imán de la mesa superior debido a la prioridad fija y al rango asimétrico.
+   - **Solución elegida**: Priorización direccional según el sentido del arrastre:
+     - **Movimiento hacia arriba (`dy > 0`)**: Se prioriza la cara inferior de las piezas/grupos superiores (mesa o travesaños).
+     - **Movimiento hacia abajo (`dy < 0`)**: Se prioriza la cota superior de las patas de apoyo, reteniendo la pieza en la cota superior (`0 mm`) para evitar que se hunda hacia el piso.
 
 ---
 
 ## 2. Cambios Propuestos
 
-### A. Geometría y Simetría de Patas 3D (`src/app/services/appliance-3d-builder.service.ts`)
-- **Pivote y Orientación de Inclinación Cónica Nórdica (`buildScandinavianMesh`)**:
-  - Reestructurar el contenedor de la pata para que el pivote de inclinación se sitúe exactamente en la base de la pletina de montaje superior (`y = h - plateThickness`).
-  - Calcular la inclinación radial en dirección a la diagonal de la esquina exterior correspondiente (`dx`, `dz`) sin aplicar rotaciones Euler encadenadas que distorsionen los ejes.
-  - Asegurar que la placa de montaje permanezca perfectamente plana y paralela a la horizontal en `y = h`.
-- **Alineación de Placas y Varillas Horquilla (`buildHairpinMesh` y `buildTableLegsSet`)**:
-  - Orientar las alas en escuadra de la pletina superior hacia el interior o acorde a cada esquina del sobre de mesa.
-  - Splay radial simétrico de las varillas y regatón hacia las 4 esquinas exteriores.
-- **Patas Cilíndricas Inox (`buildCylindricalMesh`)**:
-  - Verificar aplomo vertical estricto a 90 grados y posición precisa en las 4 esquinas.
+### A. Imán Inteligente Bidireccional Pieza ↔ Grupo (`src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts`)
+- **Umbral de Imán Calibrado a 25 mm**:
+  - Actualizar el umbral de `applyMagneticSnapToPosition` de 12 mm a `25 mm` en todos los ejes (X, Y, Z).
+- **Soporte de Agrupaciones**:
+  - Garantizar que al arrastrar una pieza suelta, se evalúen con total precisión todas las caras de las piezas pertenecientes a grupos (`groupId`).
+  - Al arrastrar un grupo completo (`this.dragInitialParts.length > 1`), calcular la envolvente del grupo e implementar el enganche magnético contra piezas sueltas externas y otros grupos, no solo contra muros.
 
-### B. Imán Inteligente y Restricción Vertical en el Visor 3D (`src/app/components/furniture-3d-viewer/furniture-3d-viewer.ts`)
-- **Detección de Patas en `applyMagneticSnapToPosition` y Arrastre de Piezas**:
-  - Incluir la colección `appliances()` filtrando elementos de tipo `'table_leg'` y `'table_legs_set'`.
-  - Cuando se desplaza una pieza (eje Y o plano XZ), comprobar si la proyección horizontal (X, Z) de la pieza se superpone o aproxima al perímetro de las patas.
-  - Si la cara inferior de la pieza se encuentra dentro de la zona de atracción vertical de la cota superior de la pata (umbral configurable de aproximación):
-    - Enganchar `posY = legTopY + movingThickness / 2`, logrando un apoyo a 0 mm exactos.
-    - Prevenir que el movimiento del ratón hacia abajo hunda la pieza a través de la pata mientras permanezca sobre ella.
-- **Guía Visual de Resaltado Magnético (`renderLegSnapGuides` / `clearLegSnapGuides`)**:
-  - Generar un contorno/línea láser luminosa de atracción magnética en la superficie de contacto entre la pata y la pieza.
-  - Mostrar un badge técnico en 3D: `🧲 Apoyo en Patas de Mesa · Cota Superior (0 mm)`.
-  - Limpiar la guía automáticamente al alejar la pieza o liberar el arrastre.
+### B. Priorización Direccional Dinámica Arriba / Abajo
+- **Detección del Sentido de Arrastre (`deltaY` / `dy`)**:
+  - Si el usuario arrastra la pieza hacia arriba:
+    - Evaluar primero la atracción hacia las caras de las piezas superiores (estructura de la mesa).
+    - Desactivar la atracción descendente hacia las patas mientras el vector de arrastre apunte hacia arriba.
+  - Si el usuario arrastra la pieza hacia abajo:
+    - Evaluar la atracción hacia la cota superior de las patas (`legTopY`).
+    - Al detectar las patas, bloquear el descenso para no atravesarlas hacia abajo.
+
+### C. Retroalimentación Visual Unificada
+- Mostrar la guía visual láser y el indicador de contacto cuando la pieza se acopla tanto a un grupo de piezas como a las patas.
+- Limpiar guías activas al soltar el ratón o alejarse de la zona de enganche.
 
 ---
 
 ## 3. Plan de Verificación
 
-1. **Prueba de Compilación y Tipado**:
-   - Ejecutar `compile_applet` para garantizar cero errores de compilación TypeScript/Angular.
-2. **Verificación Visual de Patas en 3D**:
-   - Generar un conjunto de patas cónicas de madera y observar desde vista cenital (Top) y laterales (Front, Side, Iso) comprobando simetría matemática y alineación precisa hacia las 4 esquinas.
-   - Verificar patas tipo horquilla metálica y cilíndricas de acero inoxidable.
-3. **Verificación de Imán Inteligente**:
-   - Arrastrar un tablero horizontal sobre las patas de mesa y comprobar que se ancla magnéticamente en la cota superior sin hundirse hacia el piso.
-   - Confirmar la aparición de la señal visual/resaltado de contacto magnético.
+1. **Compilación y Linting**:
+   - Ejecutar `compile_applet` y `lint_applet` para garantizar cero errores de tipos y reglas de estilo.
+2. **Prueba de Atracción Pieza Suelta a Grupo**:
+   - Crear un grupo de 2 o más piezas (estructura de mesa).
+   - Arrastrar una pieza suelta hacia el grupo y verificar que se adhiere fluidamente a 25 mm en cualquiera de sus caras sin unirse al grupo.
+3. **Prueba de Pieza Intermedia (Patas vs. Mesa Superior)**:
+   - Colocar una pieza entre las patas y la mesa.
+   - Arrastrar hacia arriba y verificar que engancha con la mesa superior sin saltársela.
+   - Arrastrar hacia abajo y comprobar que se ancla a las patas sin hundirse hacia el piso.
