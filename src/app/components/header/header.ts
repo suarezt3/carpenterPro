@@ -46,6 +46,11 @@ export class HeaderComponent {
   toastMessage = signal<string | null>(null);
   readonly showLabelsTab = signal(false);
 
+  // Editable Project Title & Client State
+  readonly isEditingTitle = signal(false);
+  readonly titleInput = signal('');
+  readonly clientInput = signal('');
+
   readonly project = this.projectService.currentProject;
   readonly savedProjects = this.projectService.savedProjects;
   readonly partsCount = this.projectService.totalPartsCount;
@@ -156,6 +161,27 @@ export class HeaderComponent {
     e?.stopPropagation();
     this.isExportDropdownOpen.update(v => !v);
     this.isProjectDropdownOpen.set(false);
+  }
+
+  startEditingTitle(e?: Event) {
+    e?.stopPropagation();
+    this.titleInput.set(this.project().name);
+    this.clientInput.set(this.project().clientName || '');
+    this.isEditingTitle.set(true);
+    this.closeDropdowns();
+  }
+
+  saveTitleChange() {
+    if (!this.isEditingTitle()) return;
+    const newName = this.titleInput().trim() || 'Proyecto Melamina';
+    const newClient = this.clientInput().trim();
+    this.projectService.updateProjectName(newName, newClient);
+    this.isEditingTitle.set(false);
+    this.showToast(`✏️ Nombre del proyecto actualizado a "${newName}"`);
+  }
+
+  cancelEditingTitle() {
+    this.isEditingTitle.set(false);
   }
 
   closeDropdowns() {

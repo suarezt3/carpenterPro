@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para ajuste de bisagras y taladros sincronizados en puertas batientes, sistema universal de creación y manipulación de grupos/conjuntos multi-pieza (mesas, módulos, cajones), menú contextual inteligente y actualización de la documentación de ayuda.",
-  "updatedAt": "2026-10-12T16:55:10.184140915Z",
+  "summary": "Plan de implementación para habilitar la edición interactiva del nombre del proyecto y cliente directamente desde la barra superior de la aplicación, garantizando que el ID interno del proyecto permanezca intacto y no se dupliquen registros en la base de datos (Supabase y LocalStorage).",
+  "updatedAt": "2026-10-12T21:33:31.842676887Z",
   "requestFeedback": true,
   "userFacing": true
 }

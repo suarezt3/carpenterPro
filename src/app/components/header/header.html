@@ -2,18 +2,93 @@
   <div class="w-full px-2.5 sm:px-4 lg:px-6">
     <div class="flex items-center justify-between h-14 gap-2 flex-nowrap overflow-visible">
       
-      <!-- ZONE 1 (LEFT): Brand & Compact Project Name (Single-line, no bulky subtitle) -->
+      <!-- ZONE 1 (LEFT): Brand & Interactive Editable Project Name -->
       <div class="flex items-center gap-2.5 min-w-0 shrink-0">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-sm shadow-indigo-900/25 ring-1 ring-white/20 shrink-0">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-xs shadow-indigo-900/25 ring-1 ring-white/20 shrink-0">
           <span class="material-icons text-xl">view_in_ar</span>
         </div>
         <div class="flex items-center gap-1.5 min-w-0">
-          <span [class]="themeService.isClassic() ? 'font-bold tracking-tight text-slate-900 text-base whitespace-nowrap' : 'font-bold tracking-tight text-white text-base whitespace-nowrap'">Modul<span class="text-indigo-600 dark:text-indigo-400">r</span></span>
-          <span class="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 whitespace-nowrap">3D Studio</span>
+          <span [class]="themeService.isClassic() ? 'font-bold tracking-tight text-slate-900 text-base whitespace-nowrap' : 'font-bold tracking-tight text-white text-base whitespace-nowrap'">Modul<span [class]="themeService.isClassic() ? 'text-indigo-600' : 'text-indigo-400'">r</span></span>
+          <span [class]="themeService.isClassic() ? 'text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap' : 'text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 whitespace-nowrap'">3D Studio</span>
           <span [class]="themeService.isClassic() ? 'text-slate-300 hidden md:inline' : 'text-zinc-600 hidden md:inline'">•</span>
-          <span [class]="themeService.isClassic() ? 'text-xs text-slate-600 font-medium truncate max-w-[120px] lg:max-w-[180px] xl:max-w-[240px] hidden md:inline' : 'text-xs text-zinc-400 font-medium truncate max-w-[120px] lg:max-w-[180px] xl:max-w-[240px] hidden md:inline'" [title]="project().name + (project().clientName ? ' • ' + project().clientName : '')">
-            {{ project().name }}
-          </span>
+          
+          <!-- Interactive Project Name Badge & Popover Editor -->
+          <div class="relative hidden md:flex items-center">
+            <button 
+              type="button" 
+              (click)="startEditingTitle($event)"
+              [class]="themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200/80 transition text-xs font-bold max-w-[160px] lg:max-w-[240px] xl:max-w-[320px] cursor-pointer group shadow-2xs' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition text-xs font-bold max-w-[160px] lg:max-w-[240px] xl:max-w-[320px] cursor-pointer group shadow-2xs'"
+              [title]="'Haz clic para cambiar el nombre del proyecto (' + project().name + ')'">
+              <span [class]="themeService.isClassic() ? 'truncate font-bold text-slate-900 text-xs' : 'truncate font-bold text-white text-xs'">{{ project().name }}</span>
+              @if (project().clientName) {
+                <span [class]="themeService.isClassic() ? 'text-[10px] text-slate-500 font-normal truncate hidden lg:inline' : 'text-[10px] text-zinc-400 font-normal truncate hidden lg:inline'">• {{ project().clientName }}</span>
+              }
+              <span [class]="themeService.isClassic() ? 'material-icons text-[13px] text-indigo-600 opacity-80 group-hover:opacity-100 transition shrink-0' : 'material-icons text-[13px] text-indigo-400 opacity-80 group-hover:opacity-100 transition shrink-0'">edit</span>
+            </button>
+
+            <!-- Floating Title Editor Popover -->
+            @if (isEditingTitle()) {
+              <div 
+                (click)="$event.stopPropagation()" 
+                [class]="themeService.isClassic() ? 'absolute top-full left-0 mt-2 z-50 w-72 p-3.5 bg-white border border-slate-300 rounded-2xl shadow-2xl space-y-2.5 text-slate-900 animate-in fade-in-50 zoom-in-95' : 'absolute top-full left-0 mt-2 z-50 w-72 p-3.5 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl space-y-2.5 text-zinc-100 animate-in fade-in-50 zoom-in-95'">
+                <div class="flex items-center justify-between border-b pb-1.5" [class]="themeService.isClassic() ? 'border-slate-200' : 'border-zinc-800'">
+                  <span class="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1" [class]="themeService.isClassic() ? 'text-indigo-600' : 'text-indigo-400'">
+                    <span class="material-icons text-xs">edit_note</span>
+                    Cambiar Nombre del Proyecto
+                  </span>
+                  <button type="button" (click)="cancelEditingTitle()" [class]="themeService.isClassic() ? 'text-slate-400 hover:text-slate-700 cursor-pointer' : 'text-zinc-400 hover:text-white cursor-pointer'">
+                    <span class="material-icons text-xs">close</span>
+                  </button>
+                </div>
+
+                <div class="space-y-2.5 text-xs">
+                  <div>
+                    <label [class]="themeService.isClassic() ? 'block text-[10px] font-bold text-slate-700 mb-0.5' : 'block text-[10px] font-bold text-zinc-300 mb-0.5'">Nombre del Proyecto:</label>
+                    <input 
+                      type="text" 
+                      [value]="titleInput()" 
+                      (input)="titleInput.set($any($event.target).value)" 
+                      (keydown.enter)="saveTitleChange()"
+                      (keydown.escape)="cancelEditingTitle()"
+                      placeholder="ej. Zapatero Vertical Repisas" 
+                      autofocus
+                      [class]="themeService.isClassic() ? 'w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-600 focus:bg-white text-slate-900 placeholder:text-slate-400' : 'w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-600 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-400 focus:bg-zinc-900 text-white placeholder:text-zinc-500'" />
+                  </div>
+
+                  <div>
+                    <label [class]="themeService.isClassic() ? 'block text-[10px] font-bold text-slate-700 mb-0.5' : 'block text-[10px] font-bold text-zinc-300 mb-0.5'">Cliente / Referencia (Opcional):</label>
+                    <input 
+                      type="text" 
+                      [value]="clientInput()" 
+                      (input)="clientInput.set($any($event.target).value)" 
+                      (keydown.enter)="saveTitleChange()"
+                      (keydown.escape)="cancelEditingTitle()"
+                      placeholder="ej. Familia Gómez" 
+                      [class]="themeService.isClassic() ? 'w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:outline-none focus:border-indigo-600 focus:bg-white text-slate-900 placeholder:text-slate-400' : 'w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-600 rounded-xl text-xs font-medium focus:outline-none focus:border-indigo-400 focus:bg-zinc-900 text-white placeholder:text-zinc-500'" />
+                  </div>
+
+                  <div class="flex items-center justify-between pt-1">
+                    <span [class]="themeService.isClassic() ? 'text-[9px] text-slate-500 font-mono italic' : 'text-[9px] text-zinc-400 font-mono italic'">ID único intacto en DB</span>
+                    <div class="flex items-center gap-1.5">
+                      <button 
+                        type="button" 
+                        (click)="cancelEditingTitle()" 
+                        [class]="themeService.isClassic() ? 'px-2.5 py-1 text-slate-600 hover:text-slate-900 text-xs transition cursor-pointer font-medium' : 'px-2.5 py-1 text-zinc-400 hover:text-white text-xs transition cursor-pointer font-medium'">
+                        Cancelar
+                      </button>
+                      <button 
+                        type="button" 
+                        (click)="saveTitleChange()" 
+                        class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-1 cursor-pointer">
+                        <span class="material-icons text-xs">check</span>
+                        <span>Guardar</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
         </div>
       </div>
 
@@ -143,6 +218,18 @@
                 ? 'absolute right-0 top-full mt-2 z-50 w-60 bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 text-xs text-slate-700 animate-in fade-in-50 zoom-in-95' 
                 : 'absolute right-0 top-full mt-2 z-50 w-60 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 text-xs text-zinc-200 animate-in fade-in-50 zoom-in-95'">
               
+              <!-- Opción: Cambiar Nombre del Proyecto -->
+              <button 
+                type="button"
+                (click)="startEditingTitle($event); closeDropdowns()"
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition cursor-pointer'">
+                <span class="material-icons text-sm text-indigo-500 shrink-0">edit_note</span>
+                <div class="flex flex-col">
+                  <span class="font-bold">Cambiar Nombre</span>
+                  <span class="text-[10px] text-slate-400">Renombrar proyecto y cliente</span>
+                </div>
+              </button>
+
               <!-- Opción: Nuevo Proyecto -->
               <button 
                 type="button"

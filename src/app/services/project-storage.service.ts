@@ -653,6 +653,16 @@ export class ProjectStorageService {
     this.saveToStorage(updated);
   }
 
+  updateProjectName(name: string, clientName?: string) {
+    const cleanName = name.trim() || 'Proyecto Melamina';
+    const cleanClient = (clientName ?? '').trim();
+    this.updateProject(p => ({
+      ...p,
+      name: cleanName,
+      clientName: cleanClient
+    }));
+  }
+
   saveToStorage(project: Project) {
     if (!this.isBrowser()) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
