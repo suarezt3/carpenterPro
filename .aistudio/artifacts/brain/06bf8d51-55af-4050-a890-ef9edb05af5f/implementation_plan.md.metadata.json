@@ -1,6 +1,6 @@
 {
-  "summary": "Plan detallado de implementación para las dos nuevas herramientas CAD en el visor 3D: Herramienta Circular (cilíndrica / mesa redonda con cota de radio y diámetro en vivo) y Herramienta de Dibujo Libre a Mano Alzada (trazado continuo en plano horizontal con polígono cerrado suavizado y extrusión de espesor paramétrico). Incluye integración en la paleta lateral de herramientas, atajos de teclado, HUD de cotas en vivo, soporte en el modelo Part con geometría cilíndrica y extruida, e inspector de propiedades.",
-  "updatedAt": "2026-10-12T16:16:01.511756575Z",
+  "summary": "Plan de implementación para ajuste de bisagras y taladros sincronizados en puertas batientes, sistema universal de creación y manipulación de grupos/conjuntos multi-pieza (mesas, módulos, cajones), menú contextual inteligente y actualización de la documentación de ayuda.",
+  "updatedAt": "2026-10-12T16:55:10.184140915Z",
   "requestFeedback": true,
   "userFacing": true
 }

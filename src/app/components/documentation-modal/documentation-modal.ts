@@ -311,6 +311,58 @@ export class DocumentationModalComponent {
       tips: [
         'La cinta contextual superior derecha te brinda acceso rápido con un solo clic a: Duplicar, Mover, Abrir/Cerrar, 90° (R), Frente y Desagrupar.'
       ]
+    },
+    {
+      id: 'agrupacion_conjuntos',
+      category: 'modulos_piezas',
+      title: 'Creación y Gestión de Conjuntos (Mesas, Módulos y Cajones)',
+      shortDesc: 'Aprende a agrupar múltiples piezas melamínicas y accesorios (patas, puertas, frentes) en un solo bloque con nombre personalizado.',
+      icon: 'format_shapes',
+      iconColor: 'text-indigo-600',
+      badge: 'NUEVO · Agrupación Libre',
+      steps: [
+        'Para agrupar varias piezas (por ejemplo, la cubierta de una mesa con sus 4 patas y faldones, o un mueble de comedor completo):',
+        '1. Selecciona las piezas deseadas manteniendo presionada la tecla [ Shift ] y haciendo clic sobre cada una en el visor 3D o en la cinta inferior de piezas.',
+        '2. También puedes usar el botón "Todo" para seleccionar todas las piezas del lienzo a la vez.',
+        '3. Haz clic en el botón "[ Crear Grupo ]" o "Agrupar Piezas" que aparecerá en la cinta inferior o en el menú contextual de clic derecho.',
+        '4. Asigna un nombre descriptivo al conjunto (ej. "Mesa Completa", "Comedor 4 Puestos", "Módulo Alacena").',
+        '5. ¡Listo! A partir de ese momento, al hacer clic sobre cualquiera de las piezas del conjunto, todo el bloque se seleccionará rígidamente.',
+        '6. Puedes mover el conjunto completo arrastrándolo directamente con el ratón o girarlo 90° con la tecla [ Q ] o [ R ] sin que se desalinee ninguna pieza.',
+        '7. Si necesitas reajustar una pata o modificar una medida individual, selecciona el grupo y haz clic en "[ Desagrupar ]" en la bandeja de propiedades. Las piezas quedarán libres de nuevo para su edición.'
+      ],
+      tips: [
+        'Los conjuntos agrupados se conservan al guardar y descargar tu archivo JSON de proyecto.',
+        'Si duplicas un grupo con el botón "Duplicar Grupo", se creará una copia idéntica del ensamble completo apilada ordenadamente en 3D.'
+      ],
+      technicalDetails: [
+        { label: 'Soporte de piezas', value: 'Piezas melamínicas, patas de mesa, herrajes y cajones' },
+        { label: 'Rotación en bloque', value: 'Cálculo de centroide común para rotación 90° / 180°' },
+        { label: 'Desagrupamiento', value: 'Retorno a piezas independientes con un solo clic' }
+      ]
+    },
+    {
+      id: 'bisagras_reversibles',
+      category: 'mecanizados',
+      title: 'Bisagras y Taladros Cazoleta Ø35mm Reversibles Sincronizados',
+      shortDesc: 'Apertura hacia la derecha o izquierda con reubicación automática de perforaciones púrpuras y herrajes 3D.',
+      icon: 'door_sliding',
+      iconColor: 'text-purple-600',
+      badge: 'NUEVO · Bisagras Dinámicas',
+      steps: [
+        'Cuando creas o duplicas una puerta batiente para colocarla en el lado opuesto del mueble:',
+        '1. En el panel de propiedades de la pieza o mediante el menú contextual de clic derecho en 3D, selecciona el sentido de apertura deseado: "Puerta (Bisagra Izquierda)" o "Puerta (Bisagra Derecha)".',
+        '2. Al cambiar el sentido, la manija/tirador 3D se ubicará en el borde opuesto y las bisagras 3D se trasladarán al borde correspondiente.',
+        '3. Las perforaciones púrpuras de cazoleta Ø35mm x 12.5mm se recalcularán automáticamente en el exacto borde de apertura (a 22mm de la arista), garantizando que concuerden con los taladros técnicos.',
+        '4. Al probar la animación con la opción "Animar / Abrir Puerta", los taladros de cazoleta rotarán integrados con la hoja de la puerta.'
+      ],
+      tips: [
+        'Al clonar una puerta batiente izquierda para crear la derecha del mueble, el sistema sincronizará tanto la estética visual 3D como el despiece técnico de mecanizados.'
+      ],
+      technicalDetails: [
+        { label: 'Estándar cazoleta', value: 'Ø 35 mm x 12.5 mm de profundidad' },
+        { label: 'Distancia al borde K', value: '4 mm al canto / 22 mm al centro del taladro' },
+        { label: 'Sincronización', value: 'Bisagra 3D + Tirador + Taladro cazoleta + Rotación animada' }
+      ]
     }
   ];
 

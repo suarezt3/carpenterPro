@@ -678,17 +678,19 @@
 
         <!-- SECCIÓN 1: ANIMACIÓN Y TIPO DE PIEZA MÓVIL (PUERTA / CAJÓN) -->
         <div class="p-1.5 bg-blue-50/70 rounded-xl border border-blue-100 flex flex-col gap-1 my-1">
-          <!-- Probar Apertura directa -->
-          <button 
-            type="button" 
-            (click)="toggleContextMenuAnimation()"
-            class="w-full py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs">
-            <div class="flex items-center gap-1.5">
-              <span class="material-icons text-sm">{{ isPartOpen(part.id) ? 'meeting_room' : 'door_sliding' }}</span>
-              <span>{{ isPartOpen(part.id) ? 'Cerrar Pieza' : 'Animar / Abrir Pieza' }}</span>
-            </div>
-            <span class="text-[10px] font-mono opacity-80 uppercase">3D</span>
-          </button>
+          <!-- Probar Apertura directa (SOLO para piezas animables: puertas y cajones) -->
+          @if (isAnimatablePart(part)) {
+            <button 
+              type="button" 
+              (click)="toggleContextMenuAnimation()"
+              class="w-full py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs">
+              <div class="flex items-center gap-1.5">
+                <span class="material-icons text-sm">{{ isPartOpen(part.id) ? 'meeting_room' : 'door_sliding' }}</span>
+                <span>{{ isPartOpen(part.id) ? 'Cerrar Pieza / Cajón' : 'Animar / Abrir Pieza' }}</span>
+              </div>
+              <span class="text-[10px] font-mono opacity-80 uppercase">3D</span>
+            </button>
+          }
 
           <!-- Submenú: Convertir Tipo de Pieza -->
           <div class="relative">

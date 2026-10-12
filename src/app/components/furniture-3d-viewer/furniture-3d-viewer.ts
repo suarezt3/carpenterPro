@@ -5395,6 +5395,27 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showHingeSubmenu.set(false);
   }
 
+  isAnimatablePart(part: Part | null): boolean {
+    if (!part) return false;
+    if (part.componentRole === 'door' || part.componentRole === 'drawer_front') return true;
+    const nameUpper = part.name.toUpperCase();
+    if (nameUpper.includes('PUERTA') || nameUpper.includes('CAJON') || nameUpper.includes('CAJÓN') || nameUpper.includes('GAVETA') || nameUpper.includes('BASCULANTE') || nameUpper.includes('ELEVABLE')) {
+      return true;
+    }
+    if (part.hardwareConfig?.isMovable && part.hardwareConfig?.movableType !== 'none') {
+      return true;
+    }
+    if (part.groupId) {
+      const grp = this.partGroups().find(g => g.id === part.groupId);
+      if (grp) {
+        if (grp.type === 'drawer' || grp.type === 'door_set') return true;
+        const gName = grp.name.toUpperCase();
+        if (gName.includes('CAJ') || gName.includes('GAVET') || gName.includes('PUERTA')) return true;
+      }
+    }
+    return false;
+  }
+
   setContextMenuPartMovable(role: 'door' | 'drawer_front' | 'shelf' | 'free', direction: OpeningDirection = 'left') {
     const part = this.contextMenuPart();
     if (!part) return;

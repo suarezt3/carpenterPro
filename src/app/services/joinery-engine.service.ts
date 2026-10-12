@@ -288,19 +288,44 @@ export class JoineryEngineService {
   private generateDoorHingeHoles(b: Part3DBounds): DrillHole[] {
     const holes: DrillHole[] = [];
     const height = b.sy; // Door height
+    const width = b.sx;  // Door width
 
-    // Hinges placed on left side of door (or right)
-    const hingeOffsetX = b.minX + 22; // 22mm from edge (standard 35mm cup center)
+    // Determine opening direction / hinge side
+    let hingeSide = b.part.hardwareConfig?.openingDirection;
+    if (!hingeSide) {
+      const nameUpper = b.part.name.toUpperCase();
+      if (nameUpper.includes('BASCULANTE') || nameUpper.includes('ELEVABLE')) {
+        hingeSide = 'top';
+      } else if (nameUpper.includes('DER') || (b.part.posX || 0) > 0) {
+        hingeSide = 'right';
+      } else {
+        hingeSide = 'left';
+      }
+    }
+
+    // Hinges placed on left, right, top or bottom side of door (22mm from edge to 35mm cup center)
+    let hingeOffsetX = b.minX + 22;
+    if (hingeSide === 'right') {
+      hingeOffsetX = b.maxX - 22;
+    } else if (hingeSide === 'top' || hingeSide === 'bottom') {
+      hingeOffsetX = b.px;
+    }
+
     const marginY = Math.min(100, height * 0.15);
-
-    const hingeYs = [
+    let hingeYs = [
       b.minY + marginY,
       b.maxY - marginY
     ];
 
-    if (height >= 950) {
+    if (hingeSide === 'top') {
+      hingeYs = [b.maxY - 22];
+    } else if (hingeSide === 'bottom') {
+      hingeYs = [b.minY + 22];
+    } else if (height >= 950) {
       hingeYs.push(b.py); // 3rd intermediate hinge
     }
+
+    const sideText = hingeSide === 'right' ? 'derecho' : (hingeSide === 'top' ? 'superior' : (hingeSide === 'bottom' ? 'inferior' : 'izquierdo'));
 
     for (let i = 0; i < hingeYs.length; i++) {
       const y = hingeYs[i];
@@ -317,7 +342,7 @@ export class JoineryEngineService {
         surfaceType: 'face',
         partId: b.part.id,
         partName: b.part.name,
-        description: `Cazoleta bisagra Ø35mm x 12.5mm (a 22mm del borde)`
+        description: `Cazoleta bisagra Ø35mm x 12.5mm (borde ${sideText})`
       });
     }
 
