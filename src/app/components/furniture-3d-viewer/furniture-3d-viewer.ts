@@ -820,9 +820,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
       // Geometry according to shapeType: circle, freehand or standard box
       let geometry: THREE.BufferGeometry;
       if (part.shapeType === 'circle') {
-        const radius = part.radius || Math.max(10, (part.length || 600) / 2);
-        // Cylinder oriented with vertical axis along Y, height equals thickness (sy)
-        geometry = new THREE.CylinderGeometry(radius, radius, sy, 48);
+        const radius = part.radius || (part.diameter ? part.diameter / 2 : Math.max(10, (part.width || 600) / 2));
+        const cylHeight = (part.length && part.length > part.thickness) ? part.length : (part.thickness || 15);
+        // Cylinder oriented along Y axis with radius and length/height
+        geometry = new THREE.CylinderGeometry(radius, radius, cylHeight, 48);
       } else if (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) {
         const shape = new THREE.Shape();
         const pts = part.contourPoints;
@@ -846,6 +847,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(px, py, pz);
+      if (part.rotationX || part.rotationY || part.rotationZ) {
+        const rx = THREE.MathUtils.degToRad(part.rotationX || 0);
+        const ry = THREE.MathUtils.degToRad(part.rotationY || 0);
+        const rz = THREE.MathUtils.degToRad(part.rotationZ || 0);
+        mesh.rotation.set(rx, ry, rz, 'XYZ');
+      }
       mesh.castShadow = !xRay;
       mesh.receiveShadow = true;
       mesh.userData = { part, isPiece: true };
@@ -5518,33 +5525,42 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   rotatePart90(part: Part, axis: 'x' | 'y' | 'z' = 'y') {
     const updates: Partial<Part> = {};
-    const currentOrient = part.orientation || 'horizontal';
-
-    if (axis === 'y') {
-      // Rotate around vertical Y: swap length and width
-      updates.length = part.width;
-      updates.width = part.length;
-    } else if (axis === 'x') {
-      // Pitch rotation: cycle between horizontal and vertical_xy
-      if (currentOrient === 'horizontal') {
-        updates.orientation = 'vertical_xy';
-      } else if (currentOrient === 'vertical_xy') {
-        updates.orientation = 'horizontal';
-      } else {
-        updates.orientation = 'horizontal';
+    if (axis === 'x') {
+      updates.rotationX = (((part.rotationX || 0) + 90) % 360);
+      if (part.shapeType !== 'circle') {
+        const currentOrient = part.orientation || 'horizontal';
+        updates.orientation = currentOrient === 'horizontal' ? 'vertical_xy' : 'horizontal';
+      }
+    } else if (axis === 'y') {
+      updates.rotationY = (((part.rotationY || 0) + 90) % 360);
+      if (part.shapeType !== 'circle') {
+        updates.length = part.width;
+        updates.width = part.length;
       }
     } else if (axis === 'z') {
-      // Roll rotation: cycle between horizontal and vertical_yz
-      if (currentOrient === 'horizontal') {
-        updates.orientation = 'vertical_yz';
-      } else if (currentOrient === 'vertical_yz') {
-        updates.orientation = 'horizontal';
-      } else {
-        updates.orientation = 'horizontal';
+      updates.rotationZ = (((part.rotationZ || 0) + 90) % 360);
+      if (part.shapeType !== 'circle') {
+        const currentOrient = part.orientation || 'horizontal';
+        updates.orientation = currentOrient === 'horizontal' ? 'vertical_yz' : 'horizontal';
       }
     }
 
     this.partModified.emit({ part, updates });
+    this.closeContextMenu();
+  }
+
+  rotatePart3dAngle(part: Part, axis: 'x' | 'y' | 'z', delta: number) {
+    const prop = axis === 'x' ? 'rotationX' : (axis === 'y' ? 'rotationY' : 'rotationZ');
+    const current = part[prop] || 0;
+    const next = ((current + delta) % 360 + 360) % 360;
+    this.partModified.emit({ part, updates: { [prop]: next } });
+  }
+
+  resetPartRotation(part: Part) {
+    this.partModified.emit({
+      part,
+      updates: { rotationX: 0, rotationY: 0, rotationZ: 0 }
+    });
     this.closeContextMenu();
   }
 

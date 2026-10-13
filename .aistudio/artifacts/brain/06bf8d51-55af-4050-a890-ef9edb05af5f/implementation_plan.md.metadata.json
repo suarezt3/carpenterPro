@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para renombrar oficialmente la aplicación a Piezo3D Studio, actualizando la marca en la barra superior, título HTML, metadatos, documentación y fichas técnicas PDF.",
-  "updatedAt": "2026-10-12T22:00:14.333170302Z",
+  "summary": "Plan de implementación para la rotación libre en 3D (ejes X, Y, Z), controles de inclinación a 90°, cálculo de dimensiones a lo largo del eje principal y generación de despiece detallado para piezas circulares y cilíndricas en Piezo3D Studio.",
+  "updatedAt": "2026-10-13T01:00:58.032311552Z",
   "requestFeedback": true,
   "userFacing": true
 }

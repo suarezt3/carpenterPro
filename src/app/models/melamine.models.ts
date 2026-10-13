@@ -121,10 +121,13 @@ export interface Part {
   colorHex?: string;
   notes?: string;
   deductEdgeBanding?: boolean; // si se descuenta el canto en la medida de corte
-  // Propiedades espaciales 3D (para modelado paramétrico individual)
+  // Propiedades espaciales y orientación 3D
   posX?: number; // mm (posición en eje X)
   posY?: number; // mm (elevación en eje Y desde el suelo)
   posZ?: number; // mm (posición en eje Z profundidad)
+  rotationX?: number; // grados (rotación en eje X)
+  rotationY?: number; // grados (rotación en eje Y)
+  rotationZ?: number; // grados (rotación en eje Z)
   orientation?: PartOrientation; // horizontal o vertical
   componentRole?: ComponentRole;
   hardwareConfig?: PartHardwareConfig;

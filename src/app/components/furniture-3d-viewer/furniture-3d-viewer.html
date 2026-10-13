@@ -846,42 +846,49 @@
           <span>Duplicar Pieza</span>
         </button>
 
-        <!-- Girar 90° Submenu Toggle -->
+        <!-- Rotación 3D y Giros 90° Submenu -->
         <div class="relative">
           <button 
             type="button"
             (click)="toggleRotateSubmenu()"
             class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition">
             <div class="flex items-center gap-2">
-              <span class="material-icons text-sm text-amber-500">rotate_right</span>
-              <span>Girar 90°</span>
+              <span class="material-icons text-sm text-amber-500">3d_rotation</span>
+              <span>Rotación y Orientación 3D</span>
             </div>
             <span class="material-icons text-xs text-slate-400">{{ showRotateSubmenu() ? 'expand_less' : 'chevron_right' }}</span>
           </button>
 
           @if (showRotateSubmenu()) {
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-1 my-0.5 flex flex-col gap-0.5 text-xs">
-              <button 
-                type="button" 
-                (click)="rotatePart90(part, 'y')"
-                class="px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center gap-2 text-left">
-                <span class="material-icons text-xs text-sky-500">sync</span>
-                <span>Girar Horizontal (Eje Y)</span>
-              </button>
-              <button 
-                type="button" 
-                (click)="rotatePart90(part, 'x')"
-                class="px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center gap-2 text-left">
-                <span class="material-icons text-xs text-amber-500">sync_alt</span>
-                <span>Girar Frontal (Eje X)</span>
-              </button>
-              <button 
-                type="button" 
-                (click)="rotatePart90(part, 'z')"
-                class="px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center gap-2 text-left">
-                <span class="material-icons text-xs text-emerald-500">import_export</span>
-                <span>Girar Lateral (Eje Z)</span>
-              </button>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-2 my-0.5 flex flex-col gap-1.5 text-xs shadow-xs">
+              <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <span>Giros Rápidos (90°):</span>
+                <button type="button" (click)="resetPartRotation(part)" class="text-sky-600 hover:text-sky-800 font-bold transition">Reset 0°</button>
+              </div>
+
+              <!-- Eje X -->
+              <div class="flex items-center justify-between gap-1">
+                <span class="font-bold text-rose-600 text-[11px] w-12">Eje X:</span>
+                <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationX || 0 }}°</span>
+                <button type="button" (click)="rotatePart3dAngle(part, 'x', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">+90°</button>
+                <button type="button" (click)="rotatePart3dAngle(part, 'x', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">-90°</button>
+              </div>
+
+              <!-- Eje Y -->
+              <div class="flex items-center justify-between gap-1">
+                <span class="font-bold text-emerald-600 text-[11px] w-12">Eje Y:</span>
+                <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationY || 0 }}°</span>
+                <button type="button" (click)="rotatePart3dAngle(part, 'y', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">+90°</button>
+                <button type="button" (click)="rotatePart3dAngle(part, 'y', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">-90°</button>
+              </div>
+
+              <!-- Eje Z -->
+              <div class="flex items-center justify-between gap-1">
+                <span class="font-bold text-sky-600 text-[11px] w-12">Eje Z:</span>
+                <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationZ || 0 }}°</span>
+                <button type="button" (click)="rotatePart3dAngle(part, 'z', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">+90°</button>
+                <button type="button" (click)="rotatePart3dAngle(part, 'z', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">-90°</button>
+              </div>
             </div>
           }
         </div>

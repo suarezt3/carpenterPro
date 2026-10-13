@@ -359,7 +359,15 @@
                 [class]="isBlueprintDark() ? 'divide-zinc-800 text-zinc-300' : 'divide-slate-200 text-slate-800'">
                 @for (part of project().parts; track part.id) {
                   <tr class="hover:bg-amber-500/5 transition">
-                    <td class="p-2.5 font-bold">{{ part.name }}</td>
+                    <td class="p-2.5 font-bold">
+                      <div>{{ part.name }}</div>
+                      @if (part.shapeType === 'circle') {
+                        <div class="text-[10px] text-cyan-600 font-bold">Cilindro Ø{{ part.diameter || part.width }}mm (Longitud {{ part.length }}mm)</div>
+                      }
+                      @if (part.rotationX || part.rotationY || part.rotationZ) {
+                        <div class="text-[10px] text-amber-500 font-normal">Ángulos 3D: X {{ part.rotationX || 0 }}° | Y {{ part.rotationY || 0 }}° | Z {{ part.rotationZ || 0 }}°</div>
+                      }
+                    </td>
                     <td class="p-2.5">{{ part.quantity }}x</td>
                     <td class="p-2.5 font-bold text-cyan-600">{{ part.length }} × {{ part.width }} mm</td>
                     <td class="p-2.5">{{ part.thickness }} mm</td>

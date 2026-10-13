@@ -743,7 +743,7 @@
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-sky-900 flex items-center gap-1">
                       <span class="material-icons text-xs text-sky-600">radio_button_unchecked</span>
-                      Pieza Circular (Tapa Cilíndrica)
+                      Pieza Circular (Cilindro / Rueda)
                     </span>
                     <span class="text-[10px] font-mono font-bold bg-sky-100 text-sky-800 px-2 py-0.5 rounded">
                       Ø {{ sel.diameter || sel.length }} mm
@@ -757,18 +757,18 @@
                         min="20"
                         step="10"
                         [value]="sel.diameter || sel.length"
-                        (input)="updateSelectedPart({ diameter: +$any($event.target).value, radius: Math.round(+$any($event.target).value / 2), length: +$any($event.target).value, width: +$any($event.target).value })"
-                        class="w-full mt-0.5 px-2 py-1 bg-white border border-sky-200 rounded-lg text-center font-bold text-slate-900 font-mono focus:outline-hidden focus:border-sky-500" />
+                        (input)="updatePartDiameter(+$any($event.target).value)"
+                        class="w-full mt-0.5 px-2 py-1 bg-white border border-sky-200 rounded-lg text-center font-bold text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 shadow-2xs" />
                     </div>
                     <div>
-                      <span class="text-[10px] text-slate-500 font-medium">Radio (R mm):</span>
+                      <span class="text-[10px] text-slate-500 font-medium">Longitud Eje (mm):</span>
                       <input 
                         type="number"
                         min="10"
-                        step="5"
-                        [value]="sel.radius || Math.round((sel.diameter || sel.length) / 2)"
-                        (input)="updateSelectedPart({ radius: +$any($event.target).value, diameter: (+$any($event.target).value) * 2, length: (+$any($event.target).value) * 2, width: (+$any($event.target).value) * 2 })"
-                        class="w-full mt-0.5 px-2 py-1 bg-white border border-sky-200 rounded-lg text-center font-bold text-slate-900 font-mono focus:outline-hidden focus:border-sky-500" />
+                        step="10"
+                        [value]="sel.length"
+                        (input)="updateSelectedPart({ length: +$any($event.target).value })"
+                        class="w-full mt-0.5 px-2 py-1 bg-white border border-sky-200 rounded-lg text-center font-bold text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 shadow-2xs" />
                     </div>
                   </div>
                 </div>
@@ -788,6 +788,78 @@
                   </p>
                 </div>
               }
+
+              <!-- SECCIÓN: ROTACIÓN Y ORIENTACIÓN 3D (EJES X, Y, Z + GIROS RÁPIDOS 90°) -->
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span class="material-icons text-xs text-amber-500">3d_rotation</span>
+                    Rotación 3D (Ejes X, Y, Z)
+                  </span>
+                  <button 
+                    type="button" 
+                    (click)="resetSelectedPartRotation()"
+                    class="text-[10px] font-bold text-sky-600 hover:text-sky-800 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs transition">
+                    0° Reset
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-1.5 text-xs">
+                  <!-- EJE X -->
+                  <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-rose-500">
+                    <div class="flex items-center justify-between text-[10px] font-extrabold text-rose-600 font-mono">
+                      <span>GIRO X</span>
+                      <span class="font-mono text-slate-700">{{ sel.rotationX || 0 }}°</span>
+                    </div>
+                    <div class="flex items-center gap-1 my-1">
+                      <button type="button" (click)="rotateSelectedPart3DAngle('x', -90)" class="flex-1 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px]" title="-90° X">-90°</button>
+                      <button type="button" (click)="rotateSelectedPart3DAngle('x', 90)" class="flex-1 py-0.5 bg-rose-500 hover:bg-rose-600 text-white rounded font-bold text-[10px]" title="+90° X">+90°</button>
+                    </div>
+                    <input 
+                      type="number" 
+                      step="15" 
+                      [value]="sel.rotationX || 0" 
+                      (input)="setPartRotationAngle('x', +$any($event.target).value)" 
+                      class="w-full text-center font-mono font-bold text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded py-0.5 focus:outline-hidden focus:border-rose-500" />
+                  </div>
+
+                  <!-- EJE Y -->
+                  <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-emerald-500">
+                    <div class="flex items-center justify-between text-[10px] font-extrabold text-emerald-600 font-mono">
+                      <span>GIRO Y</span>
+                      <span class="font-mono text-slate-700">{{ sel.rotationY || 0 }}°</span>
+                    </div>
+                    <div class="flex items-center gap-1 my-1">
+                      <button type="button" (click)="rotateSelectedPart3DAngle('y', -90)" class="flex-1 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px]" title="-90° Y">-90°</button>
+                      <button type="button" (click)="rotateSelectedPart3DAngle('y', 90)" class="flex-1 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded font-bold text-[10px]" title="+90° Y">+90°</button>
+                    </div>
+                    <input 
+                      type="number" 
+                      step="15" 
+                      [value]="sel.rotationY || 0" 
+                      (input)="setPartRotationAngle('y', +$any($event.target).value)" 
+                      class="w-full text-center font-mono font-bold text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded py-0.5 focus:outline-hidden focus:border-emerald-500" />
+                  </div>
+
+                  <!-- EJE Z -->
+                  <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-sky-500">
+                    <div class="flex items-center justify-between text-[10px] font-extrabold text-sky-600 font-mono">
+                      <span>GIRO Z</span>
+                      <span class="font-mono text-slate-700">{{ sel.rotationZ || 0 }}°</span>
+                    </div>
+                    <div class="flex items-center gap-1 my-1">
+                      <button type="button" (click)="rotateSelectedPart3DAngle('z', -90)" class="flex-1 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px]" title="-90° Z">-90°</button>
+                      <button type="button" (click)="rotateSelectedPart3DAngle('z', 90)" class="flex-1 py-0.5 bg-sky-500 hover:bg-sky-600 text-white rounded font-bold text-[10px]" title="+90° Z">+90°</button>
+                    </div>
+                    <input 
+                      type="number" 
+                      step="15" 
+                      [value]="sel.rotationZ || 0" 
+                      (input)="setPartRotationAngle('z', +$any($event.target).value)" 
+                      class="w-full text-center font-mono font-bold text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded py-0.5 focus:outline-hidden focus:border-sky-500" />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- SECTION: LUZ LIBRE Y HUECOS ÚTILES -->

@@ -1069,11 +1069,46 @@ export class ModuleDesignerComponent {
     if (this.viewer3dRef()) {
       this.viewer3dRef()!.rotatePart90(sel, axis);
     } else {
-      if (axis === 'y') {
-        this.updateSelectedPart({ length: sel.width, width: sel.length });
-      }
+      const prop = axis === 'x' ? 'rotationX' : (axis === 'y' ? 'rotationY' : 'rotationZ');
+      const current = sel[prop] || 0;
+      this.updateSelectedPart({ [prop]: (current + 90) % 360 });
     }
     this.showToast(`🔄 Pieza girada 90°`);
+  }
+
+  rotateSelectedPart3DAngle(axis: 'x' | 'y' | 'z', delta: number) {
+    const sel = this.selectedPart();
+    if (!sel) return;
+    const prop = axis === 'x' ? 'rotationX' : (axis === 'y' ? 'rotationY' : 'rotationZ');
+    const current = sel[prop] || 0;
+    const next = ((current + delta) % 360 + 360) % 360;
+    this.updateSelectedPart({ [prop]: next });
+    this.showToast(`🔄 Rotación ${axis.toUpperCase()}: ${next}°`);
+  }
+
+  setPartRotationAngle(axis: 'x' | 'y' | 'z', angle: number) {
+    const sel = this.selectedPart();
+    if (!sel || isNaN(angle)) return;
+    const normAngle = ((Math.round(angle) % 360) + 360) % 360;
+    const prop = axis === 'x' ? 'rotationX' : (axis === 'y' ? 'rotationY' : 'rotationZ');
+    this.updateSelectedPart({ [prop]: normAngle });
+  }
+
+  resetSelectedPartRotation() {
+    this.updateSelectedPart({ rotationX: 0, rotationY: 0, rotationZ: 0 });
+    this.showToast('↺ Rotación restablecida a 0°');
+  }
+
+  updatePartDiameter(diameter: number) {
+    const sel = this.selectedPart();
+    if (!sel || isNaN(diameter) || diameter <= 0) return;
+    const d = Math.max(10, Math.round(diameter));
+    const r = Math.round(d / 2);
+    this.updateSelectedPart({
+      diameter: d,
+      radius: r,
+      width: d
+    });
   }
 
   duplicateSelectedGroup() {
