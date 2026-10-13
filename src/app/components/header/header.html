@@ -168,6 +168,23 @@
           </span>
         </button>
 
+        <!-- Botón de Notas y Pendientes del Proyecto -->
+        <button
+          type="button"
+          (click)="showNotesModal.set(true)"
+          [class]="themeService.isClassic() 
+            ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-300/80 transition whitespace-nowrap shrink-0 shadow-2xs cursor-pointer' 
+            : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 rounded-lg border border-amber-700/50 transition whitespace-nowrap shrink-0 cursor-pointer'"
+          title="Abrir cuaderno de notas y pendientes del proyecto activo">
+          <span class="material-icons text-sm text-amber-500 shrink-0">edit_note</span>
+          <span class="whitespace-nowrap hidden md:inline">Notas</span>
+          @if (pendingNotesCount() > 0) {
+            <span class="px-1.5 py-0.2 text-[10px] font-black rounded-full bg-amber-500 text-slate-950 font-mono shadow-2xs">
+              {{ pendingNotesCount() }}
+            </span>
+          }
+        </button>
+
         <!-- Undo / Redo History Controls -->
         <div [class]="themeService.isClassic() ? 'flex items-center h-8.5 bg-slate-100 border border-slate-200 rounded-lg p-0.5 shadow-xs shrink-0' : 'flex items-center h-8.5 bg-zinc-950/90 border border-zinc-800 rounded-lg p-0.5 shadow-sm shrink-0'">
           <button 
@@ -876,4 +893,10 @@
   [isOpen]="showDocumentationModal()"
   (modalClose)="closeDocumentationModal()">
 </app-documentation-modal>
+
+<!-- MODAL: NOTAS Y PENDIENTES DEL PROYECTO (AUTO-GUARDADO EN NUBE) -->
+<app-project-notes-modal
+  [isOpen]="showNotesModal()"
+  (modalClose)="showNotesModal.set(false)">
+</app-project-notes-modal>
 

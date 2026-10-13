@@ -7,6 +7,7 @@ import {
   Part,
   PartGroup,
   Project,
+  ProjectNoteItem,
   ProjectSettings,
   ApplianceItem
 } from '../models/melamine.models';
@@ -102,6 +103,53 @@ export class ProjectStorageService {
     return (this.appliancesList() || []).find(a => a.id === id) || null;
   });
   readonly projectSettings = computed(() => this.currentProject().settings);
+  readonly projectNotes = computed<ProjectNoteItem[]>(() => this.currentProject().projectNotes || []);
+
+  addProjectNote(noteData: Omit<ProjectNoteItem, 'id' | 'createdAt' | 'updatedAt'>) {
+    this.pushSnapshot();
+    const now = new Date().toISOString();
+    const newNote: ProjectNoteItem = {
+      ...noteData,
+      id: 'note_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      createdAt: now,
+      updatedAt: now
+    };
+    this.updateProject(p => ({
+      ...p,
+      projectNotes: [newNote, ...(p.projectNotes || [])]
+    }));
+    return newNote;
+  }
+
+  updateProjectNote(id: string, updates: Partial<ProjectNoteItem>) {
+    this.pushSnapshot();
+    const now = new Date().toISOString();
+    this.updateProject(p => ({
+      ...p,
+      projectNotes: (p.projectNotes || []).map(n => 
+        n.id === id ? { ...n, ...updates, updatedAt: now } : n
+      )
+    }));
+  }
+
+  deleteProjectNote(id: string) {
+    this.pushSnapshot();
+    this.updateProject(p => ({
+      ...p,
+      projectNotes: (p.projectNotes || []).filter(n => n.id !== id)
+    }));
+  }
+
+  toggleProjectNoteComplete(id: string) {
+    this.pushSnapshot();
+    const now = new Date().toISOString();
+    this.updateProject(p => ({
+      ...p,
+      projectNotes: (p.projectNotes || []).map(n => 
+        n.id === id ? { ...n, completed: !n.completed, updatedAt: now } : n
+      )
+    }));
+  }
 
   addAppliance(appliance: ApplianceItem) {
     this.pushSnapshot();

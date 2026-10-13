@@ -1,0 +1,350 @@
+@if (isOpen()) {
+  <div 
+    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in-50"
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+    (keydown.escape)="close()">
+    
+    <!-- Backdrop dismiss overlay -->
+    <button 
+      type="button" 
+      class="fixed inset-0 w-full h-full cursor-default bg-transparent border-0 p-0" 
+      aria-label="Cerrar modal" 
+      (click)="close()"></button>
+
+    <!-- Modal Window Container -->
+    <div 
+      class="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border transition-all animate-in zoom-in-95"
+      [class]="themeService.isClassic() ? 'bg-white border-slate-200 text-slate-800' : 'bg-zinc-900 border-zinc-700 text-zinc-100'"
+      (click)="$event.stopPropagation()">
+      
+      <!-- HEADER -->
+      <div 
+        class="flex items-center justify-between px-5 py-3.5 border-b shrink-0"
+        [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950/80 border-zinc-800'">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0">
+            <span class="material-icons text-2xl">edit_note</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-base font-black tracking-tight" [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'">
+                Notas y Pendientes del Proyecto
+              </h2>
+              <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-600 border border-amber-500/30 font-mono">
+                {{ notes().length }} {{ notes().length === 1 ? 'nota' : 'notas' }}
+              </span>
+            </div>
+            <p class="text-xs truncate max-w-md" [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'">
+              Proyecto: <span class="font-bold" [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-200'">{{ project().name }}</span>
+              @if (project().clientName) {
+                <span> • {{ project().clientName }}</span>
+              }
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          @if (!showAddForm()) {
+            <button
+              type="button"
+              (click)="openNewNoteForm()"
+              class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+              <span class="material-icons text-sm">add</span>
+              <span>Nueva Nota</span>
+            </button>
+          }
+          <button
+            type="button"
+            (click)="close()"
+            [class]="themeService.isClassic() ? 'p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition cursor-pointer' : 'p-1.5 text-zinc-400 hover:text-white rounded-lg transition cursor-pointer'">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- MAIN BODY CONTAINER -->
+      <div class="flex-1 overflow-y-auto p-5 space-y-4">
+
+        <!-- ADD / EDIT FORM PANEL -->
+        @if (showAddForm()) {
+          <div 
+            class="p-4 rounded-2xl border space-y-3.5 shadow-md animate-in fade-in-50 zoom-in-95"
+            [class]="themeService.isClassic() ? 'bg-amber-50/70 border-amber-200 text-slate-800' : 'bg-amber-950/20 border-amber-700/40 text-zinc-100'">
+            
+            <div class="flex items-center justify-between border-b pb-2" [class]="themeService.isClassic() ? 'border-amber-200/80' : 'border-amber-800/40'">
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                <span class="material-icons text-base">{{ editingNoteId() ? 'edit' : 'post_add' }}</span>
+                {{ editingNoteId() ? 'Editar Nota' : 'Crear Nueva Nota / Pendiente' }}
+              </span>
+              <button 
+                type="button" 
+                (click)="cancelForm()" 
+                [class]="themeService.isClassic() ? 'text-slate-400 hover:text-slate-700 text-xs font-medium cursor-pointer' : 'text-zinc-400 hover:text-white text-xs font-medium cursor-pointer'">
+                Cancelar
+              </button>
+            </div>
+
+            <form [formGroup]="noteForm" (ngSubmit)="saveNote()" class="space-y-3">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="sm:col-span-2">
+                  <label for="note-title-input" [class]="themeService.isClassic() ? 'block text-xs font-bold text-slate-700 mb-1' : 'block text-xs font-bold text-zinc-300 mb-1'">
+                    Título del Ajuste o Nota:
+                  </label>
+                  <input 
+                    id="note-title-input"
+                    type="text"
+                    formControlName="title"
+                    placeholder="ej. Ajustar altura de repisa central o verificar herraje"
+                    [class]="themeService.isClassic() ? 'w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500' : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs font-medium text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400'" />
+                </div>
+
+                <div>
+                  <label for="note-category-select" [class]="themeService.isClassic() ? 'block text-xs font-bold text-slate-700 mb-1' : 'block text-xs font-bold text-zinc-300 mb-1'">
+                    Categoría:
+                  </label>
+                  <select 
+                    id="note-category-select"
+                    formControlName="category"
+                    [class]="themeService.isClassic() ? 'w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-amber-500' : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs font-medium text-white focus:outline-none focus:border-amber-400'">
+                    <option value="pending">Por Hacer / Tarea</option>
+                    <option value="adjustment">Ajuste de Medidas / Pieza</option>
+                    <option value="design">Cambio de Diseño CAD</option>
+                    <option value="general">Nota General / Cliente</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label for="note-content-text" [class]="themeService.isClassic() ? 'block text-xs font-bold text-slate-700 mb-1' : 'block text-xs font-bold text-zinc-300 mb-1'">
+                  Detalles y Observaciones:
+                </label>
+                <textarea 
+                  id="note-content-text"
+                  rows="3"
+                  formControlName="content"
+                  placeholder="Escribe los detalles que faltan por ajustar o cotizar para no olvidarlos al retomar el proyecto..."
+                  [class]="themeService.isClassic() ? 'w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500' : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs font-medium text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400'"></textarea>
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-[11px] text-amber-600 dark:text-amber-400 font-mono flex items-center gap-1">
+                  <span class="material-icons text-xs">cloud_done</span>
+                  Se guardará automáticamente en la nube con tu proyecto
+                </span>
+
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    (click)="cancelForm()"
+                    [class]="themeService.isClassic() ? 'px-3 py-1.5 text-slate-600 hover:text-slate-900 text-xs font-medium cursor-pointer' : 'px-3 py-1.5 text-zinc-400 hover:text-white text-xs font-medium cursor-pointer'">
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    [disabled]="noteForm.invalid"
+                    class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-1 cursor-pointer">
+                    <span class="material-icons text-sm">check</span>
+                    <span>{{ editingNoteId() ? 'Actualizar Nota' : 'Guardar Nota' }}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        }
+
+        <!-- SEARCH AND FILTER BAR -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <!-- Filter Tabs -->
+          <div [class]="themeService.isClassic() ? 'flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto text-xs shrink-0' : 'flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 overflow-x-auto text-xs shrink-0'">
+            <button 
+              type="button" 
+              (click)="activeFilter.set('all')"
+              [class]="activeFilter() === 'all' 
+                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-slate-900 font-bold shadow-xs' : 'px-2.5 py-1 rounded-lg bg-zinc-800 text-white font-bold shadow-xs') 
+                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white')">
+              Todas ({{ notes().length }})
+            </button>
+            <button 
+              type="button" 
+              (click)="activeFilter.set('pending')"
+              [class]="activeFilter() === 'pending' 
+                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-amber-700 font-bold shadow-xs' : 'px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-bold shadow-xs') 
+                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white')">
+              Por Hacer ({{ pendingCount() }})
+            </button>
+            <button 
+              type="button" 
+              (click)="activeFilter.set('adjustment')"
+              [class]="activeFilter() === 'adjustment' 
+                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-rose-700 font-bold shadow-xs' : 'px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 font-bold shadow-xs') 
+                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white')">
+              Ajustes
+            </button>
+            <button 
+              type="button" 
+              (click)="activeFilter.set('design')"
+              [class]="activeFilter() === 'design' 
+                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-indigo-700 font-bold shadow-xs' : 'px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 font-bold shadow-xs') 
+                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white')">
+              Diseño CAD
+            </button>
+            <button 
+              type="button" 
+              (click)="activeFilter.set('completed')"
+              [class]="activeFilter() === 'completed' 
+                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-emerald-700 font-bold shadow-xs' : 'px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold shadow-xs') 
+                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white')">
+              Completadas ({{ completedCount() }})
+            </button>
+          </div>
+
+          <!-- Search Input -->
+          <div class="relative flex-1 max-w-xs">
+            <span class="material-icons absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span>
+            <input 
+              type="text" 
+              [value]="searchQuery()" 
+              (input)="searchQuery.set($any($event.target).value)" 
+              placeholder="Buscar en notas..." 
+              [class]="themeService.isClassic() ? 'w-full pl-8 pr-3 py-1.5 bg-slate-100 border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-amber-500 text-slate-900' : 'w-full pl-8 pr-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs focus:outline-none focus:border-amber-400 text-white'" />
+          </div>
+        </div>
+
+        <!-- NOTES LIST CONTAINER -->
+        <div class="space-y-3">
+          @if (filteredNotes().length === 0) {
+            <div 
+              class="p-8 text-center rounded-2xl border border-dashed flex flex-col items-center justify-center space-y-2"
+              [class]="themeService.isClassic() ? 'border-slate-300 bg-slate-50/50 text-slate-500' : 'border-zinc-800 bg-zinc-950/40 text-zinc-500'">
+              <span class="material-icons text-4xl text-amber-500/60">note_add</span>
+              <p class="text-xs font-medium">
+                @if (notes().length === 0) {
+                  No hay notas guardadas aún en este proyecto. Haz clic en <b>"Nueva Nota"</b> para ir anotando tus pendientes.
+                } @else {
+                  No se encontraron notas con el filtro o búsqueda seleccionada.
+                }
+              </p>
+              @if (notes().length === 0 && !showAddForm()) {
+                <button
+                  type="button"
+                  (click)="openNewNoteForm()"
+                  class="mt-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-1 cursor-pointer">
+                  <span class="material-icons text-sm">add</span>
+                  <span>Crear Primera Nota</span>
+                </button>
+              }
+            </div>
+          } @else {
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              @for (note of filteredNotes(); track note.id) {
+                @let badge = getCategoryBadge(note.category);
+                <div 
+                  class="group relative p-4 rounded-2xl border transition-all hover:shadow-md flex flex-col justify-between"
+                  [class]="note.completed 
+                    ? (themeService.isClassic() ? 'bg-slate-100/80 border-slate-200 opacity-70' : 'bg-zinc-950/40 border-zinc-800 opacity-60')
+                    : (themeService.isClassic() ? 'bg-white border-slate-200/90 hover:border-amber-400' : 'bg-zinc-900 border-zinc-800 hover:border-amber-500/60')">
+                  
+                  <div class="space-y-2">
+                    <!-- Top Note Header: Checkbox, Badge & Actions -->
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="flex items-start gap-2.5 min-w-0">
+                        <!-- Custom Checkbox -->
+                        <button 
+                          type="button"
+                          (click)="toggleComplete(note.id, $event)"
+                          [class]="note.completed 
+                            ? 'w-5 h-5 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0 transition cursor-pointer mt-0.5' 
+                            : (themeService.isClassic() ? 'w-5 h-5 rounded-lg border-2 border-slate-300 hover:border-amber-500 flex items-center justify-center shrink-0 transition cursor-pointer mt-0.5' : 'w-5 h-5 rounded-lg border-2 border-zinc-600 hover:border-amber-400 flex items-center justify-center shrink-0 transition cursor-pointer mt-0.5')"
+                          [title]="note.completed ? 'Marcar como pendiente' : 'Marcar como completada'">
+                          @if (note.completed) {
+                            <span class="material-icons text-xs font-bold">check</span>
+                          }
+                        </button>
+
+                        <div class="min-w-0">
+                          <h3 
+                            class="text-xs font-bold truncate leading-tight"
+                            [class]="note.completed 
+                              ? 'line-through text-slate-400 dark:text-zinc-500' 
+                              : (themeService.isClassic() ? 'text-slate-900' : 'text-white')">
+                            {{ note.title }}
+                          </h3>
+                          <span 
+                            class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1"
+                            [class]="badge.bgClass + ' ' + badge.textClass">
+                            <span class="material-icons text-[11px]">{{ badge.icon }}</span>
+                            {{ badge.label }}
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Edit / Delete Note Action Buttons -->
+                      <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition">
+                        <button 
+                          type="button"
+                          (click)="startEditNote(note)"
+                          [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-indigo-600 rounded cursor-pointer' : 'p-1 text-zinc-400 hover:text-indigo-400 rounded cursor-pointer'"
+                          title="Editar nota">
+                          <span class="material-icons text-sm">edit</span>
+                        </button>
+                        <button 
+                          type="button"
+                          (click)="deleteNote(note.id, $event)"
+                          [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer' : 'p-1 text-zinc-400 hover:text-rose-400 rounded cursor-pointer'"
+                          title="Eliminar nota">
+                          <span class="material-icons text-sm">delete</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Note Content Text -->
+                    <p 
+                      class="text-xs whitespace-pre-line leading-relaxed pl-7"
+                      [class]="note.completed 
+                        ? 'text-slate-400 dark:text-zinc-500' 
+                        : (themeService.isClassic() ? 'text-slate-600' : 'text-zinc-300')">
+                      {{ note.content }}
+                    </p>
+                  </div>
+
+                  <!-- Date Timestamp Footer -->
+                  <div class="pt-3 mt-2 border-t flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 font-mono" [class]="themeService.isClassic() ? 'border-slate-100' : 'border-zinc-800/80'">
+                    <span>Actualizado: {{ note.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+                    @if (note.completed) {
+                      <span class="text-emerald-500 font-bold flex items-center gap-0.5">
+                        <span class="material-icons text-xs">task_alt</span>
+                        Resuelto
+                      </span>
+                    }
+                  </div>
+
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+      </div>
+
+      <!-- FOOTER -->
+      <div 
+        class="flex items-center justify-between px-5 py-3 border-t shrink-0 text-xs"
+        [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200 text-slate-600' : 'bg-zinc-950/80 border-zinc-800 text-zinc-400'">
+        <div class="flex items-center gap-2 font-mono text-[11px]">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Sincronización en Nube: {{ autoSyncEnabled() ? 'Automática activa' : 'Guardado con proyecto' }}</span>
+        </div>
+
+        <button
+          type="button"
+          (click)="close()"
+          class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition cursor-pointer">
+          Cerrar
+        </button>
+      </div>
+
+    </div>
+  </div>
+}

@@ -288,12 +288,23 @@ export interface CollisionRecord {
   overlapVolumeMm3: number;
 }
 
+export interface ProjectNoteItem {
+  id: string;
+  title: string;
+  content: string;
+  category: 'pending' | 'adjustment' | 'design' | 'general';
+  completed?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Project {
   id: string;
   name: string;
   clientName: string;
   date: string;
   notes: string;
+  projectNotes?: ProjectNoteItem[];
   settings: ProjectSettings;
   materials: Material[];
   modules: FurnitureModule[];

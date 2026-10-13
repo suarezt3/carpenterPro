@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject, signal, output, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, computed, output, input } from '@angular/core';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
 import { DocumentationModalComponent } from '../documentation-modal/documentation-modal';
+import { ProjectNotesModalComponent } from '../project-notes-modal/project-notes-modal';
 import { ProjectSettings } from '../../models/melamine.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SlicePipe } from '@angular/common';
@@ -14,7 +15,13 @@ import { ThemeService } from '../../services/theme.service';
 @Component({
   selector: 'app-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, SlicePipe, TechnicalSheetModalComponent, DocumentationModalComponent],
+  imports: [
+    ReactiveFormsModule, 
+    SlicePipe, 
+    TechnicalSheetModalComponent, 
+    DocumentationModalComponent,
+    ProjectNotesModalComponent
+  ],
   host: {
     '(window:keydown)': 'handleGlobalKeyDown($event)',
     '(document:click)': 'closeDropdowns()'
@@ -41,10 +48,12 @@ export class HeaderComponent {
   showSqlModal = signal(false);
   showTechnicalSheetModal = signal(false);
   showDocumentationModal = signal(false);
+  showNotesModal = signal(false);
   projectsTab = signal<'cloud' | 'local'>('cloud');
   sqlCopied = signal(false);
   toastMessage = signal<string | null>(null);
   readonly showLabelsTab = signal(false);
+  readonly pendingNotesCount = computed(() => this.projectService.projectNotes().filter(n => !n.completed).length);
 
   // Editable Project Title & Client State
   readonly isEditingTitle = signal(false);
