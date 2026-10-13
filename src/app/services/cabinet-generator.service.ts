@@ -595,8 +595,8 @@ export class CabinetGeneratorService {
     const backMat = materials.find(m => m.id === config.backMaterialId) || 
                     materials.find(m => m.thickness <= 6) || mainMat;
 
-    const t = config.structureThickness || 18;
-    const doorT = config.doorThickness || 18;
+    const t = config.structureThickness || 15;
+    const doorT = config.doorThickness || 15;
     const backT = config.backThickness || 3;
     const w = config.width || 600;
     const h = config.height || 800;
@@ -1052,10 +1052,75 @@ export class CabinetGeneratorService {
       id: groupId,
       name: groupName,
       type: 'assembly',
-      isOpen: false
+      isOpen: false,
+      parametricConfig: config
     };
 
     return { module, parts, group };
+  }
+
+  /**
+   * Reconstruye una configuración paramétrica a partir de las piezas existentes de un grupo
+   */
+  reconstructConfigFromParts(parts: Part[], group: PartGroup): ParametricCabinetConfig {
+    if (group.parametricConfig) {
+      return { ...group.parametricConfig };
+    }
+
+    const sidePart = parts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || parts[0];
+    const topOrBottom = parts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
+    const doorParts = parts.filter(p => p.componentRole === 'door');
+    const shelfParts = parts.filter(p => p.componentRole === 'shelf');
+    const backPart = parts.find(p => p.componentRole === 'back');
+
+    const t = sidePart?.thickness || 15;
+    const height = sidePart ? (sidePart.length > sidePart.width ? sidePart.length : sidePart.width) : 800;
+    const innerWidth = topOrBottom ? topOrBottom.length : 570;
+    const width = innerWidth + (2 * t);
+    const depth = (sidePart ? (sidePart.length > sidePart.width ? sidePart.width : sidePart.length) : 300) + (doorParts.length > 0 ? (doorParts[0].thickness || 15) : 0);
+
+    let doorOpening: ParametricCabinetConfig['doorOpening'] = 'none';
+    if (doorParts.length === 2) {
+      doorOpening = 'double';
+    } else if (doorParts.length === 1) {
+      const hw = doorParts[0].hardwareConfig;
+      if (hw?.openingDirection === 'top') {
+        doorOpening = 'top';
+      } else if (hw?.openingDirection === 'right') {
+        doorOpening = 'right';
+      } else {
+        doorOpening = 'left';
+      }
+    }
+
+    return {
+      name: group.name,
+      code: 'MOD_' + group.id.slice(-4),
+      moduleType: 'base_cabinet',
+      category: 'kitchen_base',
+      width,
+      height,
+      depth,
+      structureThickness: t,
+      doorThickness: doorParts[0]?.thickness || t,
+      backThickness: backPart?.thickness || 3,
+      backType: backPart ? 'groove' : 'none',
+      hasBackPanel: !!backPart,
+      shelvesCount: shelfParts.length,
+      shelfDistribution: 'uniform',
+      doorOpening,
+      hasHandle: doorParts[0]?.hardwareConfig?.handleType !== 'none',
+      handleType: doorParts[0]?.hardwareConfig?.handleType || 'bar_modern',
+      handleFinish: doorParts[0]?.hardwareConfig?.handleFinish || 'brushed_steel',
+      handlePosition: doorParts[0]?.hardwareConfig?.handlePosition || 'vertical',
+      structureMaterialId: sidePart?.materialId || 'mat-1',
+      doorMaterialId: doorParts[0]?.materialId || sidePart?.materialId || 'mat-1',
+      backMaterialId: backPart?.materialId || sidePart?.materialId || 'mat-1',
+      facadeGap: 3,
+      posX: parts[0]?.posX ?? 0,
+      posY: sidePart?.posY,
+      posZ: parts[0]?.posZ ?? 0
+    };
   }
 
   /**

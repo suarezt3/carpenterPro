@@ -83,6 +83,7 @@ export interface PartGroup {
   slideType?: SlideType; // Telescópica estándar, cierre suave, etc.
   colorHex?: string;
   frontGap?: number; // Holgura lateral para correderas (26mm total)
+  parametricConfig?: ParametricCabinetConfig;
 }
 
 export interface ParametricDrawerConfig {

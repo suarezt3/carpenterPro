@@ -3,6 +3,7 @@ import {
   FurnitureModule,
   HardwareItem,
   Material,
+  ParametricCabinetConfig,
   ParametricDrawerConfig,
   Part,
   PartGroup,
@@ -869,11 +870,15 @@ export class ProjectStorageService {
     }));
   }
 
-  updateParametricCabinet(groupId: string, newParts: Part[], newName?: string) {
+  updateParametricCabinet(groupId: string, newParts: Part[], newName?: string, newConfig?: ParametricCabinetConfig) {
     this.pushSnapshot();
     this.updateProject(p => ({
       ...p,
-      groups: (p.groups || []).map(g => g.id === groupId ? { ...g, name: newName || g.name } : g),
+      groups: (p.groups || []).map(g => g.id === groupId ? { 
+        ...g, 
+        name: newName || g.name, 
+        parametricConfig: newConfig || g.parametricConfig 
+      } : g),
       parts: [
         ...p.parts.filter(pt => pt.groupId !== groupId),
         ...newParts

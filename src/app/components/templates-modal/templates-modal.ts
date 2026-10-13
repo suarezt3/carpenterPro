@@ -24,9 +24,12 @@ export class TemplatesModalComponent {
 
   isOpen = input<boolean>(false);
   materials = input<Material[]>([]);
+  editingGroupId = input<string | null>(null);
+  editingConfig = input<ParametricCabinetConfig | null>(null);
 
   modalClose = output<void>();
   cabinetCreated = output<{ config: ParametricCabinetConfig; mode: 'replace' | 'append' }>();
+  cabinetUpdated = output<{ groupId: string; config: ParametricCabinetConfig }>();
   templateSelected = output<{ template: FurnitureTemplate; mode: 'replace' | 'append' }>();
   configureParametricRequested = output<FurnitureTemplate>();
   startBlankRequested = output<void>();
@@ -42,9 +45,9 @@ export class TemplatesModalComponent {
   width = signal<number>(600);
   height = signal<number>(820);
   depth = signal<number>(580);
-  structureThickness = signal<number>(18);
-  doorThickness = signal<number>(18);
-  doorOpening = signal<'none' | 'left' | 'right' | 'double' | 'top'>('left');
+  structureThickness = signal<number>(15);
+  doorThickness = signal<number>(15);
+  doorOpening = signal<'none' | 'left' | 'right' | 'double' | 'top' | 'bottom'>('left');
   hasHandle = signal<boolean>(true);
   handleType = signal<HandleType>('bar_modern');
   handleFinish = signal<HandleFinish>('brushed_steel');
@@ -58,6 +61,36 @@ export class TemplatesModalComponent {
   doorMaterialId = signal<string>('');
   useSameMaterialForDoors = signal<boolean>(true);
   creationMode = signal<'append' | 'replace'>('append');
+
+
+
+  loadConfig(cfg: ParametricCabinetConfig) {
+    if (cfg.name) this.moduleName.set(cfg.name);
+    if (cfg.width) this.width.set(cfg.width);
+    if (cfg.height) this.height.set(cfg.height);
+    if (cfg.depth) this.depth.set(cfg.depth);
+    this.structureThickness.set(cfg.structureThickness || 15);
+    this.doorThickness.set(cfg.doorThickness || 15);
+    if (cfg.doorOpening) this.doorOpening.set(cfg.doorOpening);
+    this.hasHandle.set(cfg.hasHandle !== false);
+    if (cfg.handleType) this.handleType.set(cfg.handleType);
+    if (cfg.handleFinish) this.handleFinish.set(cfg.handleFinish);
+    if (cfg.handlePosition) this.handlePosition.set(cfg.handlePosition);
+    this.shelvesCount.set(cfg.shelvesCount ?? 0);
+    if (cfg.shelfDistribution) this.shelfDistribution.set(cfg.shelfDistribution);
+    if (cfg.shelfManualOffsets && cfg.shelfManualOffsets.length > 0) {
+      this.shelfManualOffsets.set([...cfg.shelfManualOffsets]);
+    } else {
+      this.syncManualOffsets();
+    }
+    this.hasBackPanel.set(cfg.hasBackPanel !== false && cfg.backType !== 'none');
+    if (cfg.structureMaterialId) this.structureMaterialId.set(cfg.structureMaterialId);
+    if (cfg.doorMaterialId) {
+      this.doorMaterialId.set(cfg.doorMaterialId);
+      this.useSameMaterialForDoors.set(cfg.doorMaterialId === cfg.structureMaterialId);
+    }
+    if (cfg.category) this.activePreset.set(cfg.category);
+  }
 
   // Presets de dimensiones según categoría
   readonly widthPresets = computed(() => {
@@ -217,6 +250,13 @@ export class TemplatesModalComponent {
   categoriesNavRef = viewChild<ElementRef<HTMLDivElement>>('categoriesNav');
 
   constructor() {
+    effect(() => {
+      const cfg = this.editingConfig();
+      if (cfg && this.isOpen()) {
+        this.loadConfig(cfg);
+      }
+    });
+
     // Inicializar materiales cuando estén listos
     effect(() => {
       const mats = this.materials();
@@ -403,7 +443,11 @@ export class TemplatesModalComponent {
       posY: elevationY
     };
 
-    this.cabinetCreated.emit({ config, mode: this.creationMode() });
+    if (this.editingGroupId()) {
+      this.cabinetUpdated.emit({ groupId: this.editingGroupId()!, config });
+    } else {
+      this.cabinetCreated.emit({ config, mode: this.creationMode() });
+    }
     this.close();
   }
 

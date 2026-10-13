@@ -664,18 +664,80 @@ export class ModuleDesignerComponent {
   readonly isSidebarCollapsed = signal<boolean>(false);
   readonly showTemplatesDropdown = signal<boolean>(false);
   readonly showTemplatesModal = signal<boolean>(false);
+  readonly editingGroupId = signal<string | null>(null);
+  readonly editingGroupConfig = signal<ParametricCabinetConfig | null>(null);
 
   toggleSidebar() {
     this.isSidebarCollapsed.update(v => !v);
   }
 
   openTemplatesModal() {
+    this.editingGroupId.set(null);
+    this.editingGroupConfig.set(null);
     this.showTemplatesDropdown.set(false);
     this.showTemplatesModal.set(true);
   }
 
   closeTemplatesModal() {
     this.showTemplatesModal.set(false);
+    this.editingGroupId.set(null);
+    this.editingGroupConfig.set(null);
+  }
+
+  openEditSelectedGroup() {
+    const gId = this.activeSelectedGroupId();
+    if (gId) {
+      this.openEditGroup(gId);
+    }
+  }
+
+  openEditGroup(groupId: string) {
+    const group = this.groups().find(g => g.id === groupId);
+    const parts = this.currentParts().filter(p => p.groupId === groupId);
+    if (!group || parts.length === 0) return;
+
+    let config = group.parametricConfig;
+    if (!config) {
+      config = this.cabinetGen.reconstructConfigFromParts(parts, group);
+    }
+    this.editingGroupId.set(groupId);
+    this.editingGroupConfig.set(config);
+    this.showTemplatesModal.set(true);
+  }
+
+  onCabinetUpdated(event: { groupId: string; config: ParametricCabinetConfig }) {
+    const groupParts = this.currentParts().filter(p => p.groupId === event.groupId);
+    const sidePart = groupParts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || groupParts[0];
+    
+    // Maintain exact position of the module in 3D workspace
+    const posX = sidePart ? (groupParts[0].posX ?? event.config.posX ?? 0) : (event.config.posX ?? 0);
+    const posY = sidePart?.posY ?? event.config.posY;
+    const posZ = sidePart ? (groupParts[0].posZ ?? event.config.posZ ?? 0) : (event.config.posZ ?? 0);
+
+    const finalConfig: ParametricCabinetConfig = {
+      ...event.config,
+      posX,
+      posY,
+      posZ
+    };
+
+    const res = this.cabinetGen.generateParametricCabinet(finalConfig, this.materials());
+    const updatedParts = res.parts.map(p => ({
+      ...p,
+      groupId: event.groupId,
+      groupName: finalConfig.name
+    }));
+
+    this.projectService.updateParametricCabinet(event.groupId, updatedParts, finalConfig.name, finalConfig);
+    this.showToast(`✨ Módulo "${finalConfig.name}" actualizado`);
+    this.closeTemplatesModal();
+
+    // Select updated module parts
+    const partIds = updatedParts.map(p => p.id);
+    this.selectedPartIds.set(partIds);
+    if (partIds.length > 0) {
+      this.selectedPartId.set(partIds[0]);
+    }
   }
 
   toggleTemplatesDropdown() {

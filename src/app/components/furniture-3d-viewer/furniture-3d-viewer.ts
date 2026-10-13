@@ -151,6 +151,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   drawerWizardRequested = output<void>();
   groupRotationRequested = output<{ groupId: string; deltaAngle: 90 | -90 | 180 }>();
   groupDuplicationRequested = output<string>();
+  editModuleRequested = output<string>();
   hiddenPartsChanged = output<string[]>();
   roomConfigModified = output<Partial<RoomConfiguration>>();
   wallSelected = output<'main' | 'side' | null>();
@@ -997,8 +998,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         if (curOpen > 0) {
           if (hingeSide === 'left') doorPivot.rotation.y = -curOpen * (Math.PI / 2.05);
           else if (hingeSide === 'right') doorPivot.rotation.y = curOpen * (Math.PI / 2.05);
-          else if (hingeSide === 'top') doorPivot.rotation.x = curOpen * (Math.PI / 2.2);
-          else if (hingeSide === 'bottom') doorPivot.rotation.x = -curOpen * (Math.PI / 2.2);
+          else if (hingeSide === 'top') doorPivot.rotation.x = -curOpen * (Math.PI / 2.2);
+          else if (hingeSide === 'bottom') doorPivot.rotation.x = curOpen * (Math.PI / 2.2);
         }
 
         this.furnitureGroup.add(doorPivot);
@@ -5576,6 +5577,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.closeContextMenu();
   }
 
+  onEditModuleFromContext(groupId: string) {
+    this.closeContextMenu();
+    this.editModuleRequested.emit(groupId);
+  }
+
   rotatePart3dAngle(part: Part, axis: 'x' | 'y' | 'z', delta: number) {
     const prop = axis === 'x' ? 'rotationX' : (axis === 'y' ? 'rotationY' : 'rotationZ');
     const current = part[prop] || 0;
@@ -7459,9 +7465,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
         } else if (p.hingeSide === 'right') {
           p.doorPivot.rotation.y = cur * (Math.PI / 2.05);
         } else if (p.hingeSide === 'top') {
-          p.doorPivot.rotation.x = cur * (Math.PI / 2.2);
-        } else if (p.hingeSide === 'bottom') {
           p.doorPivot.rotation.x = -cur * (Math.PI / 2.2);
+        } else if (p.hingeSide === 'bottom') {
+          p.doorPivot.rotation.x = cur * (Math.PI / 2.2);
         }
       } else if (p.isDrawer) {
         const expX = p.explodedOffset.x * (this.explodedPercent() / 100);
