@@ -65,6 +65,7 @@ export class TemplatesModalComponent {
 
 
   loadConfig(cfg: ParametricCabinetConfig) {
+    this.activeView.set('assistant');
     if (cfg.name) this.moduleName.set(cfg.name);
     if (cfg.width) this.width.set(cfg.width);
     if (cfg.height) this.height.set(cfg.height);

@@ -2579,7 +2579,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     // Material color resolution
     const assignedMat = mats.find(m => m.id === part.materialId);
-    let colorHex = part.colorHex || assignedMat?.colorHex || '#b48a60';
+    let colorHex = assignedMat?.colorHex || part.colorHex || '#b48a60';
     if (part.name.toLowerCase().includes('fondo') || part.thickness <= 4) {
       colorHex = '#e5e5e5';
     }
@@ -5722,7 +5722,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       part,
       updates: {
         materialId: mat.id,
-        materialName: mat.name
+        materialName: mat.name,
+        colorHex: mat.colorHex
       }
     });
     this.closeContextMenu();

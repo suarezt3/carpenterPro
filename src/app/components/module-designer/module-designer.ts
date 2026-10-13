@@ -692,16 +692,23 @@ export class ModuleDesignerComponent {
   }
 
   openEditGroup(groupId: string) {
-    const group = this.groups().find(g => g.id === groupId);
     const parts = this.currentParts().filter(p => p.groupId === groupId);
-    if (!group || parts.length === 0) return;
+    if (parts.length === 0) {
+      this.showToast('⚠️ No se encontraron piezas para editar en este módulo');
+      return;
+    }
+    const group = this.groups().find(g => g.id === groupId) || {
+      id: groupId,
+      name: parts[0]?.groupName || parts[0]?.moduleName || 'Módulo Paramétrico',
+      type: 'assembly' as const
+    };
 
     let config = group.parametricConfig;
     if (!config) {
       config = this.cabinetGen.reconstructConfigFromParts(parts, group);
     }
     this.editingGroupId.set(groupId);
-    this.editingGroupConfig.set(config);
+    this.editingGroupConfig.set({ ...config });
     this.showTemplatesModal.set(true);
   }
 
