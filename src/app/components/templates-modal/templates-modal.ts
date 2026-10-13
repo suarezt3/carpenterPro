@@ -18,6 +18,7 @@ export class TemplatesModalComponent {
   materials = input<Material[]>([]);
   modalClose = output<void>();
   templateSelected = output<{ template: FurnitureTemplate; mode: 'replace' | 'append' }>();
+  configureParametricRequested = output<FurnitureTemplate>();
   startBlankRequested = output<void>();
 
   searchQuery = signal<string>('');
@@ -75,6 +76,11 @@ export class TemplatesModalComponent {
 
   onSelectTemplate(t: FurnitureTemplate, mode: 'replace' | 'append') {
     this.templateSelected.emit({ template: t, mode });
+    this.close();
+  }
+
+  onConfigureTemplate(t: FurnitureTemplate) {
+    this.configureParametricRequested.emit(t);
     this.close();
   }
 

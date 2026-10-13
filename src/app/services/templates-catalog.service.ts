@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Part, Material } from '../models/melamine.models';
+import { Part, Material, ParametricCabinetConfig } from '../models/melamine.models';
 
 export interface FurnitureTemplate {
   id: string;
@@ -12,6 +12,8 @@ export interface FurnitureTemplate {
   badge: string;
   partsCount: number;
   previewColor?: { top: string; body: string; front: string; accent?: string };
+  isParametric?: boolean;
+  parametricConfig?: Partial<ParametricCabinetConfig>;
   generateParts: (materials: Material[], offsetX?: number) => Part[];
 }
 
@@ -575,14 +577,470 @@ export class TemplatesCatalogService {
           }
         ];
       }
+    },
+
+    // --- 3. MÓDULO ALTO DE COCINA 1 PUERTA (PARAMÉTRICO MELAMINA PRO) ---
+    {
+      id: 'modulo_alto_cocina_1_puerta',
+      name: 'Módulo Alto Cocina 1P (MAL1PU001)',
+      category: 'cocina',
+      categoryLabel: 'Cocinas',
+      dimensions: { width: 600, height: 800, depth: 320 },
+      description: 'Alacena superior de cocina 1 puerta batiente o elevable (pistón a gas). Medidas, repisas, espesores y sentido de apertura totalmente configurables.',
+      icon: 'kitchen',
+      badge: 'Alacena Dinámica',
+      partsCount: 7,
+      previewColor: { top: '#cbd5e1', body: '#ffffff', front: '#e2e8f0', accent: '#4f46e5' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'MAL1PU001',
+        name: 'Módulo Alto 1 Puerta (MAL-1P)',
+        moduleType: 'wall_cabinet',
+        width: 600,
+        height: 800,
+        depth: 320,
+        structureThickness: 18,
+        doorThickness: 18,
+        backThickness: 3,
+        shelvesCount: 1,
+        doorOpening: 'left',
+        facadeGap: 3
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const matDoor = this.getMaterial(mats, 'roble') || matBody;
+        const matBottom = this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_3', name: 'MDF 3mm', thickness: 3 };
+        const t = matBody.thickness || 18;
+        const w = 600;
+        const h = 800;
+        const d = 320;
+        const doorT = 18;
+        const carcassDepth = d - doorT;
+        const innerW = w - (2 * t);
+        const posY = 1450 + (h / 2);
+        const carcassCenterZ = -(doorT / 2);
+
+        return [
+          {
+            id: 'alt1_lat_izq_' + crypto.randomUUID().slice(0, 6),
+            name: 'Lateral Izquierdo',
+            length: h,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX - (w / 2) + (t / 2),
+            posY,
+            posZ: carcassCenterZ,
+            orientation: 'vertical_yz',
+            componentRole: 'side_left'
+          },
+          {
+            id: 'alt1_lat_der_' + crypto.randomUUID().slice(0, 6),
+            name: 'Lateral Derecho',
+            length: h,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX + (w / 2) - (t / 2),
+            posY,
+            posZ: carcassCenterZ,
+            orientation: 'vertical_yz',
+            componentRole: 'side_right'
+          },
+          {
+            id: 'alt1_techo_' + crypto.randomUUID().slice(0, 6),
+            name: 'Techo Superior',
+            length: innerW,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY: posY + (h / 2) - (t / 2),
+            posZ: carcassCenterZ,
+            orientation: 'horizontal',
+            componentRole: 'top'
+          },
+          {
+            id: 'alt1_base_' + crypto.randomUUID().slice(0, 6),
+            name: 'Piso Inferior',
+            length: innerW,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY: posY - (h / 2) + (t / 2),
+            posZ: carcassCenterZ,
+            orientation: 'horizontal',
+            componentRole: 'bottom'
+          },
+          {
+            id: 'alt1_repisa_' + crypto.randomUUID().slice(0, 6),
+            name: 'Repisa Central',
+            length: innerW - 2,
+            width: carcassDepth - 15,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY,
+            posZ: carcassCenterZ - 7.5,
+            orientation: 'horizontal',
+            componentRole: 'shelf'
+          },
+          {
+            id: 'alt1_fondo_' + crypto.randomUUID().slice(0, 6),
+            name: 'Fondo MDF 3mm',
+            length: w - 4,
+            width: h - 4,
+            thickness: 3,
+            quantity: 1,
+            materialId: matBottom.id,
+            materialName: matBottom.name,
+            grain: 'none',
+            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY,
+            posZ: - (d / 2) + 1.5,
+            orientation: 'vertical_xy',
+            componentRole: 'back'
+          },
+          {
+            id: 'alt1_puerta_' + crypto.randomUUID().slice(0, 6),
+            name: 'Puerta Frontal (Alacena)',
+            length: w - 3,
+            width: h - 3,
+            thickness: doorT,
+            quantity: 1,
+            materialId: matDoor.id,
+            materialName: matDoor.name,
+            grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX,
+            posY,
+            posZ: (d / 2) - (doorT / 2),
+            orientation: 'vertical_xy',
+            componentRole: 'door',
+            hardwareConfig: {
+              isMovable: true,
+              movableType: 'door',
+              openingDirection: 'left',
+              hingeType: 'straight',
+              handleType: 'bar_modern',
+              handleFinish: 'brushed_steel',
+              handlePosition: 'vertical'
+            }
+          }
+        ];
+      }
+    },
+
+    // --- 4. MÓDULO CLOSET ROPERO 1 PUERTA ---
+    {
+      id: 'closet_ropero_1_puerta',
+      name: 'Módulo Closet Ropero (1 Puerta y Repisas)',
+      category: 'closets',
+      categoryLabel: 'Closets',
+      dimensions: { width: 500, height: 1900, depth: 550 },
+      description: 'Módulo vertical para armario o closet con puerta completa, 3 repisas interiores de guardado y zócalo de piso.',
+      icon: 'door_sliding',
+      badge: 'Ropero 1P',
+      partsCount: 9,
+      previewColor: { top: '#e2e8f0', body: '#ffffff', front: '#cbd5e1', accent: '#059669' },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const matDoor = this.getMaterial(mats, 'roble') || matBody;
+        const matBottom = this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_3', name: 'MDF 3mm', thickness: 3 };
+        const t = matBody.thickness || 18;
+        const w = 500;
+        const h = 1900;
+        const d = 550;
+        const zocalo = 80;
+        const carcassH = h - zocalo;
+        const innerW = w - (2 * t);
+        const carcassDepth = d - 20;
+
+        return [
+          {
+            id: 'clo1_lat_izq_' + crypto.randomUUID().slice(0, 6),
+            name: 'Lateral Izquierdo Closet',
+            length: carcassH,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX - (w / 2) + (t / 2),
+            posY: zocalo + (carcassH / 2),
+            posZ: 0,
+            orientation: 'vertical_yz',
+            componentRole: 'side_left'
+          },
+          {
+            id: 'clo1_lat_der_' + crypto.randomUUID().slice(0, 6),
+            name: 'Lateral Derecho Closet',
+            length: carcassH,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX + (w / 2) - (t / 2),
+            posY: zocalo + (carcassH / 2),
+            posZ: 0,
+            orientation: 'vertical_yz',
+            componentRole: 'side_right'
+          },
+          {
+            id: 'clo1_techo_' + crypto.randomUUID().slice(0, 6),
+            name: 'Techo Closet',
+            length: innerW,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY: h - (t / 2),
+            posZ: 0,
+            orientation: 'horizontal',
+            componentRole: 'top'
+          },
+          {
+            id: 'clo1_piso_' + crypto.randomUUID().slice(0, 6),
+            name: 'Piso Closet',
+            length: innerW,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY: zocalo + (t / 2),
+            posZ: 0,
+            orientation: 'horizontal',
+            componentRole: 'bottom'
+          },
+          {
+            id: 'clo1_zocalo_' + crypto.randomUUID().slice(0, 6),
+            name: 'Zócalo Frontal',
+            length: innerW,
+            width: zocalo,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY: zocalo / 2,
+            posZ: (carcassDepth / 2) - (t / 2),
+            orientation: 'vertical_xy',
+            componentRole: 'plinth'
+          },
+          {
+            id: 'clo1_fondo_' + crypto.randomUUID().slice(0, 6),
+            name: 'Fondo Trasero MDF',
+            length: w - 4,
+            width: carcassH - 4,
+            thickness: 3,
+            quantity: 1,
+            materialId: matBottom.id,
+            materialName: matBottom.name,
+            grain: 'none',
+            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY: zocalo + (carcassH / 2),
+            posZ: - (carcassDepth / 2) + 1.5,
+            orientation: 'vertical_xy',
+            componentRole: 'back'
+          },
+          {
+            id: 'clo1_puerta_' + crypto.randomUUID().slice(0, 6),
+            name: 'Puerta Closet (1900)',
+            length: w - 4,
+            width: carcassH - 4,
+            thickness: t,
+            quantity: 1,
+            materialId: matDoor.id,
+            materialName: matDoor.name,
+            grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX,
+            posY: zocalo + (carcassH / 2),
+            posZ: (carcassDepth / 2) + (t / 2),
+            orientation: 'vertical_xy',
+            componentRole: 'door',
+            hardwareConfig: {
+              isMovable: true,
+              movableType: 'door',
+              openingDirection: 'left',
+              hingeType: 'straight',
+              handleType: 'bar_modern',
+              handleFinish: 'black',
+              handlePosition: 'vertical'
+            }
+          }
+        ];
+      }
+    },
+
+    // --- 5. VANITORY FLOTANTE DE BAÑO 1 PUERTA ---
+    {
+      id: 'vanitory_bano_1_puerta',
+      name: 'Vanitory Flotante Baño (1 Puerta)',
+      category: 'bano',
+      categoryLabel: 'Baños',
+      dimensions: { width: 500, height: 500, depth: 400 },
+      description: 'Mueble suspendido para baño con puerta frontal abatible, espacio libre inferior y paso para desagüe.',
+      icon: 'bathtub',
+      badge: 'Baño Suspendido',
+      partsCount: 6,
+      previewColor: { top: '#0f766e', body: '#ffffff', front: '#ccfbf1', accent: '#0d9488' },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const matDoor = this.getMaterial(mats, 'blanco');
+        const t = matBody.thickness || 18;
+        const w = 500;
+        const h = 500;
+        const d = 400;
+        const elev = 350; // Suspendido a 350mm del suelo
+        const innerW = w - (2 * t);
+        const carcassDepth = d - 20;
+
+        return [
+          {
+            id: 'van1_lat_izq_' + crypto.randomUUID().slice(0, 6),
+            name: 'Lateral Izquierdo Vanitory',
+            length: h,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thick', l2: 'none', a1: 'thick', a2: 'thick' },
+            posX: offsetX - (w / 2) + (t / 2),
+            posY: elev + (h / 2),
+            posZ: 0,
+            orientation: 'vertical_yz',
+            componentRole: 'side_left'
+          },
+          {
+            id: 'van1_lat_der_' + crypto.randomUUID().slice(0, 6),
+            name: 'Lateral Derecho Vanitory',
+            length: h,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thick', l2: 'none', a1: 'thick', a2: 'thick' },
+            posX: offsetX + (w / 2) - (t / 2),
+            posY: elev + (h / 2),
+            posZ: 0,
+            orientation: 'vertical_yz',
+            componentRole: 'side_right'
+          },
+          {
+            id: 'van1_piso_' + crypto.randomUUID().slice(0, 6),
+            name: 'Piso Vanitory',
+            length: innerW,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thick', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY: elev + (t / 2),
+            posZ: 0,
+            orientation: 'horizontal',
+            componentRole: 'bottom'
+          },
+          {
+            id: 'van1_amarre_' + crypto.randomUUID().slice(0, 6),
+            name: 'Amarre Trasero Pared',
+            length: innerW,
+            width: 100,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX: offsetX,
+            posY: elev + h - 50,
+            posZ: - (carcassDepth / 2) + (t / 2),
+            orientation: 'vertical_xy',
+            componentRole: 'tie'
+          },
+          {
+            id: 'van1_puerta_' + crypto.randomUUID().slice(0, 6),
+            name: 'Puerta Vanitory',
+            length: w - 4,
+            width: h - 4,
+            thickness: t,
+            quantity: 1,
+            materialId: matDoor.id,
+            materialName: matDoor.name,
+            grain: 'length',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: offsetX,
+            posY: elev + (h / 2),
+            posZ: (carcassDepth / 2) + (t / 2),
+            orientation: 'vertical_xy',
+            componentRole: 'door',
+            hardwareConfig: {
+              isMovable: true,
+              movableType: 'door',
+              openingDirection: 'left',
+              hingeType: 'straight',
+              handleType: 'bar_modern',
+              handleFinish: 'chrome',
+              handlePosition: 'vertical'
+            }
+          }
+        ];
+      }
     }
   ];
 
   getCategories() {
     return [
       { id: 'all', label: 'Todas las Plantillas', icon: 'auto_stories', count: this.templates.length },
-      { id: 'cajones', label: 'Cajoneras y Cajones', icon: 'table_rows', count: this.templates.filter(t => t.category === 'cajones').length },
-      { id: 'cocina', label: 'Cocina', icon: 'countertops', count: this.templates.filter(t => t.category === 'cocina').length }
+      { id: 'cocina', label: 'Cocinas', icon: 'kitchen', count: this.templates.filter(t => t.category === 'cocina').length },
+      { id: 'closets', label: 'Closets y Armarios', icon: 'door_sliding', count: this.templates.filter(t => t.category === 'closets').length },
+      { id: 'bano', label: 'Baños', icon: 'bathtub', count: this.templates.filter(t => t.category === 'bano').length },
+      { id: 'cajones', label: 'Cajoneras y Gavetas', icon: 'table_rows', count: this.templates.filter(t => t.category === 'cajones').length }
     ];
   }
 

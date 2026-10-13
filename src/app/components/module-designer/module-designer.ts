@@ -34,20 +34,30 @@ import {
   ApplianceFinish,
   ApplianceType,
   APPLIANCES_CATALOG_PRESETS,
-  APPLIANCE_FINISH_OPTIONS
+  APPLIANCE_FINISH_OPTIONS,
+  ParametricCabinetConfig
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
+import { CabinetGeneratorService } from '../../services/cabinet-generator.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
-import { FurnitureTemplate } from '../../services/templates-catalog.service';
+import { ComponentOptionsModalComponent } from '../component-options-modal/component-options-modal';
+import { TemplatesModalComponent } from '../templates-modal/templates-modal';
+import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templates-catalog.service';
 
 @Component({
   selector: 'app-module-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Furniture3dViewerComponent, TechnicalSheetModalComponent],
+  imports: [
+    ReactiveFormsModule, 
+    Furniture3dViewerComponent, 
+    TechnicalSheetModalComponent,
+    ComponentOptionsModalComponent,
+    TemplatesModalComponent
+  ],
   templateUrl: './module-designer.html',
   host: {
     '(window:keydown)': 'handleGlobalKeyDown($event)'
@@ -58,12 +68,53 @@ export class ModuleDesignerComponent {
   private confirmService = inject(ConfirmDialogService);
   private joineryEngine = inject(JoineryEngineService);
   private dxfExporter = inject(DxfExporterService);
+  private cabinetGen = inject(CabinetGeneratorService);
+  private templatesCatalog = inject(TemplatesCatalogService);
 
   readonly viewer3d = viewChild<Furniture3dViewerComponent>('viewer3d');
 
   readonly project = this.projectService.currentProject;
   readonly materials = this.projectService.materialsList;
   readonly currentParts = this.projectService.partsList;
+
+  // Modal de Opciones de Componente (Paramétrico Melamina PRO)
+  readonly selectedParametricConfig = signal<ParametricCabinetConfig | null>(null);
+  readonly showComponentOptionsModal = signal<boolean>(false);
+
+  onConfigureParametric(template: FurnitureTemplate) {
+    if (template.parametricConfig) {
+      this.selectedParametricConfig.set(template.parametricConfig as ParametricCabinetConfig);
+    } else {
+      this.selectedParametricConfig.set(null);
+    }
+    this.showComponentOptionsModal.set(true);
+  }
+
+  openCabinetOptionsModal() {
+    this.selectedParametricConfig.set(null);
+    this.showComponentOptionsModal.set(true);
+  }
+
+  onCabinetSubmitted(config: ParametricCabinetConfig) {
+    let targetX = config.posX ?? 0;
+    // Si ya existen muebles en el taller y no se especificó posición X, colocar al lado con separación limpia
+    if (this.currentParts().length > 0 && targetX === 0) {
+      targetX = this.templatesCatalog.calculateTemplateOffset(this.currentParts(), config.width);
+    }
+    const finalConfig = { ...config, posX: targetX };
+    const res = this.cabinetGen.generateParametricWallCabinet(finalConfig, this.materials());
+    this.projectService.addParametricCabinet(res);
+    
+    // Seleccionar el nuevo grupo de piezas completo para mover y reposicionar libremente en 3D
+    const partIds = res.parts.map(p => p.id);
+    this.selectedPartIds.set(partIds);
+    const doorPart = res.parts.find(p => p.componentRole === 'door') || res.parts[0];
+    if (doorPart) {
+      this.selectedPartId.set(doorPart.id);
+      this.activeDockTab.set('piece');
+    }
+    this.showToast(`✨ Módulo "${res.module.name}" insertado. Puedes moverlo libremente en 3D.`);
+  }
 
   // Selected Part ID in 3D
   readonly selectedPartId = signal<string | null>(null);

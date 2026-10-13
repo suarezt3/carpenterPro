@@ -1,0 +1,470 @@
+@if (isOpen()) {
+  <div 
+    class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in-50"
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+    (keydown.escape)="close()">
+    
+    <!-- Backdrop dismiss -->
+    <button 
+      type="button" 
+      class="fixed inset-0 w-full h-full cursor-default bg-transparent border-0 p-0" 
+      aria-label="Cerrar modal de opciones" 
+      (click)="close()"></button>
+
+    <!-- Modal Window Container -->
+    <div 
+      class="relative z-10 w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border transition-all animate-in zoom-in-95"
+      [class]="themeService.isClassic() ? 'bg-white border-slate-300 text-slate-800' : 'bg-zinc-900 border-zinc-700 text-zinc-100'">
+      
+      <!-- HEADER: Identical to Melamina PRO Component Options header -->
+      <div 
+        class="flex items-center justify-between px-5 py-3 border-b shrink-0"
+        [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950 border-zinc-800'">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+            <span class="material-icons text-xl">view_in_ar</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+                Opciones de componente: <span class="font-mono text-indigo-600 dark:text-indigo-400 font-extrabold">{{ code() }}</span>
+              </h2>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400">
+                v26.1 - Melamina PRO
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-zinc-400">
+              Biblioteca de componentes dinámicos para diseño y despiece paramétrico de cocinas
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          (click)="close()"
+          [class]="themeService.isClassic() ? 'p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition cursor-pointer' : 'p-1.5 text-zinc-400 hover:text-white rounded-lg transition cursor-pointer'">
+          <span class="material-icons text-lg">close</span>
+        </button>
+      </div>
+
+      <!-- MAIN CONTENT: 2 COLUMNS (Technical Preview + Parameters Form) -->
+      <div class="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+        <!-- COLUMN 1: Visual Blueprint Diagram & Live Technical Specs (4 cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-3">
+          <div 
+            class="rounded-xl border p-4 flex flex-col items-center justify-center relative overflow-hidden"
+            [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950/60 border-zinc-800'">
+            
+            <div class="w-full flex items-center justify-between mb-2">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                <span class="material-icons text-xs">straighten</span>
+                Fachada y Abatimiento Técnico
+              </span>
+              <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                {{ width() }} × {{ height() }} × {{ depth() }} mm
+              </span>
+            </div>
+
+            <!-- SVG Technical Elevation Diagram (Door swing triangle lines like SketchUp plugin) -->
+            <div class="w-full h-56 flex items-center justify-center p-2 bg-white dark:bg-zinc-900 rounded-lg border border-slate-200 dark:border-zinc-800 shadow-inner">
+              <svg 
+                viewBox="0 0 200 240" 
+                class="w-full h-full max-h-52 drop-shadow-xs"
+                xmlns="http://www.w3.org/2000/svg">
+                
+                <!-- Background carcass structure -->
+                <rect x="20" y="15" width="160" height="210" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2" rx="2" />
+                
+                <!-- Inner carcass offset (thickness) -->
+                <rect x="25" y="20" width="150" height="200" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" />
+                
+                <!-- Interior Shelves representations -->
+                @if (shelvesCount() > 0) {
+                  @for (s of [].constructor(shelvesCount()); track $index) {
+                    @let shelfY = 20 + (200 / (shelvesCount() + 1)) * ($index + 1);
+                    <line x1="25" [attr.y1]="shelfY" x2="175" [attr.y2]="shelfY" stroke="#94a3b8" stroke-width="2.5" />
+                  }
+                }
+
+                <!-- Door Facade Panel -->
+                <rect 
+                  x="22" 
+                  y="17" 
+                  width="156" 
+                  height="206" 
+                  fill="rgba(99, 102, 241, 0.08)" 
+                  stroke="#4f46e5" 
+                  stroke-width="1.8" 
+                  rx="1" />
+
+                <!-- Door Opening Swing Lines (Dotted technical triangle) -->
+                @if (doorOpening() === 'left') {
+                  <!-- Hinges on left, swing triangle apex at right center -->
+                  <line x1="22" y1="17" x2="178" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.8" />
+                  <line x1="22" y1="223" x2="178" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.8" />
+                  <!-- Hinge indicator ticks on left -->
+                  <rect x="18" y="35" width="4" height="16" fill="#0284c7" rx="1" />
+                  <rect x="18" y="189" width="4" height="16" fill="#0284c7" rx="1" />
+                  <!-- Handle indicator on right -->
+                  <rect x="168" y="105" width="4" height="30" fill="#1e293b" rx="1" />
+                } @else if (doorOpening() === 'right') {
+                  <!-- Hinges on right, swing triangle apex at left center -->
+                  <line x1="178" y1="17" x2="22" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.8" />
+                  <line x1="178" y1="223" x2="22" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.8" />
+                  <!-- Hinge indicators on right -->
+                  <rect x="178" y="35" width="4" height="16" fill="#0284c7" rx="1" />
+                  <rect x="178" y="189" width="4" height="16" fill="#0284c7" rx="1" />
+                  <!-- Handle indicator on left -->
+                  <rect x="28" y="105" width="4" height="30" fill="#1e293b" rx="1" />
+                } @else if (doorOpening() === 'top') {
+                  <!-- Gas lift / Hinges at top, apex at bottom center -->
+                  <line x1="22" y1="17" x2="100" y2="223" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.8" />
+                  <line x1="178" y1="17" x2="100" y2="223" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.8" />
+                  <!-- Hinge indicators on top -->
+                  <rect x="50" y="14" width="20" height="4" fill="#0284c7" rx="1" />
+                  <rect x="130" y="14" width="20" height="4" fill="#0284c7" rx="1" />
+                  <!-- Handle indicator at bottom -->
+                  <rect x="85" y="212" width="30" height="4" fill="#1e293b" rx="1" />
+                } @else if (doorOpening() === 'bottom') {
+                  <!-- Hinges at bottom, apex at top center -->
+                  <line x1="22" y1="223" x2="100" y2="17" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.8" />
+                  <line x1="178" y1="223" x2="100" y2="17" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.8" />
+                  <!-- Hinge indicators on bottom -->
+                  <rect x="50" y="222" width="20" height="4" fill="#0284c7" rx="1" />
+                  <rect x="130" y="222" width="20" height="4" fill="#0284c7" rx="1" />
+                  <!-- Handle indicator at top -->
+                  <rect x="85" y="24" width="30" height="4" fill="#1e293b" rx="1" />
+                }
+
+                <!-- Dimension tags -->
+                <text x="100" y="10" font-size="8" font-family="monospace" font-weight="bold" fill="#dc2626" text-anchor="middle">X: {{ width() }} mm</text>
+                <text x="8" y="125" font-size="8" font-family="monospace" font-weight="bold" fill="#2563eb" text-anchor="middle" transform="rotate(-90 8 125)">Z: {{ height() }} mm</text>
+              </svg>
+            </div>
+
+            <!-- Technical Summary Specs -->
+            <div class="w-full mt-3 grid grid-cols-2 gap-2 text-[10px] font-mono">
+              <div class="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                <span class="text-slate-400 block font-sans">Luz Interior Libre:</span>
+                <strong class="text-slate-800 dark:text-zinc-200 font-bold">{{ innerWidth() }} × {{ innerHeight() }} × {{ innerDepth() }} mm</strong>
+              </div>
+              <div class="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                <span class="text-slate-400 block font-sans">Medida Puerta:</span>
+                <strong class="text-indigo-600 dark:text-indigo-400 font-bold">{{ doorWidth() }} × {{ doorHeight() }} mm</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Orientation Note -->
+          <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
+            <span class="material-icons text-base text-amber-500 shrink-0 mt-0.5">open_with</span>
+            <div>
+              <strong>Posicionamiento libre en 3D:</strong>
+              <p class="text-slate-600 dark:text-zinc-400 mt-0.5">
+                Al insertarse, el mueble queda agrupado y se puede mover o rotar libremente en el taller o contra cualquier pared.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUMN 2: Configuration Parameters (7 cols) -->
+        <div class="lg:col-span-7 space-y-4">
+
+          <!-- 1. DIMENSIONES EXTERIORES (X, Z, Y) -->
+          <div class="p-3.5 rounded-xl border space-y-2.5" [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950/50 border-zinc-800'">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <span class="material-icons text-sm text-indigo-500">aspect_ratio</span>
+              Dimensiones Exteriores del Módulo
+            </span>
+
+            <!-- Ancho (X) -->
+            <div>
+              <div class="flex items-center justify-between mb-1 text-xs">
+                <label for="width-input" class="font-bold text-red-600 dark:text-red-400">Ancho: (X)</label>
+                <div class="flex items-center gap-1">
+                  @for (pw of widthPresets; track pw) {
+                    <button 
+                      type="button" 
+                      (click)="setWidth(pw)"
+                      [class]="width() === pw ? 'bg-red-600 text-white font-bold' : 'bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-300'"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
+                      {{ pw }}
+                    </button>
+                  }
+                </div>
+              </div>
+              <div class="relative">
+                <input 
+                  id="width-input"
+                  type="number" 
+                  [value]="width()" 
+                  (input)="width.set(+$any($event.target).value)"
+                  min="200" 
+                  max="1200" 
+                  step="10"
+                  class="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs font-mono font-bold focus:outline-none focus:border-red-500 text-slate-900 dark:text-white" />
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">mm</span>
+              </div>
+            </div>
+
+            <!-- Altura (Z) -->
+            <div>
+              <div class="flex items-center justify-between mb-1 text-xs">
+                <label for="height-input" class="font-bold text-blue-600 dark:text-blue-400">Altura: (Z)</label>
+                <div class="flex items-center gap-1">
+                  @for (ph of heightPresets; track ph) {
+                    <button 
+                      type="button" 
+                      (click)="setHeight(ph)"
+                      [class]="height() === ph ? 'bg-blue-600 text-white font-bold' : 'bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-300'"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
+                      {{ ph }}
+                    </button>
+                  }
+                </div>
+              </div>
+              <div class="relative">
+                <input 
+                  id="height-input"
+                  type="number" 
+                  [value]="height()" 
+                  (input)="height.set(+$any($event.target).value)"
+                  min="300" 
+                  max="1500" 
+                  step="10"
+                  class="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs font-mono font-bold focus:outline-none focus:border-blue-500 text-slate-900 dark:text-white" />
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">mm</span>
+              </div>
+            </div>
+
+            <!-- Profundidad (Y) -->
+            <div>
+              <div class="flex items-center justify-between mb-1 text-xs">
+                <label for="depth-input" class="font-bold text-emerald-600 dark:text-emerald-400">Profundidad: (Y)</label>
+                <div class="flex items-center gap-1">
+                  @for (pd of depthPresets; track pd) {
+                    <button 
+                      type="button" 
+                      (click)="setDepth(pd)"
+                      [class]="depth() === pd ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-300'"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
+                      {{ pd }}
+                    </button>
+                  }
+                </div>
+              </div>
+              <div class="relative">
+                <input 
+                  id="depth-input"
+                  type="number" 
+                  [value]="depth()" 
+                  (input)="depth.set(+$any($event.target).value)"
+                  min="180" 
+                  max="600" 
+                  step="10"
+                  class="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs font-mono font-bold focus:outline-none focus:border-emerald-500 text-slate-900 dark:text-white" />
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">mm</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. APERTURA DE PUERTA & HERRAJES -->
+          <div class="p-3.5 rounded-xl border space-y-2.5" [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950/50 border-zinc-800'">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <span class="material-icons text-sm text-indigo-500">meeting_room</span>
+              Apertura de Puerta y Fachada
+            </span>
+
+            <div>
+              <span class="block text-xs font-medium text-slate-700 dark:text-zinc-300 mb-1.5">Sentido de Abatimiento / Bisagras:</span>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                <button
+                  type="button"
+                  (click)="setDoorOpening('left')"
+                  [class]="doorOpening() === 'left' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-800 hover:bg-slate-100'"
+                  class="p-2 rounded-lg text-xs flex flex-col items-center gap-1 transition cursor-pointer">
+                  <span class="material-icons text-base">arrow_back</span>
+                  <span class="text-[11px]">Izquierda</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="setDoorOpening('right')"
+                  [class]="doorOpening() === 'right' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-800 hover:bg-slate-100'"
+                  class="p-2 rounded-lg text-xs flex flex-col items-center gap-1 transition cursor-pointer">
+                  <span class="material-icons text-base">arrow_forward</span>
+                  <span class="text-[11px]">Derecha</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="setDoorOpening('top')"
+                  [class]="doorOpening() === 'top' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-800 hover:bg-slate-100'"
+                  class="p-2 rounded-lg text-xs flex flex-col items-center gap-1 transition cursor-pointer">
+                  <span class="material-icons text-base">arrow_upward</span>
+                  <span class="text-[11px]">Elevable (Gas)</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="setDoorOpening('bottom')"
+                  [class]="doorOpening() === 'bottom' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-800 hover:bg-slate-100'"
+                  class="p-2 rounded-lg text-xs flex flex-col items-center gap-1 transition cursor-pointer">
+                  <span class="material-icons text-base">arrow_downward</span>
+                  <span class="text-[11px]">Abatible Inf.</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-1">
+              <div>
+                <label for="shelves-input" class="block text-xs font-medium text-slate-700 dark:text-zinc-300 mb-1">Repisas Interiores:</label>
+                <select 
+                  id="shelves-input"
+                  [value]="shelvesCount()" 
+                  (change)="shelvesCount.set(+$any($event.target).value)"
+                  class="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-white">
+                  <option [value]="0">Sin repisa (0)</option>
+                  <option [value]="1">1 Repisa (2 espacios)</option>
+                  <option [value]="2">2 Repisas (3 espacios)</option>
+                  <option [value]="3">3 Repisas (4 espacios)</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="handle-input" class="block text-xs font-medium text-slate-700 dark:text-zinc-300 mb-1">Tirador / Jalador:</label>
+                <select 
+                  id="handle-input"
+                  [value]="handleType()" 
+                  (change)="handleType.set($any($event.target).value)"
+                  class="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-white">
+                  <option value="bar_modern">Tirador Barra Inox</option>
+                  <option value="bar_black">Tirador Barra Negro</option>
+                  <option value="profile_gola">Perfil Gola Integrado</option>
+                  <option value="none">Sin Tirador (Push)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. ESPESORES DE TABLERO -->
+          <div class="p-3.5 rounded-xl border space-y-2.5" [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950/50 border-zinc-800'">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <span class="material-icons text-sm text-indigo-500">layers</span>
+              Espesores de Tableros (mm)
+            </span>
+
+            <div class="grid grid-cols-3 gap-3 text-xs">
+              <div>
+                <label for="thick-structure" class="block text-[11px] text-slate-600 dark:text-zinc-400 mb-1">Espesor estructura:</label>
+                <select 
+                  id="thick-structure"
+                  [value]="structureThickness()" 
+                  (change)="structureThickness.set(+$any($event.target).value)"
+                  class="w-full px-2 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white">
+                  <option [value]="18">18 mm</option>
+                  <option [value]="15">15 mm</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="thick-door" class="block text-[11px] text-slate-600 dark:text-zinc-400 mb-1">Espesor puerta/tapa:</label>
+                <select 
+                  id="thick-door"
+                  [value]="doorThickness()" 
+                  (change)="doorThickness.set(+$any($event.target).value)"
+                  class="w-full px-2 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white">
+                  <option [value]="18">18 mm</option>
+                  <option [value]="15">15 mm</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="thick-back" class="block text-[11px] text-slate-600 dark:text-zinc-400 mb-1">Espesor fondo MDF:</label>
+                <select 
+                  id="thick-back"
+                  [value]="backThickness()" 
+                  (change)="backThickness.set(+$any($event.target).value)"
+                  class="w-full px-2 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white">
+                  <option [value]="3">3 mm (Durolac)</option>
+                  <option [value]="5.5">5.5 mm</option>
+                  <option [value]="15">15 mm</option>
+                  <option [value]="18">18 mm</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. MATERIALES Y ACABADOS -->
+          <div class="p-3.5 rounded-xl border space-y-2.5" [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950/50 border-zinc-800'">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <span class="material-icons text-sm text-indigo-500">palette</span>
+              Materiales y Melaminas
+            </span>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label for="mat-structure" class="block text-[11px] text-slate-600 dark:text-zinc-400 mb-1">Material Carcasa / Estructura:</label>
+                <select 
+                  id="mat-structure"
+                  [value]="structureMaterialId()" 
+                  (change)="structureMaterialId.set($any($event.target).value)"
+                  class="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs text-slate-900 dark:text-white">
+                  @for (m of materials(); track m.id) {
+                    <option [value]="m.id">{{ m.name }} ({{ m.thickness }}mm)</option>
+                  }
+                </select>
+              </div>
+
+              <div>
+                <label for="mat-door" class="block text-[11px] text-slate-600 dark:text-zinc-400 mb-1">Material Puerta / Fachada:</label>
+                <select 
+                  id="mat-door"
+                  [value]="doorMaterialId()" 
+                  (change)="doorMaterialId.set($any($event.target).value)"
+                  class="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-lg text-xs text-slate-900 dark:text-white">
+                  @for (m of materials(); track m.id) {
+                    <option [value]="m.id">{{ m.name }} ({{ m.thickness }}mm)</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- FOOTER -->
+      <div 
+        class="flex items-center justify-between px-5 py-3 border-t shrink-0 text-xs"
+        [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950 border-zinc-800'">
+        
+        <div class="flex items-center gap-2 text-slate-500 dark:text-zinc-400 text-xs">
+          <span class="material-icons text-sm text-indigo-500">check_circle</span>
+          <span class="hidden sm:inline">Despiece exacto automático con holguras y herrajes</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="close()"
+            [class]="themeService.isClassic() ? 'px-3.5 py-1.5 text-slate-600 hover:text-slate-900 text-xs font-semibold cursor-pointer' : 'px-3.5 py-1.5 text-zinc-400 hover:text-white text-xs font-semibold cursor-pointer'">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            (click)="onSubmit()"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+            <span class="material-icons text-sm">add_box</span>
+            <span>Insertar Módulo en Escena</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+}

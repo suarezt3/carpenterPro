@@ -225,27 +225,40 @@
 
                 <!-- CARD ACTIONS: Professional Proportioned Buttons -->
                 <div 
-                  class="px-4 py-3 border-t grid grid-cols-2 gap-2.5"
+                  class="px-4 py-3 border-t flex flex-col gap-2"
                   [class]="themeService.isClassic() ? 'bg-stone-50/80 border-stone-200' : 'bg-stone-900/80 border-stone-800'">
                   
-                  <button 
-                    type="button" 
-                    (click)="onSelectTemplate(tpl, 'replace')"
-                    class="py-2 px-3 text-xs font-bold bg-stone-900 hover:bg-stone-800 text-white rounded-lg flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer dark:bg-stone-100 dark:hover:bg-white dark:text-stone-950"
-                    title="Cargar este mueble reemplazando el diseño actual">
-                    <span class="material-icons text-xs">view_in_ar</span>
-                    <span>Cargar en Lienzo</span>
-                  </button>
+                  @if (tpl.isParametric) {
+                    <button 
+                      type="button" 
+                      (click)="onConfigureTemplate(tpl)"
+                      class="w-full py-2 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
+                      title="Configurar medidas, apertura de puerta y despiece en Opciones de Componente">
+                      <span class="material-icons text-sm">tune</span>
+                      <span>Configurar Módulo (Melamina PRO)</span>
+                    </button>
+                  }
 
-                  <button 
-                    type="button" 
-                    (click)="onSelectTemplate(tpl, 'append')"
-                    class="py-2 px-3 text-xs font-semibold rounded-lg border flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
-                    [class]="themeService.isClassic() ? 'bg-white hover:bg-stone-100 text-stone-700 border-stone-300' : 'bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700'"
-                    title="Añadir este mueble al lado en el visor 3D">
-                    <span class="material-icons text-xs">add</span>
-                    <span>Añadir al lado</span>
-                  </button>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button 
+                      type="button" 
+                      (click)="onSelectTemplate(tpl, 'replace')"
+                      class="py-1.5 px-3 text-xs font-bold bg-stone-900 hover:bg-stone-800 text-white rounded-lg flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer dark:bg-stone-100 dark:hover:bg-white dark:text-stone-950"
+                      title="Cargar este mueble reemplazando el diseño actual">
+                      <span class="material-icons text-xs">view_in_ar</span>
+                      <span>Cargar Directo</span>
+                    </button>
+
+                    <button 
+                      type="button" 
+                      (click)="onSelectTemplate(tpl, 'append')"
+                      class="py-1.5 px-3 text-xs font-semibold rounded-lg border flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
+                      [class]="themeService.isClassic() ? 'bg-white hover:bg-stone-100 text-stone-700 border-stone-300' : 'bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700'"
+                      title="Añadir este mueble al lado en el visor 3D">
+                      <span class="material-icons text-xs">add</span>
+                      <span>Añadir al lado</span>
+                    </button>
+                  </div>
 
                 </div>
 

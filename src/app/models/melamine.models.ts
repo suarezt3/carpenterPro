@@ -103,6 +103,31 @@ export interface ParametricDrawerConfig {
   bottomMaterialId?: string;
 }
 
+export interface ParametricCabinetConfig {
+  id?: string;
+  code: string; // ej. "MALT1PU001"
+  name: string; // ej. "Módulo Alto 1 Puerta (MAL-1P)"
+  moduleType: 'wall_cabinet' | 'base_cabinet' | 'tall_cabinet';
+  width: number; // Ancho exterior X (ej. 600 mm)
+  height: number; // Altura exterior Y (ej. 800 mm)
+  depth: number; // Profundidad exterior Z (ej. 320 mm)
+  structureThickness: number; // 18 o 15 mm
+  doorThickness: number; // 18 o 15 mm
+  backThickness: number; // 3 mm
+  backType: 'groove' | 'rebate' | 'overlay' | 'none';
+  shelvesCount: number; // 0, 1, 2, 3
+  doorOpening: 'left' | 'right' | 'top' | 'bottom'; // Izquierda, Derecha, Elevable superior, Abatible
+  structureMaterialId: string;
+  doorMaterialId: string;
+  backMaterialId: string;
+  handleType: HandleType;
+  handleFinish: HandleFinish;
+  facadeGap: number; // Holgura perimetral puerta (default: 3 mm)
+  posX?: number;
+  posY?: number; // Elevación sobre el piso
+  posZ?: number;
+}
+
 export interface Part {
   id: string;
   name: string;

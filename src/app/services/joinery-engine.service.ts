@@ -288,7 +288,6 @@ export class JoineryEngineService {
   private generateDoorHingeHoles(b: Part3DBounds): DrillHole[] {
     const holes: DrillHole[] = [];
     const height = b.sy; // Door height
-    const width = b.sx;  // Door width
 
     // Determine opening direction / hinge side
     let hingeSide = b.part.hardwareConfig?.openingDirection;

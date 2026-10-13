@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { FurnitureModule, HardwareItem, Material, Part } from '../models/melamine.models';
+import { FurnitureModule, HardwareItem, Material, Part, ParametricCabinetConfig, PartGroup } from '../models/melamine.models';
 
 @Injectable({
   providedIn: 'root'
@@ -575,4 +575,268 @@ export class CabinetGeneratorService {
     }
     return best;
   }
+
+  /**
+   * Generates a fully parametric 1-Door Wall Cabinet (Alacena) with realistic joinery,
+   * customizable door swing direction, internal shelves, and independent materials.
+   */
+  generateParametricWallCabinet(
+    config: ParametricCabinetConfig, 
+    materials: Material[]
+  ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
+    const moduleId = config.id || `module_cab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const groupId = `group_cab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const groupName = config.name || `Módulo Alto 1P (${config.code || 'MAL1PU001'})`;
+
+    const mainMat = materials.find(m => m.id === config.structureMaterialId) || materials[0];
+    const doorMat = materials.find(m => m.id === config.doorMaterialId) || mainMat;
+    const backMat = materials.find(m => m.id === config.backMaterialId) || 
+                    materials.find(m => m.thickness <= 6) || mainMat;
+
+    const t = config.structureThickness || 18;
+    const doorT = config.doorThickness || 18;
+    const backT = config.backThickness || 3;
+    const w = config.width || 600;
+    const h = config.height || 800;
+    const d = config.depth || 320;
+    const gap = config.facadeGap ?? 3;
+
+    // Coordinate centers
+    const posX = config.posX ?? 0;
+    // Standard wall cabinet height: elevation ~1450 mm from floor to bottom, so center Y = 1450 + h / 2
+    const posY = config.posY ?? (1450 + h / 2);
+    const posZ = config.posZ ?? 0;
+
+    const carcassDepth = d - doorT;
+    const innerWidth = w - (2 * t);
+    const carcassCenterZ = posZ - (doorT / 2);
+
+    const parts: Part[] = [];
+
+    // 1. Lateral Izquierdo
+    parts.push({
+      id: `${moduleId}_lat_izq_${Date.now()}`,
+      name: 'Lateral Izquierdo',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: h,
+      width: carcassDepth,
+      thickness: t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+      posX: posX - (w / 2) + (t / 2),
+      posY,
+      posZ: carcassCenterZ,
+      orientation: 'vertical_yz',
+      componentRole: 'side_left',
+      notes: 'Lateral exterior izquierdo'
+    });
+
+    // 2. Lateral Derecho
+    parts.push({
+      id: `${moduleId}_lat_der_${Date.now()}`,
+      name: 'Lateral Derecho',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: h,
+      width: carcassDepth,
+      thickness: t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+      posX: posX + (w / 2) - (t / 2),
+      posY,
+      posZ: carcassCenterZ,
+      orientation: 'vertical_yz',
+      componentRole: 'side_right',
+      notes: 'Lateral exterior derecho'
+    });
+
+    // 3. Techo Superior
+    parts.push({
+      id: `${moduleId}_techo_${Date.now()}`,
+      name: 'Techo Superior',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: innerWidth,
+      width: carcassDepth,
+      thickness: t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX,
+      posY: posY + (h / 2) - (t / 2),
+      posZ: carcassCenterZ,
+      orientation: 'horizontal',
+      componentRole: 'top',
+      notes: 'Tapa superior estructural'
+    });
+
+    // 4. Piso / Base Inferior
+    parts.push({
+      id: `${moduleId}_base_${Date.now()}`,
+      name: 'Piso Inferior',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: innerWidth,
+      width: carcassDepth,
+      thickness: t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX,
+      posY: posY - (h / 2) + (t / 2),
+      posZ: carcassCenterZ,
+      orientation: 'horizontal',
+      componentRole: 'bottom',
+      notes: 'Base inferior estructural'
+    });
+
+    // 5. Repisas Interiores
+    const shelves = config.shelvesCount ?? 1;
+    if (shelves > 0) {
+      const bottomY = posY - (h / 2) + t;
+      const topY = posY + (h / 2) - t;
+      const stepY = (topY - bottomY) / (shelves + 1);
+
+      for (let i = 1; i <= shelves; i++) {
+        const shelfY = bottomY + (stepY * i);
+        parts.push({
+          id: `${moduleId}_repisa_${i}_${Date.now()}`,
+          name: `Repisa Interior ${i}`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: innerWidth - 2, // 2mm de holgura de montaje
+          width: carcassDepth - 15, // 15mm de retranqueo frontal para no chocar con bisagras y puerta
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX,
+          posY: shelfY,
+          posZ: carcassCenterZ - 7.5,
+          orientation: 'horizontal',
+          componentRole: 'shelf',
+          notes: `Repisa regulable nivel ${i}`
+        });
+      }
+    }
+
+    // 6. Fondo Trasero (MDF 3mm)
+    if (config.backType !== 'none') {
+      parts.push({
+        id: `${moduleId}_fondo_${Date.now()}`,
+        name: 'Fondo Trasero MDF',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: w - 4,
+        width: h - 4,
+        thickness: backT,
+        quantity: 1,
+        materialId: backMat.id,
+        materialName: backMat.name,
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY,
+        posZ: posZ - (d / 2) + (backT / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'back',
+        notes: 'Fondo MDF 3mm'
+      });
+    }
+
+    // 7. Puerta Frontal con herrajes dinámicos
+    const doorOpening = config.doorOpening || 'left';
+    const isGasLift = doorOpening === 'top';
+    const doorPosZ = posZ + (d / 2) - (doorT / 2);
+
+    parts.push({
+      id: `${moduleId}_puerta_${Date.now()}`,
+      name: `Puerta Frontal (Abre: ${doorOpening})`,
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: w - gap,
+      width: h - gap,
+      thickness: doorT,
+      quantity: 1,
+      materialId: doorMat.id,
+      materialName: doorMat.name,
+      grain: doorMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+      posX,
+      posY,
+      posZ: doorPosZ,
+      orientation: 'vertical_xy',
+      componentRole: 'door',
+      notes: `Puerta frontal abatible hacia ${doorOpening}`,
+      hardwareConfig: {
+        isMovable: true,
+        movableType: 'door',
+        openingDirection: doorOpening,
+        hingeType: isGasLift ? 'gas_piston' : 'straight',
+        handleType: config.handleType || 'bar_modern',
+        handleFinish: config.handleFinish || 'brushed_steel',
+        handlePosition: isGasLift ? 'horizontal' : 'vertical',
+        isOpen: false
+      }
+    });
+
+    const module: FurnitureModule = {
+      id: moduleId,
+      name: groupName,
+      type: 'wall_cabinet',
+      width: w,
+      height: h,
+      depth: d,
+      boardThickness: t,
+      backThickness: backT,
+      backType: config.backType || 'groove',
+      shelvesCount: shelves,
+      doorsCount: 1,
+      doorsType: 'overlay',
+      drawersCount: 0,
+      hasPlinth: false,
+      plinthHeight: 0,
+      materialId: mainMat.id,
+      backMaterialId: backMat.id,
+      defaultThinEdge: true,
+      defaultThickDoors: true
+    };
+
+    const group: PartGroup = {
+      id: groupId,
+      name: groupName,
+      type: 'assembly',
+      isOpen: false
+    };
+
+    return { module, parts, group };
+  }
 }
+

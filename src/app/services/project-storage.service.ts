@@ -859,6 +859,28 @@ export class ProjectStorageService {
     }));
   }
 
+  addParametricCabinet(cabinet: { module: FurnitureModule; parts: Part[]; group: PartGroup }) {
+    this.pushSnapshot();
+    this.updateProject(p => ({
+      ...p,
+      modules: [...p.modules, cabinet.module],
+      groups: [...(p.groups || []), cabinet.group],
+      parts: [...p.parts, ...cabinet.parts]
+    }));
+  }
+
+  updateParametricCabinet(groupId: string, newParts: Part[], newName?: string) {
+    this.pushSnapshot();
+    this.updateProject(p => ({
+      ...p,
+      groups: (p.groups || []).map(g => g.id === groupId ? { ...g, name: newName || g.name } : g),
+      parts: [
+        ...p.parts.filter(pt => pt.groupId !== groupId),
+        ...newParts
+      ]
+    }));
+  }
+
   deleteModule(moduleId: string) {
     this.updateProject(p => ({
       ...p,

@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para la rotación libre en 3D (ejes X, Y, Z), controles de inclinación a 90°, cálculo de dimensiones a lo largo del eje principal y generación de despiece detallado para piezas circulares y cilíndricas en Piezo3D Studio.",
-  "updatedAt": "2026-10-13T01:00:58.032311552Z",
+  "summary": "Plan de implementación para eliminar la landing page (cargando directo el espacio de trabajo CAD) y renombrar/expandir la sección a 'Plantillas' con catálogo por categorías (Cocinas, Closets, Baños, etc.) y opciones paramétricas.",
+  "updatedAt": "2026-10-13T13:50:35.018521648Z",
   "requestFeedback": true,
   "userFacing": true
 }
