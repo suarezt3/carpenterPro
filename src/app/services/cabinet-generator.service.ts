@@ -609,6 +609,7 @@ export class CabinetGeneratorService {
     // Carcass depth: if doors are present, carcass is recessed so doors sit flush with outer front
     const carcassDepth = hasDoor ? Math.max(80, d - doorT) : d;
     const innerWidth = Math.max(50, w - (2 * t));
+    const innerHeight = Math.max(50, h - (2 * t));
 
     // Coordinate centers
     const posX = config.posX ?? 0;
@@ -627,6 +628,8 @@ export class CabinetGeneratorService {
     const posZ = config.posZ ?? 0;
 
     const carcassCenterZ = hasDoor ? posZ - (doorT / 2) : posZ;
+    const carcassBackZ = carcassCenterZ - (carcassDepth / 2);
+    const carcassFrontZ = carcassCenterZ + (carcassDepth / 2);
     const parts: Part[] = [];
 
     // 1. Lateral Izquierdo
@@ -668,7 +671,7 @@ export class CabinetGeneratorService {
       materialId: mainMat.id,
       materialName: mainMat.name,
       grain: mainMat.hasGrain ? 'length' : 'none',
-      edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+      edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'none' },
       posX: posX + (w / 2) - (t / 2),
       posY,
       posZ: carcassCenterZ,
@@ -726,14 +729,19 @@ export class CabinetGeneratorService {
     });
 
     // 5. Repisas / Entrepaños Interiores
+    const includeBack = config.backType !== 'none' && config.hasBackPanel !== false;
     const shelves = config.shelvesCount ?? 0;
     if (shelves > 0) {
       const bottomY = posY - (h / 2) + t;
       const topY = posY + (h / 2) - t;
-      const innerHeight = Math.max(50, topY - bottomY);
-      const shelfSetback = hasDoor ? 18 : 0;
-      const shelfWidth = Math.max(50, carcassDepth - shelfSetback);
-      const shelfCenterZ = carcassCenterZ - (shelfSetback / 2);
+      const innerAvailableH = Math.max(50, topY - bottomY);
+      
+      // Technical clearances: 20mm behind door facade and 22mm ahead of rear carcass/back groove
+      const frontClearance = hasDoor ? 20 : 10;
+      const rearClearance = includeBack ? 22 : 5;
+      const shelfWidth = Math.max(50, carcassDepth - frontClearance - rearClearance);
+      const shelfCenterZ = carcassBackZ + rearClearance + (shelfWidth / 2);
+      const shelfLength = Math.max(50, innerWidth - 2); // 1mm holgura a cada lado para montaje limpio
 
       if (config.shelfDistribution === 'manual' && config.shelfManualOffsets && config.shelfManualOffsets.length === shelves) {
         // Altura manual por cada entrepaño
@@ -746,7 +754,7 @@ export class CabinetGeneratorService {
             moduleName: groupName,
             groupId,
             groupName,
-            length: innerWidth - 2, // 2mm holgura de montaje
+            length: shelfLength,
             width: shelfWidth,
             thickness: t,
             quantity: 1,
@@ -764,7 +772,7 @@ export class CabinetGeneratorService {
         });
       } else {
         // Distribución uniforme automática
-        const stepY = innerHeight / (shelves + 1);
+        const stepY = innerAvailableH / (shelves + 1);
         for (let i = 1; i <= shelves; i++) {
           const shelfY = bottomY + (stepY * i);
           parts.push({
@@ -774,7 +782,7 @@ export class CabinetGeneratorService {
             moduleName: groupName,
             groupId,
             groupName,
-            length: innerWidth - 2, // 2mm holgura de montaje
+            length: shelfLength,
             width: shelfWidth,
             thickness: t,
             quantity: 1,
@@ -793,18 +801,28 @@ export class CabinetGeneratorService {
       }
     }
 
-    // 6. Fondo Trasero (MDF 3mm)
-    const includeBack = config.backType !== 'none' && config.hasBackPanel !== false;
+    // 6. Fondo Trasero (MDF 3mm / Durolac)
     if (includeBack) {
+      const isGroove = config.backType !== 'overlay';
+      const backPosZ = isGroove 
+        ? (carcassBackZ + 15 + (backT / 2)) 
+        : (carcassBackZ - (backT / 2));
+      const backLength = isGroove 
+        ? Math.max(50, innerWidth - 2) 
+        : Math.max(50, w - 4);
+      const backHeight = isGroove 
+        ? Math.max(50, innerHeight - 2) 
+        : Math.max(50, h - 4);
+
       parts.push({
         id: `${moduleId}_fondo_${Date.now()}`,
-        name: 'Fondo Trasero MDF',
+        name: isGroove ? 'Fondo Trasero Ranurado' : 'Fondo Trasero Sobrepuesto',
         moduleId,
         moduleName: groupName,
         groupId,
         groupName,
-        length: w - 4,
-        width: h - 4,
+        length: backLength,
+        width: backHeight,
         thickness: backT,
         quantity: 1,
         materialId: backMat.id,
@@ -813,15 +831,17 @@ export class CabinetGeneratorService {
         edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
         posX,
         posY,
-        posZ: posZ - (d / 2) + (backT / 2),
+        posZ: backPosZ,
         orientation: 'vertical_xy',
         componentRole: 'back',
-        notes: 'Fondo MDF 3mm'
+        notes: isGroove 
+          ? `Fondo MDF ranurado a 15mm (medida corte con espigas: ${innerWidth + 14}x${innerHeight + 14} mm)`
+          : `Fondo MDF sobrepuesto clavado al dorso (${w - 4}x${h - 4} mm)`
       });
     }
 
     // 7. Puerta(s) Frontal(es)
-    const doorPosZ = posZ + (d / 2) - (doorT / 2);
+    const doorPosZ = carcassFrontZ + (doorT / 2);
     const hasHandle = config.hasHandle !== false;
     const hType = hasHandle ? (config.handleType || 'bar_modern') : 'none';
     const hFinish = config.handleFinish || 'brushed_steel';

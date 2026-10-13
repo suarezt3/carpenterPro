@@ -443,13 +443,40 @@
     </div>
   }
 
-  <!-- TOP-RIGHT COLLISION & INTERFERENCE WARNING BADGE -->
+  <!-- TOP-RIGHT COLLISION & INTERFERENCE WARNING BADGE & DETAILS -->
   @if (detectedCollisions().length > 0) {
-    <div class="absolute top-3 right-3 z-20 pointer-events-auto">
-      <div class="flex items-center gap-2 bg-rose-600 text-white px-3 py-1.5 rounded-xl shadow-lg text-xs font-bold animate-pulse">
-        <span class="material-icons text-sm">warning</span>
+    <div class="absolute top-3 right-3 z-20 pointer-events-auto flex flex-col items-end gap-1.5 max-w-sm">
+      <button 
+        type="button"
+        (click)="toggleCollisionsDetail()"
+        class="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white px-3 py-1.5 rounded-xl shadow-lg text-xs font-bold transition cursor-pointer">
+        <span class="material-icons text-sm animate-pulse">warning</span>
         <span>{{ detectedCollisions().length }} solapamiento(s)</span>
-      </div>
+        <span class="material-icons text-xs">{{ showCollisionsDetail() ? 'expand_less' : 'expand_more' }}</span>
+      </button>
+
+      @if (showCollisionsDetail()) {
+        <div class="bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-2xl border border-rose-200 text-slate-800 text-xs w-80 max-h-72 overflow-y-auto flex flex-col gap-2">
+          <div class="flex items-center justify-between pb-1.5 border-b border-rose-100 font-bold text-rose-800">
+            <span>Interferencias detectadas</span>
+            <span class="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded">Tolerancia 0.8mm</span>
+          </div>
+          @for (c of detectedCollisions(); track c.partAId + c.partBId) {
+            <div class="p-2 rounded-lg bg-rose-50/80 border border-rose-100 flex flex-col gap-1">
+              <div class="font-semibold text-slate-900 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                <span>{{ c.partAName }}</span>
+                <span class="text-slate-400">↔</span>
+                <span>{{ c.partBName }}</span>
+              </div>
+              <div class="text-[11px] text-slate-600 flex justify-between">
+                <span>Invasión: X:{{ c.overlapX }}mm | Y:{{ c.overlapY }}mm | Z:{{ c.overlapZ }}mm</span>
+                <span class="font-mono text-rose-600 font-bold">{{ c.overlapVolumeMm3 }} mm³</span>
+              </div>
+            </div>
+          }
+        </div>
+      }
     </div>
   }
 

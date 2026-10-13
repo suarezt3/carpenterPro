@@ -40,9 +40,17 @@ export class JoineryEngineService {
 
     const orient = part.orientation || 'horizontal';
     if (orient === 'vertical_yz') {
-      const isDrawerLateral = part.componentRole === 'drawer_box' ||
+      const isCabinetSide = part.componentRole === 'side_left' || 
+                            part.componentRole === 'side_right' ||
+                            (part.name.toUpperCase().includes('LATERAL') && 
+                             !part.name.toUpperCase().includes('CAJ') && 
+                             part.componentRole !== 'drawer_box' && 
+                             part.componentRole !== 'drawer_lateral');
+      const isDrawerLateral = !isCabinetSide && (
+        part.componentRole === 'drawer_box' ||
         part.componentRole === 'drawer_lateral' ||
-        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || !!part.groupId));
+        part.name.toUpperCase().includes('CAJ')
+      );
       if (isDrawerLateral && L > W) {
         sx = t;
         sy = W;
@@ -53,8 +61,8 @@ export class JoineryEngineService {
         sz = W;
       }
     } else if (orient === 'vertical_xy') {
-      const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
-        !part.name.toUpperCase().includes('CAJ');
+      const isDoor = part.componentRole === 'door' || 
+        (part.name.toUpperCase().includes('PUERTA') && !part.name.toUpperCase().includes('CAJ'));
       const isDrawerFront = part.componentRole === 'drawer_front';
       const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
         part.name.toUpperCase().includes('CONTRA') ||
@@ -63,9 +71,10 @@ export class JoineryEngineService {
         sx = L;
         sy = W;
         sz = t;
-      } else if (isDoor && L > W) {
-        sx = W;
-        sy = L;
+      } else if (isDoor) {
+        // Doors in vertical_xy have length along X (width) and width along Y (height)
+        sx = L;
+        sy = W;
         sz = t;
       } else if (isDrawerFront && W > L) {
         sx = W;
@@ -117,8 +126,18 @@ export class JoineryEngineService {
         const overlapY = Math.min(b1.maxY, b2.maxY) - Math.max(b1.minY, b2.minY);
         const overlapZ = Math.min(b1.maxZ, b2.maxZ) - Math.max(b1.minZ, b2.minZ);
 
-        // If penetration exceeds tolerance in ALL three axes simultaneously, they collide
+        // If penetration exceeds tolerance in ALL three axes simultaneously, evaluate interference
         if (overlapX > tolerance && overlapY > tolerance && overlapZ > tolerance) {
+          // Joinery groove exception: if one piece is a back panel (MDF 3-6mm) and the other is a structural carcass part
+          // (side_left, side_right, top, bottom) in the same module/group, and penetration is shallow (<= 12mm),
+          // this is an intentional woodworking groove/ranura, not a dimensional error.
+          const isBackJoint = (b1.part.componentRole === 'back' && b2.part.componentRole && ['side_left', 'side_right', 'top', 'bottom'].includes(b2.part.componentRole)) ||
+                              (b2.part.componentRole === 'back' && b1.part.componentRole && ['side_left', 'side_right', 'top', 'bottom'].includes(b1.part.componentRole));
+          const sameGroup = b1.part.groupId && b1.part.groupId === b2.part.groupId;
+          if (isBackJoint && sameGroup && (overlapX <= 12 || overlapY <= 12)) {
+            continue; // Skip legitimate groove insertion
+          }
+
           const vol = overlapX * overlapY * overlapZ;
           collisions.push({
             partAId: b1.part.id,

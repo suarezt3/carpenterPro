@@ -738,9 +738,17 @@ export class ModuleDesignerComponent {
       if (p.orientation === 'horizontal') {
         sx = p.length; sy = p.thickness; sz = p.width;
       } else if (p.orientation === 'vertical_yz') {
-        const isDrawerLateral = p.componentRole === 'drawer_box' ||
+        const isCabinetSide = p.componentRole === 'side_left' || 
+                              p.componentRole === 'side_right' ||
+                              (p.name.toUpperCase().includes('LATERAL') && 
+                               !p.name.toUpperCase().includes('CAJ') && 
+                               p.componentRole !== 'drawer_box' && 
+                               p.componentRole !== 'drawer_lateral');
+        const isDrawerLateral = !isCabinetSide && (
+          p.componentRole === 'drawer_box' ||
           p.componentRole === 'drawer_lateral' ||
-          (p.name.toUpperCase().includes('LATERAL') && (p.name.toUpperCase().includes('CAJ') || !!p.groupId));
+          p.name.toUpperCase().includes('CAJ')
+        );
         if (isDrawerLateral && (p.length || 0) > (p.width || 0)) {
           sx = p.thickness || 15; sy = p.width; sz = p.length;
         } else {
@@ -1260,9 +1268,17 @@ export class ModuleDesignerComponent {
 
     let sy = t;
     if (orientation === 'vertical_yz') {
-      const isDrawerLateral = current.componentRole === 'drawer_box' ||
+      const isCabinetSide = current.componentRole === 'side_left' || 
+                            current.componentRole === 'side_right' ||
+                            (current.name.toUpperCase().includes('LATERAL') && 
+                             !current.name.toUpperCase().includes('CAJ') && 
+                             current.componentRole !== 'drawer_box' && 
+                             current.componentRole !== 'drawer_lateral');
+      const isDrawerLateral = !isCabinetSide && (
+        current.componentRole === 'drawer_box' ||
         current.componentRole === 'drawer_lateral' ||
-        (current.name.toUpperCase().includes('LATERAL') && (current.name.toUpperCase().includes('CAJ') || !!current.groupId));
+        current.name.toUpperCase().includes('CAJ')
+      );
       sy = (isDrawerLateral && L > current.width) ? current.width : L;
     } else if (orientation === 'vertical_xy') {
       sy = current.width;
