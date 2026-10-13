@@ -1230,6 +1230,30 @@ export class ProjectStorageService {
     });
   }
 
+  changeGroupMaterial(groupId: string, materialId: string, target: 'all' | 'structure' | 'doors' = 'all') {
+    const mat = this.materialsList().find(m => m.id === materialId);
+    if (!mat) return;
+    this.pushSnapshot();
+    this.updateProject(p => ({
+      ...p,
+      parts: p.parts.map(pt => {
+        if (pt.groupId !== groupId) return pt;
+        const isDoor = pt.componentRole === 'door' || pt.componentRole === 'drawer_front';
+        const isBack = pt.componentRole === 'back' && pt.thickness <= 6;
+        if (isBack) return pt; // Maintain thin back panel
+        if (target === 'doors' && !isDoor) return pt;
+        if (target === 'structure' && isDoor) return pt;
+        return {
+          ...pt,
+          materialId: mat.id,
+          materialName: mat.name,
+          grain: mat.hasGrain ? (pt.grain === 'none' ? 'length' : pt.grain) : 'none',
+          colorHex: mat.colorHex
+        };
+      })
+    }));
+  }
+
   deleteGroup(groupId: string, deleteParts = false) {
     this.updateProject(p => {
       const currentGroups = (p.groups || []).filter(g => g.id !== groupId);

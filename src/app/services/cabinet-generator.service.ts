@@ -577,16 +577,18 @@ export class CabinetGeneratorService {
   }
 
   /**
-   * Generates a fully parametric 1-Door Wall Cabinet (Alacena) with realistic joinery,
-   * customizable door swing direction, internal shelves, and independent materials.
+  /**
+   * Generates a fully parametric furniture module (Kitchen Base, Wall Cabinet, Closet,
+   * Vanity, Bookshelf, or Custom) with exact joinery calculations, door configurations
+   * (none, left, right, double, lift-up), handles, and uniform/manual shelf distributions.
    */
-  generateParametricWallCabinet(
+  generateParametricCabinet(
     config: ParametricCabinetConfig, 
     materials: Material[]
   ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
     const moduleId = config.id || `module_cab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const groupId = `group_cab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const groupName = config.name || `Módulo Alto 1P (${config.code || 'MAL1PU001'})`;
+    const groupName = config.name || `Módulo Paramétrico (${config.code || 'MOD001'})`;
 
     const mainMat = materials.find(m => m.id === config.structureMaterialId) || materials[0];
     const doorMat = materials.find(m => m.id === config.doorMaterialId) || mainMat;
@@ -601,16 +603,30 @@ export class CabinetGeneratorService {
     const d = config.depth || 320;
     const gap = config.facadeGap ?? 3;
 
+    const doorOpening = config.doorOpening || 'left';
+    const hasDoor = doorOpening !== 'none';
+
+    // Carcass depth: if doors are present, carcass is recessed so doors sit flush with outer front
+    const carcassDepth = hasDoor ? Math.max(80, d - doorT) : d;
+    const innerWidth = Math.max(50, w - (2 * t));
+
     // Coordinate centers
     const posX = config.posX ?? 0;
-    // Standard wall cabinet height: elevation ~1450 mm from floor to bottom, so center Y = 1450 + h / 2
-    const posY = config.posY ?? (1450 + h / 2);
+    
+    // Default elevation (posY):
+    let posY = config.posY;
+    if (posY === undefined) {
+      if (config.moduleType === 'wall_cabinet') {
+        posY = 1450 + (h / 2); // Alacena elevada
+      } else if (config.moduleType === 'vanity') {
+        posY = 250 + (h / 2); // Mueble suspendido baño
+      } else {
+        posY = h / 2; // Apoyado en el suelo
+      }
+    }
     const posZ = config.posZ ?? 0;
 
-    const carcassDepth = d - doorT;
-    const innerWidth = w - (2 * t);
-    const carcassCenterZ = posZ - (doorT / 2);
-
+    const carcassCenterZ = hasDoor ? posZ - (doorT / 2) : posZ;
     const parts: Part[] = [];
 
     // 1. Lateral Izquierdo
@@ -709,42 +725,77 @@ export class CabinetGeneratorService {
       notes: 'Base inferior estructural'
     });
 
-    // 5. Repisas Interiores
-    const shelves = config.shelvesCount ?? 1;
+    // 5. Repisas / Entrepaños Interiores
+    const shelves = config.shelvesCount ?? 0;
     if (shelves > 0) {
       const bottomY = posY - (h / 2) + t;
       const topY = posY + (h / 2) - t;
-      const stepY = (topY - bottomY) / (shelves + 1);
+      const innerHeight = Math.max(50, topY - bottomY);
+      const shelfSetback = hasDoor ? 18 : 0;
+      const shelfWidth = Math.max(50, carcassDepth - shelfSetback);
+      const shelfCenterZ = carcassCenterZ - (shelfSetback / 2);
 
-      for (let i = 1; i <= shelves; i++) {
-        const shelfY = bottomY + (stepY * i);
-        parts.push({
-          id: `${moduleId}_repisa_${i}_${Date.now()}`,
-          name: `Repisa Interior ${i}`,
-          moduleId,
-          moduleName: groupName,
-          groupId,
-          groupName,
-          length: innerWidth - 2, // 2mm de holgura de montaje
-          width: carcassDepth - 15, // 15mm de retranqueo frontal para no chocar con bisagras y puerta
-          thickness: t,
-          quantity: 1,
-          materialId: mainMat.id,
-          materialName: mainMat.name,
-          grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-          posX,
-          posY: shelfY,
-          posZ: carcassCenterZ - 7.5,
-          orientation: 'horizontal',
-          componentRole: 'shelf',
-          notes: `Repisa regulable nivel ${i}`
+      if (config.shelfDistribution === 'manual' && config.shelfManualOffsets && config.shelfManualOffsets.length === shelves) {
+        // Altura manual por cada entrepaño
+        config.shelfManualOffsets.forEach((offset, idx) => {
+          const shelfY = bottomY + offset;
+          parts.push({
+            id: `${moduleId}_repisa_${idx + 1}_${Date.now()}`,
+            name: `Entrepaño ${idx + 1}`,
+            moduleId,
+            moduleName: groupName,
+            groupId,
+            groupName,
+            length: innerWidth - 2, // 2mm holgura de montaje
+            width: shelfWidth,
+            thickness: t,
+            quantity: 1,
+            materialId: mainMat.id,
+            materialName: mainMat.name,
+            grain: mainMat.hasGrain ? 'length' : 'none',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX,
+            posY: shelfY,
+            posZ: shelfCenterZ,
+            orientation: 'horizontal',
+            componentRole: 'shelf',
+            notes: `Entrepaño cota manual ${offset} mm`
+          });
         });
+      } else {
+        // Distribución uniforme automática
+        const stepY = innerHeight / (shelves + 1);
+        for (let i = 1; i <= shelves; i++) {
+          const shelfY = bottomY + (stepY * i);
+          parts.push({
+            id: `${moduleId}_repisa_${i}_${Date.now()}`,
+            name: `Entrepaño ${i}`,
+            moduleId,
+            moduleName: groupName,
+            groupId,
+            groupName,
+            length: innerWidth - 2, // 2mm holgura de montaje
+            width: shelfWidth,
+            thickness: t,
+            quantity: 1,
+            materialId: mainMat.id,
+            materialName: mainMat.name,
+            grain: mainMat.hasGrain ? 'length' : 'none',
+            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+            posX,
+            posY: shelfY,
+            posZ: shelfCenterZ,
+            orientation: 'horizontal',
+            componentRole: 'shelf',
+            notes: `Entrepaño regulable nivel ${i}`
+          });
+        }
       }
     }
 
     // 6. Fondo Trasero (MDF 3mm)
-    if (config.backType !== 'none') {
+    const includeBack = config.backType !== 'none' && config.hasBackPanel !== false;
+    if (includeBack) {
       parts.push({
         id: `${moduleId}_fondo_${Date.now()}`,
         name: 'Fondo Trasero MDF',
@@ -769,48 +820,196 @@ export class CabinetGeneratorService {
       });
     }
 
-    // 7. Puerta Frontal con herrajes dinámicos
-    const doorOpening = config.doorOpening || 'left';
-    const isGasLift = doorOpening === 'top';
+    // 7. Puerta(s) Frontal(es)
     const doorPosZ = posZ + (d / 2) - (doorT / 2);
+    const hasHandle = config.hasHandle !== false;
+    const hType = hasHandle ? (config.handleType || 'bar_modern') : 'none';
+    const hFinish = config.handleFinish || 'brushed_steel';
+    const isGasLift = doorOpening === 'top';
 
-    parts.push({
-      id: `${moduleId}_puerta_${Date.now()}`,
-      name: `Puerta Frontal (Abre: ${doorOpening})`,
-      moduleId,
-      moduleName: groupName,
-      groupId,
-      groupName,
-      length: w - gap,
-      width: h - gap,
-      thickness: doorT,
-      quantity: 1,
-      materialId: doorMat.id,
-      materialName: doorMat.name,
-      grain: doorMat.hasGrain ? 'length' : 'none',
-      edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-      posX,
-      posY,
-      posZ: doorPosZ,
-      orientation: 'vertical_xy',
-      componentRole: 'door',
-      notes: `Puerta frontal abatible hacia ${doorOpening}`,
-      hardwareConfig: {
-        isMovable: true,
-        movableType: 'door',
-        openingDirection: doorOpening,
-        hingeType: isGasLift ? 'gas_piston' : 'straight',
-        handleType: config.handleType || 'bar_modern',
-        handleFinish: config.handleFinish || 'brushed_steel',
-        handlePosition: isGasLift ? 'horizontal' : 'vertical',
-        isOpen: false
-      }
-    });
+    if (doorOpening === 'left' || doorOpening === 'right') {
+      // 1 Puerta completa (Abre Izquierda o Derecha)
+      parts.push({
+        id: `${moduleId}_puerta_${Date.now()}`,
+        name: `Puerta Frontal (Abre: ${doorOpening === 'left' ? 'Izquierda' : 'Derecha'})`,
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: w - gap,
+        width: h - gap,
+        thickness: doorT,
+        quantity: 1,
+        materialId: doorMat.id,
+        materialName: doorMat.name,
+        grain: doorMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX,
+        posY,
+        posZ: doorPosZ,
+        orientation: 'vertical_xy',
+        componentRole: 'door',
+        notes: `Puerta abatible hacia ${doorOpening}`,
+        hardwareConfig: {
+          isMovable: true,
+          movableType: 'door',
+          openingDirection: doorOpening,
+          hingeType: 'straight',
+          handleType: hType,
+          handleFinish: hFinish,
+          handlePosition: config.handlePosition || 'vertical',
+          isOpen: false
+        }
+      });
+    } else if (doorOpening === 'double') {
+      // 2 Puertas Dobles (Puerta Izquierda y Puerta Derecha)
+      const doorW = Math.max(50, (w / 2) - (gap * 1.2));
+      const leftDoorX = posX - (w / 4) + (gap / 4);
+      const rightDoorX = posX + (w / 4) - (gap / 4);
+
+      // Puerta Izquierda
+      parts.push({
+        id: `${moduleId}_puerta_izq_${Date.now()}`,
+        name: 'Puerta Izquierda (Doble)',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: doorW,
+        width: h - gap,
+        thickness: doorT,
+        quantity: 1,
+        materialId: doorMat.id,
+        materialName: doorMat.name,
+        grain: doorMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: leftDoorX,
+        posY,
+        posZ: doorPosZ,
+        orientation: 'vertical_xy',
+        componentRole: 'door',
+        notes: 'Puerta izquierda abatible hacia afuera',
+        hardwareConfig: {
+          isMovable: true,
+          movableType: 'door',
+          openingDirection: 'left',
+          hingeType: 'straight',
+          handleType: hType,
+          handleFinish: hFinish,
+          handlePosition: config.handlePosition || 'vertical',
+          isOpen: false
+        }
+      });
+
+      // Puerta Derecha
+      parts.push({
+        id: `${moduleId}_puerta_der_${Date.now()}`,
+        name: 'Puerta Derecha (Doble)',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: doorW,
+        width: h - gap,
+        thickness: doorT,
+        quantity: 1,
+        materialId: doorMat.id,
+        materialName: doorMat.name,
+        grain: doorMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: rightDoorX,
+        posY,
+        posZ: doorPosZ,
+        orientation: 'vertical_xy',
+        componentRole: 'door',
+        notes: 'Puerta derecha abatible hacia afuera',
+        hardwareConfig: {
+          isMovable: true,
+          movableType: 'door',
+          openingDirection: 'right',
+          hingeType: 'straight',
+          handleType: hType,
+          handleFinish: hFinish,
+          handlePosition: config.handlePosition || 'vertical',
+          isOpen: false
+        }
+      });
+    } else if (doorOpening === 'top' || isGasLift) {
+      // 1 Puerta Elevable Superior (Pistón a Gas)
+      parts.push({
+        id: `${moduleId}_puerta_elev_${Date.now()}`,
+        name: 'Puerta Elevable (Pistón Gas)',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: w - gap,
+        width: h - gap,
+        thickness: doorT,
+        quantity: 1,
+        materialId: doorMat.id,
+        materialName: doorMat.name,
+        grain: doorMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX,
+        posY,
+        posZ: doorPosZ,
+        orientation: 'vertical_xy',
+        componentRole: 'door',
+        notes: 'Puerta elevable con pistón a gas',
+        hardwareConfig: {
+          isMovable: true,
+          movableType: 'door',
+          openingDirection: 'top',
+          hingeType: 'gas_piston',
+          handleType: hType,
+          handleFinish: hFinish,
+          handlePosition: 'horizontal',
+          isOpen: false
+        }
+      });
+    } else if (doorOpening === 'bottom') {
+      // Puerta Abatible Inferior
+      parts.push({
+        id: `${moduleId}_puerta_abat_${Date.now()}`,
+        name: 'Puerta Abatible Inferior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: w - gap,
+        width: h - gap,
+        thickness: doorT,
+        quantity: 1,
+        materialId: doorMat.id,
+        materialName: doorMat.name,
+        grain: doorMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX,
+        posY,
+        posZ: doorPosZ,
+        orientation: 'vertical_xy',
+        componentRole: 'door',
+        notes: 'Puerta abatible hacia abajo',
+        hardwareConfig: {
+          isMovable: true,
+          movableType: 'door',
+          openingDirection: 'bottom',
+          hingeType: 'straight',
+          handleType: hType,
+          handleFinish: hFinish,
+          handlePosition: 'horizontal',
+          isOpen: false
+        }
+      });
+    }
 
     const module: FurnitureModule = {
       id: moduleId,
       name: groupName,
-      type: 'wall_cabinet',
+      type: (config.moduleType === 'wall_cabinet' || config.moduleType === 'base_cabinet' || config.moduleType === 'tall_cabinet')
+        ? config.moduleType 
+        : 'base_cabinet',
       width: w,
       height: h,
       depth: d,
@@ -818,7 +1017,7 @@ export class CabinetGeneratorService {
       backThickness: backT,
       backType: config.backType || 'groove',
       shelvesCount: shelves,
-      doorsCount: 1,
+      doorsCount: doorOpening === 'none' ? 0 : (doorOpening === 'double' ? 2 : 1),
       doorsType: 'overlay',
       drawersCount: 0,
       hasPlinth: false,
@@ -837,6 +1036,16 @@ export class CabinetGeneratorService {
     };
 
     return { module, parts, group };
+  }
+
+  /**
+   * Alias de compatibilidad hacia atrás
+   */
+  generateParametricWallCabinet(
+    config: ParametricCabinetConfig, 
+    materials: Material[]
+  ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
+    return this.generateParametricCabinet(config, materials);
   }
 }
 

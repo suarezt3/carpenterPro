@@ -116,6 +116,30 @@ export class ModuleDesignerComponent {
     this.showToast(`✨ Módulo "${res.module.name}" insertado. Puedes moverlo libremente en 3D.`);
   }
 
+  onCabinetCreated(event: { config: ParametricCabinetConfig; mode: 'replace' | 'append' }) {
+    if (event.mode === 'replace') {
+      this.projectService.clearFurniture();
+    }
+    this.onCabinetSubmitted(event.config);
+    this.showTemplatesModal.set(false);
+  }
+
+  readonly showGroupMaterialDropdown = signal<boolean>(false);
+
+  toggleGroupMaterialDropdown(event?: Event) {
+    if (event) event.stopPropagation();
+    this.showGroupMaterialDropdown.update(v => !v);
+  }
+
+  applyGroupMaterial(materialId: string, target: 'all' | 'structure' | 'doors' = 'all') {
+    const gId = this.activeSelectedGroupId();
+    if (gId) {
+      this.projectService.changeGroupMaterial(gId, materialId, target);
+      this.showToast('🎨 Material del módulo actualizado');
+      this.showGroupMaterialDropdown.set(false);
+    }
+  }
+
   // Selected Part ID in 3D
   readonly selectedPartId = signal<string | null>(null);
   // Selected Multiple Part IDs in 3D (Shift-Click or Select All)

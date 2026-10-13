@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para eliminar la landing page (cargando directo el espacio de trabajo CAD) y renombrar/expandir la sección a 'Plantillas' con catálogo por categorías (Cocinas, Closets, Baños, etc.) y opciones paramétricas.",
-  "updatedAt": "2026-10-13T13:50:35.018521648Z",
+  "summary": "Plan de implementación integral para el nuevo Asistente Paramétrico de Plantillas y Módulos. Transforma la sesión de plantillas en un asistente interactivo ergonómico en tema claro (blanco y pizarra con acentos suaves), permitiendo parametrizar alto, ancho, fondo, espesor de melamina, tipo y apertura de puertas, presencia de manijas, y entrepaños con distribución automática uniforme o manual, garantizando edición posterior de materiales y despiece 3D perfecto.",
+  "updatedAt": "2026-10-13T15:15:25.174699326Z",
   "requestFeedback": true,
   "userFacing": true
 }

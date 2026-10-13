@@ -39,7 +39,7 @@ export class ComponentOptionsModalComponent {
   readonly backThickness = signal<number>(3);
   readonly backType = signal<'groove' | 'rebate' | 'overlay'>('groove');
   readonly shelvesCount = signal<number>(1);
-  readonly doorOpening = signal<'left' | 'right' | 'top' | 'bottom'>('left');
+  readonly doorOpening = signal<'left' | 'right' | 'top' | 'bottom' | 'double' | 'none'>('left');
   readonly structureMaterialId = signal<string>('');
   readonly doorMaterialId = signal<string>('');
   readonly backMaterialId = signal<string>('');
@@ -86,7 +86,7 @@ export class ComponentOptionsModalComponent {
   setWidth(val: number) { this.width.set(val); }
   setHeight(val: number) { this.height.set(val); }
   setDepth(val: number) { this.depth.set(val); }
-  setDoorOpening(dir: 'left' | 'right' | 'top' | 'bottom') { this.doorOpening.set(dir); }
+  setDoorOpening(dir: 'left' | 'right' | 'top' | 'bottom' | 'double' | 'none') { this.doorOpening.set(dir); }
 
   getStructureMat(): Material | undefined {
     return this.materials().find(m => m.id === this.structureMaterialId()) || this.materials()[0];
