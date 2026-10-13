@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para habilitar la edición interactiva del nombre del proyecto y cliente directamente desde la barra superior de la aplicación, garantizando que el ID interno del proyecto permanezca intacto y no se dupliquen registros en la base de datos (Supabase y LocalStorage).",
-  "updatedAt": "2026-10-12T21:33:31.842676887Z",
+  "summary": "Plan de implementación para renombrar oficialmente la aplicación a Piezo3D Studio, actualizando la marca en la barra superior, título HTML, metadatos, documentación y fichas técnicas PDF.",
+  "updatedAt": "2026-10-12T22:00:14.333170302Z",
   "requestFeedback": true,
   "userFacing": true
 }
