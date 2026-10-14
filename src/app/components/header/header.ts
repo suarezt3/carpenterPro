@@ -1,24 +1,37 @@
-import { ChangeDetectionStrategy, Component, inject, signal, computed, output, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  input,
+  output,
+  signal
+} from '@angular/core';
+import { SlicePipe } from '@angular/common';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
+import { ThemeService } from '../../services/theme.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
 import { DocumentationModalComponent } from '../documentation-modal/documentation-modal';
 import { ProjectNotesModalComponent } from '../project-notes-modal/project-notes-modal';
 import { ProjectSettings } from '../../models/melamine.models';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { SlicePipe } from '@angular/common';
 
-import { ThemeService } from '../../services/theme.service';
-
+/**
+ * Barra de navegación superior global de Piezo3D Studio.
+ * Gestiona el cambio de pestañas, edición rápida del nombre del proyecto,
+ * historial Undo/Redo, sincronización con Supabase, exportación DXF/PDF/JSON y parámetros de sierra.
+ */
 @Component({
   selector: 'app-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ReactiveFormsModule, 
-    SlicePipe, 
-    TechnicalSheetModalComponent, 
+    ReactiveFormsModule,
+    SlicePipe,
+    TechnicalSheetModalComponent,
     DocumentationModalComponent,
     ProjectNotesModalComponent
   ],
@@ -26,40 +39,47 @@ import { ThemeService } from '../../services/theme.service';
     '(window:keydown)': 'handleGlobalKeyDown($event)',
     '(document:click)': 'closeDropdowns()'
   },
-  templateUrl: './header.html'
+  templateUrl: './header.html',
+  styleUrl: './header.css'
 })
 export class HeaderComponent {
   readonly themeService = inject(ThemeService);
-  private projectService = inject(ProjectStorageService);
-  private confirmService = inject(ConfirmDialogService);
-  private dxfExporter = inject(DxfExporterService);
-  private fb = inject(FormBuilder);
+  private readonly projectService = inject(ProjectStorageService);
+  private readonly confirmService = inject(ConfirmDialogService);
+  private readonly dxfExporter = inject(DxfExporterService);
+  private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
 
-  activeTab = input<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>('modules');
-  tabChanged = output<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>();
+  // Pestaña activa y evento de navegación hacia App
+  readonly activeTab = input<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>('modules');
+  readonly tabChanged = output<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>();
 
-  // Dropdown menus state (compact toolbar to prevent overflow on laptops)
+  // Estado de menús desplegables y modales
   readonly isProjectDropdownOpen = signal(false);
   readonly isExportDropdownOpen = signal(false);
+  readonly showProjectsModal = signal(false);
+  readonly showSettingsModal = signal(false);
+  readonly showNewProjectModal = signal(false);
+  readonly showSqlModal = signal(false);
+  readonly showTechnicalSheetModal = signal(false);
+  readonly showDocumentationModal = signal(false);
+  readonly showNotesModal = signal(false);
 
-  showProjectsModal = signal(false);
-  showSettingsModal = signal(false);
-  showNewProjectModal = signal(false);
-  showSqlModal = signal(false);
-  showTechnicalSheetModal = signal(false);
-  showDocumentationModal = signal(false);
-  showNotesModal = signal(false);
-  projectsTab = signal<'cloud' | 'local'>('cloud');
-  sqlCopied = signal(false);
-  toastMessage = signal<string | null>(null);
+  readonly projectsTab = signal<'cloud' | 'local'>('cloud');
+  readonly sqlCopied = signal(false);
+  readonly toastMessage = signal<string | null>(null);
   readonly showLabelsTab = signal(false);
-  readonly pendingNotesCount = computed(() => this.projectService.projectNotes().filter(n => !n.completed).length);
 
-  // Editable Project Title & Client State
+  readonly pendingNotesCount = computed(() =>
+    this.projectService.projectNotes().filter(n => !n.completed).length
+  );
+
+  // Estado de edición rápida del nombre del proyecto y cliente
   readonly isEditingTitle = signal(false);
   readonly titleInput = signal('');
   readonly clientInput = signal('');
 
+  // Signals sincronizados con ProjectStorageService y SupabaseService
   readonly project = this.projectService.currentProject;
   readonly savedProjects = this.projectService.savedProjects;
   readonly partsCount = this.projectService.totalPartsCount;
@@ -68,19 +88,19 @@ export class HeaderComponent {
   readonly syncStatus = this.supabase.syncStatus;
   readonly lastSyncTime = this.supabase.lastSyncTime;
 
-  // History & cloud controls
   readonly canUndo = this.projectService.canUndo;
   readonly canRedo = this.projectService.canRedo;
   readonly autoSyncEnabled = this.projectService.autoSyncEnabled;
 
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
+  private sqlCopyTimer: ReturnType<typeof setTimeout> | null = null;
 
-  newProjectForm: FormGroup = this.fb.group({
+  readonly newProjectForm: FormGroup = this.fb.group({
     name: ['Nuevo Mueble de Cocina', Validators.required],
     clientName: ['']
   });
 
-  settingsForm: FormGroup = this.fb.group({
+  readonly settingsForm: FormGroup = this.fb.group({
     sawKerf: [4, [Validators.required, Validators.min(0)]],
     trimMargin: [10, [Validators.required, Validators.min(0)]],
     thinEdgeThickness: [0.45, [Validators.required, Validators.min(0)]],
@@ -90,6 +110,25 @@ export class HeaderComponent {
     currency: ['COP', Validators.required],
     optimizationPreference: ['best_fit', Validators.required]
   });
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+      if (this.sqlCopyTimer) clearTimeout(this.sqlCopyTimer);
+    });
+  }
+
+  // --- MANEJADORES DE ENTRADA TIPADOS ---
+
+  onTitleInput(event: Event) {
+    const target = event.target as HTMLInputElement | null;
+    this.titleInput.set(target?.value ?? '');
+  }
+
+  onClientInput(event: Event) {
+    const target = event.target as HTMLInputElement | null;
+    this.clientInput.set(target?.value ?? '');
+  }
 
   selectTab(tab: 'modules' | 'parts' | 'optimizer' | 'budget' | 'labels') {
     this.tabChanged.emit(tab);
@@ -136,7 +175,8 @@ export class HeaderComponent {
     }
   }
 
-  // --- UNDO / REDO & SHORTCUTS ---
+  // --- HISTORIAL UNDO / REDO Y ATAJOS GLOBALES ---
+
   undo() {
     if (this.canUndo()) {
       this.projectService.undo();
@@ -156,7 +196,7 @@ export class HeaderComponent {
     if (this.autoSyncEnabled()) {
       this.showToast('☁️ Auto-guardado en nube ACTIVADO');
     } else {
-      this.showToast('💾 Auto-guardado DESACTIVADO (Solo guardado manual)');
+      this.showToast('☁️ Auto-guardado DESACTIVADO (Solo guardado manual)');
     }
   }
 
@@ -198,9 +238,18 @@ export class HeaderComponent {
     this.isExportDropdownOpen.set(false);
   }
 
+  /**
+   * Gestiona el cierre de menús con Escape y los atajos Ctrl+Z / Ctrl+Y
+   * cuando el usuario se encuentra en las pestañas fuera del Diseñador 3D
+   * (evitando ejecutar dos veces el Undo cuando ModuleDesignerComponent está activo).
+   */
   handleGlobalKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       this.closeDropdowns();
+    }
+
+    if (e.defaultPrevented || this.activeTab() === 'modules') {
+      return;
     }
 
     const target = e.target as HTMLElement | null;
@@ -228,12 +277,13 @@ export class HeaderComponent {
     }
   }
 
-  // --- CLOUD SUPABASE ACTIONS ---
+  // --- ACCIONES EN LA NUBE CON SUPABASE ---
+
   async saveCurrentToCloud() {
     this.showToast('Guardando en Supabase...');
     const res = await this.projectService.saveCurrentToCloud();
     if (res.success) {
-      this.showToast('☁️ ¡Proyecto guardado en la nube exitosamente!');
+      this.showToast('¡Proyecto guardado en la nube exitosamente!');
     } else if (res.error === 'table_needed') {
       this.showSqlModal.set(true);
     } else {
@@ -241,8 +291,8 @@ export class HeaderComponent {
     }
   }
 
-  loadCloudProject(item: CloudProjectRecord) {
-    this.projectService.loadCloudProject(item);
+  async loadCloudProject(item: CloudProjectRecord) {
+    await this.projectService.loadCloudProject(item);
     this.showProjectsModal.set(false);
     this.showToast(`☁️ Proyecto "${item.name}" cargado desde Supabase`);
   }
@@ -256,7 +306,6 @@ export class HeaderComponent {
       cancelText: 'Cancelar',
       severity: 'danger'
     });
-
     if (confirmed) {
       const ok = await this.projectService.deleteCloudProject(item.id);
       if (ok) {
@@ -266,15 +315,16 @@ export class HeaderComponent {
   }
 
   refreshCloud() {
-    this.supabase.refreshProjects();
+    void this.supabase.refreshProjects();
     this.showToast('Actualizando proyectos de Supabase...');
   }
 
   copySqlScript() {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(this.supabase.getSqlSetupScript());
+      void navigator.clipboard.writeText(this.supabase.getSqlSetupScript());
       this.sqlCopied.set(true);
-      setTimeout(() => this.sqlCopied.set(false), 3000);
+      if (this.sqlCopyTimer) clearTimeout(this.sqlCopyTimer);
+      this.sqlCopyTimer = setTimeout(() => this.sqlCopied.set(false), 3000);
     }
   }
 
@@ -284,7 +334,8 @@ export class HeaderComponent {
     this.toastTimer = setTimeout(() => this.toastMessage.set(null), 3500);
   }
 
-  // --- LOCAL ACTIONS ---
+  // --- ACCIONES DE ALMACENAMIENTO LOCAL Y EXPORTACIÓN ---
+
   loadProject(meta: ProjectMeta) {
     this.projectService.loadProjectById(meta.id);
     this.showProjectsModal.set(false);
@@ -299,7 +350,6 @@ export class HeaderComponent {
       cancelText: 'Cancelar',
       severity: 'danger'
     });
-
     if (confirmed) {
       this.projectService.deleteLocalProject(meta.id);
       this.showToast('Proyecto eliminado de la memoria local');
@@ -314,7 +364,6 @@ export class HeaderComponent {
       cancelText: 'Volver',
       severity: 'warning'
     });
-
     if (confirmed) {
       this.projectService.resetToDemo();
       this.showProjectsModal.set(false);
@@ -331,7 +380,7 @@ export class HeaderComponent {
     if (input.files && input.files[0]) {
       const file = input.files[0];
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = e => {
         const content = e.target?.result as string;
         if (content) {
           const success = this.projectService.importProjectFromJson(content);
@@ -339,7 +388,7 @@ export class HeaderComponent {
             this.showToast('¡Proyecto importado exitosamente!');
             this.showProjectsModal.set(false);
           } else {
-            this.showToast('Error: El archivo no tiene el formato válido de Modulr 3D Studio.');
+            this.showToast('Error: El archivo no tiene el formato válido de Piezo3D Studio.');
           }
         }
       };

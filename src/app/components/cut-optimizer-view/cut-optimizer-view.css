@@ -1,0 +1,5 @@
+/* Estilos encapsulados del componente CutOptimizerView */
+:host {
+  display: block;
+  width: 100%;
+}

@@ -1,25 +1,26 @@
-@if (isOpen(); as open) {
+@if (isOpen()) {
   @if (options(); as opt) {
-    <div 
+    <div
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs select-none"
       role="dialog"
       aria-modal="true"
       tabindex="-1"
       (keydown.escape)="cancel()">
-      
-      <!-- Backdrop click handler -->
-      <button 
+
+      <!-- Fondo interactivo para cerrar al hacer clic afuera -->
+      <button
         type="button"
         class="fixed inset-0 w-full h-full bg-transparent cursor-default border-0 outline-hidden -z-10"
         (click)="cancel()"
         tabindex="-1"
         aria-label="Cerrar cuadro de diálogo"></button>
-      
-      <div 
+
+      <!-- Tarjeta del Diálogo de Confirmación -->
+      <div
         [class]="themeService.isClassic() ? 'bg-white border-slate-200 text-slate-900 shadow-2xl' : 'bg-slate-900 border-slate-700 text-slate-100 shadow-2xl'"
         class="border rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 relative animate-in zoom-in-95 duration-150">
-        
-        <!-- Header with Severity Icon -->
+
+        <!-- Cabecera con Ícono según Severidad -->
         <div class="flex items-start gap-3.5">
           @if (opt.severity === 'danger') {
             <div class="w-11 h-11 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 shadow-xs">
@@ -45,8 +46,8 @@
           </div>
         </div>
 
-        <!-- Security / Caution Footer Banner -->
-        <div 
+        <!-- Franja informativa de atajos de teclado -->
+        <div
           [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-950/80 border-slate-800 text-slate-400'"
           class="px-3 py-2 rounded-lg border text-[11px] flex items-center justify-between">
           <span class="flex items-center gap-1.5">
@@ -54,30 +55,36 @@
             <span>Confirmación de acción</span>
           </span>
           <div class="flex items-center gap-1.5 font-mono text-[10px]">
-            <kbd class="px-1 py-0.2 bg-slate-200 border border-slate-300 rounded text-slate-700" [class]="themeService.isClassic() ? 'bg-slate-200 border-slate-300 text-slate-700' : 'bg-slate-800 border-slate-700 text-slate-300'">Esc</kbd> cancelar
-            <kbd class="px-1 py-0.2 bg-slate-200 border border-slate-300 rounded text-slate-700" [class]="themeService.isClassic() ? 'bg-slate-200 border-slate-300 text-slate-700' : 'bg-slate-800 border-slate-700 text-slate-300'">Enter</kbd> aceptar
+            <kbd
+              class="px-1 py-0.2 border rounded"
+              [class]="themeService.isClassic() ? 'bg-slate-200 border-slate-300 text-slate-700' : 'bg-slate-800 border-slate-700 text-slate-300'">Esc</kbd>
+            <span>cancelar</span>
+            <kbd
+              class="px-1 py-0.2 border rounded"
+              [class]="themeService.isClassic() ? 'bg-slate-200 border-slate-300 text-slate-700' : 'bg-slate-800 border-slate-700 text-slate-300'">Enter</kbd>
+            <span>aceptar</span>
           </div>
         </div>
 
-        <!-- Action Buttons -->
+        <!-- Botones de Acción -->
         <div class="flex items-center justify-end gap-2.5 pt-1">
-          <button 
+          <button
             type="button"
             (click)="cancel()"
             [class]="themeService.isClassic() ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'"
-            class="px-3.5 py-2 text-xs font-semibold rounded-xl border transition">
+            class="px-3.5 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer">
             {{ opt.cancelText || 'Cancelar' }}
           </button>
 
-          <button 
+          <button
             type="button"
             (click)="confirm()"
-            [class]="opt.severity === 'danger' 
-              ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs' 
-              : opt.severity === 'info' 
-              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs' 
+            [class]="opt.severity === 'danger'
+              ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs'
+              : opt.severity === 'info'
+              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
               : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-xs'"
-            class="px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+            class="px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer">
             @if (opt.severity === 'danger') {
               <span class="material-icons text-sm">delete</span>
             } @else {

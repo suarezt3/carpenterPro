@@ -1,0 +1,5 @@
+/* Estilos encapsulados del componente PartsList */
+:host {
+  display: block;
+  width: 100%;
+}

@@ -1,23 +1,23 @@
 <header [class]="themeService.isClassic() ? 'bg-white border-b border-slate-200 text-slate-800 sticky top-0 z-50 print:hidden w-full shadow-xs' : 'bg-zinc-900 border-b border-zinc-800 text-zinc-100 sticky top-0 z-50 print:hidden w-full'">
   <div class="w-full px-2.5 sm:px-4 lg:px-6">
     <div class="flex items-center justify-between h-14 gap-2 flex-nowrap overflow-visible">
-      
-      <!-- ZONE 1 (LEFT): Brand & Interactive Editable Project Name -->
+
+      <!-- ZONA 1 (IZQUIERDA): Marca e Identificador Editable del Proyecto -->
       <div class="flex items-center gap-2.5 min-w-0 shrink-0">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-xs shadow-indigo-900/25 ring-1 ring-white/20 shrink-0">
+        <div class="w-8 h-8 rounded-lg bg-linear-to-br from-indigo-600 via-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-xs shadow-indigo-900/25 ring-1 ring-white/20 shrink-0">
           <span class="material-icons text-xl">view_in_ar</span>
         </div>
         <div class="flex items-center gap-1.5 min-w-0">
           <span [class]="themeService.isClassic() ? 'font-bold tracking-tight text-slate-900 text-base whitespace-nowrap' : 'font-bold tracking-tight text-white text-base whitespace-nowrap'">Piezo<span [class]="themeService.isClassic() ? 'text-indigo-600' : 'text-indigo-400'">3D</span></span>
           <span [class]="themeService.isClassic() ? 'text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap' : 'text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 whitespace-nowrap'">Studio</span>
-          <span [class]="themeService.isClassic() ? 'text-slate-300 hidden md:inline' : 'text-zinc-600 hidden md:inline'">•</span>
-          
-          <!-- Interactive Project Name Badge & Popover Editor -->
+          <span [class]="themeService.isClassic() ? 'text-slate-300 hidden md:inline' : 'text-zinc-600 hidden md:inline'">·</span>
+
+          <!-- Botón y Popover para Editar Nombre del Proyecto y Cliente -->
           <div class="relative hidden md:flex items-center">
-            <button 
-              type="button" 
+            <button
+              type="button"
               (click)="startEditingTitle($event)"
-              [class]="themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200/80 transition text-xs font-bold max-w-[160px] lg:max-w-[240px] xl:max-w-[320px] cursor-pointer group shadow-2xs' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition text-xs font-bold max-w-[160px] lg:max-w-[240px] xl:max-w-[320px] cursor-pointer group shadow-2xs'"
+              [class]="themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200/80 transition text-xs font-bold max-w-40 lg:max-w-60 xl:max-w-80 cursor-pointer group shadow-2xs' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition text-xs font-bold max-w-40 lg:max-w-60 xl:max-w-80 cursor-pointer group shadow-2xs'"
               [title]="'Haz clic para cambiar el nombre del proyecto (' + project().name + ')'">
               <span [class]="themeService.isClassic() ? 'truncate font-bold text-slate-900 text-xs' : 'truncate font-bold text-white text-xs'">{{ project().name }}</span>
               @if (project().clientName) {
@@ -26,9 +26,13 @@
               <span [class]="themeService.isClassic() ? 'material-icons text-[13px] text-indigo-600 opacity-80 group-hover:opacity-100 transition shrink-0' : 'material-icons text-[13px] text-indigo-400 opacity-80 group-hover:opacity-100 transition shrink-0'">edit</span>
             </button>
 
-            <!-- Floating Title Editor Popover -->
+            <!-- Popover Flotante de Edición de Título -->
             @if (isEditingTitle()) {
-              <div 
+              <div
+                (click)="$event.stopPropagation()"
+                (keydown)="$event.stopPropagation()"
+                role="dialog"
+                tabindex="-1"
                 [class]="themeService.isClassic() ? 'absolute top-full left-0 mt-2 z-50 w-72 p-3.5 bg-white border border-slate-300 rounded-2xl shadow-2xl space-y-2.5 text-slate-900 animate-in fade-in-50 zoom-in-95' : 'absolute top-full left-0 mt-2 z-50 w-72 p-3.5 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl space-y-2.5 text-zinc-100 animate-in fade-in-50 zoom-in-95'">
                 <div class="flex items-center justify-between border-b pb-1.5" [class]="themeService.isClassic() ? 'border-slate-200' : 'border-zinc-800'">
                   <span class="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1" [class]="themeService.isClassic() ? 'text-indigo-600' : 'text-indigo-400'">
@@ -43,42 +47,42 @@
                 <div class="space-y-2.5 text-xs">
                   <div>
                     <label for="proj-title-input" [class]="themeService.isClassic() ? 'block text-[10px] font-bold text-slate-700 mb-0.5' : 'block text-[10px] font-bold text-zinc-300 mb-0.5'">Nombre del Proyecto:</label>
-                    <input 
+                    <input
                       id="proj-title-input"
-                      type="text" 
-                      [value]="titleInput()" 
-                      (input)="titleInput.set($any($event.target).value)" 
+                      type="text"
+                      [value]="titleInput()"
+                      (input)="onTitleInput($event)"
                       (keydown.enter)="saveTitleChange()"
                       (keydown.escape)="cancelEditingTitle()"
-                      placeholder="ej. Zapatero Vertical Repisas" 
-                      [class]="themeService.isClassic() ? 'w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-600 focus:bg-white text-slate-900 placeholder:text-slate-400' : 'w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-600 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-400 focus:bg-zinc-900 text-white placeholder:text-zinc-500'" />
+                      placeholder="ej. Zapatero Vertical Repisas"
+                      [class]="themeService.isClassic() ? 'w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:outline-hidden focus:border-indigo-600 focus:bg-white text-slate-900 placeholder:text-slate-400' : 'w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-600 rounded-xl text-xs font-bold focus:outline-hidden focus:border-indigo-400 focus:bg-zinc-900 text-white placeholder:text-zinc-500'" />
                   </div>
 
                   <div>
                     <label for="proj-client-input" [class]="themeService.isClassic() ? 'block text-[10px] font-bold text-slate-700 mb-0.5' : 'block text-[10px] font-bold text-zinc-300 mb-0.5'">Cliente / Referencia (Opcional):</label>
-                    <input 
+                    <input
                       id="proj-client-input"
-                      type="text" 
-                      [value]="clientInput()" 
-                      (input)="clientInput.set($any($event.target).value)" 
+                      type="text"
+                      [value]="clientInput()"
+                      (input)="onClientInput($event)"
                       (keydown.enter)="saveTitleChange()"
                       (keydown.escape)="cancelEditingTitle()"
-                      placeholder="ej. Familia Gómez" 
-                      [class]="themeService.isClassic() ? 'w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:outline-none focus:border-indigo-600 focus:bg-white text-slate-900 placeholder:text-slate-400' : 'w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-600 rounded-xl text-xs font-medium focus:outline-none focus:border-indigo-400 focus:bg-zinc-900 text-white placeholder:text-zinc-500'" />
+                      placeholder="ej. Familia Gómez"
+                      [class]="themeService.isClassic() ? 'w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:outline-hidden focus:border-indigo-600 focus:bg-white text-slate-900 placeholder:text-slate-400' : 'w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-600 rounded-xl text-xs font-medium focus:outline-hidden focus:border-indigo-400 focus:bg-zinc-900 text-white placeholder:text-zinc-500'" />
                   </div>
 
                   <div class="flex items-center justify-between pt-1">
                     <span [class]="themeService.isClassic() ? 'text-[9px] text-slate-500 font-mono italic' : 'text-[9px] text-zinc-400 font-mono italic'">ID único intacto en DB</span>
                     <div class="flex items-center gap-1.5">
-                      <button 
-                        type="button" 
-                        (click)="cancelEditingTitle()" 
+                      <button
+                        type="button"
+                        (click)="cancelEditingTitle()"
                         [class]="themeService.isClassic() ? 'px-2.5 py-1 text-slate-600 hover:text-slate-900 text-xs transition cursor-pointer font-medium' : 'px-2.5 py-1 text-zinc-400 hover:text-white text-xs transition cursor-pointer font-medium'">
                         Cancelar
                       </button>
-                      <button 
-                        type="button" 
-                        (click)="saveTitleChange()" 
+                      <button
+                        type="button"
+                        (click)="saveTitleChange()"
                         class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-1 cursor-pointer">
                         <span class="material-icons text-xs">check</span>
                         <span>Guardar</span>
@@ -92,73 +96,78 @@
         </div>
       </div>
 
-      <!-- ZONE 2 (CENTER): Navigation Tabs in Compact Segmented Bar -->
+      <!-- ZONA 2 (CENTRO): Pestañas de Navegación Principal -->
       <nav [class]="themeService.isClassic() ? 'flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-xl p-0.5 shadow-inner shrink-0' : 'flex items-center gap-1 bg-zinc-950/90 border border-zinc-800/90 rounded-xl p-0.5 shadow-inner shrink-0'">
-        <button 
+        <button
+          type="button"
           (click)="selectTab('modules')"
-          [class]="activeTab() === 'modules' 
-            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition') 
-            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition')">
+          [class]="activeTab() === 'modules'
+            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
           <span class="material-icons text-base">kitchen</span>
           <span class="hidden lg:inline">1. Diseñador 3D</span>
           <span class="lg:hidden">1. 3D</span>
           <span [class]="themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono' : 'text-[10px] px-1 py-0.2 rounded-full bg-slate-800 text-slate-200 font-mono'">{{ project().modules.length }}</span>
         </button>
 
-        <button 
+        <button
+          type="button"
           (click)="selectTab('parts')"
-          [class]="activeTab() === 'parts' 
-            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition') 
-            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition')">
+          [class]="activeTab() === 'parts'
+            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
           <span class="material-icons text-base">format_list_numbered</span>
           <span class="hidden lg:inline">2. Despiece</span>
           <span class="lg:hidden">2. Piezas</span>
           <span [class]="themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono' : 'text-[10px] px-1 py-0.2 rounded-full bg-slate-800 text-slate-200 font-mono'">{{ partsCount() }}</span>
         </button>
 
-        <button 
+        <button
+          type="button"
           (click)="selectTab('optimizer')"
-          [class]="activeTab() === 'optimizer' 
-            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition') 
-            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition')">
+          [class]="activeTab() === 'optimizer'
+            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
           <span class="material-icons text-base">grid_view</span>
           <span class="hidden lg:inline">3. Optimizador 2D</span>
           <span class="lg:hidden">3. Corte</span>
           <span class="text-[9px] uppercase font-bold tracking-wider px-1 py-0.2 rounded bg-amber-500/15 text-amber-700 border border-amber-500/30">Sierra</span>
         </button>
 
-        <button 
+        <button
+          type="button"
           (click)="selectTab('budget')"
-          [class]="activeTab() === 'budget' 
-            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition') 
-            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition')">
+          [class]="activeTab() === 'budget'
+            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
           <span class="material-icons text-base">monetization_on</span>
           <span class="hidden lg:inline">4. Presupuesto</span>
           <span class="lg:hidden">4. Cotizar</span>
         </button>
 
         @if (showLabelsTab()) {
-          <button 
+          <button
+            type="button"
             (click)="selectTab('labels')"
-            [class]="activeTab() === 'labels' 
-              ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition') 
-              : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition')">
+            [class]="activeTab() === 'labels'
+              ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+              : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
             <span class="material-icons text-base">qr_code_2</span>
             <span>5. Etiquetas</span>
           </button>
         }
       </nav>
 
-      <!-- ZONE 3 (RIGHT): Action Buttons (Grouped Compact Menus, Anti-Overflow) -->
+      <!-- ZONA 3 (DERECHA): Botones de Acción, Historial, Nube y Configuración -->
       <div class="flex items-center gap-1.5 shrink-0 justify-end">
 
-        <!-- Selector de Tema (Modo Claro / Oscuro) -->
+        <!-- Selector de Tema (Claro / Oscuro) -->
         <button
           type="button"
           (click)="themeService.toggleTheme()"
-          [class]="themeService.isClassic() 
-            ? 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs' 
-            : 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-amber-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0'"
+          [class]="themeService.isClassic()
+            ? 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
+            : 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-amber-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
           [title]="themeService.isClassic() ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro (Estudio)'">
           <span class="material-icons text-sm" [class.text-amber-500]="themeService.isClassic()" [class.text-amber-400]="!themeService.isClassic()">
             {{ themeService.isClassic() ? 'light_mode' : 'dark_mode' }}
@@ -172,8 +181,8 @@
         <button
           type="button"
           (click)="showNotesModal.set(true)"
-          [class]="themeService.isClassic() 
-            ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-300/80 transition whitespace-nowrap shrink-0 shadow-2xs cursor-pointer' 
+          [class]="themeService.isClassic()
+            ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-300/80 transition whitespace-nowrap shrink-0 shadow-2xs cursor-pointer'
             : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 rounded-lg border border-amber-700/50 transition whitespace-nowrap shrink-0 cursor-pointer'"
           title="Abrir cuaderno de notas y pendientes del proyecto activo">
           <span class="material-icons text-sm text-amber-500 shrink-0">edit_note</span>
@@ -185,35 +194,35 @@
           }
         </button>
 
-        <!-- Undo / Redo History Controls -->
+        <!-- Controles Undo / Redo -->
         <div [class]="themeService.isClassic() ? 'flex items-center h-8.5 bg-slate-100 border border-slate-200 rounded-lg p-0.5 shadow-xs shrink-0' : 'flex items-center h-8.5 bg-zinc-950/90 border border-zinc-800 rounded-lg p-0.5 shadow-sm shrink-0'">
-          <button 
+          <button
             type="button"
-            (click)="undo()" 
+            (click)="undo()"
             [disabled]="!canUndo()"
-            [class]="themeService.isClassic() ? 'h-full px-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap' : 'h-full px-1.5 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap'"
+            [class]="themeService.isClassic() ? 'h-full px-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap cursor-pointer' : 'h-full px-1.5 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap cursor-pointer'"
             title="Deshacer cambio (Ctrl+Z)">
             <span class="material-icons text-base">undo</span>
           </button>
           <div [class]="themeService.isClassic() ? 'w-px h-3.5 bg-slate-200 my-auto' : 'w-px h-3.5 bg-zinc-800 my-auto'"></div>
-          <button 
+          <button
             type="button"
-            (click)="redo()" 
+            (click)="redo()"
             [disabled]="!canRedo()"
-            [class]="themeService.isClassic() ? 'h-full px-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap' : 'h-full px-1.5 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap'"
+            [class]="themeService.isClassic() ? 'h-full px-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap cursor-pointer' : 'h-full px-1.5 rounded text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-25 disabled:pointer-events-none transition flex items-center text-xs whitespace-nowrap cursor-pointer'"
             title="Rehacer cambio (Ctrl+Y)">
             <span class="material-icons text-base">redo</span>
           </button>
         </div>
 
-        <!-- MENÚ DESPLEGABLE: PROYECTO (Nuevo, Abrir proyectos, Auto-sync) -->
+        <!-- MENÚ DESPLEGABLE: PROYECTO -->
         <div class="relative z-50">
-          <button 
+          <button
             type="button"
             (click)="toggleProjectDropdown($event)"
-            [class]="themeService.isClassic() 
-              ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs' 
-              : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0'"
+            [class]="themeService.isClassic()
+              ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
+              : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
             title="Menú de Proyectos y Gestión de Archivos">
             <span class="material-icons text-sm text-amber-500 shrink-0">folder_open</span>
             <span class="whitespace-nowrap">Proyecto</span>
@@ -226,17 +235,16 @@
           </button>
 
           @if (isProjectDropdownOpen()) {
-            <div 
+            <div
               role="menu"
               tabindex="-1"
               (keydown)="$event.stopPropagation()"
               (click)="$event.stopPropagation()"
-              [class]="themeService.isClassic() 
-                ? 'absolute right-0 top-full mt-2 z-50 w-60 bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 text-xs text-slate-700 animate-in fade-in-50 zoom-in-95' 
+              [class]="themeService.isClassic()
+                ? 'absolute right-0 top-full mt-2 z-50 w-60 bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 text-xs text-slate-700 animate-in fade-in-50 zoom-in-95'
                 : 'absolute right-0 top-full mt-2 z-50 w-60 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 text-xs text-zinc-200 animate-in fade-in-50 zoom-in-95'">
-              
-              <!-- Opción: Cambiar Nombre del Proyecto -->
-              <button 
+
+              <button
                 type="button"
                 (click)="startEditingTitle($event); closeDropdowns()"
                 [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition cursor-pointer'">
@@ -247,11 +255,10 @@
                 </div>
               </button>
 
-              <!-- Opción: Nuevo Proyecto -->
-              <button 
+              <button
                 type="button"
                 (click)="openNewProjectModal(); closeDropdowns()"
-                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition cursor-pointer'">
                 <span class="material-icons text-sm text-emerald-500 shrink-0">add_circle</span>
                 <div class="flex flex-col">
                   <span class="font-bold">Nuevo Proyecto</span>
@@ -259,11 +266,10 @@
                 </div>
               </button>
 
-              <!-- Opción: Abrir / Gestionar Proyectos -->
-              <button 
+              <button
                 type="button"
                 (click)="showProjectsModal.set(true); closeDropdowns()"
-                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition cursor-pointer'">
                 <span class="material-icons text-sm text-amber-500 shrink-0">folder_open</span>
                 <div class="flex flex-col flex-1">
                   <div class="flex items-center justify-between">
@@ -280,11 +286,10 @@
 
               <div [class]="themeService.isClassic() ? 'h-px bg-slate-100 my-0.5' : 'h-px bg-zinc-800 my-0.5'"></div>
 
-              <!-- Opción: Conmutador de Auto-guardado en Nube -->
-              <button 
+              <button
                 type="button"
                 (click)="toggleAutoSync()"
-                [class]="themeService.isClassic() ? 'flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                [class]="themeService.isClassic() ? 'flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition cursor-pointer' : 'flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition cursor-pointer'">
                 <div class="flex items-center gap-2">
                   <span class="material-icons text-sm text-sky-500 shrink-0">cloud_sync</span>
                   <div class="flex flex-col">
@@ -292,23 +297,24 @@
                     <span class="text-[10px] text-slate-400">Sincronización en la nube</span>
                   </div>
                 </div>
-                <span 
+                <span
                   [class]="autoSyncEnabled() ? 'px-2 py-0.5 text-[9px] font-bold uppercase rounded-full bg-emerald-500/20 text-emerald-600 border border-emerald-500/30' : 'px-2 py-0.5 text-[9px] font-bold uppercase rounded-full bg-slate-200 text-slate-500'">
                   {{ autoSyncEnabled() ? 'ON' : 'OFF' }}
                 </span>
               </button>
+
             </div>
           }
         </div>
 
-        <!-- MENÚ DESPLEGABLE: EXPORTAR (Plano 2D PDF, DXF CNC, Descargar JSON) -->
+        <!-- MENÚ DESPLEGABLE: EXPORTAR -->
         <div class="relative">
-          <button 
+          <button
             type="button"
             (click)="toggleExportDropdown($event)"
-            [class]="themeService.isClassic() 
-              ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs' 
-              : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0'"
+            [class]="themeService.isClassic()
+              ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
+              : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
             title="Menú de Exportaciones para Taller y Fábrica">
             <span class="material-icons text-sm text-sky-500 shrink-0">file_download</span>
             <span class="whitespace-nowrap">Exportar</span>
@@ -316,20 +322,19 @@
           </button>
 
           @if (isExportDropdownOpen()) {
-            <div 
+            <div
               role="menu"
               tabindex="-1"
               (keydown)="$event.stopPropagation()"
               (click)="$event.stopPropagation()"
-              [class]="themeService.isClassic() 
-                ? 'absolute right-0 top-full mt-1.5 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 text-xs text-slate-700 animate-in fade-in-50 zoom-in-95' 
+              [class]="themeService.isClassic()
+                ? 'absolute right-0 top-full mt-1.5 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 text-xs text-slate-700 animate-in fade-in-50 zoom-in-95'
                 : 'absolute right-0 top-full mt-1.5 z-50 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 text-xs text-zinc-200 animate-in fade-in-50 zoom-in-95'">
-              
-              <!-- Plano 2D Técnico PDF -->
-              <button 
+
+              <button
                 type="button"
                 (click)="openTechnicalSheet(); closeDropdowns()"
-                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition cursor-pointer'">
                 <span class="material-icons text-sm text-amber-500 shrink-0">architecture</span>
                 <div class="flex flex-col">
                   <span class="font-bold">Plano 2D Técnico (PDF)</span>
@@ -337,11 +342,10 @@
                 </div>
               </button>
 
-              <!-- Exportar DXF CNC -->
-              <button 
+              <button
                 type="button"
                 (click)="exportDxf(); closeDropdowns()"
-                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition cursor-pointer'">
                 <span class="material-icons text-sm text-cyan-500 shrink-0">download</span>
                 <div class="flex flex-col">
                   <span class="font-bold">Exportar DXF CNC</span>
@@ -349,30 +353,30 @@
                 </div>
               </button>
 
-              <!-- Descargar Copia JSON -->
-              <button 
+              <button
                 type="button"
                 (click)="exportJson(); closeDropdowns()"
-                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition'">
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-zinc-800 text-left transition cursor-pointer'">
                 <span class="material-icons text-sm text-slate-500 shrink-0">code</span>
                 <div class="flex flex-col">
                   <span class="font-bold">Copia JSON</span>
                   <span class="text-[10px] text-slate-400">Respaldo completo editable</span>
                 </div>
               </button>
+
             </div>
           }
         </div>
 
-        <!-- Botón Directo Destacado: Guardar en la Nube con Supabase -->
-        <button 
+        <!-- Botón Guardar en la Nube con Supabase -->
+        <button
           type="button"
           (click)="saveCurrentToCloud()"
-          [class]="syncStatus() === 'syncing' 
-            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-700/90 rounded-lg border border-blue-500/50 shadow-sm animate-pulse whitespace-nowrap shrink-0'
+          [class]="syncStatus() === 'syncing'
+            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-700/90 rounded-lg border border-blue-500/50 shadow-sm animate-pulse whitespace-nowrap shrink-0 cursor-pointer'
             : syncStatus() === 'table_needed'
-            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-amber-300 bg-amber-950/70 hover:bg-amber-900/90 rounded-lg border border-amber-600/50 shadow-sm transition whitespace-nowrap shrink-0'
-            : 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500 shadow-sm transition whitespace-nowrap shrink-0'"
+            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-amber-300 bg-amber-950/70 hover:bg-amber-900/90 rounded-lg border border-amber-600/50 shadow-sm transition whitespace-nowrap shrink-0 cursor-pointer'
+            : 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500 shadow-sm transition whitespace-nowrap shrink-0 cursor-pointer'"
           title="Guardar proyecto en la base de datos de Supabase">
           @if (syncStatus() === 'syncing') {
             <span class="material-icons text-sm animate-spin shrink-0">sync</span>
@@ -386,28 +390,29 @@
           }
         </button>
 
-        <!-- Botón Ayuda / Manual Interactivo de Herramientas -->
-        <button 
+        <!-- Botón Ayuda / Manual Interactivo -->
+        <button
           type="button"
           (click)="openDocumentationModal()"
-          [class]="themeService.isClassic() 
-            ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs' 
-            : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 rounded-lg border border-emerald-700/50 transition whitespace-nowrap shrink-0'"
+          [class]="themeService.isClassic()
+            ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
+            : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 rounded-lg border border-emerald-700/50 transition whitespace-nowrap shrink-0 cursor-pointer'"
           title="Manual de Herramientas, Mecanizados CNC y Atajos (Ayuda)">
           <span class="material-icons text-base text-emerald-500">help_outline</span>
           <span class="whitespace-nowrap hidden lg:inline">Ayuda</span>
         </button>
 
         <!-- Botón Configuración -->
-        <button 
+        <button
           type="button"
           (click)="openSettings()"
-          [class]="themeService.isClassic() 
-            ? 'h-8.5 w-8.5 inline-flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-lg border border-slate-300 transition shrink-0 shadow-xs' 
-            : 'h-8.5 w-8.5 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg border border-transparent hover:border-zinc-700 transition shrink-0'"
+          [class]="themeService.isClassic()
+            ? 'h-8.5 w-8.5 inline-flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-lg border border-slate-300 transition shrink-0 shadow-xs cursor-pointer'
+            : 'h-8.5 w-8.5 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg border border-transparent hover:border-zinc-700 transition shrink-0 cursor-pointer'"
           title="Configuración de Sierra (Kerf), Refilado y Costos">
           <span class="material-icons text-base">settings</span>
         </button>
+
       </div>
 
     </div>
@@ -426,8 +431,8 @@
 @if (showProjectsModal()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
     <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-2xl shadow-2xl p-6 text-zinc-100 max-h-[90vh] flex flex-col">
-      
-      <!-- Header del Modal -->
+
+      <!-- Cabecera del Modal -->
       <div class="flex items-center justify-between pb-3 border-b border-zinc-800 shrink-0">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
@@ -438,20 +443,20 @@
             <p class="text-xs text-zinc-400">Base de datos en la nube Supabase y almacenamiento local</p>
           </div>
         </div>
-        <button (click)="showProjectsModal.set(false)" class="text-zinc-400 hover:text-white p-1 rounded-lg">
+        <button type="button" (click)="showProjectsModal.set(false)" class="text-zinc-400 hover:text-white p-1 rounded-lg cursor-pointer">
           <span class="material-icons">close</span>
         </button>
       </div>
 
       <!-- Barra de Estado de Supabase & Pestañas -->
       <div class="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-        <!-- Tabs -->
         <div class="inline-flex rounded-lg bg-zinc-800/80 p-1 border border-zinc-700/60 text-xs">
-          <button 
+          <button
+            type="button"
             (click)="projectsTab.set('cloud')"
-            [class]="projectsTab() === 'cloud' 
-              ? 'px-3 py-1.5 rounded-md bg-blue-600 text-white font-semibold shadow-xs' 
-              : 'px-3 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition'">
+            [class]="projectsTab() === 'cloud'
+              ? 'px-3 py-1.5 rounded-md bg-blue-600 text-white font-semibold shadow-xs cursor-pointer'
+              : 'px-3 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition cursor-pointer'">
             <span class="inline-flex items-center gap-1.5">
               <span class="material-icons text-xs">cloud</span>
               <span>En la Nube (Supabase)</span>
@@ -460,12 +465,12 @@
               }
             </span>
           </button>
-
-          <button 
+          <button
+            type="button"
             (click)="projectsTab.set('local')"
-            [class]="projectsTab() === 'local' 
-              ? 'px-3 py-1.5 rounded-md bg-zinc-700 text-white font-semibold shadow-xs' 
-              : 'px-3 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition'">
+            [class]="projectsTab() === 'local'
+              ? 'px-3 py-1.5 rounded-md bg-zinc-700 text-white font-semibold shadow-xs cursor-pointer'
+              : 'px-3 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition cursor-pointer'">
             <span class="inline-flex items-center gap-1.5">
               <span class="material-icons text-xs">storage</span>
               <span>Memoria Local</span>
@@ -474,18 +479,18 @@
           </button>
         </div>
 
-        <!-- Botones de Acción de Nube -->
         <div class="flex items-center gap-2">
-          <button 
-            (click)="saveCurrentToCloud()" 
-            class="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition inline-flex items-center gap-1.5">
+          <button
+            type="button"
+            (click)="saveCurrentToCloud()"
+            class="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer">
             <span class="material-icons text-sm">cloud_upload</span>
             <span>Guardar Proyecto Actual</span>
           </button>
-
-          <button 
+          <button
+            type="button"
             (click)="refreshCloud()"
-            class="p-1.5 text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition"
+            class="p-1.5 text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition cursor-pointer"
             title="Refrescar lista desde Supabase">
             <span class="material-icons text-sm">refresh</span>
           </button>
@@ -494,11 +499,8 @@
 
       <!-- Contenido de Proyectos -->
       <div class="mt-4 flex-1 overflow-y-auto space-y-3 pr-1">
-        
+
         @if (projectsTab() === 'cloud') {
-          <!-- PESTAÑA: NUBE SUPABASE -->
-          
-          <!-- Si la tabla aún requiere creación de schema en Supabase -->
           @if (syncStatus() === 'table_needed') {
             <div class="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 text-amber-200 space-y-3">
               <div class="flex items-start gap-3">
@@ -511,9 +513,10 @@
                 </div>
               </div>
               <div class="flex items-center justify-end gap-2 pt-1">
-                <button 
+                <button
+                  type="button"
                   (click)="showSqlModal.set(true)"
-                  class="px-3.5 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-lg transition inline-flex items-center gap-1.5 shadow-sm">
+                  class="px-3.5 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-lg transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
                   <span class="material-icons text-sm">terminal</span>
                   <span>Ver y Copiar Script SQL (1 paso)</span>
                 </button>
@@ -521,7 +524,6 @@
             </div>
           }
 
-          <!-- Lista de proyectos en Supabase -->
           @if (cloudProjects().length > 0) {
             <div class="space-y-2">
               @for (cp of cloudProjects(); track cp.id) {
@@ -548,16 +550,17 @@
                   </div>
 
                   <div class="flex items-center gap-2 shrink-0">
-                    <button 
+                    <button
+                      type="button"
                       (click)="loadCloudProject(cp)"
-                      class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition inline-flex items-center gap-1 shadow-sm">
+                      class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition inline-flex items-center gap-1 shadow-sm cursor-pointer">
                       <span class="material-icons text-xs">file_download</span>
                       <span>Abrir</span>
                     </button>
-
-                    <button 
+                    <button
+                      type="button"
                       (click)="deleteCloudProject(cp, $event)"
-                      class="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition"
+                      class="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
                       title="Eliminar de la nube">
                       <span class="material-icons text-sm">delete_outline</span>
                     </button>
@@ -572,19 +575,17 @@
               <p class="text-xs text-zinc-500 max-w-sm mx-auto">
                 Pulsa el botón "Guardar Proyecto Actual" para subir el mueble que estás diseñando a Supabase y acceder a él desde cualquier equipo.
               </p>
-              <button 
+              <button
+                type="button"
                 (click)="saveCurrentToCloud()"
-                class="px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition inline-flex items-center gap-1.5">
+                class="px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer">
                 <span class="material-icons text-sm">cloud_upload</span>
                 <span>Guardar Proyecto Actual Ahora</span>
               </button>
             </div>
           }
-
         } @else {
           <!-- PESTAÑA: MEMORIA LOCAL Y ARCHIVOS -->
-          
-          <!-- Acciones de Importar / Exportar JSON -->
           <div class="grid grid-cols-2 gap-3 mb-3">
             <label class="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-zinc-700 hover:border-amber-500/60 bg-zinc-800/40 hover:bg-zinc-800/70 cursor-pointer transition text-center">
               <span class="material-icons text-amber-400 text-2xl mb-1">upload_file</span>
@@ -593,9 +594,10 @@
               <input type="file" accept=".json" (change)="onFileSelected($event)" class="hidden" />
             </label>
 
-            <button 
+            <button
+              type="button"
               (click)="exportJson()"
-              class="flex flex-col items-center justify-center p-3 rounded-xl border border-zinc-700 hover:border-cyan-500/60 bg-zinc-800/40 hover:bg-zinc-800/70 transition text-center">
+              class="flex flex-col items-center justify-center p-3 rounded-xl border border-zinc-700 hover:border-cyan-500/60 bg-zinc-800/40 hover:bg-zinc-800/70 transition text-center cursor-pointer">
               <span class="material-icons text-cyan-400 text-2xl mb-1">download</span>
               <span class="text-xs font-semibold text-zinc-200">Descargar Copia JSON</span>
               <span class="text-[10px] text-zinc-400">Guardar en tu computadora</span>
@@ -604,7 +606,7 @@
 
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Historial Local</span>
-            <button (click)="resetDemo()" class="text-xs text-amber-400 hover:underline flex items-center gap-1">
+            <button type="button" (click)="resetDemo()" class="text-xs text-amber-400 hover:underline flex items-center gap-1 cursor-pointer">
               <span class="material-icons text-xs">restart_alt</span> Cargar Demo Barra
             </button>
           </div>
@@ -619,14 +621,16 @@
                   </p>
                 </div>
                 <div class="flex items-center gap-2">
-                  <button 
+                  <button
+                    type="button"
                     (click)="loadProject(p)"
-                    class="px-3 py-1 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 transition">
+                    class="px-3 py-1 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 transition cursor-pointer">
                     Abrir
                   </button>
-                  <button 
+                  <button
+                    type="button"
                     (click)="deleteLocalProject(p, $event)"
-                    class="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-zinc-700/60 rounded-lg transition"
+                    class="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-zinc-700/60 rounded-lg transition cursor-pointer"
                     title="Eliminar de memoria local">
                     <span class="material-icons text-sm">delete</span>
                   </button>
@@ -639,20 +643,23 @@
             }
           </div>
         }
+
       </div>
 
-      <!-- Footer del Modal -->
+      <!-- Pie del Modal -->
       <div class="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between shrink-0">
         <span class="text-[11px] text-zinc-500 flex items-center gap-1.5">
           <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
           <span>Supabase: umdcxcjrdyckpxomxlmi.supabase.co</span>
         </span>
-        <button 
+        <button
+          type="button"
           (click)="showProjectsModal.set(false)"
-          class="px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-200 transition">
+          class="px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-200 transition cursor-pointer">
           Cerrar
         </button>
       </div>
+
     </div>
   </div>
 }
@@ -666,7 +673,7 @@
           <span class="material-icons text-amber-400">terminal</span>
           <h3 class="text-base font-bold">Inicializar Tabla en Supabase</h3>
         </div>
-        <button (click)="showSqlModal.set(false)" class="text-zinc-400 hover:text-white">
+        <button type="button" (click)="showSqlModal.set(false)" class="text-zinc-400 hover:text-white cursor-pointer">
           <span class="material-icons">close</span>
         </button>
       </div>
@@ -675,18 +682,18 @@
         <p class="text-xs text-zinc-300">
           Para que Supabase almacene tus proyectos, sigue estos 3 simples pasos:
         </p>
-
         <ol class="list-decimal list-inside text-xs text-zinc-400 space-y-1 pl-1">
-          <li>Abre tu consola de Supabase en <a href="https://supabase.com/dashboard/project/umdcxcjrdyckpxomxlmi" target="_blank" class="text-blue-400 underline">tu proyecto</a>.</li>
+          <li>Abre tu consola de Supabase en <a href="https://supabase.com/dashboard/project/umdcxcjrdyckpxomxlmi" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline">tu proyecto</a>.</li>
           <li>En el menú lateral izquierdo, haz clic en <strong>SQL Editor</strong>.</li>
           <li>Pega el código siguiente y haz clic en el botón verde <strong>RUN</strong>.</li>
         </ol>
 
         <div class="relative mt-2">
           <pre class="bg-zinc-950 p-3.5 rounded-xl border border-zinc-800 text-[11px] font-mono text-zinc-300 overflow-x-auto select-all leading-relaxed">{{ supabase.getSqlSetupScript() }}</pre>
-          <button 
+          <button
+            type="button"
             (click)="copySqlScript()"
-            class="absolute top-2.5 right-2.5 px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition inline-flex items-center gap-1 shadow-md">
+            class="absolute top-2.5 right-2.5 px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition inline-flex items-center gap-1 shadow-md cursor-pointer">
             <span class="material-icons text-xs">content_copy</span>
             <span>{{ sqlCopied() ? '¡Copiado!' : 'Copiar SQL' }}</span>
           </button>
@@ -695,9 +702,10 @@
 
       <div class="mt-4 pt-3 border-t border-zinc-800 flex justify-between items-center shrink-0">
         <span class="text-xs text-zinc-500">¡Solo se realiza una vez!</span>
-        <button 
+        <button
+          type="button"
           (click)="showSqlModal.set(false); refreshCloud()"
-          class="px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition">
+          class="px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition cursor-pointer">
           Listo, verificar conexión
         </button>
       </div>
@@ -714,7 +722,7 @@
           <span class="material-icons text-emerald-400">create_new_folder</span>
           Crear Nuevo Proyecto
         </h3>
-        <button (click)="showNewProjectModal.set(false)" class="text-zinc-400 hover:text-white">
+        <button type="button" (click)="showNewProjectModal.set(false)" class="text-zinc-400 hover:text-white cursor-pointer">
           <span class="material-icons">close</span>
         </button>
       </div>
@@ -722,33 +730,31 @@
       <form [formGroup]="newProjectForm" (ngSubmit)="submitNewProject()" class="mt-4 space-y-4">
         <div>
           <span class="block text-xs font-medium text-zinc-300 mb-1">Nombre del Proyecto *</span>
-          <input 
-            type="text" 
-            formControlName="name" 
+          <input
+            type="text"
+            formControlName="name"
             placeholder="ej. Mueble de Cocina o Vestidor"
             class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500" />
         </div>
-
         <div>
           <span class="block text-xs font-medium text-zinc-300 mb-1">Nombre del Cliente / Ubicación</span>
-          <input 
-            type="text" 
-            formControlName="clientName" 
+          <input
+            type="text"
+            formControlName="clientName"
             placeholder="ej. Ing. Carlos Pérez - Apto 302"
             class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500" />
         </div>
-
         <div class="pt-2 flex justify-end gap-2">
-          <button 
-            type="button" 
+          <button
+            type="button"
             (click)="showNewProjectModal.set(false)"
-            class="px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300">
+            class="px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 cursor-pointer">
             Cancelar
           </button>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             [disabled]="newProjectForm.invalid"
-            class="px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg transition">
+            class="px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg transition cursor-pointer">
             Crear Proyecto
           </button>
         </div>
@@ -766,7 +772,7 @@
           <span class="material-icons text-amber-400">tune</span>
           Parámetros de Taller y Corte
         </h3>
-        <button (click)="showSettingsModal.set(false)" class="text-zinc-400 hover:text-white">
+        <button type="button" (click)="showSettingsModal.set(false)" class="text-zinc-400 hover:text-white cursor-pointer">
           <span class="material-icons">close</span>
         </button>
       </div>
@@ -778,9 +784,9 @@
               Grosor Sierra / Disco (Kerf)
             </span>
             <div class="relative">
-              <input 
-                type="number" 
-                step="0.5" 
+              <input
+                type="number"
+                step="0.5"
                 formControlName="sawKerf"
                 class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500 pr-10" />
               <span class="absolute right-3 top-2 text-xs text-zinc-400">mm</span>
@@ -793,9 +799,9 @@
               Refilado Perimetral (Trim)
             </span>
             <div class="relative">
-              <input 
-                type="number" 
-                step="1" 
+              <input
+                type="number"
+                step="1"
                 formControlName="trimMargin"
                 class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500 pr-10" />
               <span class="absolute right-3 top-2 text-xs text-zinc-400">mm</span>
@@ -810,9 +816,9 @@
               Costo Canto Delgado (0.45mm)
             </span>
             <div class="relative">
-              <input 
-                type="number" 
-                step="0.05" 
+              <input
+                type="number"
+                step="0.05"
                 formControlName="thinEdgeCostPerMeter"
                 class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500 pr-14" />
               <span class="absolute right-3 top-2 text-xs text-zinc-400">/ metro</span>
@@ -824,9 +830,9 @@
               Costo Canto Grueso (2.0mm)
             </span>
             <div class="relative">
-              <input 
-                type="number" 
-                step="0.05" 
+              <input
+                type="number"
+                step="0.05"
                 formControlName="thickEdgeCostPerMeter"
                 class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500 pr-14" />
               <span class="absolute right-3 top-2 text-xs text-zinc-400">/ metro</span>
@@ -837,7 +843,7 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <span class="block text-xs font-medium text-zinc-300 mb-1">Moneda del Proyecto</span>
-            <select 
+            <select
               formControlName="currency"
               class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500">
               <option value="COP">COP ($) - Pesos Colombianos (Predeterminado)</option>
@@ -849,10 +855,9 @@
               <option value="ARS">ARS ($) - Pesos Argentinos</option>
             </select>
           </div>
-
           <div>
             <span class="block text-xs font-medium text-zinc-300 mb-1">Estrategia de Corte</span>
-            <select 
+            <select
               formControlName="optimizationPreference"
               class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500">
               <option value="best_fit">Mejor aprovechamiento (Recomendado)</option>
@@ -863,15 +868,15 @@
         </div>
 
         <div class="pt-3 flex justify-end gap-2">
-          <button 
-            type="button" 
+          <button
+            type="button"
             (click)="showSettingsModal.set(false)"
-            class="px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300">
+            class="px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 cursor-pointer">
             Cancelar
           </button>
-          <button 
-            type="submit" 
-            class="px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 rounded-lg transition">
+          <button
+            type="submit"
+            class="px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 rounded-lg transition cursor-pointer">
             Guardar Parámetros
           </button>
         </div>
@@ -894,9 +899,8 @@
   (modalClose)="closeDocumentationModal()">
 </app-documentation-modal>
 
-<!-- MODAL: NOTAS Y PENDIENTES DEL PROYECTO (AUTO-GUARDADO EN NUBE) -->
+<!-- MODAL: NOTAS Y PENDIENTES DEL PROYECTO -->
 <app-project-notes-modal
   [isOpen]="showNotesModal()"
   (modalClose)="showNotesModal.set(false)">
 </app-project-notes-modal>
-

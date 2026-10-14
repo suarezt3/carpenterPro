@@ -11,6 +11,7 @@ import {
   effect,
   untracked,
   OnDestroy,
+  NgZone,
   inject
 } from '@angular/core';
 import * as THREE from 'three';
@@ -120,9 +121,15 @@ export interface WallSnapResult {
   }
 })
 export class Furniture3dViewerComponent implements OnDestroy {
+ private readonly ngZone = inject(NgZone);
   private joineryEngine = inject(JoineryEngineService);
   readonly hardwareCatalog = inject(HardwareCatalogService);
   private appliance3dBuilder = inject(Appliance3dBuilderService);
+
+  // Referencias a los listeners del DOM para removerlos limpiamente en ngOnDestroy
+  private readonly boundPointerDown = (e: PointerEvent) => this.onPointerDown(e);
+  private readonly boundPointerMove = (e: PointerEvent) => this.onPointerMove(e);
+  private readonly boundPointerUp = (e: PointerEvent) => this.onPointerUp(e);
 
   // Inputs
   parts = input<Part[]>([]);
@@ -576,22 +583,24 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.show3dDimensions()
     );
 
-    // 8. Animation Loop
-    this.animate();
+    // 8, 9 y 10. Ejecutar el bucle WebGL de 60 FPS y eventos continuos fuera de NgZone
+    // para no disparar ciclos innecesarios de detección de cambios en Angular
+    this.ngZone.runOutsideAngular(() => {
+      this.animate();
 
-    // 9. Resize Observer
-    if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObserver = new ResizeObserver(() => {
-        this.onResize();
-      });
-      this.resizeObserver.observe(container);
-    }
+      if (typeof ResizeObserver !== 'undefined') {
+        this.resizeObserver = new ResizeObserver(() => {
+          this.onResize();
+        });
+        this.resizeObserver.observe(container);
+      }
 
-    // 10. Pointer Interactions (Selection, Gizmo Drag, Edge Handles)
-    canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
-    window.addEventListener('pointermove', (e) => this.onPointerMove(e));
-    window.addEventListener('pointerup', (e) => this.onPointerUp(e));
-    window.addEventListener('pointercancel', (e) => this.onPointerUp(e));
+      canvas.addEventListener('pointerdown', this.boundPointerDown);
+      window.addEventListener('pointermove', this.boundPointerMove);
+      window.addEventListener('pointerup', this.boundPointerUp);
+      window.addEventListener('pointercancel', this.boundPointerUp);
+    });
+  
   }
 
   private applyThemeColors() {
@@ -8184,42 +8193,82 @@ export class Furniture3dViewerComponent implements OnDestroy {
     });
   }
 
+  /**
+   * Libera recursivamente las geometrías y materiales de un grupo de Three.js en la GPU (VRAM).
+   */
+  private disposeGroup(group: THREE.Group) {
+    while (group.children.length > 0) {
+      const child = group.children[0];
+      group.remove(child);
+      child.traverse(obj => {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
+          if (obj.geometry) {
+            obj.geometry.dispose();
+          }
+          if (obj.material) {
+            if (Array.isArray(obj.material)) {
+              for (const m of obj.material) {
+                m.dispose();
+              }
+            } else {
+              obj.material.dispose();
+            }
+          }
+        } else if (obj instanceof THREE.Sprite) {
+          if (obj.material.map) {
+            obj.material.map.dispose();
+          }
+          obj.material.dispose();
+        }
+      });
+    }
+  }
+
+  /**
+   * Limpia el bucle requestAnimationFrame, desconecta el ResizeObserver,
+   * remueve los listeners globales de window y libera la memoria WebGL al destruir el componente.
+   */
   ngOnDestroy() {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
+      this.resizeObserver = null;
     }
-    while (this.roomGroup.children.length > 0) {
-      const child = this.roomGroup.children[0] as THREE.Mesh;
-      this.roomGroup.remove(child);
-      if (child.geometry) child.geometry.dispose();
-      if (child.material) {
-        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-        else child.material.dispose();
-      }
+
+    const canvas = this.canvasRef()?.nativeElement;
+    if (canvas) {
+      canvas.removeEventListener('pointerdown', this.boundPointerDown);
     }
-    while (this.wallGizmoGroup.children.length > 0) {
-      const child = this.wallGizmoGroup.children[0] as THREE.Mesh;
-      this.wallGizmoGroup.remove(child);
-      if (child.geometry) child.geometry.dispose();
-      if (child.material) {
-        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-        else child.material.dispose();
-      }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pointermove', this.boundPointerMove);
+      window.removeEventListener('pointerup', this.boundPointerUp);
+      window.removeEventListener('pointercancel', this.boundPointerUp);
     }
-    while (this.appliancesGroup.children.length > 0) {
-      const child = this.appliancesGroup.children[0];
-      this.appliancesGroup.remove(child);
-    }
-    while (this.applianceGizmoGroup.children.length > 0) {
-      const child = this.applianceGizmoGroup.children[0];
-      this.applianceGizmoGroup.remove(child);
-    }
+
+    this.disposeGroup(this.furnitureGroup);
+    this.disposeGroup(this.dimensionGroup);
+    this.disposeGroup(this.gizmoGroup);
+    this.disposeGroup(this.drillGroup);
+    this.disposeGroup(this.roomGroup);
+    this.disposeGroup(this.wallGizmoGroup);
+    this.disposeGroup(this.appliancesGroup);
+    this.disposeGroup(this.applianceGizmoGroup);
+
     this.clearWallSnapGuides();
     this.clearLegSnapGuides();
     this.clearPartSnapGuides();
+
+    for (const tex of this.textureCache.values()) {
+      tex.dispose();
+    }
+    this.textureCache.clear();
+
+    if (this.controls) {
+      this.controls.dispose();
+    }
     if (this.renderer) {
       this.renderer.dispose();
     }

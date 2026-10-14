@@ -1,6 +1,6 @@
 <div class="w-full px-3 sm:px-6 py-4 space-y-5">
 
-  <!-- Metric Badges Header -->
+  <!-- Tarjetas de Resumen de Métricas de Corte y Tapacantos -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
     <div [class]="themeService.isClassic() ? 'p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 shadow-xs' : 'p-4 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center gap-3'">
       <div [class]="themeService.isClassic() ? 'w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600' : 'w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400'">
@@ -46,35 +46,35 @@
   <!-- SELECTOR DE PESTAÑAS: MELAMINA VS EQUIPAMIENTO/ACCESORIOS -->
   <div class="flex items-center gap-2 p-1 rounded-2xl w-fit"
     [class]="themeService.isClassic() ? 'bg-slate-100 border border-slate-200' : 'bg-zinc-900 border border-zinc-800'">
-    <button 
-      type="button" 
+    <button
+      type="button"
       (click)="activeTab.set('melamine')"
-      [class]="activeTab() === 'melamine' 
-        ? (themeService.isClassic() ? 'bg-white text-slate-900 shadow-xs font-bold' : 'bg-amber-500 text-zinc-950 font-bold shadow-md') 
+      [class]="activeTab() === 'melamine'
+        ? (themeService.isClassic() ? 'bg-white text-slate-900 shadow-xs font-bold' : 'bg-amber-500 text-zinc-950 font-bold shadow-md')
         : (themeService.isClassic() ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white')"
       class="px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition cursor-pointer">
       <span class="material-icons text-sm">view_in_ar</span>
       <span>Despiece de Melamina</span>
       <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
-        [class]="activeTab() === 'melamine' 
-          ? (themeService.isClassic() ? 'bg-slate-100 text-slate-800' : 'bg-zinc-950 text-amber-400') 
+        [class]="activeTab() === 'melamine'
+          ? (themeService.isClassic() ? 'bg-slate-100 text-slate-800' : 'bg-zinc-950 text-amber-400')
           : (themeService.isClassic() ? 'bg-slate-200 text-slate-600' : 'bg-zinc-800 text-zinc-300')">
         {{ totalPartsCount() }} piezas
       </span>
     </button>
 
-    <button 
-      type="button" 
+    <button
+      type="button"
       (click)="activeTab.set('appliances')"
-      [class]="activeTab() === 'appliances' 
-        ? (themeService.isClassic() ? 'bg-white text-slate-900 shadow-xs font-bold' : 'bg-sky-500 text-zinc-950 font-bold shadow-md') 
+      [class]="activeTab() === 'appliances'
+        ? (themeService.isClassic() ? 'bg-white text-slate-900 shadow-xs font-bold' : 'bg-sky-500 text-zinc-950 font-bold shadow-md')
         : (themeService.isClassic() ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white')"
       class="px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition cursor-pointer">
       <span class="material-icons text-sm">kitchen</span>
       <span>Equipamiento y Electrodomésticos</span>
       <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
-        [class]="activeTab() === 'appliances' 
-          ? (themeService.isClassic() ? 'bg-slate-100 text-slate-800' : 'bg-zinc-950 text-sky-400') 
+        [class]="activeTab() === 'appliances'
+          ? (themeService.isClassic() ? 'bg-slate-100 text-slate-800' : 'bg-zinc-950 text-sky-400')
           : (themeService.isClassic() ? 'bg-slate-200 text-slate-600' : 'bg-zinc-800 text-zinc-300')">
         {{ appliances().length }} equipos (0 m² corte)
       </span>
@@ -82,370 +82,238 @@
   </div>
 
   @if (activeTab() === 'melamine') {
-  <!-- Table Toolbar -->
-  <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4'">
-    <!-- Filters -->
-    <div class="flex flex-wrap items-center gap-3 flex-1">
-      <!-- Search Input -->
-      <div class="relative min-w-[200px] flex-1 sm:max-w-xs">
-        <span [class]="themeService.isClassic() ? 'material-icons absolute left-3 top-2.5 text-slate-400 text-sm' : 'material-icons absolute left-3 top-2.5 text-zinc-400 text-sm'">search</span>
-        <input 
-          type="text" 
-          [value]="searchQuery()"
-          (input)="searchQuery.set($any($event.target).value)"
-          placeholder="Buscar pieza o módulo..."
-          [class]="themeService.isClassic() ? 'w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-hidden focus:border-amber-500 focus:bg-white' : 'w-full pl-9 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white focus:outline-hidden focus:border-amber-500'" />
-      </div>
+    <!-- Barra de filtros y acciones -->
+    <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4'">
+      <div class="flex flex-wrap items-center gap-3 flex-1">
+        <!-- Buscador -->
+        <div class="relative min-w-50 flex-1 sm:max-w-xs">
+          <span [class]="themeService.isClassic() ? 'material-icons absolute left-3 top-2.5 text-slate-400 text-sm' : 'material-icons absolute left-3 top-2.5 text-zinc-400 text-sm'">search</span>
+          <input
+            type="text"
+            [value]="searchQuery()"
+            (input)="onSearchInput($event)"
+            placeholder="Buscar pieza o módulo..."
+            aria-label="Buscar pieza o módulo"
+            [class]="themeService.isClassic() ? 'w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-hidden focus:border-amber-500 focus:bg-white' : 'w-full pl-9 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white focus:outline-hidden focus:border-amber-500'" />
+        </div>
 
-      <!-- Filter by Module -->
-      <select 
-        [value]="filterModuleId()"
-        (change)="filterModuleId.set($any($event.target).value)"
-        [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-hidden focus:border-amber-500 cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-hidden focus:border-amber-500 cursor-pointer'">
-        <option value="all">Todos los Módulos</option>
-        @for (mod of modules(); track mod.id) {
-          <option [value]="mod.id">{{ mod.name }}</option>
-        }
-      </select>
-
-      <!-- Filter by Material -->
-      <select 
-        [value]="filterMaterialId()"
-        (change)="filterMaterialId.set($any($event.target).value)"
-        [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-hidden focus:border-amber-500 cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-hidden focus:border-amber-500 cursor-pointer'">
-        <option value="all">Todos los Materiales</option>
-        @for (mat of materials(); track mat.id) {
-          <option [value]="mat.id">{{ mat.name }}</option>
-        }
-      </select>
-    </div>
-
-    <!-- Actions -->
-    <div class="flex items-center gap-2">
-      <button 
-        (click)="openAddModal()"
-        class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs rounded-lg flex items-center gap-1.5 transition shadow-xs">
-        <span class="material-icons text-sm">add_circle</span>
-        <span>Pieza Manual</span>
-      </button>
-
-      <button 
-        (click)="exportCsv()"
-        [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium text-xs rounded-lg flex items-center gap-1.5 transition' : 'px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-lg flex items-center gap-1.5 transition'"
-        title="Exportar a Excel / CSV para centros de corte Arauco, Masisa, Sodimac, Promart">
-        <span class="material-icons text-sm text-emerald-500">table_view</span>
-        <span>Descargar CSV</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- Legend for Edge Banding -->
-  <div [class]="themeService.isClassic() ? 'flex flex-wrap items-center justify-between text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200' : 'flex flex-wrap items-center justify-between text-xs text-zinc-400 bg-zinc-950/70 p-3 rounded-xl border border-zinc-800/80'">
-    <div class="flex items-center gap-4">
-      <span [class]="themeService.isClassic() ? 'font-semibold text-slate-700' : 'font-semibold text-zinc-300'">Tapacantos (Haz clic en L1, L2, A1, A2 para alternar):</span>
-      <span class="inline-flex items-center gap-1">
-        <span [class]="themeService.isClassic() ? 'w-2.5 h-2.5 rounded bg-slate-300' : 'w-2.5 h-2.5 rounded bg-zinc-700'"></span>
-        <span>Ninguno</span>
-      </span>
-      <span class="inline-flex items-center gap-1">
-        <span class="w-2.5 h-2.5 rounded bg-cyan-500"></span>
-        <span>Delgado (0.45mm)</span>
-      </span>
-      <span class="inline-flex items-center gap-1">
-        <span class="w-2.5 h-2.5 rounded bg-amber-500"></span>
-        <span>Grueso (2.0mm)</span>
-      </span>
-    </div>
-    <div [class]="themeService.isClassic() ? 'text-[11px] text-slate-400' : 'text-[11px] text-zinc-500'">
-      L1 = Largo Sup, L2 = Largo Inf, A1 = Ancho Izq, A2 = Ancho Der
-    </div>
-  </div>
-
-  <!-- PARTS TABLE -->
-  <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg'">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
-        <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase tracking-wider text-[10px] font-bold border-b border-zinc-800'">
-          <tr>
-            <th class="py-3 px-3">#</th>
-            <th class="py-3 px-4">Pieza</th>
-            <th class="py-3 px-3">Módulo</th>
-            <th class="py-3 px-3">Material</th>
-            <th class="py-3 px-3 text-center">Cant.</th>
-            <th class="py-3 px-3 text-right">Largo (mm)</th>
-            <th class="py-3 px-3 text-right">Ancho (mm)</th>
-            <th class="py-3 px-2 text-center">Espesor</th>
-            <th class="py-3 px-3 text-center">Veta</th>
-            <th class="py-3 px-3 text-center">Tapacantos (L1 / L2 / A1 / A2)</th>
-            <th class="py-3 px-3 text-right">Acciones</th>
-          </tr>
-        </thead>
-        <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
-          @for (part of filteredParts(); track part.id; let idx = $index) {
-            <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80 transition group' : 'hover:bg-zinc-800/40 transition group'">
-              <td [class]="themeService.isClassic() ? 'py-3 px-3 font-mono text-slate-400 text-[11px]' : 'py-3 px-3 font-mono text-zinc-500 text-[11px]'">{{ idx + 1 }}</td>
-              
-              <td class="py-3 px-4">
-                <div [class]="themeService.isClassic() ? 'font-medium text-slate-800' : 'font-medium text-white'">{{ part.name }}</div>
-                @if (part.shapeType === 'circle') {
-                  <div class="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30">
-                    <span class="material-icons text-[11px]">radio_button_unchecked</span>
-                    <span>Cilindro Ø{{ part.diameter || part.width }}mm (Longitud {{ part.length }}mm)</span>
-                  </div>
-                }
-                @if (part.rotationX || part.rotationY || part.rotationZ) {
-                  <div class="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                    <span class="material-icons text-[11px]">3d_rotation</span>
-                    <span>Orientación 3D: X {{ part.rotationX || 0 }}° | Y {{ part.rotationY || 0 }}° | Z {{ part.rotationZ || 0 }}°</span>
-                  </div>
-                }
-                @if (part.notes) {
-                  <div [class]="themeService.isClassic() ? 'text-[10px] text-slate-400 italic mt-0.5' : 'text-[10px] text-zinc-400 italic mt-0.5'">{{ part.notes }}</div>
-                }
-              </td>
-
-              <td [class]="themeService.isClassic() ? 'py-3 px-3 text-slate-500 font-medium' : 'py-3 px-3 text-zinc-400 font-medium'">
-                {{ part.moduleName || 'Pieza Manual' }}
-              </td>
-
-              <td class="py-3 px-3">
-                <span [class]="themeService.isClassic() ? 'inline-flex items-center gap-1.5 text-slate-700' : 'inline-flex items-center gap-1.5 text-zinc-300'">
-                  <span class="w-2 h-2 rounded-full" [style.background-color]="part.thickness <= 3 ? '#94a3b8' : '#d97706'"></span>
-                  <span class="truncate max-w-[140px]" [title]="part.materialName">{{ part.materialName }}</span>
-                </span>
-              </td>
-
-              <td class="py-3 px-3 text-center font-bold text-amber-500 bg-amber-500/5">
-                {{ part.quantity }}
-              </td>
-
-              <td [class]="themeService.isClassic() ? 'py-3 px-3 text-right font-mono font-semibold text-slate-800' : 'py-3 px-3 text-right font-mono font-semibold text-zinc-100'">
-                {{ part.length }}
-              </td>
-
-              <td [class]="themeService.isClassic() ? 'py-3 px-3 text-right font-mono font-semibold text-slate-800' : 'py-3 px-3 text-right font-mono font-semibold text-zinc-100'">
-                {{ part.width }}
-              </td>
-
-              <td [class]="themeService.isClassic() ? 'py-3 px-2 text-center font-mono text-slate-500' : 'py-3 px-2 text-center font-mono text-zinc-400'">
-                {{ part.thickness }}mm
-              </td>
-
-              <!-- Veta Switcher -->
-              <td class="py-3 px-3 text-center">
-                <button 
-                  (click)="toggleGrain(part)"
-                  [title]="part.grain === 'length' ? 'Veta Longitudinal (X)' : part.grain === 'width' ? 'Veta Transversal (Y)' : 'Sin Veta (Permite rotar)'"
-                  [class]="themeService.isClassic() ? 'p-1 rounded hover:bg-slate-100 transition' : 'p-1 rounded hover:bg-zinc-800 transition'">
-                  @if (part.grain === 'length') {
-                    <span class="material-icons text-sm text-amber-500">swap_horiz</span>
-                  } @else if (part.grain === 'width') {
-                    <span class="material-icons text-sm text-cyan-500">swap_vert</span>
-                  } @else {
-                    <span [class]="themeService.isClassic() ? 'material-icons text-sm text-slate-400' : 'material-icons text-sm text-zinc-500'">sync_alt</span>
-                  }
-                </button>
-              </td>
-
-              <!-- Interactive Edge Banding Badges -->
-              <td class="py-3 px-3">
-                <div class="flex items-center justify-center gap-1.5 font-mono text-[10px]">
-                  <!-- L1 -->
-                  <button 
-                    (click)="cycleEdgeBanding(part, 'l1')"
-                    [class]="part.edges.l1 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : part.edges.l1 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : (themeService.isClassic() ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-zinc-800 text-zinc-400 border border-zinc-700')"
-                    class="px-1.5 py-0.5 rounded transition hover:scale-105"
-                    title="Largo 1: Haz clic para cambiar">
-                    L1
-                  </button>
-
-                  <!-- L2 -->
-                  <button 
-                    (click)="cycleEdgeBanding(part, 'l2')"
-                    [class]="part.edges.l2 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : part.edges.l2 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : (themeService.isClassic() ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-zinc-800 text-zinc-400 border border-zinc-700')"
-                    class="px-1.5 py-0.5 rounded transition hover:scale-105"
-                    title="Largo 2: Haz clic para cambiar">
-                    L2
-                  </button>
-
-                  <!-- A1 -->
-                  <button 
-                    (click)="cycleEdgeBanding(part, 'a1')"
-                    [class]="part.edges.a1 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : part.edges.a1 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : (themeService.isClassic() ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-zinc-800 text-zinc-400 border border-zinc-700')"
-                    class="px-1.5 py-0.5 rounded transition hover:scale-105"
-                    title="Ancho 1: Haz clic para cambiar">
-                    A1
-                  </button>
-
-                  <!-- A2 -->
-                  <button 
-                    (click)="cycleEdgeBanding(part, 'a2')"
-                    [class]="part.edges.a2 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : part.edges.a2 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : (themeService.isClassic() ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-zinc-800 text-zinc-400 border border-zinc-700')"
-                    class="px-1.5 py-0.5 rounded transition hover:scale-105"
-                    title="Ancho 2: Haz clic para cambiar">
-                    A2
-                  </button>
-                </div>
-              </td>
-
-              <!-- Actions -->
-              <td class="py-3 px-3 text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <button 
-                    (click)="editPart(part)"
-                    [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-amber-500 transition' : 'p-1 text-zinc-400 hover:text-amber-400 transition'"
-                    title="Editar dimensiones">
-                    <span class="material-icons text-sm">edit</span>
-                  </button>
-                  <button 
-                    (click)="deletePart(part.id)"
-                    [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-rose-500 transition' : 'p-1 text-zinc-400 hover:text-rose-400 transition'"
-                    title="Eliminar pieza">
-                    <span class="material-icons text-sm">delete</span>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          } @empty {
-            <tr>
-              <td colspan="11" [class]="themeService.isClassic() ? 'py-8 text-center text-slate-400' : 'py-8 text-center text-zinc-500'">
-                No se encontraron piezas con los filtros seleccionados.
-              </td>
-            </tr>
+        <!-- Filtro por Módulo -->
+        <select
+          [value]="filterModuleId()"
+          (change)="onFilterModuleChange($event)"
+          aria-label="Filtrar por módulo"
+          [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-hidden focus:border-amber-500 cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-hidden focus:border-amber-500 cursor-pointer'">
+          <option value="all">Todos los Módulos</option>
+          @for (mod of modules(); track mod.id) {
+            <option [value]="mod.id">{{ mod.name }}</option>
           }
-        </tbody>
-      </table>
-    </div>
-  </div>
-  } @else {
-  <!-- PESTAÑA: EQUIPAMIENTO Y ELECTRODOMÉSTICOS (FASE 4: SIN CORTE DE MELAMINA) -->
-  <div class="space-y-4">
-    <!-- Banner Informativo de Despiece Inteligente -->
-    <div [class]="themeService.isClassic() ? 'p-4 bg-sky-50 border border-sky-200 rounded-2xl flex items-start gap-3 text-sky-900 shadow-2xs' : 'p-4 bg-sky-950/40 border border-sky-800/80 rounded-2xl flex items-start gap-3 text-sky-200'">
-      <span class="material-icons text-sky-500 text-xl shrink-0 mt-0.5">verified</span>
-      <div class="text-xs space-y-1">
-        <p class="font-bold text-sm text-sky-950 dark:text-sky-100 flex items-center gap-1.5">
-          <span>Despiece Inteligente · Equipamiento y Accesorios</span>
-          <span class="px-2 py-0.2 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono text-[10px] font-bold border border-emerald-500/30">0 m² Melamina</span>
-        </p>
-        <p class="text-slate-600 dark:text-sky-200/90 leading-relaxed">
-          Los electrodomésticos y accesorios (refrigerador, campana, estufa, fregadero, horno, microondas) se contabilizan en la lista de equipamiento para presupuesto, planos y especificación de instalación. 
-          <strong>No generan piezas de melamina ni consumen placas en el optimizador de corte</strong>. Las placas de tablero se reservan exclusivamente para los muebles y módulos fabricables.
-        </p>
+        </select>
+
+        <!-- Filtro por Material -->
+        <select
+          [value]="filterMaterialId()"
+          (change)="onFilterMaterialChange($event)"
+          aria-label="Filtrar por material"
+          [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-hidden focus:border-amber-500 cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-hidden focus:border-amber-500 cursor-pointer'">
+          <option value="all">Todos los Materiales</option>
+          @for (mat of materials(); track mat.id) {
+            <option [value]="mat.id">{{ mat.name }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          (click)="openAddModal()"
+          class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs rounded-lg flex items-center gap-1.5 transition shadow-xs cursor-pointer">
+          <span class="material-icons text-sm">add_circle</span>
+          <span>Pieza Manual</span>
+        </button>
+
+        <button
+          type="button"
+          (click)="exportCsv()"
+          [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium text-xs rounded-lg flex items-center gap-1.5 transition cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-lg flex items-center gap-1.5 transition cursor-pointer'"
+          title="Exportar a Excel / CSV para centros de corte Arauco, Masisa, Sodimac, Promart">
+          <span class="material-icons text-sm text-emerald-500">table_view</span>
+          <span>Descargar CSV</span>
+        </button>
       </div>
     </div>
 
-    <!-- Metric Badges de Equipamiento -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div [class]="themeService.isClassic() ? 'p-3.5 bg-white border border-slate-200 rounded-xl flex items-center gap-3 shadow-2xs' : 'p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3'">
-        <div class="w-9 h-9 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
-          <span class="material-icons text-lg">kitchen</span>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Equipos Registrados</p>
-          <p class="text-lg font-bold text-slate-800 dark:text-white">{{ appliances().length }} <span class="text-xs font-normal text-slate-400">artefactos</span></p>
-        </div>
+    <!-- Leyenda de Tapacantos -->
+    <div [class]="themeService.isClassic() ? 'flex flex-wrap items-center justify-between text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200' : 'flex flex-wrap items-center justify-between text-xs text-zinc-400 bg-zinc-950/70 p-3 rounded-xl border border-zinc-800/80'">
+      <div class="flex items-center gap-4">
+        <span [class]="themeService.isClassic() ? 'font-semibold text-slate-700' : 'font-semibold text-zinc-300'">Tapacantos (Haz clic en L1, L2, A1, A2 para alternar):</span>
+        <span class="inline-flex items-center gap-1">
+          <span [class]="themeService.isClassic() ? 'w-2.5 h-2.5 rounded bg-slate-300' : 'w-2.5 h-2.5 rounded bg-zinc-700'"></span>
+          <span>Ninguno</span>
+        </span>
+        <span class="inline-flex items-center gap-1">
+          <span class="w-2.5 h-2.5 rounded bg-cyan-500"></span>
+          <span>Delgado (0.45mm)</span>
+        </span>
+        <span class="inline-flex items-center gap-1">
+          <span class="w-2.5 h-2.5 rounded bg-amber-500"></span>
+          <span>Grueso (2.0mm)</span>
+        </span>
       </div>
-
-      <div [class]="themeService.isClassic() ? 'p-3.5 bg-white border border-slate-200 rounded-xl flex items-center gap-3 shadow-2xs' : 'p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3'">
-        <div class="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-          <span class="material-icons text-lg">content_cut</span>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Corte de Tablero</p>
-          <p class="text-lg font-bold text-emerald-600 dark:text-emerald-400">0.00 m² <span class="text-xs font-normal text-slate-400">(Sin aserrado)</span></p>
-        </div>
-      </div>
-
-      <div [class]="themeService.isClassic() ? 'p-3.5 bg-white border border-slate-200 rounded-xl flex items-center gap-3 shadow-2xs' : 'p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3'">
-        <div class="w-9 h-9 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
-          <span class="material-icons text-lg">payments</span>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Inversión en Equipos</p>
-          <p class="text-lg font-bold text-slate-800 dark:text-white">
-            {{ formatCurrency(totalAppliancesCost()) }}
-          </p>
-        </div>
+      <div [class]="themeService.isClassic() ? 'text-[11px] text-slate-400' : 'text-[11px] text-zinc-500'">
+        L1 = Largo Sup, L2 = Largo Inf, A1 = Ancho Izq, A2 = Ancho Der
       </div>
     </div>
 
-    <!-- TABLA DE EQUIPAMIENTO Y ELECTRODOMÉSTICOS -->
+    <!-- TABLA DE DESPIECE DE MELAMINA -->
     <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg'">
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs">
           <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase tracking-wider text-[10px] font-bold border-b border-zinc-800'">
             <tr>
               <th class="py-3 px-3">#</th>
-              <th class="py-3 px-4">Equipo / Artefacto</th>
-              <th class="py-3 px-3">Categoría</th>
+              <th class="py-3 px-4">Pieza</th>
+              <th class="py-3 px-3">Módulo</th>
+              <th class="py-3 px-3">Material</th>
+              <th class="py-3 px-3 text-center">Cant.</th>
+              <th class="py-3 px-3 text-right">Largo (mm)</th>
               <th class="py-3 px-3 text-right">Ancho (mm)</th>
-              <th class="py-3 px-3 text-right">Alto (mm)</th>
-              <th class="py-3 px-3 text-right">Fondo (mm)</th>
-              <th class="py-3 px-3 text-center">Posición 3D (X, Y, Z)</th>
-              <th class="py-3 px-3 text-center">Despiece de Melamina</th>
-              <th class="py-3 px-3 text-right">Precio Unitario</th>
+              <th class="py-3 px-2 text-center">Espesor</th>
+              <th class="py-3 px-3 text-center">Veta</th>
+              <th class="py-3 px-3 text-center">Tapacantos (L1 / L2 / A1 / A2)</th>
               <th class="py-3 px-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
-            @for (app of appliances(); track app.id; let idx = $index) {
+            @for (part of filteredParts(); track part.id; let idx = $index) {
               <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80 transition group' : 'hover:bg-zinc-800/40 transition group'">
                 <td [class]="themeService.isClassic() ? 'py-3 px-3 font-mono text-slate-400 text-[11px]' : 'py-3 px-3 font-mono text-zinc-500 text-[11px]'">{{ idx + 1 }}</td>
-                
+
                 <td class="py-3 px-4">
-                  <div class="flex items-center gap-2">
-                    <span class="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
-                      <span class="material-icons text-sm">kitchen</span>
-                    </span>
-                    <div>
-                      <div [class]="themeService.isClassic() ? 'font-bold text-slate-800' : 'font-bold text-white'">{{ app.name }}</div>
-                      @if (app.brand || app.modelCode) {
-                        <div class="text-[10px] text-slate-400 dark:text-zinc-500">{{ app.brand || '' }} {{ app.modelCode || '' }}</div>
-                      }
+                  <div [class]="themeService.isClassic() ? 'font-medium text-slate-800' : 'font-medium text-white'">{{ part.name }}</div>
+                  @if (part.shapeType === 'circle') {
+                    <div class="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30">
+                      <span class="material-icons text-[11px]">radio_button_unchecked</span>
+                      <span>Cilindro Ø{{ part.diameter || part.width }}mm (Longitud {{ part.length }}mm)</span>
                     </div>
+                  }
+                  @if (part.rotationX || part.rotationY || part.rotationZ) {
+                    <div class="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                      <span class="material-icons text-[11px]">3d_rotation</span>
+                      <span>Orientación 3D: X {{ part.rotationX || 0 }}° | Y {{ part.rotationY || 0 }}° | Z {{ part.rotationZ || 0 }}°</span>
+                    </div>
+                  }
+                  @if (part.notes) {
+                    <div [class]="themeService.isClassic() ? 'text-[10px] text-slate-400 italic mt-0.5' : 'text-[10px] text-zinc-400 italic mt-0.5'">{{ part.notes }}</div>
+                  }
+                </td>
+
+                <td [class]="themeService.isClassic() ? 'py-3 px-3 text-slate-500 font-medium' : 'py-3 px-3 text-zinc-400 font-medium'">
+                  {{ part.moduleName || part.groupName || 'Pieza Manual' }}
+                </td>
+
+                <td class="py-3 px-3">
+                  <span [class]="themeService.isClassic() ? 'inline-flex items-center gap-1.5 text-slate-700' : 'inline-flex items-center gap-1.5 text-zinc-300'">
+                    <span class="w-2 h-2 rounded-full" [style.background-color]="part.thickness <= 3 ? '#94a3b8' : '#d97706'"></span>
+                    <span class="truncate max-w-35" [title]="part.materialName">{{ part.materialName }}</span>
+                  </span>
+                </td>
+
+                <td class="py-3 px-3 text-center font-bold text-amber-500 bg-amber-500/5">
+                  {{ part.quantity }}
+                </td>
+
+                <td [class]="themeService.isClassic() ? 'py-3 px-3 text-right font-mono font-semibold text-slate-800' : 'py-3 px-3 text-right font-mono font-semibold text-zinc-100'">
+                  {{ part.length }}
+                </td>
+
+                <td [class]="themeService.isClassic() ? 'py-3 px-3 text-right font-mono font-semibold text-slate-800' : 'py-3 px-3 text-right font-mono font-semibold text-zinc-100'">
+                  {{ part.width }}
+                </td>
+
+                <td [class]="themeService.isClassic() ? 'py-3 px-2 text-center font-mono text-slate-500' : 'py-3 px-2 text-center font-mono text-zinc-400'">
+                  {{ part.thickness }}mm
+                </td>
+
+                <!-- Selector rápido de Veta -->
+                <td class="py-3 px-3 text-center">
+                  <button
+                    type="button"
+                    (click)="toggleGrain(part)"
+                    [title]="part.grain === 'length' ? 'Veta Longitudinal (X)' : part.grain === 'width' ? 'Veta Transversal (Y)' : 'Sin Veta (Permite rotar)'"
+                    [class]="themeService.isClassic() ? 'p-1 rounded hover:bg-slate-100 transition cursor-pointer' : 'p-1 rounded hover:bg-zinc-800 transition cursor-pointer'">
+                    @if (part.grain === 'length') {
+                      <span class="material-icons text-sm text-amber-500">swap_horiz</span>
+                    } @else if (part.grain === 'width') {
+                      <span class="material-icons text-sm text-cyan-500">swap_vert</span>
+                    } @else {
+                      <span [class]="themeService.isClassic() ? 'material-icons text-sm text-slate-400' : 'material-icons text-sm text-zinc-500'">sync_alt</span>
+                    }
+                  </button>
+                </td>
+
+                <!-- Botones interactivos de Tapacantos -->
+                <td class="py-3 px-3">
+                  <div class="flex items-center justify-center gap-1.5 font-mono text-[10px]">
+                    <button
+                      type="button"
+                      (click)="cycleEdgeBanding(part, 'l1')"
+                      [class]="part.edges.l1 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : part.edges.l1 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : (themeService.isClassic() ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-zinc-800 text-zinc-400 border border-zinc-700')"
+                      class="px-1.5 py-0.5 rounded transition hover:scale-105 cursor-pointer"
+                      title="Largo 1: Haz clic para cambiar">
+                      L1
+                    </button>
+                    <button
+                      type="button"
+                      (click)="cycleEdgeBanding(part, 'l2')"
+                      [class]="part.edges.l2 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : part.edges.l2 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : (themeService.isClassic() ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-zinc-800 text-zinc-400 border border-zinc-700')"
+                      class="px-1.5 py-0.5 rounded transition hover:scale-105 cursor-pointer"
+                      title="Largo 2: Haz clic para cambiar">
+                      L2
+                    </button>
+                    <button
+                      type="button"
+                      (click)="cycleEdgeBanding(part, 'a1')"
+                      [class]="part.edges.a1 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : part.edges.a1 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : (themeService.isClassic() ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-zinc-800 text-zinc-400 border border-zinc-700')"
+                      class="px-1.5 py-0.5 rounded transition hover:scale-105 cursor-pointer"
+                      title="Ancho 1: Haz clic para cambiar">
+                      A1
+                    </button>
+                    <button
+                      type="button"
+                      (click)="cycleEdgeBanding(part, 'a2')"
+                      [class]="part.edges.a2 === 'thick' ? 'bg-amber-500 text-zinc-950 font-bold' : part.edges.a2 === 'thin' ? 'bg-cyan-500 text-zinc-950 font-bold' : (themeService.isClassic() ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-zinc-800 text-zinc-400 border border-zinc-700')"
+                      class="px-1.5 py-0.5 rounded transition hover:scale-105 cursor-pointer"
+                      title="Ancho 2: Haz clic para cambiar">
+                      A2
+                    </button>
                   </div>
                 </td>
 
-                <td class="py-3 px-3 capitalize">
-                  <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold"
-                    [class]="themeService.isClassic() ? 'bg-slate-100 text-slate-700' : 'bg-zinc-800 text-zinc-300'">
-                    {{ app.type }}
-                  </span>
-                </td>
-
-                <td class="py-3 px-3 text-right font-mono font-bold">{{ app.width }}</td>
-                <td class="py-3 px-3 text-right font-mono font-bold">{{ app.height }}</td>
-                <td class="py-3 px-3 text-right font-mono font-bold">{{ app.depth }}</td>
-
-                <td class="py-3 px-3 text-center font-mono text-[11px] text-slate-400 dark:text-zinc-500">
-                  X: {{ app.position.x }} · Y: {{ app.position.y }} · Z: {{ app.position.z }}
-                </td>
-
-                <td class="py-3 px-3 text-center">
-                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                    <span class="material-icons text-[11px]">check_circle</span>
-                    <span>Sin corte de melamina</span>
-                  </span>
-                </td>
-
-                <td class="py-3 px-3 text-right font-mono font-bold text-slate-800 dark:text-zinc-200">
-                  {{ formatCurrency(app.price || 0) }}
-                </td>
-
+                <!-- Acciones de Fila -->
                 <td class="py-3 px-3 text-right">
-                  <button 
-                    (click)="deleteAppliance(app.id)"
-                    [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-rose-500 transition' : 'p-1 text-zinc-400 hover:text-rose-400 transition'"
-                    title="Eliminar equipo de la lista">
-                    <span class="material-icons text-sm">delete</span>
-                  </button>
+                  <div class="flex items-center justify-end gap-1">
+                    <button
+                      type="button"
+                      (click)="editPart(part)"
+                      [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-amber-500 transition cursor-pointer' : 'p-1 text-zinc-400 hover:text-amber-400 transition cursor-pointer'"
+                      title="Editar dimensiones">
+                      <span class="material-icons text-sm">edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      (click)="deletePart(part.id)"
+                      [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-rose-500 transition cursor-pointer' : 'p-1 text-zinc-400 hover:text-rose-400 transition cursor-pointer'"
+                      title="Eliminar pieza">
+                      <span class="material-icons text-sm">delete</span>
+                    </button>
+                  </div>
                 </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="10" [class]="themeService.isClassic() ? 'py-8 text-center text-slate-400' : 'py-8 text-center text-zinc-500'">
-                  No hay electrodomésticos ni accesorios insertados en este proyecto. Puedes agregarlos desde la barra de herramientas del visor 3D en Modo Habitación.
+                <td colspan="11" [class]="themeService.isClassic() ? 'py-8 text-center text-slate-400' : 'py-8 text-center text-zinc-500'">
+                  No se encontraron piezas con los filtros seleccionados.
                 </td>
               </tr>
             }
@@ -453,7 +321,143 @@
         </table>
       </div>
     </div>
-  </div>
+  } @else {
+    <!-- PESTAÑA: EQUIPAMIENTO Y ELECTRODOMÉSTICOS -->
+    <div class="space-y-4">
+      <div [class]="themeService.isClassic() ? 'p-4 bg-sky-50 border border-sky-200 rounded-2xl flex items-start gap-3 text-sky-900 shadow-2xs' : 'p-4 bg-sky-950/40 border border-sky-800/80 rounded-2xl flex items-start gap-3 text-sky-200'">
+        <span class="material-icons text-sky-500 text-xl shrink-0 mt-0.5">verified</span>
+        <div class="text-xs space-y-1">
+          <p class="font-bold text-sm text-sky-950 dark:text-sky-100 flex items-center gap-1.5">
+            <span>Despiece Inteligente • Equipamiento y Accesorios</span>
+            <span class="px-2 py-0.2 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono text-[10px] font-bold border border-emerald-500/30">0 m² Melamina</span>
+          </p>
+          <p class="text-slate-600 dark:text-sky-200/90 leading-relaxed">
+            Los electrodomésticos y accesorios (refrigerador, campana, estufa, fregadero, horno, microondas) se contabilizan en la lista de equipamiento para presupuesto, planos y especificación de instalación.
+            <strong>No generan piezas de melamina ni consumen placas en el optimizador de corte</strong>. Las placas de tablero se reservan exclusivamente para los muebles y módulos fabricables.
+          </p>
+        </div>
+      </div>
+
+      <!-- Tarjetas de resumen de equipamiento -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div [class]="themeService.isClassic() ? 'p-3.5 bg-white border border-slate-200 rounded-xl flex items-center gap-3 shadow-2xs' : 'p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3'">
+          <div class="w-9 h-9 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
+            <span class="material-icons text-lg">kitchen</span>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Equipos Registrados</p>
+            <p class="text-lg font-bold text-slate-800 dark:text-white">{{ appliances().length }} <span class="text-xs font-normal text-slate-400">artefactos</span></p>
+          </div>
+        </div>
+
+        <div [class]="themeService.isClassic() ? 'p-3.5 bg-white border border-slate-200 rounded-xl flex items-center gap-3 shadow-2xs' : 'p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3'">
+          <div class="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+            <span class="material-icons text-lg">content_cut</span>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Corte de Tablero</p>
+            <p class="text-lg font-bold text-emerald-600 dark:text-emerald-400">0.00 m² <span class="text-xs font-normal text-slate-400">(Sin aserrado)</span></p>
+          </div>
+        </div>
+
+        <div [class]="themeService.isClassic() ? 'p-3.5 bg-white border border-slate-200 rounded-xl flex items-center gap-3 shadow-2xs' : 'p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3'">
+          <div class="w-9 h-9 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
+            <span class="material-icons text-lg">payments</span>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Inversión en Equipos</p>
+            <p class="text-lg font-bold text-slate-800 dark:text-white">
+              {{ formatCurrency(totalAppliancesCost()) }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABLA DE EQUIPAMIENTO Y ELECTRODOMÉSTICOS -->
+      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg'">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase tracking-wider text-[10px] font-bold border-b border-zinc-800'">
+              <tr>
+                <th class="py-3 px-3">#</th>
+                <th class="py-3 px-4">Equipo / Artefacto</th>
+                <th class="py-3 px-3">Categoría</th>
+                <th class="py-3 px-3 text-right">Ancho (mm)</th>
+                <th class="py-3 px-3 text-right">Alto (mm)</th>
+                <th class="py-3 px-3 text-right">Fondo (mm)</th>
+                <th class="py-3 px-3 text-center">Posición 3D (X, Y, Z)</th>
+                <th class="py-3 px-3 text-center">Despiece de Melamina</th>
+                <th class="py-3 px-3 text-right">Precio Unitario</th>
+                <th class="py-3 px-3 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
+              @for (app of appliances(); track app.id; let idx = $index) {
+                <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80 transition group' : 'hover:bg-zinc-800/40 transition group'">
+                  <td [class]="themeService.isClassic() ? 'py-3 px-3 font-mono text-slate-400 text-[11px]' : 'py-3 px-3 font-mono text-zinc-500 text-[11px]'">{{ idx + 1 }}</td>
+
+                  <td class="py-3 px-4">
+                    <div class="flex items-center gap-2">
+                      <span class="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
+                        <span class="material-icons text-sm">kitchen</span>
+                      </span>
+                      <div>
+                        <div [class]="themeService.isClassic() ? 'font-bold text-slate-800' : 'font-bold text-white'">{{ app.name }}</div>
+                        @if (app.brand || app.modelCode) {
+                          <div class="text-[10px] text-slate-400 dark:text-zinc-500">{{ app.brand || '' }} {{ app.modelCode || '' }}</div>
+                        }
+                      </div>
+                    </div>
+                  </td>
+
+                  <td class="py-3 px-3 capitalize">
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold"
+                      [class]="themeService.isClassic() ? 'bg-slate-100 text-slate-700' : 'bg-zinc-800 text-zinc-300'">
+                      {{ app.type }}
+                    </span>
+                  </td>
+
+                  <td class="py-3 px-3 text-right font-mono font-bold">{{ app.width }}</td>
+                  <td class="py-3 px-3 text-right font-mono font-bold">{{ app.height }}</td>
+                  <td class="py-3 px-3 text-right font-mono font-bold">{{ app.depth }}</td>
+
+                  <td class="py-3 px-3 text-center font-mono text-[11px] text-slate-400 dark:text-zinc-500">
+                    X: {{ app.position.x }} • Y: {{ app.position.y }} • Z: {{ app.position.z }}
+                  </td>
+
+                  <td class="py-3 px-3 text-center">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <span class="material-icons text-[11px]">check_circle</span>
+                      <span>Sin corte de melamina</span>
+                    </span>
+                  </td>
+
+                  <td class="py-3 px-3 text-right font-mono font-bold text-slate-800 dark:text-zinc-200">
+                    {{ formatCurrency(app.price || 0) }}
+                  </td>
+
+                  <td class="py-3 px-3 text-right">
+                    <button
+                      type="button"
+                      (click)="deleteAppliance(app.id)"
+                      [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-rose-500 transition cursor-pointer' : 'p-1 text-zinc-400 hover:text-rose-400 transition cursor-pointer'"
+                      title="Eliminar equipo de la lista">
+                      <span class="material-icons text-sm">delete</span>
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="10" [class]="themeService.isClassic() ? 'py-8 text-center text-slate-400' : 'py-8 text-center text-zinc-500'">
+                    No hay electrodomésticos ni accesorios insertados en este proyecto. Puedes agregarlos desde la barra de herramientas del visor 3D en Modo Habitación.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   }
 
   <!-- MODAL: AGREGAR O EDITAR PIEZA MANUAL -->
@@ -465,7 +469,11 @@
             <span class="material-icons text-amber-500">extension</span>
             {{ editingPart() ? 'Editar Pieza' : 'Agregar Pieza Manual' }}
           </h3>
-          <button (click)="showAddPartModal.set(false)" [class]="themeService.isClassic() ? 'text-slate-400 hover:text-slate-700' : 'text-zinc-400 hover:text-white'">
+          <button
+            type="button"
+            (click)="showAddPartModal.set(false)"
+            aria-label="Cerrar modal"
+            [class]="themeService.isClassic() ? 'text-slate-400 hover:text-slate-700 cursor-pointer' : 'text-zinc-400 hover:text-white cursor-pointer'">
             <span class="material-icons">close</span>
           </button>
         </div>
@@ -474,16 +482,16 @@
           <div class="grid grid-cols-2 gap-3">
             <div class="col-span-2">
               <span [class]="themeService.isClassic() ? 'block text-xs font-medium text-slate-600 mb-1' : 'block text-xs font-medium text-zinc-300 mb-1'">Nombre de la Pieza *</span>
-              <input 
-                type="text" 
-                formControlName="name" 
+              <input
+                type="text"
+                formControlName="name"
                 placeholder="ej. Tapa de Barra, Regrueso, Moldura"
                 [class]="themeService.isClassic() ? 'w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-hidden focus:border-amber-500 focus:bg-white' : 'w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500'" />
             </div>
 
             <div>
               <span [class]="themeService.isClassic() ? 'block text-xs font-medium text-slate-600 mb-1' : 'block text-xs font-medium text-zinc-300 mb-1'">Módulo Asociado (Opcional)</span>
-              <select 
+              <select
                 formControlName="moduleId"
                 [class]="themeService.isClassic() ? 'w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700' : 'w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white'">
                 <option value="">Sin módulo específico</option>
@@ -495,7 +503,7 @@
 
             <div>
               <span [class]="themeService.isClassic() ? 'block text-xs font-medium text-slate-600 mb-1' : 'block text-xs font-medium text-zinc-300 mb-1'">Material *</span>
-              <select 
+              <select
                 formControlName="materialId"
                 [class]="themeService.isClassic() ? 'w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700' : 'w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white'">
                 @for (mat of materials(); track mat.id) {
@@ -509,33 +517,33 @@
           <div class="grid grid-cols-4 gap-2">
             <div>
               <span [class]="themeService.isClassic() ? 'block text-[11px] text-slate-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Largo (mm)</span>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 formControlName="length"
                 [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 text-center font-bold' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold'" />
             </div>
 
             <div>
               <span [class]="themeService.isClassic() ? 'block text-[11px] text-slate-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Ancho (mm)</span>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 formControlName="width"
                 [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 text-center font-bold' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center font-bold'" />
             </div>
 
             <div>
               <span [class]="themeService.isClassic() ? 'block text-[11px] text-slate-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Espesor (mm)</span>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 formControlName="thickness"
                 [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 text-center' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white text-center'" />
             </div>
 
             <div>
               <span [class]="themeService.isClassic() ? 'block text-[11px] text-slate-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Cantidad</span>
-              <input 
-                type="number" 
-                min="1" 
+              <input
+                type="number"
+                min="1"
                 formControlName="quantity"
                 [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-amber-600 text-center font-bold' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-amber-400 text-center font-bold'" />
             </div>
@@ -544,7 +552,7 @@
           <!-- Orientación de Veta -->
           <div>
             <span [class]="themeService.isClassic() ? 'block text-xs font-medium text-slate-600 mb-1' : 'block text-xs font-medium text-zinc-300 mb-1'">Orientación de Veta</span>
-            <select 
+            <select
               formControlName="grain"
               [class]="themeService.isClassic() ? 'w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700' : 'w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white'">
               <option value="length">Longitudinal a lo largo del tablero (X)</option>
@@ -594,24 +602,24 @@
 
           <div>
             <span [class]="themeService.isClassic() ? 'block text-xs font-medium text-slate-600 mb-1' : 'block text-xs font-medium text-zinc-300 mb-1'">Notas técnicas (Opcional)</span>
-            <input 
-              type="text" 
-              formControlName="notes" 
+            <input
+              type="text"
+              formControlName="notes"
               placeholder="ej. Chaflán a 45°, perforación pasacable"
               [class]="themeService.isClassic() ? 'w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800' : 'w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white'" />
           </div>
 
           <div class="pt-3 flex justify-end gap-2">
-            <button 
-              type="button" 
+            <button
+              type="button"
               (click)="showAddPartModal.set(false)"
-              [class]="themeService.isClassic() ? 'px-4 py-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700' : 'px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300'">
+              [class]="themeService.isClassic() ? 'px-4 py-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 cursor-pointer' : 'px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 cursor-pointer'">
               Cancelar
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               [disabled]="partForm.invalid"
-              class="px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 rounded-lg transition shadow-xs">
+              class="px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 rounded-lg transition shadow-xs cursor-pointer">
               {{ editingPart() ? 'Guardar Cambios' : 'Agregar a la Lista' }}
             </button>
           </div>
@@ -619,5 +627,4 @@
       </div>
     </div>
   }
-
 </div>

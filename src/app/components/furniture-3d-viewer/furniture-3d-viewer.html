@@ -1,105 +1,103 @@
-<div #container3d 
+<div #container3d
   [class]="isWhiteTheme() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950 border-zinc-800'"
   (contextmenu)="onContextMenu($event)"
-  class="relative w-full h-full min-h-[420px] rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-200">
+  class="relative w-full h-full min-h-105 rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-200">
 
-  <!-- 3D WebGL Canvas -->
+  <!-- Lienzo 3D WebGL -->
   <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
 
-  <!-- LEFT VERTICAL CAD PALETTE (ANTI-OVERFLOW ON LAPTOPS) -->
+  <!-- PALETA VERTICAL IZQUIERDA DE HERRAMIENTAS CAD -->
   <div class="absolute top-3 left-3 z-30 flex flex-col gap-1 bg-white/95 text-slate-700 backdrop-blur-md p-1 rounded-2xl border border-slate-200/90 shadow-xl pointer-events-auto transition-colors duration-200 max-h-[calc(100%-1.5rem)] overflow-y-auto scrollbar-none">
-    
-    <!-- 1. SELECT TOOL -->
-    <button 
+
+    <!-- 1. HERRAMIENTA SELECCIONAR -->
+    <button
       type="button"
       (click)="setActiveTool('select')"
       [class]="activeTool() === 'select' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Seleccionar (V o Espacio): Haz clic para seleccionar piezas o Shift+Clic para multi-selección">
       <span class="material-icons text-lg">near_me</span>
     </button>
 
-    <!-- 2. PUSH/PULL (EMPUJAR / TIRAR) TOOL -->
-    <button 
+    <!-- 2. HERRAMIENTA EMPUJAR / TIRAR (PUSH/PULL) -->
+    <button
       type="button"
       (click)="setActiveTool('push_pull')"
       [class]="activeTool() === 'push_pull' ? 'bg-amber-500 text-white font-bold shadow-md shadow-amber-500/30 ring-2 ring-amber-400/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition relative"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition relative cursor-pointer"
       title="Empujar / Tirar (P): Haz clic en cualquier cara de la pieza y arrastra para estirar o encoger sus dimensiones en tiempo real">
       <span class="material-icons text-lg">open_in_full</span>
       <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400"></span>
     </button>
 
-    <!-- 3. MOVE (GIZMO) TOOL -->
-    <button 
+    <!-- 3. HERRAMIENTA MOVER (GIZMO) -->
+    <button
       type="button"
       (click)="setActiveTool('move')"
       [class]="activeTool() === 'move' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Mover (M): Muestra las flechas 3D para posicionar y trasladar piezas en los ejes X, Y, Z">
       <span class="material-icons text-lg">open_with</span>
     </button>
 
-    <!-- 4. ROTATE 90° (TRANSPORTADOR CAD) TOOL -->
-    <button 
+    <!-- 4. HERRAMIENTA ROTAR 90° -->
+    <button
       type="button"
       (click)="setActiveTool('rotate_90')"
       [class]="activeTool() === 'rotate_90' ? 'bg-amber-500 text-white font-bold shadow-md shadow-amber-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Rotar 90° (Q): Haz clic en cualquier pieza para girarla 90 grados con transportador">
       <span class="material-icons text-lg">rotate_right</span>
     </button>
 
-    <!-- 5. DRAW 3D RECTANGLE TOOL -->
-    <button 
+    <!-- 5. DIBUJAR RECTÁNGULO 3D -->
+    <button
       type="button"
       (click)="setActiveTool('draw_rect')"
       [class]="activeTool() === 'draw_rect' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Dibujar Rectángulo 3D (R): Dibuja un rectángulo en el plano horizontal para crear una pieza rectangular">
       <span class="material-icons text-lg">crop_square</span>
     </button>
 
-    <!-- 5.1. DRAW 3D CIRCLE TOOL -->
-    <button 
+    <!-- 5.1. DIBUJAR CÍRCULO 3D -->
+    <button
       type="button"
       (click)="setActiveTool('draw_circle')"
       [class]="activeTool() === 'draw_circle' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Dibujar Círculo 3D (C): Arrastra desde el centro para definir el radio y crear una pieza o mesa redonda">
       <span class="material-icons text-lg">radio_button_unchecked</span>
     </button>
 
-    <!-- 5.2. DRAW FREEHAND (MANO ALZADA) TOOL -->
-    <button 
+    <!-- 5.2. DIBUJO LIBRE A MANO ALZADA -->
+    <button
       type="button"
       (click)="setActiveTool('draw_freehand')"
       [class]="activeTool() === 'draw_freehand' ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Dibujo Libre a Mano Alzada (F): Trazo continuo que se suaviza y extruye en un polígono tridimensional">
       <span class="material-icons text-lg">gesture</span>
     </button>
 
-    <!-- 6. MEASURE TAPE TOOL -->
-    <button 
+    <!-- 6. CINTA MÉTRICA 3D -->
+    <button
       type="button"
       (click)="setActiveTool('measure')"
       [class]="activeTool() === 'measure' ? 'bg-amber-500 text-white font-bold shadow-md shadow-amber-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Cinta Métrica 3D (T): Mide distancias reales y luces entre aristas o caras">
       <span class="material-icons text-lg">straighten</span>
     </button>
 
     <div class="w-6 h-px bg-slate-200 mx-auto my-0.5"></div>
 
-
-
-    <!-- 8. DRILL HOLES (MECANIZADOS CNC) TOGGLE -->
-    <button 
+    <!-- 8. MECANIZADOS CNC (PERFORACIONES) -->
+    <button
       type="button"
       (click)="toggleDrillHoles()"
       [class]="showDrillHoles() ? 'text-sky-600 bg-sky-50 shadow-xs ring-1 ring-sky-300' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition relative"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition relative cursor-pointer"
       title="Mecanizados CNC: Perforaciones calculadas (Cazoletas de bisagra Ø35mm moradas, tornillos 4x50 cyan y clavijas 8x30 ámbar)">
       <span class="material-icons text-lg">adjust</span>
       @if (showDrillHoles() && allDrillHoles().length > 0) {
@@ -110,58 +108,58 @@
     </button>
 
     <!-- 9. COTAS 3D -->
-    <button 
+    <button
       type="button"
       (click)="toggleDimensions()"
       [class]="show3dDimensions() ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Cotas 3D: Mostrar u ocultar líneas de acotado milimétrico sobre el mueble">
       <span class="material-icons text-lg">straighten</span>
     </button>
 
     <!-- 10. LUZ LIBRE -->
-    <button 
+    <button
       type="button"
       (click)="toggleClearances()"
       [class]="showClearances() ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Luz Libre: Cotas dinámicas de huecos interiores útiles entre baldas y laterales">
       <span class="material-icons text-lg">unfold_more</span>
     </button>
 
     <!-- 11. RAYOS X -->
-    <button 
+    <button
       type="button"
       (click)="toggleXRay()"
       [class]="isXRay() ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer"
       title="Rayos X: Transparencia técnica para inspeccionar ensambles interiores">
       <span class="material-icons text-lg">visibility</span>
     </button>
 
-    <!-- 11.5. HERRAJES & ACCESORIOS 3D (TIRADORES, BISAGRAS, CORREDERAS SELECTIVOS) -->
-    <button 
+    <!-- 11.5. HERRAJES Y ACCESORIOS 3D -->
+    <button
       type="button"
       [disabled]="!hasHardwareSelected()"
       (click)="toggleHardware()"
-      [class]="!hasHardwareSelected() 
-        ? 'opacity-35 cursor-not-allowed text-slate-300' 
-        : (isSelectedHardwareVisible() 
-            ? 'text-blue-600 bg-blue-50 ring-1 ring-blue-300 shadow-xs' 
-            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100')"
+      [class]="!hasHardwareSelected()
+        ? 'opacity-35 cursor-not-allowed text-slate-300'
+        : (isSelectedHardwareVisible()
+            ? 'text-blue-600 bg-blue-50 ring-1 ring-blue-300 shadow-xs cursor-pointer'
+            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer')"
       class="w-9 h-9 rounded-xl flex items-center justify-center transition"
-      [title]="!hasHardwareSelected() 
-        ? 'Herrajes 3D: Selecciona un cajón o puerta para gestionar sus herrajes' 
+      [title]="!hasHardwareSelected()
+        ? 'Herrajes 3D: Selecciona un cajón o puerta para gestionar sus herrajes'
         : (isSelectedHardwareVisible() ? 'Ocultar herrajes 3D del cajón seleccionado' : 'Mostrar herrajes 3D del cajón seleccionado')">
       <span class="material-icons text-lg">hardware</span>
     </button>
 
-    <!-- 12. ABRIR / CERRAR PUERTAS Y CAJONES (MOVIMIENTO 3D SUAVE) -->
-    <button 
+    <!-- 12. ABRIR / CERRAR PUERTAS Y CAJONES -->
+    <button
       type="button"
       (click)="toggleAllDoorsAndDrawers()"
       [class]="isAllOpen() ? 'text-blue-700 bg-blue-50 ring-2 ring-blue-400 shadow-xs font-bold' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'"
-      class="w-9 h-9 rounded-xl flex items-center justify-center transition relative"
+      class="w-9 h-9 rounded-xl flex items-center justify-center transition relative cursor-pointer"
       [title]="isAllOpen() ? 'Cerrar todas las puertas y cajones (Animación fluida)' : 'Abrir todas las puertas y cajones en 3D (Animación fluida)'">
       <span class="material-icons text-lg">{{ isAllOpen() ? 'meeting_room' : 'door_sliding' }}</span>
       @if (isAllOpen()) {
@@ -169,15 +167,13 @@
       }
     </button>
 
-
-
-    <!-- 14. CAJONES Y GRUPOS GUARDADOS (BOTÓN DE APERTURA) -->
+    <!-- 13. CAJONES Y GRUPOS GUARDADOS -->
     <div class="relative">
-      <button 
+      <button
         type="button"
         (click)="toggleGroupsFlyout()"
         [class]="showGroupsFlyout() ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-500/30 ring-2 ring-indigo-400' : (activePartGroups().length > 0 ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 ring-1 ring-indigo-300' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100')"
-        class="w-9 h-9 rounded-xl flex items-center justify-center transition relative"
+        class="w-9 h-9 rounded-xl flex items-center justify-center transition relative cursor-pointer"
         title="Cajones y Grupos Guardados: Administrar y seleccionar cajones completos para moverlos o animarlos">
         <span class="material-icons text-lg">inbox</span>
         @if (activePartGroups().length > 0) {
@@ -190,38 +186,35 @@
 
     <div class="w-6 h-px bg-slate-200 mx-auto my-0.5"></div>
 
-    <!-- 13. THEME TOGGLE (STUDIO LIGHT / CAD DARK) -->
-    <button 
+    <!-- 14. TEMA DE ESTUDIO (CLARO / OSCURO) -->
+    <button
       type="button"
       (click)="toggleTheme()"
-      class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
       [title]="isWhiteTheme() ? 'Cambiar a modo CAD oscuro' : 'Cambiar a modo estudio claro'">
       <span class="material-icons text-lg">{{ isWhiteTheme() ? 'wb_sunny' : 'nightlight' }}</span>
     </button>
 
-    <!-- 14. RESET CAMERA -->
-    <button 
+    <!-- 15. REINICIAR CÁMARA -->
+    <button
       type="button"
       (click)="resetCamera()"
-      class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
+      class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
       title="Centrar y reiniciar cámara (Z)">
       <span class="material-icons text-lg">filter_center_focus</span>
     </button>
-
   </div>
 
-  <!-- FLOATING SIDE PANEL: CAJONES Y GRUPOS GUARDADOS (POSICIONADO JUNTO A LA PALETA SIN OVERFLOW) -->
+  <!-- PANEL LATERAL FLOTANTE: CAJONES Y GRUPOS GUARDADOS -->
   @if (showGroupsFlyout()) {
-    <!-- Backdrop invisible para cerrar al hacer clic afuera en el visor 3D -->
-    <button 
+    <button
       type="button"
       aria-label="Cerrar panel de grupos"
-      class="absolute inset-0 z-35 bg-black/5 backdrop-blur-[0.5px] cursor-default w-full h-full border-none outline-none" 
+      class="absolute inset-0 z-35 bg-black/5 backdrop-blur-xs cursor-default w-full h-full border-none outline-hidden"
       (click)="closeGroupsFlyout()">
     </button>
 
     <div class="absolute left-16 top-12 z-40 bg-white/95 text-slate-800 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 w-84 max-w-[calc(100vw-5rem)] max-h-[calc(100vh-8rem)] overflow-y-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 scrollbar-thin pointer-events-auto">
-      <!-- Flyout Header -->
       <div class="flex items-center justify-between pb-2 border-b border-slate-200/80">
         <div class="flex items-center gap-2">
           <div class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
@@ -232,51 +225,48 @@
             <p class="text-[10px] text-slate-500 font-medium">{{ activePartGroups().length }} guardados en el proyecto</p>
           </div>
         </div>
-        <button 
-          type="button" 
-          (click)="closeGroupsFlyout()" 
-          class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+        <button
+          type="button"
+          (click)="closeGroupsFlyout()"
+          class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
           title="Cerrar panel">
           <span class="material-icons text-sm">close</span>
         </button>
       </div>
 
-      <!-- Empty State -->
       @if (activePartGroups().length === 0) {
         <div class="py-4 px-2 text-center flex flex-col items-center gap-2">
           <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
             <span class="material-icons text-2xl">inbox</span>
           </div>
           <p class="text-xs font-semibold text-slate-700">Sin grupos guardados</p>
-          <p class="text-[11px] text-slate-500 max-w-[220px]">
+          <p class="text-[11px] text-slate-500 max-w-55">
             Crea un cajón paramétrico o selecciona varias piezas en 3D para agruparlas como un bloque móvil.
           </p>
-          <button 
-            type="button" 
-            (click)="drawerWizardRequested.emit(); closeGroupsFlyout()" 
-            class="mt-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition">
+          <button
+            type="button"
+            (click)="drawerWizardRequested.emit(); closeGroupsFlyout()"
+            class="mt-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer">
             <span class="material-icons text-xs">add_box</span>
             <span>Crear Cajón Modular</span>
           </button>
         </div>
       } @else {
-        <!-- List of Saved Groups -->
         <div class="flex flex-col gap-2.5">
           @for (group of activePartGroups(); track group.id) {
             @let isSel = isGroupFullySelected(group.id);
             @let partsCount = getPartsForGroup(group.id).length;
             @let isOpen = isGroupOpen(group.id);
 
-            <div 
+            <div
               [class]="isSel ? 'border-indigo-400 bg-indigo-50/60 ring-2 ring-indigo-400/40 shadow-xs' : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50'"
               class="border rounded-xl p-2.5 flex flex-col gap-2 transition">
-              
-              <!-- Group Header & Select Button with Camera Focus -->
+
               <div class="flex items-center justify-between">
-                <button 
+                <button
                   type="button"
                   (click)="selectGroupInViewer(group.id)"
-                  class="flex items-center gap-2 text-left flex-1 min-w-0 group"
+                  class="flex items-center gap-2 text-left flex-1 min-w-0 group cursor-pointer"
                   title="Haz clic para seleccionar el grupo en 3D y enfocar la cámara">
                   <span class="material-icons text-base transition-colors" [class]="isSel ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-600'">
                     {{ isSel ? 'check_circle' : 'inbox' }}
@@ -295,111 +285,102 @@
                 </button>
 
                 <div class="flex items-center gap-0.5 shrink-0">
-                  <!-- Edit Parametric Module -->
-                  <button 
+                  <button
                     type="button"
                     (click)="$event.stopPropagation(); onEditModuleFromContext(group.id, $event)"
-                    class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                    class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
                     title="Editar Módulo Paramétrico">
                     <span class="material-icons text-sm">tune</span>
                   </button>
 
-                  <!-- Duplicate group button -->
-                  <button 
+                  <button
                     type="button"
                     (click)="duplicateGroupInViewer(group.id)"
-                    class="p-1 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
+                    class="p-1 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition cursor-pointer"
                     title="Duplicar cajón (crea una copia apilada encima)">
                     <span class="material-icons text-sm">content_copy</span>
                   </button>
 
-                  <!-- Rotate 90 deg button -->
-                  <button 
+                  <button
                     type="button"
                     (click)="rotateGroupInViewer(group.id, 90)"
-                    class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                    class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
                     title="Girar cajón 90° en 3D (Atajo: tecla R)">
                     <span class="material-icons text-sm">rotate_right</span>
                   </button>
 
-                  <!-- Animate toggle -->
-                  <button 
+                  <button
                     type="button"
                     (click)="toggleGroupAnimation(group.id)"
                     [class]="isOpen ? 'text-blue-600 bg-blue-100' : 'text-slate-400 hover:text-blue-600 hover:bg-slate-100'"
-                    class="p-1 rounded-lg transition"
+                    class="p-1 rounded-lg transition cursor-pointer"
                     [title]="isOpen ? 'Cerrar cajón' : 'Abrir cajón (animación 3D)'">
                     <span class="material-icons text-sm">{{ isOpen ? 'meeting_room' : 'door_sliding' }}</span>
                   </button>
 
-                  <!-- Ungroup -->
-                  <button 
+                  <button
                     type="button"
                     (click)="ungroupInViewer(group.id)"
-                    class="p-1 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition"
+                    class="p-1 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
                     title="Desagrupar piezas (liberar para edición suelta)">
                     <span class="material-icons text-sm">link_off</span>
                   </button>
                 </div>
               </div>
 
-              <!-- Quick Action Buttons (Duplicar Apilado & Girar) -->
               <div class="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100">
-                <button 
+                <button
                   type="button"
                   (click)="duplicateGroupInViewer(group.id)"
-                  class="py-1 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold flex items-center justify-center gap-1 transition"
+                  class="py-1 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold flex items-center justify-center gap-1 transition cursor-pointer"
                   title="Duplicar cajón apilado verticalmente">
                   <span class="material-icons text-xs">content_copy</span>
                   <span>Duplicar Arriba</span>
                 </button>
-                <button 
+                <button
                   type="button"
                   (click)="rotateGroupInViewer(group.id, 90)"
-                  class="py-1 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold flex items-center justify-center gap-1 transition"
+                  class="py-1 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold flex items-center justify-center gap-1 transition cursor-pointer"
                   title="Girar 90° en bloque (Atajo: tecla R)">
                   <span class="material-icons text-xs">rotate_right</span>
                   <span>Girar 90°</span>
                 </button>
               </div>
 
-              <!-- Quick Movement Controls (Arriba / Abajo) -->
               <div class="grid grid-cols-2 gap-1.5">
-                <button 
+                <button
                   type="button"
                   (click)="moveGroupStep(group.id, 'y', 50)"
-                  class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium flex items-center justify-center gap-1 transition"
+                  class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium flex items-center justify-center gap-1 transition cursor-pointer"
                   title="Subir cajón 50mm en eje vertical (Y)">
                   <span class="material-icons text-xs">arrow_upward</span>
                   <span>Subir 50mm</span>
                 </button>
-                <button 
+                <button
                   type="button"
                   (click)="moveGroupStep(group.id, 'y', -50)"
-                  class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium flex items-center justify-center gap-1 transition"
+                  class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium flex items-center justify-center gap-1 transition cursor-pointer"
                   title="Bajar cajón 50mm en eje vertical (Y)">
                   <span class="material-icons text-xs">arrow_downward</span>
                   <span>Bajar 50mm</span>
                 </button>
               </div>
 
-              <!-- Select Block & Smooth Focus Button -->
-              <button 
+              <button
                 type="button"
                 (click)="selectGroupInViewer(group.id)"
                 [class]="isSel ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-semibold'"
-                class="w-full py-1.5 px-2 rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow-xs">
+                class="w-full py-1.5 px-2 rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer">
                 <span class="material-icons text-xs">{{ isSel ? 'center_focus_strong' : 'near_me' }}</span>
                 <span>{{ isSel ? 'Cajón Activo (Enfocado en 3D)' : 'Seleccionar y Enfocar este Grupo' }}</span>
               </button>
             </div>
           }
 
-          <!-- Quick Add Drawer Button -->
-          <button 
+          <button
             type="button"
             (click)="drawerWizardRequested.emit(); closeGroupsFlyout()"
-            class="w-full py-1.5 px-2.5 rounded-xl border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-semibold flex items-center justify-center gap-1.5 transition mt-1">
+            class="w-full py-1.5 px-2.5 rounded-xl border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-semibold flex items-center justify-center gap-1.5 transition mt-1 cursor-pointer">
             <span class="material-icons text-sm">add_box</span>
             <span>+ Crear Nuevo Cajón Modular</span>
           </button>
@@ -408,25 +389,23 @@
     </div>
   }
 
-
-
-  <!-- HIDDEN PIECES BANNER -->
+  <!-- BANNER DE PIEZAS OCULTAS -->
   @if (hiddenPartIds().size > 0) {
     <div class="absolute top-12 left-16 z-20 pointer-events-auto animate-in fade-in duration-150">
       <div class="flex items-center gap-2 bg-amber-500/95 text-white backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md text-xs font-semibold">
         <span class="material-icons text-sm">visibility_off</span>
         <span>{{ hiddenPartIds().size }} pieza(s) oculta(s)</span>
-        <button 
-          type="button" 
-          (click)="showAllParts()" 
-          class="underline hover:text-amber-100 ml-1.5 font-bold">
+        <button
+          type="button"
+          (click)="showAllParts()"
+          class="underline hover:text-amber-100 ml-1.5 font-bold cursor-pointer">
           Mostrar Todas
         </button>
       </div>
     </div>
   }
 
-  <!-- PUSH/PULL LIVE DELTA FLOATING BADGE -->
+  <!-- BADGE FLOTANTE DE EMPUJAR / TIRAR (PUSH/PULL) -->
   @if (pushPullDelta(); as pp) {
     <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-in zoom-in-95 duration-100">
       <div class="flex items-center gap-2 bg-amber-500 text-white px-3.5 py-1.5 rounded-full shadow-lg font-bold text-xs font-mono">
@@ -439,7 +418,7 @@
     </div>
   }
 
-  <!-- DRAW RECTANGLE LIVE FLOATING BADGE -->
+  <!-- BADGE FLOTANTE DE DIBUJO DE RECTÁNGULO -->
   @if (isDrawingRect() && rectDrawDims(); as rd) {
     <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-in zoom-in-95 duration-100">
       <div class="flex items-center gap-2 bg-sky-600 text-white px-3.5 py-1.5 rounded-full shadow-lg font-bold text-xs font-mono">
@@ -452,10 +431,10 @@
     </div>
   }
 
-  <!-- TOP-RIGHT COLLISION & INTERFERENCE WARNING BADGE & DETAILS -->
+  <!-- ALERTA SUPERIOR DERECHA DE SOLAPAMIENTOS / COLISIONES -->
   @if (detectedCollisions().length > 0) {
     <div class="absolute top-3 right-3 z-20 pointer-events-auto flex flex-col items-end gap-1.5 max-w-sm">
-      <button 
+      <button
         type="button"
         (click)="toggleCollisionsDetail()"
         class="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white px-3 py-1.5 rounded-xl shadow-lg text-xs font-bold transition cursor-pointer">
@@ -489,7 +468,7 @@
     </div>
   }
 
-  <!-- 3D MEASUREMENT TAPE COMPACT HUD (PANEL COMPACTO JUNTO A LA PALETA LATERAL IZQUIERDA) -->
+  <!-- HUD COMPACTO DE CINTA MÉTRICA 3D -->
   @if (isMeasureMode()) {
     <div class="absolute top-3 left-16 sm:left-17 z-30 pointer-events-auto flex flex-col gap-1.5 w-72 max-w-[calc(100vw-5rem)] animate-in fade-in zoom-in-95 duration-150">
       <div class="bg-white/95 text-slate-800 backdrop-blur-md p-2.5 rounded-xl border border-slate-200 shadow-xl flex flex-col gap-2">
@@ -502,11 +481,10 @@
               Imán CAD
             </span>
           </div>
-
-          <button 
-            type="button" 
+          <button
+            type="button"
             (click)="setActiveTool('select')"
-            class="text-slate-400 hover:text-slate-700 p-0.5 rounded transition"
+            class="text-slate-400 hover:text-slate-700 p-0.5 rounded transition cursor-pointer"
             title="Cerrar cinta métrica">
             <span class="material-icons text-sm">close</span>
           </button>
@@ -521,13 +499,11 @@
           </div>
         } @else if (measureDistance(); as dist) {
           <div class="flex flex-col gap-1.5">
-            <!-- Distancia Principal y Desglose Ortogonal -->
             <div class="bg-amber-50/80 px-2.5 py-1.5 rounded-lg border border-amber-200/70 flex items-center justify-between">
               <span class="text-[10px] uppercase font-bold text-amber-800">Cota CAD</span>
               <span class="text-base font-black text-amber-700 font-mono tracking-tight">{{ dist.total }} mm</span>
             </div>
 
-            <!-- Desglose por ejes ΔX ΔY ΔZ -->
             <div class="flex items-center justify-around text-[10px] font-mono text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200/60">
               <span>ΔX: <strong class="text-rose-600">{{ dist.dx }}</strong></span>
               <span class="text-slate-300">|</span>
@@ -536,20 +512,19 @@
               <span>ΔZ: <strong class="text-sky-600">{{ dist.dz }}</strong></span>
             </div>
 
-            <!-- Botones compactos y elegantes para nueva medida y borrar cota -->
             <div class="flex items-center gap-1.5 pt-0.5">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 (click)="startNewMeasurement()"
-                class="flex-1 py-1 px-2 text-[11px] bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg shadow-xs transition flex items-center justify-center gap-1"
+                class="flex-1 py-1 px-2 text-[11px] bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
                 title="Comenzar una nueva medición">
                 <span class="material-icons text-xs">add</span>
                 <span>Nueva Medida</span>
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 (click)="clearMeasure()"
-                class="py-1 px-2 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg border border-slate-200 transition flex items-center justify-center gap-1"
+                class="py-1 px-2 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg border border-slate-200 transition flex items-center justify-center gap-1 cursor-pointer"
                 title="Borrar cota actual (Esc)">
                 <span class="material-icons text-xs">delete_outline</span>
                 <span>Borrar</span>
@@ -568,24 +543,22 @@
     </div>
   }
 
-  <!-- FLOATING MICRO-NUDGE HUD (CUADRO DE MICRO-AJUSTE EN ZOOM - CONSERVADO SEGÚN REQUERIMIENTO EXPLÍCITO) -->
+  <!-- HUD FLOTANTE DE MICRO-AJUSTE EN ZOOM -->
   @if (selectedPart(); as sel) {
     <div class="absolute bottom-10 left-16 z-20 pointer-events-auto flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
-      <div class="bg-white/95 text-slate-800 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200/90 shadow-xl flex flex-col gap-1.5 max-w-[320px]">
-        
-        <!-- Header: Title, Step selector, Magnetic Toggle -->
+      <div class="bg-white/95 text-slate-800 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200/90 shadow-xl flex flex-col gap-1.5 max-w-80">
+
         <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5">
           <div class="flex items-center gap-1.5">
             <span class="material-icons text-sm text-sky-500">tune</span>
             <span class="text-xs font-bold text-slate-800">Micro-Ajuste en Zoom</span>
           </div>
-
           <div class="flex items-center gap-1">
             <button
               type="button"
               (click)="setNudgeStep(1)"
               [class]="nudgeStep() === 1 ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-              class="px-1.5 py-0.5 text-[10px] rounded transition"
+              class="px-1.5 py-0.5 text-[10px] rounded transition cursor-pointer"
               title="Paso de 1 milímetro">
               1 mm
             </button>
@@ -593,17 +566,15 @@
               type="button"
               (click)="setNudgeStep(10)"
               [class]="nudgeStep() === 10 ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-              class="px-1.5 py-0.5 text-[10px] rounded transition"
+              class="px-1.5 py-0.5 text-[10px] rounded transition cursor-pointer"
               title="Paso de 10 milímetros">
               10 mm
             </button>
-
-            <!-- Magnetic Snap Toggle -->
             <button
               type="button"
               (click)="toggleMagneticSnap()"
               [class]="isMagneticSnap() ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-slate-100 text-slate-400 border-slate-200'"
-              class="px-1.5 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-0.5 transition ml-0.5"
+              class="px-1.5 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-0.5 transition ml-0.5 cursor-pointer"
               [title]="isMagneticSnap() ? 'Imán de caras activo. Une piezas a 0mm de contacto perfecto.' : 'Imán desactivado.'">
               <span class="material-icons text-[11px]">filter_vintage</span>
               <span>{{ isMagneticSnap() ? 'Imán ON' : 'OFF' }}</span>
@@ -611,99 +582,95 @@
           </div>
         </div>
 
-        <!-- 3 Axis Controls (X lateral, Y vertical, Z profundidad) -->
         <div class="grid grid-cols-3 gap-1 text-center">
-          
-          <!-- Axis X -->
+
+          <!-- Eje X -->
           <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
             <span class="text-[10px] font-bold text-red-500">X Lateral</span>
             <div class="flex items-center gap-1 w-full justify-center my-0.5">
               <button
                 type="button"
                 (click)="nudgePart('x', -nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
                 title="Mover a la izquierda (←)">
-                ◄
+                -
               </button>
               <button
                 type="button"
                 (click)="nudgePart('x', nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
                 title="Mover a la derecha (→)">
-                ►
+                +
               </button>
             </div>
             <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posX) }} mm</span>
           </div>
 
-          <!-- Axis Y (Height) -->
+          <!-- Eje Y -->
           <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
             <span class="text-[10px] font-bold text-emerald-600">Y Altura</span>
             <div class="flex items-center gap-1 w-full justify-center my-0.5">
               <button
                 type="button"
                 (click)="nudgePart('y', -nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
                 title="Bajar pieza (↓)">
-                ▼
+                -
               </button>
               <button
                 type="button"
                 (click)="nudgePart('y', nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
                 title="Subir pieza (↑)">
-                ▲
+                +
               </button>
             </div>
             <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posY) }} mm</span>
           </div>
 
-          <!-- Axis Z (Depth) -->
+          <!-- Eje Z -->
           <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
             <span class="text-[10px] font-bold text-sky-600">Z Fondo</span>
             <div class="flex items-center gap-1 w-full justify-center my-0.5">
               <button
                 type="button"
                 (click)="nudgePart('z', -nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
                 title="Mover al fondo">
-                ◄
+                -
               </button>
               <button
                 type="button"
                 (click)="nudgePart('z', nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition"
+                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
                 title="Mover al frente">
-                ►
+                +
               </button>
             </div>
             <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posZ) }} mm</span>
           </div>
 
         </div>
-
       </div>
     </div>
   }
 
-  <!-- RIGHT-CLICK CONTEXT MENU -->
+  <!-- MENÚ CONTEXTUAL DE CLIC DERECHO -->
   @if (contextMenuPos(); as pos) {
-    <!-- Full-screen invisible backdrop to dismiss menu on click outside -->
-    <button 
-      type="button" 
-      class="fixed inset-0 z-40 bg-transparent cursor-default w-full h-full border-0 p-0" 
-      (click)="closeContextMenu()" 
-      (contextmenu)="$event.preventDefault(); closeContextMenu()" 
+    <button
+      type="button"
+      class="fixed inset-0 z-40 bg-transparent cursor-default w-full h-full border-0 p-0"
+      (click)="closeContextMenu()"
+      (contextmenu)="$event.preventDefault(); closeContextMenu()"
       aria-label="Cerrar menú contextual">
     </button>
 
-    <div 
-      [style.left.px]="pos.x" 
-      [style.top.px]="pos.y" 
-      class="absolute z-50 bg-white text-slate-800 rounded-2xl border border-slate-200/90 shadow-2xl p-1.5 flex flex-col gap-0.5 min-w-[220px] text-xs font-medium animate-in fade-in zoom-in-95 select-none pointer-events-auto">
-      
+    <div
+      [style.left.px]="pos.x"
+      [style.top.px]="pos.y"
+      class="absolute z-50 bg-white text-slate-800 rounded-2xl border border-slate-200/90 shadow-2xl p-1.5 flex flex-col gap-0.5 min-w-55 text-xs font-medium animate-in fade-in zoom-in-95 select-none pointer-events-auto">
+
       @if (contextMenuPart(); as part) {
-        <!-- Piece header -->
         <div class="px-2.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
           <div class="flex items-center gap-1.5 truncate">
             <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
@@ -712,10 +679,9 @@
           <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ part.length }}×{{ part.width }}</span>
         </div>
 
-        <!-- Acción Rápida: Editar Módulo Paramétrico si pertenece a un grupo -->
         @if (part.groupId) {
-          <button 
-            type="button" 
+          <button
+            type="button"
             (click)="$event.stopPropagation(); onEditModuleFromContext(part.groupId, $event)"
             class="w-full my-1 py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 text-indigo-700 font-bold rounded-xl flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
             <div class="flex items-center gap-1.5">
@@ -726,14 +692,12 @@
           </button>
         }
 
-        <!-- SECCIÓN 1: ANIMACIÓN Y TIPO DE PIEZA MÓVIL (PUERTA / CAJÓN) -->
         <div class="p-1.5 bg-blue-50/70 rounded-xl border border-blue-100 flex flex-col gap-1 my-1">
-          <!-- Probar Apertura directa (SOLO para piezas animables: puertas y cajones) -->
           @if (isAnimatablePart(part)) {
-            <button 
-              type="button" 
+            <button
+              type="button"
               (click)="toggleContextMenuAnimation()"
-              class="w-full py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs">
+              class="w-full py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
               <div class="flex items-center gap-1.5">
                 <span class="material-icons text-sm">{{ isPartOpen(part.id) ? 'meeting_room' : 'door_sliding' }}</span>
                 <span>{{ isPartOpen(part.id) ? 'Cerrar Pieza / Cajón' : 'Animar / Abrir Pieza' }}</span>
@@ -744,10 +708,10 @@
 
           <!-- Submenú: Convertir Tipo de Pieza -->
           <div class="relative">
-            <button 
-              type="button" 
+            <button
+              type="button"
               (click)="toggleMovableRoleSubmenu()"
-              class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium">
+              class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
               <div class="flex items-center gap-1.5">
                 <span class="material-icons text-xs text-blue-600">tune</span>
                 <span>Tipo (Puerta / Cajón / Estante)</span>
@@ -758,26 +722,25 @@
             @if (showMovableRoleSubmenu()) {
               <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1">Puertas Batientes / Elevables:</span>
-                <button type="button" (click)="setContextMenuPartMovable('door', 'left')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'door' && (!part.hardwareConfig?.openingDirection || part.hardwareConfig?.openingDirection === 'left')">
+                <button type="button" (click)="setContextMenuPartMovable('door', 'left')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'door' && (part.hardwareConfig?.openingDirection ?? 'left') === 'left'">
                   <span class="material-icons text-xs text-blue-500">arrow_back</span>
                   <span>Puerta (Bisagra Izquierda)</span>
                 </button>
-                <button type="button" (click)="setContextMenuPartMovable('door', 'right')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'door' && part.hardwareConfig?.openingDirection === 'right'">
+                <button type="button" (click)="setContextMenuPartMovable('door', 'right')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'door' && part.hardwareConfig?.openingDirection === 'right'">
                   <span class="material-icons text-xs text-blue-500">arrow_forward</span>
                   <span>Puerta (Bisagra Derecha)</span>
                 </button>
-                <button type="button" (click)="setContextMenuPartMovable('door', 'top')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'door' && part.hardwareConfig?.openingDirection === 'top'">
+                <button type="button" (click)="setContextMenuPartMovable('door', 'top')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'door' && part.hardwareConfig?.openingDirection === 'top'">
                   <span class="material-icons text-xs text-amber-500">arrow_upward</span>
                   <span>Puerta Basculante Superior</span>
                 </button>
-
                 <div class="h-px bg-slate-100 my-0.5"></div>
                 <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1">Cajones y Estructura:</span>
-                <button type="button" (click)="setContextMenuPartMovable('drawer_front', 'top')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'drawer_front'">
+                <button type="button" (click)="setContextMenuPartMovable('drawer_front', 'top')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'drawer_front'">
                   <span class="material-icons text-xs text-emerald-500">view_day</span>
                   <span>Frente de Cajón Móvil</span>
                 </button>
-                <button type="button" (click)="setContextMenuPartMovable('shelf')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left" [class.font-bold]="part.componentRole === 'shelf'">
+                <button type="button" (click)="setContextMenuPartMovable('shelf')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'shelf'">
                   <span class="material-icons text-xs text-slate-400">table_rows</span>
                   <span>Estante / Pieza Fija</span>
                 </button>
@@ -787,10 +750,10 @@
 
           <!-- Submenú: Tirador / Manija -->
           <div class="relative">
-            <button 
-              type="button" 
+            <button
+              type="button"
               (click)="toggleHandleSubmenu()"
-              class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium">
+              class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
               <div class="flex items-center gap-1.5">
                 <span class="material-icons text-xs text-amber-600">hardware</span>
                 <span>Asignar Tirador / Manija</span>
@@ -801,11 +764,11 @@
             @if (showHandleSubmenu()) {
               <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md max-h-48 overflow-y-auto">
                 @for (hOpt of hardwareCatalog.handleOptions; track hOpt.id) {
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     (click)="setContextMenuPartHandle(hOpt.id, part.hardwareConfig?.handleFinish || 'brushed_steel')"
                     [class]="(part.hardwareConfig?.handleType || 'bar_modern') === hOpt.id ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
-                    class="px-2 py-1 rounded-lg flex items-center justify-between text-left">
+                    class="px-2 py-1 rounded-lg flex items-center justify-between text-left cursor-pointer">
                     <div class="flex items-center gap-1.5 truncate">
                       <span class="material-icons text-xs text-slate-400">{{ hOpt.icon }}</span>
                       <span class="truncate">{{ hOpt.name }}</span>
@@ -817,13 +780,13 @@
             }
           </div>
 
-          <!-- Submenú: Bisagras (si es puerta) -->
+          <!-- Submenú: Bisagras -->
           @if (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) {
             <div class="relative">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 (click)="toggleHingeSubmenu()"
-                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium">
+                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
                 <div class="flex items-center gap-1.5">
                   <span class="material-icons text-xs text-purple-600">door_sliding</span>
                   <span>Bisagra Cazoleta Ø35mm</span>
@@ -834,11 +797,11 @@
               @if (showHingeSubmenu()) {
                 <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
                   @for (hinge of hardwareCatalog.hingeOptions; track hinge.id) {
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       (click)="setContextMenuPartHinge(hinge.id)"
                       [class]="(part.hardwareConfig?.hingeType || 'straight') === hinge.id ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
-                      class="px-2 py-1 rounded-lg flex items-center justify-between text-left">
+                      class="px-2 py-1 rounded-lg flex items-center justify-between text-left cursor-pointer">
                       <div class="flex items-center gap-1.5 truncate">
                         <span class="material-icons text-xs text-slate-400">{{ hinge.icon }}</span>
                         <span class="truncate">{{ hinge.name }}</span>
@@ -850,13 +813,13 @@
             </div>
           }
 
-          <!-- Submenú: Correderas (si es cajón) -->
+          <!-- Submenú: Correderas -->
           @if (part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('CAJON') || part.name.toUpperCase().includes('CAJÓN') || part.name.toUpperCase().includes('GAVETA') || part.hardwareConfig?.movableType === 'drawer') {
             <div class="relative">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 (click)="toggleSlideSubmenu()"
-                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium">
+                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
                 <div class="flex items-center gap-1.5">
                   <span class="material-icons text-xs text-sky-600">view_week</span>
                   <span>Tipo de Corredera</span>
@@ -867,11 +830,11 @@
               @if (showSlideSubmenu()) {
                 <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
                   @for (slide of hardwareCatalog.slideOptions; track slide.id) {
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       (click)="setContextMenuPartSlide(slide.id)"
                       [class]="(part.hardwareConfig?.slideType || 'telescopic') === slide.id ? 'bg-sky-50 text-sky-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
-                      class="px-2 py-1 rounded-lg flex items-center justify-between text-left">
+                      class="px-2 py-1 rounded-lg flex items-center justify-between text-left cursor-pointer">
                       <div class="flex items-center gap-1.5 truncate">
                         <span class="material-icons text-xs text-slate-400">{{ slide.icon }}</span>
                         <span class="truncate">{{ slide.name }}</span>
@@ -888,20 +851,20 @@
         <div class="h-px bg-slate-100 my-0.5"></div>
 
         <!-- Duplicar -->
-        <button 
+        <button
           type="button"
           (click)="duplicateContextMenuPart()"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <span class="material-icons text-sm text-sky-500">content_copy</span>
           <span>Duplicar Pieza</span>
         </button>
 
-        <!-- Rotación 3D y Giros 90° Submenu -->
+        <!-- Submenú Rotación 3D -->
         <div class="relative">
-          <button 
+          <button
             type="button"
             (click)="toggleRotateSubmenu()"
-            class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition">
+            class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
             <div class="flex items-center gap-2">
               <span class="material-icons text-sm text-amber-500">3d_rotation</span>
               <span>Rotación y Orientación 3D</span>
@@ -913,48 +876,42 @@
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-2 my-0.5 flex flex-col gap-1.5 text-xs shadow-xs">
               <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 <span>Giros Rápidos (90°):</span>
-                <button type="button" (click)="resetPartRotation(part)" class="text-sky-600 hover:text-sky-800 font-bold transition">Reset 0°</button>
+                <button type="button" (click)="resetPartRotation(part)" class="text-sky-600 hover:text-sky-800 font-bold transition cursor-pointer">Reset 0°</button>
               </div>
-
-              <!-- Eje X -->
               <div class="flex items-center justify-between gap-1">
                 <span class="font-bold text-rose-600 text-[11px] w-12">Eje X:</span>
                 <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationX || 0 }}°</span>
-                <button type="button" (click)="rotatePart3dAngle(part, 'x', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">+90°</button>
-                <button type="button" (click)="rotatePart3dAngle(part, 'x', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">-90°</button>
+                <button type="button" (click)="rotatePart3dAngle(part, 'x', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
+                <button type="button" (click)="rotatePart3dAngle(part, 'x', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
               </div>
-
-              <!-- Eje Y -->
               <div class="flex items-center justify-between gap-1">
                 <span class="font-bold text-emerald-600 text-[11px] w-12">Eje Y:</span>
                 <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationY || 0 }}°</span>
-                <button type="button" (click)="rotatePart3dAngle(part, 'y', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">+90°</button>
-                <button type="button" (click)="rotatePart3dAngle(part, 'y', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">-90°</button>
+                <button type="button" (click)="rotatePart3dAngle(part, 'y', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
+                <button type="button" (click)="rotatePart3dAngle(part, 'y', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
               </div>
-
-              <!-- Eje Z -->
               <div class="flex items-center justify-between gap-1">
                 <span class="font-bold text-sky-600 text-[11px] w-12">Eje Z:</span>
                 <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationZ || 0 }}°</span>
-                <button type="button" (click)="rotatePart3dAngle(part, 'z', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">+90°</button>
-                <button type="button" (click)="rotatePart3dAngle(part, 'z', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition">-90°</button>
+                <button type="button" (click)="rotatePart3dAngle(part, 'z', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
+                <button type="button" (click)="rotatePart3dAngle(part, 'z', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
               </div>
             </div>
           }
         </div>
 
-        <!-- Alinear 1-clic -->
+        <!-- Alineación rápida -->
         <div class="grid grid-cols-2 gap-1 px-1 my-0.5">
-          <button 
+          <button
             type="button"
             (click)="alignContextMenuPart('floor')"
-            class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition">
+            class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
             Al Suelo (Y=0)
           </button>
-          <button 
+          <button
             type="button"
             (click)="alignContextMenuPart('centerX')"
-            class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition">
+            class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
             Centrar Mueble
           </button>
         </div>
@@ -962,28 +919,28 @@
         <div class="h-px bg-slate-100 my-0.5"></div>
 
         <!-- Aislar / Ocultar -->
-        <button 
+        <button
           type="button"
           (click)="isolatePart(part)"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <span class="material-icons text-sm text-indigo-500">filter_center_focus</span>
           <span>Aislar Pieza (Ocultar demás)</span>
         </button>
 
-        <button 
+        <button
           type="button"
           (click)="hidePart(part)"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <span class="material-icons text-sm text-slate-400">visibility_off</span>
           <span>Ocultar Temporalmente</span>
         </button>
 
-        <!-- Cambiar Material Quick Submenu -->
+        <!-- Submenú Cambiar Material -->
         <div class="relative">
-          <button 
+          <button
             type="button"
             (click)="toggleQuickMaterialPicker()"
-            class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition">
+            class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
             <div class="flex items-center gap-2">
               <span class="material-icons text-sm text-amber-500">palette</span>
               <span>Cambiar Material</span>
@@ -995,11 +952,11 @@
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-1.5 my-0.5 flex flex-col gap-1 text-xs max-h-40 overflow-y-auto">
               <span class="text-[10px] uppercase font-bold text-slate-400 px-1">Melaminas:</span>
               @for (mat of materials(); track mat.id) {
-                <button 
+                <button
                   type="button"
                   (click)="assignQuickMaterial(mat.id)"
                   [class]="part.materialId === mat.id ? 'bg-sky-50 text-sky-700 font-bold border border-sky-200' : 'hover:bg-white text-slate-700'"
-                  class="px-2 py-1.5 rounded-lg text-left truncate flex items-center gap-2">
+                  class="px-2 py-1.5 rounded-lg text-left truncate flex items-center gap-2 cursor-pointer">
                   <span class="w-2.5 h-2.5 rounded-full border border-slate-300 shrink-0" [style.background-color]="mat.colorHex"></span>
                   <span class="truncate text-xs">{{ mat.name }}</span>
                 </button>
@@ -1008,92 +965,85 @@
           }
         </div>
 
-        <!-- Quick Tapacantos Row -->
+        <!-- Fila Rápida de Tapacantos -->
         <div class="px-2 py-1 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-1 my-0.5">
           <span class="text-[10px] font-bold text-slate-500 uppercase">Cantos:</span>
           <div class="flex items-center gap-1">
-            <button (click)="toggleEdgeBandingQuick('l1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" [class]="part.edges.l1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo 1">L1</button>
-            <button (click)="toggleEdgeBandingQuick('l2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" [class]="part.edges.l2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo 2">L2</button>
-            <button (click)="toggleEdgeBandingQuick('a1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" [class]="part.edges.a1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho 1">A1</button>
-            <button (click)="toggleEdgeBandingQuick('a2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" [class]="part.edges.a2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho 2">A2</button>
+            <button type="button" (click)="toggleEdgeBandingQuick('l1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.l1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo 1">L1</button>
+            <button type="button" (click)="toggleEdgeBandingQuick('l2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.l2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo 2">L2</button>
+            <button type="button" (click)="toggleEdgeBandingQuick('a1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.a1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho 1">A1</button>
+            <button type="button" (click)="toggleEdgeBandingQuick('a2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.a2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho 2">A2</button>
           </div>
         </div>
 
         <div class="h-px bg-slate-100 my-0.5"></div>
 
         <!-- Eliminar -->
-        <button 
+        <button
           type="button"
           (click)="deleteContextMenuPart()"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 flex items-center gap-2 text-left transition font-semibold">
+          class="px-2.5 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 flex items-center gap-2 text-left transition font-semibold cursor-pointer">
           <span class="material-icons text-sm text-rose-500">delete</span>
           <span>Eliminar Pieza</span>
         </button>
 
       } @else {
-        <!-- Context menu for empty canvas space -->
+        <!-- Menú contextual sobre espacio vacío del lienzo 3D -->
         <div class="px-2.5 py-1.5 border-b border-slate-100 text-slate-500 text-[11px] font-semibold">
           Espacio de Trabajo 3D
         </div>
-
         @if (hiddenPartIds().size > 0) {
-          <button 
+          <button
             type="button"
             (click)="showAllParts()"
-            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
             <span class="material-icons text-sm text-amber-500">visibility</span>
             <span>Mostrar Todas las Piezas ({{ hiddenPartIds().size }} ocultas)</span>
           </button>
         }
-
-        <button 
+        <button
           type="button"
           (click)="setActiveTool('draw_rect'); closeContextMenu()"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <span class="material-icons text-sm text-sky-500">crop_square</span>
           <span>Dibujar Rectángulo 3D (R)</span>
         </button>
-
-        <button 
+        <button
           type="button"
           (click)="setActiveTool('draw_circle'); closeContextMenu()"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <span class="material-icons text-sm text-sky-500">radio_button_unchecked</span>
           <span>Dibujar Círculo 3D (C)</span>
         </button>
-
-        <button 
+        <button
           type="button"
           (click)="setActiveTool('draw_freehand'); closeContextMenu()"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <span class="material-icons text-sm text-sky-500">gesture</span>
           <span>Dibujo Libre a Mano Alzada (F)</span>
         </button>
-
-        <button 
+        <button
           type="button"
           (click)="setActiveTool('push_pull'); closeContextMenu()"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <span class="material-icons text-sm text-amber-500">open_in_full</span>
           <span>Herramienta Empujar / Tirar (P)</span>
         </button>
-
-        <button 
+        <button
           type="button"
           (click)="resetCamera(); closeContextMenu()"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition">
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <span class="material-icons text-sm text-slate-500">filter_center_focus</span>
           <span>Centrar Cámara en Mueble (Z)</span>
         </button>
       }
-
     </div>
   }
 
-  <!-- CAD BOTTOM STATUS BAR & MEASUREMENTS BOX -->
+  <!-- BARRA DE ESTADO INFERIOR CAD Y CUADRO DE MEDIDAS -->
   <div class="absolute bottom-0 left-0 right-0 h-7 bg-white/95 text-slate-600 backdrop-blur-md border-t border-slate-200/90 px-3 flex items-center justify-between text-xs z-20 pointer-events-auto">
-    
-    <!-- Left: Contextual tool hint -->
+
+    <!-- Izquierda: Guía contextual de la herramienta activa -->
     <div class="flex items-center gap-2 truncate pr-2">
       @if (activeTool() === 'push_pull') {
         <span class="material-icons text-sm text-amber-500">open_in_full</span>
@@ -1118,7 +1068,7 @@
         <span><strong>Rotar 90° (Q):</strong> Haz clic sobre cualquier pieza para girarla 90° en el plano horizontal.</span>
       } @else if (activeTool() === 'select') {
         <span class="material-icons text-sm text-sky-500">near_me</span>
-        <span><strong>Seleccionar:</strong> Clic en pieza • <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Clic Derecho</kbd> Menú Contextual • Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> Empujar • Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">R</kbd> Rectángulo</span>
+        <span><strong>Seleccionar:</strong> Clic en pieza · <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Clic Derecho</kbd> Menú Contextual · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> Empujar · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">R</kbd> Rectángulo</span>
       } @else if (activeTool() === 'move') {
         <span class="material-icons text-sm text-sky-500">open_with</span>
         <span><strong>Mover (M):</strong> Arrastra las flechas 3D para posicionar la pieza en X, Y o Z.</span>
@@ -1128,7 +1078,7 @@
       }
     </div>
 
-    <!-- Right: CAD Measurements Box (Alto x Ancho - Espesor mm) -->
+    <!-- Derecha: Cuadro de Medidas CAD (Largo x Ancho - Espesor mm) -->
     <div class="flex items-center gap-1.5 shrink-0 bg-slate-100 dark:bg-zinc-800 px-2.5 py-0.5 rounded border border-slate-300 dark:border-zinc-700 font-mono text-xs">
       <span class="text-[10px] uppercase font-bold text-slate-500 dark:text-zinc-400">Medidas:</span>
       @if (pushPullDelta(); as pp) {
@@ -1138,13 +1088,12 @@
       } @else if (circleDrawDims(); as cd) {
         <strong class="text-sky-600">Ø {{ cd.diameter }} mm (R {{ cd.radius }})</strong>
       } @else if (freehandStats(); as fh) {
-        <strong class="text-sky-600">{{ fh.pointCount }} pts • Perím {{ fh.perimeter }} mm</strong>
+        <strong class="text-sky-600">{{ fh.pointCount }} pts · Perím {{ fh.perimeter }} mm</strong>
       } @else if (measureDistance(); as dist) {
         <strong class="text-sky-600">{{ dist.total }} mm</strong>
       } @else if (selectedPart(); as sel) {
         <div class="flex items-center gap-1">
-          <!-- Alto / Largo -->
-          <input 
+          <input
             type="number"
             min="10"
             step="1"
@@ -1153,8 +1102,7 @@
             class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
             title="Alto / Largo (mm)" />
           <span class="text-slate-400 font-bold text-[11px]">×</span>
-          <!-- Ancho -->
-          <input 
+          <input
             type="number"
             min="10"
             step="1"
@@ -1163,8 +1111,7 @@
             class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
             title="Ancho (mm)" />
           <span class="text-slate-400 font-bold text-[11px]">-</span>
-          <!-- Espesor / Grosor -->
-          <input 
+          <input
             type="number"
             min="3"
             max="60"

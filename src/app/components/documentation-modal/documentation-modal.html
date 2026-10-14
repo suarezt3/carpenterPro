@@ -1,14 +1,14 @@
 @if (isOpen()) {
-  <div 
+  <div
     class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
     (keydown.escape)="close()"
     (click)="close()">
-    
-    <!-- Modal Container -->
-    <div 
+
+    <!-- Contenedor Principal del Modal -->
+    <div
       class="relative w-full max-w-6xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border transition-colors duration-200"
       [class]="themeService.isClassic() ? 'bg-white border-slate-300 text-slate-950' : 'bg-zinc-900 border-zinc-700 text-zinc-100'"
       role="document"
@@ -16,11 +16,11 @@
       (keydown)="$event.stopPropagation()"
       (click)="$event.stopPropagation()">
 
-      <!-- HEADER MODAL (LIMPIO Y SIN CINTA DUPLICADA) -->
-      <div 
+      <!-- CABECERA DEL MODAL -->
+      <div
         class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b shrink-0"
         [class]="themeService.isClassic() ? 'bg-slate-100 border-slate-300 text-slate-950' : 'bg-zinc-950 border-zinc-800 text-zinc-100'">
-        
+
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-600 text-white shadow-xs">
             <span class="material-icons text-2xl">menu_book</span>
@@ -40,25 +40,25 @@
           </div>
         </div>
 
-        <button 
-          type="button" 
+        <button
+          type="button"
           (click)="close()"
           [class]="themeService.isClassic() ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-200 border border-slate-300' : 'text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-700'"
-          class="w-8 h-8 rounded-lg flex items-center justify-center transition shadow-2xs"
+          class="w-8 h-8 rounded-lg flex items-center justify-center transition shadow-2xs cursor-pointer"
           title="Cerrar manual (Esc)">
           <span class="material-icons text-xl">close</span>
         </button>
       </div>
 
-      <!-- MAIN SPLIT CONTENT -->
+      <!-- CONTENIDO DIVIDIDO (PANEL LATERAL + DETALLE DEL ARTÍCULO) -->
       <div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
-        
-        <!-- PANEL LATERAL IZQUIERDO: BUSCADOR + CATEGORÍAS + LISTA DE GUÍAS CON SCROLL -->
-        <div 
+
+        <!-- PANEL LATERAL IZQUIERDO: BUSCADOR, CATEGORÍAS Y LISTA DE GUÍAS -->
+        <div
           class="w-full md:w-88 lg:w-96 border-b md:border-b-0 md:border-r flex flex-col shrink-0 min-h-0"
           [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-300' : 'bg-zinc-950 border-zinc-800'">
-          
-          <!-- BARRA DE BÚSQUEDA INTEGRADA EN EL PANEL LATERAL -->
+
+          <!-- Barra de búsqueda integrada -->
           <div class="p-3 border-b flex flex-col gap-2 shrink-0" [class]="themeService.isClassic() ? 'border-slate-300 bg-white' : 'border-zinc-800 bg-zinc-900'">
             <label for="doc-search-input" class="text-[11px] font-bold uppercase tracking-wide flex items-center justify-between" [class]="themeService.isClassic() ? 'text-slate-800' : 'text-zinc-300'">
               <span>Buscar en el Manual</span>
@@ -66,41 +66,41 @@
                 {{ filteredArticles().length }} {{ filteredArticles().length === 1 ? 'guía' : 'guías' }}
               </span>
             </label>
-            
+
             <div class="relative w-full">
               <span class="material-icons absolute left-2.5 top-2 text-slate-600 text-lg pointer-events-none">search</span>
-              <input 
+              <input
                 id="doc-search-input"
                 type="text"
                 [value]="searchQuery()"
-                (input)="searchQuery.set($any($event.target).value)"
+                (input)="onSearchInput($event)"
                 placeholder="Buscar por herramienta, tecla, taladro..."
                 autocomplete="off"
-                [class]="themeService.isClassic() 
-                  ? 'w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none text-slate-950 font-bold placeholder:text-slate-500 shadow-2xs' 
-                  : 'w-full pl-8 pr-7 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none text-zinc-100 font-medium placeholder:text-zinc-400'"
+                [class]="themeService.isClassic()
+                  ? 'w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-hidden text-slate-950 font-bold placeholder:text-slate-500 shadow-2xs'
+                  : 'w-full pl-8 pr-7 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-hidden text-zinc-100 font-medium placeholder:text-zinc-400'"
               />
               @if (searchQuery()) {
-                <button 
+                <button
                   type="button"
                   (click)="searchQuery.set('')"
-                  class="absolute right-2 top-2 text-slate-500 hover:text-slate-900 transition"
+                  class="absolute right-2 top-2 text-slate-500 hover:text-slate-900 transition cursor-pointer"
                   title="Limpiar búsqueda">
                   <span class="material-icons text-sm">cancel</span>
                 </button>
               }
             </div>
 
-            <!-- CHIPS DE CATEGORÍAS COMPACTOS -->
+            <!-- Chips de Categorías -->
             <div class="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-thin">
               @for (cat of categories; track cat.id) {
-                <button 
+                <button
                   type="button"
                   (click)="selectCategory(cat.id)"
-                  [class]="activeCategory() === cat.id 
-                    ? 'bg-emerald-700 text-white font-bold shadow-2xs' 
+                  [class]="activeCategory() === cat.id
+                    ? 'bg-emerald-700 text-white font-bold shadow-2xs'
                     : (themeService.isClassic() ? 'bg-slate-200 text-slate-900 hover:bg-slate-300 border border-slate-300 font-bold' : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 border border-zinc-700 font-medium')"
-                  class="px-2 py-1 rounded-md text-[11px] transition flex items-center gap-1 whitespace-nowrap shrink-0">
+                  class="px-2 py-1 rounded-md text-[11px] transition flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer">
                   <span class="material-icons text-[13px]">{{ cat.icon }}</span>
                   <span>{{ cat.label }}</span>
                 </button>
@@ -108,32 +108,32 @@
             </div>
           </div>
 
-          <!-- LISTA VERTICAL CON SCROLL DE TODAS LAS GUÍAS -->
+          <!-- Lista vertical de guías -->
           <div class="flex-1 overflow-y-auto p-2.5 flex flex-col gap-2 min-h-0 scrollbar-thin">
             @if (filteredArticles().length === 0) {
               <div class="p-6 text-center text-xs text-slate-700 flex flex-col items-center gap-2">
                 <span class="material-icons text-3xl text-slate-400">search_off</span>
                 <span class="font-bold text-slate-900">No se encontraron guías</span>
                 <span class="text-slate-600">Intenta con otro término como "cinta", "mecanizado", "atajo" o "empujar".</span>
-                <button 
-                  type="button" 
-                  (click)="searchQuery.set(''); activeCategory.set('all')" 
-                  class="mt-2 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs transition">
+                <button
+                  type="button"
+                  (click)="searchQuery.set(''); activeCategory.set('all')"
+                  class="mt-2 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs transition cursor-pointer">
                   Ver todas las guías
                 </button>
               </div>
             }
 
             @for (art of filteredArticles(); track art.id) {
-              <button 
+              <button
                 type="button"
                 (click)="selectArticle(art.id)"
-                [class]="selectedArticleId() === art.id 
+                [class]="selectedArticleId() === art.id
                   ? (themeService.isClassic() ? 'bg-white border-emerald-600 shadow-md ring-2 ring-emerald-600/30' : 'bg-zinc-800 border-emerald-500 shadow-md ring-2 ring-emerald-500/40')
                   : (themeService.isClassic() ? 'bg-white hover:bg-slate-100 border-slate-300 hover:border-slate-400 shadow-2xs' : 'bg-zinc-900/80 hover:bg-zinc-800 border-zinc-800 hover:border-zinc-700')"
-                class="p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 group">
-                
-                <div 
+                class="p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 group cursor-pointer">
+
+                <div
                   [class]="art.iconColor"
                   [class.bg-slate-100]="themeService.isClassic()"
                   [class.bg-zinc-800]="!themeService.isClassic()"
@@ -143,20 +143,20 @@
 
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between gap-1 mb-1">
-                    <h4 
+                    <h4
                       [class]="themeService.isClassic() ? 'text-slate-950 font-black group-hover:text-emerald-800' : 'text-zinc-100 font-bold group-hover:text-emerald-400'"
                       class="text-xs leading-snug">
                       {{ art.title }}
                     </h4>
                   </div>
                   @if (art.badge) {
-                    <span 
+                    <span
                       [class]="themeService.isClassic() ? 'bg-slate-200 text-slate-900 border border-slate-300 font-bold' : 'bg-zinc-800 text-zinc-200 border border-zinc-700 font-medium'"
                       class="text-[10px] px-1.5 py-0.2 rounded inline-block mb-1">
                       {{ art.badge }}
                     </span>
                   }
-                  <p 
+                  <p
                     [class]="themeService.isClassic() ? 'text-slate-700 font-semibold' : 'text-zinc-300'"
                     class="text-[11px] line-clamp-2 leading-relaxed">
                     {{ art.shortDesc }}
@@ -167,50 +167,50 @@
           </div>
         </div>
 
-        <!-- DETALLE DEL ARTÍCULO SELECCIONADO (ALTA LEGIBILIDAD Y CONTRASTE) -->
-        <div 
+        <!-- DETALLE DEL ARTÍCULO SELECCIONADO -->
+        <div
           class="flex-1 overflow-y-auto p-5 sm:p-7 flex flex-col gap-6 min-h-0 scrollbar-thin"
           [class]="themeService.isClassic() ? 'bg-white text-slate-950' : 'bg-zinc-900 text-zinc-100'">
-          
+
           @if (selectedArticle(); as art) {
-            
-            <!-- ENCABEZADO DEL ARTÍCULO -->
-            <div 
+
+            <!-- Encabezado del Artículo -->
+            <div
               class="flex flex-col gap-2.5 border-b pb-4"
               [class]="themeService.isClassic() ? 'border-slate-300' : 'border-zinc-800'">
-              
+
               <div class="flex items-center gap-2">
-                <span 
+                <span
                   [class]="themeService.isClassic() ? 'bg-emerald-100 text-emerald-950 border-emerald-400 font-black' : 'bg-emerald-950 text-emerald-300 border-emerald-800 font-bold'"
                   class="px-2.5 py-0.5 text-[10px] uppercase rounded-md border">
                   {{ art.badge || 'Documentación' }}
                 </span>
                 <span class="text-xs text-slate-400 font-bold">·</span>
-                <span 
+                <span
                   [class]="themeService.isClassic() ? 'text-slate-800 font-extrabold' : 'text-zinc-300 font-bold'"
                   class="text-xs font-mono uppercase">
                   {{ art.category.replace('_', ' ') }}
                 </span>
               </div>
 
-              <h3 
+              <h3
                 [class]="themeService.isClassic() ? 'text-slate-950' : 'text-white'"
                 class="text-xl sm:text-2xl font-black flex items-center gap-2.5 tracking-tight">
                 <span class="material-icons text-2xl shrink-0" [class]="art.iconColor">{{ art.icon }}</span>
                 <span>{{ art.title }}</span>
               </h3>
 
-              <p 
+              <p
                 [class]="themeService.isClassic() ? 'text-slate-800 font-semibold' : 'text-zinc-200 font-medium'"
                 class="text-xs sm:text-sm leading-relaxed">
                 {{ art.shortDesc }}
               </p>
             </div>
 
-            <!-- FICHA TÉCNICA / ESPECIFICACIONES -->
+            <!-- Ficha Técnica / Especificaciones -->
             @if (art.technicalDetails && art.technicalDetails.length > 0) {
               <div class="flex flex-col gap-2.5">
-                <h4 
+                <h4
                   [class]="themeService.isClassic() ? 'text-slate-950 font-black' : 'text-zinc-200 font-bold'"
                   class="text-xs uppercase tracking-wider flex items-center gap-1.5">
                   <span class="material-icons text-sm text-sky-700">tune</span>
@@ -218,15 +218,15 @@
                 </h4>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   @for (spec of art.technicalDetails; track spec.label) {
-                    <div 
+                    <div
                       class="p-3 rounded-xl border flex flex-col gap-1 transition-colors"
                       [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-300 shadow-2xs' : 'bg-zinc-800/90 border-zinc-700'">
-                      <span 
+                      <span
                         [class]="themeService.isClassic() ? 'text-slate-700 font-extrabold' : 'text-zinc-400 font-bold'"
                         class="text-[10px] uppercase tracking-wide">
                         {{ spec.label }}
                       </span>
-                      <span 
+                      <span
                         [class]="themeService.isClassic() ? 'text-slate-950 font-black' : 'text-amber-300 font-bold'"
                         class="text-xs font-mono">
                         {{ spec.value }}
@@ -237,9 +237,9 @@
               </div>
             }
 
-            <!-- PASO A PASO / INSTRUCCIONES DETALLADAS -->
+            <!-- Paso a Paso / Instrucciones Detalladas -->
             <div class="flex flex-col gap-3">
-              <h4 
+              <h4
                 [class]="themeService.isClassic() ? 'text-slate-950 font-black' : 'text-zinc-200 font-bold'"
                 class="text-xs uppercase tracking-wider flex items-center gap-1.5">
                 <span class="material-icons text-sm text-emerald-700">format_list_numbered</span>
@@ -248,15 +248,15 @@
 
               <div class="flex flex-col gap-2.5">
                 @for (step of art.steps; track step; let idx = $index) {
-                  <div 
+                  <div
                     class="p-3.5 rounded-xl border flex items-start gap-3 transition-colors"
                     [class]="themeService.isClassic() ? 'bg-white border-slate-300 shadow-2xs hover:border-slate-400' : 'bg-zinc-800/80 border-zinc-700 shadow-xs'">
-                    
+
                     <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black bg-emerald-700 text-white shrink-0 mt-0.5 shadow-2xs">
                       {{ idx + 1 }}
                     </span>
 
-                    <p 
+                    <p
                       [class]="themeService.isClassic() ? 'text-slate-900 font-semibold' : 'text-zinc-100 font-medium'"
                       class="text-xs sm:text-[13px] leading-relaxed flex-1">
                       {{ step }}
@@ -266,9 +266,9 @@
               </div>
             </div>
 
-            <!-- CONSEJOS PROFESIONALES (TIPS) -->
+            <!-- Consejos Profesionales (Tips) -->
             @if (art.tips && art.tips.length > 0) {
-              <div 
+              <div
                 class="p-4 rounded-xl border flex flex-col gap-2"
                 [class]="themeService.isClassic() ? 'bg-amber-50 border-amber-300 text-amber-950' : 'bg-amber-950/40 border-amber-800/60 text-amber-200'">
                 <div class="flex items-center gap-2">
@@ -294,18 +294,18 @@
         </div>
       </div>
 
-      <!-- FOOTER -->
-      <div 
+      <!-- PIE DEL MODAL -->
+      <div
         class="px-6 py-3 border-t flex items-center justify-between shrink-0"
         [class]="themeService.isClassic() ? 'bg-slate-100 border-slate-300' : 'bg-zinc-950 border-zinc-800'">
         <div class="flex items-center gap-2 text-xs font-bold" [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-400'">
           <span class="material-icons text-sm text-indigo-600">verified</span>
-          <span>Modulr 3D Studio · Documentación Técnica y Manual de Uso</span>
+          <span>Piezo3D Studio · Documentación Técnica y Manual de Uso</span>
         </div>
-        <button 
-          type="button" 
+        <button
+          type="button"
           (click)="close()"
-          class="px-4 py-1.5 text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition shadow-2xs">
+          class="px-4 py-1.5 text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition shadow-2xs cursor-pointer">
           Entendido, Cerrar
         </button>
       </div>

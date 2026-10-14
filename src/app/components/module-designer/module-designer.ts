@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   ElementRef,
   inject,
   signal,
@@ -48,12 +49,17 @@ import { ComponentOptionsModalComponent } from '../component-options-modal/compo
 import { TemplatesModalComponent } from '../templates-modal/templates-modal';
 import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templates-catalog.service';
 
+/**
+ * Componente principal de diseño y modelado 3D (Modo Módulo y Modo Habitación 3D).
+ * Coordina el visor Three.js, el inspector de propiedades de piezas, el catálogo de módulos
+ * paramétricos, el asistente de cajones y la colocación de electrodomésticos.
+ */
 @Component({
   selector: 'app-module-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ReactiveFormsModule, 
-    Furniture3dViewerComponent, 
+    ReactiveFormsModule,
+    Furniture3dViewerComponent,
     TechnicalSheetModalComponent,
     ComponentOptionsModalComponent,
     TemplatesModalComponent
@@ -66,22 +72,31 @@ import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templ
 })
 export class ModuleDesignerComponent {
   readonly projectService = inject(ProjectStorageService);
-  private confirmService = inject(ConfirmDialogService);
-  private joineryEngine = inject(JoineryEngineService);
-  private dxfExporter = inject(DxfExporterService);
-  private cabinetGen = inject(CabinetGeneratorService);
-  private templatesCatalog = inject(TemplatesCatalogService);
+  private readonly confirmService = inject(ConfirmDialogService);
+  private readonly joineryEngine = inject(JoineryEngineService);
+  private readonly dxfExporter = inject(DxfExporterService);
+  private readonly cabinetGen = inject(CabinetGeneratorService);
+  private readonly templatesCatalog = inject(TemplatesCatalogService);
+  private readonly destroyRef = inject(DestroyRef);
+  readonly hardwareCatalog = inject(HardwareCatalogService);
 
+  // Referencia al visor 3D y al contenedor horizontal de chips de piezas
   readonly viewer3d = viewChild<Furniture3dViewerComponent>('viewer3d');
+  readonly viewer3dRef = this.viewer3d;
+  readonly chipsScrollContainer = viewChild<ElementRef<HTMLDivElement>>('chipsScrollContainer');
 
+  // Signals principales sincronizados con ProjectStorageService
   readonly project = this.projectService.currentProject;
   readonly materials = this.projectService.materialsList;
   readonly currentParts = this.projectService.partsList;
 
-  // Modal de Opciones de Componente (Paramétrico Melamina PRO)
+  // Estado del Modal de Opciones de Componente Paramétrico
   readonly selectedParametricConfig = signal<ParametricCabinetConfig | null>(null);
   readonly showComponentOptionsModal = signal<boolean>(false);
 
+  /**
+   * Abre el modal de configuración paramétrica precargando los valores de una plantilla.
+   */
   onConfigureParametric(template: FurnitureTemplate) {
     if (template.parametricConfig) {
       this.selectedParametricConfig.set(template.parametricConfig as ParametricCabinetConfig);
@@ -96,17 +111,19 @@ export class ModuleDesignerComponent {
     this.showComponentOptionsModal.set(true);
   }
 
+  /**
+   * Genera e inserta un nuevo módulo paramétrico en la escena 3D calculando su desplazamiento X
+   * automático para no superponerse con muebles existentes.
+   */
   onCabinetSubmitted(config: ParametricCabinetConfig) {
     let targetX = config.posX ?? 0;
-    // Si ya existen muebles en el taller y no se especificó posición X, colocar al lado con separación limpia
     if (this.currentParts().length > 0 && targetX === 0) {
       targetX = this.templatesCatalog.calculateTemplateOffset(this.currentParts(), config.width);
     }
     const finalConfig = { ...config, posX: targetX };
     const res = this.cabinetGen.generateParametricWallCabinet(finalConfig, this.materials());
     this.projectService.addParametricCabinet(res);
-    
-    // Seleccionar el nuevo grupo de piezas completo para mover y reposicionar libremente en 3D
+
     const partIds = res.parts.map(p => p.id);
     this.selectedPartIds.set(partIds);
     const doorPart = res.parts.find(p => p.componentRole === 'door') || res.parts[0];
@@ -141,20 +158,16 @@ export class ModuleDesignerComponent {
     }
   }
 
-  // Selected Part ID in 3D
+  // Estado de selección en 3D (pieza individual, multiselección y luz libre)
   readonly selectedPartId = signal<string | null>(null);
-  // Selected Multiple Part IDs in 3D (Shift-Click or Select All)
   readonly selectedPartIds = signal<string[]>([]);
-  // Dynamic Clearance Info from 3D (Luz libre a elementos adyacentes)
   readonly clearanceInfo = signal<ClearanceInfo | null>(null);
 
-  // Template utilities
   readonly Math = Math;
 
-  // Groups / Cajones Modulares
+  // Grupos y Cajones Modulares
   readonly groups = this.projectService.groupsList;
 
-  // Grupos con sus piezas asociadas
   readonly groupsWithParts = computed(() => {
     const grps = this.groups();
     const parts = this.currentParts();
@@ -166,12 +179,13 @@ export class ModuleDesignerComponent {
       .filter(item => item.parts.length > 0);
   });
 
-  // Piezas libres / sin grupo
   readonly ungroupedParts = computed(() => {
     return this.currentParts().filter(p => !p.groupId);
   });
 
-  // ID del grupo activo si la selección pertenece a un grupo
+  /**
+   * Identifica el ID del grupo activo cuando la pieza o conjunto seleccionado pertenece a un módulo/cajón.
+   */
   readonly activeSelectedGroupId = computed<string | null>(() => {
     const sel = this.selectedPart();
     if (sel?.groupId) return sel.groupId;
@@ -184,7 +198,6 @@ export class ModuleDesignerComponent {
     return null;
   });
 
-  // Nombre del grupo activo si la selección pertenece a un grupo
   readonly activeSelectedGroupName = computed(() => {
     const gId = this.activeSelectedGroupId();
     if (!gId) return null;
@@ -202,10 +215,9 @@ export class ModuleDesignerComponent {
     return this.projectService.getGroupFacingDirection(gId);
   });
 
-  // Collapsed / expanded groups in parts list
   readonly openGroupCardIds = signal<Set<string>>(new Set());
 
-  // Drawer Wizard Modal State
+  // Estado del Asistente de Cajón Modular
   readonly showDrawerWizard = signal<boolean>(false);
   readonly drawerForm = signal<ParametricDrawerConfig>({
     name: 'Cajón 1',
@@ -223,15 +235,11 @@ export class ModuleDesignerComponent {
     posZ: 0
   });
 
-  // Quick group naming modal state
+  // Modal de agrupación manual y renombrado en línea
   readonly showGroupNamingModal = signal<boolean>(false);
   readonly newGroupNameInput = signal<string>('Cajón 1');
-
-  // Inline group renaming
   readonly renamingGroupId = signal<string | null>(null);
   readonly renamingGroupName = signal<string>('');
-
-  // Inline part renaming
   readonly renamingPartId = signal<string | null>(null);
   readonly renamingPartName = signal<string>('');
 
@@ -255,17 +263,16 @@ export class ModuleDesignerComponent {
     return this.getNextUniqueGroupName('Cajón');
   });
 
-  // Visibility (Ocultar / Mostrar piezas y grupos)
+  // Control de visibilidad (Ocultar / Mostrar piezas y grupos con tecla H / Alt+H)
   readonly hiddenPartIds = signal<Set<string>>(new Set());
   readonly hiddenPartsCount = computed(() => this.hiddenPartIds().size);
 
-  // Architectural 3D Room / Kitchen Environment Mode
+  // Configuración del Modo Habitación 3D y Catálogos de Acabados Arquitectónicos
   readonly workspaceMode = signal<WorkspaceMode>('module');
   readonly roomConfig = signal<RoomConfiguration>(DEFAULT_ROOM_CONFIG);
   readonly showRoomSettingsModal = signal<boolean>(false);
   readonly selectedWall = signal<'main' | 'side' | null>(null);
 
-  // Finish Catalogs (Corona & Holztek collections)
   readonly floorCatalog = FLOOR_FINISHES_CATALOG;
   readonly wallCatalog = WALL_FINISHES_CATALOG;
   readonly activeFloorCategory = signal<FloorFinishCategory>('all');
@@ -283,13 +290,10 @@ export class ModuleDesignerComponent {
     return this.wallCatalog.filter(item => item.category === cat);
   });
 
-  // Technical Shop Sheet Modal
   readonly showTechnicalSheetModal = signal<boolean>(false);
-
-  // Floating Cutting Dimensions widget minimized state
   readonly isDimensionsWidgetMinimized = signal<boolean>(false);
 
-  // Toast feedback banner
+  // Notificación flotante tipo Toast con limpieza automática
   readonly toastMessage = signal<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -301,13 +305,18 @@ export class ModuleDesignerComponent {
     }, 2800);
   }
 
+  /**
+   * Atajos globales de teclado del diseñador 3D:
+   * - Ctrl+Z / Ctrl+Y: Deshacer y Rehacer
+   * - Delete / Backspace: Eliminar pieza, grupo o electrodoméstico seleccionado
+   * - H / Alt+H: Ocultar selección o mostrar todas las piezas ocultas
+   */
   handleGlobalKeyDown(e: KeyboardEvent) {
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
       return;
     }
 
-    // Ctrl+Z / Cmd+Z: Deshacer
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
       e.preventDefault();
       if (this.projectService.canUndo()) {
@@ -317,7 +326,6 @@ export class ModuleDesignerComponent {
       return;
     }
 
-    // Ctrl+Y / Cmd+Y o Ctrl+Shift+Z: Rehacer
     if (((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) ||
         ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z'))) {
       e.preventDefault();
@@ -328,7 +336,6 @@ export class ModuleDesignerComponent {
       return;
     }
 
-    // Supr / Delete / Backspace: Eliminar pieza o electrodoméstico seleccionado inmediatamente con feedback
     if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Del') {
       const selAppId = this.selectedApplianceId();
       if (selAppId) {
@@ -373,7 +380,6 @@ export class ModuleDesignerComponent {
       }
     }
 
-    // Tecla 'H' o 'h' (sin modificadores): Ocultar pieza seleccionada o grupo seleccionado
     if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'h' || e.key === 'H')) {
       if (this.isAnyGroupSelected()) {
         e.preventDefault();
@@ -386,7 +392,6 @@ export class ModuleDesignerComponent {
       }
     }
 
-    // Alt+H: Mostrar todas las piezas ocultas
     if (e.altKey && (e.key === 'h' || e.key === 'H')) {
       e.preventDefault();
       this.showAllParts();
@@ -394,7 +399,7 @@ export class ModuleDesignerComponent {
     }
   }
 
-  // Active dock tab: 'piece' (properties of selected part), 'catalog' (add pieces & tree), or 'appliances' (catalog & parametric 3D controls)
+  // Pestaña activa de la bandeja derecha: 'piece', 'catalog' o 'appliances'
   readonly activeDockTab = signal<'piece' | 'catalog' | 'appliances'>('catalog');
 
   // Electrodomésticos y Accesorios 3D
@@ -426,6 +431,10 @@ export class ModuleDesignerComponent {
     }
   }
 
+  /**
+   * Inserta un electrodoméstico o juego de patas desde el catálogo calculando su elevación
+   * y posición inicial según el tipo de montaje (suelo, encimera, pared o empotrado).
+   */
   addApplianceFromPreset(preset: AppliancePreset) {
     const config = this.roomConfig();
     const selPart = this.selectedPart();
@@ -437,7 +446,6 @@ export class ModuleDesignerComponent {
     let targetHeight = preset.defaultHeight;
 
     if (preset.type === 'table_legs_set') {
-      // Si hay una pieza horizontal seleccionada (cubierta o mesa), acopla el juego de patas a sus medidas
       if (selPart && (selPart.orientation === 'horizontal' || !selPart.orientation)) {
         targetWidth = selPart.length;
         targetDepth = selPart.width;
@@ -448,9 +456,6 @@ export class ModuleDesignerComponent {
         if (partUnderside > 150) {
           targetHeight = partUnderside;
         }
-      } else {
-        posY = 0;
-        posZ = 0;
       }
     } else if (preset.type === 'table_leg') {
       if (selPart) {
@@ -461,12 +466,8 @@ export class ModuleDesignerComponent {
         if (partUnderside > 150) {
           targetHeight = partUnderside;
         }
-      } else {
-        posY = 0;
-        posZ = 0;
       }
     } else if (preset.type === 'coffee_maker') {
-      // Si hay una cubierta o pieza seleccionada, sitúa la cafetera exactamente encima de ella
       if (selPart) {
         posX = selPart.posX || 0;
         posY = (selPart.posY || 0) + (selPart.thickness || 18) / 2;
@@ -535,10 +536,9 @@ export class ModuleDesignerComponent {
     this.showToast(`✨ ${newApp.name} añadido`);
   }
 
-  // Acción rápida: Añadir juego de 4 patas directamente a la pieza / mesa seleccionada
   attachTableLegsToSelectedPart(style: 'hairpin' | 'cylindrical_inox' | 'scandinavian_wood' = 'hairpin') {
-    const presetId = style === 'hairpin' 
-      ? 'preset_legs_hairpin_set' 
+    const presetId = style === 'hairpin'
+      ? 'preset_legs_hairpin_set'
       : (style === 'cylindrical_inox' ? 'preset_legs_cylindrical_inox_set' : 'preset_legs_scandinavian_wood_set');
     const preset = this.appliancesCatalog.find(p => p.id === presetId);
     if (!preset) return;
@@ -661,7 +661,7 @@ export class ModuleDesignerComponent {
     this.showToast(`🗑️ "${name}" eliminado (Delete)`);
   }
 
-  // Sidebar collapse toggle for 100% full-screen 3D modeling
+  // Control de colapso de la bandeja lateral y modal de plantillas/edición de módulos
   readonly isSidebarCollapsed = signal<boolean>(false);
   readonly showTemplatesDropdown = signal<boolean>(false);
   readonly showTemplatesModal = signal<boolean>(false);
@@ -693,9 +693,13 @@ export class ModuleDesignerComponent {
     }
   }
 
+  /**
+   * Abre el asistente paramétrico cargando las dimensiones actuales del grupo seleccionado.
+   * Cancela previamente cualquier interacción activa en el visor 3D.
+   */
   openEditGroup(groupId: string, event?: Event) {
     event?.stopPropagation();
-    this.viewer3dRef()?.cancelActiveInteractions();
+    this.viewer3d()?.cancelActiveInteractions();
 
     const parts = this.currentParts().filter(p => p.groupId === groupId);
     if (parts.length === 0) {
@@ -715,14 +719,22 @@ export class ModuleDesignerComponent {
     this.showTemplatesModal.set(true);
   }
 
+  /**
+   * Actualiza un módulo paramétrico conservando su centro exacto (posX, posY, posZ) en el espacio 3D.
+   * Toma el centro X del techo/piso (o el punto medio entre ambos laterales) para evitar desplazamientos.
+   */
   onCabinetUpdated(event: { groupId: string; config: ParametricCabinetConfig }) {
     const groupParts = this.currentParts().filter(p => p.groupId === event.groupId);
     const sidePart = groupParts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || groupParts[0];
-    
-    // Maintain exact position of the module in 3D workspace
-    const posX = sidePart ? (groupParts[0].posX ?? event.config.posX ?? 0) : (event.config.posX ?? 0);
+    const topOrBottom = groupParts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
+    const doorPart = groupParts.find(p => p.componentRole === 'door');
+
+    const posX = topOrBottom?.posX ?? event.config.posX ?? 0;
     const posY = sidePart?.posY ?? event.config.posY;
-    const posZ = sidePart ? (groupParts[0].posZ ?? event.config.posZ ?? 0) : (event.config.posZ ?? 0);
+    const doorOffsetZ = doorPart ? (Number(doorPart.thickness || event.config.doorThickness || 15) / 2) : 0;
+    const posZ = sidePart !== undefined && sidePart.posZ !== undefined
+      ? sidePart.posZ + doorOffsetZ
+      : (event.config.posZ ?? 0);
 
     const finalConfig: ParametricCabinetConfig = {
       ...event.config,
@@ -742,7 +754,6 @@ export class ModuleDesignerComponent {
     this.showToast(`✨ Módulo "${finalConfig.name}" actualizado`);
     this.closeTemplatesModal();
 
-    // Select updated module parts
     const partIds = updatedParts.map(p => p.id);
     this.selectedPartIds.set(partIds);
     if (partIds.length > 0) {
@@ -762,90 +773,60 @@ export class ModuleDesignerComponent {
     return this.joineryEngine.calculateJoinery(this.currentParts());
   });
 
-  // Drill holes for the currently selected part
   readonly selectedPartDrillHoles = computed<DrillHole[]>(() => {
     const sel = this.selectedPart();
     if (!sel) return [];
     return this.joineryData().drillHolesByPart.get(sel.id) || [];
   });
 
-  // Computed selected part
   readonly selectedPart = computed<Part | null>(() => {
     const id = this.selectedPartId();
     if (!id) return null;
     return this.currentParts().find(p => p.id === id) || null;
   });
 
-  // Active material object for selected part
   readonly selectedPartMaterial = computed<Material | null>(() => {
     const sel = this.selectedPart();
     if (!sel) return null;
     return this.materials().find(m => m.id === sel.materialId) || null;
   });
 
-  // Computed multiple selected parts
   readonly selectedPartsList = computed<Part[]>(() => {
     const ids = this.selectedPartIds();
     return this.currentParts().filter(p => ids.includes(p.id));
   });
 
-  // Total square meters computed
   readonly totalAreaM2 = computed(() => {
     const parts = this.currentParts();
     const sumMm2 = parts.reduce((acc, p) => acc + (p.length * p.width * p.quantity), 0);
     return (sumMm2 / 1_000_000).toFixed(2);
   });
 
-  // Overall furniture bounding box dimensions (Ancho × Alto × Fondo)
+  /**
+   * Calcula las dimensiones envolventes totales del mobiliario (Ancho × Alto × Fondo)
+   * delegando el cálculo geométrico de cada pieza a JoineryEngineService.
+   */
   readonly overallDimensions = computed(() => {
     const parts = this.currentParts();
     if (parts.length === 0) return { width: 0, height: 0, depth: 0 };
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+
     for (const p of parts) {
-      let sx = p.length || 0;
-      let sy = p.width || 0;
-      let sz = p.thickness || 18;
-      if (p.orientation === 'horizontal') {
-        sx = p.length; sy = p.thickness; sz = p.width;
-      } else if (p.orientation === 'vertical_yz') {
-        const isCabinetSide = p.componentRole === 'side_left' || 
-                              p.componentRole === 'side_right' ||
-                              (p.name.toUpperCase().includes('LATERAL') && 
-                               !p.name.toUpperCase().includes('CAJ') && 
-                               p.componentRole !== 'drawer_box' && 
-                               p.componentRole !== 'drawer_lateral');
-        const isDrawerLateral = !isCabinetSide && (
-          p.componentRole === 'drawer_box' ||
-          p.componentRole === 'drawer_lateral' ||
-          p.name.toUpperCase().includes('CAJ')
-        );
-        if (isDrawerLateral && (p.length || 0) > (p.width || 0)) {
-          sx = p.thickness || 15; sy = p.width; sz = p.length;
-        } else {
-          sx = p.thickness || 15; sy = p.length; sz = p.width;
-        }
-      } else {
-        const isDrawerBoxHead = p.componentRole === 'drawer_box' ||
-          p.name.toUpperCase().includes('CONTRA') ||
-          p.name.toUpperCase().includes('TRASERA');
-        if (isDrawerBoxHead) {
-          sx = p.length; sy = p.width; sz = p.thickness || 15;
-        } else {
-          sx = p.length; sy = p.width; sz = p.thickness || 18;
-        }
-      }
-      const px = p.posX ?? 0;
-      const py = p.posY ?? 0;
-      const pz = p.posZ ?? 0;
-      minX = Math.min(minX, px - sx / 2);
-      maxX = Math.max(maxX, px + sx / 2);
-      minY = Math.min(minY, py - sy / 2);
-      maxY = Math.max(maxY, py + sy / 2);
-      minZ = Math.min(minZ, pz - sz / 2);
-      maxZ = Math.max(maxZ, pz + sz / 2);
+      const b = this.joineryEngine.getPartBounds(p);
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxY > maxY) maxY = b.maxY;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
     }
+
     return {
       width: Math.round(maxX - minX),
       height: Math.round(maxY - minY),
@@ -878,7 +859,6 @@ export class ModuleDesignerComponent {
   }
 
   constructor() {
-    // If project has parts, auto-select first part or 'desk_top' if present
     const parts = this.currentParts();
     if (parts.length > 0) {
       const topPart = parts.find(p => p.name.toUpperCase().includes('TECHO') || p.id === 'desk_top') || parts[0];
@@ -886,13 +866,18 @@ export class ModuleDesignerComponent {
       this.selectedPartIds.set([topPart.id]);
       this.activeDockTab.set('piece');
     }
+
+    this.destroyRef.onDestroy(() => {
+      if (this.toastTimer) {
+        clearTimeout(this.toastTimer);
+      }
+    });
   }
 
-  // --- SELECTION ---
+  // --- SELECCIÓN DE PIEZAS Y GRUPOS ---
 
   onSelectPartFrom3D(part: Part | null) {
     if (part) {
-      // If we already have multiple parts selected and this part is one of them, do not reset multi-selection
       if (this.selectedPartIds().length > 1 && this.selectedPartIds().includes(part.id)) {
         this.selectedPartId.set(part.id);
         this.activeDockTab.set('piece');
@@ -977,15 +962,10 @@ export class ModuleDesignerComponent {
     this.deselectAll();
   }
 
-  // --- PIECE EDITING (Real-time single & group manipulation) ---
-
-  readonly hardwareCatalog = inject(HardwareCatalogService);
-  readonly viewer3dRef = viewChild<Furniture3dViewerComponent>('viewer3d');
-  readonly chipsScrollContainer = viewChild<ElementRef<HTMLDivElement>>('chipsScrollContainer');
+  // --- EDICIÓN EN TIEMPO REAL DE PIEZAS Y GRUPOS ---
 
   /**
-   * Permite realizar scroll lateral suave en la cinta de piezas usando la rueda del ratón (mouse wheel).
-   * Convierte automáticamente el desplazamiento vertical deltaY en desplazamiento horizontal scrollLeft.
+   * Permite realizar scroll lateral suave en la cinta inferior de piezas usando la rueda del ratón.
    */
   onPiecesBarWheel(event: WheelEvent) {
     const el = this.chipsScrollContainer()?.nativeElement;
@@ -1008,11 +988,14 @@ export class ModuleDesignerComponent {
     }
   }
 
+  /**
+   * Actualiza las propiedades de la pieza seleccionada. Si se modifican coordenadas espaciales
+   * (posX, posY, posZ) y la pieza pertenece a un grupo, desplaza todo el grupo en bloque.
+   */
   updateSelectedPart(changes: Partial<Part>) {
     const current = this.selectedPart();
     if (!current) return;
 
-    // If changing spatial coordinates and the part belongs to a group, move the whole group together!
     if (current.groupId && (changes.posX !== undefined || changes.posY !== undefined || changes.posZ !== undefined)) {
       const dx = changes.posX !== undefined ? changes.posX - (current.posX ?? 0) : 0;
       const dy = changes.posY !== undefined ? changes.posY - (current.posY ?? 0) : 0;
@@ -1038,7 +1021,7 @@ export class ModuleDesignerComponent {
   }
 
   testPieceAnimation(partId: string) {
-    this.viewer3dRef()?.togglePartOpen(partId);
+    this.viewer3d()?.togglePartOpen(partId);
   }
 
   updateSelectedPartRole(role: ComponentRole) {
@@ -1087,12 +1070,10 @@ export class ModuleDesignerComponent {
     this.updateSelectedPart({ hardwareConfig: hw });
   }
 
-  // Called when starting a 3D gizmo translation or stretch drag
   onDragStarted() {
     this.projectService.pushSnapshot();
   }
 
-  // Receives real-time 3D translation & stretch changes directly from the 3D Viewer Gizmo or context menu
   onPartModifiedFromViewer(event: { part: Part; updates: Partial<Part> }) {
     const targetPart = this.currentParts().find(p => p.id === event.part.id) || event.part;
     const updated: Part = {
@@ -1102,13 +1083,11 @@ export class ModuleDesignerComponent {
     this.projectService.updatePart(updated, false);
   }
 
-  // Receives synchronized multi-part translation changes from group gizmo
   onMultiplePartsModifiedFromViewer(event: { updates: { part: Part; updates: Partial<Part> }[] }) {
     const updatesList = event.updates.map(u => ({ partId: u.part.id, updates: u.updates }));
     this.projectService.updateMultipleParts(updatesList, false);
   }
 
-  // Receives newly drawn piece from 3D Rectangle Tool
   onPartCreatedFromViewer(partData: Partial<Part>) {
     const defaultMat = this.materials()[0];
     const newPart: Part = {
@@ -1155,7 +1134,6 @@ export class ModuleDesignerComponent {
     }
   }
 
-  // Sets melamine color/texture without modifying the piece's custom thickness
   onMaterialChange(matId: string) {
     const mat = this.materials().find(m => m.id === matId);
     if (!mat) return;
@@ -1165,7 +1143,6 @@ export class ModuleDesignerComponent {
     });
   }
 
-  // Quick or free custom thickness adjustment without altering the assigned melamine
   onThicknessChange(thickness: number) {
     if (isNaN(thickness) || thickness <= 0) return;
     const t = Math.max(1, Math.min(100, Math.round(thickness)));
@@ -1218,17 +1195,19 @@ export class ModuleDesignerComponent {
       this.rotateSelectedGroup(90);
     }
   }
+
   rotateSelectedPart90(axis: 'x' | 'y' | 'z' = 'y') {
     const sel = this.selectedPart();
     if (!sel) return;
-    if (this.viewer3dRef()) {
-      this.viewer3dRef()!.rotatePart90(sel, axis);
+    const viewer = this.viewer3d();
+    if (viewer) {
+      viewer.rotatePart90(sel, axis);
     } else {
       const prop = axis === 'x' ? 'rotationX' : (axis === 'y' ? 'rotationY' : 'rotationZ');
       const current = sel[prop] || 0;
       this.updateSelectedPart({ [prop]: (current + 90) % 360 });
     }
-    this.showToast(`🔄 Pieza girada 90°`);
+    this.showToast('🔄 Pieza girada 90°');
   }
 
   rotateSelectedPart3DAngle(axis: 'x' | 'y' | 'z', delta: number) {
@@ -1334,27 +1313,8 @@ export class ModuleDesignerComponent {
     const current = this.selectedPart();
     if (!current) return;
 
-    const t = current.thickness || 18;
-    const L = current.length;
-    const orientation = current.orientation || 'horizontal';
-
-    let sy = t;
-    if (orientation === 'vertical_yz') {
-      const isCabinetSide = current.componentRole === 'side_left' || 
-                            current.componentRole === 'side_right' ||
-                            (current.name.toUpperCase().includes('LATERAL') && 
-                             !current.name.toUpperCase().includes('CAJ') && 
-                             current.componentRole !== 'drawer_box' && 
-                             current.componentRole !== 'drawer_lateral');
-      const isDrawerLateral = !isCabinetSide && (
-        current.componentRole === 'drawer_box' ||
-        current.componentRole === 'drawer_lateral' ||
-        current.name.toUpperCase().includes('CAJ')
-      );
-      sy = (isDrawerLateral && L > current.width) ? current.width : L;
-    } else if (orientation === 'vertical_xy') {
-      sy = current.width;
-    }
+    const bounds = this.joineryEngine.getPartBounds(current);
+    const sy = bounds.sy;
 
     switch (preset) {
       case 'floor':
@@ -1385,6 +1345,9 @@ export class ModuleDesignerComponent {
     }
   }
 
+  /**
+   * Elimina la pieza o conjunto de piezas seleccionadas en una única transacción de historial.
+   */
   async deleteSelectedPart() {
     const selIds = this.selectedPartIds();
     const selId = this.selectedPartId();
@@ -1397,9 +1360,7 @@ export class ModuleDesignerComponent {
         severity: 'danger'
       });
       if (!confirmed) return;
-      for (const id of selIds) {
-        this.projectService.deletePart(id);
-      }
+      this.projectService.deleteMultipleParts(selIds);
       this.selectedPartIds.set([]);
       this.selectedPartId.set(null);
       this.activeDockTab.set('catalog');
@@ -1450,7 +1411,7 @@ export class ModuleDesignerComponent {
     }
   }
 
-  // --- CATALOG: ADD PIECES INDIVIDUALLY ---
+  // --- CATÁLOGO DE PIEZAS INDIVIDUALES ---
 
   addPieceFromCatalog(role: ComponentRole) {
     const mats = this.materials();
@@ -1462,7 +1423,6 @@ export class ModuleDesignerComponent {
     let newPart: Part;
 
     const currentParts = this.currentParts();
-    // Approximate reference bounds
     const maxTopY = currentParts.reduce((max, p) => Math.max(max, (p.posY ?? 0) + (p.thickness || 15)), 850);
 
     switch (role) {
@@ -1666,7 +1626,7 @@ export class ModuleDesignerComponent {
         };
         break;
 
-      default: // free
+      default:
         newPart = {
           id: 'part_' + crypto.randomUUID().slice(0, 8),
           name: 'PIEZA PERSONALIZADA',
@@ -1699,7 +1659,7 @@ export class ModuleDesignerComponent {
     this.clearanceInfo.set(info);
   }
 
-  // --- ACTIONS: START BLANK OR LOAD TEMPLATES ---
+  // --- ACCIONES DE LIENZO Y PLANTILLAS ---
 
   async startBlank() {
     if (this.currentParts().length > 0) {
@@ -1761,7 +1721,8 @@ export class ModuleDesignerComponent {
     this.dxfExporter.exportProjectToDxf(this.project());
   }
 
-  // --- ACCORDION & GROUP DISPLAY ---
+  // --- ACORDEÓN Y GESTIÓN DE GRUPOS ---
+
   toggleGroupAccordion(groupId: string) {
     const cur = new Set(this.openGroupCardIds());
     if (cur.has(groupId)) {
@@ -1776,7 +1737,8 @@ export class ModuleDesignerComponent {
     return this.openGroupCardIds().has(groupId);
   }
 
-  // --- MODULAR DRAWER WIZARD ---
+  // --- ASISTENTE DE CAJÓN MODULAR ---
+
   openDrawerWizard() {
     const uniqueName = this.getNextUniqueGroupName('Cajón');
     const defaultMat = this.materials()[0];
@@ -1828,7 +1790,8 @@ export class ModuleDesignerComponent {
     this.showToast(`✨ ${grp.name} generado con 5-6 piezas ensambladas`);
   }
 
-  // --- MANUAL GROUPING & UNGROUPING ---
+  // --- AGRUPACIÓN MANUAL Y DESAGRUPACIÓN ---
+
   openGroupNamingModal() {
     const selCount = this.selectedPartIds().length;
     if (selCount < 2) {
@@ -1836,9 +1799,9 @@ export class ModuleDesignerComponent {
       return;
     }
     const selParts = this.currentParts().filter(p => this.selectedPartIds().includes(p.id));
-    const isDrawerLike = selParts.some(p => 
-      p.name.toUpperCase().includes('CAJ') || 
-      p.name.toUpperCase().includes('GAVET') || 
+    const isDrawerLike = selParts.some(p =>
+      p.name.toUpperCase().includes('CAJ') ||
+      p.name.toUpperCase().includes('GAVET') ||
       p.componentRole?.includes('drawer')
     );
     const baseDefault = isDrawerLike ? 'Cajón' : 'Conjunto';
@@ -1856,7 +1819,7 @@ export class ModuleDesignerComponent {
     if (selIds.length < 2) return;
 
     const selParts = this.currentParts().filter(p => selIds.includes(p.id));
-    const isDrawerLike = selParts.length >= 4 && selParts.every(p => 
+    const isDrawerLike = selParts.length >= 4 && selParts.every(p =>
       p.componentRole?.includes('drawer') || p.id.includes('caj_ind_')
     );
     const baseDefault = isDrawerLike ? 'Cajón' : 'Conjunto';
@@ -1915,37 +1878,37 @@ export class ModuleDesignerComponent {
   }
 
   activateMoveToolOnViewer() {
-    this.viewer3dRef()?.setActiveTool('move');
+    this.viewer3d()?.setActiveTool('move');
   }
 
   toggleSelectedGroupOpen() {
     const gId = this.activeSelectedGroupId();
     if (gId) {
-      this.viewer3dRef()?.toggleGroupAnimation(gId);
+      this.viewer3d()?.toggleGroupAnimation(gId);
       this.projectService.toggleGroupOpen(gId);
       return;
     }
     const ids = this.selectedPartIds();
     const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId) || this.selectedPart();
     if (part?.groupId) {
-      this.viewer3dRef()?.toggleGroupAnimation(part.groupId);
+      this.viewer3d()?.toggleGroupAnimation(part.groupId);
       this.projectService.toggleGroupOpen(part.groupId);
     } else if (part) {
-      this.viewer3dRef()?.togglePartOpen(part.id);
+      this.viewer3d()?.togglePartOpen(part.id);
     }
   }
 
   isGroupOpen(): boolean {
     const gId = this.activeSelectedGroupId();
     if (gId) {
-      return this.viewer3dRef()?.isGroupOpen(gId) ?? false;
+      return this.viewer3d()?.isGroupOpen(gId) ?? false;
     }
     const ids = this.selectedPartIds();
     const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId) || this.selectedPart();
     if (part?.groupId) {
-      return this.viewer3dRef()?.isGroupOpen(part.groupId) ?? false;
+      return this.viewer3d()?.isGroupOpen(part.groupId) ?? false;
     } else if (part) {
-      return this.viewer3dRef()?.isPartOpen(part.id) ?? false;
+      return this.viewer3d()?.isPartOpen(part.id) ?? false;
     }
     return false;
   }
@@ -2040,7 +2003,8 @@ export class ModuleDesignerComponent {
     return `${cleanBase} ${counter}`;
   }
 
-  // --- PIECE RENAMING (RIBBON & PARTS LIST) ---
+  // --- RENOMBRADO DE PIEZAS ---
+
   startRenameSelectedPart(event?: MouseEvent) {
     if (event) event.stopPropagation();
     const part = this.selectedPart();
@@ -2115,15 +2079,13 @@ export class ModuleDesignerComponent {
     if (!selId) return;
     const part = this.currentParts().find(p => p.id === selId);
     const partName = part ? part.name : 'Pieza';
-    
+
     const next = new Set(this.hiddenPartIds());
     next.add(selId);
     this.hiddenPartIds.set(next);
 
-    // Sincronizar visor 3D
-    this.viewer3dRef()?.hidePartById(selId);
+    this.viewer3d()?.hidePartById(selId);
 
-    // Deseleccionar la pieza oculta para evitar manipulaciones invisibles
     this.selectedPartId.set(null);
     this.selectedPartIds.set([]);
     this.activeDockTab.set('catalog');
@@ -2146,10 +2108,7 @@ export class ModuleDesignerComponent {
     }
     this.hiddenPartIds.set(next);
 
-    // Sincronizar visor 3D
-    this.viewer3dRef()?.hidePartsByIds(partIds);
-
-    // Deseleccionar grupo
+    this.viewer3d()?.hidePartsByIds(partIds);
     this.deselectAll();
 
     this.showToast(`👁️ "${groupName}" oculto (${groupParts.length} piezas). Alt+H para mostrar`);
@@ -2164,12 +2123,12 @@ export class ModuleDesignerComponent {
     if (next.has(partId)) {
       next.delete(partId);
       this.hiddenPartIds.set(next);
-      this.viewer3dRef()?.showPartById(partId);
+      this.viewer3d()?.showPartById(partId);
       this.showToast(`👁️ "${partName}" visible`);
     } else {
       next.add(partId);
       this.hiddenPartIds.set(next);
-      this.viewer3dRef()?.hidePartById(partId);
+      this.viewer3d()?.hidePartById(partId);
       if (this.selectedPartId() === partId) {
         this.selectedPartId.set(null);
         this.selectedPartIds.set([]);
@@ -2191,20 +2150,18 @@ export class ModuleDesignerComponent {
 
     const next = new Set(this.hiddenPartIds());
     if (allHidden) {
-      // Mostrar todo el grupo
       for (const id of partIds) {
         next.delete(id);
       }
       this.hiddenPartIds.set(next);
-      this.viewer3dRef()?.showPartsByIds(partIds);
+      this.viewer3d()?.showPartsByIds(partIds);
       this.showToast(`👁️ "${groupName}" visible`);
     } else {
-      // Ocultar todo el grupo
       for (const id of partIds) {
         next.add(id);
       }
       this.hiddenPartIds.set(next);
-      this.viewer3dRef()?.hidePartsByIds(partIds);
+      this.viewer3d()?.hidePartsByIds(partIds);
       if (this.activeSelectedGroupId() === groupId) {
         this.deselectAll();
       }
@@ -2219,7 +2176,7 @@ export class ModuleDesignerComponent {
       return;
     }
     this.hiddenPartIds.set(new Set());
-    this.viewer3dRef()?.showAllParts();
+    this.viewer3d()?.showAllParts();
     this.showToast(`👁️ Se restauraron ${prevCount} pieza(s) ocultas`);
   }
 
@@ -2227,13 +2184,13 @@ export class ModuleDesignerComponent {
     this.hiddenPartIds.set(new Set(hiddenIds));
   }
 
-  // --- MODO HABITACIÓN Y ESPACIO ARQUITECTÓNICO ---
+  // --- MODO HABITACIÓN Y ENTORNO ARQUITECTÓNICO ---
 
   setWorkspaceMode(mode: WorkspaceMode) {
     this.workspaceMode.set(mode);
     if (mode === 'room') {
       setTimeout(() => {
-        this.viewer3dRef()?.frameRoomView();
+        this.viewer3d()?.frameRoomView();
       }, 60);
       this.showToast('🏠 Modo Habitación 3D activado');
     } else {
@@ -2290,7 +2247,7 @@ export class ModuleDesignerComponent {
   }
 
   frameRoomCamera() {
-    this.viewer3dRef()?.frameRoomView();
+    this.viewer3d()?.frameRoomView();
   }
 
   alignWallsToEdge() {

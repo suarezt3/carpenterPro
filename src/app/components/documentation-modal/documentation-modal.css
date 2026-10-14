@@ -1,0 +1,4 @@
+/* Estilos encapsulados del componente DocumentationModal */
+:host {
+  display: contents;
+}

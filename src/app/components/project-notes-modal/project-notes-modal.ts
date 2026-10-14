@@ -1,39 +1,53 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ThemeService } from '../../services/theme.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
+import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { ProjectNoteItem } from '../../models/melamine.models';
 
+/**
+ * Modal de gestión de notas técnicas, ajustes pendientes y bitácora del proyecto.
+ * Permite crear, categorizar, filtrar y marcar como resueltas las notas de carpintería.
+ */
 @Component({
   selector: 'app-project-notes-modal',
-  imports: [CommonModule, ReactiveFormsModule, DatePipe],
+  imports: [ReactiveFormsModule, DatePipe],
   templateUrl: './project-notes-modal.html',
+  styleUrl: './project-notes-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProjectNotesModalComponent {
   readonly themeService = inject(ThemeService);
-  private projectService = inject(ProjectStorageService);
-  private fb = inject(FormBuilder);
+  private readonly projectService = inject(ProjectStorageService);
+  private readonly confirmService = inject(ConfirmDialogService);
+  private readonly fb = inject(FormBuilder);
 
-  isOpen = input<boolean>(false);
-  modalClose = output<void>();
+  // Estado de apertura y evento de cierre del modal
+  readonly isOpen = input<boolean>(false);
+  readonly modalClose = output<void>();
 
-  activeFilter = signal<'all' | 'pending' | 'adjustment' | 'design' | 'general' | 'completed'>('all');
-  searchQuery = signal<string>('');
-  editingNoteId = signal<string | null>(null);
-  showAddForm = signal<boolean>(false);
+  // Estado reactivo para filtros, búsqueda y edición
+  readonly activeFilter = signal<'all' | 'pending' | 'adjustment' | 'design' | 'general' | 'completed'>('all');
+  readonly searchQuery = signal<string>('');
+  readonly editingNoteId = signal<string | null>(null);
+  readonly showAddForm = signal<boolean>(false);
 
+  // Referencias reactivas al proyecto actual y sus notas
   readonly project = this.projectService.currentProject;
   readonly notes = this.projectService.projectNotes;
   readonly autoSyncEnabled = this.projectService.autoSyncEnabled;
 
-  noteForm: FormGroup = this.fb.group({
+  // Formulario reactivo con validaciones para crear o editar notas
+  readonly noteForm: FormGroup = this.fb.group({
     title: ['', [Validators.required, Validators.maxLength(100)]],
     content: ['', [Validators.required]],
     category: ['pending' as const, [Validators.required]]
   });
 
+  /**
+   * Filtra dinámicamente la lista de notas según la pestaña activa y el texto de búsqueda.
+   */
   readonly filteredNotes = computed(() => {
     let list = this.notes();
     const filter = this.activeFilter();
@@ -46,8 +60,8 @@ export class ProjectNotesModalComponent {
     }
 
     if (query) {
-      list = list.filter(n => 
-        n.title.toLowerCase().includes(query) || 
+      list = list.filter(n =>
+        n.title.toLowerCase().includes(query) ||
         n.content.toLowerCase().includes(query)
       );
     }
@@ -58,6 +72,17 @@ export class ProjectNotesModalComponent {
   readonly pendingCount = computed(() => this.notes().filter(n => !n.completed).length);
   readonly completedCount = computed(() => this.notes().filter(n => n.completed).length);
 
+  /**
+   * Actualiza el término de búsqueda con tipado seguro desde el evento input.
+   */
+  onSearchInput(event: Event) {
+    const target = event.target as HTMLInputElement | null;
+    this.searchQuery.set(target?.value ?? '');
+  }
+
+  /**
+   * Inicializa el formulario en blanco para registrar una nueva nota.
+   */
   openNewNoteForm() {
     this.editingNoteId.set(null);
     this.noteForm.reset({
@@ -68,6 +93,9 @@ export class ProjectNotesModalComponent {
     this.showAddForm.set(true);
   }
 
+  /**
+   * Carga los datos de una nota existente en el formulario para editarla.
+   */
   startEditNote(note: ProjectNoteItem) {
     this.editingNoteId.set(note.id);
     this.noteForm.patchValue({
@@ -84,22 +112,24 @@ export class ProjectNotesModalComponent {
     this.noteForm.reset();
   }
 
+  /**
+   * Guarda una nota nueva o actualiza la nota en edición dentro del proyecto activo.
+   */
   saveNote() {
     if (this.noteForm.invalid) return;
-
     const val = this.noteForm.value;
     const editId = this.editingNoteId();
 
     if (editId) {
       this.projectService.updateProjectNote(editId, {
-        title: val.title.trim(),
-        content: val.content.trim(),
+        title: String(val.title || '').trim(),
+        content: String(val.content || '').trim(),
         category: val.category
       });
     } else {
       this.projectService.addProjectNote({
-        title: val.title.trim(),
-        content: val.content.trim(),
+        title: String(val.title || '').trim(),
+        content: String(val.content || '').trim(),
         category: val.category
       });
     }
@@ -107,14 +137,31 @@ export class ProjectNotesModalComponent {
     this.cancelForm();
   }
 
+  /**
+   * Alterna el estado completado/pendiente de una nota.
+   */
   toggleComplete(noteId: string, event: Event) {
     event.stopPropagation();
     this.projectService.toggleProjectNoteComplete(noteId);
   }
 
-  deleteNote(noteId: string, event: Event) {
+  /**
+   * Solicita confirmación mediante ConfirmDialogService antes de eliminar una nota.
+   */
+  async deleteNote(noteId: string, event: Event) {
     event.stopPropagation();
-    if (confirm('¿Deseas eliminar esta nota del proyecto?')) {
+    const note = this.notes().find(n => n.id === noteId);
+    const noteTitle = note ? `"${note.title}"` : 'esta nota';
+
+    const confirmed = await this.confirmService.ask({
+      title: '¿Eliminar nota del proyecto?',
+      message: `Se eliminará ${noteTitle} de la bitácora del proyecto.`,
+      confirmText: 'Eliminar Nota',
+      cancelText: 'Cancelar',
+      severity: 'danger'
+    });
+
+    if (confirmed) {
       this.projectService.deleteProjectNote(noteId);
       if (this.editingNoteId() === noteId) {
         this.cancelForm();
@@ -126,6 +173,9 @@ export class ProjectNotesModalComponent {
     this.modalClose.emit();
   }
 
+  /**
+   * Devuelve los estilos visuales y el ícono correspondiente a cada categoría de nota.
+   */
   getCategoryBadge(category: ProjectNoteItem['category']): { label: string; bgClass: string; textClass: string; icon: string } {
     switch (category) {
       case 'adjustment':

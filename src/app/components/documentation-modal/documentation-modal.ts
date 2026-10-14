@@ -1,7 +1,9 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { ThemeService } from '../../services/theme.service';
 
+/**
+ * Estructura de un artículo o guía interactiva dentro del manual técnico de Piezo3D Studio.
+ */
 export interface DocArticle {
   id: string;
   category: 'mecanizados' | 'cinta_metrica' | 'herramientas_3d' | 'modulos_piezas' | 'optimizador' | 'atajos';
@@ -15,21 +17,28 @@ export interface DocArticle {
   technicalDetails?: { label: string; value: string }[];
 }
 
+/**
+ * Modal de documentación técnica interactiva y manual de usuario.
+ * Permite buscar guías paso a paso por categoría, herramienta CAD, mecanizados CNC o atajos de teclado.
+ */
 @Component({
   selector: 'app-documentation-modal',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './documentation-modal.html',
+  styleUrl: './documentation-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DocumentationModalComponent {
   readonly themeService = inject(ThemeService);
 
-  isOpen = input<boolean>(false);
-  modalClose = output<void>();
+  // Estado de apertura del modal y evento de cierre
+  readonly isOpen = input<boolean>(false);
+  readonly modalClose = output<void>();
 
-  searchQuery = signal<string>('');
-  activeCategory = signal<string>('all');
-  selectedArticleId = signal<string>('mecanizados_cnc');
+  // Signals reactivos para el buscador, categoría activa y artículo seleccionado
+  readonly searchQuery = signal<string>('');
+  readonly activeCategory = signal<string>('all');
+  readonly selectedArticleId = signal<string>('mecanizados_cnc');
 
   readonly categories = [
     { id: 'all', label: 'Todas las Guías', icon: 'auto_stories' },
@@ -82,7 +91,7 @@ export class DocumentationModalComponent {
       iconColor: 'text-amber-600',
       badge: 'Precisión Milimétrica',
       steps: [
-        'Activa la herramienta pulsando el icono de cinta métrica en la barra vertical izquierda o presionando la tecla [ M ].',
+        'Activa la herramienta pulsando el icono de cinta métrica en la barra vertical izquierda o presionando la tecla [ T ].',
         'Acerca el cursor a una esquina o arista de cualquier pieza. Observarás que el imán inteligente (indicador verde esmeralda) se bloquea con precisión matemática al vértice exacto, mostrando un rótulo con el nombre de la pieza.',
         'Haz clic en el vértice inicial (Punto A) y arrastra hacia la esquina o arista de destino (Punto B).',
         'Al soltar el clic, las flechas CAD finas indicarán con su punta matemática el inicio y fin exactos de la medida.',
@@ -239,25 +248,25 @@ export class DocumentationModalComponent {
     {
       id: 'plantillas_muebles',
       category: 'modulos_piezas',
-      title: 'Catálogo de 20 Plantillas de Muebles y Despiece',
-      shortDesc: 'Accede a 20 plantillas profesionales organizadas en Cocina, Baño, Closets, Sala TV y Oficina con opción de reemplazar o añadir al 3D.',
+      title: 'Catálogo de Plantillas de Muebles y Asistente Modular',
+      shortDesc: 'Diseña módulos paramétricos a medida o carga plantillas listas de Cocina, Baño, Closets y Cajoneras con opción de reemplazar o añadir al 3D.',
       icon: 'menu_book',
       iconColor: 'text-blue-600',
-      badge: '20 Plantillas',
+      badge: 'Asistente Paramétrico',
       steps: [
-        'Haz clic en el botón "Plantillas de Muebles" en la barra superior o en el modelador 3D.',
-        'Explora las 20 plantillas categorizadas: Cocina (bajo mesadas, alacenas, torres), Baño (vanitories flotantes, gabinetes con espejo), Closets (roperos, cómodas, mesas de noche, zapateros), Sala TV (racks, libreros, mesas de centro) y Oficina (escritorios en L, cajoneras móviles).',
-        'Al hacer clic en cualquier plantilla podrás elegir:',
-        '• "Reemplazar diseño actual": Borra el lienzo actual y carga el mueble seleccionado centrado en el espacio 3D.',
-        '• "Añadir junto al diseño": Coloca el mueble a la derecha del diseño actual sin borrar tus piezas previas, ideal para componer habitaciones completas.',
+        'Haz clic en el botón "Plantillas" en la barra superior del modelador 3D.',
+        'Utiliza el Asistente Paramétrico para configurar ancho, alto, profundidad, cantidad de entrepaños (uniformes o manuales), puertas y manijas, o explora el catálogo prediseñado.',
+        'Al insertar cualquier módulo o plantilla podrás elegir:',
+        '• "Reemplazar actual": Limpia el lienzo actual y carga el mueble seleccionado centrado en el espacio 3D.',
+        '• "Añadir al taller": Coloca el mueble junto al diseño actual sin borrar tus piezas previas, ideal para componer cocinas o armarios completos.',
         '• "Lienzo en Blanco": Inicia un diseño desde cero.'
       ],
       tips: [
-        'Todas las piezas de las plantillas son 100% editables: puedes cambiar su material, grosor, tapacantos o medidas usando la herramienta Empujar/Tirar o el panel de propiedades.'
+        'Todas las piezas generadas son 100% editables: puedes usar el botón "Editar Módulo" de la cinta superior para reconfigurar sus parámetros en cualquier momento.'
       ],
       technicalDetails: [
-        { label: 'Categorías', value: 'Cocina, Baño, Closets, Sala TV, Oficina' },
-        { label: 'Total Muebles', value: '20 diseños paramétricos completos' },
+        { label: 'Categorías', value: 'Cocina Bajo/Alto, Closets, Baño, Estanterías y Cajoneras' },
+        { label: 'Edición en Vivo', value: 'Reconstrucción paramétrica sin perder posición 3D' },
         { label: 'Modos de Carga', value: 'Reemplazo total o Adición lateral en 3D' }
       ]
     },
@@ -265,23 +274,23 @@ export class DocumentationModalComponent {
       id: 'optimizador_despiece',
       category: 'optimizador',
       title: 'Optimización de Corte 2D y Despiece Milimétrico',
-      shortDesc: 'Algoritmo guillotine de máximo rendimiento de placas con kerf de sierra, refilado y etiquetas imprimibles con QR.',
+      shortDesc: 'Algoritmo guillotina de máximo rendimiento de placas con kerf de sierra, refilado y etiquetas imprimibles.',
       icon: 'precision_manufacturing',
       iconColor: 'text-purple-600',
       badge: 'Ahorro de Material',
       steps: [
-        'Ve a la pestaña "Optimizador" en la barra superior.',
-        'Configura el tamaño del tablero comercial (ej. 2440 x 1830 mm o 2750 x 1830 mm) y el espesor de la hoja de sierra (Kerf = 4 mm estándar).',
-        'Establece el margen de refilado perimetral del tablero (ej. 10 mm) para eliminar bordes dañados.',
-        'El motor organizará automáticamente los cortes respetando la dirección de la veta de la melamina y minimizando los retazos sobrantes.',
+        'Ve a la pestaña "3. Optimizador 2D" en la barra superior.',
+        'Configura el tamaño del tablero comercial (ej. 2440 x 1830 mm) y el espesor de la hoja de sierra (Kerf = 4 mm estándar).',
+        'Establece el margen de refilado perimetral del tablero (ej. 10 mm) para limpiar bordes de fábrica.',
+        'El motor organizará automáticamente los cortes respetando la dirección de la veta longitudinal o transversal de la melamina y minimizando los retazos sobrantes.',
         'Genera el reporte con el porcentaje de aprovechamiento, metros lineales de tapacanto y plano de corte con numeración de piezas.',
         'Pulsa "Exportar Plano 2D Técnico" para descargar el PDF de taller listo para imprimir.'
       ],
       tips: [
-        'Puedes imprimir etiquetas autoadhesivas para cada pieza con su código QR, nombre del módulo, medidas y bordes con canto.'
+        'Puedes imprimir etiquetas adhesivas para cada pieza con su nombre de módulo, medidas exactas y esquema de bordes con tapacanto.'
       ],
       technicalDetails: [
-        { label: 'Algoritmo', value: 'Guillotine 2D con respeto estricto de veta' },
+        { label: 'Algoritmo', value: 'Guillotine 2D con respeto estricto de veta (Largo/Ancho)' },
         { label: 'Parámetros', value: 'Kerf de sierra (0-10 mm), Refilado (0-25 mm)' }
       ]
     },
@@ -294,22 +303,22 @@ export class DocumentationModalComponent {
       iconColor: 'text-emerald-600',
       badge: 'Productividad',
       steps: [
-        '• [ Clic sostenido + Arrastre ]: Mover pieza individual o grupo completo directamente en el espacio 3D (arrastre fluido sin flechas en el centro)',
+        '• [ Clic sostenido + Arrastre ]: Mover pieza individual o grupo completo directamente en el espacio 3D',
         '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar piezas',
-        '• [ M ]: Cinta Métrica 3D con Imán Inteligente a vértices y aristas',
+        '• [ T ]: Cinta Métrica 3D con Imán Inteligente a vértices y aristas',
         '• [ P ]: Empujar / Tirar (Push/Pull) para estirar o encoger caras en tiempo real',
-        '• [ R ]: Dibujar rectángulo 3D en el piso con previsualización dinámica',
-        '• [ Q ]: Rotar pieza o ensamble seleccionado 90 grados en el plano horizontal',
-        '• [ Supr / Delete / Backspace ]: Eliminar inmediatamente la pieza o grupo seleccionado (con restauración vía Ctrl+Z)',
-        '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer última acción o restauración de pieza eliminada',
+        '• [ R ]: Girar pieza/grupo seleccionado 90° o activar Dibujar Rectángulo 3D si no hay selección',
+        '• [ Q ]: Herramienta Rotar 90 grados en el plano horizontal',
+        '• [ H ] / [ Alt + H ]: Ocultar temporalmente la pieza/grupo seleccionado o mostrar todas las ocultas',
+        '• [ Supr / Delete / Backspace ]: Eliminar inmediatamente la pieza, grupo o equipo seleccionado (con restauración vía Ctrl+Z)',
+        '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer última acción',
         '• [ Ctrl + Y ] / [ Cmd + Shift + Z ]: Rehacer acción deshecha',
-        '• [ Clic en Puerta o Cajón ]: Abrir o cerrar individualmente puertas (giro 90°) o extraer cajones en el visor 3D',
-        '• [ Shift + Clic ]: Selección múltiple aditiva de piezas en el visor 3D para mover o duplicar en bloque',
+        '• [ Shift + Clic ]: Selección múltiple aditiva de piezas en el visor 3D para agrupar o mover en bloque',
         '• [ Flechas Teclado ]: Mover pieza seleccionada en incrementos milimétricos (1 mm o 10 mm con Shift)',
         '• [ Esc ]: Cancelar herramienta activa, limpiar selección o cerrar ventanas emergentes'
       ],
       tips: [
-        'La cinta contextual superior derecha te brinda acceso rápido con un solo clic a: Duplicar, Mover, Abrir/Cerrar, 90° (R), Frente y Desagrupar.'
+        'La cinta contextual superior derecha te brinda acceso rápido con un solo clic a: Duplicar, Mover, Abrir/Cerrar, Editar Módulo, 90° (R), Frente y Desagrupar.'
       ]
     },
     {
@@ -319,23 +328,22 @@ export class DocumentationModalComponent {
       shortDesc: 'Aprende a agrupar múltiples piezas melamínicas y accesorios (patas, puertas, frentes) en un solo bloque con nombre personalizado.',
       icon: 'format_shapes',
       iconColor: 'text-indigo-600',
-      badge: 'NUEVO · Agrupación Libre',
+      badge: 'Agrupación Libre',
       steps: [
-        'Para agrupar varias piezas (por ejemplo, la cubierta de una mesa con sus 4 patas y faldones, o un mueble de comedor completo):',
+        'Para agrupar varias piezas (por ejemplo, la cubierta de una mesa con sus 4 patas y faldones, o un mueble armado a medida):',
         '1. Selecciona las piezas deseadas manteniendo presionada la tecla [ Shift ] y haciendo clic sobre cada una en el visor 3D o en la cinta inferior de piezas.',
         '2. También puedes usar el botón "Todo" para seleccionar todas las piezas del lienzo a la vez.',
-        '3. Haz clic en el botón "[ Crear Grupo ]" o "Agrupar Piezas" que aparecerá en la cinta inferior o en el menú contextual de clic derecho.',
-        '4. Asigna un nombre descriptivo al conjunto (ej. "Mesa Completa", "Comedor 4 Puestos", "Módulo Alacena").',
-        '5. ¡Listo! A partir de ese momento, al hacer clic sobre cualquiera de las piezas del conjunto, todo el bloque se seleccionará rígidamente.',
-        '6. Puedes mover el conjunto completo arrastrándolo directamente con el ratón o girarlo 90° con la tecla [ Q ] o [ R ] sin que se desalinee ninguna pieza.',
-        '7. Si necesitas reajustar una pata o modificar una medida individual, selecciona el grupo y haz clic en "[ Desagrupar ]" en la bandeja de propiedades. Las piezas quedarán libres de nuevo para su edición.'
+        '3. Haz clic en el botón "Agrupar" que aparecerá en la barra flotante superior.',
+        '4. Asigna un nombre descriptivo al conjunto (ej. "Mesa Comedor", "Cajón 1", "Módulo Alacena").',
+        '5. A partir de ese momento, al hacer clic sobre cualquiera de las piezas del conjunto, todo el bloque se seleccionará rígidamente.',
+        '6. Si necesitas modificar una pieza por separado, selecciona el grupo y haz clic en "Desagrupar" en la barra superior.'
       ],
       tips: [
-        'Los conjuntos agrupados se conservan al guardar y descargar tu archivo JSON de proyecto.',
-        'Si duplicas un grupo con el botón "Duplicar Grupo", se creará una copia idéntica del ensamble completo apilada ordenadamente en 3D.'
+        'Los conjuntos agrupados se conservan al guardar en Supabase y al descargar tu archivo JSON de proyecto.',
+        'Si duplicas un grupo con el botón "Duplicar", se creará una copia idéntica del ensamble completo.'
       ],
       technicalDetails: [
-        { label: 'Soporte de piezas', value: 'Piezas melamínicas, patas de mesa, herrajes y cajones' },
+        { label: 'Soporte de piezas', value: 'Piezas melamínicas, puertas, estantes y cajones' },
         { label: 'Rotación en bloque', value: 'Cálculo de centroide común para rotación 90° / 180°' },
         { label: 'Desagrupamiento', value: 'Retorno a piezas independientes con un solo clic' }
       ]
@@ -347,13 +355,13 @@ export class DocumentationModalComponent {
       shortDesc: 'Apertura hacia la derecha o izquierda con reubicación automática de perforaciones púrpuras y herrajes 3D.',
       icon: 'door_sliding',
       iconColor: 'text-purple-600',
-      badge: 'NUEVO · Bisagras Dinámicas',
+      badge: 'Bisagras Dinámicas',
       steps: [
         'Cuando creas o duplicas una puerta batiente para colocarla en el lado opuesto del mueble:',
-        '1. En el panel de propiedades de la pieza o mediante el menú contextual de clic derecho en 3D, selecciona el sentido de apertura deseado: "Puerta (Bisagra Izquierda)" o "Puerta (Bisagra Derecha)".',
+        '1. En el menú contextual de clic derecho en 3D o desde Editar Módulo, selecciona el sentido de apertura deseado: "Puerta (Bisagra Izquierda)" o "Puerta (Bisagra Derecha)".',
         '2. Al cambiar el sentido, la manija/tirador 3D se ubicará en el borde opuesto y las bisagras 3D se trasladarán al borde correspondiente.',
-        '3. Las perforaciones púrpuras de cazoleta Ø35mm x 12.5mm se recalcularán automáticamente en el exacto borde de apertura (a 22mm de la arista), garantizando que concuerden con los taladros técnicos.',
-        '4. Al probar la animación con la opción "Animar / Abrir Puerta", los taladros de cazoleta rotarán integrados con la hoja de la puerta.'
+        '3. Las perforaciones púrpuras de cazoleta Ø35mm x 12.5mm se recalcularán automáticamente en el borde de apertura (a 22mm de la arista).',
+        '4. Al probar la animación con la opción "Animar / Abrir Pieza", los taladros de cazoleta rotarán integrados con la hoja de la puerta.'
       ],
       tips: [
         'Al clonar una puerta batiente izquierda para crear la derecha del mueble, el sistema sincronizará tanto la estética visual 3D como el despiece técnico de mecanizados.'
@@ -366,7 +374,10 @@ export class DocumentationModalComponent {
     }
   ];
 
-  filteredArticles = computed(() => {
+  /**
+   * Filtra los artículos del manual según la categoría seleccionada y el término de búsqueda.
+   */
+  readonly filteredArticles = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
     const cat = this.activeCategory();
 
@@ -380,18 +391,28 @@ export class DocumentationModalComponent {
       const inBadge = art.badge ? art.badge.toLowerCase().includes(q) : false;
       const inSteps = art.steps.some(s => s.toLowerCase().includes(q));
       const inTips = art.tips.some(t => t.toLowerCase().includes(q));
-      const inTech = art.technicalDetails ? art.technicalDetails.some(td => td.label.toLowerCase().includes(q) || td.value.toLowerCase().includes(q)) : false;
+      const inTech = art.technicalDetails
+        ? art.technicalDetails.some(td => td.label.toLowerCase().includes(q) || td.value.toLowerCase().includes(q))
+        : false;
       return inTitle || inDesc || inBadge || inSteps || inTips || inTech;
     });
   });
 
-  selectedArticle = computed(() => {
+  /**
+   * Obtiene el artículo actualmente activo para mostrarlo en el panel de lectura derecho.
+   */
+  readonly selectedArticle = computed(() => {
     const currentId = this.selectedArticleId();
     const list = this.filteredArticles();
     if (list.length === 0) return null;
     const found = list.find(a => a.id === currentId);
     return found || list[0];
   });
+
+  onSearchInput(event: Event) {
+    const target = event.target as HTMLInputElement | null;
+    this.searchQuery.set(target?.value ?? '');
+  }
 
   selectCategory(catId: string) {
     this.activeCategory.set(catId);

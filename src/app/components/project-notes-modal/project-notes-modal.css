@@ -1,0 +1,4 @@
+/* Estilos encapsulados del componente ProjectNotesModal */
+:host {
+  display: contents;
+}
