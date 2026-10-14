@@ -5578,26 +5578,19 @@ export class Furniture3dViewerComponent implements OnDestroy {
   }
 
   cancelActiveInteractions() {
-    this.isDraggingPart = false;
-    this.isDraggingGroup = false;
-    this.isDraggingAppliance = false;
-    this.isDraggingGizmo = false;
-    this.isExtruding = false;
-    this.isDrawingFloor = false;
-    this.isMarqueeSelecting = false;
-    this.isDraggingMainWall = false;
-    this.isDraggingSideWall = false;
-    this.isDraggingRightWall = false;
-    this.isStretchingMainWall = false;
-    this.isStretchingSideWall = false;
-    this.isStretchingRightWall = false;
-    this.isStretchingFloor = false;
-    this.activeDragPart = null;
-    this.activeGizmoData = null;
-    this.dragGroupPartsData = [];
-    this.clearSnapIndicators();
-    this.activeMeasureHud.set(null);
-    this.activeSnapAlert.set(null);
+    this.isDragging = false;
+    this.activeGizmoHit = null;
+    this.isDirectPieceDrag = false;
+    this.directPieceDragThresholdPassed = false;
+    this.dragInitialPart = null;
+    this.dragInitialParts = [];
+    this.isWallDragging = false;
+    this.isWallGizmoDragging = false;
+    this.activeWallGizmoHit = null;
+    this.isApplianceDragging = false;
+    this.isApplianceResizing = false;
+    this.draggingAppliance = null;
+    this.isMeasuringDrag = false;
     this.closeContextMenu();
     this.showGroupsFlyout.set(false);
     if (this.controls) {
