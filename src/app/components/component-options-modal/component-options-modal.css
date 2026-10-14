@@ -1,0 +1,4 @@
+/* Estilos encapsulados del componente ComponentOptionsModal */
+:host {
+  display: contents;
+}

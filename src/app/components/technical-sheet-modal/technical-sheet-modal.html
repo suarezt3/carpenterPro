@@ -9,7 +9,7 @@
 
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-500 flex items-center justify-center shadow-xs">
-          <span class="material-icons text-xl">architecture</span>
+          <hugeicons-icon [icon]="icons.blueprint" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
         </div>
         <div>
           <h3 class="text-sm sm:text-base font-bold tracking-tight">Plano Técnico 2D de Fabricación (Taller)</h3>
@@ -26,7 +26,7 @@
           (click)="toggleTheme()"
           [class]="isBlueprintDark() ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-slate-200 text-slate-800 hover:bg-slate-300'"
           class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
-          <span class="material-icons text-sm">{{ isBlueprintDark() ? 'wb_sunny' : 'nightlight' }}</span>
+          <hugeicons-icon [icon]="isBlueprintDark() ? icons.sun : icons.moon" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           <span>{{ isBlueprintDark() ? 'Papel Blanco' : 'CAD Oscuro' }}</span>
         </button>
 
@@ -35,7 +35,7 @@
           type="button"
           (click)="downloadDxf()"
           class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer">
-          <span class="material-icons text-sm">download</span>
+          <hugeicons-icon [icon]="icons.download" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           <span>Exportar DXF CNC</span>
         </button>
 
@@ -44,7 +44,7 @@
           type="button"
           (click)="printSheet()"
           class="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold rounded-lg text-xs flex items-center gap-1.5 transition shadow-md cursor-pointer">
-          <span class="material-icons text-sm">print</span>
+          <hugeicons-icon [icon]="icons.print" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           <span>Imprimir / Guardar PDF</span>
         </button>
 
@@ -54,7 +54,7 @@
           (click)="modalClose.emit()"
           class="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition cursor-pointer"
           title="Cerrar plano">
-          <span class="material-icons text-base">close</span>
+          <hugeicons-icon [icon]="icons.close" [size]="18" [strokeWidth]="2"></hugeicons-icon>
         </button>
       </div>
     </div>
@@ -102,8 +102,8 @@
             <div class="flex items-center justify-between border-b pb-1"
               [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
               <span class="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                <span class="material-icons text-sm">visibility</span>
-                01. Vista Frontal (Alzada)
+                <hugeicons-icon [icon]="icons.view" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+                <span>01. Vista Frontal (Alzada)</span>
               </span>
               <span class="text-[11px] font-mono text-zinc-400">
                 Ancho: {{ bounds().width }} mm | Alto: {{ bounds().height }} mm
@@ -115,7 +115,7 @@
               [class]="isBlueprintDark() ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'">
               <svg
                 [attr.viewBox]="'-80 -60 ' + (bounds().width + 160) + ' ' + (bounds().height + 110)"
-                class="w-full max-h-[380px] overflow-visible">
+                class="w-full max-h-95 overflow-visible">
 
                 <defs>
                   <pattern id="gridDots" width="100" height="100" patternUnits="userSpaceOnUse">
@@ -201,7 +201,7 @@
                   {{ bounds().width }} mm
                 </text>
 
-                <!-- Cota Izquierda: Altura Total (Corregido atributo x2="-40") -->
+                <!-- Cota Izquierda: Altura Total -->
                 <line
                   x1="-40"
                   y1="0"
@@ -233,8 +233,8 @@
             <div class="flex items-center justify-between border-b pb-1"
               [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
               <span class="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                <span class="material-icons text-sm">straighten</span>
-                02. Vista Lateral (Perfil)
+                <hugeicons-icon [icon]="icons.ruler" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+                <span>02. Vista Lateral (Perfil)</span>
               </span>
               <span class="text-[11px] font-mono text-zinc-400">
                 Prof: {{ bounds().depth }} mm
@@ -246,7 +246,7 @@
               [class]="isBlueprintDark() ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'">
               <svg
                 [attr.viewBox]="'-60 -60 ' + (bounds().depth + 110) + ' ' + (bounds().height + 110)"
-                class="w-full max-h-[380px] overflow-visible">
+                class="w-full max-h-95 overflow-visible">
 
                 @for (piece of sidePieces(); track piece.id) {
                   <rect
@@ -326,8 +326,8 @@
           <div class="flex items-center justify-between border-b pb-1"
             [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
             <span class="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-              <span class="material-icons text-sm">format_list_numbered</span>
-              03. Listado de Piezas y Mecanizados para Armado
+              <hugeicons-icon [icon]="icons.list" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+              <span>03. Listado de Piezas y Mecanizados para Armado</span>
             </span>
             <span class="text-xs font-mono font-bold text-cyan-500">
               Total: {{ project().parts.length }} piezas | {{ drillHoles().length }} taladros
@@ -364,7 +364,7 @@
                     <td class="p-2.5">{{ part.quantity }}x</td>
                     <td class="p-2.5 font-bold text-cyan-600">{{ part.length }} × {{ part.width }} mm</td>
                     <td class="p-2.5">{{ part.thickness }} mm</td>
-                    <td class="p-2.5 truncate max-w-[140px]">{{ part.materialName }}</td>
+                    <td class="p-2.5 truncate max-w-35">{{ part.materialName }}</td>
                     <td class="p-2.5 text-[11px]">
                       {{ part.edges.l1 !== 'none' ? 'L1 ' : '' }}{{ part.edges.l2 !== 'none' ? 'L2 ' : '' }}{{ part.edges.a1 !== 'none' ? 'A1 ' : '' }}{{ part.edges.a2 !== 'none' ? 'A2' : '' }}
                       @if (part.edges.l1 === 'none' && part.edges.l2 === 'none' && part.edges.a1 === 'none' && part.edges.a2 === 'none') {

@@ -4,7 +4,7 @@
   <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden'">
     <div>
       <div class="flex items-center gap-2">
-        <span class="material-icons text-amber-500">qr_code_2</span>
+        <hugeicons-icon [icon]="icons.qrCode" [size]="22" [strokeWidth]="1.8" class="text-amber-500 shrink-0"></hugeicons-icon>
         <h2 [class]="themeService.isClassic() ? 'text-xl font-bold text-slate-900' : 'text-xl font-bold text-white'">
           Generador de Etiquetas para Taller
         </h2>
@@ -44,7 +44,7 @@
         type="button"
         (click)="printLabels()"
         class="px-4 py-2 bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-2 shadow-md shadow-amber-900/20 transition cursor-pointer">
-        <span class="material-icons text-sm">print</span>
+        <hugeicons-icon [icon]="icons.print" [size]="16" [strokeWidth]="2"></hugeicons-icon>
         <span>Imprimir Etiquetas ({{ flatLabels().length }})</span>
       </button>
     </div>
@@ -196,8 +196,13 @@
 
       </div>
     } @empty {
-      <div [class]="themeService.isClassic() ? 'col-span-full p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs' : 'col-span-full p-12 text-center bg-zinc-900 rounded-2xl border border-zinc-800'">
-        <span [class]="themeService.isClassic() ? 'material-icons text-slate-400 text-4xl mb-2' : 'material-icons text-zinc-600 text-4xl mb-2'">label_off</span>
+      <div [class]="themeService.isClassic() ? 'col-span-full p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center' : 'col-span-full p-12 text-center bg-zinc-900 rounded-2xl border border-zinc-800 flex flex-col items-center'">
+        <hugeicons-icon
+          [icon]="icons.tag"
+          [size]="38"
+          [strokeWidth]="1.6"
+          [class]="themeService.isClassic() ? 'text-slate-400 mb-2' : 'text-zinc-600 mb-2'">
+        </hugeicons-icon>
         <h3 [class]="themeService.isClassic() ? 'text-base font-bold text-slate-800' : 'text-base font-bold text-zinc-300'">No hay etiquetas disponibles</h3>
         <p [class]="themeService.isClassic() ? 'text-xs text-slate-500 mt-1' : 'text-xs text-zinc-500 mt-1'">Verifica los filtros seleccionados o añade módulos en el diseñador.</p>
       </div>

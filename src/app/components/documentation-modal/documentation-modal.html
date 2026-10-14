@@ -23,7 +23,7 @@
 
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-600 text-white shadow-xs">
-            <span class="material-icons text-2xl">menu_book</span>
+            <hugeicons-icon [icon]="icons.book" [size]="22" [strokeWidth]="1.8"></hugeicons-icon>
           </div>
           <div>
             <div class="flex items-center gap-2">
@@ -46,7 +46,7 @@
           [class]="themeService.isClassic() ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-200 border border-slate-300' : 'text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-700'"
           class="w-8 h-8 rounded-lg flex items-center justify-center transition shadow-2xs cursor-pointer"
           title="Cerrar manual (Esc)">
-          <span class="material-icons text-xl">close</span>
+          <hugeicons-icon [icon]="icons.close" [size]="18" [strokeWidth]="2"></hugeicons-icon>
         </button>
       </div>
 
@@ -68,7 +68,7 @@
             </label>
 
             <div class="relative w-full">
-              <span class="material-icons absolute left-2.5 top-2 text-slate-600 text-lg pointer-events-none">search</span>
+              <hugeicons-icon [icon]="icons.search" [size]="16" [strokeWidth]="2" class="absolute left-2.5 top-2.5 text-slate-500 pointer-events-none"></hugeicons-icon>
               <input
                 id="doc-search-input"
                 type="text"
@@ -86,7 +86,7 @@
                   (click)="searchQuery.set('')"
                   class="absolute right-2 top-2 text-slate-500 hover:text-slate-900 transition cursor-pointer"
                   title="Limpiar búsqueda">
-                  <span class="material-icons text-sm">cancel</span>
+                  <hugeicons-icon [icon]="icons.cancel" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 </button>
               }
             </div>
@@ -101,7 +101,7 @@
                     ? 'bg-emerald-700 text-white font-bold shadow-2xs'
                     : (themeService.isClassic() ? 'bg-slate-200 text-slate-900 hover:bg-slate-300 border border-slate-300 font-bold' : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 border border-zinc-700 font-medium')"
                   class="px-2 py-1 rounded-md text-[11px] transition flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer">
-                  <span class="material-icons text-[13px]">{{ cat.icon }}</span>
+                  <hugeicons-icon [icon]="getCategoryIcon(cat.icon)" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                   <span>{{ cat.label }}</span>
                 </button>
               }
@@ -112,7 +112,7 @@
           <div class="flex-1 overflow-y-auto p-2.5 flex flex-col gap-2 min-h-0 scrollbar-thin">
             @if (filteredArticles().length === 0) {
               <div class="p-6 text-center text-xs text-slate-700 flex flex-col items-center gap-2">
-                <span class="material-icons text-3xl text-slate-400">search_off</span>
+                <hugeicons-icon [icon]="icons.searchOff" [size]="32" [strokeWidth]="1.6" class="text-slate-400"></hugeicons-icon>
                 <span class="font-bold text-slate-900">No se encontraron guías</span>
                 <span class="text-slate-600">Intenta con otro término como "cinta", "mecanizado", "atajo" o "empujar".</span>
                 <button
@@ -138,7 +138,7 @@
                   [class.bg-slate-100]="themeService.isClassic()"
                   [class.bg-zinc-800]="!themeService.isClassic()"
                   class="w-8 h-8 rounded-lg flex items-center justify-center border border-slate-300 shrink-0 mt-0.5">
-                  <span class="material-icons text-lg">{{ art.icon }}</span>
+                  <hugeicons-icon [icon]="getArticleIcon(art.icon)" [size]="16" [strokeWidth]="2"></hugeicons-icon>
                 </div>
 
                 <div class="flex-1 min-w-0">
@@ -196,7 +196,9 @@
               <h3
                 [class]="themeService.isClassic() ? 'text-slate-950' : 'text-white'"
                 class="text-xl sm:text-2xl font-black flex items-center gap-2.5 tracking-tight">
-                <span class="material-icons text-2xl shrink-0" [class]="art.iconColor">{{ art.icon }}</span>
+                <span class="shrink-0" [class]="art.iconColor">
+                  <hugeicons-icon [icon]="getArticleIcon(art.icon)" [size]="22" [strokeWidth]="2"></hugeicons-icon>
+                </span>
                 <span>{{ art.title }}</span>
               </h3>
 
@@ -213,7 +215,7 @@
                 <h4
                   [class]="themeService.isClassic() ? 'text-slate-950 font-black' : 'text-zinc-200 font-bold'"
                   class="text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <span class="material-icons text-sm text-sky-700">tune</span>
+                  <hugeicons-icon [icon]="icons.tune" [size]="15" [strokeWidth]="2" class="text-sky-700"></hugeicons-icon>
                   <span>Especificaciones Técnicas y Parámetros</span>
                 </h4>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -242,7 +244,7 @@
               <h4
                 [class]="themeService.isClassic() ? 'text-slate-950 font-black' : 'text-zinc-200 font-bold'"
                 class="text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <span class="material-icons text-sm text-emerald-700">format_list_numbered</span>
+                <hugeicons-icon [icon]="icons.listNumbered" [size]="15" [strokeWidth]="2" class="text-emerald-700"></hugeicons-icon>
                 <span>Instrucciones y Funcionamiento Detallado</span>
               </h4>
 
@@ -272,7 +274,7 @@
                 class="p-4 rounded-xl border flex flex-col gap-2"
                 [class]="themeService.isClassic() ? 'bg-amber-50 border-amber-300 text-amber-950' : 'bg-amber-950/40 border-amber-800/60 text-amber-200'">
                 <div class="flex items-center gap-2">
-                  <span class="material-icons text-base text-amber-600">lightbulb</span>
+                  <hugeicons-icon [icon]="icons.lightbulb" [size]="16" [strokeWidth]="2" class="text-amber-600"></hugeicons-icon>
                   <h4 class="text-xs font-black uppercase tracking-wider">Consejos Profesionales de Carpintería</h4>
                 </div>
                 <ul class="list-disc list-inside text-xs font-semibold flex flex-col gap-1.5 leading-relaxed pl-1" [class]="themeService.isClassic() ? 'text-slate-900' : 'text-zinc-200'">
@@ -285,7 +287,7 @@
 
           } @else {
             <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
-              <span class="material-icons text-5xl text-slate-400 mb-2">menu_book</span>
+              <hugeicons-icon [icon]="icons.book" [size]="42" [strokeWidth]="1.6" class="text-slate-400 mb-2"></hugeicons-icon>
               <h3 class="text-base font-bold text-slate-900">Selecciona una guía para leer</h3>
               <p class="text-xs text-slate-600">Explora la lista lateral o realiza una búsqueda.</p>
             </div>
@@ -299,7 +301,7 @@
         class="px-6 py-3 border-t flex items-center justify-between shrink-0"
         [class]="themeService.isClassic() ? 'bg-slate-100 border-slate-300' : 'bg-zinc-950 border-zinc-800'">
         <div class="flex items-center gap-2 text-xs font-bold" [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-400'">
-          <span class="material-icons text-sm text-indigo-600">verified</span>
+          <hugeicons-icon [icon]="icons.verified" [size]="15" [strokeWidth]="2" class="text-indigo-600"></hugeicons-icon>
           <span>Piezo3D Studio · Documentación Técnica y Manual de Uso</span>
         </div>
         <button

@@ -7,7 +7,18 @@ import {
   computed,
   inject
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { HugeiconsIconComponent } from '@hugeicons/angular';
+import {
+  Cancel01Icon,
+  CheckListIcon,
+  Compass01Icon,
+  Download01Icon,
+  Moon02Icon,
+  PrinterIcon,
+  RulerIcon,
+  Sun01Icon,
+  ViewIcon
+} from '@hugeicons/core-free-icons';
 import { Project, DrillHole } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
@@ -46,7 +57,7 @@ export interface DimensionLine2D {
  */
 @Component({
   selector: 'app-technical-sheet-modal',
-  imports: [CommonModule],
+  imports: [HugeiconsIconComponent],
   templateUrl: './technical-sheet-modal.html',
   styleUrl: './technical-sheet-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -54,6 +65,19 @@ export interface DimensionLine2D {
 export class TechnicalSheetModalComponent {
   private readonly joineryEngine = inject(JoineryEngineService);
   private readonly dxfExporter = inject(DxfExporterService);
+
+  // Iconos vectoriales de Hugeicons utilizados en la lámina técnica
+  readonly icons = {
+    blueprint: Compass01Icon,
+    sun: Sun01Icon,
+    moon: Moon02Icon,
+    download: Download01Icon,
+    print: PrinterIcon,
+    close: Cancel01Icon,
+    view: ViewIcon,
+    ruler: RulerIcon,
+    list: CheckListIcon
+  };
 
   // Proyecto activo y evento de cierre del modal
   readonly project = input.required<Project>();
@@ -65,7 +89,7 @@ export class TechnicalSheetModalComponent {
   readonly showTopView = signal<boolean>(true);
   readonly showDimensions = signal<boolean>(true);
   readonly showDrills = signal<boolean>(true);
-  readonly isBlueprintDark = signal<boolean>(false); // Por defecto en papel blanco para taller
+  readonly isBlueprintDark = signal<boolean>(false);
 
   /**
    * Calcula en tiempo real todas las perforaciones y colisiones del proyecto usando JoineryEngineService.

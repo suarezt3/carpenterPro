@@ -1,6 +1,22 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { HugeiconsIconComponent } from '@hugeicons/angular';
+import {
+  Add01Icon,
+  Cancel01Icon,
+  CheckListIcon,
+  CheckmarkCircle02Icon,
+  Clock01Icon,
+  CloudIcon,
+  Compass01Icon,
+  Delete02Icon,
+  Edit02Icon,
+  Note01Icon,
+  Search01Icon,
+  Settings01Icon,
+  Tick02Icon
+} from '@hugeicons/core-free-icons';
 import { ThemeService } from '../../services/theme.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -12,7 +28,7 @@ import { ProjectNoteItem } from '../../models/melamine.models';
  */
 @Component({
   selector: 'app-project-notes-modal',
-  imports: [ReactiveFormsModule, DatePipe],
+  imports: [ReactiveFormsModule, DatePipe, HugeiconsIconComponent],
   templateUrl: './project-notes-modal.html',
   styleUrl: './project-notes-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -22,6 +38,23 @@ export class ProjectNotesModalComponent {
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly fb = inject(FormBuilder);
+
+  // Registro local de iconos vectoriales de Hugeicons
+  readonly icons = {
+    note: Note01Icon,
+    add: Add01Icon,
+    close: Cancel01Icon,
+    edit: Edit02Icon,
+    delete: Delete02Icon,
+    check: Tick02Icon,
+    search: Search01Icon,
+    cloud: CloudIcon,
+    completed: CheckmarkCircle02Icon,
+    adjustment: Settings01Icon,
+    design: Compass01Icon,
+    general: CheckListIcon,
+    pending: Clock01Icon
+  };
 
   // Estado de apertura y evento de cierre del modal
   readonly isOpen = input<boolean>(false);
@@ -174,19 +207,19 @@ export class ProjectNotesModalComponent {
   }
 
   /**
-   * Devuelve los estilos visuales y el ícono correspondiente a cada categoría de nota.
+   * Devuelve los estilos visuales y el ícono vectorial de Hugeicons correspondiente a cada categoría.
    */
-  getCategoryBadge(category: ProjectNoteItem['category']): { label: string; bgClass: string; textClass: string; icon: string } {
+  getCategoryBadge(category: ProjectNoteItem['category']) {
     switch (category) {
       case 'adjustment':
-        return { label: 'Ajuste Pendiente', bgClass: 'bg-rose-500/10 border-rose-500/30', textClass: 'text-rose-500', icon: 'build' };
+        return { label: 'Ajuste Pendiente', bgClass: 'bg-rose-500/10 border-rose-500/30', textClass: 'text-rose-500', icon: this.icons.adjustment };
       case 'design':
-        return { label: 'Diseño CAD', bgClass: 'bg-indigo-500/10 border-indigo-500/30', textClass: 'text-indigo-500', icon: 'architecture' };
+        return { label: 'Diseño CAD', bgClass: 'bg-indigo-500/10 border-indigo-500/30', textClass: 'text-indigo-500', icon: this.icons.design };
       case 'general':
-        return { label: 'General / Taller', bgClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-sky-500', icon: 'assignment' };
+        return { label: 'General / Taller', bgClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-sky-500', icon: this.icons.general };
       case 'pending':
       default:
-        return { label: 'Por Hacer', bgClass: 'bg-amber-500/10 border-amber-500/30', textClass: 'text-amber-500', icon: 'pending_actions' };
+        return { label: 'Por Hacer', bgClass: 'bg-amber-500/10 border-amber-500/30', textClass: 'text-amber-500', icon: this.icons.pending };
     }
   }
 }

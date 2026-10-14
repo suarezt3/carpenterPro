@@ -10,6 +10,30 @@ import {
 } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { HugeiconsIconComponent } from '@hugeicons/angular';
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Cancel01Icon,
+  CheckListIcon,
+  Clock01Icon,
+  CloudIcon,
+  Compass01Icon,
+  Delete02Icon,
+  Download01Icon,
+  Edit02Icon,
+  InformationCircleIcon,
+  Layers01Icon,
+  Moon02Icon,
+  Note01Icon,
+  QrCodeIcon,
+  Settings01Icon,
+  Sun01Icon,
+  Tag01Icon,
+  Tick02Icon
+} from '@hugeicons/core-free-icons';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -31,6 +55,7 @@ import { ProjectSettings } from '../../models/melamine.models';
   imports: [
     ReactiveFormsModule,
     SlicePipe,
+    HugeiconsIconComponent,
     TechnicalSheetModalComponent,
     DocumentationModalComponent,
     ProjectNotesModalComponent
@@ -49,6 +74,33 @@ export class HeaderComponent {
   private readonly dxfExporter = inject(DxfExporterService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+
+  // Registro local de iconos vectoriales de Hugeicons
+  readonly icons = {
+    logo3d: Compass01Icon,
+    edit: Edit02Icon,
+    close: Cancel01Icon,
+    check: Tick02Icon,
+    tab3d: Compass01Icon,
+    tabParts: CheckListIcon,
+    tabOptimizer: Layers01Icon,
+    tabBudget: Tag01Icon,
+    tabLabels: QrCodeIcon,
+    sun: Sun01Icon,
+    moon: Moon02Icon,
+    note: Note01Icon,
+    undo: ArrowLeft01Icon,
+    redo: ArrowRight01Icon,
+    project: Layers01Icon,
+    chevronDown: ArrowDown01Icon,
+    add: Add01Icon,
+    cloud: CloudIcon,
+    download: Download01Icon,
+    loading: Clock01Icon,
+    info: InformationCircleIcon,
+    settings: Settings01Icon,
+    delete: Delete02Icon
+  };
 
   // Pestaña activa y evento de navegación hacia App
   readonly activeTab = input<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>('modules');

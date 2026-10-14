@@ -1,0 +1,5 @@
+/* Estilos encapsulados del componente BudgetView */
+:host {
+  display: block;
+  width: 100%;
+}

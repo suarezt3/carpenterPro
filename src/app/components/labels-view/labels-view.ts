@@ -1,4 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { HugeiconsIconComponent } from '@hugeicons/angular';
+import {
+  PrinterIcon,
+  QrCodeIcon,
+  Tag01Icon
+} from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { ThemeService } from '../../services/theme.service';
 import { Part } from '../../models/melamine.models';
@@ -22,13 +28,20 @@ export interface FlatPartLabel {
 @Component({
   selector: 'app-labels-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [],
+  imports: [HugeiconsIconComponent],
   templateUrl: './labels-view.html',
   styleUrl: './labels-view.css'
 })
 export class LabelsViewComponent {
   readonly themeService = inject(ThemeService);
   private readonly projectService = inject(ProjectStorageService);
+
+  // Iconos vectoriales de Hugeicons utilizados en la vista
+  readonly icons = {
+    qrCode: QrCodeIcon,
+    print: PrinterIcon,
+    tag: Tag01Icon
+  };
 
   // Signals conectados al estado global del proyecto
   readonly project = this.projectService.currentProject;

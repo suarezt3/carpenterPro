@@ -1,4 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { HugeiconsIconComponent } from '@hugeicons/angular';
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  CheckListIcon,
+  Clock01Icon,
+  Compass01Icon,
+  Download01Icon,
+  Layers01Icon,
+  Note01Icon,
+  PrinterIcon,
+  ViewIcon
+} from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { ThemeService } from '../../services/theme.service';
@@ -12,7 +25,7 @@ import { OptimizationResult, PlacedPart, PlacedSheet } from '../../models/melami
 @Component({
   selector: 'app-cut-optimizer-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [],
+  imports: [HugeiconsIconComponent],
   templateUrl: './cut-optimizer-view.html',
   styleUrl: './cut-optimizer-view.css'
 })
@@ -20,6 +33,21 @@ export class CutOptimizerViewComponent {
   readonly themeService = inject(ThemeService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly optimizer = inject(CutOptimizerService);
+
+  // Registro local de iconos vectoriales de Hugeicons
+  readonly icons = {
+    optimizer: Compass01Icon,
+    print: PrinterIcon,
+    loading: Clock01Icon,
+    download: Download01Icon,
+    chevronDown: ArrowDown01Icon,
+    image: ViewIcon,
+    pdf: Note01Icon,
+    board: Layers01Icon,
+    zoomIn: Add01Icon,
+    zoomOut: ArrowDown01Icon,
+    list: CheckListIcon
+  };
 
   // Signals sincronizados con el estado global del proyecto
   readonly project = this.projectService.currentProject;

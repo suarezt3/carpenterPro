@@ -1,4 +1,22 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject } from '@angular/core';
+import { HugeiconsIconComponent } from '@hugeicons/angular';
+import {
+  Archive01Icon,
+  BookOpen01Icon,
+  Cancel01Icon,
+  CheckListIcon,
+  Compass01Icon,
+  FileSearchIcon,
+  HelpCircleIcon,
+  KeyboardIcon,
+  Layers01Icon,
+  LightbulbIcon,
+  RulerIcon,
+  Search01Icon,
+  Settings01Icon,
+  ShieldCheckIcon,
+  ViewIcon
+} from '@hugeicons/core-free-icons';
 import { ThemeService } from '../../services/theme.service';
 
 /**
@@ -23,13 +41,26 @@ export interface DocArticle {
  */
 @Component({
   selector: 'app-documentation-modal',
-  imports: [],
+  imports: [HugeiconsIconComponent],
   templateUrl: './documentation-modal.html',
   styleUrl: './documentation-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DocumentationModalComponent {
   readonly themeService = inject(ThemeService);
+
+  // Registro local de iconos vectoriales de Hugeicons
+  readonly icons = {
+    book: BookOpen01Icon,
+    close: Cancel01Icon,
+    search: Search01Icon,
+    cancel: Cancel01Icon,
+    searchOff: FileSearchIcon,
+    tune: Settings01Icon,
+    listNumbered: CheckListIcon,
+    lightbulb: LightbulbIcon,
+    verified: ShieldCheckIcon
+  };
 
   // Estado de apertura del modal y evento de cierre
   readonly isOpen = input<boolean>(false);
@@ -357,7 +388,7 @@ export class DocumentationModalComponent {
       iconColor: 'text-purple-600',
       badge: 'Bisagras Dinámicas',
       steps: [
-        'Cuando creas o duplicas una puerta batiente para colocarla en el lado opuesto del mueble:',
+        'When you create or duplicate a swing door...',
         '1. En el menú contextual de clic derecho en 3D o desde Editar Módulo, selecciona el sentido de apertura deseado: "Puerta (Bisagra Izquierda)" o "Puerta (Bisagra Derecha)".',
         '2. Al cambiar el sentido, la manija/tirador 3D se ubicará en el borde opuesto y las bisagras 3D se trasladarán al borde correspondiente.',
         '3. Las perforaciones púrpuras de cazoleta Ø35mm x 12.5mm se recalcularán automáticamente en el borde de apertura (a 22mm de la arista).',
@@ -428,5 +459,44 @@ export class DocumentationModalComponent {
 
   close() {
     this.modalClose.emit();
+  }
+
+  /**
+   * Mapea los iconos de las categorías del manual a sus equivalentes en Hugeicons.
+   */
+  getCategoryIcon(iconName: string) {
+    switch (iconName) {
+      case 'adjust': return Settings01Icon;
+      case 'straighten': return RulerIcon;
+      case 'architecture': return Compass01Icon;
+      case 'view_in_ar': return ViewIcon;
+      case 'precision_manufacturing': return Layers01Icon;
+      case 'keyboard': return KeyboardIcon;
+      case 'auto_stories':
+      default:
+        return BookOpen01Icon;
+    }
+  }
+
+  /**
+   * Mapea los iconos de los artículos individuales del manual a Hugeicons.
+   */
+  getArticleIcon(iconName: string) {
+    switch (iconName) {
+      case 'adjust': return Settings01Icon;
+      case 'straighten': return RulerIcon;
+      case 'pan_tool': return Archive01Icon;
+      case 'dashboard_customize': return Settings01Icon;
+      case 'crop_square': return Layers01Icon;
+      case 'open_in_full': return Compass01Icon;
+      case 'height': return RulerIcon;
+      case 'menu_book': return BookOpen01Icon;
+      case 'precision_manufacturing': return Layers01Icon;
+      case 'keyboard': return KeyboardIcon;
+      case 'format_shapes': return ViewIcon;
+      case 'door_sliding': return HelpCircleIcon;
+      default:
+        return BookOpen01Icon;
+    }
   }
 }
