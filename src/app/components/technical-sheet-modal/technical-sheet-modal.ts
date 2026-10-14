@@ -12,6 +12,9 @@ import { Project, DrillHole } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 
+/**
+ * Representa una pieza proyectada ortográficamente en un plano 2D (Frontal, Lateral o Planta).
+ */
 export interface OrthoPiece2D {
   id: string;
   name: string;
@@ -36,28 +39,37 @@ export interface DimensionLine2D {
   isHorizontal: boolean;
 }
 
+/**
+ * Modal de Plano Técnico 2D de Fabricación.
+ * Genera proyecciones ortográficas SVG acotadas (Alzada Frontal y Perfil Lateral)
+ * y resume los mecanizados CNC de cada pieza para impresión o exportación DXF.
+ */
 @Component({
   selector: 'app-technical-sheet-modal',
   imports: [CommonModule],
   templateUrl: './technical-sheet-modal.html',
+  styleUrl: './technical-sheet-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TechnicalSheetModalComponent {
-  private joineryEngine = inject(JoineryEngineService);
-  private dxfExporter = inject(DxfExporterService);
+  private readonly joineryEngine = inject(JoineryEngineService);
+  private readonly dxfExporter = inject(DxfExporterService);
 
-  // Inputs & Outputs
-  project = input.required<Project>();
-  modalClose = output<void>();
+  // Proyecto activo y evento de cierre del modal
+  readonly project = input.required<Project>();
+  readonly modalClose = output<void>();
 
-  // Interactive View Settings
-  showFrontView = signal<boolean>(true);
-  showSideView = signal<boolean>(true);
-  showTopView = signal<boolean>(true);
-  showDimensions = signal<boolean>(true);
-  showDrills = signal<boolean>(true);
-  isBlueprintDark = signal<boolean>(false); // Default to clean white workshop paper
+  // Opciones interactivas de visualización del plano
+  readonly showFrontView = signal<boolean>(true);
+  readonly showSideView = signal<boolean>(true);
+  readonly showTopView = signal<boolean>(true);
+  readonly showDimensions = signal<boolean>(true);
+  readonly showDrills = signal<boolean>(true);
+  readonly isBlueprintDark = signal<boolean>(false); // Por defecto en papel blanco para taller
 
+  /**
+   * Calcula en tiempo real todas las perforaciones y colisiones del proyecto usando JoineryEngineService.
+   */
   readonly joineryData = computed(() => {
     return this.joineryEngine.calculateJoinery(this.project().parts);
   });
@@ -66,16 +78,21 @@ export class TechnicalSheetModalComponent {
     return this.joineryData().allDrillHoles;
   });
 
-  // Calculate furniture overall dimensions
+  /**
+   * Calcula la caja envolvente total (Bounding Box 3D) del mueble completo en milímetros.
+   */
   readonly bounds = computed(() => {
     const parts = this.project().parts;
     if (parts.length === 0) {
       return { minX: 0, maxX: 1000, minY: 0, maxY: 900, minZ: 0, maxZ: 600, width: 1000, height: 900, depth: 600 };
     }
 
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
 
     for (const p of parts) {
       const b = this.joineryEngine.getPartBounds(p);
@@ -100,7 +117,9 @@ export class TechnicalSheetModalComponent {
     };
   });
 
-  // Front View 2D Projected Rectangles
+  /**
+   * Proyección 2D de la Vista Frontal (Alzada: Eje X vs Eje Y invertido para SVG).
+   */
   readonly frontPieces = computed<OrthoPiece2D[]>(() => {
     const parts = this.project().parts;
     const bTotal = this.bounds();
@@ -112,7 +131,7 @@ export class TechnicalSheetModalComponent {
         name: p.name,
         role: p.componentRole,
         x: b.minX - bTotal.minX,
-        y: bTotal.maxY - b.maxY, // SVG Y is inverted
+        y: bTotal.maxY - b.maxY,
         w: b.sx,
         h: b.sy,
         thickness: p.thickness || 18,
@@ -122,7 +141,9 @@ export class TechnicalSheetModalComponent {
     });
   });
 
-  // Side View 2D Projected Rectangles (Profile: Z vs Y)
+  /**
+   * Proyección 2D de la Vista Lateral (Perfil: Eje Z vs Eje Y invertido para SVG).
+   */
   readonly sidePieces = computed<OrthoPiece2D[]>(() => {
     const parts = this.project().parts;
     const bTotal = this.bounds();
@@ -144,7 +165,9 @@ export class TechnicalSheetModalComponent {
     });
   });
 
-  // Top View 2D Projected Rectangles (Planta: X vs Z)
+  /**
+   * Proyección 2D de la Vista Superior (Planta: Eje X vs Eje Z).
+   */
   readonly topPieces = computed<OrthoPiece2D[]>(() => {
     const parts = this.project().parts;
     const bTotal = this.bounds();
@@ -166,48 +189,54 @@ export class TechnicalSheetModalComponent {
     });
   });
 
-  // Front View Dimensions (Overall width, height, shelf heights)
+  /**
+   * Líneas de cotas generales para la vista frontal.
+   */
   readonly frontDimensions = computed<DimensionLine2D[]>(() => {
     const b = this.bounds();
-    const dims: DimensionLine2D[] = [];
-
-    // Top Width Cota
-    dims.push({
-      x1: 0,
-      y1: -35,
-      x2: b.width,
-      y2: -35,
-      text: `${b.width} mm`,
-      textX: b.width / 2,
-      textY: -43,
-      isHorizontal: true
-    });
-
-    // Left Height Cota
-    dims.push({
-      x1: -45,
-      y1: 0,
-      x2: -45,
-      y2: b.height,
-      text: `${b.height} mm`,
-      textX: -55,
-      textY: b.height / 2,
-      isHorizontal: false
-    });
-
-    return dims;
+    return [
+      {
+        x1: 0,
+        y1: -35,
+        x2: b.width,
+        y2: -35,
+        text: `${b.width} mm`,
+        textX: b.width / 2,
+        textY: -43,
+        isHorizontal: true
+      },
+      {
+        x1: -45,
+        y1: 0,
+        x2: -45,
+        y2: b.height,
+        text: `${b.height} mm`,
+        textX: -55,
+        textY: b.height / 2,
+        isHorizontal: false
+      }
+    ];
   });
 
+  /**
+   * Abre el diálogo nativo de impresión del navegador para guardar o imprimir el plano en PDF.
+   */
   printSheet() {
     if (typeof window !== 'undefined') {
       window.print();
     }
   }
 
+  /**
+   * Descarga el archivo DXF R12 con todas las capas de corte y taladros CNC.
+   */
   downloadDxf() {
     this.dxfExporter.exportProjectToDxf(this.project());
   }
 
+  /**
+   * Alterna entre el modo Papel Blanco de taller y el modo Blueprint CAD Oscuro.
+   */
   toggleTheme() {
     this.isBlueprintDark.update(v => !v);
   }

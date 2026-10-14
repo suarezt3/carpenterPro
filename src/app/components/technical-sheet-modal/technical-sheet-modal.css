@@ -1,0 +1,4 @@
+/* Estilos encapsulados del componente TechnicalSheetModal */
+:host {
+  display: contents;
+}

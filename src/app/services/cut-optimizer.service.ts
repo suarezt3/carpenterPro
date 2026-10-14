@@ -46,13 +46,11 @@ export class CutOptimizerService {
 
       if (part.edges.l1 === 'thin') totalThinEdgeMeters += lMeters;
       if (part.edges.l1 === 'thick') totalThickEdgeMeters += lMeters;
-
       if (part.edges.l2 === 'thin') totalThinEdgeMeters += lMeters;
       if (part.edges.l2 === 'thick') totalThickEdgeMeters += lMeters;
 
       if (part.edges.a1 === 'thin') totalThinEdgeMeters += wMeters;
       if (part.edges.a1 === 'thick') totalThickEdgeMeters += wMeters;
-
       if (part.edges.a2 === 'thin') totalThinEdgeMeters += wMeters;
       if (part.edges.a2 === 'thick') totalThickEdgeMeters += wMeters;
     }
@@ -135,7 +133,6 @@ export class CutOptimizerService {
         // Remover piezas colocadas
         const placedIds = new Set(sheetResult.placedParts.map(p => `${p.part.id}_${p.copyIndex}`));
         currentItems = currentItems.filter(item => !placedIds.has(`${item.part.id}_${item.copyIndex}`));
-
         sheetNum++;
       }
     }
@@ -176,6 +173,7 @@ export class CutOptimizerService {
 
     const placedParts: PlacedPart[] = [];
     const cutLines: CutLine[] = [];
+
     let freeRects: FreeRect[] = [
       {
         x: margin,
@@ -190,19 +188,21 @@ export class CutOptimizerService {
 
     // Crear lista de ítems restantes para este tablero
     const remainingItems = [...items];
-    const placedIndices = new Set<number>();
 
-    for (let i = 0; i < remainingItems.length; i++) {
-      const item = remainingItems[i];
+    for (const item of remainingItems) {
+      // Determinar orientaciones permitidas según la veta del material y de la pieza
+      const effectiveGrain = material.hasGrain ? item.grain : 'none';
+      const orientations: { length: number; width: number; rotated: boolean }[] = [];
 
-      // Determinar orientaciones permitidas según la veta
-      const canRotate = item.grain === 'none';
-      const orientations: { length: number; width: number; rotated: boolean }[] = [
-        { length: item.length, width: item.width, rotated: false }
-      ];
-
-      if (canRotate && item.length !== item.width) {
+      if (effectiveGrain === 'length') {
+        orientations.push({ length: item.length, width: item.width, rotated: false });
+      } else if (effectiveGrain === 'width') {
         orientations.push({ length: item.width, width: item.length, rotated: true });
+      } else {
+        orientations.push({ length: item.length, width: item.width, rotated: false });
+        if (item.length !== item.width) {
+          orientations.push({ length: item.width, width: item.length, rotated: true });
+        }
       }
 
       // Buscar el mejor espacio libre (Best Short Side Fit)
@@ -249,13 +249,10 @@ export class CutOptimizerService {
           tag: `P${placedParts.length + 1}`
         });
 
-        placedIndices.add(i);
-
         // Remover el rectángulo usado
         freeRects.splice(bestRectIndex, 1);
 
         // Generar líneas de corte y dos nuevos rectángulos guillotina
-        // Corte tipo guillotina:
         const remX = targetRect.length - placedL - kerf;
         const remY = targetRect.width - placedW - kerf;
 
@@ -351,7 +348,7 @@ export class CutOptimizerService {
       }
     }
 
-    // Calcular retazos aprovechables (sobrantes con área >= 0.05m² y lados >= 200mm)
+    // Calcular retazos aprovechables (sobrantes con área >= 0.06m² y lados >= 250x200mm)
     const leftovers: LeftoverScrap[] = freeRects.map((r, idx) => {
       const areaM2 = (r.length * r.width) / 1_000_000;
       const usable = r.length >= 250 && r.width >= 200 && areaM2 >= 0.06;

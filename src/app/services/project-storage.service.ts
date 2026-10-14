@@ -19,6 +19,10 @@ import { FurnitureTemplate } from './templates-catalog.service';
 const STORAGE_KEY = 'melamipro_current_project';
 const PROJECTS_LIST_KEY = 'melamipro_saved_projects_meta';
 
+/**
+ * Metadatos ligeros para listar proyectos guardados en localStorage
+ * sin necesidad de parsear todas las piezas y módulos de cada proyecto.
+ */
 export interface ProjectMeta {
   id: string;
   name: string;
@@ -28,10 +32,12 @@ export interface ProjectMeta {
   partsCount: number;
 }
 
+/**
+ * Formatea valores numéricos a la moneda configurada en el proyecto (COP, CLP, MXN, USD, etc.).
+ */
 export function formatCurrencyValue(amount: number, currency = 'COP'): string {
   const num = Number(amount) || 0;
   const curr = (currency || 'COP').toUpperCase();
-
   switch (curr) {
     case 'COP':
       return '$ ' + Math.round(num).toLocaleString('es-CO') + ' COP';
@@ -51,6 +57,9 @@ export function formatCurrencyValue(amount: number, currency = 'COP'): string {
   }
 }
 
+/**
+ * Normaliza los nombres de materiales eliminando sufijos redundantes de espesor.
+ */
 export function cleanMaterialName(name: string): string {
   if (!name) return '';
   return name
@@ -66,22 +75,22 @@ export function cleanMaterialName(name: string): string {
 export class ProjectStorageService {
   private cabinetGen = inject(CabinetGeneratorService);
   readonly supabase = inject(SupabaseService);
-
   private autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Undo / Redo history stacks (deep cloned snapshots)
+  // Pilas de historial Undo / Redo (almacenan snapshots profundos del proyecto activo)
   private undoStack: Project[] = [];
   private redoStack: Project[] = [];
   readonly canUndo = signal<boolean>(false);
   readonly canRedo = signal<boolean>(false);
 
-  // Cloud auto-sync preference (default: false, manual save with button)
+  // Preferencia de sincronización automática con Supabase (por defecto manual para ahorrar cuota)
   readonly autoSyncEnabled = signal<boolean>(this.loadAutoSyncPreference());
 
+  // Estado reactivo principal del proyecto activo y lista de proyectos locales
   readonly currentProject = signal<Project>(this.getInitialProject());
   readonly savedProjects = signal<ProjectMeta[]>(this.loadSavedProjectsList());
 
-  // Computed totals
+  // Signals computados derivados automáticamente del proyecto actual
   readonly totalPartsCount = computed(() => {
     return this.currentProject().parts.reduce((sum, p) => sum + p.quantity, 0);
   });
@@ -89,12 +98,17 @@ export class ProjectStorageService {
   readonly materialsList = computed(() => this.currentProject().materials);
   readonly modulesList = computed(() => this.currentProject().modules);
   readonly partsList = computed(() => this.currentProject().parts);
+
+  /**
+   * Filtra únicamente los grupos que aún tienen piezas activas asociadas en el proyecto.
+   */
   readonly groupsList = computed(() => {
     const parts = this.currentProject().parts;
     const groups = this.currentProject().groups || [];
     const activeGroupIds = new Set(parts.map(p => p.groupId).filter(Boolean));
     return groups.filter(g => activeGroupIds.has(g.id));
   });
+
   readonly hardwareList = computed(() => this.currentProject().hardware);
   readonly appliancesList = computed<ApplianceItem[]>(() => this.currentProject().appliances || []);
   readonly selectedApplianceId = signal<string | null>(null);
@@ -105,6 +119,10 @@ export class ProjectStorageService {
   });
   readonly projectSettings = computed(() => this.currentProject().settings);
   readonly projectNotes = computed<ProjectNoteItem[]>(() => this.currentProject().projectNotes || []);
+
+  // ==========================================
+  // GESTIÓN DE NOTAS DEL PROYECTO
+  // ==========================================
 
   addProjectNote(noteData: Omit<ProjectNoteItem, 'id' | 'createdAt' | 'updatedAt'>) {
     const now = new Date().toISOString();
@@ -125,7 +143,7 @@ export class ProjectStorageService {
     const now = new Date().toISOString();
     this.updateProject(p => ({
       ...p,
-      projectNotes: (p.projectNotes || []).map(n => 
+      projectNotes: (p.projectNotes || []).map(n =>
         n.id === id ? { ...n, ...updates, updatedAt: now } : n
       )
     }));
@@ -142,11 +160,15 @@ export class ProjectStorageService {
     const now = new Date().toISOString();
     this.updateProject(p => ({
       ...p,
-      projectNotes: (p.projectNotes || []).map(n => 
+      projectNotes: (p.projectNotes || []).map(n =>
         n.id === id ? { ...n, completed: !n.completed, updatedAt: now } : n
       )
     }));
   }
+
+  // ==========================================
+  // GESTIÓN DE ELECTRODOMÉSTICOS Y ACCESORIOS 3D
+  // ==========================================
 
   addAppliance(appliance: ApplianceItem) {
     this.updateProject(p => ({
@@ -237,12 +259,15 @@ export class ProjectStorageService {
   }
 
   constructor() {
-    // If no project existed, initialize demo and persist
+    // Si no existía proyecto en localStorage, guarda el proyecto demo inicial
     if (this.isBrowser() && !localStorage.getItem(STORAGE_KEY)) {
       this.saveToStorage(this.currentProject());
     }
   }
 
+  /**
+   * Carga el proyecto activo desde localStorage o genera el proyecto de demostración inicial.
+   */
   getInitialProject(): Project {
     if (this.isBrowser()) {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -286,6 +311,9 @@ export class ProjectStorageService {
     return this.createDemoProject();
   }
 
+  /**
+   * Crea el proyecto de referencia inicial con el catálogo base de melaminas y piezas de muestra.
+   */
   createDemoProject(): Project {
     const matRoble: Material = {
       id: 'mat_roble_18',
@@ -472,7 +500,6 @@ export class ProjectStorageService {
       matMdfFondo
     ];
 
-    // Inicializar directamente con el modelo de barra/mueble de referencia (Techo 1800x600, laterales, base)
     const initialParts: Part[] = [
       {
         id: 'desk_top',
@@ -635,8 +662,14 @@ export class ProjectStorageService {
     };
   }
 
-  // --- HISTORY (UNDO / REDO) ---
+  // ==========================================
+  // HISTORIAL DE CAMBIOS (UNDO / REDO)
+  // ==========================================
 
+  /**
+   * Guarda una copia profunda del estado actual antes de aplicar una mutación.
+   * Mantiene un límite máximo de 35 estados en memoria.
+   */
   pushSnapshot() {
     try {
       const snap = JSON.parse(JSON.stringify(this.currentProject()));
@@ -648,10 +681,24 @@ export class ProjectStorageService {
       this.canUndo.set(this.undoStack.length > 0);
       this.canRedo.set(false);
     } catch {
-      // Fallback
+      // Fallback seguro si falla la serialización
     }
   }
 
+  /**
+   * Limpia las pilas de Undo/Redo cuando el usuario cambia de proyecto o crea uno nuevo,
+   * evitando que Ctrl+Z mezcle estados de proyectos distintos.
+   */
+  clearHistory() {
+    this.undoStack = [];
+    this.redoStack = [];
+    this.canUndo.set(false);
+    this.canRedo.set(false);
+  }
+
+  /**
+   * Restaura el estado inmediatamente anterior en la pila `undoStack`.
+   */
   undo() {
     if (this.undoStack.length === 0) return;
     try {
@@ -667,6 +714,9 @@ export class ProjectStorageService {
     }
   }
 
+  /**
+   * Reaplica un estado deshecho previamente desde la pila `redoStack`.
+   */
   redo() {
     if (this.redoStack.length === 0) return;
     try {
@@ -682,8 +732,15 @@ export class ProjectStorageService {
     }
   }
 
-  // --- CRUD OPERACIONES ---
+  // ==========================================
+  // PERSISTENCIA LOCAL Y EN LA NUBE (SUPABASE)
+  // ==========================================
 
+  /**
+   * Método central para mutar el proyecto activo.
+   * Registra automáticamente el snapshot en el historial (si `recordHistory` es true)
+   * y persiste en localStorage (y en Supabase si autoSync está activo).
+   */
   updateProject(mutator: (p: Project) => Project, recordHistory = true) {
     if (recordHistory) {
       this.pushSnapshot();
@@ -704,11 +761,13 @@ export class ProjectStorageService {
     }));
   }
 
+  /**
+   * Guarda el proyecto completo en localStorage y actualiza el índice ligero `savedProjects`.
+   */
   saveToStorage(project: Project) {
     if (!this.isBrowser()) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
 
-    // Update list metadata
     const list = this.loadSavedProjectsList();
     const existingIndex = list.findIndex(p => p.id === project.id);
     const meta: ProjectMeta = {
@@ -730,7 +789,7 @@ export class ProjectStorageService {
     localStorage.setItem(`melamipro_project_${project.id}`, JSON.stringify(project));
     this.savedProjects.set(list);
 
-    // Only sync to Supabase automatically if user enabled auto-sync
+    // Sincronizar con Supabase con debounce de 1.5s únicamente si el usuario activó autoSync
     if (this.autoSyncEnabled()) {
       this.scheduleCloudAutoSync(project);
     } else if (this.autoSyncTimeout) {
@@ -744,7 +803,7 @@ export class ProjectStorageService {
       clearTimeout(this.autoSyncTimeout);
     }
     this.autoSyncTimeout = setTimeout(() => {
-      this.supabase.saveProject(project);
+      void this.supabase.saveProject(project);
     }, 1500);
   }
 
@@ -752,14 +811,27 @@ export class ProjectStorageService {
     return this.supabase.saveProject(this.currentProject());
   }
 
-  loadCloudProject(record: CloudProjectRecord) {
-    if (record && record.data) {
-      const proj = record.data;
-      this.currentProject.set(proj);
-      if (this.isBrowser()) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(proj));
-        localStorage.setItem(`melamipro_project_${proj.id}`, JSON.stringify(proj));
+  /**
+   * Carga un proyecto desde Supabase. Si el registro no incluye el objeto `data`,
+   * lo descarga bajo demanda usando `getProjectById`, limpia el historial Undo/Redo
+   * y actualiza el almacenamiento local.
+   */
+  async loadCloudProject(record: CloudProjectRecord) {
+    if (!record) return;
+    let projectData = record.data;
+
+    if (!projectData && record.id) {
+      const fullRecord = await this.supabase.getProjectById(record.id);
+      if (fullRecord?.data) {
+        projectData = fullRecord.data;
       }
+    }
+
+    if (projectData) {
+      this.clearHistory();
+      this.selectedApplianceId.set(null);
+      this.currentProject.set(projectData);
+      this.saveToStorage(projectData);
     }
   }
 
@@ -785,7 +857,9 @@ export class ProjectStorageService {
     const raw = localStorage.getItem(`melamipro_project_${id}`);
     if (raw) {
       try {
-        const proj = JSON.parse(raw);
+        const proj = JSON.parse(raw) as Project;
+        this.clearHistory();
+        this.selectedApplianceId.set(null);
         this.currentProject.set(proj);
         localStorage.setItem(STORAGE_KEY, raw);
       } catch (e) {
@@ -813,20 +887,28 @@ export class ProjectStorageService {
       notes: '',
       modules: [],
       parts: [],
+      groups: [],
+      appliances: [],
       hardware: [],
       updatedAt: new Date().toISOString()
     };
+    this.clearHistory();
+    this.selectedApplianceId.set(null);
     this.currentProject.set(newProj);
     this.saveToStorage(newProj);
   }
 
   resetToDemo() {
     const demo = this.createDemoProject();
+    this.clearHistory();
+    this.selectedApplianceId.set(null);
     this.currentProject.set(demo);
     this.saveToStorage(demo);
   }
 
-  // --- MODULE ACTIONS ---
+  // ==========================================
+  // ACCIONES DE MÓDULOS Y PLANTILLAS
+  // ==========================================
 
   addModule(module: FurnitureModule) {
     const partsRes = this.cabinetGen.generatePartsForModule(module, this.currentProject().materials);
@@ -840,7 +922,6 @@ export class ProjectStorageService {
 
   updateModule(module: FurnitureModule) {
     const current = this.currentProject();
-    // Regenerar piezas para este módulo
     const partsRes = this.cabinetGen.generatePartsForModule(module, current.materials);
     const otherParts = current.parts.filter(p => p.moduleId !== module.id);
     const otherModules = current.modules.map(m => m.id === module.id ? module : m);
@@ -864,10 +945,10 @@ export class ProjectStorageService {
   updateParametricCabinet(groupId: string, newParts: Part[], newName?: string, newConfig?: ParametricCabinetConfig) {
     this.updateProject(p => ({
       ...p,
-      groups: (p.groups || []).map(g => g.id === groupId ? { 
-        ...g, 
-        name: newName || g.name, 
-        parametricConfig: newConfig || g.parametricConfig 
+      groups: (p.groups || []).map(g => g.id === groupId ? {
+        ...g,
+        name: newName || g.name,
+        parametricConfig: newConfig || g.parametricConfig
       } : g),
       parts: [
         ...p.parts.filter(pt => pt.groupId !== groupId),
@@ -937,7 +1018,6 @@ export class ProjectStorageService {
     const mats = this.currentProject().materials;
     const woodMat = mats.find(m => m.hasGrain) || mats[0];
 
-    // Reference model matching image.png (Desk / Counter with right cabinet)
     const deskParts: Part[] = [
       {
         id: 'desk_top',
@@ -1056,7 +1136,9 @@ export class ProjectStorageService {
     }));
   }
 
-  // --- PARTS ACTIONS ---
+  // ==========================================
+  // ACCIONES DE PIEZAS INDIVIDUALES
+  // ==========================================
 
   addPart(part: Part) {
     this.updateProject(p => ({
@@ -1090,7 +1172,6 @@ export class ProjectStorageService {
     const part = currentProj.parts.find(p => p.id === partId);
     if (!part) return null;
 
-    // Ensure strictly unique name
     const existingNames = currentProj.parts.map(p => p.name.trim().toLowerCase());
     const baseClean = part.name.replace(/\s+\(Copia.*?\)$/i, '').replace(/\s+\d+$/, '').trim();
     let candidate = `${baseClean} 2`;
@@ -1115,7 +1196,6 @@ export class ProjectStorageService {
   deletePart(partId: string) {
     this.updateProject(p => {
       const remainingParts = p.parts.filter(pt => pt.id !== partId);
-      // Clean up empty groups if needed
       const usedGroupIds = new Set(remainingParts.map(pt => pt.groupId).filter(Boolean));
       const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
       return {
@@ -1140,7 +1220,9 @@ export class ProjectStorageService {
     });
   }
 
-  // --- GROUPS ACTIONS (CAJONES Y MODULARES) ---
+  // ==========================================
+  // ACCIONES DE GRUPOS (CAJONES Y ENSAMBLES)
+  // ==========================================
 
   createGroup(name: string, partIds: string[], type: 'drawer' | 'door_set' | 'assembly' | 'custom' = 'drawer', slideLength = 450): PartGroup {
     const newGroup: PartGroup = {
@@ -1189,7 +1271,6 @@ export class ProjectStorageService {
         }
         return pt;
       });
-
       return {
         ...p,
         groups: currentGroups,
@@ -1228,15 +1309,18 @@ export class ProjectStorageService {
   changeGroupMaterial(groupId: string, materialId: string, target: 'all' | 'structure' | 'doors' = 'all') {
     const mat = this.materialsList().find(m => m.id === materialId);
     if (!mat) return;
+
     this.updateProject(p => ({
       ...p,
       parts: p.parts.map(pt => {
         if (pt.groupId !== groupId) return pt;
         const isDoor = pt.componentRole === 'door' || pt.componentRole === 'drawer_front';
         const isBack = pt.componentRole === 'back' && pt.thickness <= 6;
-        if (isBack) return pt; // Maintain thin back panel
+        if (isBack) return pt; // Mantener fondo delgado MDF
+
         if (target === 'doors' && !isDoor) return pt;
         if (target === 'structure' && isDoor) return pt;
+
         return {
           ...pt,
           materialId: mat.id,
@@ -1265,7 +1349,6 @@ export class ProjectStorageService {
           return pt;
         });
       }
-
       return {
         ...p,
         groups: currentGroups,
@@ -1321,16 +1404,14 @@ export class ProjectStorageService {
     const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
     if (groupParts.length === 0) return null;
 
-    // Determine vertical offset (+Y) to stack cleanly right above the original drawer
     const frontPart = groupParts.find(p => p.componentRole === 'drawer_front' || p.id.includes('frente') || p.name.toUpperCase().includes('FRENTE')) || groupParts[0];
-    const frontHeight = frontPart.orientation === 'vertical_xy' 
-      ? (frontPart.width > 0 ? frontPart.width : frontPart.length) 
+    const frontHeight = frontPart.orientation === 'vertical_xy'
+      ? (frontPart.width > 0 ? frontPart.width : frontPart.length)
       : (frontPart.orientation === 'vertical_yz' ? (frontPart.width > 0 ? frontPart.width : frontPart.length) : frontPart.width);
-    
-    const effectiveHeight = frontHeight && frontHeight > 40 ? frontHeight : 180;
-    const deltaY = Math.round(effectiveHeight + 15); // Stack above with 15mm clearance gap
 
-    // Auto-generate next group name (e.g. "Cajón 2", "Cajón 3")
+    const effectiveHeight = frontHeight && frontHeight > 40 ? frontHeight : 180;
+    const deltaY = Math.round(effectiveHeight + 15);
+
     const existingGroups = currentProj.groups || [];
     let nextName = `${group.name} (Copia)`;
     const match = group.name.match(/^(.*?caj[oó]n\s*)(\d+)/i);
@@ -1349,7 +1430,6 @@ export class ProjectStorageService {
       nextName = `${group.name} ${existingGroups.length + 1}`;
     }
 
-    // Ensure strict uniqueness across all existing group names
     const existingGroupNames = existingGroups.map(g => g.name.trim().toLowerCase());
     let groupCandidate = nextName;
     let groupSuffix = 2;
@@ -1369,11 +1449,11 @@ export class ProjectStorageService {
 
     const existingPartNames = currentProj.parts.map(p => p.name.trim().toLowerCase());
     const newPartIds: string[] = [];
+
     const newParts: Part[] = groupParts.map(pt => {
       const newId = 'part_' + crypto.randomUUID().slice(0, 8) + '_' + (pt.componentRole || 'drawer');
       newPartIds.push(newId);
 
-      // Generate distinct part name based on the new group name
       let partNameCandidate = pt.name;
       if (group.name && pt.name.toLowerCase().includes(group.name.toLowerCase())) {
         partNameCandidate = pt.name.replace(new RegExp(group.name, 'gi'), nextName);
@@ -1414,7 +1494,6 @@ export class ProjectStorageService {
       const groupParts = p.parts.filter(pt => pt.groupId === groupId);
       if (groupParts.length === 0) return p;
 
-      // Group centroid in (X, Z)
       const minX = Math.min(...groupParts.map(pt => pt.posX ?? 0));
       const maxX = Math.max(...groupParts.map(pt => pt.posX ?? 0));
       const minZ = Math.min(...groupParts.map(pt => pt.posZ ?? 0));
@@ -1427,16 +1506,13 @@ export class ProjectStorageService {
 
         const dx = (pt.posX ?? 0) - cx;
         const dz = (pt.posZ ?? 0) - cz;
-
         let newDx = dx;
         let newDz = dz;
 
         if (angleDelta === 90) {
-          // Clockwise 90° (+Z -> +X, +X -> -Z, -Z -> -X, -X -> +Z)
           newDx = dz;
           newDz = -dx;
         } else if (angleDelta === -90) {
-          // Counter-clockwise 90° (+Z -> -X, -X -> -Z, -Z -> +X, +X -> +Z)
           newDx = -dz;
           newDz = dx;
         } else if (angleDelta === 180) {
@@ -1457,7 +1533,6 @@ export class ProjectStorageService {
           } else if (pt.orientation === 'vertical_yz') {
             newOrientation = 'vertical_xy';
           } else if (pt.orientation === 'horizontal') {
-            // Swap length and width for horizontal boards
             newLength = pt.width;
             newWidth = pt.length;
           }
@@ -1504,7 +1579,6 @@ export class ProjectStorageService {
     }
   }
 
-
   addParametricDrawer(cfg: ParametricDrawerConfig): PartGroup {
     const defaultMat = this.materialsList().find(m => m.id === cfg.materialId) || this.materialsList()[0];
     const mdfMat = this.materialsList().find(m => m.id === cfg.bottomMaterialId || m.thickness === 3) || defaultMat;
@@ -1534,7 +1608,6 @@ export class ProjectStorageService {
       frontGap: gap
     };
 
-    // 1. Fondo MDF 3mm (Colocado en la base inferior por debajo de la caja)
     const fondo: Part = {
       id: `${groupId}_fondo_mdf`,
       name: `Fondo MDF (${groupName})`,
@@ -1556,10 +1629,8 @@ export class ProjectStorageService {
       notes: 'Fondo MDF 3mm colocado por debajo de la caja'
     };
 
-    // Las 4 paredes de la caja (Laterales, contra-frente, trasera) asientan exactamente sobre el fondo
     const boxCenterY = basePosY + bT + (boxH / 2);
 
-    // 2. Lateral Izquierdo
     const latIzq: Part = {
       id: `${groupId}_lat_izq`,
       name: `Lateral Izq (${groupName})`,
@@ -1581,7 +1652,6 @@ export class ProjectStorageService {
       notes: `Corredera ${boxLen}mm`
     };
 
-    // 3. Lateral Derecho
     const latDer: Part = {
       id: `${groupId}_lat_der`,
       name: `Lateral Der (${groupName})`,
@@ -1603,7 +1673,6 @@ export class ProjectStorageService {
       notes: `Corredera ${boxLen}mm`
     };
 
-    // 4. Contra-frente (frente interior ajustado entre laterales)
     const testeraWidth = Math.max(80, boxWidth - (2 * t));
     const contraFrente: Part = {
       id: `${groupId}_contrafrente`,
@@ -1626,7 +1695,6 @@ export class ProjectStorageService {
       notes: 'Frente interior de caja'
     };
 
-    // 5. Trasera de Cajón (ajustada entre laterales)
     const trasera: Part = {
       id: `${groupId}_trasera`,
       name: `Trasera (${groupName})`,
@@ -1650,7 +1718,6 @@ export class ProjectStorageService {
 
     const newParts: Part[] = [latIzq, latDer, contraFrente, trasera, fondo];
 
-    // 6. Frente exterior visto si se solicitó (por defecto activo)
     const includeFront = cfg.includeFront !== false;
     if (includeFront) {
       const fW = cfg.frontWidth || cfg.outerWidth;
@@ -1686,7 +1753,6 @@ export class ProjectStorageService {
       newParts.push(frente);
     }
 
-    // Add hardware pair of telescopic slides
     const slideHwItem: HardwareItem = {
       id: 'hw_slide_' + crypto.randomUUID().slice(0, 8),
       name: `Par Correderas Telescópicas ${boxLen}mm (${groupName})`,
@@ -1711,7 +1777,9 @@ export class ProjectStorageService {
     return newGroup;
   }
 
-  // --- MATERIALS ACTIONS ---
+  // ==========================================
+  // ACCIONES DE MATERIALES, HERRAJES Y AJUSTES
+  // ==========================================
 
   addMaterial(material: Material) {
     this.updateProject(p => ({
@@ -1734,8 +1802,6 @@ export class ProjectStorageService {
     }));
   }
 
-  // --- HARDWARE ACTIONS ---
-
   addHardware(item: HardwareItem) {
     this.updateProject(p => ({
       ...p,
@@ -1757,8 +1823,6 @@ export class ProjectStorageService {
     }));
   }
 
-  // --- SETTINGS ACTIONS ---
-
   updateSettings(settings: ProjectSettings) {
     this.updateProject(p => ({
       ...p,
@@ -1766,7 +1830,9 @@ export class ProjectStorageService {
     }));
   }
 
-  // --- EXPORT & IMPORT ---
+  // ==========================================
+  // EXPORTACIÓN E IMPORTACIÓN (JSON / CSV)
+  // ==========================================
 
   exportProjectAsJson(): string {
     return JSON.stringify(this.currentProject(), null, 2);
@@ -1789,6 +1855,8 @@ export class ProjectStorageService {
       if (!parsed.id || !Array.isArray(parsed.parts) || !Array.isArray(parsed.materials)) {
         throw new Error('Formato de proyecto inválido');
       }
+      this.clearHistory();
+      this.selectedApplianceId.set(null);
       this.currentProject.set(parsed);
       this.saveToStorage(parsed);
       return true;

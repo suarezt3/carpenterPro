@@ -9,49 +9,32 @@ import { FloorMaterialType, WallMaterialType } from '../models/melamine.models';
  */
 export class ProceduralTextureFactory {
   private static canvasCache = new Map<string, { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture }>();
+  private static repeatCache = new Map<string, { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture }>();
 
   // ==========================================
   // PISOS ARQUITECTÓNICOS
   // ==========================================
-
   static getFloorMaterial(
     type: FloorMaterialType,
     widthMm = 5000,
     depthMm = 5000
   ): THREE.MeshStandardMaterial {
-    const key = `floor_${type}`;
-    let textures = this.canvasCache.get(key);
-
-    if (!textures) {
-      textures = this.generateFloorTextures(type);
-      this.canvasCache.set(key, textures);
-    }
+    const baseKey = `floor_${type}`;
+    const repeatX = Math.max(1, Math.round(widthMm / 1000));
+    const repeatY = Math.max(1, Math.round(depthMm / 1000));
+    const configured = this.getOrCreateRepeatedTextures(baseKey, repeatX, repeatY, () =>
+      this.generateFloorTextures(type)
+    );
 
     const mat = new THREE.MeshStandardMaterial({
-      map: textures.map.clone(),
+      map: configured.map,
       roughness: 0.35,
       metalness: 0.05,
     });
 
-    if (textures.bump) {
-      mat.bumpMap = textures.bump.clone();
+    if (configured.bump) {
+      mat.bumpMap = configured.bump;
       mat.bumpScale = 0.015;
-    }
-
-    // Calibrar repetición basada en medidas físicas reales en mm
-    const repeatX = Math.max(1, Math.round(widthMm / 1000));
-    const repeatY = Math.max(1, Math.round(depthMm / 1000));
-
-    mat.map!.wrapS = THREE.RepeatWrapping;
-    mat.map!.wrapT = THREE.RepeatWrapping;
-    mat.map!.repeat.set(repeatX, repeatY);
-    mat.map!.needsUpdate = true;
-
-    if (mat.bumpMap) {
-      mat.bumpMap.wrapS = THREE.RepeatWrapping;
-      mat.bumpMap.wrapT = THREE.RepeatWrapping;
-      mat.bumpMap.repeat.set(repeatX, repeatY);
-      mat.bumpMap.needsUpdate = true;
     }
 
     // Ajuste físico según tipo de material
@@ -108,34 +91,19 @@ export class ProceduralTextureFactory {
   // ==========================================
   // PAREDES ARQUITECTÓNICAS
   // ==========================================
-
   static getWallMaterial(
     type: WallMaterialType,
     lengthMm = 3600,
     heightMm = 2600
   ): THREE.MeshStandardMaterial {
-    const key = `wall_${type}`;
-    let textures = this.canvasCache.get(key);
-
-    if (!textures) {
-      textures = this.generateWallTextures(type);
-      this.canvasCache.set(key, textures);
-    }
-
-    const mat = new THREE.MeshStandardMaterial({
-      map: textures.map.clone(),
-      roughness: 0.4,
-      metalness: 0.02,
-    });
-
-    if (textures.bump) {
-      mat.bumpMap = textures.bump.clone();
-      mat.bumpScale = 0.02;
-    }
+    const baseKey = `wall_${type}`;
 
     // Repetición proporcional a la longitud y altura del muro
     let repeatX = 1;
     let repeatY = 1;
+    let roughness = 0.4;
+    let metalness = 0.02;
+    let bumpScale = 0.02;
 
     switch (type) {
       case 'brick_clay':
@@ -143,9 +111,9 @@ export class ProceduralTextureFactory {
         // Ladrillos caravista estándar 24x6 cm aprox
         repeatX = Math.max(1, Math.round(lengthMm / 900));
         repeatY = Math.max(1, Math.round(heightMm / 900));
-        mat.roughness = 0.80; // Arcilla mate rugosa
-        mat.metalness = 0.01;
-        if (mat.bumpMap) mat.bumpScale = 0.06;
+        roughness = 0.80; // Arcilla mate rugosa
+        metalness = 0.01;
+        bumpScale = 0.06;
         break;
       case 'subway_tile_white':
       case 'subway_tile_emerald':
@@ -153,68 +121,108 @@ export class ProceduralTextureFactory {
         // Azulejos metro 10x20 cm
         repeatX = Math.max(1, Math.round(lengthMm / 1000) * 2);
         repeatY = Math.max(1, Math.round(heightMm / 1000) * 3);
-        mat.roughness = type === 'subway_tile_black' ? 0.35 : 0.15; // Cerámica esmaltada
-        if (mat.bumpMap) mat.bumpScale = 0.035;
+        roughness = type === 'subway_tile_black' ? 0.35 : 0.15; // Cerámica esmaltada
+        bumpScale = 0.035;
         break;
       case 'marble_wall_calacatta':
         repeatX = Math.max(1, Math.round(lengthMm / 2000));
         repeatY = Math.max(1, Math.round(heightMm / 2400));
-        mat.roughness = 0.15;
-        mat.metalness = 0.06;
-        if (mat.bumpMap) mat.bumpScale = 0.006;
+        roughness = 0.15;
+        metalness = 0.06;
+        bumpScale = 0.006;
         break;
       case 'kitchen_backsplash_quartz':
         repeatX = Math.max(1, Math.round(lengthMm / 1600));
         repeatY = Math.max(1, Math.round(heightMm / 1600));
-        mat.roughness = 0.28;
-        mat.metalness = 0.03;
-        if (mat.bumpMap) mat.bumpScale = 0.008;
+        roughness = 0.28;
+        metalness = 0.03;
+        bumpScale = 0.008;
         break;
       case 'kitchen_backsplash_mosaic':
         repeatX = Math.max(1, Math.round(lengthMm / 600));
         repeatY = Math.max(1, Math.round(heightMm / 600));
-        mat.roughness = 0.24;
-        if (mat.bumpMap) mat.bumpScale = 0.04;
+        roughness = 0.24;
+        bumpScale = 0.04;
         break;
       case 'vertical_slats_wood':
         repeatX = Math.max(1, Math.round(lengthMm / 500));
         repeatY = Math.max(1, Math.round(heightMm / 1200));
-        mat.roughness = 0.45;
-        if (mat.bumpMap) mat.bumpScale = 0.05;
+        roughness = 0.45;
+        bumpScale = 0.05;
         break;
       case 'concrete_smooth':
         repeatX = Math.max(1, Math.round(lengthMm / 1800));
         repeatY = Math.max(1, Math.round(heightMm / 1800));
-        mat.roughness = 0.7;
-        if (mat.bumpMap) mat.bumpScale = 0.02;
+        roughness = 0.7;
+        bumpScale = 0.02;
         break;
       case 'plaster_warm':
         repeatX = Math.max(1, Math.round(lengthMm / 1200));
         repeatY = Math.max(1, Math.round(heightMm / 1200));
-        mat.roughness = 0.85;
-        if (mat.bumpMap) mat.bumpScale = 0.015;
+        roughness = 0.85;
+        bumpScale = 0.015;
         break;
     }
 
-    mat.map!.wrapS = THREE.RepeatWrapping;
-    mat.map!.wrapT = THREE.RepeatWrapping;
-    mat.map!.repeat.set(repeatX, repeatY);
-    mat.map!.needsUpdate = true;
+    const configured = this.getOrCreateRepeatedTextures(baseKey, repeatX, repeatY, () =>
+      this.generateWallTextures(type)
+    );
 
-    if (mat.bumpMap) {
-      mat.bumpMap.wrapS = THREE.RepeatWrapping;
-      mat.bumpMap.wrapT = THREE.RepeatWrapping;
-      mat.bumpMap.repeat.set(repeatX, repeatY);
-      mat.bumpMap.needsUpdate = true;
+    const mat = new THREE.MeshStandardMaterial({
+      map: configured.map,
+      roughness,
+      metalness,
+    });
+
+    if (configured.bump) {
+      mat.bumpMap = configured.bump;
+      mat.bumpScale = bumpScale;
     }
 
     return mat;
   }
 
+  private static getOrCreateRepeatedTextures(
+    baseKey: string,
+    repeatX: number,
+    repeatY: number,
+    generator: () => { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture }
+  ): { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture } {
+    const repeatKey = `${baseKey}_${repeatX}_${repeatY}`;
+    const existingRepeat = this.repeatCache.get(repeatKey);
+    if (existingRepeat) {
+      return existingRepeat;
+    }
+
+    let baseTextures = this.canvasCache.get(baseKey);
+    if (!baseTextures) {
+      baseTextures = generator();
+      this.canvasCache.set(baseKey, baseTextures);
+    }
+
+    const mapClone = baseTextures.map.clone();
+    mapClone.wrapS = THREE.RepeatWrapping;
+    mapClone.wrapT = THREE.RepeatWrapping;
+    mapClone.repeat.set(repeatX, repeatY);
+    mapClone.needsUpdate = true;
+
+    let bumpClone: THREE.CanvasTexture | undefined;
+    if (baseTextures.bump) {
+      bumpClone = baseTextures.bump.clone();
+      bumpClone.wrapS = THREE.RepeatWrapping;
+      bumpClone.wrapT = THREE.RepeatWrapping;
+      bumpClone.repeat.set(repeatX, repeatY);
+      bumpClone.needsUpdate = true;
+    }
+
+    const configured = { map: mapClone, bump: bumpClone };
+    this.repeatCache.set(repeatKey, configured);
+    return configured;
+  }
+
   // ==========================================
   // GENERADORES DE PISO
   // ==========================================
-
   private static generateFloorTextures(type: FloorMaterialType): { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture } {
     const size = 1024;
     const canvas = document.createElement('canvas');
@@ -269,14 +277,12 @@ export class ProceduralTextureFactory {
     const map = new THREE.CanvasTexture(canvas);
     map.colorSpace = THREE.SRGBColorSpace;
     const bump = new THREE.CanvasTexture(bumpCanvas);
-
     return { map, bump };
   }
 
   // ==========================================
   // GENERADORES DE PARED
   // ==========================================
-
   private static generateWallTextures(type: WallMaterialType): { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture } {
     const size = 1024;
     const canvas = document.createElement('canvas');
@@ -328,7 +334,6 @@ export class ProceduralTextureFactory {
     const map = new THREE.CanvasTexture(canvas);
     map.colorSpace = THREE.SRGBColorSpace;
     const bump = new THREE.CanvasTexture(bumpCanvas);
-
     return { map, bump };
   }
 
@@ -380,13 +385,13 @@ export class ProceduralTextureFactory {
 
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, size, size);
+
     bumpCtx.fillStyle = '#808080';
     bumpCtx.fillRect(0, 0, size, size);
 
     for (let i = 0; i < plankCount; i++) {
       const y = i * plankH;
       const color = baseColors[i % baseColors.length];
-
       ctx.fillStyle = color;
       ctx.fillRect(0, y, size, plankH);
 
@@ -466,8 +471,8 @@ export class ProceduralTextureFactory {
       alpha: number,
       goldTint: boolean
     ) => {
-      const color = goldTint 
-        ? `rgba(180, 140, 70, ${alpha * 1.2})` 
+      const color = goldTint
+        ? `rgba(180, 140, 70, ${alpha * 1.2})`
         : `rgba(130, 140, 150, ${alpha})`;
 
       ctx.strokeStyle = color;
@@ -509,6 +514,7 @@ export class ProceduralTextureFactory {
       const step = size / gridCount;
       ctx.strokeStyle = isGold ? 'rgba(210, 195, 175, 0.5)' : 'rgba(180, 185, 190, 0.4)';
       ctx.lineWidth = 1.5;
+
       bumpCtx.strokeStyle = '#303030';
       bumpCtx.lineWidth = 2.5;
 
@@ -561,7 +567,6 @@ export class ProceduralTextureFactory {
       const py = Math.random() * size;
       const pw = 4 + Math.random() * 12;
       const ph = 1.5 + Math.random() * 3;
-
       ctx.fillStyle = 'rgba(120, 105, 85, 0.25)';
       ctx.fillRect(px, py, pw, ph);
 
@@ -698,7 +703,6 @@ export class ProceduralTextureFactory {
         const r = 40 + toneVar;
         const g = 44 + toneVar;
         const b = 49 + toneVar;
-
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.fillRect(x * tileSize + 2, y * tileSize + 2, tileSize - 4, tileSize - 4);
 
@@ -842,8 +846,8 @@ export class ProceduralTextureFactory {
         ctx.fillRect(tx, ty, tw, th);
 
         // Bisel cerámico (reflejo de luz superior/izquierda)
-        ctx.fillStyle = variety === 'white' 
-          ? 'rgba(255, 255, 255, 0.45)' 
+        ctx.fillStyle = variety === 'white'
+          ? 'rgba(255, 255, 255, 0.45)'
           : 'rgba(255, 255, 255, 0.15)';
         ctx.fillRect(tx, ty, tw, 3);
         ctx.fillRect(tx, ty, 3, th);
@@ -875,7 +879,6 @@ export class ProceduralTextureFactory {
     // Micropartículas de cuarzo reflectantes
     const imgData = ctx.getImageData(0, 0, size, size);
     const data = imgData.data;
-
     for (let i = 0; i < data.length; i += 4) {
       if (Math.random() < 0.08) {
         // Puntos brillantes minerales de sílice
@@ -963,7 +966,6 @@ export class ProceduralTextureFactory {
 
     for (let i = 0; i < slatCount; i++) {
       const x = i * slatWidth;
-
       ctx.fillStyle = '#c8a97e';
       ctx.fillRect(x, 0, woodWidth, size);
 
@@ -996,7 +998,6 @@ export class ProceduralTextureFactory {
 
     const imgData = ctx.getImageData(0, 0, size, size);
     const data = imgData.data;
-
     for (let i = 0; i < data.length; i += 4) {
       const noise = (Math.random() - 0.5) * 14;
       data[i] = Math.min(255, Math.max(0, data[i] + noise));
@@ -1022,13 +1023,11 @@ export class ProceduralTextureFactory {
     const bumpData = bumpCtx.getImageData(0, 0, size, size);
     const data = imgData.data;
     const bdata = bumpData.data;
-
     for (let i = 0; i < data.length; i += 4) {
       const n = (Math.random() - 0.5) * 8;
       data[i] = Math.min(255, Math.max(0, data[i] + n));
       data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + n));
       data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + n));
-
       bdata[i] = 128 + n * 2;
       bdata[i + 1] = 128 + n * 2;
       bdata[i + 2] = 128 + n * 2;

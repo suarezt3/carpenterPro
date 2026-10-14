@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Project, Part, DrillHole } from '../models/melamine.models';
-import { JoineryEngineService } from './joinery-engine.service';
+import { JoineryEngineService, Part3DBounds } from './joinery-engine.service';
 
 @Injectable({
   providedIn: 'root'
@@ -25,7 +25,6 @@ export class DxfExporterService {
   generateDxfString(project: Project): string {
     const joinery = this.joineryEngine.calculateJoinery(project.parts);
     const parts = project.parts;
-
     const lines: string[] = [];
 
     // --- HEADER SECTION ---
@@ -73,6 +72,7 @@ export class DxfExporterService {
       const L = part.length;
       const W = part.width;
       const holes = joinery.drillHolesByPart.get(part.id) || [];
+      const bounds = this.joineryEngine.getPartBounds(part);
 
       if (currentX + L > maxRowWidth && currentX > 100) {
         currentX = 50;
@@ -109,7 +109,7 @@ export class DxfExporterService {
       }
 
       // 3. Draw Drill Holes (Mecanizados) on Layer MECANIZADOS_PERFORACIONES
-      this.addPartDrillHolesToDxf(lines, part, holes, pX, pY, L, W);
+      this.addPartDrillHolesToDxf(lines, part, bounds, holes, pX, pY, L, W);
 
       // 4. Draw Piece Title & Technical Specs on Layer TEXTOS_ETIQUETAS
       const textX = pX + 15;
@@ -174,31 +174,61 @@ export class DxfExporterService {
     lines.push('1', text);
   }
 
-  // Maps global 3D drill holes into 2D coordinates on the piece surface
+  // Maps global 3D drill holes into exact 2D local coordinates on the piece surface (L x W)
   private addPartDrillHolesToDxf(
     lines: string[],
     part: Part,
+    bounds: Part3DBounds,
     holes: DrillHole[],
     originX: number,
     originY: number,
     L: number,
     W: number
   ) {
+    const orient = part.orientation || 'horizontal';
+
     for (const h of holes) {
       const radius = h.diameter / 2;
-
-      // Project onto the 2D plane of the piece
       let localX = L / 2;
       let localY = W / 2;
 
-      if (h.type === 'hinge_35') {
-        localX = 22; // 22mm from edge
-        localY = Math.max(30, Math.min(W - 30, (h.posY % W)));
-      } else {
-        // Distribute based on posZ depth and relative position
-        localX = Math.max(30, Math.min(L - 30, (h.posZ + 1000) % L));
-        localY = Math.max(20, Math.min(W - 20, (h.posX + 1000) % W));
+      if (orient === 'horizontal') {
+        // Horizontal panel: sx = L (along X), sz = W (along Z)
+        if (Math.abs(bounds.sx - L) <= Math.abs(bounds.sz - L)) {
+          localX = h.posX - bounds.minX;
+          localY = h.posZ - bounds.minZ;
+        } else {
+          localX = h.posZ - bounds.minZ;
+          localY = h.posX - bounds.minX;
+        }
+      } else if (orient === 'vertical_yz') {
+        // Side / Divider / Drawer lateral in YZ plane
+        if (Math.abs(bounds.sy - L) <= Math.abs(bounds.sz - L)) {
+          // Cabinet side: sy = L (height), sz = W (depth)
+          localX = h.posY - bounds.minY;
+          localY = h.posZ - bounds.minZ;
+        } else {
+          // Drawer lateral: sz = L (slide length), sy = W (box height)
+          localX = h.posZ - bounds.minZ;
+          localY = h.posY - bounds.minY;
+        }
+      } else if (orient === 'vertical_xy') {
+        // Door / Back / Plinth / Drawer front in XY plane
+        if (Math.abs(bounds.sx - L) <= Math.abs(bounds.sy - L)) {
+          // sx = L (width), sy = W (height)
+          localX = h.posX - bounds.minX;
+          localY = h.posY - bounds.minY;
+        } else {
+          // sy = L (height), sx = W (width)
+          localX = h.posY - bounds.minY;
+          localY = h.posX - bounds.minX;
+        }
       }
+
+      // Clamp safely inside the physical board boundaries
+      const minMargin = Math.min(radius + 2, 10);
+      localX = Math.max(minMargin, Math.min(L - minMargin, localX));
+      localY = Math.max(minMargin, Math.min(W - minMargin, localY));
 
       const cx = originX + localX;
       const cy = originY + localY;
