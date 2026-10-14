@@ -112,7 +112,7 @@ export interface WallSnapResult {
   selector: 'app-furniture-3d-viewer',
   imports: [],
   templateUrl: './furniture-3d-viewer.html',
-  styleUrls: [],
+  styleUrl: './furniture-3d-viewer.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'block w-full h-full',
@@ -5577,8 +5577,37 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.closeContextMenu();
   }
 
-  onEditModuleFromContext(groupId: string) {
+  cancelActiveInteractions() {
+    this.isDraggingPart = false;
+    this.isDraggingGroup = false;
+    this.isDraggingAppliance = false;
+    this.isDraggingGizmo = false;
+    this.isExtruding = false;
+    this.isDrawingFloor = false;
+    this.isMarqueeSelecting = false;
+    this.isDraggingMainWall = false;
+    this.isDraggingSideWall = false;
+    this.isDraggingRightWall = false;
+    this.isStretchingMainWall = false;
+    this.isStretchingSideWall = false;
+    this.isStretchingRightWall = false;
+    this.isStretchingFloor = false;
+    this.activeDragPart = null;
+    this.activeGizmoData = null;
+    this.dragGroupPartsData = [];
+    this.clearSnapIndicators();
+    this.activeMeasureHud.set(null);
+    this.activeSnapAlert.set(null);
     this.closeContextMenu();
+    this.showGroupsFlyout.set(false);
+    if (this.controls) {
+      this.controls.enabled = true;
+    }
+  }
+
+  onEditModuleFromContext(groupId: string, event?: Event) {
+    event?.stopPropagation();
+    this.cancelActiveInteractions();
     this.editModuleRequested.emit(groupId);
   }
 

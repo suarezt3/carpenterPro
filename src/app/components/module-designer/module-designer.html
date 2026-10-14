@@ -264,7 +264,7 @@
               <!-- Editar Configuración del Módulo -->
               <button 
                 type="button" 
-                (click)="openEditSelectedGroup()" 
+                (click)="$event.stopPropagation(); openEditSelectedGroup($event)" 
                 class="h-6 px-2 bg-indigo-600/90 hover:bg-indigo-500 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
                 title="Editar dimensiones, puertas, entrepaños y parámetros de este módulo">
                 <span class="material-icons text-xs">tune</span>

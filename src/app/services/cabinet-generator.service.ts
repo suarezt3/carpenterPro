@@ -1063,8 +1063,69 @@ export class CabinetGeneratorService {
    * Reconstruye una configuración paramétrica a partir de las piezas existentes de un grupo
    */
   reconstructConfigFromParts(parts: Part[], group: PartGroup): ParametricCabinetConfig {
+    const normalizeConfig = (raw: Partial<ParametricCabinetConfig>): ParametricCabinetConfig => {
+      const safeWidth = Math.max(200, Number(raw.width) || 600);
+      const safeHeight = Math.max(200, Number(raw.height) || 800);
+      const safeDepth = Math.max(150, Number(raw.depth) || 350);
+      const safeStructT = Math.max(9, Number(raw.structureThickness) || 15);
+      const safeDoorT = Math.max(9, Number(raw.doorThickness) || safeStructT);
+      const safeBackT = Math.max(3, Number(raw.backThickness) || 3);
+      const safeShelvesCount = Math.max(0, Math.min(8, Math.floor(Number(raw.shelvesCount) || 0)));
+      const innerH = Math.max(100, safeHeight - (2 * safeStructT));
+
+      let validOffsets: number[] = [];
+      if (safeShelvesCount > 0) {
+        if (Array.isArray(raw.shelfManualOffsets) && raw.shelfManualOffsets.length === safeShelvesCount) {
+          validOffsets = raw.shelfManualOffsets.map((v, i) => {
+            const num = Number(v);
+            if (!Number.isFinite(num) || num <= 0) {
+              const gap = (innerH - (safeShelvesCount * safeStructT)) / (safeShelvesCount + 1);
+              return Math.max(40, Math.round(gap * (i + 1) + (i * safeStructT)));
+            }
+            return Math.max(40, Math.min(innerH - 40, Math.round(num)));
+          });
+        } else {
+          const gap = (innerH - (safeShelvesCount * safeStructT)) / (safeShelvesCount + 1);
+          for (let i = 0; i < safeShelvesCount; i++) {
+            const yFromBottom = Math.round(gap * (i + 1) + (i * safeStructT));
+            validOffsets.push(Math.max(40, Math.min(innerH - 40, yFromBottom)));
+          }
+        }
+      }
+
+      return {
+        name: raw.name || group.name || 'Módulo Paramétrico',
+        code: raw.code || ('MOD_' + group.id.slice(-4)),
+        moduleType: raw.moduleType || 'base_cabinet',
+        category: raw.category || 'kitchen_base',
+        width: safeWidth,
+        height: safeHeight,
+        depth: safeDepth,
+        structureThickness: safeStructT,
+        doorThickness: safeDoorT,
+        backThickness: safeBackT,
+        backType: raw.backType || 'groove',
+        hasBackPanel: raw.hasBackPanel !== undefined ? Boolean(raw.hasBackPanel) : true,
+        shelvesCount: safeShelvesCount,
+        shelfDistribution: raw.shelfDistribution === 'manual' ? 'manual' : 'uniform',
+        shelfManualOffsets: validOffsets,
+        doorOpening: raw.doorOpening || 'none',
+        hasHandle: raw.hasHandle !== undefined ? Boolean(raw.hasHandle) : true,
+        handleType: raw.handleType || 'bar_modern',
+        handleFinish: raw.handleFinish || 'brushed_steel',
+        handlePosition: raw.handlePosition || 'vertical',
+        structureMaterialId: raw.structureMaterialId || 'mat-1',
+        doorMaterialId: raw.doorMaterialId || raw.structureMaterialId || 'mat-1',
+        backMaterialId: raw.backMaterialId || raw.structureMaterialId || 'mat-1',
+        facadeGap: Number(raw.facadeGap) || 3,
+        posX: Number.isFinite(Number(raw.posX)) ? Number(raw.posX) : 0,
+        posY: Number.isFinite(Number(raw.posY)) ? Number(raw.posY) : undefined,
+        posZ: Number.isFinite(Number(raw.posZ)) ? Number(raw.posZ) : 0
+      };
+    };
+
     if (group.parametricConfig) {
-      return { ...group.parametricConfig };
+      return normalizeConfig(group.parametricConfig);
     }
 
     const sidePart = parts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || parts[0];
@@ -1073,11 +1134,14 @@ export class CabinetGeneratorService {
     const shelfParts = parts.filter(p => p.componentRole === 'shelf');
     const backPart = parts.find(p => p.componentRole === 'back');
 
-    const t = sidePart?.thickness || 15;
-    const height = sidePart ? (sidePart.length > sidePart.width ? sidePart.length : sidePart.width) : 800;
-    const innerWidth = topOrBottom ? topOrBottom.length : 570;
+    const t = Number(sidePart?.thickness) || 15;
+    const rawSideLen = Number(sidePart?.length) || 800;
+    const rawSideWid = Number(sidePart?.width) || 300;
+    const height = sidePart ? (rawSideLen > rawSideWid ? rawSideLen : rawSideWid) : 800;
+    const innerWidth = Number(topOrBottom?.length) || 570;
     const width = innerWidth + (2 * t);
-    const depth = (sidePart ? (sidePart.length > sidePart.width ? sidePart.width : sidePart.length) : 300) + (doorParts.length > 0 ? (doorParts[0].thickness || 15) : 0);
+    const doorT = doorParts.length > 0 ? (Number(doorParts[0]?.thickness) || 15) : t;
+    const depth = (sidePart ? (rawSideLen > rawSideWid ? rawSideWid : rawSideLen) : 300) + (doorParts.length > 0 ? doorT : 0);
 
     let doorOpening: ParametricCabinetConfig['doorOpening'] = 'none';
     if (doorParts.length === 2) {
@@ -1093,7 +1157,9 @@ export class CabinetGeneratorService {
       }
     }
 
-    return {
+    const shelvesCount = Math.max(0, Math.min(8, Math.floor(Number(shelfParts.length) || 0)));
+
+    return normalizeConfig({
       name: group.name,
       code: 'MOD_' + group.id.slice(-4),
       moduleType: 'base_cabinet',
@@ -1102,11 +1168,11 @@ export class CabinetGeneratorService {
       height,
       depth,
       structureThickness: t,
-      doorThickness: doorParts[0]?.thickness || t,
-      backThickness: backPart?.thickness || 3,
+      doorThickness: doorT,
+      backThickness: Number(backPart?.thickness) || 3,
       backType: backPart ? 'groove' : 'none',
       hasBackPanel: !!backPart,
-      shelvesCount: shelfParts.length,
+      shelvesCount,
       shelfDistribution: 'uniform',
       doorOpening,
       hasHandle: doorParts[0]?.hardwareConfig?.handleType !== 'none',
@@ -1117,10 +1183,10 @@ export class CabinetGeneratorService {
       doorMaterialId: doorParts[0]?.materialId || sidePart?.materialId || 'mat-1',
       backMaterialId: backPart?.materialId || sidePart?.materialId || 'mat-1',
       facadeGap: 3,
-      posX: parts[0]?.posX ?? 0,
-      posY: sidePart?.posY,
-      posZ: parts[0]?.posZ ?? 0
-    };
+      posX: Number(parts[0]?.posX) || 0,
+      posY: sidePart?.posY !== undefined ? Number(sidePart.posY) : undefined,
+      posZ: Number(parts[0]?.posZ) || 0
+    });
   }
 
   /**

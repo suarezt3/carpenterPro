@@ -107,7 +107,6 @@ export class ProjectStorageService {
   readonly projectNotes = computed<ProjectNoteItem[]>(() => this.currentProject().projectNotes || []);
 
   addProjectNote(noteData: Omit<ProjectNoteItem, 'id' | 'createdAt' | 'updatedAt'>) {
-    this.pushSnapshot();
     const now = new Date().toISOString();
     const newNote: ProjectNoteItem = {
       ...noteData,
@@ -123,7 +122,6 @@ export class ProjectStorageService {
   }
 
   updateProjectNote(id: string, updates: Partial<ProjectNoteItem>) {
-    this.pushSnapshot();
     const now = new Date().toISOString();
     this.updateProject(p => ({
       ...p,
@@ -134,7 +132,6 @@ export class ProjectStorageService {
   }
 
   deleteProjectNote(id: string) {
-    this.pushSnapshot();
     this.updateProject(p => ({
       ...p,
       projectNotes: (p.projectNotes || []).filter(n => n.id !== id)
@@ -142,7 +139,6 @@ export class ProjectStorageService {
   }
 
   toggleProjectNoteComplete(id: string) {
-    this.pushSnapshot();
     const now = new Date().toISOString();
     this.updateProject(p => ({
       ...p,
@@ -153,7 +149,6 @@ export class ProjectStorageService {
   }
 
   addAppliance(appliance: ApplianceItem) {
-    this.pushSnapshot();
     this.updateProject(p => ({
       ...p,
       appliances: [...(p.appliances || []), appliance]
@@ -162,7 +157,6 @@ export class ProjectStorageService {
   }
 
   updateAppliance(id: string, updates: Partial<ApplianceItem>) {
-    this.pushSnapshot();
     this.updateProject(p => ({
       ...p,
       appliances: (p.appliances || []).map(a => a.id === id ? { ...a, ...updates } : a)
@@ -170,7 +164,6 @@ export class ProjectStorageService {
   }
 
   removeAppliance(id: string) {
-    this.pushSnapshot();
     if (this.selectedApplianceId() === id) {
       this.selectedApplianceId.set(null);
     }
@@ -183,7 +176,6 @@ export class ProjectStorageService {
   duplicateAppliance(id: string) {
     const existing = (this.currentProject().appliances || []).find(a => a.id === id);
     if (!existing) return;
-    this.pushSnapshot();
     const copy: ApplianceItem = {
       ...existing,
       id: 'appliance_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
@@ -861,7 +853,6 @@ export class ProjectStorageService {
   }
 
   addParametricCabinet(cabinet: { module: FurnitureModule; parts: Part[]; group: PartGroup }) {
-    this.pushSnapshot();
     this.updateProject(p => ({
       ...p,
       modules: [...p.modules, cabinet.module],
@@ -871,7 +862,6 @@ export class ProjectStorageService {
   }
 
   updateParametricCabinet(groupId: string, newParts: Part[], newName?: string, newConfig?: ParametricCabinetConfig) {
-    this.pushSnapshot();
     this.updateProject(p => ({
       ...p,
       groups: (p.groups || []).map(g => g.id === groupId ? { 
@@ -1238,7 +1228,6 @@ export class ProjectStorageService {
   changeGroupMaterial(groupId: string, materialId: string, target: 'all' | 'structure' | 'doors' = 'all') {
     const mat = this.materialsList().find(m => m.id === materialId);
     if (!mat) return;
-    this.pushSnapshot();
     this.updateProject(p => ({
       ...p,
       parts: p.parts.map(pt => {

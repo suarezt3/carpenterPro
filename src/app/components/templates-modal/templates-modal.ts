@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject, viewChild, ElementRef, effect } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject, viewChild, ElementRef, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ThemeService } from '../../services/theme.service';
 import { TemplatesCatalogService, FurnitureTemplate } from '../../services/templates-catalog.service';
@@ -16,6 +16,7 @@ export type ModuleCategoryPreset =
   selector: 'app-templates-modal',
   imports: [CommonModule],
   templateUrl: './templates-modal.html',
+  styleUrl: './templates-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TemplatesModalComponent {
@@ -62,33 +63,44 @@ export class TemplatesModalComponent {
   useSameMaterialForDoors = signal<boolean>(true);
   creationMode = signal<'append' | 'replace'>('append');
 
-
-
   loadConfig(cfg: ParametricCabinetConfig) {
     this.activeView.set('assistant');
     if (cfg.name) this.moduleName.set(cfg.name);
-    if (cfg.width) this.width.set(cfg.width);
-    if (cfg.height) this.height.set(cfg.height);
-    if (cfg.depth) this.depth.set(cfg.depth);
-    this.structureThickness.set(cfg.structureThickness || 15);
-    this.doorThickness.set(cfg.doorThickness || 15);
+    const safeWidth = Math.max(150, Number(cfg.width) || 600);
+    const safeHeight = Math.max(200, Number(cfg.height) || 820);
+    const safeDepth = Math.max(150, Number(cfg.depth) || 580);
+    const safeStructT = Number(cfg.structureThickness) || 15;
+    const safeDoorT = Number(cfg.doorThickness) || 15;
+    const safeShelvesCount = Math.max(0, Math.min(8, Math.floor(Number(cfg.shelvesCount) || 0)));
+
+    this.width.set(safeWidth);
+    this.height.set(safeHeight);
+    this.depth.set(safeDepth);
+    this.structureThickness.set(safeStructT);
+    this.doorThickness.set(safeDoorT);
     if (cfg.doorOpening) this.doorOpening.set(cfg.doorOpening);
     this.hasHandle.set(cfg.hasHandle !== false);
     if (cfg.handleType) this.handleType.set(cfg.handleType);
     if (cfg.handleFinish) this.handleFinish.set(cfg.handleFinish);
     if (cfg.handlePosition) this.handlePosition.set(cfg.handlePosition);
-    this.shelvesCount.set(cfg.shelvesCount ?? 0);
-    if (cfg.shelfDistribution) this.shelfDistribution.set(cfg.shelfDistribution);
-    if (cfg.shelfManualOffsets && cfg.shelfManualOffsets.length > 0) {
-      this.shelfManualOffsets.set([...cfg.shelfManualOffsets]);
+    this.shelvesCount.set(safeShelvesCount);
+    this.shelfDistribution.set(cfg.shelfDistribution || 'uniform');
+
+    const innerH = Math.max(50, safeHeight - (2 * safeStructT));
+    if (cfg.shelfManualOffsets && Array.isArray(cfg.shelfManualOffsets) && cfg.shelfManualOffsets.length === safeShelvesCount) {
+      this.shelfManualOffsets.set(cfg.shelfManualOffsets.map((val, idx) => {
+        const n = Number(val);
+        return (!isNaN(n) && n > 20 && n < innerH) ? Math.round(n) : Math.round((innerH / (safeShelvesCount + 1)) * (idx + 1));
+      }));
     } else {
       this.syncManualOffsets();
     }
+
     this.hasBackPanel.set(cfg.hasBackPanel !== false && cfg.backType !== 'none');
     if (cfg.structureMaterialId) this.structureMaterialId.set(cfg.structureMaterialId);
     if (cfg.doorMaterialId) {
       this.doorMaterialId.set(cfg.doorMaterialId);
-      this.useSameMaterialForDoors.set(cfg.doorMaterialId === cfg.structureMaterialId);
+      this.useSameMaterialForDoors.set(cfg.doorMaterialId === (cfg.structureMaterialId || this.structureMaterialId()));
     }
     if (cfg.category) this.activePreset.set(cfg.category);
   }
@@ -144,45 +156,63 @@ export class TemplatesModalComponent {
     }
   });
 
-  // Dimensiones interiores libres calculadas
-  readonly innerWidth = computed(() => Math.max(50, this.width() - (2 * this.structureThickness())));
-  readonly innerHeight = computed(() => Math.max(50, this.height() - (2 * this.structureThickness())));
+  // Dimensiones interiores libres calculadas (100% puras)
+  readonly innerWidth = computed(() => {
+    const w = Number(this.width()) || 600;
+    const t = Number(this.structureThickness()) || 15;
+    return Math.max(50, w - (2 * t));
+  });
+
+  readonly innerHeight = computed(() => {
+    const h = Number(this.height()) || 820;
+    const t = Number(this.structureThickness()) || 15;
+    return Math.max(50, h - (2 * t));
+  });
+
   readonly innerDepth = computed(() => {
+    const d = Number(this.depth()) || 580;
+    const doorT = Number(this.doorThickness()) || 15;
     const hasDoor = this.doorOpening() !== 'none';
-    return Math.max(50, this.depth() - (hasDoor ? this.doorThickness() : 0));
+    return Math.max(50, d - (hasDoor ? doorT : 0));
   });
 
   // Dimensiones de corte de puerta
   readonly doorCutWidth = computed(() => {
-    const w = this.width();
+    const w = Number(this.width()) || 600;
     if (this.doorOpening() === 'double') {
       return Math.max(50, Math.round((w / 2) - 3));
     }
     return Math.max(50, Math.round(w - 3));
   });
 
-  readonly doorCutHeight = computed(() => Math.max(50, Math.round(this.height() - 3)));
+  readonly doorCutHeight = computed(() => {
+    const h = Number(this.height()) || 820;
+    return Math.max(50, Math.round(h - 3));
+  });
 
-  // Luz libre uniforme entre entrepaños
+  // Luz libre uniforme entre entrepaños (100% pura)
   readonly uniformShelfGap = computed(() => {
-    const count = this.shelvesCount();
-    if (count <= 0) return this.innerHeight();
+    const count = Math.max(0, Math.min(8, Math.floor(Number(this.shelvesCount()) || 0)));
     const innerH = this.innerHeight();
-    const t = this.structureThickness();
+    if (count <= 0) return innerH;
+    const t = Number(this.structureThickness()) || 15;
     const gap = (innerH - (count * t)) / (count + 1);
     return Math.max(0, Math.round(gap));
   });
 
-  // Lista de posiciones relativas de los entrepaños para el diagrama técnico y resumen
+  // Lista de posiciones relativas de los entrepaños para el diagrama técnico y resumen (100% pura)
   readonly effectiveShelvesList = computed(() => {
-    const count = this.shelvesCount();
+    const count = Math.max(0, Math.min(8, Math.floor(Number(this.shelvesCount()) || 0)));
     if (count <= 0) return [];
-    const innerH = this.innerHeight();
+    const innerH = Math.max(50, this.innerHeight());
 
     if (this.shelfDistribution() === 'manual') {
       const offsets = this.shelfManualOffsets();
       return Array.from({ length: count }, (_, idx) => {
-        const off = offsets[idx] !== undefined ? offsets[idx] : Math.round((innerH / (count + 1)) * (idx + 1));
+        const rawOff = offsets[idx];
+        const off = (rawOff !== undefined && !isNaN(Number(rawOff)))
+          ? Number(rawOff)
+          : Math.round((innerH / (count + 1)) * (idx + 1));
         const pct = Math.min(95, Math.max(5, (off / innerH) * 100));
         return { index: idx + 1, offset: off, percentage: pct };
       });
@@ -197,10 +227,10 @@ export class TemplatesModalComponent {
     });
   });
 
-  // Conteo total de piezas calculadas
+  // Conteo total de piezas calculadas (100% pura)
   readonly totalPartsCount = computed(() => {
     let count = 4; // 2 laterales + 1 piso + 1 techo
-    count += this.shelvesCount();
+    count += Math.max(0, Math.min(8, Math.floor(Number(this.shelvesCount()) || 0)));
     if (this.hasBackPanel()) count += 1;
     if (this.doorOpening() === 'double') count += 2;
     else if (this.doorOpening() !== 'none') count += 1;
@@ -251,33 +281,43 @@ export class TemplatesModalComponent {
   categoriesNavRef = viewChild<ElementRef<HTMLDivElement>>('categoriesNav');
 
   constructor() {
+    // 1. Cargar configuración del módulo a editar: SOLO depende de isOpen(), editingGroupId() y editingConfig()
     effect(() => {
+      const open = this.isOpen();
+      const groupId = this.editingGroupId();
       const cfg = this.editingConfig();
-      if (cfg && this.isOpen()) {
-        this.loadConfig(cfg);
+      if (open && groupId && cfg) {
+        untracked(() => {
+          this.loadConfig(cfg);
+        });
       }
     });
 
-    // Inicializar materiales cuando estén listos
+    // 2. Inicializar materiales cuando estén listos: SOLO depende de materials()
     effect(() => {
       const mats = this.materials();
       if (mats.length > 0) {
-        if (!this.structureMaterialId()) {
-          this.structureMaterialId.set(mats[0].id);
-        }
-        if (!this.doorMaterialId()) {
-          this.doorMaterialId.set(mats[0].id);
-        }
+        untracked(() => {
+          if (!this.structureMaterialId()) {
+            this.structureMaterialId.set(mats[0].id);
+          }
+          if (!this.doorMaterialId()) {
+            this.doorMaterialId.set(mats[0].id);
+          }
+        });
       }
     });
 
-    // Ajustar puertas dobles si el ancho es >= 750 mm en preset cocina o closet
+    // 3. Ajustar puertas dobles si el ancho es >= 800 mm en modo creación (nunca sobrescribir al editar un grupo)
     effect(() => {
       const w = this.width();
-      const currentOpening = this.doorOpening();
-      if (w >= 800 && (currentOpening === 'left' || currentOpening === 'right') && this.activePreset() !== 'custom') {
-        this.doorOpening.set('double');
-      }
+      untracked(() => {
+        if (this.editingGroupId()) return;
+        const currentOpening = this.doorOpening();
+        if (w >= 800 && (currentOpening === 'left' || currentOpening === 'right') && this.activePreset() !== 'custom') {
+          this.doorOpening.set('double');
+        }
+      });
     });
   }
 
@@ -351,7 +391,7 @@ export class TemplatesModalComponent {
 
   // Cambiar cantidad de entrepaños
   setShelvesCount(count: number) {
-    const clamped = Math.min(8, Math.max(0, count));
+    const clamped = Math.max(0, Math.min(8, Math.floor(Number(count) || 0)));
     this.shelvesCount.set(clamped);
     this.syncManualOffsets();
   }
@@ -364,15 +404,16 @@ export class TemplatesModalComponent {
   }
 
   syncManualOffsets() {
-    const count = this.shelvesCount();
-    const innerH = this.innerHeight();
-    const current = [...this.shelfManualOffsets()];
+    const count = Math.max(0, Math.min(8, Math.floor(Number(this.shelvesCount()) || 0)));
+    const innerH = Math.max(50, Number(this.innerHeight()) || 750);
+    const current = Array.isArray(this.shelfManualOffsets()) ? [...this.shelfManualOffsets()] : [];
     const step = innerH / (count + 1);
 
     const next: number[] = [];
     for (let i = 0; i < count; i++) {
-      if (current[i] !== undefined && current[i] > 20 && current[i] < innerH) {
-        next.push(current[i]);
+      const existingVal = Number(current[i]);
+      if (!isNaN(existingVal) && existingVal > 20 && existingVal < innerH) {
+        next.push(Math.round(existingVal));
       } else {
         next.push(Math.round(step * (i + 1)));
       }
@@ -382,8 +423,9 @@ export class TemplatesModalComponent {
 
   updateManualShelfOffset(index: number, val: number) {
     const current = [...this.shelfManualOffsets()];
-    const innerH = this.innerHeight();
-    const clamped = Math.min(innerH - 20, Math.max(30, val));
+    const innerH = Math.max(50, Number(this.innerHeight()) || 750);
+    const safeVal = Number(val) || 30;
+    const clamped = Math.min(innerH - 20, Math.max(30, Math.round(safeVal)));
     current[index] = clamped;
     this.shelfManualOffsets.set(current);
   }

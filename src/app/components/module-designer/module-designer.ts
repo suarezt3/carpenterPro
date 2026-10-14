@@ -59,6 +59,7 @@ import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templ
     TemplatesModalComponent
   ],
   templateUrl: './module-designer.html',
+  styleUrl: './module-designer.css',
   host: {
     '(window:keydown)': 'handleGlobalKeyDown($event)'
   }
@@ -684,14 +685,18 @@ export class ModuleDesignerComponent {
     this.editingGroupConfig.set(null);
   }
 
-  openEditSelectedGroup() {
+  openEditSelectedGroup(event?: Event) {
+    event?.stopPropagation();
     const gId = this.activeSelectedGroupId();
     if (gId) {
-      this.openEditGroup(gId);
+      this.openEditGroup(gId, event);
     }
   }
 
-  openEditGroup(groupId: string) {
+  openEditGroup(groupId: string, event?: Event) {
+    event?.stopPropagation();
+    this.viewer3dRef()?.cancelActiveInteractions();
+
     const parts = this.currentParts().filter(p => p.groupId === groupId);
     if (parts.length === 0) {
       this.showToast('⚠️ No se encontraron piezas para editar en este módulo');
@@ -703,12 +708,10 @@ export class ModuleDesignerComponent {
       type: 'assembly' as const
     };
 
-    let config = group.parametricConfig;
-    if (!config) {
-      config = this.cabinetGen.reconstructConfigFromParts(parts, group);
-    }
+    const safeConfig = this.cabinetGen.reconstructConfigFromParts(parts, group);
+    this.editingGroupConfig.set({ ...safeConfig });
     this.editingGroupId.set(groupId);
-    this.editingGroupConfig.set({ ...config });
+    this.showTemplatesDropdown.set(false);
     this.showTemplatesModal.set(true);
   }
 
