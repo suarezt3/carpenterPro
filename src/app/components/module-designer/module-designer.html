@@ -3,7 +3,7 @@
   <!-- BARRA SUPERIOR: Información del espacio de trabajo, modo Módulo/Habitación y accesos rápidos -->
   <div class="h-9 px-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3 shrink-0 shadow-xs">
     <div class="flex items-center gap-2 min-w-0">
-      <span class="material-icons text-sky-600 text-lg">view_in_ar</span>
+      <hugeicons-icon [icon]="icons.cube3d" [size]="17" [strokeWidth]="1.9" class="text-sky-600 shrink-0"></hugeicons-icon>
       <span class="text-xs font-bold text-slate-800 tracking-tight whitespace-nowrap">Modelador 3D</span>
       <span class="text-slate-300 hidden sm:inline">|</span>
       <div class="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-mono">
@@ -26,7 +26,7 @@
             : 'text-slate-500 hover:text-slate-800 font-medium'"
           class="h-6.5 px-2.5 text-xs rounded-md flex items-center gap-1.5 transition cursor-pointer"
           title="Modo Taller: Vista aislada para diseñar y despiezar el mueble">
-          <span class="material-icons text-sm" [class.text-sky-600]="workspaceMode() === 'module'">view_in_ar</span>
+          <hugeicons-icon [icon]="icons.cube3d" [size]="14" [strokeWidth]="1.9" [class.text-sky-600]="workspaceMode() === 'module'"></hugeicons-icon>
           <span>Módulo</span>
         </button>
 
@@ -38,7 +38,7 @@
             : 'text-slate-500 hover:text-slate-800 font-medium'"
           class="h-6.5 px-2.5 text-xs rounded-md flex items-center gap-1.5 transition cursor-pointer"
           title="Modo Habitación: Contexto espacial arquitectónico con paredes, piso y texturas reales">
-          <span class="material-icons text-sm" [class.text-white]="workspaceMode() === 'room'">roofing</span>
+          <hugeicons-icon [icon]="icons.homeRoof" [size]="14" [strokeWidth]="1.9" [class.text-white]="workspaceMode() === 'room'"></hugeicons-icon>
           <span>Habitación 3D</span>
         </button>
       </div>
@@ -49,7 +49,7 @@
         (click)="openTemplatesModal()"
         class="h-7.5 px-3 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
         title="Catálogo de Plantillas: Cocinas, Closets, Baños y Cajoneras">
-        <span class="material-icons text-sm text-indigo-600">dashboard_customize</span>
+        <hugeicons-icon [icon]="icons.templatesGrid" [size]="14" [strokeWidth]="1.9" class="text-indigo-600 shrink-0"></hugeicons-icon>
         <span>Plantillas</span>
         <span class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-200/70 text-indigo-900 font-mono font-bold">Catálogo</span>
       </button>
@@ -61,7 +61,7 @@
           (click)="openRoomSettings()"
           class="h-7 px-2.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer animate-in fade-in"
           title="Configurar medidas de paredes, piso y catálogo de texturas">
-          <span class="material-icons text-sm text-sky-600">tune</span>
+          <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="1.9" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span class="hidden sm:inline">Configurar Entorno</span>
         </button>
       }
@@ -72,7 +72,7 @@
         (click)="startBlank()"
         class="h-7.5 px-2.5 text-xs font-medium text-stone-700 bg-white hover:bg-stone-100 rounded-lg border border-stone-300 flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
         title="Limpiar el lienzo 3D e iniciar un nuevo mueble desde cero">
-        <span class="material-icons text-sm text-stone-400">delete_sweep</span>
+        <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="1.9" class="text-stone-400 shrink-0"></hugeicons-icon>
         <span class="hidden md:inline">Lienzo en Blanco</span>
       </button>
 
@@ -83,7 +83,7 @@
         [class]="isSidebarCollapsed() ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'"
         class="h-7 px-2.5 text-xs font-semibold rounded-lg border flex items-center gap-1.5 transition cursor-pointer"
         [title]="isSidebarCollapsed() ? 'Mostrar bandeja de propiedades' : 'Ocultar bandeja para lienzo 3D al 100% de pantalla'">
-        <span class="material-icons text-sm">{{ isSidebarCollapsed() ? 'dock' : 'view_sidebar' }}</span>
+        <hugeicons-icon [icon]="icons.sidebarToggle" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
         <span class="hidden sm:inline">{{ isSidebarCollapsed() ? 'Mostrar Bandeja' : 'Ocultar Bandeja' }}</span>
       </button>
 
@@ -133,7 +133,7 @@
 
         <!-- HUD SUPERIOR IZQUIERDO: Medidas de la Pieza o Grupo Seleccionado -->
         @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
-          <div class="absolute top-3 left-16 sm:left-18 z-30 flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-xs pointer-events-auto">
+          <div class="absolute top-3 left-14 sm:left-15 z-30 flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-xs pointer-events-auto">
             <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
             <span class="font-bold uppercase tracking-wider text-slate-700">GRUPO ({{ selectedPartIds().length }}):</span>
             <span class="font-semibold text-amber-600">Arrastre sincronizado</span>
@@ -145,7 +145,7 @@
             </button>
           </div>
         } @else if (selectedPart(); as sel) {
-          <div class="absolute top-3 left-16 sm:left-18 z-30 flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-xs pointer-events-auto">
+          <div class="absolute top-3 left-14 sm:left-15 z-30 flex items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-xs pointer-events-auto">
             <span class="w-2 h-2 rounded-full bg-sky-500"></span>
             <span class="font-bold text-slate-800">{{ sel.name }}:</span>
             <span class="font-mono font-bold text-sky-600">{{ sel.length }} × {{ sel.width }} mm</span>
@@ -153,9 +153,9 @@
             <button
               type="button"
               (click)="deselectAll()"
-              class="text-slate-400 hover:text-slate-800 ml-1 cursor-pointer"
+              class="text-slate-400 hover:text-slate-800 ml-1 cursor-pointer flex items-center justify-center"
               title="Deseleccionar">
-              <span class="material-icons text-xs">close</span>
+              <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             </button>
           </div>
         }
@@ -164,12 +164,12 @@
         @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
           <div
             [class]="isSidebarCollapsed() ? 'right-28' : 'right-3'"
-            class="absolute top-2 z-30 flex items-center gap-1 bg-slate-950/90 text-white backdrop-blur-md px-1.5 py-1 rounded-xl shadow-xl border border-slate-800/80 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-240px)] overflow-x-auto no-scrollbar whitespace-nowrap">
+            class="absolute top-2.5 z-30 flex items-center gap-1 bg-slate-950/92 text-white backdrop-blur-md px-2 py-1 rounded-xl shadow-xl border border-slate-800/90 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-220px)] overflow-x-auto no-scrollbar whitespace-nowrap">
             <!-- Badge de Grupo / Edición en Línea -->
             @if (activeSelectedGroupName()) {
               @if (renamingGroupId() === activeSelectedGroupId()) {
-                <div class="flex items-center gap-1 px-1 py-0.5 rounded-md bg-indigo-950/80 border border-indigo-400/50 h-6 shrink-0 text-[11px]">
-                  <span class="material-icons text-xs text-indigo-400">edit</span>
+                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-950/80 border border-indigo-400/50 h-6.5 shrink-0 text-[11px]">
+                  <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="2" class="text-indigo-400 shrink-0"></hugeicons-icon>
                   <input
                     type="text"
                     [value]="renamingGroupName()"
@@ -177,40 +177,40 @@
                     (click)="$event.stopPropagation()"
                     (keydown.enter)="saveRenameActiveGroup()"
                     (keydown.escape)="cancelRenameGroup()"
-                    class="text-[11px] font-bold px-1 py-0.5 bg-slate-900 border border-indigo-400/80 rounded text-white w-28 focus:outline-hidden focus:ring-1 focus:ring-indigo-400"
+                    class="text-[11px] font-bold px-1.5 py-0.5 bg-slate-900 border border-indigo-400/80 rounded text-white w-28 focus:outline-hidden focus:ring-1 focus:ring-indigo-400"
                     placeholder="Nombre del cajón" />
                   <button
                     type="button"
                     (click)="saveRenameActiveGroup()"
                     class="h-5 w-5 text-emerald-400 hover:text-emerald-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
                     title="Guardar nombre (Enter)">
-                    <span class="material-icons text-xs">check</span>
+                    <hugeicons-icon [icon]="icons.check" [size]="12" [strokeWidth]="2.2"></hugeicons-icon>
                   </button>
                   <button
                     type="button"
                     (click)="cancelRenameGroup()"
                     class="h-5 w-5 text-rose-400 hover:text-rose-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
                     title="Cancelar (Esc)">
-                    <span class="material-icons text-xs">close</span>
+                    <hugeicons-icon [icon]="icons.close" [size]="12" [strokeWidth]="2"></hugeicons-icon>
                   </button>
                 </div>
               } @else {
-                <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 h-6 shrink-0 text-[11px]">
+                <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 h-6.5 shrink-0 text-[11px]">
                   <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
-                  <span class="material-icons text-xs text-indigo-400">inbox</span>
+                  <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="1.9" class="text-indigo-400 shrink-0"></hugeicons-icon>
                   <span class="text-[11px] font-bold text-white truncate max-w-30">{{ activeSelectedGroupName() }}</span>
                   <span class="text-[10px] text-slate-400 font-mono">({{ selectedPartIds().length }})</span>
                   <button
                     type="button"
                     (click)="startRenameActiveGroup($event)"
-                    class="ml-0.5 text-slate-400 hover:text-white hover:bg-white/15 p-0.5 rounded transition cursor-pointer"
+                    class="ml-0.5 text-slate-400 hover:text-white hover:bg-white/15 p-0.5 rounded transition cursor-pointer flex items-center justify-center"
                     title="Renombrar este cajón o módulo">
-                    <span class="material-icons text-xs">edit</span>
+                    <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
                   </button>
                 </div>
               }
             } @else {
-              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 h-6 shrink-0 text-[11px]">
+              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 h-6.5 shrink-0 text-[11px]">
                 <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
                 <span class="text-[11px] font-medium text-white">
                   {{ selectedPartIds().length }} seleccionadas
@@ -224,9 +224,9 @@
               <button
                 type="button"
                 (click)="openGroupNamingModal()"
-                class="h-6 px-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 shadow-xs transition shrink-0 cursor-pointer"
+                class="h-6.5 px-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1.5 shadow-xs transition shrink-0 cursor-pointer"
                 title="Agrupar las piezas seleccionadas como un cajón o módulo">
-                <span class="material-icons text-xs">link</span>
+                <hugeicons-icon [icon]="icons.link" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                 <span>Agrupar</span>
               </button>
             } @else {
@@ -234,9 +234,9 @@
               <button
                 type="button"
                 (click)="duplicateSelectedGroup()"
-                class="h-6 px-2 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+                class="h-6.5 px-2.5 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1.5 transition shrink-0 shadow-xs cursor-pointer"
                 title="Duplicar módulo completo (crea una copia apilada arriba)">
-                <span class="material-icons text-xs">content_copy</span>
+                <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                 <span>Duplicar</span>
               </button>
 
@@ -244,9 +244,9 @@
               <button
                 type="button"
                 (click)="activateMoveToolOnViewer()"
-                class="h-6 px-2 bg-sky-600/80 hover:bg-sky-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+                class="h-6.5 px-2.5 bg-sky-600/85 hover:bg-sky-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1.5 transition shrink-0 shadow-xs cursor-pointer"
                 title="Mover módulo completo con flechas 3D">
-                <span class="material-icons text-xs">open_with</span>
+                <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                 <span>Mover</span>
               </button>
 
@@ -255,9 +255,9 @@
                 type="button"
                 (click)="toggleSelectedGroupOpen()"
                 [class]="isGroupOpen() ? 'bg-amber-500 hover:bg-amber-400 text-white shadow-xs' : 'bg-white/10 hover:bg-white/20 text-white'"
-                class="h-6 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 cursor-pointer"
+                class="h-6.5 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition shrink-0 cursor-pointer"
                 title="Abrir o cerrar módulo completo en 3D">
-                <span class="material-icons text-xs">{{ isGroupOpen() ? 'meeting_room' : 'door_sliding' }}</span>
+                <hugeicons-icon [icon]="isGroupOpen() ? icons.doorOpen : icons.doorClosed" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                 <span>{{ isGroupOpen() ? 'Cerrar' : 'Abrir' }}</span>
               </button>
 
@@ -265,37 +265,37 @@
               <button
                 type="button"
                 (click)="$event.stopPropagation(); openEditSelectedGroup($event)"
-                class="h-6 px-2 bg-indigo-600/90 hover:bg-indigo-500 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+                class="h-6.5 px-2.5 bg-indigo-600/90 hover:bg-indigo-500 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition shrink-0 shadow-xs cursor-pointer"
                 title="Editar dimensiones, puertas, entrepaños y parámetros de este módulo">
-                <span class="material-icons text-xs">tune</span>
+                <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                 <span>Editar Módulo</span>
               </button>
 
               <div class="h-3.5 w-px bg-slate-800 shrink-0 mx-0.5"></div>
 
               <!-- Giro 90° -->
-              <div class="flex items-center bg-white/5 rounded-md p-0.5 border border-white/10 h-6 shrink-0">
+              <div class="flex items-center bg-white/5 rounded-md p-0.5 border border-white/10 h-6.5 shrink-0">
                 <button
                   type="button"
                   (click)="rotateSelectedGroup(-90)"
-                  class="h-5 w-5 flex items-center justify-center hover:bg-white/20 text-slate-300 hover:text-white rounded transition cursor-pointer"
+                  class="h-5.5 w-5.5 flex items-center justify-center hover:bg-white/20 text-slate-300 hover:text-white rounded transition cursor-pointer"
                   title="Girar módulo 90° Antihorario (Izquierda)">
-                  <span class="material-icons text-xs">rotate_left</span>
+                  <hugeicons-icon [icon]="icons.rotateLeft" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
                 </button>
                 <button
                   type="button"
                   (click)="rotateSelectedGroup(90)"
-                  class="h-5 px-1 hover:bg-white/20 text-white rounded text-[11px] font-medium flex items-center gap-1 transition cursor-pointer"
+                  class="h-5.5 px-1.5 hover:bg-white/20 text-white rounded text-[11px] font-medium flex items-center gap-1 transition cursor-pointer"
                   title="Girar módulo 90° Horario (Derecha) - Atajo: tecla R">
-                  <span class="material-icons text-xs">rotate_right</span>
+                  <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
                   <span>90° (R)</span>
                 </button>
               </div>
 
               <!-- Selector de Cara/Frente del Módulo -->
-              <div class="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5 border border-white/10 h-6 shrink-0 text-[11px]">
-                <span class="text-[10px] text-slate-400 font-medium px-1 flex items-center gap-0.5">
-                  <span class="material-icons text-[11px] text-indigo-400">explore</span>
+              <div class="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5 border border-white/10 h-6.5 shrink-0 text-[11px]">
+                <span class="text-[10px] text-slate-400 font-medium px-1.5 flex items-center gap-1">
+                  <hugeicons-icon [icon]="icons.compass" [size]="12" [strokeWidth]="1.9" class="text-indigo-400 shrink-0"></hugeicons-icon>
                   <span>Frente:</span>
                 </span>
                 <button
@@ -338,9 +338,9 @@
               <button
                 type="button"
                 (click)="hideActiveGroup()"
-                class="h-6 px-2 bg-white/10 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 cursor-pointer"
+                class="h-6.5 px-2 bg-white/10 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition shrink-0 cursor-pointer"
                 title="Ocultar temporalmente este módulo (Tecla H)">
-                <span class="material-icons text-xs">visibility_off</span>
+                <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                 <span>Ocultar</span>
               </button>
 
@@ -348,9 +348,9 @@
               <button
                 type="button"
                 (click)="ungroupSelected()"
-                class="h-6 px-2 bg-white/10 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 cursor-pointer"
+                class="h-6.5 px-2 bg-white/10 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition shrink-0 cursor-pointer"
                 title="Desagrupar piezas para editarlas individualmente">
-                <span class="material-icons text-xs">link_off</span>
+                <hugeicons-icon [icon]="icons.unlink" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                 <span>Desagrupar</span>
               </button>
             }
@@ -360,20 +360,20 @@
             <button
               type="button"
               (click)="deselectAll()"
-              class="h-7 w-7 rounded-lg text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0 cursor-pointer"
+              class="h-6.5 w-6.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0 cursor-pointer"
               title="Deseleccionar piezas (Esc)">
-              <span class="material-icons text-sm">close</span>
+              <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
             </button>
           </div>
         } @else if (selectedPart(); as selPart) {
           <!-- BARRA FLOTANTE PARA PIEZA INDIVIDUAL -->
           <div
             [class]="isSidebarCollapsed() ? 'right-28' : 'right-3'"
-            class="absolute top-3 z-30 flex items-center gap-1.5 bg-slate-900/95 text-white backdrop-blur-md px-2.5 py-1.5 rounded-2xl shadow-xl border border-white/10 animate-in fade-in slide-in-from-top-2 duration-150 pointer-events-auto max-w-[calc(100%-240px)] overflow-x-auto no-scrollbar whitespace-nowrap">
+            class="absolute top-2.5 z-30 flex items-center gap-1.5 bg-slate-950/92 text-white backdrop-blur-md px-2 py-1 rounded-xl shadow-xl border border-slate-800/90 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-220px)] overflow-x-auto no-scrollbar whitespace-nowrap">
             <!-- Badge de Pieza Individual / Edición en Línea -->
             @if (renamingPartId() === selPart.id) {
-              <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-sky-950/80 border border-sky-400/50 h-7 shrink-0">
-                <span class="material-icons text-xs text-sky-400">edit</span>
+              <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-950/80 border border-sky-400/50 h-6.5 shrink-0">
+                <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="2" class="text-sky-400 shrink-0"></hugeicons-icon>
                 <input
                   type="text"
                   [value]="renamingPartName()"
@@ -381,35 +381,35 @@
                   (click)="$event.stopPropagation()"
                   (keydown.enter)="saveRenameSelectedPart()"
                   (keydown.escape)="cancelRenamePart()"
-                  class="text-xs font-bold px-1.5 py-0.5 bg-slate-900 border border-sky-400/80 rounded text-white w-32 focus:outline-hidden focus:ring-1 focus:ring-sky-400"
+                  class="text-[11px] font-bold px-1.5 py-0.5 bg-slate-900 border border-sky-400/80 rounded text-white w-32 focus:outline-hidden focus:ring-1 focus:ring-sky-400"
                   placeholder="Nombre de pieza" />
                 <button
                   type="button"
                   (click)="saveRenameSelectedPart()"
-                  class="h-6 w-6 text-emerald-400 hover:text-emerald-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
+                  class="h-5 w-5 text-emerald-400 hover:text-emerald-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
                   title="Guardar nombre (Enter)">
-                  <span class="material-icons text-xs">check</span>
+                  <hugeicons-icon [icon]="icons.check" [size]="12" [strokeWidth]="2.2"></hugeicons-icon>
                 </button>
                 <button
                   type="button"
                   (click)="cancelRenamePart()"
-                  class="h-6 w-6 text-rose-400 hover:text-rose-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
+                  class="h-5 w-5 text-rose-400 hover:text-rose-300 hover:bg-white/10 rounded flex items-center justify-center transition cursor-pointer"
                   title="Cancelar (Esc)">
-                  <span class="material-icons text-xs">close</span>
+                  <hugeicons-icon [icon]="icons.close" [size]="12" [strokeWidth]="2"></hugeicons-icon>
                 </button>
               </div>
             } @else {
-              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 h-7 shrink-0">
+              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 h-6.5 shrink-0">
                 <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
-                <span class="material-icons text-sm text-sky-400">crop_square</span>
-                <span class="text-xs font-bold text-white truncate max-w-30">{{ selPart.name }}</span>
-                <span class="text-[10px] text-slate-400 font-medium">({{ selPart.length }}×{{ selPart.width }}×{{ selPart.thickness }})</span>
+                <hugeicons-icon [icon]="icons.squareShape" [size]="13" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
+                <span class="text-[11px] font-bold text-white truncate max-w-30">{{ selPart.name }}</span>
+                <span class="text-[10px] text-slate-400 font-mono">({{ selPart.length }}×{{ selPart.width }}×{{ selPart.thickness }})</span>
                 <button
                   type="button"
                   (click)="startRenameSelectedPart($event)"
-                  class="ml-0.5 text-slate-400 hover:text-white hover:bg-white/15 p-0.5 rounded transition cursor-pointer"
+                  class="ml-0.5 text-slate-400 hover:text-white hover:bg-white/15 p-0.5 rounded transition cursor-pointer flex items-center justify-center"
                   title="Renombrar esta pieza">
-                  <span class="material-icons text-xs">edit</span>
+                  <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
                 </button>
               </div>
             }
@@ -418,9 +418,9 @@
             <button
               type="button"
               (click)="duplicateSelectedPart()"
-              class="h-7 px-2.5 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+              class="h-6.5 px-2.5 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1.5 transition shrink-0 shadow-xs cursor-pointer"
               title="Duplicar pieza individual">
-              <span class="material-icons text-xs">content_copy</span>
+              <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Duplicar</span>
             </button>
 
@@ -428,42 +428,42 @@
             <button
               type="button"
               (click)="activateMoveToolOnViewer()"
-              class="h-7 px-2.5 bg-sky-600/80 hover:bg-sky-500 active:scale-95 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+              class="h-6.5 px-2.5 bg-sky-600/85 hover:bg-sky-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1.5 transition shrink-0 shadow-xs cursor-pointer"
               title="Mover pieza con flechas 3D">
-              <span class="material-icons text-xs">open_with</span>
+              <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Mover</span>
             </button>
 
             <!-- Girar 90° -->
-            <div class="flex items-center bg-white/10 rounded-lg p-0.5 border border-white/10 h-7 shrink-0">
+            <div class="flex items-center bg-white/5 rounded-md p-0.5 border border-white/10 h-6.5 shrink-0">
               <button
                 type="button"
                 (click)="rotateSelectedPart90('z')"
-                class="h-6 w-6 flex items-center justify-center hover:bg-white/20 text-slate-300 hover:text-white rounded transition cursor-pointer"
+                class="h-5.5 w-5.5 flex items-center justify-center hover:bg-white/20 text-slate-300 hover:text-white rounded transition cursor-pointer"
                 title="Voltear / Girar en plano">
-                <span class="material-icons text-xs">rotate_left</span>
+                <hugeicons-icon [icon]="icons.rotateLeft" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
               </button>
               <button
                 type="button"
                 (click)="rotateSelectedPart90('y')"
-                class="h-6 px-1.5 hover:bg-white/20 text-white rounded text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+                class="h-5.5 px-1.5 hover:bg-white/20 text-white rounded text-[11px] font-medium flex items-center gap-1 transition cursor-pointer"
                 title="Girar pieza 90° (intercambia largo y ancho) - Atajo: tecla R">
-                <span class="material-icons text-xs">rotate_right</span>
+                <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
                 <span>90° (R)</span>
               </button>
             </div>
 
             <!-- Selector de Orientación de la Pieza -->
-            <div class="flex items-center gap-0.5 bg-white/10 rounded-lg p-0.5 border border-white/10 h-7 shrink-0 text-xs">
-              <span class="text-xs text-slate-300 font-medium px-1.5 flex items-center gap-1">
-                <span class="material-icons text-xs text-sky-400">explore</span>
+            <div class="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5 border border-white/10 h-6.5 shrink-0 text-[11px]">
+              <span class="text-[10px] text-slate-400 font-medium px-1.5 flex items-center gap-1">
+                <hugeicons-icon [icon]="icons.compass" [size]="12" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
                 <span>Orientación:</span>
               </span>
               <button
                 type="button"
                 (click)="setPartOrientation('horizontal')"
                 [class]="(selPart.orientation || 'horizontal') === 'horizontal' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                class="h-6 px-2 rounded text-xs font-semibold transition cursor-pointer"
+                class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
                 title="Orientación Horizontal (plano XZ, ej. estante, base, tapa)">
                 Horizontal
               </button>
@@ -471,7 +471,7 @@
                 type="button"
                 (click)="setPartOrientation('vertical_yz')"
                 [class]="selPart.orientation === 'vertical_yz' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                class="h-6 px-2 rounded text-xs font-semibold transition cursor-pointer"
+                class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
                 title="Orientación Lateral (plano YZ, ej. lateral izquierdo o derecho)">
                 Lateral (YZ)
               </button>
@@ -479,7 +479,7 @@
                 type="button"
                 (click)="setPartOrientation('vertical_xy')"
                 [class]="selPart.orientation === 'vertical_xy' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                class="h-6 px-2 rounded text-xs font-semibold transition cursor-pointer"
+                class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
                 title="Orientación Frontal (plano XY, ej. frente, trasera o fondo)">
                 Frontal (XY)
               </button>
@@ -489,9 +489,9 @@
             <button
               type="button"
               (click)="hideSelectedPart()"
-              class="h-7 px-2.5 bg-white/10 hover:bg-slate-700 hover:text-white text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 transition shrink-0 cursor-pointer"
+              class="h-6.5 px-2 bg-white/10 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition shrink-0 cursor-pointer"
               title="Ocultar temporalmente esta pieza (Tecla H)">
-              <span class="material-icons text-xs">visibility_off</span>
+              <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Ocultar</span>
             </button>
 
@@ -499,9 +499,9 @@
             <button
               type="button"
               (click)="deleteSelectedPart()"
-              class="h-7 px-2.5 bg-rose-600/80 hover:bg-rose-600 active:scale-95 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+              class="h-6.5 px-2 bg-rose-600/85 hover:bg-rose-600 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1.5 transition shrink-0 shadow-xs cursor-pointer"
               title="Eliminar pieza seleccionada (Supr)">
-              <span class="material-icons text-xs">delete</span>
+              <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Eliminar</span>
             </button>
 
@@ -510,17 +510,17 @@
             <button
               type="button"
               (click)="deselectAll()"
-              class="h-7 w-7 rounded-lg text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0 cursor-pointer"
+              class="h-6.5 w-6.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0 cursor-pointer"
               title="Deseleccionar pieza (Esc)">
-              <span class="material-icons text-sm">close</span>
+              <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
             </button>
           </div>
         }
 
         <!-- CINTA DE CONFIGURAR ENTORNO / AJUSTAR HABITACIÓN 3D -->
         @if (workspaceMode() === 'room') {
-          <div class="absolute bottom-9 right-3 z-30 pointer-events-auto flex items-center gap-1.5 bg-slate-900/95 text-white backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-xl border border-white/10 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[calc(100%-24px)] flex-wrap">
-            <span class="material-icons text-sky-400 text-sm">roofing</span>
+          <div class="absolute bottom-9 right-3 z-30 pointer-events-auto flex items-center gap-1.5 bg-slate-950/92 text-white backdrop-blur-md px-3 py-1.5 rounded-xl shadow-xl border border-slate-800/90 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[calc(100%-24px)] flex-wrap">
+            <hugeicons-icon [icon]="icons.homeRoof" [size]="14" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
             <span class="font-medium text-slate-200">
               <span class="font-bold text-white">{{ roomConfig().layout === 'u_shape' ? 'Cocina en U' : roomConfig().layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta' }}</span>
             </span>
@@ -529,7 +529,7 @@
 
             <!-- Badge de Imán Inteligente a Paredes -->
             <div class="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-[11px] font-semibold text-emerald-300 shadow-2xs" title="Imán inteligente activo a 30 mm para piezas, muebles y equipos">
-              <span class="material-icons text-xs text-emerald-400">auto_fix_high</span>
+              <hugeicons-icon [icon]="icons.magnet" [size]="12" [strokeWidth]="1.9" class="text-emerald-400 shrink-0"></hugeicons-icon>
               <span>Imán Paredes (30mm)</span>
             </div>
 
@@ -537,16 +537,16 @@
             <button
               type="button"
               (click)="moveEntireFurniture()"
-              class="px-2.5 py-0.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-lg text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer shadow-xs"
+              class="px-2.5 py-0.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
               title="Seleccionar todo el mueble y activar arrastre para alinearlo magnéticamente a las paredes">
-              <span class="material-icons text-xs">open_with</span>
+              <hugeicons-icon [icon]="icons.moveAxes" [size]="12" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Mover Mueble</span>
             </button>
 
             <!-- Control Interactivo del Muro Seleccionado en 3D -->
             @if (selectedWall(); as wall) {
               <div class="flex items-center gap-1 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2 py-0.5 rounded-lg text-[11px] font-semibold animate-in fade-in duration-100">
-                <span class="material-icons text-xs text-sky-400">straighten</span>
+                <hugeicons-icon [icon]="icons.ruler" [size]="12" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
                 <span>{{ wall === 'main' ? 'Muro Principal' : 'Muro Lateral L' }}:</span>
                 <span class="font-mono text-white">{{ wall === 'main' ? roomConfig().mainWallLength : roomConfig().sideWallLength }} mm</span>
                 <button
@@ -568,7 +568,7 @@
                 (click)="alignWallsToEdge()"
                 class="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 cursor-pointer border border-amber-500/30"
                 title="Alinear muros al borde posterior e izquierdo del piso para aprovechar todo el espacio">
-                <span class="material-icons text-[11px]">align_horizontal_left</span>
+                <hugeicons-icon [icon]="icons.alignLeft" [size]="12" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                 <span>Al Borde</span>
               </button>
             }
@@ -578,7 +578,7 @@
               (click)="openRoomSettings()"
               class="ml-0.5 px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
               title="Ajustar medidas de paredes, dimensiones de suelo, posición y texturas">
-              <span class="material-icons text-xs">tune</span>
+              <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Ajustar Habitación</span>
             </button>
             <button
@@ -586,7 +586,7 @@
               (click)="frameRoomCamera()"
               class="px-2 py-1 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white rounded-lg text-xs transition flex items-center gap-1 cursor-pointer"
               title="Centrar vista en la habitación">
-              <span class="material-icons text-xs">center_focus_strong</span>
+              <hugeicons-icon [icon]="icons.cameraFocus" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span class="hidden sm:inline">Centrar</span>
             </button>
           </div>
@@ -594,9 +594,9 @@
           <button
             type="button"
             (click)="setWorkspaceMode('room'); openRoomSettings()"
-            class="absolute bottom-9 right-3 z-30 pointer-events-auto flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-900 text-slate-300 hover:text-white backdrop-blur-md px-2.5 py-1 rounded-xl shadow-lg border border-white/10 text-xs transition cursor-pointer"
+            class="absolute bottom-9 right-3 z-30 pointer-events-auto flex items-center gap-1.5 bg-slate-900/85 hover:bg-slate-900 text-slate-300 hover:text-white backdrop-blur-md px-2.5 py-1 rounded-xl shadow-lg border border-white/10 text-xs transition cursor-pointer"
             title="Configurar entorno y ajustar habitación 3D">
-            <span class="material-icons text-sky-400 text-xs">roofing</span>
+            <hugeicons-icon [icon]="icons.homeRoof" [size]="13" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
             <span>Configurar Entorno</span>
           </button>
         }
@@ -609,7 +609,7 @@
           (click)="toggleSidebar()"
           class="absolute top-3 right-3 z-30 h-8 px-2.5 bg-white text-slate-700 hover:text-slate-900 border border-slate-200 rounded-xl shadow-lg flex items-center gap-1 text-xs font-bold transition hover:bg-slate-50 cursor-pointer"
           title="Abrir Bandeja de Propiedades">
-          <span class="material-icons text-sm text-sky-600">chevron_left</span>
+          <hugeicons-icon [icon]="icons.chevronLeft" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>Bandeja</span>
         </button>
       }
@@ -619,8 +619,8 @@
         (wheel)="onPiecesBarWheel($event)"
         class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs flex items-center gap-2 overflow-hidden shrink-0 select-none">
         <span class="text-[11px] font-bold text-slate-400 whitespace-nowrap flex items-center gap-1 pl-1 shrink-0">
-          <span class="material-icons text-xs text-sky-500">dns</span>
-          Piezas:
+          <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="1.9" class="text-sky-500 shrink-0"></hugeicons-icon>
+          <span>Piezas:</span>
         </span>
 
         <!-- Botón Seleccionar Todo -->
@@ -629,7 +629,7 @@
           (click)="selectAllParts()"
           class="px-2 py-0.5 rounded-lg text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center gap-1 shrink-0 transition cursor-pointer"
           title="Seleccionar todas las piezas a la vez para moverlas en bloque">
-          <span class="material-icons text-xs text-amber-500">select_all</span>
+          <hugeicons-icon [icon]="icons.selectAll" [size]="13" [strokeWidth]="1.9" class="text-amber-500 shrink-0"></hugeicons-icon>
           <span>Todo ({{ currentParts().length }})</span>
         </button>
 
@@ -655,7 +655,7 @@
               class="px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 shrink-0 transition cursor-pointer"
               [title]="isPartHidden(part.id) ? part.name + ' (Oculta). Clic para seleccionar o mostrar' : part.name + ' (' + part.length + '×' + part.width + 'mm)'">
               @if (isPartHidden(part.id)) {
-                <span class="material-icons text-[11px] text-amber-500">visibility_off</span>
+                <hugeicons-icon [icon]="icons.eyeOff" [size]="12" [strokeWidth]="1.9" class="text-amber-500 shrink-0"></hugeicons-icon>
               } @else {
                 <span class="w-1.5 h-1.5 rounded-full" [class]="isPartSelected(part.id) ? 'bg-white' : 'bg-slate-400'"></span>
               }
@@ -692,7 +692,7 @@
               (click)="activeDockTab.set('piece')"
               [class]="activeDockTab() === 'piece' ? 'bg-white text-sky-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
               class="flex-1 py-1.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer">
-              <span class="material-icons text-sm">tune</span>
+              <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Propiedades</span>
               @if (selectedPart()) {
                 <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
@@ -704,7 +704,7 @@
               (click)="activeDockTab.set('catalog')"
               [class]="activeDockTab() === 'catalog' ? 'bg-white text-amber-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
               class="flex-1 py-1.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer">
-              <span class="material-icons text-sm">add_circle</span>
+              <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
               <span>Catálogo</span>
             </button>
 
@@ -714,7 +714,7 @@
               [class]="activeDockTab() === 'appliances' ? 'bg-white text-emerald-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
               class="flex-1 py-1.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer"
               title="Repositorio y catálogo 3D de electrodomésticos y accesorios">
-              <span class="material-icons text-sm">kitchen</span>
+              <hugeicons-icon [icon]="icons.appliance" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Equipos</span>
               @if (appliances().length > 0) {
                 <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
@@ -727,9 +727,9 @@
           <button
             type="button"
             (click)="toggleSidebar()"
-            class="p-1 text-slate-400 hover:text-slate-700 rounded-lg ml-1 cursor-pointer"
+            class="p-1 text-slate-400 hover:text-slate-700 rounded-lg ml-1 cursor-pointer flex items-center justify-center"
             title="Colapsar bandeja lateral (100% pantalla 3D)">
-            <span class="material-icons text-sm">chevron_right</span>
+            <hugeicons-icon [icon]="icons.chevronRight" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           </button>
         </div>
 
@@ -742,16 +742,16 @@
               <!-- Nombre y Geometría de la Pieza -->
               <div class="pb-2.5 border-b border-slate-200 space-y-1.5">
                 <div class="flex items-center justify-between">
-                  <span class="text-[11px] font-bold uppercase tracking-wider text-sky-700 flex items-center gap-1">
-                    <span class="material-icons text-xs text-sky-600">extension</span>
-                    Pieza Seleccionada
+                  <span class="text-[11px] font-bold uppercase tracking-wider text-sky-700 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="1.9" class="text-sky-600 shrink-0"></hugeicons-icon>
+                    <span>Pieza Seleccionada</span>
                   </span>
                   <button
                     type="button"
                     (click)="deselectPart()"
-                    class="text-slate-400 hover:text-slate-700 cursor-pointer"
+                    class="text-slate-400 hover:text-slate-700 cursor-pointer flex items-center justify-center"
                     title="Cerrar inspector">
-                    <span class="material-icons text-sm">close</span>
+                    <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                   </button>
                 </div>
 
@@ -767,9 +767,9 @@
                 @if (sel.shapeType === 'circle') {
                   <div class="p-2.5 bg-sky-50/80 border border-sky-200 rounded-xl space-y-1.5">
                     <div class="flex items-center justify-between">
-                      <span class="text-xs font-bold text-sky-900 flex items-center gap-1">
-                        <span class="material-icons text-xs text-sky-600">radio_button_unchecked</span>
-                        Pieza Circular (Cilindro / Rueda)
+                      <span class="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.circleShape" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                        <span>Pieza Circular (Cilindro / Rueda)</span>
                       </span>
                       <span class="text-[10px] font-mono font-bold bg-sky-100 text-sky-800 px-2 py-0.5 rounded">
                         Ø {{ sel.diameter || sel.length }} mm
@@ -801,9 +801,9 @@
                 } @else if (sel.shapeType === 'freehand') {
                   <div class="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-1">
                     <div class="flex items-center justify-between">
-                      <span class="text-xs font-bold text-emerald-900 flex items-center gap-1">
-                        <span class="material-icons text-xs text-emerald-600">gesture</span>
-                        Geometría de Dibujo Libre
+                      <span class="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.freehandWave" [size]="13" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                        <span>Geometría de Dibujo Libre</span>
                       </span>
                       <span class="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
                         {{ sel.contourPoints?.length || 0 }} vértices
@@ -819,8 +819,8 @@
                 <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <span class="material-icons text-xs text-amber-500">3d_rotation</span>
-                      Rotación 3D (Ejes X, Y, Z)
+                      <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                      <span>Rotación 3D (Ejes X, Y, Z)</span>
                     </span>
                     <button
                       type="button"
@@ -894,8 +894,8 @@
                   <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
                     <div class="flex items-center justify-between">
                       <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <span class="material-icons text-sm text-emerald-600">unfold_more</span>
-                        Luz Libre (Espacio Interior Útil)
+                        <hugeicons-icon [icon]="icons.clearanceVert" [size]="14" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                        <span>Luz Libre (Espacio Interior Útil)</span>
                       </span>
                       <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono border border-emerald-200">
                         CAD 3D
@@ -905,8 +905,8 @@
                     <div class="grid grid-cols-2 gap-2 text-xs">
                       <div class="p-2 bg-white rounded-lg border border-slate-200">
                         <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
-                          <span class="material-icons text-xs text-emerald-600">arrow_upward</span>
-                          Hacia Arriba:
+                          <hugeicons-icon [icon]="icons.arrowUp" [size]="12" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                          <span>Hacia Arriba:</span>
                         </span>
                         @if (clr.topClearance !== null) {
                           <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.topClearance }} mm</p>
@@ -920,8 +920,8 @@
 
                       <div class="p-2 bg-white rounded-lg border border-slate-200">
                         <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
-                          <span class="material-icons text-xs text-emerald-600">arrow_downward</span>
-                          Hacia Abajo:
+                          <hugeicons-icon [icon]="icons.arrowDown" [size]="12" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                          <span>Hacia Abajo:</span>
                         </span>
                         @if (clr.bottomClearance !== null) {
                           <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.bottomClearance }} mm</p>
@@ -935,8 +935,8 @@
 
                       <div class="p-2 bg-white rounded-lg border border-slate-200">
                         <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
-                          <span class="material-icons text-xs text-sky-600">arrow_back</span>
-                          Hacia Izquierda:
+                          <hugeicons-icon [icon]="icons.arrowLeft" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                          <span>Hacia Izquierda:</span>
                         </span>
                         @if (clr.leftClearance !== null) {
                           <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.leftClearance }} mm</p>
@@ -950,8 +950,8 @@
 
                       <div class="p-2 bg-white rounded-lg border border-slate-200">
                         <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
-                          <span class="material-icons text-xs text-sky-600">arrow_forward</span>
-                          Hacia Derecha:
+                          <hugeicons-icon [icon]="icons.arrowRight" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                          <span>Hacia Derecha:</span>
                         </span>
                         @if (clr.rightClearance !== null) {
                           <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.rightClearance }} mm</p>
@@ -971,8 +971,8 @@
               <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span class="material-icons text-xs text-amber-500">palette</span>
-                    Tablero & Espesor
+                    <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                    <span>Tablero & Espesor</span>
                   </span>
                   <span class="text-xs font-mono font-bold text-sky-700 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
                     {{ sel.thickness }} mm
@@ -1015,7 +1015,7 @@
                       (click)="adjustPartProperty('thickness', -1)"
                       class="h-8 px-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold transition flex items-center justify-center shadow-2xs cursor-pointer"
                       title="Disminuir 1 mm">
-                      <span class="material-icons text-sm">remove</span>
+                      <hugeicons-icon [icon]="icons.minus" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                     </button>
                     <div class="relative flex-1">
                       <input
@@ -1034,7 +1034,7 @@
                       (click)="adjustPartProperty('thickness', 1)"
                       class="h-8 px-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold transition flex items-center justify-center shadow-2xs cursor-pointer"
                       title="Aumentar 1 mm">
-                      <span class="material-icons text-sm">add</span>
+                      <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                     </button>
                   </div>
 
@@ -1079,8 +1079,8 @@
               <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span class="material-icons text-xs text-amber-500">open_with</span>
-                    Posición 3D en Milímetros
+                    <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                    <span>Posición 3D en Milímetros</span>
                   </span>
                   <span class="text-[9px] font-mono text-slate-500 font-semibold">
                     Ejes XYZ
@@ -1175,25 +1175,25 @@
                   <button
                     type="button"
                     (click)="alignPart('floor')"
-                    class="py-1 px-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-0.5 cursor-pointer"
+                    class="py-1 px-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                     title="Posicionar pieza directamente sobre el piso (Y=0)">
-                    <span class="material-icons text-xs text-emerald-600">vertical_align_bottom</span>
+                    <hugeicons-icon [icon]="icons.alignBottom" [size]="12" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
                     <span>Al Suelo</span>
                   </button>
                   <button
                     type="button"
                     (click)="alignPart('centerX')"
-                    class="py-1 px-1 bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-0.5 cursor-pointer"
+                    class="py-1 px-1 bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                     title="Centrar pieza horizontalmente en el eje X (X=0)">
-                    <span class="material-icons text-xs text-rose-500">align_horizontal_center</span>
+                    <hugeicons-icon [icon]="icons.alignCenter" [size]="12" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
                     <span>Centrar X</span>
                   </button>
                   <button
                     type="button"
                     (click)="alignPart('centerZ')"
-                    class="py-1 px-1 bg-white hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-0.5 cursor-pointer"
+                    class="py-1 px-1 bg-white hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                     title="Centrar pieza en profundidad en el eje Z (Z=0)">
-                    <span class="material-icons text-xs text-sky-500">filter_center_focus</span>
+                    <hugeicons-icon [icon]="icons.cameraFocus" [size]="12" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
                     <span>Centrar Z</span>
                   </button>
                 </div>
@@ -1250,8 +1250,8 @@
               <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span class="material-icons text-xs text-amber-500">adjust</span>
-                    Mecanizados de Ensamble
+                    <hugeicons-icon [icon]="icons.cncTarget" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                    <span>Mecanizados de Ensamble</span>
                   </span>
                   <span class="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg border border-amber-200">
                     {{ selectedPartDrillHoles().length }} taladros
@@ -1292,8 +1292,8 @@
               <div class="p-2.5 bg-linear-to-r from-teal-50/80 to-slate-50 border border-teal-200/90 rounded-xl space-y-2">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-teal-900 flex items-center gap-1.5">
-                    <span class="material-icons text-xs text-teal-600">table_bar</span>
-                    Convertir en Mesa (Añadir 4 Patas)
+                    <hugeicons-icon [icon]="icons.tableBar" [size]="13" [strokeWidth]="2" class="text-teal-600 shrink-0"></hugeicons-icon>
+                    <span>Convertir en Mesa (Añadir 4 Patas)</span>
                   </span>
                   <span class="text-[9px] font-bold text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded uppercase">Accesorios 3D</span>
                 </div>
@@ -1305,7 +1305,7 @@
                     type="button"
                     (click)="attachTableLegsToSelectedPart('hairpin')"
                     class="p-1.5 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
-                    <span class="material-icons text-sm text-slate-900">table_bar</span>
+                    <hugeicons-icon [icon]="icons.tableBar" [size]="14" [strokeWidth]="2" class="text-slate-900"></hugeicons-icon>
                     <span class="text-[10px] font-bold text-slate-800 leading-none">Horquilla</span>
                     <span class="text-[8px] text-slate-400 font-mono">Hairpin 72cm</span>
                   </button>
@@ -1313,7 +1313,7 @@
                     type="button"
                     (click)="attachTableLegsToSelectedPart('cylindrical_inox')"
                     class="p-1.5 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
-                    <span class="material-icons text-sm text-sky-600">view_column</span>
+                    <hugeicons-icon [icon]="icons.columns" [size]="14" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
                     <span class="text-[10px] font-bold text-slate-800 leading-none">Inox Ø60</span>
                     <span class="text-[8px] text-slate-400 font-mono">Regulable</span>
                   </button>
@@ -1321,7 +1321,7 @@
                     type="button"
                     (click)="attachTableLegsToSelectedPart('scandinavian_wood')"
                     class="p-1.5 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
-                    <span class="material-icons text-sm text-amber-700">park</span>
+                    <hugeicons-icon [icon]="icons.woodLeg" [size]="14" [strokeWidth]="2" class="text-amber-700"></hugeicons-icon>
                     <span class="text-[10px] font-bold text-slate-800 leading-none">Nórdica</span>
                     <span class="text-[8px] text-slate-400 font-mono">Madera + Oro</span>
                   </button>
@@ -1334,7 +1334,7 @@
                   type="button"
                   (click)="duplicateSelectedPart()"
                   class="flex-1 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer">
-                  <span class="material-icons text-sm text-sky-600">content_copy</span>
+                  <hugeicons-icon [icon]="icons.copy" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                   <span>Duplicar Pieza</span>
                 </button>
 
@@ -1342,7 +1342,7 @@
                   type="button"
                   (click)="deleteSelectedPart()"
                   class="flex-1 py-2 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl border border-rose-200 flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer">
-                  <span class="material-icons text-sm text-rose-500">delete</span>
+                  <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
                   <span>Eliminar Pieza</span>
                 </button>
               </div>
@@ -1352,7 +1352,7 @@
               <!-- Estado vacío cuando no hay pieza seleccionada -->
               <div class="p-8 text-center space-y-3">
                 <div class="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
-                  <span class="material-icons text-2xl text-sky-600">touch_app</span>
+                  <hugeicons-icon [icon]="icons.cursorSelect" [size]="22" [strokeWidth]="1.8" class="text-sky-600"></hugeicons-icon>
                 </div>
                 <div>
                   <h4 class="text-sm font-bold text-slate-800">Ninguna pieza seleccionada</h4>
@@ -1380,8 +1380,8 @@
             <!-- CATÁLOGO DE PIEZAS RÁPIDAS -->
             <div class="space-y-2">
               <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <span class="material-icons text-xs text-amber-500">library_add</span>
-                Catálogo de Piezas (Añadir al Mueble)
+                <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                <span>Catálogo de Piezas (Añadir al Mueble)</span>
               </span>
               <p class="text-[11px] text-slate-500">
                 Selecciona una pieza para insertarla en el modelo 3D con medidas iniciales de taller:
@@ -1393,7 +1393,7 @@
                   (click)="addPieceFromCatalog('top')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-sky-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-sky-50 group-hover:bg-sky-100 border border-sky-200/60 flex items-center justify-center shrink-0 transition text-sky-600">
-                    <span class="material-icons text-base">table_bar</span>
+                    <hugeicons-icon [icon]="icons.tableBar" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-sky-700">Techo / Barra</span>
@@ -1406,7 +1406,7 @@
                   (click)="addPieceFromCatalog('side_left')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-amber-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-amber-50 group-hover:bg-amber-100 border border-amber-200/60 flex items-center justify-center shrink-0 transition text-amber-600">
-                    <span class="material-icons text-base">align_horizontal_left</span>
+                    <hugeicons-icon [icon]="icons.alignLeft" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-amber-700">Lateral Izq.</span>
@@ -1419,7 +1419,7 @@
                   (click)="addPieceFromCatalog('side_right')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-amber-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-amber-50 group-hover:bg-amber-100 border border-amber-200/60 flex items-center justify-center shrink-0 transition text-amber-600">
-                    <span class="material-icons text-base">align_horizontal_right</span>
+                    <hugeicons-icon [icon]="icons.alignRight" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-amber-700">Lateral Der.</span>
@@ -1432,7 +1432,7 @@
                   (click)="addPieceFromCatalog('bottom')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-orange-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-orange-50 group-hover:bg-orange-100 border border-orange-200/60 flex items-center justify-center shrink-0 transition text-orange-600">
-                    <span class="material-icons text-base">table_rows</span>
+                    <hugeicons-icon [icon]="icons.tableRows" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-orange-700">Piso / Base</span>
@@ -1445,7 +1445,7 @@
                   (click)="addPieceFromCatalog('divider')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-yellow-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-yellow-50 group-hover:bg-yellow-100 border border-yellow-200/60 flex items-center justify-center shrink-0 transition text-yellow-600">
-                    <span class="material-icons text-base">view_column</span>
+                    <hugeicons-icon [icon]="icons.columns" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-yellow-700">División Vert.</span>
@@ -1458,7 +1458,7 @@
                   (click)="addPieceFromCatalog('shelf')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-emerald-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-emerald-50 group-hover:bg-emerald-100 border border-emerald-200/60 flex items-center justify-center shrink-0 transition text-emerald-600">
-                    <span class="material-icons text-base">horizontal_split</span>
+                    <hugeicons-icon [icon]="icons.shelfSplit" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-emerald-700">Repisa Interior</span>
@@ -1471,7 +1471,7 @@
                   (click)="addPieceFromCatalog('back')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-purple-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-purple-50 group-hover:bg-purple-100 border border-purple-200/60 flex items-center justify-center shrink-0 transition text-purple-600">
-                    <span class="material-icons text-base">layers</span>
+                    <hugeicons-icon [icon]="icons.layers" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-purple-700">Fondo Trasero</span>
@@ -1484,7 +1484,7 @@
                   (click)="addPieceFromCatalog('door')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-blue-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-blue-50 group-hover:bg-blue-100 border border-blue-200/60 flex items-center justify-center shrink-0 transition text-blue-600">
-                    <span class="material-icons text-base">meeting_room</span>
+                    <hugeicons-icon [icon]="icons.doorClosed" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-blue-700">Puerta Batiente</span>
@@ -1497,7 +1497,7 @@
                   (click)="addPieceFromCatalog('drawer_front')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-indigo-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-indigo-50 group-hover:bg-indigo-100 border border-indigo-200/60 flex items-center justify-center shrink-0 transition text-indigo-600">
-                    <span class="material-icons text-base">inbox</span>
+                    <hugeicons-icon [icon]="icons.inbox" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-indigo-700">Frente Cajón</span>
@@ -1510,7 +1510,7 @@
                   (click)="addPieceFromCatalog('plinth')"
                   class="p-2.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-stone-500 rounded-lg text-left transition flex items-start gap-2.5 group shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer">
                   <div class="w-7 h-7 rounded-md bg-stone-50 group-hover:bg-stone-100 border border-stone-200/60 flex items-center justify-center shrink-0 transition text-stone-600">
-                    <span class="material-icons text-base">border_bottom</span>
+                    <hugeicons-icon [icon]="icons.plinthBottom" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-stone-700">Zócalo Piso</span>
@@ -1524,7 +1524,7 @@
                 type="button"
                 (click)="openDrawerWizard()"
                 class="w-full py-2.5 bg-linear-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs active:scale-[0.99] cursor-pointer">
-                <span class="material-icons text-sm">inbox</span>
+                <hugeicons-icon [icon]="icons.inbox" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 <span>+ Crear Cajón Modular (Asistente)</span>
               </button>
 
@@ -1533,7 +1533,7 @@
                 type="button"
                 (click)="addPieceFromCatalog('free')"
                 class="w-full py-2 bg-slate-50 hover:bg-white border border-dashed border-slate-300 hover:border-sky-500 rounded-lg text-xs font-semibold text-slate-700 transition flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.99] cursor-pointer">
-                <span class="material-icons text-sm text-sky-600">add</span>
+                <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2.2" class="text-sky-600"></hugeicons-icon>
                 <span>+ Añadir Pieza Libre Personalizada</span>
               </button>
 
@@ -1541,8 +1541,8 @@
               <div class="mt-2.5 p-2.5 bg-linear-to-br from-teal-50/70 to-slate-50 border border-teal-200/80 rounded-xl space-y-2">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span class="material-icons text-xs text-teal-600">table_bar</span>
-                    Accesorios: Patas de Mesa y Mueble
+                    <hugeicons-icon [icon]="icons.tableBar" [size]="13" [strokeWidth]="2" class="text-teal-600 shrink-0"></hugeicons-icon>
+                    <span>Accesorios: Patas de Mesa y Mueble</span>
                   </span>
                   <span class="text-[10px] text-teal-700 bg-teal-100/70 font-semibold px-1.5 py-0.5 rounded">3 Estilos 3D</span>
                 </div>
@@ -1556,7 +1556,7 @@
                     (click)="attachTableLegsToSelectedPart('hairpin')"
                     class="p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-lg text-left transition flex items-center gap-2 group cursor-pointer shadow-2xs">
                     <div class="w-6 h-6 rounded-md bg-slate-900 text-white flex items-center justify-center shrink-0">
-                      <span class="material-icons text-xs">table_bar</span>
+                      <hugeicons-icon [icon]="icons.tableBar" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                     </div>
                     <div class="min-w-0 flex-1">
                       <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-teal-700 text-[11px]">Horquilla (4 uds)</span>
@@ -1569,7 +1569,7 @@
                     (click)="attachTableLegsToSelectedPart('cylindrical_inox')"
                     class="p-2 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-400 rounded-lg text-left transition flex items-center gap-2 group cursor-pointer shadow-2xs">
                     <div class="w-6 h-6 rounded-md bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center shrink-0">
-                      <span class="material-icons text-xs">view_column</span>
+                      <hugeicons-icon [icon]="icons.columns" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                     </div>
                     <div class="min-w-0 flex-1">
                       <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-sky-700 text-[11px]">Cilíndrica Inox</span>
@@ -1582,7 +1582,7 @@
                     (click)="attachTableLegsToSelectedPart('scandinavian_wood')"
                     class="p-2 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-lg text-left transition flex items-center gap-2 group cursor-pointer shadow-2xs">
                     <div class="w-6 h-6 rounded-md bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center shrink-0">
-                      <span class="material-icons text-xs">park</span>
+                      <hugeicons-icon [icon]="icons.woodLeg" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                     </div>
                     <div class="min-w-0 flex-1">
                       <span class="text-slate-800 font-semibold block truncate leading-tight group-hover:text-amber-800 text-[11px]">Madera Nórdica</span>
@@ -1593,8 +1593,8 @@
                   <button
                     type="button"
                     (click)="activeDockTab.set('appliances'); activeApplianceCategory.set('legs')"
-                    class="p-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-center transition flex items-center justify-center gap-1 group cursor-pointer shadow-2xs text-[11px] font-bold">
-                    <span class="material-icons text-xs">open_in_new</span>
+                    class="p-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-center transition flex items-center justify-center gap-1.5 group cursor-pointer shadow-2xs text-[11px] font-bold">
+                    <hugeicons-icon [icon]="icons.externalLink" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                     <span>Catálogo 3D</span>
                   </button>
                 </div>
@@ -1604,9 +1604,9 @@
             <!-- ESTRUCTURA DE DESPIECE Y GRUPOS -->
             <div class="space-y-2.5 pt-2 border-t border-slate-200">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
-                  <span class="material-icons text-xs text-sky-600">format_list_numbered</span>
-                  Despiece Total ({{ currentParts().length }})
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.listNumbered" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                  <span>Despiece Total ({{ currentParts().length }})</span>
                 </span>
                 <div class="flex items-center gap-2">
                   @if (hiddenPartsCount() > 0) {
@@ -1615,7 +1615,7 @@
                       (click)="showAllParts()"
                       class="text-[10px] text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-md font-bold transition flex items-center gap-1 cursor-pointer"
                       title="Mostrar todas las piezas ocultas (Alt+H)">
-                      <span class="material-icons text-[11px]">visibility</span>
+                      <hugeicons-icon [icon]="icons.eye" [size]="11" [strokeWidth]="2"></hugeicons-icon>
                       <span>Mostrar ({{ hiddenPartsCount() }})</span>
                     </button>
                   }
@@ -1628,8 +1628,8 @@
                 <div class="space-y-1.5 p-2 bg-indigo-50/60 border border-indigo-100 rounded-xl">
                   <div class="flex items-center justify-between">
                     <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
-                      <span class="material-icons text-xs">folder_open</span>
-                      Cajones y Módulos ({{ groups().length }})
+                      <hugeicons-icon [icon]="icons.inbox" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                      <span>Cajones y Módulos ({{ groups().length }})</span>
                     </span>
                     <span class="text-[10px] text-indigo-500 font-medium">Clic para gestionar</span>
                   </div>
@@ -1645,7 +1645,15 @@
                           (click)="selectEntireGroup(grp.id)"
                           class="flex items-center gap-1 cursor-pointer min-w-0"
                           title="Seleccionar {{ grp.name }} para abrir, mover o renombrar en la cinta superior">
-                          <span class="material-icons text-xs" [class.text-indigo-300]="activeSelectedGroupId() === grp.id" [class.text-indigo-600]="activeSelectedGroupId() !== grp.id && !isGroupHidden(grp.id)" [class.text-amber-500]="isGroupHidden(grp.id)">inbox</span>
+                          <hugeicons-icon
+                            [icon]="icons.inbox"
+                            [size]="12"
+                            [strokeWidth]="2"
+                            class="shrink-0"
+                            [class.text-indigo-300]="activeSelectedGroupId() === grp.id"
+                            [class.text-indigo-600]="activeSelectedGroupId() !== grp.id && !isGroupHidden(grp.id)"
+                            [class.text-amber-500]="isGroupHidden(grp.id)">
+                          </hugeicons-icon>
                           <span class="truncate max-w-28">{{ grp.name }}</span>
                         </button>
 
@@ -1653,9 +1661,9 @@
                           type="button"
                           (click)="toggleGroupVisibility(grp.id, $event)"
                           [class]="activeSelectedGroupId() === grp.id ? 'text-white/80 hover:text-white' : (isGroupHidden(grp.id) ? 'text-amber-600 hover:text-amber-800' : 'text-indigo-400 hover:text-indigo-700')"
-                          class="p-0.5 rounded transition cursor-pointer"
+                          class="p-0.5 rounded transition cursor-pointer flex items-center justify-center"
                           [title]="isGroupHidden(grp.id) ? 'Cajón/módulo oculto. Clic para mostrarlo' : 'Ocultar temporalmente este cajón/módulo'">
-                          <span class="material-icons text-xs">{{ isGroupHidden(grp.id) ? 'visibility_off' : 'visibility' }}</span>
+                          <hugeicons-icon [icon]="isGroupHidden(grp.id) ? icons.eyeOff : icons.eye" [size]="12" [strokeWidth]="2"></hugeicons-icon>
                         </button>
                       </div>
                     }
@@ -1690,14 +1698,14 @@
                           (click)="saveRenamePart(part.id)"
                           class="h-6 w-6 text-emerald-600 hover:text-emerald-700 hover:bg-slate-100 rounded flex items-center justify-center transition cursor-pointer"
                           title="Guardar nombre (Enter)">
-                          <span class="material-icons text-xs">check</span>
+                          <hugeicons-icon [icon]="icons.check" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
                         </button>
                         <button
                           type="button"
                           (click)="cancelRenamePart()"
                           class="h-6 w-6 text-rose-500 hover:text-rose-600 hover:bg-slate-100 rounded flex items-center justify-center transition cursor-pointer"
                           title="Cancelar (Esc)">
-                          <span class="material-icons text-xs">close</span>
+                          <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                         </button>
                       </div>
                     } @else {
@@ -1714,8 +1722,8 @@
                           <div class="flex items-center gap-1.5">
                             <p class="font-bold truncate text-[11px]">{{ part.name }}</p>
                             @if (getGroupName(part.groupId); as gName) {
-                              <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 bg-indigo-100 text-indigo-800 rounded text-[9px] font-semibold shrink-0" title="Pertenece al cajón/módulo: {{ gName }}">
-                                <span class="material-icons text-[10px]">inbox</span>
+                              <span class="inline-flex items-center gap-1 px-1.5 py-0.2 bg-indigo-100 text-indigo-800 rounded text-[9px] font-semibold shrink-0" title="Pertenece al cajón/módulo: {{ gName }}">
+                                <hugeicons-icon [icon]="icons.inbox" [size]="10" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                                 <span class="truncate max-w-22">{{ gName }}</span>
                               </span>
                             }
@@ -1731,23 +1739,23 @@
                           type="button"
                           (click)="togglePartVisibility(part.id, $event)"
                           [class]="isPartHidden(part.id) ? 'text-amber-500 bg-amber-50 hover:bg-amber-100' : 'text-slate-400 hover:text-slate-700'"
-                          class="p-1 rounded-lg transition cursor-pointer"
+                          class="p-1 rounded-lg transition cursor-pointer flex items-center justify-center"
                           [title]="isPartHidden(part.id) ? 'Pieza oculta. Clic para mostrarla' : 'Ocultar temporalmente esta pieza'">
-                          <span class="material-icons text-xs">{{ isPartHidden(part.id) ? 'visibility_off' : 'visibility' }}</span>
+                          <hugeicons-icon [icon]="isPartHidden(part.id) ? icons.eyeOff : icons.eye" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
                         </button>
                         <button
                           type="button"
                           (click)="startRenamePart(part, $event)"
-                          class="text-slate-400 hover:text-sky-600 p-1 rounded-lg transition cursor-pointer"
+                          class="text-slate-400 hover:text-sky-600 p-1 rounded-lg transition cursor-pointer flex items-center justify-center"
                           title="Renombrar esta pieza">
-                          <span class="material-icons text-xs">edit</span>
+                          <hugeicons-icon [icon]="icons.edit" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
                         </button>
                         <button
                           type="button"
                           (click)="deletePartById(part.id, $event)"
-                          class="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition cursor-pointer"
+                          class="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition cursor-pointer flex items-center justify-center"
                           title="Eliminar esta pieza">
-                          <span class="material-icons text-xs">delete</span>
+                          <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
                         </button>
                       </div>
                     }
@@ -1773,7 +1781,7 @@
 
                 <div class="flex items-center justify-between border-b border-emerald-200/80 pb-2">
                   <div class="flex items-center gap-1.5 min-w-0">
-                    <span class="material-icons text-emerald-700 text-base">kitchen</span>
+                    <hugeicons-icon [icon]="icons.appliance" [size]="16" [strokeWidth]="2" class="text-emerald-700 shrink-0"></hugeicons-icon>
                     <div class="min-w-0">
                       <span class="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">Equipo Seleccionado</span>
                       <input
@@ -1789,23 +1797,23 @@
                     <button
                       type="button"
                       (click)="duplicateSelectedAppliance()"
-                      class="p-1 text-slate-500 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg transition cursor-pointer"
+                      class="p-1 text-slate-500 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg transition cursor-pointer flex items-center justify-center"
                       title="Duplicar este electrodoméstico">
-                      <span class="material-icons text-xs">content_copy</span>
+                      <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                     </button>
                     <button
                       type="button"
                       (click)="deleteSelectedAppliance()"
-                      class="p-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                      class="p-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer flex items-center justify-center"
                       title="Eliminar este electrodoméstico">
-                      <span class="material-icons text-xs">delete</span>
+                      <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                     </button>
                     <button
                       type="button"
                       (click)="selectAppliance(null)"
-                      class="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition cursor-pointer"
+                      class="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition cursor-pointer flex items-center justify-center"
                       title="Deseleccionar">
-                      <span class="material-icons text-xs">close</span>
+                      <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                     </button>
                   </div>
                 </div>
@@ -1907,9 +1915,9 @@
 
                 <!-- Imán de Contacto Automático -->
                 <div class="space-y-1.5">
-                  <span class="text-[11px] font-bold text-emerald-900 block uppercase tracking-wider flex items-center gap-1">
-                    <span class="material-icons text-xs text-emerald-600">tune</span>
-                    Imán de Contacto Automático
+                  <span class="text-[11px] font-bold text-emerald-900 block uppercase tracking-wider flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                    <span>Imán de Contacto Automático</span>
                   </span>
                   <div class="grid grid-cols-3 gap-1">
                     <button
@@ -1917,7 +1925,7 @@
                       (click)="snapSelectedAppliance('floor')"
                       class="py-1.5 px-2 bg-white hover:bg-emerald-100/60 border border-emerald-200 rounded-xl text-[10px] font-bold text-slate-700 flex items-center justify-center gap-1 transition cursor-pointer"
                       title="Adherir al suelo (Y=0 mm)">
-                      <span class="material-icons text-xs text-emerald-600">vertical_align_bottom</span>
+                      <hugeicons-icon [icon]="icons.alignBottom" [size]="12" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
                       <span>Al Piso</span>
                     </button>
 
@@ -1926,7 +1934,7 @@
                       (click)="snapSelectedAppliance('countertop')"
                       class="py-1.5 px-2 bg-white hover:bg-emerald-100/60 border border-emerald-200 rounded-xl text-[10px] font-bold text-slate-700 flex items-center justify-center gap-1 transition cursor-pointer"
                       title="Adherir sobre la mesada o mueble bajo más alto">
-                      <span class="material-icons text-xs text-sky-600">table_bar</span>
+                      <hugeicons-icon [icon]="icons.tableBar" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                       <span>A Mesada</span>
                     </button>
 
@@ -1935,7 +1943,7 @@
                       (click)="snapSelectedAppliance('wall')"
                       class="py-1.5 px-2 bg-white hover:bg-emerald-100/60 border border-emerald-200 rounded-xl text-[10px] font-bold text-slate-700 flex items-center justify-center gap-1 transition cursor-pointer"
                       title="Adherir cara trasera a la pared principal">
-                      <span class="material-icons text-xs text-amber-600">border_all</span>
+                      <hugeicons-icon [icon]="icons.alignLeft" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
                       <span>A Pared</span>
                     </button>
                   </div>
@@ -1953,7 +1961,7 @@
                         (click)="rotateAppliance(90)"
                         class="px-2 py-0.5 bg-white hover:bg-emerald-100 border border-emerald-200 rounded-lg text-[10px] font-bold text-emerald-800 flex items-center gap-1 transition cursor-pointer"
                         title="Girar 90 grados hacia la derecha">
-                        <span class="material-icons text-xs">rotate_right</span>
+                        <hugeicons-icon [icon]="icons.rotateRight" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                         <span>Girar 90°</span>
                       </button>
                       <span class="text-[10px] font-mono font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
@@ -2007,9 +2015,9 @@
                 <!-- Presupuesto e Integración Financiera -->
                 <div class="p-2.5 bg-white rounded-xl border border-emerald-100 space-y-1.5">
                   <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                      <span class="material-icons text-xs text-amber-500">payments</span>
-                      Costo en Presupuesto
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.currency" [size]="12" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                      <span>Costo en Presupuesto</span>
                     </span>
                     <label class="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-slate-600">
                       <input
@@ -2041,9 +2049,9 @@
             @if (appliances().length > 0) {
               <div class="space-y-2">
                 <div class="flex items-center justify-between">
-                  <span class="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
-                    <span class="material-icons text-xs text-emerald-600">inventory_2</span>
-                    Equipos en el Proyecto ({{ appliances().length }})
+                  <span class="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                    <span>Equipos en el Proyecto ({{ appliances().length }})</span>
                   </span>
                   <span class="text-[10px] text-slate-400">Clic para seleccionar</span>
                 </div>
@@ -2061,9 +2069,13 @@
                       class="p-2 rounded-xl border flex items-center justify-between gap-2 transition cursor-pointer text-xs">
 
                       <div class="flex items-center gap-2 min-w-0">
-                        <span class="material-icons text-sm" [class.text-emerald-600]="selectedApplianceId() === app.id">
-                          {{ getApplianceIcon(app.type) }}
-                        </span>
+                        <hugeicons-icon
+                          [icon]="getApplianceHugeIcon(app.type)"
+                          [size]="15"
+                          [strokeWidth]="1.9"
+                          class="shrink-0"
+                          [class.text-emerald-600]="selectedApplianceId() === app.id">
+                        </hugeicons-icon>
                         <div class="truncate">
                           <p class="truncate text-[11px] leading-tight text-slate-800">{{ app.name }}</p>
                           <p class="text-[10px] font-mono text-slate-400">
@@ -2079,9 +2091,9 @@
                         <button
                           type="button"
                           (click)="projectService.removeAppliance(app.id); $event.stopPropagation()"
-                          class="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                          class="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer flex items-center justify-center"
                           title="Eliminar del 3D">
-                          <span class="material-icons text-xs">delete</span>
+                          <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
                         </button>
                       </div>
 
@@ -2094,9 +2106,9 @@
             <!-- CATÁLOGO DE ELECTRODOMÉSTICOS Y ACCESORIOS -->
             <div class="space-y-2 pt-2 border-t border-slate-200">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                  <span class="material-icons text-xs text-sky-600">apps</span>
-                  Catálogo de Electrodomésticos y Accesorios
+                <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.templatesGrid" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                  <span>Catálogo de Electrodomésticos y Accesorios</span>
                 </span>
                 <span class="text-[10px] text-slate-400">8 Familias 3D & Herrajes</span>
               </div>
@@ -2115,7 +2127,7 @@
                   (click)="activeApplianceCategory.set('legs')"
                   [class]="activeApplianceCategory() === 'legs' ? 'bg-teal-700 text-white font-bold shadow-2xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
                   class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer flex items-center gap-1">
-                  <span class="material-icons text-[11px]">table_bar</span>
+                  <hugeicons-icon [icon]="icons.tableBar" [size]="11" [strokeWidth]="2"></hugeicons-icon>
                   <span>Patas Mesa</span>
                 </button>
                 <button
@@ -2123,7 +2135,7 @@
                   (click)="activeApplianceCategory.set('coffee')"
                   [class]="activeApplianceCategory() === 'coffee' ? 'bg-amber-700 text-white font-bold shadow-2xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
                   class="px-2 py-0.5 rounded-lg text-[10px] shrink-0 transition cursor-pointer flex items-center gap-1">
-                  <span class="material-icons text-[11px]">coffee</span>
+                  <hugeicons-icon [icon]="icons.coffee" [size]="11" [strokeWidth]="2"></hugeicons-icon>
                   <span>Cafeteras</span>
                 </button>
                 <button
@@ -2170,7 +2182,7 @@
                     <div class="flex items-start justify-between gap-2">
                       <div class="flex items-center gap-2">
                         <div class="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-emerald-50 text-slate-600 group-hover:text-emerald-700 flex items-center justify-center shrink-0 transition">
-                          <span class="material-icons text-base">{{ preset.icon }}</span>
+                          <hugeicons-icon [icon]="getApplianceHugeIcon(preset.icon)" [size]="16" [strokeWidth]="1.9"></hugeicons-icon>
                         </div>
                         <div class="min-w-0">
                           <h4 class="font-bold text-[11px] text-slate-800 leading-tight">{{ preset.name }}</h4>
@@ -2182,7 +2194,7 @@
                         type="button"
                         (click)="addApplianceFromPreset(preset)"
                         class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg flex items-center gap-1 transition shadow-2xs shrink-0 cursor-pointer">
-                        <span class="material-icons text-xs">add</span>
+                        <hugeicons-icon [icon]="icons.add" [size]="12" [strokeWidth]="2.2"></hugeicons-icon>
                         <span>Añadir 3D</span>
                       </button>
                     </div>
@@ -2224,7 +2236,7 @@
       <div class="px-6 py-4 bg-linear-to-r from-sky-600 to-indigo-700 text-white flex items-center justify-between">
         <div class="flex items-center gap-2.5">
           <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
-            <span class="material-icons text-xl">inbox</span>
+            <hugeicons-icon [icon]="icons.inbox" [size]="20" [strokeWidth]="1.9"></hugeicons-icon>
           </div>
           <div>
             <h3 class="font-bold text-sm tracking-tight">Asistente de Cajón Modular</h3>
@@ -2235,7 +2247,7 @@
           type="button"
           (click)="closeDrawerWizard()"
           class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center text-white/80 hover:text-white transition cursor-pointer">
-          <span class="material-icons text-sm">close</span>
+          <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
         </button>
       </div>
 
@@ -2247,8 +2259,9 @@
           <div class="flex items-center justify-between mb-1">
             <span class="block text-xs font-bold text-slate-700">Nombre del Cajón / Módulo</span>
             @if (isDrawerWizardNameDuplicate()) {
-              <span class="text-[10px] text-rose-500 font-semibold flex items-center gap-0.5">
-                <span class="material-icons text-xs">warning</span> Nombre ya en uso
+              <span class="text-[10px] text-rose-500 font-semibold flex items-center gap-1">
+                <hugeicons-icon [icon]="icons.warning" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                <span>Nombre ya en uso</span>
               </span>
             }
           </div>
@@ -2262,7 +2275,8 @@
           @if (isDrawerWizardNameDuplicate()) {
             <div class="mt-1 flex items-center justify-between text-[11px] text-rose-600 bg-rose-50 p-2 rounded-lg border border-rose-200">
               <span class="flex items-center gap-1 font-medium">
-                <span class="material-icons text-xs">error</span> Ya existe un cajón con este nombre.
+                <hugeicons-icon [icon]="icons.warning" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                <span>Ya existe un cajón con este nombre.</span>
               </span>
               <button
                 type="button"
@@ -2328,9 +2342,9 @@
         <!-- Estándares de Carpintería -->
         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
           <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-              <span class="material-icons text-xs text-sky-600">tune</span>
-              Parámetros de Taller y Carpintería
+            <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+              <span>Parámetros de Taller y Carpintería</span>
             </span>
           </div>
 
@@ -2443,7 +2457,7 @@
           [disabled]="isDrawerWizardNameDuplicate() || !drawerForm().name.trim()"
           [class]="isDrawerWizardNameDuplicate() || !drawerForm().name.trim() ? 'opacity-50 cursor-not-allowed bg-slate-400 text-white' : 'bg-linear-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-md shadow-sky-600/20 cursor-pointer'"
           class="px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition">
-          <span class="material-icons text-sm">check_circle</span>
+          <hugeicons-icon [icon]="icons.checkCircle" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           <span>Crear y Ensamblar Cajón</span>
         </button>
       </div>
@@ -2460,7 +2474,7 @@
       <div class="p-5 space-y-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
-            <span class="material-icons text-xl">link</span>
+            <hugeicons-icon [icon]="icons.link" [size]="20" [strokeWidth]="2"></hugeicons-icon>
           </div>
           <div>
             <h3 class="font-bold text-sm text-slate-900">Agrupar Selección</h3>
@@ -2476,8 +2490,9 @@
           <div class="flex items-center justify-between mb-1">
             <span class="block text-xs font-bold text-slate-700">Nombre del Grupo / Conjunto</span>
             @if (isNewGroupNameDuplicate()) {
-              <span class="text-[10px] text-rose-500 font-semibold flex items-center gap-0.5">
-                <span class="material-icons text-xs">warning</span> Nombre ya en uso
+              <span class="text-[10px] text-rose-500 font-semibold flex items-center gap-1">
+                <hugeicons-icon [icon]="icons.warning" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                <span>Nombre ya en uso</span>
               </span>
             }
           </div>
@@ -2492,7 +2507,8 @@
           @if (isNewGroupNameDuplicate()) {
             <div class="mt-1 flex items-center justify-between text-[11px] text-rose-600 bg-rose-50 p-2 rounded-lg border border-rose-200">
               <span class="flex items-center gap-1 font-medium">
-                <span class="material-icons text-xs">error</span> Ya existe un grupo con este nombre.
+                <hugeicons-icon [icon]="icons.warning" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                <span>Ya existe un grupo con este nombre.</span>
               </span>
               <button
                 type="button"
@@ -2518,7 +2534,7 @@
           [disabled]="isNewGroupNameDuplicate() || !newGroupNameInput().trim()"
           [class]="isNewGroupNameDuplicate() || !newGroupNameInput().trim() ? 'opacity-50 cursor-not-allowed bg-slate-400 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm cursor-pointer'"
           class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
-          <span class="material-icons text-xs">done</span>
+          <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
           <span>Agrupar Piezas</span>
         </button>
       </div>
@@ -2544,7 +2560,7 @@
       <div class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80 shrink-0 min-w-0">
         <div class="flex items-center gap-2.5 min-w-0">
           <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
-            <span class="material-icons text-lg">roofing</span>
+            <hugeicons-icon [icon]="icons.homeRoof" [size]="18" [strokeWidth]="2"></hugeicons-icon>
           </div>
           <div class="min-w-0">
             <h3 class="text-sm font-bold text-slate-800 leading-tight truncate">Configuración de Habitación 3D</h3>
@@ -2556,7 +2572,7 @@
           (click)="closeRoomSettings()"
           class="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer shrink-0"
           title="Cerrar modal">
-          <span class="material-icons text-base">close</span>
+          <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
         </button>
       </div>
 
@@ -2567,8 +2583,8 @@
         <div class="space-y-2 min-w-0">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <span class="material-icons text-xs text-sky-600">view_quilt</span>
-              Disposición de Paredes
+              <hugeicons-icon [icon]="icons.templatesGrid" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+              <span>Disposición de Paredes</span>
             </span>
             <span class="text-[10px] text-slate-400 font-medium">Configuración de muros arquitectónicos</span>
           </div>
@@ -2642,8 +2658,8 @@
         <!-- 2. MEDIDAS Y COTAS PARAMÉTRICAS -->
         <div class="space-y-2.5 pt-4 min-w-0">
           <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <span class="material-icons text-xs text-sky-600">straighten</span>
-            Dimensiones de los Muros (Milímetros)
+            <hugeicons-icon [icon]="icons.ruler" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+            <span>Dimensiones de los Muros (Milímetros)</span>
           </span>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 min-w-0">
@@ -2717,8 +2733,8 @@
         <div class="space-y-2.5 pt-4 min-w-0">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <span class="material-icons text-xs text-indigo-600">crop_free</span>
-              Dimensiones del Suelo / Entorno (Expandible)
+              <hugeicons-icon [icon]="icons.expandArea" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+              <span>Dimensiones del Suelo / Entorno (Expandible)</span>
             </span>
             <span class="text-[10px] text-indigo-600 font-semibold">Hasta 12+ metros</span>
           </div>
@@ -2794,15 +2810,15 @@
         <div class="space-y-2.5 pt-4 min-w-0">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <span class="material-icons text-xs text-indigo-600">open_with</span>
-              Posición Modular de Muros (Desplazamiento X / Z)
+              <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+              <span>Posición Modular de Muros (Desplazamiento X / Z)</span>
             </span>
             <button
               type="button"
               (click)="alignWallsToEdge()"
               class="px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-md text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
               title="Alinear muros al borde posterior e izquierdo del piso para aprovechar todo el espacio">
-              <span class="material-icons text-xs text-sky-600">align_horizontal_left</span>
+              <hugeicons-icon [icon]="icons.alignLeft" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
               <span>Alinear al Borde (0, 0)</span>
             </button>
           </div>
@@ -2861,8 +2877,8 @@
 
           <div class="p-2.5 bg-sky-50/50 rounded-lg border border-sky-200/80 flex flex-wrap items-center justify-between gap-2 min-w-0">
             <span class="text-[11px] font-semibold text-sky-900 flex items-center gap-1">
-              <span class="material-icons text-xs text-sky-600">aspect_ratio</span>
-              Ajuste Rápido de Longitud:
+              <hugeicons-icon [icon]="icons.expandArea" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+              <span>Ajuste Rápido de Longitud:</span>
             </span>
             <div class="flex items-center gap-1">
               <span class="text-[10px] font-medium text-slate-500 mr-0.5">Muro X:</span>
@@ -2903,8 +2919,8 @@
         <div class="space-y-3 pt-4">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <span class="material-icons text-xs text-amber-600">texture</span>
-              Acabado del Piso
+              <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+              <span>Acabado del Piso</span>
               <span class="text-[10px] font-normal text-slate-400">({{ filteredFloorCatalog().length }} modelos)</span>
             </span>
 
@@ -2962,7 +2978,9 @@
                   class="w-8 h-8 rounded-lg shrink-0 border border-black/10 shadow-2xs mt-0.5 flex items-center justify-center text-xs font-semibold"
                   [style.backgroundColor]="item.swatchBg">
                   @if (roomConfig().floorMaterial === item.id) {
-                    <span class="material-icons text-xs text-amber-600 bg-white/95 rounded-full p-0.5 shadow-2xs">check</span>
+                    <span class="bg-white/95 rounded-full p-0.5 shadow-2xs flex items-center justify-center text-amber-600">
+                      <hugeicons-icon [icon]="icons.check" [size]="12" [strokeWidth]="2.5"></hugeicons-icon>
+                    </span>
                   }
                 </div>
 
@@ -2980,8 +2998,8 @@
         <div class="space-y-3 pt-4">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <span class="material-icons text-xs text-sky-600">wallpaper</span>
-              Acabado de Muros y Paredes
+              <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+              <span>Acabado de Muros y Paredes</span>
               <span class="text-[10px] font-normal text-slate-400">({{ filteredWallCatalog().length }} modelos)</span>
             </span>
 
@@ -3048,7 +3066,9 @@
                   class="w-8 h-8 rounded-lg shrink-0 border border-black/10 shadow-2xs mt-0.5 flex items-center justify-center text-xs font-semibold"
                   [style.backgroundColor]="item.swatchBg">
                   @if (roomConfig().wallMaterial === item.id) {
-                    <span class="material-icons text-xs text-sky-600 bg-white/95 rounded-full p-0.5 shadow-2xs">check</span>
+                    <span class="bg-white/95 rounded-full p-0.5 shadow-2xs flex items-center justify-center text-sky-600">
+                      <hugeicons-icon [icon]="icons.check" [size]="12" [strokeWidth]="2.5"></hugeicons-icon>
+                    </span>
                   } @else if (item.swatchIcon) {
                     <span class="text-xs">{{ item.swatchIcon }}</span>
                   }
@@ -3093,7 +3113,7 @@
           type="button"
           (click)="frameRoomCamera()"
           class="h-8 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
-          <span class="material-icons text-sm text-sky-600">center_focus_strong</span>
+          <hugeicons-icon [icon]="icons.cameraFocus" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>Centrar Vista</span>
         </button>
 
@@ -3101,7 +3121,7 @@
           type="button"
           (click)="closeRoomSettings()"
           class="h-8 px-4 text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-lg flex items-center gap-1.5 transition shadow-xs cursor-pointer">
-          <span class="material-icons text-sm">check</span>
+          <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.2" class="shrink-0"></hugeicons-icon>
           <span>Aplicar Cambios</span>
         </button>
       </div>
@@ -3113,7 +3133,7 @@
 <!-- NOTIFICACIÓN FLOTANTE TOAST -->
 @if (toastMessage()) {
   <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-950 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700/80 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-none">
-    <span class="material-icons text-amber-400 text-sm">notifications</span>
+    <hugeicons-icon [icon]="icons.info" [size]="15" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
     <span>{{ toastMessage() }}</span>
   </div>
 }

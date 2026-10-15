@@ -9,6 +9,30 @@ import {
   viewChild
 } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
+import { HugeiconsIconComponent } from '@hugeicons/angular';
+import {
+  Add01Icon,
+  Alert02Icon,
+  Archive01Icon,
+  ArrowDown01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  ArrowUp01Icon,
+  Cancel01Icon,
+  CheckListIcon,
+  CheckmarkCircle02Icon,
+  Compass01Icon,
+  Delete02Icon,
+  Edit02Icon,
+  InformationCircleIcon,
+  Layers01Icon,
+  PaintBoardIcon,
+  RulerIcon,
+  Settings01Icon,
+  Tag01Icon,
+  Tick02Icon,
+  ViewIcon
+} from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import {
   ComponentRole,
@@ -49,6 +73,10 @@ import { ComponentOptionsModalComponent } from '../component-options-modal/compo
 import { TemplatesModalComponent } from '../templates-modal/templates-modal';
 import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templates-catalog.service';
 
+type HugeIconDef = typeof Compass01Icon;
+const cadSvg = (paths: string[]): HugeIconDef =>
+  paths.map((d, idx) => ['path', { d, key: `md_${idx}` }]) as unknown as HugeIconDef;
+
 /**
  * Componente principal de diseño y modelado 3D (Modo Módulo y Modo Habitación 3D).
  * Coordina el visor Three.js, el inspector de propiedades de piezas, el catálogo de módulos
@@ -59,6 +87,7 @@ import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templ
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
+    HugeiconsIconComponent,
     Furniture3dViewerComponent,
     TechnicalSheetModalComponent,
     ComponentOptionsModalComponent,
@@ -79,6 +108,243 @@ export class ModuleDesignerComponent {
   private readonly templatesCatalog = inject(TemplatesCatalogService);
   private readonly destroyRef = inject(DestroyRef);
   readonly hardwareCatalog = inject(HardwareCatalogService);
+
+  // Registro centralizado de iconos vectoriales para las barras flotantes, el panel derecho y los modales
+  readonly icons = {
+    cube3d: cadSvg([
+      'M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z',
+      'M12 12L20 7.5',
+      'M12 12L4 7.5',
+      'M12 12V21'
+    ]),
+    homeRoof: cadSvg([
+      'M3 10.5L12 3L21 10.5',
+      'M5 9.5V20H19V9.5',
+      'M9.5 20V14H14.5V20'
+    ]),
+    templatesGrid: cadSvg([
+      'M4 4H10V10H4V4Z',
+      'M14 4H20V10H14V4Z',
+      'M4 14H10V20H4V14Z',
+      'M17 14V20',
+      'M14 17H20'
+    ]),
+    tune: Settings01Icon,
+    delete: Delete02Icon,
+    sidebarToggle: cadSvg([
+      'M4 5A1 1 0 0 1 5 4H19A1 1 0 0 1 20 5V19A1 1 0 0 1 19 20H5A1 1 0 0 1 4 19V5Z',
+      'M15 4V20'
+    ]),
+    close: Cancel01Icon,
+    edit: Edit02Icon,
+    check: Tick02Icon,
+    checkCircle: CheckmarkCircle02Icon,
+    inbox: Archive01Icon,
+    link: cadSvg([
+      'M10 13A5 5 0 0 0 17.5 13.5L19.5 11.5A5 5 0 0 0 12.5 4.5L11 6',
+      'M14 11A5 5 0 0 0 6.5 10.5L4.5 12.5A5 5 0 0 0 11.5 19.5L13 18'
+    ]),
+    unlink: cadSvg([
+      'M10 14L14 10',
+      'M7.5 16.5L5.5 18.5A3.5 3.5 0 0 1 5.5 13.5L7.5 11.5',
+      'M16.5 7.5L18.5 5.5A3.5 3.5 0 0 1 18.5 10.5L16.5 12.5'
+    ]),
+    copy: cadSvg([
+      'M9 9H19V19H9V9Z',
+      'M5 15H4V4H15V5'
+    ]),
+    moveAxes: cadSvg([
+      'M12 3V21',
+      'M3 12H21',
+      'M9.5 5.5L12 3L14.5 5.5',
+      'M9.5 18.5L12 21L14.5 18.5',
+      'M5.5 9.5L3 12L5.5 14.5',
+      'M18.5 9.5L21 12L18.5 14.5'
+    ]),
+    doorClosed: cadSvg([
+      'M5 3H19V21H5V3Z',
+      'M12 3V21',
+      'M9.5 11.5V12.5',
+      'M14.5 11.5V12.5'
+    ]),
+    doorOpen: cadSvg([
+      'M5 3H19V21H5V3Z',
+      'M12 3L17.5 5.5V18.5L12 21V3Z',
+      'M9.5 11.5V12.5'
+    ]),
+    rotateLeft: cadSvg([
+      'M4 11A8 8 0 1 1 6.4 16.6',
+      'M4 6V11H9'
+    ]),
+    rotateRight: cadSvg([
+      'M20 11A8 8 0 1 0 17.6 16.6',
+      'M20 6V11H15'
+    ]),
+    compass: Compass01Icon,
+    eye: ViewIcon,
+    eyeOff: cadSvg([
+      'M3 3L21 21',
+      'M10.6 10.6A2 2 0 0 0 13.4 13.4',
+      'M9.9 5.1A10.5 10.5 0 0 1 12 5C17 5 20.5 9 21.5 12C21 13.4 20.1 14.9 18.8 16.1',
+      'M6.2 6.2C4.4 7.5 3.1 9.5 2.5 12C3.5 15 7 19 12 19C13.8 19 15.4 18.5 16.8 17.6'
+    ]),
+    squareShape: cadSvg(['M4 4H20V20H4V4Z']),
+    circleShape: cadSvg(['M21 12A9 9 0 1 1 3 12A9 9 0 0 1 21 12Z']),
+    freehandWave: cadSvg(['M3.5 16.5C6.5 8.5 10 8.5 12 12.5C14 16.5 17.5 16.5 20.5 7.5']),
+    magnet: cadSvg(['M6 4V11A6 6 0 0 0 18 11V4', 'M6 8H9', 'M15 8H18']),
+    ruler: RulerIcon,
+    alignLeft: cadSvg(['M4 4V20', 'M8 7H20V11H8V7Z', 'M8 13H16V17H8V13Z']),
+    alignRight: cadSvg(['M20 4V20', 'M4 7H16V11H4V7Z', 'M8 13H16V17H8V13Z']),
+    alignCenter: cadSvg(['M12 3V21', 'M6 7H18V11H6V7Z', 'M8 13H16V17H8V13Z']),
+    alignBottom: cadSvg(['M4 20H20', 'M12 4V16', 'M8 12L12 16L16 12']),
+    cameraFocus: cadSvg([
+      'M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8',
+      'M16 4H18.5A1.5 1.5 0 0 1 20 5.5V8',
+      'M20 16V18.5A1.5 1.5 0 0 1 18.5 20H16',
+      'M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16',
+      'M14 12A2 2 0 1 1 10 12A2 2 0 0 1 14 12Z'
+    ]),
+    chevronLeft: ArrowLeft01Icon,
+    chevronRight: ArrowRight01Icon,
+    arrowUp: ArrowUp01Icon,
+    arrowDown: ArrowDown01Icon,
+    arrowLeft: ArrowLeft01Icon,
+    arrowRight: ArrowRight01Icon,
+    layers: Layers01Icon,
+    selectAll: cadSvg([
+      'M4 4H7', 'M10 4H14', 'M17 4H20V7',
+      'M20 10V14', 'M20 17V20H17',
+      'M14 20H10', 'M7 20H4V17',
+      'M4 14V10', 'M8 8H16V16H8V8Z'
+    ]),
+    add: Add01Icon,
+    minus: cadSvg(['M5 12H19']),
+    appliance: cadSvg([
+      'M6 3H18A1 1 0 0 1 19 4V20A1 1 0 0 1 18 21H6A1 1 0 0 1 5 20V4A1 1 0 0 1 6 3Z',
+      'M5 10H19',
+      'M8 6.5V7.5',
+      'M8 13V16'
+    ]),
+    clearanceVert: cadSvg([
+      'M8.5 8.5L12 5L15.5 8.5',
+      'M8.5 15.5L12 19L15.5 15.5',
+      'M5 3H19',
+      'M5 21H19'
+    ]),
+    palette: PaintBoardIcon,
+    cncTarget: cadSvg([
+      'M20 12A8 8 0 1 1 4 12A8 8 0 0 1 20 12Z',
+      'M14.5 12A2.5 2.5 0 1 1 9.5 12A2.5 2.5 0 0 1 14.5 12Z'
+    ]),
+    tableBar: cadSvg([
+      'M3 7H21',
+      'M5 7V19',
+      'M19 7V19',
+      'M3 10H21'
+    ]),
+    columns: cadSvg([
+      'M4 4H20V20H4V4Z',
+      'M9.5 4V20',
+      'M14.5 4V20'
+    ]),
+    woodLeg: cadSvg([
+      'M7 4H17L14.5 20H9.5L7 4Z',
+      'M8.5 16H15.5'
+    ]),
+    cursorSelect: cadSvg(['M4.5 3.5L19.5 10.5L12.5 13L10 20L4.5 3.5Z']),
+    tableRows: cadSvg([
+      'M4 4H20V20H4V4Z',
+      'M4 9.5H20',
+      'M4 14.5H20'
+    ]),
+    shelfSplit: cadSvg([
+      'M4 5H20',
+      'M4 12H20',
+      'M4 19H20',
+      'M4 5V19',
+      'M20 5V19'
+    ]),
+    plinthBottom: cadSvg([
+      'M4 4H20V16H4V4Z',
+      'M6 16V20H18V16'
+    ]),
+    externalLink: cadSvg([
+      'M14 4H20V10',
+      'M20 4L11 13',
+      'M20 14V19A1 1 0 0 1 19 20H5A1 1 0 0 1 4 19V5A1 1 0 0 1 5 4H10'
+    ]),
+    listNumbered: CheckListIcon,
+    currency: Tag01Icon,
+    coffee: cadSvg([
+      'M4 8H16V15A4 4 0 0 1 12 19H8A4 4 0 0 1 4 15V8Z',
+      'M16 9H18.5A2.5 2.5 0 0 1 18.5 14H16',
+      'M3 21H17'
+    ]),
+    sink: cadSvg([
+      'M4 12H20V16A4 4 0 0 1 16 20H8A4 4 0 0 1 4 16V12Z',
+      'M12 12V6A2.5 2.5 0 0 1 17 6V7'
+    ]),
+    hood: cadSvg([
+      'M4 15L8 7H16L20 15H4Z',
+      'M9 4V7',
+      'M15 4V7',
+      'M4 15V18H20V15'
+    ]),
+    cooktop: cadSvg([
+      'M3 6H21V18H3V6Z',
+      'M8.5 12A2.5 2.5 0 1 1 3.5 12',
+      'M15.5 12A2.5 2.5 0 1 1 20.5 12'
+    ]),
+    microwave: cadSvg([
+      'M3 6H21V18H3V6Z',
+      'M6 9H14V15H6V9Z',
+      'M17.5 10V10.5',
+      'M17.5 13.5V14'
+    ]),
+    warning: Alert02Icon,
+    info: InformationCircleIcon,
+    expandArea: cadSvg([
+      'M4 9V4H9',
+      'M15 4H20V9',
+      'M20 15V20H15',
+      'M9 20H4V15'
+    ])
+  };
+
+  /**
+   * Devuelve el icono vectorial de Hugeicons correspondiente al tipo o nombre de ícono de un electrodoméstico.
+   */
+  getApplianceHugeIcon(typeOrIcon: string): HugeIconDef {
+    switch (typeOrIcon) {
+      case 'refrigerator':
+      case 'kitchen':
+        return this.icons.appliance;
+      case 'sink':
+      case 'wash':
+        return this.icons.sink;
+      case 'hood':
+      case 'air':
+        return this.icons.hood;
+      case 'cooktop':
+      case 'mode_heat':
+        return this.icons.cooktop;
+      case 'coffee_maker':
+      case 'coffee':
+        return this.icons.coffee;
+      case 'table_leg':
+      case 'table_legs_set':
+      case 'table_bar':
+        return this.icons.tableBar;
+      case 'view_column':
+        return this.icons.columns;
+      case 'park':
+        return this.icons.woodLeg;
+      case 'microwave':
+      case 'oven':
+      default:
+        return this.icons.microwave;
+    }
+  }
 
   // Referencia al visor 3D y al contenedor horizontal de chips de piezas
   readonly viewer3d = viewChild<Furniture3dViewerComponent>('viewer3d');

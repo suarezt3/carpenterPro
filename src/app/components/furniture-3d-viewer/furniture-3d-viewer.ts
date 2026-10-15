@@ -14,15 +14,38 @@ import {
   NgZone,
   inject
 } from '@angular/core';
+import { HugeiconsIconComponent } from '@hugeicons/angular';
+import {
+  Add01Icon,
+  Alert02Icon,
+  Archive01Icon,
+  ArrowDown01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  ArrowUp01Icon,
+  Cancel01Icon,
+  CheckmarkCircle02Icon,
+  Compass01Icon,
+  Delete02Icon,
+  Edit02Icon,
+  Layers01Icon,
+  LockIcon,
+  Moon02Icon,
+  PaintBoardIcon,
+  RulerIcon,
+  Settings01Icon,
+  Sun01Icon,
+  ViewIcon
+} from '@hugeicons/core-free-icons';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { 
-  Part, 
+import {
+  Part,
   PartGroup,
-  Material, 
-  DrillHole, 
-  CollisionRecord, 
-  EdgeBandingType, 
+  Material,
+  DrillHole,
+  CollisionRecord,
+  EdgeBandingType,
   PartHardwareConfig,
   HandleType,
   HandleFinish,
@@ -38,6 +61,10 @@ import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
+
+type HugeIconDef = typeof Compass01Icon;
+const cadSvg = (paths: string[]): HugeIconDef =>
+  paths.map((d, idx) => ['path', { d, key: `cad_${idx}` }]) as unknown as HugeIconDef;
 
 interface PieceMeshData {
   part: Part;
@@ -111,7 +138,7 @@ export interface WallSnapResult {
 
 @Component({
   selector: 'app-furniture-3d-viewer',
-  imports: [],
+  imports: [HugeiconsIconComponent],
   templateUrl: './furniture-3d-viewer.html',
   styleUrl: './furniture-3d-viewer.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -121,16 +148,120 @@ export interface WallSnapResult {
   }
 })
 export class Furniture3dViewerComponent implements OnDestroy {
- private readonly ngZone = inject(NgZone);
+  private readonly ngZone = inject(NgZone);
   private joineryEngine = inject(JoineryEngineService);
   readonly hardwareCatalog = inject(HardwareCatalogService);
   private appliance3dBuilder = inject(Appliance3dBuilderService);
+
+  // Iconos vectoriales estilizados para la cinta de herramientas CAD y menús 3D
+  readonly icons = {
+    cursorSelect: cadSvg(['M4.5 3.5L19.5 10.5L12.5 13L10 20L4.5 3.5Z']),
+    pushPull: cadSvg(['M14 4H20V10', 'M10 20H4V14', 'M20 4L13.5 10.5', 'M4 20L10.5 13.5']),
+    moveAxes: cadSvg([
+      'M12 3V21',
+      'M3 12H21',
+      'M9.5 5.5L12 3L14.5 5.5',
+      'M9.5 18.5L12 21L14.5 18.5',
+      'M5.5 9.5L3 12L5.5 14.5',
+      'M18.5 9.5L21 12L18.5 14.5'
+    ]),
+    rotate90: cadSvg([
+      'M20 11A8 8 0 1 0 17.6 16.6',
+      'M20 6V11H15'
+    ]),
+    squareShape: cadSvg(['M4 4H20V20H4V4Z']),
+    circleShape: cadSvg(['M21 12A9 9 0 1 1 3 12A9 9 0 0 1 21 12Z']),
+    freehandWave: cadSvg(['M3.5 16.5C6.5 8.5 10 8.5 12 12.5C14 16.5 17.5 16.5 20.5 7.5']),
+    ruler: RulerIcon,
+    cncTarget: cadSvg([
+      'M20 12A8 8 0 1 1 4 12A8 8 0 0 1 20 12Z',
+      'M14.5 12A2.5 2.5 0 1 1 9.5 12A2.5 2.5 0 0 1 14.5 12Z'
+    ]),
+    dimensions3d: cadSvg([
+      'M3 9H21',
+      'M3 6V12',
+      'M21 6V12',
+      'M7 15H17',
+      'M7 13V17',
+      'M17 13V17'
+    ]),
+    clearanceVert: cadSvg([
+      'M8.5 8.5L12 5L15.5 8.5',
+      'M8.5 15.5L12 19L15.5 15.5',
+      'M5 3H19',
+      'M5 21H19'
+    ]),
+    eye: ViewIcon,
+    eyeOff: cadSvg([
+      'M3 3L21 21',
+      'M10.6 10.6A2 2 0 0 0 13.4 13.4',
+      'M9.9 5.1A10.5 10.5 0 0 1 12 5C17 5 20.5 9 21.5 12C21 13.4 20.1 14.9 18.8 16.1',
+      'M6.2 6.2C4.4 7.5 3.1 9.5 2.5 12C3.5 15 7 19 12 19C13.8 19 15.4 18.5 16.8 17.6'
+    ]),
+    hardwareTool: cadSvg([
+      'M14.7 6.3A1 1 0 0 0 14.7 7.7L16.3 9.3A1 1 0 0 0 17.7 9.3L20.7 6.3A5.5 5.5 0 0 1 13 13.5L6.5 20A2.1 2.1 0 0 1 3.5 17L10 10.5A5.5 5.5 0 0 1 17.2 2.8L14.7 6.3Z'
+    ]),
+    doorClosed: cadSvg([
+      'M5 3H19V21H5V3Z',
+      'M12 3V21',
+      'M9.5 11.5V12.5',
+      'M14.5 11.5V12.5'
+    ]),
+    doorOpen: cadSvg([
+      'M5 3H19V21H5V3Z',
+      'M12 3L17.5 5.5V18.5L12 21V3Z',
+      'M9.5 11.5V12.5'
+    ]),
+    inbox: Archive01Icon,
+    sun: Sun01Icon,
+    moon: Moon02Icon,
+    cameraFocus: cadSvg([
+      'M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8',
+      'M16 4H18.5A1.5 1.5 0 0 1 20 5.5V8',
+      'M20 16V18.5A1.5 1.5 0 0 1 18.5 20H16',
+      'M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16',
+      'M14 12A2 2 0 1 1 10 12A2 2 0 0 1 14 12Z'
+    ]),
+    close: Cancel01Icon,
+    add: Add01Icon,
+    checkCircle: CheckmarkCircle02Icon,
+    tune: Settings01Icon,
+    copy: cadSvg([
+      'M9 9H19V19H9V9Z',
+      'M5 15H4V4H15V5'
+    ]),
+    unlink: cadSvg([
+      'M10 14L14 10',
+      'M7.5 16.5L5.5 18.5A3.5 3.5 0 0 1 5.5 13.5L7.5 11.5',
+      'M16.5 7.5L18.5 5.5A3.5 3.5 0 0 1 18.5 10.5L16.5 12.5'
+    ]),
+    arrowUp: ArrowUp01Icon,
+    arrowDown: ArrowDown01Icon,
+    arrowLeft: ArrowLeft01Icon,
+    arrowRight: ArrowRight01Icon,
+    chevronUp: ArrowUp01Icon,
+    chevronDown: ArrowDown01Icon,
+    chevronRight: ArrowRight01Icon,
+    warning: Alert02Icon,
+    delete: Delete02Icon,
+    lock: LockIcon,
+    magnet: cadSvg(['M6 4V11A6 6 0 0 0 18 11V4', 'M6 8H9', 'M15 8H18']),
+    layers: Layers01Icon,
+    palette: PaintBoardIcon,
+    edit: Edit02Icon
+  };
+
+  onSelectedDimensionInput(prop: 'length' | 'width' | 'thickness', event: Event) {
+    const target = event.target as HTMLInputElement | null;
+    if (target) {
+      this.updateSelectedPartDimension(prop, target.value);
+    }
+  }
 
   // Referencias a los listeners del DOM para removerlos limpiamente en ngOnDestroy
   private readonly boundPointerDown = (e: PointerEvent) => this.onPointerDown(e);
   private readonly boundPointerMove = (e: PointerEvent) => this.onPointerMove(e);
   private readonly boundPointerUp = (e: PointerEvent) => this.onPointerUp(e);
-
   // Inputs
   parts = input<Part[]>([]);
   selectedPartId = input<string | null>(null);

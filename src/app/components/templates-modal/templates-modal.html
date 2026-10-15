@@ -1,14 +1,14 @@
 @if (isOpen()) {
-  <div 
+  <div
     class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-900/45 backdrop-blur-xs animate-in fade-in duration-150"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
     (keydown.escape)="close()"
     (click)="close()">
-    
+
     <!-- Modal Window: Modern Clean Architectural Light Theme -->
-    <div 
+    <div
       class="relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-slate-200 bg-white text-slate-800 transition-all"
       role="document"
       tabindex="0"
@@ -17,10 +17,10 @@
 
       <!-- HEADER MODAL: Pure White, Soft Slate Borders & Indigo/Sky Modern Accents -->
       <div class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-slate-200 bg-white shrink-0">
-        
+
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-200/80 shadow-xs shrink-0">
-            <span class="material-icons text-xl">tune</span>
+            <hugeicons-icon [icon]="icons.tune" [size]="20" [strokeWidth]="1.9"></hugeicons-icon>
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-2">
@@ -41,31 +41,31 @@
         <div class="flex items-center gap-2 shrink-0">
           <!-- Conmutador de Vistas: Asistente vs Catálogo -->
           <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs font-semibold">
-            <button 
-              type="button" 
+            <button
+              type="button"
               (click)="activeView.set('assistant')"
               [class]="activeView() === 'assistant' ? 'bg-white text-indigo-700 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'"
-              class="px-2.5 py-1 rounded-md transition flex items-center gap-1 cursor-pointer">
-              <span class="material-icons text-sm">auto_fix_high</span>
+              class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5 cursor-pointer">
+              <hugeicons-icon [icon]="icons.magicWand" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Asistente</span>
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               (click)="activeView.set('catalog')"
               [class]="activeView() === 'catalog' ? 'bg-white text-indigo-700 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'"
-              class="px-2.5 py-1 rounded-md transition flex items-center gap-1 cursor-pointer">
-              <span class="material-icons text-sm">auto_stories</span>
+              class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5 cursor-pointer">
+              <hugeicons-icon [icon]="icons.book" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Catálogo ({{ catalogService.templates.length }})</span>
             </button>
           </div>
 
           <!-- Cerrar modal -->
-          <button 
-            type="button" 
+          <button
+            type="button"
             (click)="close()"
             class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 transition cursor-pointer"
             title="Cerrar (Esc)">
-            <span class="material-icons text-lg">close</span>
+            <hugeicons-icon [icon]="icons.close" [size]="17" [strokeWidth]="2"></hugeicons-icon>
           </button>
         </div>
       </div>
@@ -74,82 +74,82 @@
       <!-- VISTA 1: ASISTENTE PARAMÉTRICO INTERACTIVO -->
       <!-- ========================================== -->
       @if (activeView() === 'assistant') {
-        
+
         <!-- BARRA DE CATEGORÍAS PRESETS (Cocina, Closet, Baño, etc.) -->
         <div class="px-5 sm:px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
           <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Tipo:</span>
-          
-          <button 
+
+          <button
             type="button"
             (click)="selectPreset('kitchen_base')"
             [class]="activePreset() === 'kitchen_base' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
             class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
-            <span class="material-icons text-sm">countertops</span>
+            <hugeicons-icon [icon]="icons.countertop" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Cocina Bajo (Base)</span>
           </button>
 
-          <button 
+          <button
             type="button"
             (click)="selectPreset('kitchen_wall')"
             [class]="activePreset() === 'kitchen_wall' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
             class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
-            <span class="material-icons text-sm">kitchen</span>
+            <hugeicons-icon [icon]="icons.kitchen" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Cocina Alto (Alacena)</span>
           </button>
 
-          <button 
+          <button
             type="button"
             (click)="selectPreset('closet')"
             [class]="activePreset() === 'closet' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
             class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
-            <span class="material-icons text-sm">door_sliding</span>
+            <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Closet / Armario</span>
           </button>
 
-          <button 
+          <button
             type="button"
             (click)="selectPreset('vanity')"
             [class]="activePreset() === 'vanity' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
             class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
-            <span class="material-icons text-sm">bathtub</span>
+            <hugeicons-icon [icon]="icons.vanity" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Baño / Vanitorio</span>
           </button>
 
-          <button 
+          <button
             type="button"
             (click)="selectPreset('bookshelf')"
             [class]="activePreset() === 'bookshelf' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
             class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
-            <span class="material-icons text-sm">shelves</span>
+            <hugeicons-icon [icon]="icons.shelves" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Estantería / Abierto</span>
           </button>
 
-          <button 
+          <button
             type="button"
             (click)="selectPreset('custom')"
             [class]="activePreset() === 'custom' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
             class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
-            <span class="material-icons text-sm">tune</span>
+            <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Personalizado</span>
           </button>
         </div>
 
         <!-- CUERPO PRINCIPAL DEL ASISTENTE (2 COLUMNAS) -->
         <div class="flex-1 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 bg-slate-50/50">
-          
+
           <!-- COLUMNA 1: FORMULARIO PARAMÉTRICO DE ENTRADA (7 cols) -->
           <div class="lg:col-span-7 space-y-4">
-            
+
             <!-- 1. Nombre del Módulo -->
             <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
               <label for="module-name-input" class="block text-xs font-bold text-slate-700 mb-1">
                 Nombre del Módulo
               </label>
-              <input 
+              <input
                 id="module-name-input"
-                type="text" 
-                [value]="moduleName()" 
-                (input)="moduleName.set($any($event.target).value)" 
+                type="text"
+                [value]="moduleName()"
+                (input)="moduleName.set($any($event.target).value)"
                 class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden transition"
                 placeholder="ej. Módulo Cocina Bajo 1, Alacena 2P" />
             </div>
@@ -158,8 +158,8 @@
             <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <span class="material-icons text-sm text-indigo-500">straighten</span>
-                  Dimensiones Exteriores (mm)
+                  <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                  <span>Dimensiones Exteriores (mm)</span>
                 </span>
                 <span class="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
                   {{ width() }} × {{ height() }} × {{ depth() }} mm
@@ -175,8 +175,8 @@
                   </label>
                   <div class="flex items-center gap-1">
                     @for (pw of widthPresets(); track pw) {
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         (click)="width.set(pw)"
                         [class]="width() === pw ? 'bg-rose-500 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
                         class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
@@ -186,14 +186,14 @@
                   </div>
                 </div>
                 <div class="relative">
-                  <input 
+                  <input
                     id="width-input-param"
-                    type="number" 
-                    [value]="width()" 
-                    (input)="width.set(+$any($event.target).value)" 
-                    min="150" 
-                    max="2400" 
-                    step="10" 
+                    type="number"
+                    [value]="width()"
+                    (input)="width.set(+$any($event.target).value)"
+                    min="150"
+                    max="2400"
+                    step="10"
                     class="w-full px-3 py-1.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:border-rose-500 focus:outline-hidden transition" />
                   <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">mm</span>
                 </div>
@@ -208,8 +208,8 @@
                   </label>
                   <div class="flex items-center gap-1">
                     @for (ph of heightPresets(); track ph) {
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         (click)="height.set(ph)"
                         [class]="height() === ph ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
                         class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
@@ -219,14 +219,14 @@
                   </div>
                 </div>
                 <div class="relative">
-                  <input 
+                  <input
                     id="height-input-param"
-                    type="number" 
-                    [value]="height()" 
-                    (input)="height.set(+$any($event.target).value)" 
-                    min="200" 
-                    max="2600" 
-                    step="10" 
+                    type="number"
+                    [value]="height()"
+                    (input)="height.set(+$any($event.target).value)"
+                    min="200"
+                    max="2600"
+                    step="10"
                     class="w-full px-3 py-1.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-hidden transition" />
                   <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">mm</span>
                 </div>
@@ -241,8 +241,8 @@
                   </label>
                   <div class="flex items-center gap-1">
                     @for (pd of depthPresets(); track pd) {
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         (click)="depth.set(pd)"
                         [class]="depth() === pd ? 'bg-emerald-500 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
                         class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
@@ -252,14 +252,14 @@
                   </div>
                 </div>
                 <div class="relative">
-                  <input 
+                  <input
                     id="depth-input-param"
-                    type="number" 
-                    [value]="depth()" 
-                    (input)="depth.set(+$any($event.target).value)" 
-                    min="150" 
-                    max="1000" 
-                    step="10" 
+                    type="number"
+                    [value]="depth()"
+                    (input)="depth.set(+$any($event.target).value)"
+                    min="150"
+                    max="1000"
+                    step="10"
                     class="w-full px-3 py-1.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:border-emerald-500 focus:outline-hidden transition" />
                   <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">mm</span>
                 </div>
@@ -269,15 +269,15 @@
               <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span class="font-bold text-slate-700">Espesor Melamina Estructura:</span>
                 <div class="flex items-center gap-1.5">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     (click)="structureThickness.set(15)"
                     [class]="structureThickness() === 15 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
                     class="px-3 py-1 rounded-md font-mono text-xs transition cursor-pointer">
                     15 mm
                   </button>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     (click)="structureThickness.set(18)"
                     [class]="structureThickness() === 18 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
                     class="px-3 py-1 rounded-md font-mono text-xs transition cursor-pointer">
@@ -290,63 +290,63 @@
             <!-- 3. Configuración de Puertas -->
             <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
               <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <span class="material-icons text-sm text-indigo-500">meeting_room</span>
-                Configuración de Puertas
+                <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                <span>Configuración de Puertas</span>
               </span>
 
               <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                
+
                 <!-- Sin Puerta -->
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   (click)="doorOpening.set('none')"
                   [class]="doorOpening() === 'none' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
                   class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <span class="material-icons text-lg" [class.text-indigo-600]="doorOpening() === 'none'">check_box_outline_blank</span>
+                  <hugeicons-icon [icon]="icons.squareShape" [size]="17" [strokeWidth]="1.9" [class.text-indigo-600]="doorOpening() === 'none'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">Sin Puerta</span>
                   <span class="text-[9px] text-slate-400">Abierto</span>
                 </button>
 
                 <!-- Abre Izquierda -->
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   (click)="doorOpening.set('left')"
                   [class]="doorOpening() === 'left' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
                   class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <span class="material-icons text-lg" [class.text-indigo-600]="doorOpening() === 'left'">arrow_back</span>
+                  <hugeicons-icon [icon]="icons.arrowLeft" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'left'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">1 Puerta</span>
                   <span class="text-[9px] text-slate-400">Abre Izq</span>
                 </button>
 
                 <!-- Abre Derecha -->
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   (click)="doorOpening.set('right')"
                   [class]="doorOpening() === 'right' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
                   class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <span class="material-icons text-lg" [class.text-indigo-600]="doorOpening() === 'right'">arrow_forward</span>
+                  <hugeicons-icon [icon]="icons.arrowRight" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'right'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">1 Puerta</span>
                   <span class="text-[9px] text-slate-400">Abre Der</span>
                 </button>
 
                 <!-- Doble Puerta -->
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   (click)="doorOpening.set('double')"
                   [class]="doorOpening() === 'double' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
                   class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <span class="material-icons text-lg" [class.text-indigo-600]="doorOpening() === 'double'">compare_arrows</span>
+                  <hugeicons-icon [icon]="icons.doubleArrows" [size]="17" [strokeWidth]="1.9" [class.text-indigo-600]="doorOpening() === 'double'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">2 Puertas</span>
                   <span class="text-[9px] text-slate-400">Dobles</span>
                 </button>
 
                 <!-- Elevable Gas -->
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   (click)="doorOpening.set('top')"
                   [class]="doorOpening() === 'top' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
                   class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer col-span-2 sm:col-span-1">
-                  <span class="material-icons text-lg" [class.text-indigo-600]="doorOpening() === 'top'">arrow_upward</span>
+                  <hugeicons-icon [icon]="icons.arrowUp" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'top'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">Elevable</span>
                   <span class="text-[9px] text-slate-400">Pistón Gas</span>
                 </button>
@@ -356,15 +356,15 @@
                 <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                   <span class="font-bold text-slate-700">Espesor Puerta(s):</span>
                   <div class="flex items-center gap-1.5">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       (click)="doorThickness.set(15)"
                       [class]="doorThickness() === 15 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
                       class="px-2.5 py-1 rounded-md font-mono text-xs transition cursor-pointer">
                       15 mm
                     </button>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       (click)="doorThickness.set(18)"
                       [class]="doorThickness() === 18 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
                       class="px-2.5 py-1 rounded-md font-mono text-xs transition cursor-pointer">
@@ -380,18 +380,18 @@
               <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <span class="material-icons text-sm text-indigo-500">radio_button_checked</span>
-                    Manijas y Tiradores
+                    <hugeicons-icon [icon]="icons.knob" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                    <span>Manijas y Tiradores</span>
                   </span>
-                  
+
                   <!-- Toggle Con/Sin Manija -->
                   <label class="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      [checked]="hasHandle()" 
-                      (change)="hasHandle.set($any($event.target).checked)" 
+                    <input
+                      type="checkbox"
+                      [checked]="hasHandle()"
+                      (change)="hasHandle.set($any($event.target).checked)"
                       class="sr-only peer" />
-                    <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                     <span class="ml-2 text-xs font-semibold text-slate-700">
                       {{ hasHandle() ? 'Con Manija' : 'Sin Manija (Push)' }}
                     </span>
@@ -400,13 +400,13 @@
 
                 @if (hasHandle()) {
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                    
+
                     <!-- Tipo de Manija -->
                     <div>
                       <span class="block text-[11px] font-bold text-slate-700 mb-1">Modelo de Manija:</span>
-                      <select 
-                        [value]="handleType()" 
-                        (change)="handleType.set($any($event.target).value)" 
+                      <select
+                        [value]="handleType()"
+                        (change)="handleType.set($any($event.target).value)"
                         class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
                         <option value="bar_modern">Barra Tubular Moderna</option>
                         <option value="bar_black">Perfil Negro Minimalista</option>
@@ -420,9 +420,9 @@
                     <!-- Acabado / Color Manija -->
                     <div>
                       <span class="block text-[11px] font-bold text-slate-700 mb-1">Acabado:</span>
-                      <select 
-                        [value]="handleFinish()" 
-                        (change)="handleFinish.set($any($event.target).value)" 
+                      <select
+                        [value]="handleFinish()"
+                        (change)="handleFinish.set($any($event.target).value)"
                         class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
                         <option value="brushed_steel">Acero Inox Cepillado</option>
                         <option value="black">Negro Mate</option>
@@ -435,16 +435,15 @@
                     <!-- Posición -->
                     <div>
                       <span class="block text-[11px] font-bold text-slate-700 mb-1">Orientación:</span>
-                      <select 
-                        [value]="handlePosition()" 
-                        (change)="handlePosition.set($any($event.target).value)" 
+                      <select
+                        [value]="handlePosition()"
+                        (change)="handlePosition.set($any($event.target).value)"
                         class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
                         <option value="vertical">Vertical</option>
                         <option value="horizontal">Horizontal</option>
                         <option value="centered">Centrado</option>
                       </select>
                     </div>
-
                   </div>
                 }
               </div>
@@ -454,15 +453,15 @@
             <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <span class="material-icons text-sm text-indigo-500">table_rows</span>
-                  Entrepaños / Repisas
+                  <hugeicons-icon [icon]="icons.tableRows" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                  <span>Entrepaños / Repisas</span>
                 </span>
-                
+
                 <!-- Stepper de cantidad -->
                 <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                  <button 
-                    type="button" 
-                    (click)="setShelvesCount(shelvesCount() - 1)" 
+                  <button
+                    type="button"
+                    (click)="setShelvesCount(shelvesCount() - 1)"
                     [disabled]="shelvesCount() <= 0"
                     class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
                     -
@@ -470,9 +469,9 @@
                   <span class="text-xs font-mono font-bold px-2 text-slate-900">
                     {{ shelvesCount() }} {{ shelvesCount() === 1 ? 'entrepaño' : 'entrepaños' }}
                   </span>
-                  <button 
-                    type="button" 
-                    (click)="setShelvesCount(shelvesCount() + 1)" 
+                  <button
+                    type="button"
+                    (click)="setShelvesCount(shelvesCount() + 1)"
                     [disabled]="shelvesCount() >= 8"
                     class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
                     +
@@ -485,20 +484,20 @@
                 <div class="flex items-center gap-2 pt-1">
                   <span class="text-xs text-slate-500 font-medium">Distribución:</span>
                   <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs">
-                    <button 
-                      type="button" 
-                      (click)="setShelfDistribution('uniform')" 
+                    <button
+                      type="button"
+                      (click)="setShelfDistribution('uniform')"
                       [class]="shelfDistribution() === 'uniform' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
-                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1">
-                      <span class="material-icons text-xs">equalizer</span>
+                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.equalizer" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                       <span>Uniforme Automática</span>
                     </button>
-                    <button 
-                      type="button" 
-                      (click)="setShelfDistribution('manual')" 
+                    <button
+                      type="button"
+                      (click)="setShelfDistribution('manual')"
                       [class]="shelfDistribution() === 'manual' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
-                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1">
-                      <span class="material-icons text-xs">edit_attributes</span>
+                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.editAttributes" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                       <span>Ajuste Manual</span>
                     </button>
                   </div>
@@ -508,7 +507,7 @@
                 @if (shelfDistribution() === 'uniform') {
                   <div class="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 text-[11px] text-indigo-900 flex items-center justify-between">
                     <div class="flex items-center gap-1.5 font-medium">
-                      <span class="material-icons text-sm text-indigo-600">info</span>
+                      <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
                       <span>Luz libre uniforme entre cada nivel:</span>
                     </div>
                     <strong class="font-mono text-indigo-700 font-bold text-xs">
@@ -526,13 +525,13 @@
                         <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
                           <span class="text-xs font-bold text-slate-700">Entrepaño {{ s.index }}:</span>
                           <div class="relative w-24">
-                            <input 
-                              type="number" 
-                              [value]="s.offset" 
-                              (input)="updateManualShelfOffset(s.index - 1, +$any($event.target).value)" 
-                              min="30" 
-                              [max]="innerHeight() - 30" 
-                              step="5" 
+                            <input
+                              type="number"
+                              [value]="s.offset"
+                              (input)="updateManualShelfOffset(s.index - 1, +$any($event.target).value)"
+                              min="30"
+                              [max]="innerHeight() - 30"
+                              step="5"
                               class="w-full pr-6 pl-2 py-1 text-xs font-mono font-bold bg-white border border-slate-200 rounded text-right focus:border-indigo-500 focus:outline-hidden" />
                             <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">mm</span>
                           </div>
@@ -551,12 +550,12 @@
                 <span class="text-[11px] text-slate-500">Panel posterior para cuadratura y rigidez</span>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  [checked]="hasBackPanel()" 
-                  (change)="hasBackPanel.set($any($event.target).checked)" 
+                <input
+                  type="checkbox"
+                  [checked]="hasBackPanel()"
+                  (change)="hasBackPanel.set($any($event.target).checked)"
                   class="sr-only peer" />
-                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                 <span class="ml-2 text-xs font-semibold text-slate-700">
                   {{ hasBackPanel() ? 'Con Fondo' : 'Sin Fondo' }}
                 </span>
@@ -566,8 +565,8 @@
             <!-- 7. Materiales & Acabados Iniciales -->
             <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
               <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <span class="material-icons text-sm text-indigo-500">palette</span>
-                Material / Color Inicial
+                <hugeicons-icon [icon]="icons.palette" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                <span>Material / Color Inicial</span>
               </span>
 
               <!-- Selector Material Estructura -->
@@ -577,13 +576,13 @@
                 </span>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   @for (mat of materials(); track mat.id) {
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       (click)="structureMaterialId.set(mat.id)"
                       [class]="selectedStructureMat()?.id === mat.id ? 'bg-indigo-50 border-indigo-500 text-indigo-950 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
                       class="p-2 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer min-w-0">
-                      <span 
-                        class="w-5 h-5 rounded-md border border-black/10 shrink-0 shadow-2xs" 
+                      <span
+                        class="w-5 h-5 rounded-md border border-black/10 shrink-0 shadow-2xs"
                         [style.background-color]="mat.colorHex || '#f1f5f9'"></span>
                       <div class="min-w-0">
                         <span class="text-xs font-bold block truncate">{{ mat.name }}</span>
@@ -600,10 +599,10 @@
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-slate-700">Material de las Puertas:</span>
                     <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
-                      <input 
-                        type="checkbox" 
-                        [checked]="useSameMaterialForDoors()" 
-                        (change)="useSameMaterialForDoors.set($any($event.target).checked)" 
+                      <input
+                        type="checkbox"
+                        [checked]="useSameMaterialForDoors()"
+                        (change)="useSameMaterialForDoors.set($any($event.target).checked)"
                         class="rounded text-indigo-600 focus:ring-0" />
                       <span>Mismo que estructura</span>
                     </label>
@@ -612,13 +611,13 @@
                   @if (!useSameMaterialForDoors()) {
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                       @for (mat of materials(); track mat.id) {
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           (click)="doorMaterialId.set(mat.id)"
                           [class]="selectedDoorMat()?.id === mat.id ? 'bg-indigo-50 border-indigo-500 text-indigo-950 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
                           class="p-2 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer min-w-0">
-                          <span 
-                            class="w-5 h-5 rounded-md border border-black/10 shrink-0 shadow-2xs" 
+                          <span
+                            class="w-5 h-5 rounded-md border border-black/10 shrink-0 shadow-2xs"
                             [style.background-color]="mat.colorHex || '#f1f5f9'"></span>
                           <div class="min-w-0">
                             <span class="text-xs font-bold block truncate">{{ mat.name }}</span>
@@ -631,19 +630,18 @@
                 </div>
               }
             </div>
-
           </div>
 
           <!-- COLUMNA 2: DIAGRAMA BLUEPRINT 2D & RESUMEN CONSTRUCTIVO (5 cols) -->
           <div class="lg:col-span-5 flex flex-col gap-4">
-            
+
             <!-- TARJETA BLUEPRINT SVG TÉCNICO INTERACTIVO -->
             <div class="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs flex flex-col items-center">
-              
+
               <div class="w-full flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                  <span class="material-icons text-xs text-indigo-500">architecture</span>
-                  Alzado Técnico de Fachada
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.compass" [size]="13" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                  <span>Alzado Técnico de Fachada</span>
                 </span>
                 <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
                   Escala Dinámica
@@ -652,17 +650,17 @@
 
               <!-- Canvas Blueprint Técnico SVG -->
               <div class="w-full h-64 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-center p-3 relative overflow-hidden shadow-inner">
-                <svg 
-                  viewBox="0 0 200 240" 
-                  class="w-full h-full max-h-60 drop-shadow-xs" 
+                <svg
+                  viewBox="0 0 200 240"
+                  class="w-full h-full max-h-60 drop-shadow-xs"
                   xmlns="http://www.w3.org/2000/svg">
-                  
+
                   <!-- Carcasa Exterior del Mueble -->
                   <rect x="25" y="20" width="150" height="200" fill="#f8fafc" stroke="#64748b" stroke-width="2" rx="2" />
-                  
+
                   <!-- Espesor interior de laterales y tapas -->
                   <rect x="30" y="25" width="140" height="190" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
-                  
+
                   <!-- Entrepaños / Repisas calculadas -->
                   @for (s of effectiveShelvesList(); track s.index) {
                     @let shelfSvgY = 215 - (190 * (s.percentage / 100));
@@ -751,12 +749,11 @@
                   }
                 </div>
               </div>
-
             </div>
 
             <!-- TARJETA INFORMATIVA DE EDICIÓN POSTERIOR -->
             <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 flex items-start gap-2.5">
-              <span class="material-icons text-base text-amber-600 shrink-0 mt-0.5">tips_and_updates</span>
+              <hugeicons-icon [icon]="icons.lightbulb" [size]="16" [strokeWidth]="2" class="text-amber-600 shrink-0 mt-0.5"></hugeicons-icon>
               <div>
                 <strong class="font-bold text-amber-950 block">Edición post-creación:</strong>
                 <p class="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
@@ -768,35 +765,33 @@
             <!-- Resumen de piezas generadas -->
             <div class="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-xs font-semibold text-slate-700">
               <div class="flex items-center gap-1.5">
-                <span class="material-icons text-sm text-indigo-600">view_in_ar</span>
+                <hugeicons-icon [icon]="icons.cube3d" [size]="15" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
                 <span>Piezas listas para despiece:</span>
               </div>
               <span class="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
                 {{ totalPartsCount() }} piezas ensambladas
               </span>
             </div>
-
           </div>
-
         </div>
 
         <!-- PIE DE MODAL (ACCIONES CLARAS) -->
         <div class="px-5 sm:px-6 py-3.5 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
-          
+
           <!-- Selector de Modo o Indicador de Edición -->
           @if (!editingGroupId()) {
             <div class="flex items-center gap-2 text-xs">
               <span class="text-slate-500 font-medium">Modo de inserción:</span>
               <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   (click)="creationMode.set('append')"
                   [class]="creationMode() === 'append' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
                   class="px-2.5 py-1 rounded-md transition cursor-pointer">
                   Añadir al taller
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   (click)="creationMode.set('replace')"
                   [class]="creationMode() === 'replace' ? 'bg-white text-rose-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
                   class="px-2.5 py-1 rounded-md transition cursor-pointer">
@@ -806,38 +801,35 @@
             </div>
           } @else {
             <div class="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
-              <span class="material-icons text-sm text-amber-600">info</span>
+              <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
               <span>Actualizando módulo en su posición 3D actual.</span>
             </div>
           }
 
           <!-- Botones de Acción -->
           <div class="flex items-center gap-2 justify-end">
-            <button 
-              type="button" 
+            <button
+              type="button"
               (click)="close()"
               class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition cursor-pointer">
               Cancelar
             </button>
-
-            <button 
-              type="button" 
+            <button
+              type="button"
               (click)="onSubmitAssistant()"
               class="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl shadow-md shadow-indigo-600/20 flex items-center gap-2 transition cursor-pointer">
-              <span class="material-icons text-sm">{{ editingGroupId() ? 'check_circle' : 'view_in_ar' }}</span>
+              <hugeicons-icon [icon]="editingGroupId() ? icons.checkCircle : icons.cube3d" [size]="15" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
               <span>{{ editingGroupId() ? 'Guardar Cambios del Módulo' : 'Crear Módulo en 3D' }}</span>
             </button>
           </div>
-
         </div>
 
       } @else {
-
         <!-- ========================================== -->
         <!-- VISTA 2: CATÁLOGO DE PLANTILLAS PREDISEÑADAS -->
         <!-- ========================================== -->
         <div class="px-5 sm:px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shrink-0">
-          
+
           <!-- Categorías Tabs con Botones de Navegación Compactos -->
           <div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
             <button
@@ -845,24 +837,24 @@
               (click)="scrollCategories('left')"
               class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 bg-white hover:bg-slate-200 border border-slate-200 transition shrink-0 cursor-pointer"
               title="Desplazar a la izquierda">
-              <span class="material-icons text-sm">chevron_left</span>
+              <hugeicons-icon [icon]="icons.chevronLeft" [size]="14" [strokeWidth]="2"></hugeicons-icon>
             </button>
 
-            <div 
+            <div
               #categoriesNav
               (wheel)="onCategoryWheel($event)"
               class="flex items-center gap-1.5 overflow-x-auto py-1 scroll-smooth scrollbar-none flex-1 min-w-0">
               @for (cat of categories(); track cat.id) {
-                <button 
+                <button
                   type="button"
                   (click)="selectCategory(cat.id)"
-                  [class]="activeCategory() === cat.id 
-                    ? 'bg-indigo-600 text-white font-bold shadow-xs' 
+                  [class]="activeCategory() === cat.id
+                    ? 'bg-indigo-600 text-white font-bold shadow-xs'
                     : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-medium'"
                   class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer">
-                  <span class="material-icons text-sm">{{ cat.icon }}</span>
+                  <hugeicons-icon [icon]="getCatalogIcon(cat.icon)" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                   <span>{{ cat.label }}</span>
-                  <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold" 
+                  <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold"
                     [class]="activeCategory() === cat.id ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-600'">
                     {{ cat.count }}
                   </span>
@@ -875,14 +867,14 @@
               (click)="scrollCategories('right')"
               class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 bg-white hover:bg-slate-200 border border-slate-200 transition shrink-0 cursor-pointer"
               title="Desplazar a la derecha">
-              <span class="material-icons text-sm">chevron_right</span>
+              <hugeicons-icon [icon]="icons.chevronRight" [size]="14" [strokeWidth]="2"></hugeicons-icon>
             </button>
           </div>
 
           <!-- Buscador Limpio -->
           <div class="relative w-full md:w-60 shrink-0">
-            <span class="material-icons absolute left-2.5 top-2 text-slate-400 text-base pointer-events-none">search</span>
-            <input 
+            <hugeicons-icon [icon]="icons.search" [size]="15" [strokeWidth]="2" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></hugeicons-icon>
+            <input
               type="text"
               [value]="searchQuery()"
               (input)="searchQuery.set($any($event.target).value)"
@@ -890,12 +882,12 @@
               autocomplete="off"
               class="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-lg outline-hidden text-slate-900 font-medium placeholder:text-slate-400 transition" />
             @if (searchQuery()) {
-              <button 
-                type="button" 
+              <button
+                type="button"
                 (click)="searchQuery.set('')"
-                class="absolute right-2 top-2 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition cursor-pointer flex items-center justify-center"
                 title="Borrar búsqueda">
-                <span class="material-icons text-sm">cancel</span>
+                <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
               </button>
             }
           </div>
@@ -905,12 +897,12 @@
         <div class="flex-1 overflow-y-auto p-5 sm:p-6 min-h-0 bg-slate-50/50 scrollbar-thin">
           @if (filteredTemplates().length === 0) {
             <div class="p-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-              <span class="material-icons text-4xl text-slate-400">search_off</span>
+              <hugeicons-icon [icon]="icons.search" [size]="34" [strokeWidth]="1.6" class="text-slate-400"></hugeicons-icon>
               <span class="font-bold text-slate-800 text-sm">No se encontraron plantillas</span>
               <span class="text-slate-500">Prueba cambiando el término de búsqueda o selecciona otra categoría.</span>
-              <button 
-                type="button" 
-                (click)="searchQuery.set(''); activeCategory.set('all')" 
+              <button
+                type="button"
+                (click)="searchQuery.set(''); activeCategory.set('all')"
                 class="mt-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs transition cursor-pointer">
                 Ver todas las plantillas
               </button>
@@ -919,12 +911,12 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               @for (tpl of filteredTemplates(); track tpl.id) {
                 <div class="rounded-xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md flex flex-col justify-between transition-all duration-150 overflow-hidden group">
-                  
+
                   <div class="p-4 flex flex-col flex-1">
                     <div class="flex items-start justify-between gap-3 mb-2">
                       <div class="flex items-center gap-2.5 min-w-0">
                         <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-slate-200 bg-slate-50 text-indigo-600 transition-transform group-hover:scale-105">
-                          <span class="material-icons text-xl">{{ tpl.icon || 'kitchen' }}</span>
+                          <hugeicons-icon [icon]="getCatalogIcon(tpl.icon || 'kitchen')" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
                         </div>
                         <div class="min-w-0">
                           <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -935,7 +927,6 @@
                           </h3>
                         </div>
                       </div>
-
                       <span class="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full shrink-0">
                         {{ tpl.partsCount }} piezas
                       </span>
@@ -948,7 +939,7 @@
                     <!-- Dimensiones -->
                     <div class="mt-auto flex items-center justify-between text-xs font-mono px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700">
                       <span class="font-sans text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                        <span class="material-icons text-xs text-slate-500">straighten</span>
+                        <hugeicons-icon [icon]="icons.ruler" [size]="12" [strokeWidth]="2" class="text-slate-500 shrink-0"></hugeicons-icon>
                         <span>Medidas:</span>
                       </span>
                       <div class="flex items-center gap-1 font-bold text-slate-900">
@@ -964,22 +955,21 @@
 
                   <!-- Acciones de tarjeta -->
                   <div class="px-4 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-2">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       (click)="onSelectTemplate(tpl, 'append')"
                       class="py-1.5 px-3 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg flex items-center gap-1.5 transition cursor-pointer">
-                      <span class="material-icons text-xs">add</span>
+                      <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.2" class="shrink-0"></hugeicons-icon>
                       <span>Añadir</span>
                     </button>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       (click)="onSelectTemplate(tpl, 'replace')"
                       class="py-1.5 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
-                      <span class="material-icons text-xs">view_in_ar</span>
+                      <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                       <span>Cargar en 3D</span>
                     </button>
                   </div>
-
                 </div>
               }
             </div>
@@ -988,26 +978,22 @@
 
         <!-- PIE DE CATÁLOGO -->
         <div class="px-5 sm:px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-between shrink-0">
-          <button 
-            type="button" 
+          <button
+            type="button"
             (click)="onStartBlank()"
             class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg flex items-center gap-1.5 transition cursor-pointer">
-            <span class="material-icons text-xs text-slate-400">delete_sweep</span>
+            <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="1.9" class="text-slate-400 shrink-0"></hugeicons-icon>
             <span>Lienzo en Blanco</span>
           </button>
-
-          <button 
-            type="button" 
+          <button
+            type="button"
             (click)="activeView.set('assistant')"
             class="px-4 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition cursor-pointer flex items-center gap-1.5">
-            <span class="material-icons text-xs">auto_fix_high</span>
+            <hugeicons-icon [icon]="icons.magicWand" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Volver al Asistente Paramétrico</span>
           </button>
         </div>
-
       }
-
     </div>
-
   </div>
 }

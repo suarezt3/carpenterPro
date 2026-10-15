@@ -1,20 +1,53 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject, viewChild, ElementRef, effect, untracked } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  output,
+  signal,
+  computed,
+  inject,
+  viewChild,
+  ElementRef,
+  effect,
+  untracked
+} from '@angular/core';
+import { HugeiconsIconComponent } from '@hugeicons/angular';
+import {
+  Add01Icon,
+  Archive01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  ArrowUp01Icon,
+  Cancel01Icon,
+  CheckmarkCircle02Icon,
+  Compass01Icon,
+  Delete02Icon,
+  InformationCircleIcon,
+  Layers01Icon,
+  PaintBoardIcon,
+  RulerIcon,
+  Search01Icon,
+  Settings01Icon
+} from '@hugeicons/core-free-icons';
 import { ThemeService } from '../../services/theme.service';
 import { TemplatesCatalogService, FurnitureTemplate } from '../../services/templates-catalog.service';
 import { Material, ParametricCabinetConfig, HandleType, HandleFinish } from '../../models/melamine.models';
 
-export type ModuleCategoryPreset = 
-  | 'kitchen_base' 
-  | 'kitchen_wall' 
-  | 'closet' 
-  | 'vanity' 
-  | 'bookshelf' 
+type HugeIconDef = typeof Compass01Icon;
+const cadSvg = (paths: string[]): HugeIconDef =>
+  paths.map((d, idx) => ['path', { d, key: `tm_${idx}` }]) as unknown as HugeIconDef;
+
+export type ModuleCategoryPreset =
+  | 'kitchen_base'
+  | 'kitchen_wall'
+  | 'closet'
+  | 'vanity'
+  | 'bookshelf'
   | 'custom';
 
 @Component({
   selector: 'app-templates-modal',
-  imports: [CommonModule],
+  imports: [HugeiconsIconComponent],
   templateUrl: './templates-modal.html',
   styleUrl: './templates-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -22,6 +55,143 @@ export type ModuleCategoryPreset =
 export class TemplatesModalComponent {
   readonly themeService = inject(ThemeService);
   readonly catalogService = inject(TemplatesCatalogService);
+
+  // Registro local de iconos vectoriales de Hugeicons y trazos CAD
+  readonly icons = {
+    tune: Settings01Icon,
+    magicWand: cadSvg([
+      'M14.5 4.5L19.5 9.5L7.5 21.5L2.5 16.5L14.5 4.5Z',
+      'M12 7L17 12',
+      'M19 2V5',
+      'M17.5 3.5H20.5',
+      'M6 3V5',
+      'M5 4H7'
+    ]),
+    book: cadSvg([
+      'M4 5.5A2.5 2.5 0 0 1 6.5 3H20V19H6.5A2.5 2.5 0 0 0 4 21.5V5.5Z',
+      'M4 19.5A2.5 2.5 0 0 1 6.5 17H20',
+      'M8 7H16',
+      'M8 11H14'
+    ]),
+    close: Cancel01Icon,
+    countertop: cadSvg([
+      'M3 7H21V10H3V7Z',
+      'M4 10V20H20V10',
+      'M12 10V20',
+      'M9.5 14V15.5',
+      'M14.5 14V15.5'
+    ]),
+    kitchen: cadSvg([
+      'M4 4H20V16H4V4Z',
+      'M12 4V16',
+      'M9.5 9V11',
+      'M14.5 9V11',
+      'M4 20H20'
+    ]),
+    closetDoor: cadSvg([
+      'M5 3H19V21H5V3Z',
+      'M12 3V21',
+      'M9.5 11.5V12.5',
+      'M14.5 11.5V12.5'
+    ]),
+    vanity: cadSvg([
+      'M4 10H20V20H4V10Z',
+      'M7 10V8A5 5 0 0 1 17 8V10',
+      'M12 4V6',
+      'M8 14H16'
+    ]),
+    shelves: cadSvg([
+      'M4 3H20V21H4V3Z',
+      'M4 9H20',
+      'M4 15H20'
+    ]),
+    ruler: RulerIcon,
+    squareShape: cadSvg(['M4 4H20V20H4V4Z']),
+    arrowLeft: ArrowLeft01Icon,
+    arrowRight: ArrowRight01Icon,
+    arrowUp: ArrowUp01Icon,
+    doubleArrows: cadSvg([
+      'M3 9H21',
+      'M7 5L3 9L7 13',
+      'M21 15H3',
+      'M17 11L21 15L17 19'
+    ]),
+    knob: cadSvg([
+      'M20 12A8 8 0 1 1 4 12A8 8 0 0 1 20 12Z',
+      'M15 12A3 3 0 1 1 9 12A3 3 0 0 1 15 12Z'
+    ]),
+    tableRows: cadSvg([
+      'M4 4H20V20H4V4Z',
+      'M4 9.5H20',
+      'M4 14.5H20'
+    ]),
+    equalizer: cadSvg([
+      'M6 18V10',
+      'M12 18V6',
+      'M18 18V13',
+      'M4 18H20'
+    ]),
+    editAttributes: cadSvg([
+      'M4 7H20',
+      'M4 12H14',
+      'M4 17H11',
+      'M16 14L20 18',
+      'M20 14L16 18'
+    ]),
+    info: InformationCircleIcon,
+    palette: PaintBoardIcon,
+    compass: Compass01Icon,
+    lightbulb: InformationCircleIcon,
+    cube3d: cadSvg([
+      'M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z',
+      'M12 12L20 7.5',
+      'M12 12L4 7.5',
+      'M12 12V21'
+    ]),
+    checkCircle: CheckmarkCircle02Icon,
+    chevronLeft: ArrowLeft01Icon,
+    chevronRight: ArrowRight01Icon,
+    search: Search01Icon,
+    add: Add01Icon,
+    delete: Delete02Icon,
+    inbox: Archive01Icon,
+    layers: Layers01Icon
+  };
+
+  /**
+   * Mapea el nombre de ícono de una categoría o plantilla del catálogo a su vector de Hugeicons.
+   */
+  getCatalogIcon(iconName?: string): HugeIconDef {
+    switch (iconName) {
+      case 'countertops':
+        return this.icons.countertop;
+      case 'kitchen':
+        return this.icons.kitchen;
+      case 'door_sliding':
+      case 'checkroom':
+      case 'meeting_room':
+        return this.icons.closetDoor;
+      case 'bathtub':
+      case 'wash':
+        return this.icons.vanity;
+      case 'shelves':
+      case 'menu_book':
+      case 'table_rows':
+        return this.icons.shelves;
+      case 'inbox':
+      case 'view_agenda':
+      case 'dns':
+        return this.icons.inbox;
+      case 'tune':
+        return this.icons.tune;
+      case 'apps':
+      case 'grid_view':
+      case 'dashboard':
+      case 'view_in_ar':
+      default:
+        return this.icons.cube3d;
+    }
+  }
 
   isOpen = input<boolean>(false);
   materials = input<Material[]>([]);
@@ -46,21 +216,27 @@ export class TemplatesModalComponent {
   width = signal<number>(600);
   height = signal<number>(820);
   depth = signal<number>(580);
+
   structureThickness = signal<number>(15);
   doorThickness = signal<number>(15);
+
   doorOpening = signal<'none' | 'left' | 'right' | 'double' | 'top' | 'bottom'>('left');
   hasHandle = signal<boolean>(true);
   handleType = signal<HandleType>('bar_modern');
   handleFinish = signal<HandleFinish>('brushed_steel');
   handlePosition = signal<'vertical' | 'horizontal' | 'centered'>('vertical');
+
   shelvesCount = signal<number>(1);
   shelfDistribution = signal<'uniform' | 'manual'>('uniform');
   shelfManualOffsets = signal<number[]>([380]);
+
   hasBackPanel = signal<boolean>(true);
   backThickness = signal<number>(3);
+
   structureMaterialId = signal<string>('');
   doorMaterialId = signal<string>('');
   useSameMaterialForDoors = signal<boolean>(true);
+
   creationMode = signal<'append' | 'replace'>('append');
 
   loadConfig(cfg: ParametricCabinetConfig) {
@@ -156,7 +332,7 @@ export class TemplatesModalComponent {
     }
   });
 
-  // Dimensiones interiores libres calculadas (100% puras)
+  // Dimensiones interiores libres calculadas
   readonly innerWidth = computed(() => {
     const w = Number(this.width()) || 600;
     const t = Number(this.structureThickness()) || 15;
@@ -190,7 +366,7 @@ export class TemplatesModalComponent {
     return Math.max(50, Math.round(h - 3));
   });
 
-  // Luz libre uniforme entre entrepaños (100% pura)
+  // Luz libre uniforme entre entrepaños
   readonly uniformShelfGap = computed(() => {
     const count = Math.max(0, Math.min(8, Math.floor(Number(this.shelvesCount()) || 0)));
     const innerH = this.innerHeight();
@@ -200,7 +376,7 @@ export class TemplatesModalComponent {
     return Math.max(0, Math.round(gap));
   });
 
-  // Lista de posiciones relativas de los entrepaños para el diagrama técnico y resumen (100% pura)
+  // Lista de posiciones relativas de los entrepaños para el diagrama técnico y resumen
   readonly effectiveShelvesList = computed(() => {
     const count = Math.max(0, Math.min(8, Math.floor(Number(this.shelvesCount()) || 0)));
     if (count <= 0) return [];
@@ -227,7 +403,7 @@ export class TemplatesModalComponent {
     });
   });
 
-  // Conteo total de piezas calculadas (100% pura)
+  // Conteo total de piezas calculadas
   readonly totalPartsCount = computed(() => {
     let count = 4; // 2 laterales + 1 piso + 1 techo
     count += Math.max(0, Math.min(8, Math.floor(Number(this.shelvesCount()) || 0)));
@@ -253,7 +429,7 @@ export class TemplatesModalComponent {
     return mats.find(m => m.id === this.doorMaterialId()) || this.selectedStructureMat();
   });
 
-  // Catálogo legacy para la vista de exploración
+  // Catálogo para la vista de exploración
   searchQuery = signal<string>('');
   activeCategory = signal<string>('all');
   selectedTemplate = signal<FurnitureTemplate | null>(null);
@@ -267,7 +443,6 @@ export class TemplatesModalComponent {
     return this.catalogService.templates.filter(t => {
       const matchCat = cat === 'all' || t.category === cat;
       if (!matchCat) return false;
-
       if (!q) return true;
       const inName = t.name.toLowerCase().includes(q);
       const inDesc = t.description.toLowerCase().includes(q);
@@ -408,7 +583,6 @@ export class TemplatesModalComponent {
     const innerH = Math.max(50, Number(this.innerHeight()) || 750);
     const current = Array.isArray(this.shelfManualOffsets()) ? [...this.shelfManualOffsets()] : [];
     const step = innerH / (count + 1);
-
     const next: number[] = [];
     for (let i = 0; i < count; i++) {
       const existingVal = Number(current[i]);
@@ -494,7 +668,7 @@ export class TemplatesModalComponent {
     this.close();
   }
 
-  // Navegación en catálogo legacy
+  // Navegación en catálogo
   scrollCategories(direction: 'left' | 'right') {
     const el = this.categoriesNavRef()?.nativeElement;
     if (!el) return;

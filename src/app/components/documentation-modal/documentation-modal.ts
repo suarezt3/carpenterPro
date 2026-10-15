@@ -2,22 +2,22 @@ import { Component, ChangeDetectionStrategy, input, output, signal, computed, in
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   Archive01Icon,
-  BookOpen01Icon,
   Cancel01Icon,
   CheckListIcon,
+  CheckmarkCircle02Icon,
   Compass01Icon,
-  FileSearchIcon,
-  HelpCircleIcon,
-  KeyboardIcon,
+  InformationCircleIcon,
   Layers01Icon,
-  LightbulbIcon,
+  Note01Icon,
   RulerIcon,
   Search01Icon,
-  Settings01Icon,
-  ShieldCheckIcon,
-  ViewIcon
+  Settings01Icon
 } from '@hugeicons/core-free-icons';
 import { ThemeService } from '../../services/theme.service';
+
+type HugeIconDef = typeof Compass01Icon;
+const docSvg = (paths: string[]): HugeIconDef =>
+  paths.map((d, idx) => ['path', { d, key: `doc_${idx}` }]) as unknown as HugeIconDef;
 
 /**
  * Estructura de un artículo o guía interactiva dentro del manual técnico de Piezo3D Studio.
@@ -49,17 +49,39 @@ export interface DocArticle {
 export class DocumentationModalComponent {
   readonly themeService = inject(ThemeService);
 
-  // Registro local de iconos vectoriales de Hugeicons
+  // Registro local de iconos vectoriales verificados
   readonly icons = {
-    book: BookOpen01Icon,
+    book: docSvg([
+      'M4 5.5A2.5 2.5 0 0 1 6.5 3H20V19H6.5A2.5 2.5 0 0 0 4 21.5V5.5Z',
+      'M4 19.5A2.5 2.5 0 0 1 6.5 17H20',
+      'M8 7H16',
+      'M8 11H14'
+    ]),
     close: Cancel01Icon,
     search: Search01Icon,
     cancel: Cancel01Icon,
-    searchOff: FileSearchIcon,
+    searchOff: Search01Icon,
     tune: Settings01Icon,
     listNumbered: CheckListIcon,
-    lightbulb: LightbulbIcon,
-    verified: ShieldCheckIcon
+    lightbulb: InformationCircleIcon,
+    verified: CheckmarkCircle02Icon,
+    keyboard: docSvg([
+      'M3 6H21V18H3V6Z',
+      'M7 10H8',
+      'M11 10H13',
+      'M16 10H17',
+      'M7 14H17'
+    ]),
+    cube3d: docSvg([
+      'M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z',
+      'M12 12L20 7.5',
+      'M12 12L4 7.5',
+      'M12 12V21'
+    ]),
+    doorSwing: docSvg([
+      'M5 3H19V21H5V3Z',
+      'M12 3L17.5 5.5V18.5L12 21V3Z'
+    ])
   };
 
   // Estado de apertura del modal y evento de cierre
@@ -388,7 +410,7 @@ export class DocumentationModalComponent {
       iconColor: 'text-purple-600',
       badge: 'Bisagras Dinámicas',
       steps: [
-        'When you create or duplicate a swing door...',
+        'Cuando creas o duplicas una puerta batiente para colocarla en el lado opuesto del mueble:',
         '1. En el menú contextual de clic derecho en 3D o desde Editar Módulo, selecciona el sentido de apertura deseado: "Puerta (Bisagra Izquierda)" o "Puerta (Bisagra Derecha)".',
         '2. Al cambiar el sentido, la manija/tirador 3D se ubicará en el borde opuesto y las bisagras 3D se trasladarán al borde correspondiente.',
         '3. Las perforaciones púrpuras de cazoleta Ø35mm x 12.5mm se recalcularán automáticamente en el borde de apertura (a 22mm de la arista).',
@@ -469,12 +491,12 @@ export class DocumentationModalComponent {
       case 'adjust': return Settings01Icon;
       case 'straighten': return RulerIcon;
       case 'architecture': return Compass01Icon;
-      case 'view_in_ar': return ViewIcon;
+      case 'view_in_ar': return this.icons.cube3d;
       case 'precision_manufacturing': return Layers01Icon;
-      case 'keyboard': return KeyboardIcon;
+      case 'keyboard': return this.icons.keyboard;
       case 'auto_stories':
       default:
-        return BookOpen01Icon;
+        return this.icons.book;
     }
   }
 
@@ -490,13 +512,14 @@ export class DocumentationModalComponent {
       case 'crop_square': return Layers01Icon;
       case 'open_in_full': return Compass01Icon;
       case 'height': return RulerIcon;
-      case 'menu_book': return BookOpen01Icon;
+      case 'menu_book': return this.icons.book;
       case 'precision_manufacturing': return Layers01Icon;
-      case 'keyboard': return KeyboardIcon;
-      case 'format_shapes': return ViewIcon;
-      case 'door_sliding': return HelpCircleIcon;
+      case 'keyboard': return this.icons.keyboard;
+      case 'format_shapes': return this.icons.cube3d;
+      case 'door_sliding': return this.icons.doorSwing;
+      case 'note': return Note01Icon;
       default:
-        return BookOpen01Icon;
+        return this.icons.book;
     }
   }
 }
