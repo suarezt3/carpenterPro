@@ -1,22 +1,22 @@
 <div #container3d
   [class]="isWhiteTheme() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950 border-zinc-800'"
   (contextmenu)="onContextMenu($event)"
-  class="relative w-full h-full min-h-105 rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-200">
+  class="relative w-full h-full min-h-0 rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-200">
 
   <!-- Lienzo 3D WebGL -->
   <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
 
-  <!-- PALETA VERTICAL IZQUIERDA DE HERRAMIENTAS CAD (ESTILIZADA Y COMPACTA) -->
-  <div class="absolute top-3 left-3 z-30 flex flex-col items-center gap-0.5 bg-white/95 text-slate-700 backdrop-blur-md p-1 rounded-xl border border-slate-200/90 shadow-lg pointer-events-auto transition-colors duration-200 max-h-[calc(100%-2.5rem)] overflow-y-auto scrollbar-none">
+  <!-- PALETA VERTICAL IZQUIERDA DE HERRAMIENTAS CAD (ADAPTATIVA HD / FHD / 2K) -->
+  <div class="cad-toolbar absolute top-2.5 left-2.5 z-30 flex flex-col items-center bg-white/95 text-slate-700 backdrop-blur-md rounded-xl border border-slate-200/90 shadow-lg pointer-events-auto transition-colors duration-200 max-h-[calc(100%-2.25rem)] overflow-y-auto scrollbar-none">
 
     <!-- 1. HERRAMIENTA SELECCIONAR -->
     <button
       type="button"
       (click)="setActiveTool('select')"
       [class]="activeTool() === 'select' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Seleccionar (V o Espacio): Haz clic para seleccionar piezas o Shift+Clic para multi-selección">
-      <hugeicons-icon [icon]="icons.cursorSelect" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.cursorSelect" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 2. HERRAMIENTA EMPUJAR / TIRAR (PUSH/PULL) -->
@@ -24,9 +24,9 @@
       type="button"
       (click)="setActiveTool('push_pull')"
       [class]="activeTool() === 'push_pull' ? 'bg-amber-500 text-white shadow-xs shadow-amber-500/30 ring-1 ring-amber-400/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition relative cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition relative cursor-pointer shrink-0"
       title="Empujar / Tirar (P): Haz clic en cualquier cara de la pieza y arrastra para estirar o encoger sus dimensiones en tiempo real">
-      <hugeicons-icon [icon]="icons.pushPull" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.pushPull" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400"></span>
     </button>
 
@@ -35,9 +35,9 @@
       type="button"
       (click)="setActiveTool('move')"
       [class]="activeTool() === 'move' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Mover (M): Muestra las flechas 3D para posicionar y trasladar piezas en los ejes X, Y, Z">
-      <hugeicons-icon [icon]="icons.moveAxes" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.moveAxes" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 4. HERRAMIENTA ROTAR 90° -->
@@ -45,9 +45,9 @@
       type="button"
       (click)="setActiveTool('rotate_90')"
       [class]="activeTool() === 'rotate_90' ? 'bg-amber-500 text-white shadow-xs shadow-amber-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Rotar 90° (Q): Haz clic en cualquier pieza para girarla 90 grados con transportador">
-      <hugeicons-icon [icon]="icons.rotate90" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.rotate90" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 5. DIBUJAR RECTÁNGULO 3D -->
@@ -55,9 +55,9 @@
       type="button"
       (click)="setActiveTool('draw_rect')"
       [class]="activeTool() === 'draw_rect' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Dibujar Rectángulo 3D (R): Dibuja un rectángulo en el plano horizontal para crear una pieza rectangular">
-      <hugeicons-icon [icon]="icons.squareShape" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.squareShape" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 5.1. DIBUJAR CÍRCULO 3D -->
@@ -65,9 +65,9 @@
       type="button"
       (click)="setActiveTool('draw_circle')"
       [class]="activeTool() === 'draw_circle' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Dibujar Círculo 3D (C): Arrastra desde el centro para definir el radio y crear una pieza o mesa redonda">
-      <hugeicons-icon [icon]="icons.circleShape" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.circleShape" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 5.2. DIBUJO LIBRE A MANO ALZADA -->
@@ -75,9 +75,9 @@
       type="button"
       (click)="setActiveTool('draw_freehand')"
       [class]="activeTool() === 'draw_freehand' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Dibujo Libre a Mano Alzada (F): Trazo continuo que se suaviza y extruye en un polígono tridimensional">
-      <hugeicons-icon [icon]="icons.freehandWave" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.freehandWave" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 6. CINTA MÉTRICA 3D -->
@@ -85,21 +85,21 @@
       type="button"
       (click)="setActiveTool('measure')"
       [class]="activeTool() === 'measure' ? 'bg-amber-500 text-white shadow-xs shadow-amber-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Cinta Métrica 3D (T): Mide distancias reales y luces entre aristas o caras">
-      <hugeicons-icon [icon]="icons.ruler" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.ruler" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
-    <div class="w-5 h-px bg-slate-200/90 my-0.5"></div>
+    <div class="cad-toolbar-divider w-5 h-px bg-slate-200/90 shrink-0"></div>
 
     <!-- 8. MECANIZADOS CNC (PERFORACIONES) -->
     <button
       type="button"
       (click)="toggleDrillHoles()"
       [class]="showDrillHoles() ? 'text-sky-600 bg-sky-50 ring-1 ring-sky-300/80' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition relative cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition relative cursor-pointer shrink-0"
       title="Mecanizados CNC: Perforaciones calculadas (Cazoletas de bisagra Ø35mm moradas, tornillos 4x50 cyan y clavijas 8x30 ámbar)">
-      <hugeicons-icon [icon]="icons.cncTarget" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.cncTarget" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       @if (showDrillHoles() && allDrillHoles().length > 0) {
         <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-sky-500 text-white flex items-center justify-center leading-none shadow-2xs">
           {{ allDrillHoles().length }}
@@ -112,9 +112,9 @@
       type="button"
       (click)="toggleDimensions()"
       [class]="show3dDimensions() ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Cotas 3D: Mostrar u ocultar líneas de acotado milimétrico sobre el mueble">
-      <hugeicons-icon [icon]="icons.dimensions3d" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.dimensions3d" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 10. LUZ LIBRE -->
@@ -122,9 +122,9 @@
       type="button"
       (click)="toggleClearances()"
       [class]="showClearances() ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Luz Libre: Cotas dinámicas de huecos interiores útiles entre baldas y laterales">
-      <hugeicons-icon [icon]="icons.clearanceVert" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.clearanceVert" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 11. RAYOS X -->
@@ -132,9 +132,9 @@
       type="button"
       (click)="toggleXRay()"
       [class]="isXRay() ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
       title="Rayos X: Transparencia técnica para inspeccionar ensambles interiores">
-      <hugeicons-icon [icon]="icons.eye" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.eye" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 11.5. HERRAJES Y ACCESORIOS 3D -->
@@ -147,11 +147,11 @@
         : (isSelectedHardwareVisible()
             ? 'text-blue-600 bg-blue-50 ring-1 ring-blue-300/80 cursor-pointer'
             : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer')"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition shrink-0"
       [title]="!hasHardwareSelected()
         ? 'Herrajes 3D: Selecciona un cajón o puerta para gestionar sus herrajes'
         : (isSelectedHardwareVisible() ? 'Ocultar herrajes 3D del cajón seleccionado' : 'Mostrar herrajes 3D del cajón seleccionado')">
-      <hugeicons-icon [icon]="icons.hardwareTool" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.hardwareTool" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 12. ABRIR / CERRAR PUERTAS Y CAJONES -->
@@ -159,23 +159,23 @@
       type="button"
       (click)="toggleAllDoorsAndDrawers()"
       [class]="isAllOpen() ? 'text-blue-700 bg-blue-50 ring-1 ring-blue-400 font-bold' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'"
-      class="w-8 h-8 rounded-lg flex items-center justify-center transition relative cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition relative cursor-pointer shrink-0"
       [title]="isAllOpen() ? 'Cerrar todas las puertas y cajones (Animación fluida)' : 'Abrir todas las puertas y cajones en 3D (Animación fluida)'">
-      <hugeicons-icon [icon]="isAllOpen() ? icons.doorOpen : icons.doorClosed" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="isAllOpen() ? icons.doorOpen : icons.doorClosed" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       @if (isAllOpen()) {
         <span class="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-blue-500 border border-white"></span>
       }
     </button>
 
     <!-- 13. CAJONES Y GRUPOS GUARDADOS -->
-    <div class="relative">
+    <div class="relative shrink-0">
       <button
         type="button"
         (click)="toggleGroupsFlyout()"
         [class]="showGroupsFlyout() ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-500/30 ring-1 ring-indigo-400' : (activePartGroups().length > 0 ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 ring-1 ring-indigo-300/80' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100')"
-        class="w-8 h-8 rounded-lg flex items-center justify-center transition relative cursor-pointer"
+        class="cad-tool-btn rounded-lg flex items-center justify-center transition relative cursor-pointer"
         title="Cajones y Grupos Guardados: Administrar y seleccionar cajones completos para moverlos o animarlos">
-        <hugeicons-icon [icon]="icons.inbox" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+        <hugeicons-icon [icon]="icons.inbox" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
         @if (activePartGroups().length > 0) {
           <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-indigo-600 text-white flex items-center justify-center leading-none shadow-2xs">
             {{ activePartGroups().length }}
@@ -184,24 +184,24 @@
       </button>
     </div>
 
-    <div class="w-5 h-px bg-slate-200/90 my-0.5"></div>
+    <div class="cad-toolbar-divider w-5 h-px bg-slate-200/90 shrink-0"></div>
 
     <!-- 14. TEMA DE ESTUDIO (CLARO / OSCURO) -->
     <button
       type="button"
       (click)="toggleTheme()"
-      class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer shrink-0"
       [title]="isWhiteTheme() ? 'Cambiar a modo CAD oscuro' : 'Cambiar a modo estudio claro'">
-      <hugeicons-icon [icon]="isWhiteTheme() ? icons.sun : icons.moon" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="isWhiteTheme() ? icons.sun : icons.moon" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <!-- 15. REINICIAR CÁMARA -->
     <button
       type="button"
       (click)="resetCamera()"
-      class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+      class="cad-tool-btn rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer shrink-0"
       title="Centrar y reiniciar cámara (Z)">
-      <hugeicons-icon [icon]="icons.cameraFocus" [size]="16" [strokeWidth]="1.75"></hugeicons-icon>
+      <hugeicons-icon [icon]="icons.cameraFocus" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
   </div>
 
@@ -213,8 +213,7 @@
       class="absolute inset-0 z-35 bg-black/5 backdrop-blur-xs cursor-default w-full h-full border-none outline-hidden"
       (click)="closeGroupsFlyout()">
     </button>
-
-    <div class="absolute left-14 top-12 z-40 bg-white/95 text-slate-800 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 w-84 max-w-[calc(100vw-4.5rem)] max-h-[calc(100vh-8rem)] overflow-y-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 scrollbar-thin pointer-events-auto">
+    <div class="absolute left-13 top-10 z-40 bg-white/95 text-slate-800 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 w-80 max-w-[calc(100vw-4.5rem)] max-h-[calc(100%-3.5rem)] overflow-y-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 scrollbar-thin pointer-events-auto">
       <div class="flex items-center justify-between pb-2 border-b border-slate-200/80">
         <div class="flex items-center gap-2">
           <div class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
@@ -261,7 +260,6 @@
             <div
               [class]="isSel ? 'border-indigo-400 bg-indigo-50/60 ring-2 ring-indigo-400/40 shadow-xs' : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50'"
               class="border rounded-xl p-2.5 flex flex-col gap-2 transition">
-
               <div class="flex items-center justify-between">
                 <button
                   type="button"
@@ -296,7 +294,6 @@
                     title="Editar Módulo Paramétrico">
                     <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="1.8"></hugeicons-icon>
                   </button>
-
                   <button
                     type="button"
                     (click)="duplicateGroupInViewer(group.id)"
@@ -304,7 +301,6 @@
                     title="Duplicar cajón (crea una copia apilada encima)">
                     <hugeicons-icon [icon]="icons.copy" [size]="14" [strokeWidth]="1.8"></hugeicons-icon>
                   </button>
-
                   <button
                     type="button"
                     (click)="rotateGroupInViewer(group.id, 90)"
@@ -312,7 +308,6 @@
                     title="Girar cajón 90° en 3D (Atajo: tecla R)">
                     <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="1.8"></hugeicons-icon>
                   </button>
-
                   <button
                     type="button"
                     (click)="toggleGroupAnimation(group.id)"
@@ -321,7 +316,6 @@
                     [title]="isOpen ? 'Cerrar cajón' : 'Abrir cajón (animación 3D)'">
                     <hugeicons-icon [icon]="isOpen ? icons.doorOpen : icons.doorClosed" [size]="14" [strokeWidth]="1.8"></hugeicons-icon>
                   </button>
-
                   <button
                     type="button"
                     (click)="ungroupInViewer(group.id)"
@@ -395,7 +389,7 @@
 
   <!-- BANNER DE PIEZAS OCULTAS -->
   @if (hiddenPartIds().size > 0) {
-    <div class="absolute top-12 left-14 z-20 pointer-events-auto animate-in fade-in duration-150">
+    <div class="absolute top-12 left-13 z-20 pointer-events-auto animate-in fade-in duration-150">
       <div class="flex items-center gap-2 bg-amber-500/95 text-white backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md text-xs font-semibold">
         <hugeicons-icon [icon]="icons.eyeOff" [size]="14" [strokeWidth]="2"></hugeicons-icon>
         <span>{{ hiddenPartIds().size }} pieza(s) oculta(s)</span>
@@ -437,7 +431,7 @@
 
   <!-- ALERTA SUPERIOR DERECHA DE SOLAPAMIENTOS / COLISIONES -->
   @if (detectedCollisions().length > 0) {
-    <div class="absolute top-3 right-3 z-20 pointer-events-auto flex flex-col items-end gap-1.5 max-w-sm">
+    <div class="absolute top-12 right-3 z-20 pointer-events-auto flex flex-col items-end gap-1.5 max-w-sm">
       <button
         type="button"
         (click)="toggleCollisionsDetail()"
@@ -448,7 +442,7 @@
       </button>
 
       @if (showCollisionsDetail()) {
-        <div class="bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-2xl border border-rose-200 text-slate-800 text-xs w-80 max-h-72 overflow-y-auto flex flex-col gap-2">
+        <div class="bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-2xl border border-rose-200 text-slate-800 text-xs w-80 max-h-64 overflow-y-auto scrollbar-thin flex flex-col gap-2">
           <div class="flex items-center justify-between pb-1.5 border-b border-rose-100 font-bold text-rose-800">
             <span>Interferencias detectadas</span>
             <span class="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded">Tolerancia 0.8mm</span>
@@ -474,7 +468,7 @@
 
   <!-- HUD COMPACTO DE CINTA MÉTRICA 3D -->
   @if (isMeasureMode()) {
-    <div class="absolute top-3 left-14 sm:left-15 z-30 pointer-events-auto flex flex-col gap-1.5 w-72 max-w-[calc(100vw-4.5rem)] animate-in fade-in zoom-in-95 duration-150">
+    <div class="absolute top-2.5 left-13 z-30 pointer-events-auto flex flex-col gap-1.5 w-72 max-w-[calc(100vw-4.5rem)] animate-in fade-in zoom-in-95 duration-150">
       <div class="bg-white/95 text-slate-800 backdrop-blur-md p-2.5 rounded-xl border border-slate-200 shadow-xl flex flex-col gap-2">
         <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
           <div class="flex items-center gap-1.5 min-w-0">
@@ -549,14 +543,14 @@
 
   <!-- HUD FLOTANTE DE MICRO-AJUSTE EN ZOOM -->
   @if (selectedPart(); as sel) {
-    <div class="absolute bottom-10 left-14 z-20 pointer-events-auto flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
-      <div class="bg-white/95 text-slate-800 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200/90 shadow-xl flex flex-col gap-1.5 max-w-80">
-
-        <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5">
+    <div class="absolute bottom-8.5 left-13 z-20 pointer-events-auto flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+      <div class="cad-nudge-card bg-white/95 text-slate-800 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200/90 shadow-xl flex flex-col gap-1.5 max-w-76">
+        <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-1">
           <div class="flex items-center gap-1.5">
-            <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
-            <span class="text-xs font-bold text-slate-800">Micro-Ajuste en Zoom</span>
+            <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
+            <span class="text-[11px] font-bold text-slate-800">Micro-Ajuste en Zoom</span>
           </div>
+
           <div class="flex items-center gap-1">
             <button
               type="button"
@@ -574,6 +568,7 @@
               title="Paso de 10 milímetros">
               10 mm
             </button>
+
             <button
               type="button"
               (click)="toggleMagneticSnap()"
@@ -587,7 +582,6 @@
         </div>
 
         <div class="grid grid-cols-3 gap-1 text-center">
-
           <!-- Eje X -->
           <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
             <span class="text-[10px] font-bold text-red-500">X Lateral</span>
@@ -596,14 +590,14 @@
                 type="button"
                 (click)="nudgePart('x', -nudgeStep())"
                 class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
-                title="Mover a la izquierda (←)">
+                title="Mover a la izquierda">
                 -
               </button>
               <button
                 type="button"
                 (click)="nudgePart('x', nudgeStep())"
                 class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
-                title="Mover a la derecha (→)">
+                title="Mover a la derecha">
                 +
               </button>
             </div>
@@ -618,14 +612,14 @@
                 type="button"
                 (click)="nudgePart('y', -nudgeStep())"
                 class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
-                title="Bajar pieza (↓)">
+                title="Bajar pieza">
                 -
               </button>
               <button
                 type="button"
                 (click)="nudgePart('y', nudgeStep())"
                 class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
-                title="Subir pieza (↑)">
+                title="Subir pieza">
                 +
               </button>
             </div>
@@ -653,7 +647,6 @@
             </div>
             <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posZ) }} mm</span>
           </div>
-
         </div>
       </div>
     </div>
@@ -668,11 +661,10 @@
       (contextmenu)="$event.preventDefault(); closeContextMenu()"
       aria-label="Cerrar menú contextual">
     </button>
-
     <div
       [style.left.px]="pos.x"
       [style.top.px]="pos.y"
-      class="absolute z-50 bg-white text-slate-800 rounded-2xl border border-slate-200/90 shadow-2xl p-1.5 flex flex-col gap-0.5 min-w-55 text-xs font-medium animate-in fade-in zoom-in-95 select-none pointer-events-auto">
+      class="absolute z-50 bg-white text-slate-800 rounded-2xl border border-slate-200/90 shadow-2xl p-1.5 flex flex-col gap-0.5 min-w-55 max-h-[calc(100%-1.5rem)] overflow-y-auto scrollbar-thin text-xs font-medium animate-in fade-in zoom-in-95 select-none pointer-events-auto">
 
       @if (contextMenuPart(); as part) {
         <div class="px-2.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
@@ -766,7 +758,7 @@
             </button>
 
             @if (showHandleSubmenu()) {
-              <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md max-h-48 overflow-y-auto">
+              <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md max-h-48 overflow-y-auto scrollbar-thin">
                 @for (hOpt of hardwareCatalog.handleOptions; track hOpt.id) {
                   <button
                     type="button"
@@ -904,7 +896,7 @@
           }
         </div>
 
-        <!-- Alineación rápida -->
+        <!-- Alineación Rápida -->
         <div class="grid grid-cols-2 gap-1 px-1 my-0.5">
           <button
             type="button"
@@ -953,7 +945,7 @@
           </button>
 
           @if (showQuickMaterialPicker()) {
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-1.5 my-0.5 flex flex-col gap-1 text-xs max-h-40 overflow-y-auto">
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-1.5 my-0.5 flex flex-col gap-1 text-xs max-h-40 overflow-y-auto scrollbar-thin">
               <span class="text-[10px] uppercase font-bold text-slate-400 px-1">Melaminas:</span>
               @for (mat of materials(); track mat.id) {
                 <button
@@ -1045,40 +1037,39 @@
   }
 
   <!-- BARRA DE ESTADO INFERIOR CAD Y CUADRO DE MEDIDAS -->
-  <div class="absolute bottom-0 left-0 right-0 h-7 bg-white/95 text-slate-600 backdrop-blur-md border-t border-slate-200/90 px-3 flex items-center justify-between text-xs z-20 pointer-events-auto">
-
+  <div class="absolute bottom-0 left-0 right-0 h-7 2xl:h-8 bg-white/95 text-slate-600 backdrop-blur-md border-t border-slate-200/90 px-3 flex items-center justify-between text-xs z-20 pointer-events-auto">
     <!-- Izquierda: Guía contextual de la herramienta activa -->
-    <div class="flex items-center gap-2 truncate pr-2">
+    <div class="flex items-center gap-2 truncate pr-2 min-w-0">
       @if (activeTool() === 'push_pull') {
         <hugeicons-icon [icon]="icons.pushPull" [size]="14" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
         @if (hoveredFaceInfo(); as hf) {
-          <span class="font-medium text-slate-800">
+          <span class="font-medium text-slate-800 truncate">
             Posa y arrastra la <strong>{{ hf.faceLabel }}</strong> de <strong>{{ hf.partName }}</strong> ({{ hf.dimLabel }})
           </span>
         } @else {
-          <span><strong>Empujar / Tirar (P):</strong> Posa el cursor sobre una cara de la pieza y arrastra para estirar o encoger.</span>
+          <span class="truncate"><strong>Empujar / Tirar (P):</strong> Posa el cursor sobre una cara de la pieza y arrastra para estirar o encoger.</span>
         }
       } @else if (activeTool() === 'draw_rect') {
         <hugeicons-icon [icon]="icons.squareShape" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span><strong>Dibujar Rectángulo 3D (R):</strong> Haz clic y arrastra en el suelo para definir el largo y ancho de una nueva pieza.</span>
+        <span class="truncate"><strong>Dibujar Rectángulo 3D (R):</strong> Haz clic y arrastra en el suelo para definir el largo y ancho de una nueva pieza.</span>
       } @else if (activeTool() === 'draw_circle') {
         <hugeicons-icon [icon]="icons.circleShape" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span><strong>Dibujar Círculo 3D (C):</strong> Haz clic en el centro y arrastra para definir el radio/diámetro de la pieza circular.</span>
+        <span class="truncate"><strong>Dibujar Círculo 3D (C):</strong> Haz clic en el centro y arrastra para definir el radio/diámetro de la pieza circular.</span>
       } @else if (activeTool() === 'draw_freehand') {
         <hugeicons-icon [icon]="icons.freehandWave" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span><strong>Dibujo Libre a Mano Alzada (F):</strong> Mantén presionado y traza la forma deseada en el suelo; al soltar se cerrará y extruirá.</span>
+        <span class="truncate"><strong>Dibujo Libre a Mano Alzada (F):</strong> Mantén presionado y traza la forma deseada en el suelo; al soltar se cerrará y extruirá.</span>
       } @else if (activeTool() === 'rotate_90') {
         <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-        <span><strong>Rotar 90° (Q):</strong> Haz clic sobre cualquier pieza para girarla 90° en el plano horizontal.</span>
+        <span class="truncate"><strong>Rotar 90° (Q):</strong> Haz clic sobre cualquier pieza para girarla 90° en el plano horizontal.</span>
       } @else if (activeTool() === 'select') {
         <hugeicons-icon [icon]="icons.cursorSelect" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span><strong>Seleccionar:</strong> Clic en pieza · <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Clic Derecho</kbd> Menú Contextual · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> Empujar · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">R</kbd> Rectángulo</span>
+        <span class="truncate"><strong>Seleccionar:</strong> Clic en pieza · <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Clic Derecho</kbd> Menú Contextual · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> Empujar · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">R</kbd> Rectángulo</span>
       } @else if (activeTool() === 'move') {
         <hugeicons-icon [icon]="icons.moveAxes" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span><strong>Mover (M):</strong> Arrastra las flechas 3D para posicionar la pieza en X, Y o Z.</span>
+        <span class="truncate"><strong>Mover (M):</strong> Arrastra las flechas 3D para posicionar la pieza en X, Y o Z.</span>
       } @else if (activeTool() === 'measure') {
         <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-        <span><strong>Cinta Métrica (T):</strong> Clic en dos puntos para medir la distancia real en milímetros.</span>
+        <span class="truncate"><strong>Cinta Métrica (T):</strong> Clic en dos puntos para medir la distancia real en milímetros.</span>
       }
     </div>
 
@@ -1130,7 +1121,5 @@
         <span class="text-slate-400 text-[11px] italic">Selecciona una pieza</span>
       }
     </div>
-
   </div>
-
 </div>

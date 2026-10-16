@@ -1,27 +1,29 @@
 <header [class]="themeService.isClassic() ? 'bg-white border-b border-slate-200 text-slate-800 sticky top-0 z-50 print:hidden w-full shadow-xs' : 'bg-zinc-900 border-b border-zinc-800 text-zinc-100 sticky top-0 z-50 print:hidden w-full'">
-  <div class="w-full px-2.5 sm:px-4 lg:px-6">
-    <div class="flex items-center justify-between h-14 gap-2 flex-nowrap overflow-visible">
+  <div class="w-full max-w-[2560px] mx-auto px-2.5 sm:px-3.5 xl:px-5 2xl:px-6">
+    <div class="flex items-center justify-between h-12 xl:h-13 2xl:h-14 gap-1.5 xl:gap-2.5 flex-nowrap overflow-visible">
 
       <!-- ZONA 1 (IZQUIERDA): Marca e Identificador Editable del Proyecto -->
-      <div class="flex items-center gap-2.5 min-w-0 shrink-0">
-        <div class="w-8 h-8 rounded-lg bg-linear-to-br from-indigo-600 via-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-xs shadow-indigo-900/25 ring-1 ring-white/20 shrink-0">
-          <hugeicons-icon [icon]="icons.logo3d" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+      <div class="flex items-center gap-2 min-w-0 shrink">
+        <div class="w-7.5 h-7.5 xl:w-8 xl:h-8 rounded-lg bg-linear-to-br from-indigo-600 via-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-xs shadow-indigo-900/25 ring-1 ring-white/20 shrink-0">
+          <hugeicons-icon [icon]="icons.logo3d" [size]="17" [strokeWidth]="2"></hugeicons-icon>
         </div>
+
         <div class="flex items-center gap-1.5 min-w-0">
-          <span [class]="themeService.isClassic() ? 'font-bold tracking-tight text-slate-900 text-base whitespace-nowrap' : 'font-bold tracking-tight text-white text-base whitespace-nowrap'">Piezo<span [class]="themeService.isClassic() ? 'text-indigo-600' : 'text-indigo-400'">3D</span></span>
-          <span [class]="themeService.isClassic() ? 'text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap' : 'text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 whitespace-nowrap'">Studio</span>
+          <span [class]="themeService.isClassic() ? 'font-bold tracking-tight text-slate-900 text-sm xl:text-base whitespace-nowrap' : 'font-bold tracking-tight text-white text-sm xl:text-base whitespace-nowrap'">Piezo<span [class]="themeService.isClassic() ? 'text-indigo-600' : 'text-indigo-400'">3D</span></span>
+          <span [class]="themeService.isClassic() ? 'text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap hidden sm:inline-block' : 'text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 whitespace-nowrap hidden sm:inline-block'">Studio</span>
+
           <span [class]="themeService.isClassic() ? 'text-slate-300 hidden md:inline' : 'text-zinc-600 hidden md:inline'">·</span>
 
           <!-- Botón y Popover para Editar Nombre del Proyecto y Cliente -->
-          <div class="relative hidden md:flex items-center">
+          <div class="relative hidden md:flex items-center min-w-0">
             <button
               type="button"
               (click)="startEditingTitle($event)"
-              [class]="themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200/80 transition text-xs font-bold max-w-40 lg:max-w-60 xl:max-w-80 cursor-pointer group shadow-2xs' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition text-xs font-bold max-w-40 lg:max-w-60 xl:max-w-80 cursor-pointer group shadow-2xs'"
-              [title]="'Haz clic para cambiar el nombre del proyecto (' + project().name + ')'">
+              [class]="themeService.isClassic() ? 'flex items-center gap-1.5 px-2 xl:px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200/80 transition text-xs font-bold max-w-36 lg:max-w-44 xl:max-w-52 2xl:max-w-80 cursor-pointer group shadow-2xs' : 'flex items-center gap-1.5 px-2 xl:px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition text-xs font-bold max-w-36 lg:max-w-44 xl:max-w-52 2xl:max-w-80 cursor-pointer group shadow-2xs'"
+              [title]="'Haz clic para cambiar el nombre del proyecto (' + project().name + (project().clientName ? ' · ' + project().clientName : '') + ')'">
               <span [class]="themeService.isClassic() ? 'truncate font-bold text-slate-900 text-xs' : 'truncate font-bold text-white text-xs'">{{ project().name }}</span>
               @if (project().clientName) {
-                <span [class]="themeService.isClassic() ? 'text-[10px] text-slate-500 font-normal truncate hidden lg:inline' : 'text-[10px] text-zinc-400 font-normal truncate hidden lg:inline'">• {{ project().clientName }}</span>
+                <span [class]="themeService.isClassic() ? 'text-[10px] text-slate-500 font-normal truncate hidden 2xl:inline max-w-32' : 'text-[10px] text-zinc-400 font-normal truncate hidden 2xl:inline max-w-32'">· {{ project().clientName }}</span>
               }
               <hugeicons-icon
                 [icon]="icons.edit"
@@ -102,14 +104,14 @@
       </div>
 
       <!-- ZONA 2 (CENTRO): Pestañas de Navegación Principal -->
-      <nav [class]="themeService.isClassic() ? 'flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-xl p-0.5 shadow-inner shrink-0' : 'flex items-center gap-1 bg-zinc-950/90 border border-zinc-800/90 rounded-xl p-0.5 shadow-inner shrink-0'">
+      <nav [class]="themeService.isClassic() ? 'flex items-center gap-0.5 xl:gap-1 bg-slate-100 border border-slate-200 rounded-xl p-0.5 shadow-inner shrink-0' : 'flex items-center gap-0.5 xl:gap-1 bg-zinc-950/90 border border-zinc-800/90 rounded-xl p-0.5 shadow-inner shrink-0'">
         <button
           type="button"
           (click)="selectTab('modules')"
           [class]="activeTab() === 'modules'
-            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-          <hugeicons-icon [icon]="icons.tab3d" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            ? (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+            : (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
+          <hugeicons-icon [icon]="icons.tab3d" [size]="14" [strokeWidth]="2"></hugeicons-icon>
           <span class="hidden lg:inline">1. Diseñador 3D</span>
           <span class="lg:hidden">1. 3D</span>
           <span [class]="themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono' : 'text-[10px] px-1 py-0.2 rounded-full bg-slate-800 text-slate-200 font-mono'">{{ project().modules.length }}</span>
@@ -119,9 +121,9 @@
           type="button"
           (click)="selectTab('parts')"
           [class]="activeTab() === 'parts'
-            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-          <hugeicons-icon [icon]="icons.tabParts" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            ? (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+            : (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
+          <hugeicons-icon [icon]="icons.tabParts" [size]="14" [strokeWidth]="2"></hugeicons-icon>
           <span class="hidden lg:inline">2. Despiece</span>
           <span class="lg:hidden">2. Piezas</span>
           <span [class]="themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono' : 'text-[10px] px-1 py-0.2 rounded-full bg-slate-800 text-slate-200 font-mono'">{{ partsCount() }}</span>
@@ -131,21 +133,21 @@
           type="button"
           (click)="selectTab('optimizer')"
           [class]="activeTab() === 'optimizer'
-            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-          <hugeicons-icon [icon]="icons.tabOptimizer" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            ? (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+            : (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
+          <hugeicons-icon [icon]="icons.tabOptimizer" [size]="14" [strokeWidth]="2"></hugeicons-icon>
           <span class="hidden lg:inline">3. Optimizador 2D</span>
           <span class="lg:hidden">3. Corte</span>
-          <span class="text-[9px] uppercase font-bold tracking-wider px-1 py-0.2 rounded bg-amber-500/15 text-amber-700 border border-amber-500/30">Sierra</span>
+          <span class="text-[9px] uppercase font-bold tracking-wider px-1 py-0.2 rounded bg-amber-500/15 text-amber-700 border border-amber-500/30 hidden xl:inline">Sierra</span>
         </button>
 
         <button
           type="button"
           (click)="selectTab('budget')"
           [class]="activeTab() === 'budget'
-            ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-            : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-          <hugeicons-icon [icon]="icons.tabBudget" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            ? (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+            : (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
+          <hugeicons-icon [icon]="icons.tabBudget" [size]="14" [strokeWidth]="2"></hugeicons-icon>
           <span class="hidden lg:inline">4. Presupuesto</span>
           <span class="lg:hidden">4. Cotizar</span>
         </button>
@@ -155,24 +157,24 @@
             type="button"
             (click)="selectTab('labels')"
             [class]="activeTab() === 'labels'
-              ? (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-              : (themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-            <hugeicons-icon [icon]="icons.tabLabels" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+              ? (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-white text-blue-700 border border-slate-200 font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg bg-blue-600 text-white font-bold shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
+              : (themeService.isClassic() ? 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
+            <hugeicons-icon [icon]="icons.tabLabels" [size]="14" [strokeWidth]="2"></hugeicons-icon>
             <span>5. Etiquetas</span>
           </button>
         }
       </nav>
 
       <!-- ZONA 3 (DERECHA): Botones de Acción, Historial, Nube y Configuración -->
-      <div class="flex items-center gap-1.5 shrink-0 justify-end">
+      <div class="flex items-center gap-1 xl:gap-1.5 shrink-0 justify-end">
 
         <!-- Selector de Tema (Claro / Oscuro) -->
         <button
           type="button"
           (click)="themeService.toggleTheme()"
           [class]="themeService.isClassic()
-            ? 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
-            : 'h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-amber-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
+            ? 'h-8 xl:h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
+            : 'h-8 xl:h-8.5 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-amber-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
           [title]="themeService.isClassic() ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro (Estudio)'">
           <hugeicons-icon
             [icon]="themeService.isClassic() ? icons.sun : icons.moon"
@@ -180,7 +182,7 @@
             [strokeWidth]="2"
             [class]="themeService.isClassic() ? 'text-amber-500' : 'text-amber-400'">
           </hugeicons-icon>
-          <span class="whitespace-nowrap hidden xl:inline">
+          <span class="whitespace-nowrap hidden 2xl:inline">
             {{ themeService.isClassic() ? 'Claro' : 'Oscuro' }}
           </span>
         </button>
@@ -190,8 +192,8 @@
           type="button"
           (click)="showNotesModal.set(true)"
           [class]="themeService.isClassic()
-            ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-300/80 transition whitespace-nowrap shrink-0 shadow-2xs cursor-pointer'
-            : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 rounded-lg border border-amber-700/50 transition whitespace-nowrap shrink-0 cursor-pointer'"
+            ? 'h-8 xl:h-8.5 inline-flex items-center gap-1.5 px-2 xl:px-2.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-300/80 transition whitespace-nowrap shrink-0 shadow-2xs cursor-pointer'
+            : 'h-8 xl:h-8.5 inline-flex items-center gap-1.5 px-2 xl:px-2.5 text-xs font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 rounded-lg border border-amber-700/50 transition whitespace-nowrap shrink-0 cursor-pointer'"
           title="Abrir cuaderno de notas y pendientes del proyecto activo">
           <hugeicons-icon [icon]="icons.note" [size]="15" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
           <span class="whitespace-nowrap hidden md:inline">Notas</span>
@@ -203,7 +205,7 @@
         </button>
 
         <!-- Controles Undo / Redo -->
-        <div [class]="themeService.isClassic() ? 'flex items-center h-8.5 bg-slate-100 border border-slate-200 rounded-lg p-0.5 shadow-xs shrink-0' : 'flex items-center h-8.5 bg-zinc-950/90 border border-zinc-800 rounded-lg p-0.5 shadow-sm shrink-0'">
+        <div [class]="themeService.isClassic() ? 'flex items-center h-8 xl:h-8.5 bg-slate-100 border border-slate-200 rounded-lg p-0.5 shadow-xs shrink-0' : 'flex items-center h-8 xl:h-8.5 bg-zinc-950/90 border border-zinc-800 rounded-lg p-0.5 shadow-sm shrink-0'">
           <button
             type="button"
             (click)="undo()"
@@ -212,7 +214,9 @@
             title="Deshacer cambio (Ctrl+Z)">
             <hugeicons-icon [icon]="icons.undo" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           </button>
+
           <div [class]="themeService.isClassic() ? 'w-px h-3.5 bg-slate-200 my-auto' : 'w-px h-3.5 bg-zinc-800 my-auto'"></div>
+
           <button
             type="button"
             (click)="redo()"
@@ -229,8 +233,8 @@
             type="button"
             (click)="toggleProjectDropdown($event)"
             [class]="themeService.isClassic()
-              ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
-              : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
+              ? 'h-8 xl:h-8.5 inline-flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
+              : 'h-8 xl:h-8.5 inline-flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
             title="Menú de Proyectos y Gestión de Archivos">
             <hugeicons-icon [icon]="icons.project" [size]="15" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
             <span class="whitespace-nowrap">Proyecto</span>
@@ -310,7 +314,6 @@
                   {{ autoSyncEnabled() ? 'ON' : 'OFF' }}
                 </span>
               </button>
-
             </div>
           }
         </div>
@@ -321,8 +324,8 @@
             type="button"
             (click)="toggleExportDropdown($event)"
             [class]="themeService.isClassic()
-              ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
-              : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
+              ? 'h-8 xl:h-8.5 inline-flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
+              : 'h-8 xl:h-8.5 inline-flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 text-xs font-semibold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
             title="Menú de Exportaciones para Taller y Fábrica">
             <hugeicons-icon [icon]="icons.download" [size]="15" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
             <span class="whitespace-nowrap">Exportar</span>
@@ -371,7 +374,6 @@
                   <span class="text-[10px] text-slate-400">Respaldo completo editable</span>
                 </div>
               </button>
-
             </div>
           }
         </div>
@@ -381,10 +383,10 @@
           type="button"
           (click)="saveCurrentToCloud()"
           [class]="syncStatus() === 'syncing'
-            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-700/90 rounded-lg border border-blue-500/50 shadow-sm animate-pulse whitespace-nowrap shrink-0 cursor-pointer'
+            ? 'inline-flex items-center gap-1.5 h-8 xl:h-8.5 px-2.5 xl:px-3 text-xs font-semibold text-white bg-blue-700/90 rounded-lg border border-blue-500/50 shadow-sm animate-pulse whitespace-nowrap shrink-0 cursor-pointer'
             : syncStatus() === 'table_needed'
-            ? 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-amber-300 bg-amber-950/70 hover:bg-amber-900/90 rounded-lg border border-amber-600/50 shadow-sm transition whitespace-nowrap shrink-0 cursor-pointer'
-            : 'inline-flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500 shadow-sm transition whitespace-nowrap shrink-0 cursor-pointer'"
+            ? 'inline-flex items-center gap-1.5 h-8 xl:h-8.5 px-2.5 xl:px-3 text-xs font-semibold text-amber-300 bg-amber-950/70 hover:bg-amber-900/90 rounded-lg border border-amber-600/50 shadow-sm transition whitespace-nowrap shrink-0 cursor-pointer'
+            : 'inline-flex items-center gap-1.5 h-8 xl:h-8.5 px-2.5 xl:px-3 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500 shadow-sm transition whitespace-nowrap shrink-0 cursor-pointer'"
           title="Guardar proyecto en la base de datos de Supabase">
           @if (syncStatus() === 'syncing') {
             <hugeicons-icon [icon]="icons.loading" [size]="15" [strokeWidth]="2" class="animate-spin shrink-0"></hugeicons-icon>
@@ -403,11 +405,11 @@
           type="button"
           (click)="openDocumentationModal()"
           [class]="themeService.isClassic()
-            ? 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
-            : 'h-8.5 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 rounded-lg border border-emerald-700/50 transition whitespace-nowrap shrink-0 cursor-pointer'"
+            ? 'h-8 xl:h-8.5 inline-flex items-center gap-1.5 px-2 xl:px-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition whitespace-nowrap shrink-0 shadow-xs cursor-pointer'
+            : 'h-8 xl:h-8.5 inline-flex items-center gap-1.5 px-2 xl:px-2.5 text-xs font-semibold text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 rounded-lg border border-emerald-700/50 transition whitespace-nowrap shrink-0 cursor-pointer'"
           title="Manual de Herramientas, Mecanizados CNC y Atajos (Ayuda)">
           <hugeicons-icon [icon]="icons.info" [size]="16" [strokeWidth]="2" class="text-emerald-500"></hugeicons-icon>
-          <span class="whitespace-nowrap hidden lg:inline">Ayuda</span>
+          <span class="whitespace-nowrap hidden 2xl:inline">Ayuda</span>
         </button>
 
         <!-- Botón Configuración -->
@@ -415,8 +417,8 @@
           type="button"
           (click)="openSettings()"
           [class]="themeService.isClassic()
-            ? 'h-8.5 w-8.5 inline-flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-lg border border-slate-300 transition shrink-0 shadow-xs cursor-pointer'
-            : 'h-8.5 w-8.5 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg border border-transparent hover:border-zinc-700 transition shrink-0 cursor-pointer'"
+            ? 'h-8 w-8 xl:h-8.5 xl:w-8.5 inline-flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-lg border border-slate-300 transition shrink-0 shadow-xs cursor-pointer'
+            : 'h-8 w-8 xl:h-8.5 xl:w-8.5 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg border border-transparent hover:border-zinc-700 transition shrink-0 cursor-pointer'"
           title="Configuración de Sierra (Kerf), Refilado y Costos">
           <hugeicons-icon [icon]="icons.settings" [size]="16" [strokeWidth]="2"></hugeicons-icon>
         </button>
@@ -437,8 +439,8 @@
 
 <!-- MODAL: GESTIÓN DE PROYECTOS (NUBE SUPABASE Y LOCAL) -->
 @if (showProjectsModal()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-2xl shadow-2xl p-6 text-zinc-100 max-h-[90vh] flex flex-col">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-2xl shadow-2xl p-4 sm:p-5 xl:p-6 text-zinc-100 max-h-[88dvh] flex flex-col">
 
       <!-- Cabecera del Modal -->
       <div class="flex items-center justify-between pb-3 border-b border-zinc-800 shrink-0">
@@ -457,7 +459,7 @@
       </div>
 
       <!-- Barra de Estado de Supabase & Pestañas -->
-      <div class="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+      <div class="mt-3 sm:mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div class="inline-flex rounded-lg bg-zinc-800/80 p-1 border border-zinc-700/60 text-xs">
           <button
             type="button"
@@ -506,9 +508,9 @@
       </div>
 
       <!-- Contenido de Proyectos -->
-      <div class="mt-4 flex-1 overflow-y-auto space-y-3 pr-1">
-
+      <div class="mt-3 sm:mt-4 flex-1 overflow-y-auto scrollbar-thin space-y-3 pr-1">
         @if (projectsTab() === 'cloud') {
+
           @if (syncStatus() === 'table_needed') {
             <div class="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 text-amber-200 space-y-3">
               <div class="flex items-start gap-3">
@@ -547,12 +549,12 @@
                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-zinc-400">
                       @if (cp.client_name) {
                         <span>Cliente: <strong class="text-zinc-300">{{ cp.client_name }}</strong></span>
-                        <span>•</span>
+                        <span>·</span>
                       }
                       <span>{{ cp.modules_count }} módulos</span>
-                      <span>•</span>
+                      <span>·</span>
                       <span>{{ cp.parts_count }} piezas</span>
-                      <span>•</span>
+                      <span>·</span>
                       <span class="text-zinc-500">Act: {{ cp.updated_at | slice:0:10 }}</span>
                     </div>
                   </div>
@@ -592,6 +594,7 @@
               </button>
             </div>
           }
+
         } @else {
           <!-- PESTAÑA: MEMORIA LOCAL Y ARCHIVOS -->
           <div class="grid grid-cols-2 gap-3 mb-3">
@@ -626,7 +629,7 @@
                 <div>
                   <h4 class="text-sm font-semibold text-zinc-100">{{ p.name }}</h4>
                   <p class="text-xs text-zinc-400">
-                    {{ p.clientName || 'Sin cliente' }} • {{ p.modulesCount }} módulos • {{ p.partsCount }} piezas
+                    {{ p.clientName || 'Sin cliente' }} · {{ p.modulesCount }} módulos · {{ p.partsCount }} piezas
                   </p>
                 </div>
                 <div class="flex items-center gap-2">
@@ -652,11 +655,10 @@
             }
           </div>
         }
-
       </div>
 
       <!-- Pie del Modal -->
-      <div class="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between shrink-0">
+      <div class="mt-3 sm:mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between shrink-0">
         <span class="text-[11px] text-zinc-500 flex items-center gap-1.5">
           <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
           <span>Supabase: umdcxcjrdyckpxomxlmi.supabase.co</span>
@@ -668,15 +670,14 @@
           Cerrar
         </button>
       </div>
-
     </div>
   </div>
 }
 
 <!-- MODAL: SCRIPT SQL PARA SUPABASE -->
 @if (showSqlModal()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-xl shadow-2xl p-6 text-zinc-100 max-h-[90vh] flex flex-col">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-xl shadow-2xl p-4 sm:p-5 xl:p-6 text-zinc-100 max-h-[88dvh] flex flex-col">
       <div class="flex items-center justify-between pb-3 border-b border-zinc-800 shrink-0">
         <div class="flex items-center gap-2">
           <hugeicons-icon [icon]="icons.note" [size]="19" [strokeWidth]="2" class="text-amber-400"></hugeicons-icon>
@@ -687,7 +688,7 @@
         </button>
       </div>
 
-      <div class="mt-4 space-y-3 overflow-y-auto pr-1 flex-1">
+      <div class="mt-3 sm:mt-4 space-y-3 overflow-y-auto scrollbar-thin pr-1 flex-1">
         <p class="text-xs text-zinc-300">
           Para que Supabase almacene tus proyectos, sigue estos 3 simples pasos:
         </p>
@@ -709,7 +710,7 @@
         </div>
       </div>
 
-      <div class="mt-4 pt-3 border-t border-zinc-800 flex justify-between items-center shrink-0">
+      <div class="mt-3 sm:mt-4 pt-3 border-t border-zinc-800 flex justify-between items-center shrink-0">
         <span class="text-xs text-zinc-500">¡Solo se realiza una vez!</span>
         <button
           type="button"
@@ -724,8 +725,8 @@
 
 <!-- MODAL: NUEVO PROYECTO -->
 @if (showNewProjectModal()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl p-6 text-zinc-100">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl p-4 sm:p-5 xl:p-6 text-zinc-100 max-h-[88dvh] overflow-y-auto scrollbar-thin">
       <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
         <h3 class="text-base font-bold flex items-center gap-2">
           <hugeicons-icon [icon]="icons.add" [size]="19" [strokeWidth]="2" class="text-emerald-400"></hugeicons-icon>
@@ -753,6 +754,7 @@
             placeholder="ej. Ing. Carlos Pérez - Apto 302"
             class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500" />
         </div>
+
         <div class="pt-2 flex justify-end gap-2">
           <button
             type="button"
@@ -774,8 +776,8 @@
 
 <!-- MODAL: CONFIGURACIÓN DE TALLER & SIERRA -->
 @if (showSettingsModal()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-lg shadow-2xl p-6 text-zinc-100">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-lg shadow-2xl p-4 sm:p-5 xl:p-6 text-zinc-100 max-h-[88dvh] overflow-y-auto scrollbar-thin">
       <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
         <h3 class="text-base font-bold flex items-center gap-2">
           <hugeicons-icon [icon]="icons.settings" [size]="19" [strokeWidth]="2" class="text-amber-400"></hugeicons-icon>
