@@ -1,13 +1,13 @@
-<div class="w-full px-3 sm:px-6 py-4 space-y-5">
+<div class="w-full px-3 sm:px-5 2xl:px-6 py-3 xl:py-4 space-y-3.5 xl:space-y-4">
 
   <!-- Barra Superior: Título y Selector Rápido de Moneda -->
-  <div [class]="themeService.isClassic() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-xs' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-sm'">
+  <div [class]="themeService.isClassic() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 shadow-xs print:hidden' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-sm print:hidden'">
     <div class="flex items-center gap-3">
-      <div [class]="themeService.isClassic() ? 'w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 shrink-0' : 'w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0'">
-        <hugeicons-icon [icon]="icons.budget" [size]="22" [strokeWidth]="1.8"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'w-9 h-9 xl:w-10 xl:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 shrink-0' : 'w-9 h-9 xl:w-10 xl:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0'">
+        <hugeicons-icon [icon]="icons.budget" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
       </div>
       <div>
-        <h2 [class]="themeService.isClassic() ? 'text-base font-bold text-slate-800 tracking-tight' : 'text-base font-bold text-white tracking-tight'">Presupuesto y Costos de Fabricación</h2>
+        <h2 [class]="themeService.isClassic() ? 'text-base xl:text-lg font-bold text-slate-800 tracking-tight' : 'text-base xl:text-lg font-bold text-white tracking-tight'">Presupuesto y Costos de Fabricación</h2>
         <p [class]="themeService.isClassic() ? 'text-xs text-slate-500' : 'text-xs text-zinc-400'">Cálculo exacto de placas, tapacantos, herrajes y mano de obra con margen de utilidad</p>
       </div>
     </div>
@@ -34,100 +34,100 @@
     </div>
   </div>
 
-  <!-- Tarjetas Principales de Resumen Financiero -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+  <!-- Tarjetas Principales de Resumen Financiero (3 columnas en HD 1280px, 6 columnas en FHD 1920px y 2K 2560px) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2.5 xl:gap-3.5 print:hidden">
 
     <!-- Tableros -->
-    <div [class]="themeService.isClassic() ? 'p-4 bg-white border border-slate-200 rounded-2xl shadow-xs' : 'p-4 bg-zinc-900 border border-zinc-800 rounded-2xl'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1'">
-        <span class="font-semibold uppercase tracking-wider">Tableros Melamina</span>
-        <hugeicons-icon [icon]="icons.board" [size]="16" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Tableros Melamina</span>
+        <hugeicons-icon [icon]="icons.board" [size]="16" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-xl font-bold text-slate-800 font-mono' : 'text-xl font-bold text-white font-mono'">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(sheetsCostBreakdown().totalSheetsCost)">
         {{ format(sheetsCostBreakdown().totalSheetsCost) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-1' : 'text-[11px] text-zinc-500 mt-1'">{{ optResult().totalSheetsUsed }} tableros requeridos</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">{{ optResult().totalSheetsUsed }} tableros requeridos</p>
     </div>
 
     <!-- Tapacantos -->
-    <div [class]="themeService.isClassic() ? 'p-4 bg-white border border-slate-200 rounded-2xl shadow-xs' : 'p-4 bg-zinc-900 border border-zinc-800 rounded-2xl'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1'">
-        <span class="font-semibold uppercase tracking-wider">Tapacantos</span>
-        <hugeicons-icon [icon]="icons.edges" [size]="16" [strokeWidth]="2" class="text-cyan-500"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Tapacantos</span>
+        <hugeicons-icon [icon]="icons.edges" [size]="16" [strokeWidth]="2" class="text-cyan-500 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-xl font-bold text-slate-800 font-mono' : 'text-xl font-bold text-white font-mono'">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(edgesCostBreakdown().totalEdgeCost)">
         {{ format(edgesCostBreakdown().totalEdgeCost) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-1' : 'text-[11px] text-zinc-500 mt-1'">{{ (optResult().thinEdgeMeters + optResult().thickEdgeMeters).toFixed(1) }} ml totales</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">{{ (optResult().thinEdgeMeters + optResult().thickEdgeMeters).toFixed(1) }} ml totales</p>
     </div>
 
     <!-- Herrajes -->
-    <div [class]="themeService.isClassic() ? 'p-4 bg-white border border-slate-200 rounded-2xl shadow-xs' : 'p-4 bg-zinc-900 border border-zinc-800 rounded-2xl'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1'">
-        <span class="font-semibold uppercase tracking-wider">Herrajes & Tornillos</span>
-        <hugeicons-icon [icon]="icons.hardware" [size]="16" [strokeWidth]="2" class="text-purple-500"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Herrajes & Tornillos</span>
+        <hugeicons-icon [icon]="icons.hardware" [size]="16" [strokeWidth]="2" class="text-purple-500 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-xl font-bold text-slate-800 font-mono' : 'text-xl font-bold text-white font-mono'">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(hardwareCostTotal())">
         {{ format(hardwareCostTotal()) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-1' : 'text-[11px] text-zinc-500 mt-1'">{{ hardware().length }} ítems listados</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">{{ hardware().length }} ítems listados</p>
     </div>
 
     <!-- Electrodomésticos y Equipamiento 3D -->
-    <div [class]="themeService.isClassic() ? 'p-4 bg-white border border-slate-200 rounded-2xl shadow-xs' : 'p-4 bg-zinc-900 border border-zinc-800 rounded-2xl'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1'">
-        <span class="font-semibold uppercase tracking-wider">Electrodomésticos</span>
-        <hugeicons-icon [icon]="icons.appliance" [size]="16" [strokeWidth]="2" class="text-emerald-600"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Electrodomésticos</span>
+        <hugeicons-icon [icon]="icons.appliance" [size]="16" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-xl font-bold text-slate-800 font-mono' : 'text-xl font-bold text-white font-mono'">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(appliancesCostTotal())">
         {{ format(appliancesCostTotal()) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-1' : 'text-[11px] text-zinc-500 mt-1'">{{ appliancesBudgetList().length }} equipos cotizados</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">{{ appliancesBudgetList().length }} equipos cotizados</p>
     </div>
 
     <!-- Mano de Obra -->
-    <div [class]="themeService.isClassic() ? 'p-4 bg-white border border-slate-200 rounded-2xl shadow-xs' : 'p-4 bg-zinc-900 border border-zinc-800 rounded-2xl'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1'">
-        <span class="font-semibold uppercase tracking-wider">Mano de Obra</span>
-        <hugeicons-icon [icon]="icons.labor" [size]="16" [strokeWidth]="2" class="text-emerald-500"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Mano de Obra</span>
+        <hugeicons-icon [icon]="icons.labor" [size]="16" [strokeWidth]="2" class="text-emerald-500 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-xl font-bold text-slate-800 font-mono' : 'text-xl font-bold text-white font-mono'">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(laborTotal())">
         {{ format(laborTotal()) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-1' : 'text-[11px] text-zinc-500 mt-1'">Armado e instalación</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">Armado e instalación</p>
     </div>
 
     <!-- PRECIO TOTAL SUGERIDO -->
-    <div [class]="themeService.isClassic() ? 'p-4 bg-linear-to-br from-amber-500/10 via-white to-amber-500/5 border-2 border-amber-500/40 rounded-2xl shadow-sm' : 'p-4 bg-linear-to-br from-amber-500/20 via-zinc-900 to-zinc-900 border-2 border-amber-500/50 rounded-2xl shadow-xl'">
-      <div class="flex items-center justify-between text-amber-500 text-xs mb-1">
-        <span class="font-bold uppercase tracking-wider">Precio Sugerido Venta</span>
-        <hugeicons-icon [icon]="icons.star" [size]="16" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-linear-to-br from-amber-500/10 via-white to-amber-500/5 border-2 border-amber-500/40 rounded-2xl shadow-sm min-w-0' : 'p-3.5 xl:p-4 bg-linear-to-br from-amber-500/20 via-zinc-900 to-zinc-900 border-2 border-amber-500/50 rounded-2xl shadow-xl min-w-0'">
+      <div class="flex items-center justify-between text-amber-500 text-xs mb-1 gap-1">
+        <span class="font-bold uppercase tracking-wider truncate text-[11px]">Precio Sugerido Venta</span>
+        <hugeicons-icon [icon]="icons.star" [size]="16" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
       </div>
-      <p class="text-2xl font-black text-amber-600 font-mono">
+      <p class="text-xl xl:text-2xl font-black text-amber-600 font-mono truncate" [title]="format(finalClientPrice())">
         {{ format(finalClientPrice()) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[10px] text-slate-500 mt-1' : 'text-[10px] text-zinc-400 mt-1'">Con {{ project().profitMarginPercent }}% margen utilidad</p>
+      <p [class]="themeService.isClassic() ? 'text-[10px] text-slate-500 mt-0.5' : 'text-[10px] text-zinc-400 mt-0.5'">Con {{ project().profitMarginPercent }}% margen utilidad</p>
     </div>
 
   </div>
 
   <!-- Tablas de Desglose de Costos y Configuración de Margen -->
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 2xl:gap-6 items-start print:hidden">
 
     <!-- COLUMNA IZQUIERDA: Materiales, Tapacantos, Herrajes y Equipos (8 cols) -->
-    <div class="lg:col-span-8 space-y-6">
+    <div class="lg:col-span-8 space-y-4 2xl:space-y-5 min-w-0">
 
       <!-- 1. TABLEROS DE MELAMINA REQUERIDOS -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg'">
-        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3'">
-          <h3 [class]="themeService.isClassic() ? 'text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
-            <hugeicons-icon [icon]="icons.board" [size]="17" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg'">
+        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+          <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
+            <hugeicons-icon [icon]="icons.board" [size]="17" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
             <span>1. Tableros Enteros (Calculados por Optimizador)</span>
           </h3>
           <span [class]="themeService.isClassic() ? 'text-xs text-slate-500 font-mono font-semibold' : 'text-xs text-zinc-400 font-mono'">Subtotal: {{ format(sheetsCostBreakdown().totalSheetsCost) }}</span>
         </div>
 
-        <div [class]="themeService.isClassic() ? 'overflow-x-auto border border-slate-200 rounded-xl' : 'overflow-x-auto border border-zinc-800 rounded-xl'">
+        <div [class]="themeService.isClassic() ? 'overflow-x-auto scrollbar-thin border border-slate-200 rounded-xl' : 'overflow-x-auto scrollbar-thin border border-zinc-800 rounded-xl'">
           <table class="w-full text-left text-xs">
             <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold'">
               <tr>
@@ -142,10 +142,10 @@
               @for (item of sheetsCostBreakdown().items; track item.material.id) {
                 <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80' : 'hover:bg-zinc-800/40'">
                   <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-semibold text-slate-800 flex items-center gap-2' : 'py-2.5 px-3 font-semibold text-white flex items-center gap-2'">
-                    <span class="w-2.5 h-2.5 rounded-full" [style.background-color]="item.material.colorHex"></span>
-                    {{ item.material.name }}
+                    <span class="w-2.5 h-2.5 rounded-full shrink-0" [style.background-color]="item.material.colorHex"></span>
+                    <span>{{ item.material.name }}</span>
                   </td>
-                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-mono text-slate-500' : 'py-2.5 px-3 font-mono text-zinc-400'">
+                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-mono text-slate-500 whitespace-nowrap' : 'py-2.5 px-3 font-mono text-zinc-400 whitespace-nowrap'">
                     {{ item.material.sheetLength }} × {{ item.material.sheetWidth }} × {{ item.material.thickness }}mm
                   </td>
                   <td class="py-2.5 px-3 text-center font-bold text-amber-500">
@@ -158,9 +158,9 @@
                       [value]="item.material.sheetCost"
                       (change)="onMaterialCostChange(item.material, $event)"
                       aria-label="Costo por tablero"
-                      [class]="themeService.isClassic() ? 'w-24 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-24 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
+                      [class]="themeService.isClassic() ? 'w-28 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-28 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
                   </td>
-                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 text-right font-bold font-mono text-slate-800' : 'py-2.5 px-3 text-right font-bold font-mono text-zinc-100'">
+                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 text-right font-bold font-mono text-slate-800 whitespace-nowrap' : 'py-2.5 px-3 text-right font-bold font-mono text-zinc-100 whitespace-nowrap'">
                     {{ format(item.subtotal) }}
                   </td>
                 </tr>
@@ -171,35 +171,35 @@
       </div>
 
       <!-- 2. TAPACANTOS -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg'">
-        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3'">
-          <h3 [class]="themeService.isClassic() ? 'text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
-            <hugeicons-icon [icon]="icons.edges" [size]="17" [strokeWidth]="2" class="text-cyan-500"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg'">
+        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+          <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
+            <hugeicons-icon [icon]="icons.edges" [size]="17" [strokeWidth]="2" class="text-cyan-500 shrink-0"></hugeicons-icon>
             <span>2. Tapacantos / Cubrecantos (Metros Lineales)</span>
           </h3>
           <span [class]="themeService.isClassic() ? 'text-xs text-slate-500 font-mono font-semibold' : 'text-xs text-zinc-400 font-mono'">Subtotal: {{ format(edgesCostBreakdown().totalEdgeCost) }}</span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <!-- Delgado 0.45mm -->
-          <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl flex items-center justify-between'">
+          <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl flex items-center justify-between gap-2'">
             <div>
               <span class="text-xs font-bold text-cyan-600 block">Canto Delgado (0.45mm)</span>
               <span [class]="themeService.isClassic() ? 'text-[11px] text-slate-500' : 'text-[11px] text-zinc-400'">{{ edgesCostBreakdown().thinMeters }} metros lineales consumidos</span>
             </div>
-            <div class="text-right">
+            <div class="text-right shrink-0">
               <span [class]="themeService.isClassic() ? 'text-xs font-mono font-bold text-slate-800' : 'text-xs font-mono font-bold text-zinc-100'">{{ format(edgesCostBreakdown().thinCost) }}</span>
               <span [class]="themeService.isClassic() ? 'text-[10px] text-slate-400 block' : 'text-[10px] text-zinc-500 block'">@ {{ format(edgesCostBreakdown().thinRate) }}/ml</span>
             </div>
           </div>
 
           <!-- Grueso 2.0mm -->
-          <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl flex items-center justify-between'">
+          <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl flex items-center justify-between gap-2'">
             <div>
               <span class="text-xs font-bold text-orange-600 block">Canto Grueso (2.0mm)</span>
               <span [class]="themeService.isClassic() ? 'text-[11px] text-slate-500' : 'text-[11px] text-zinc-400'">{{ edgesCostBreakdown().thickMeters }} metros lineales consumidos</span>
             </div>
-            <div class="text-right">
+            <div class="text-right shrink-0">
               <span [class]="themeService.isClassic() ? 'text-xs font-mono font-bold text-slate-800' : 'text-xs font-mono font-bold text-zinc-100'">{{ format(edgesCostBreakdown().thickCost) }}</span>
               <span [class]="themeService.isClassic() ? 'text-[10px] text-slate-400 block' : 'text-[10px] text-zinc-500 block'">@ {{ format(edgesCostBreakdown().thickRate) }}/ml</span>
             </div>
@@ -208,10 +208,10 @@
       </div>
 
       <!-- 3. HERRAJES Y ACCESORIOS -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg'">
-        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3'">
-          <h3 [class]="themeService.isClassic() ? 'text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
-            <hugeicons-icon [icon]="icons.hardware" [size]="17" [strokeWidth]="2" class="text-purple-500"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg'">
+        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+          <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
+            <hugeicons-icon [icon]="icons.hardware" [size]="17" [strokeWidth]="2" class="text-purple-500 shrink-0"></hugeicons-icon>
             <span>3. Herrajes, Correderas y Tornillería</span>
           </h3>
           <div class="flex items-center gap-2">
@@ -226,7 +226,7 @@
           </div>
         </div>
 
-        <div [class]="themeService.isClassic() ? 'overflow-x-auto border border-slate-200 rounded-xl max-h-64' : 'overflow-x-auto border border-zinc-800 rounded-xl max-h-64'">
+        <div [class]="themeService.isClassic() ? 'overflow-x-auto overflow-y-auto scrollbar-thin border border-slate-200 rounded-xl max-h-64 2xl:max-h-80' : 'overflow-x-auto overflow-y-auto scrollbar-thin border border-zinc-800 rounded-xl max-h-64 2xl:max-h-80'">
           <table class="w-full text-left text-xs">
             <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold sticky top-0 border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold sticky top-0'">
               <tr>
@@ -259,9 +259,9 @@
                       [value]="h.unitCost"
                       (change)="onHardwareCostChange(h, $event)"
                       aria-label="Costo unitario de herraje"
-                      [class]="themeService.isClassic() ? 'w-22 px-1.5 py-0.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-22 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
+                      [class]="themeService.isClassic() ? 'w-24 px-1.5 py-0.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-24 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
                   </td>
-                  <td [class]="themeService.isClassic() ? 'py-2 px-3 text-right font-mono font-semibold text-slate-800' : 'py-2 px-3 text-right font-mono font-semibold text-zinc-100'">
+                  <td [class]="themeService.isClassic() ? 'py-2 px-3 text-right font-mono font-semibold text-slate-800 whitespace-nowrap' : 'py-2 px-3 text-right font-mono font-semibold text-zinc-100 whitespace-nowrap'">
                     {{ format(h.quantity * h.unitCost) }}
                   </td>
                   <td class="py-2 px-2 text-right">
@@ -281,10 +281,10 @@
       </div>
 
       <!-- 4. ELECTRODOMÉSTICOS Y EQUIPAMIENTO 3D -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg'">
+      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg'">
         <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
-          <h3 [class]="themeService.isClassic() ? 'text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
-            <hugeicons-icon [icon]="icons.appliance" [size]="17" [strokeWidth]="2" class="text-emerald-600"></hugeicons-icon>
+          <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
+            <hugeicons-icon [icon]="icons.appliance" [size]="17" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
             <span>4. Electrodomésticos & Equipamiento 3D</span>
           </h3>
           <span [class]="themeService.isClassic() ? 'text-xs text-slate-500 font-mono font-semibold' : 'text-xs text-zinc-400 font-mono'">
@@ -293,13 +293,13 @@
         </div>
 
         @if (appliances().length === 0) {
-          <div [class]="themeService.isClassic() ? 'text-center py-6 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex flex-col items-center' : 'text-center py-6 px-4 bg-zinc-950 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center'">
+          <div [class]="themeService.isClassic() ? 'text-center py-5 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex flex-col items-center' : 'text-center py-5 px-4 bg-zinc-950 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center'">
             <hugeicons-icon [icon]="icons.appliance" [size]="28" [strokeWidth]="1.6" class="text-slate-400"></hugeicons-icon>
             <p [class]="themeService.isClassic() ? 'text-xs text-slate-500 mt-1' : 'text-xs text-zinc-400 mt-1'">No hay electrodomésticos colocados en el diseño 3D.</p>
             <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">Puedes añadirlos desde la pestaña "Equipos" en el Modelador 3D.</p>
           </div>
         } @else {
-          <div [class]="themeService.isClassic() ? 'overflow-x-auto border border-slate-200 rounded-xl' : 'overflow-x-auto border border-zinc-800 rounded-xl'">
+          <div [class]="themeService.isClassic() ? 'overflow-x-auto scrollbar-thin border border-slate-200 rounded-xl' : 'overflow-x-auto scrollbar-thin border border-zinc-800 rounded-xl'">
             <table class="w-full text-left text-xs">
               <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold'">
                 <tr>
@@ -323,11 +323,11 @@
                         </div>
                       </div>
                     </td>
-                    <td [class]="themeService.isClassic() ? 'py-2.5 px-2 font-mono text-[11px] text-slate-600' : 'py-2.5 px-2 font-mono text-[11px] text-zinc-300'">
+                    <td [class]="themeService.isClassic() ? 'py-2.5 px-2 font-mono text-[11px] text-slate-600 whitespace-nowrap' : 'py-2.5 px-2 font-mono text-[11px] text-zinc-300 whitespace-nowrap'">
                       {{ app.width }}×{{ app.depth }}×{{ app.height }} mm
                     </td>
                     <td class="py-2.5 px-2 text-[11px]">
-                      <span [class]="themeService.isClassic() ? 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700' : 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-800 text-zinc-300'">
+                      <span [class]="themeService.isClassic() ? 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700 whitespace-nowrap' : 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-800 text-zinc-300 whitespace-nowrap'">
                         {{ app.finish === 'stainless_steel' ? 'Acero Inox' : (app.finish === 'black_matte' ? 'Negro Mate' : (app.finish === 'white_gloss' ? 'Blanco Cristal' : (app.finish === 'gold_brass' ? 'Latón Dorado' : (app.finish === 'natural_wood' ? 'Madera Roble' : (app.finish === 'retro_red' ? 'Rojo Barista' : app.finish))))) }}
                       </span>
                     </td>
@@ -346,9 +346,9 @@
                         [value]="app.price"
                         (change)="onAppliancePriceChange(app.id, $event)"
                         aria-label="Precio unitario de electrodoméstico"
-                        [class]="themeService.isClassic() ? 'w-24 px-1.5 py-0.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-24 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
+                        [class]="themeService.isClassic() ? 'w-28 px-1.5 py-0.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-28 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
                     </td>
-                    <td class="py-2.5 px-3 text-right font-mono font-bold" [class.text-emerald-700]="app.includeInBudget" [class.text-slate-400]="!app.includeInBudget">
+                    <td class="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap" [class.text-emerald-700]="app.includeInBudget" [class.text-slate-400]="!app.includeInBudget">
                       {{ app.includeInBudget ? format(app.price) : 'Excluido' }}
                     </td>
                   </tr>
@@ -361,13 +361,13 @@
 
     </div>
 
-    <!-- COLUMNA DERECHA: Cálculo de Precio Final y Exportación de Cotización (4 cols) -->
-    <div class="lg:col-span-4 space-y-6">
+    <!-- COLUMNA DERECHA FIJA (Sticky): Cálculo de Precio Final y Exportación de Cotización (4 cols) -->
+    <div class="lg:col-span-4 lg:sticky lg:top-4 space-y-4 min-w-0">
 
       <!-- Tarjeta de Configuración de Márgenes y Estructura de Precios -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg space-y-4'">
-        <h3 [class]="themeService.isClassic() ? 'text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2' : 'text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2'">
-          <hugeicons-icon [icon]="icons.calculate" [size]="17" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs space-y-3.5' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg space-y-3.5'">
+        <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2' : 'text-xs xl:text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2'">
+          <hugeicons-icon [icon]="icons.calculate" [size]="17" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
           <span>Estructura de Precios</span>
         </h3>
 
@@ -383,12 +383,13 @@
               [value]="project().laborCost"
               (change)="onLaborCostChange($event)"
               aria-label="Costo de mano de obra"
-              [class]="themeService.isClassic() ? 'w-24 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800' : 'w-24 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white'" />
+              [class]="themeService.isClassic() ? 'w-28 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 font-mono' : 'w-28 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white font-mono'" />
+
             <select
               [value]="project().laborType"
               (change)="onLaborTypeChange($event)"
               aria-label="Tipo de cálculo de mano de obra"
-              [class]="themeService.isClassic() ? 'flex-1 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800' : 'flex-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white'">
+              [class]="themeService.isClassic() ? 'flex-1 min-w-0 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800' : 'flex-1 min-w-0 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white'">
               <option value="fixed">Monto Fijo ({{ settings().currency }})</option>
               <option value="percent">% sobre Materiales</option>
             </select>
@@ -426,13 +427,13 @@
               [value]="project().taxPercent"
               (change)="onTaxChange($event)"
               aria-label="Porcentaje de impuesto o IVA"
-              [class]="themeService.isClassic() ? 'w-20 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-center' : 'w-20 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-center'" />
+              [class]="themeService.isClassic() ? 'w-20 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-center font-mono' : 'w-20 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-center font-mono'" />
             <span [class]="themeService.isClassic() ? 'text-xs text-slate-400' : 'text-xs text-zinc-500'">% sobre subtotal</span>
           </div>
         </div>
 
         <!-- RESUMEN TOTAL FINAL -->
-        <div [class]="themeService.isClassic() ? 'pt-4 border-t border-slate-100 space-y-2 text-xs' : 'pt-4 border-t border-zinc-800 space-y-2 text-xs'">
+        <div [class]="themeService.isClassic() ? 'pt-3.5 border-t border-slate-100 space-y-2 text-xs' : 'pt-3.5 border-t border-zinc-800 space-y-2 text-xs'">
           <div [class]="themeService.isClassic() ? 'flex justify-between text-slate-500' : 'flex justify-between text-zinc-400'">
             <span>Costo Total Materiales:</span>
             <span class="font-mono">{{ format(totalMaterialsCost()) }}</span>
@@ -455,14 +456,15 @@
               <span class="font-mono">+{{ format(taxAmount()) }}</span>
             </div>
           }
-          <div [class]="themeService.isClassic() ? 'pt-3 border-t-2 border-amber-500/30 flex justify-between items-center text-sm font-bold text-slate-900' : 'pt-3 border-t-2 border-amber-500/30 flex justify-between items-center text-sm font-bold text-white'">
+
+          <div [class]="themeService.isClassic() ? 'pt-3 border-t-2 border-amber-500/30 flex justify-between items-center text-sm font-bold text-slate-900 gap-2' : 'pt-3 border-t-2 border-amber-500/30 flex justify-between items-center text-sm font-bold text-white gap-2'">
             <span>PRECIO AL CLIENTE:</span>
-            <span class="text-xl font-black text-amber-600 font-mono">{{ format(finalClientPrice()) }}</span>
+            <span class="text-lg xl:text-xl font-black text-amber-600 font-mono truncate">{{ format(finalClientPrice()) }}</span>
           </div>
         </div>
 
         <!-- Botones de Acción -->
-        <div class="pt-2 space-y-2">
+        <div class="pt-1.5 space-y-2">
           <button
             type="button"
             (click)="showClientQuotation.set(!showClientQuotation())"
@@ -479,22 +481,20 @@
             <span>Imprimir Cotización PDF</span>
           </button>
         </div>
-
       </div>
 
     </div>
 
   </div>
 
-  <!-- HOJA DE COTIZACIÓN FORMAL PARA EL CLIENTE (LISTA PARA IMPRIMIR) -->
+  <!-- HOJA DE COTIZACIÓN FORMAL PARA EL CLIENTE (CENTRADA EN MONITORES 2K Y LISTA PARA IMPRIMIR) -->
   @if (showClientQuotation()) {
-    <div class="bg-white text-zinc-900 rounded-2xl p-8 shadow-xl border border-slate-200 print:border-none print:shadow-none print:m-0 print:p-0">
-
+    <div class="w-full max-w-5xl mx-auto print:max-w-none bg-white text-zinc-900 rounded-2xl p-6 sm:p-8 shadow-xl border border-slate-200 print:border-none print:shadow-none print:m-0 print:p-0">
       <!-- Cabecera de Cotización -->
       <div class="flex items-center justify-between pb-6 border-b-2 border-zinc-900">
         <div>
-          <h2 class="text-2xl font-black tracking-tight text-zinc-950">PRESUPUESTO DE CARPINTERÍA</h2>
-          <p class="text-sm font-medium text-zinc-600 mt-1">Muebles a Medida en Melamina de Alta Densidad · Piezo3D Studio</p>
+          <h2 class="text-xl sm:text-2xl font-black tracking-tight text-zinc-950">PRESUPUESTO DE CARPINTERÍA</h2>
+          <p class="text-xs sm:text-sm font-medium text-zinc-600 mt-1">Muebles a Medida en Melamina de Alta Densidad · Piezo3D Studio</p>
         </div>
         <div class="text-right text-xs">
           <p class="font-bold text-zinc-800">Fecha: {{ project().date }}</p>
@@ -503,13 +503,13 @@
       </div>
 
       <!-- Datos del Cliente y Proyecto -->
-      <div class="grid grid-cols-2 gap-4 py-4 border-b border-zinc-200 text-xs">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4 border-b border-zinc-200 text-xs">
         <div>
           <p class="font-bold text-zinc-700 uppercase">Cliente:</p>
           <p class="text-base font-bold text-zinc-900">{{ project().clientName || 'Cliente Particular' }}</p>
           <p class="text-zinc-600 mt-1">Proyecto: <strong class="text-zinc-800">{{ project().name }}</strong></p>
         </div>
-        <div class="text-right">
+        <div class="sm:text-right">
           <p class="font-bold text-zinc-700 uppercase">Resumen Técnico:</p>
           <p class="text-zinc-800">{{ project().modules.length }} módulos incluidos ({{ project().parts.length }} piezas)</p>
           <p class="text-zinc-600">Correderas telescópicas y bisagras de cierre suave</p>
@@ -578,7 +578,7 @@
       </div>
 
       <!-- Condiciones Comerciales y Firma -->
-      <div class="pt-8 border-t border-zinc-200 grid grid-cols-2 gap-8 text-[11px] text-zinc-600">
+      <div class="pt-8 border-t border-zinc-200 grid grid-cols-1 sm:grid-cols-2 gap-8 text-[11px] text-zinc-600">
         <div>
           <p class="font-bold text-zinc-800 mb-1">Condiciones Comerciales:</p>
           <ul class="list-disc list-inside space-y-0.5">
@@ -593,14 +593,13 @@
           <span class="text-zinc-700 font-semibold">Firma del Taller / Carpintero</span>
         </div>
       </div>
-
     </div>
   }
 
   <!-- MODAL: AGREGAR HERRAJE -->
   @if (showAddHardwareModal()) {
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl p-6 text-slate-800' : 'bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl p-6 text-zinc-100'">
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
+      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl p-5 sm:p-6 text-slate-800 max-h-[88dvh] overflow-y-auto scrollbar-thin' : 'bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl p-5 sm:p-6 text-zinc-100 max-h-[88dvh] overflow-y-auto scrollbar-thin'">
         <div [class]="themeService.isClassic() ? 'flex items-center justify-between pb-3 border-b border-slate-100' : 'flex items-center justify-between pb-3 border-b border-zinc-800'">
           <h3 class="text-base font-bold flex items-center gap-2">
             <hugeicons-icon [icon]="icons.hardware" [size]="19" [strokeWidth]="2" class="text-purple-500"></hugeicons-icon>

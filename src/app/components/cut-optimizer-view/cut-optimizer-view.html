@@ -1,28 +1,28 @@
-<div class="w-full px-3 sm:px-6 py-4 space-y-5">
+<div class="w-full px-3 sm:px-5 2xl:px-6 py-3 xl:py-4 space-y-3.5 xl:space-y-4">
 
   <!-- Banner Superior de Estadísticas Globales de Optimización -->
-  <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg'">
-    <div [class]="themeService.isClassic() ? 'flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100' : 'flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-zinc-800'">
+  <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5 sm:p-4 2xl:p-5 shadow-lg'">
+    <div [class]="themeService.isClassic() ? 'flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100' : 'flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-zinc-800'">
       <div>
         <div class="flex items-center gap-2">
-          <hugeicons-icon [icon]="icons.optimizer" [size]="22" [strokeWidth]="1.8" class="text-amber-500 shrink-0"></hugeicons-icon>
-          <h2 [class]="themeService.isClassic() ? 'text-xl font-bold text-slate-800' : 'text-xl font-bold text-white'">Optimizador de Corte 2D Guillotina</h2>
-          <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 font-semibold border border-emerald-500/30">
+          <hugeicons-icon [icon]="icons.optimizer" [size]="20" [strokeWidth]="1.8" class="text-amber-500 shrink-0"></hugeicons-icon>
+          <h2 [class]="themeService.isClassic() ? 'text-base xl:text-lg 2xl:text-xl font-bold text-slate-800' : 'text-base xl:text-lg 2xl:text-xl font-bold text-white'">Optimizador de Corte 2D Guillotina</h2>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 font-semibold border border-emerald-500/30">
             Algoritmo Activo
           </span>
         </div>
-        <p [class]="themeService.isClassic() ? 'text-xs text-slate-500 mt-1' : 'text-xs text-zinc-400 mt-1'">
+        <p [class]="themeService.isClassic() ? 'text-xs text-slate-500 mt-0.5' : 'text-xs text-zinc-400 mt-0.5'">
           Cortes continuos de borde a borde para escuadradora / sierra de mesa. Respeto estricto de veta, ancho de disco ({{ settings().sawKerf }}mm) y refilado perimetral ({{ settings().trimMargin }}mm).
         </p>
       </div>
 
       <!-- Botones de Acción: Imprimir y Descargar (PNG / PDF) -->
-      <div class="flex items-center gap-2.5 print:hidden">
+      <div class="flex items-center gap-2 print:hidden shrink-0">
         <!-- Botón Imprimir Diagrama -->
         <button
           type="button"
           (click)="printCurrentSheet()"
-          [class]="themeService.isClassic() ? 'px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium text-xs rounded-xl flex items-center gap-2 transition shadow-xs cursor-pointer' : 'px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-xl flex items-center gap-2 transition shadow-xs cursor-pointer'">
+          [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer'">
           <hugeicons-icon [icon]="icons.print" [size]="15" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
           <span>Imprimir Diagrama</span>
         </button>
@@ -33,7 +33,7 @@
             type="button"
             (click)="toggleDownloadMenu()"
             [disabled]="isExporting()"
-            [class]="themeService.isClassic() ? 'px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-2 transition shadow-sm cursor-pointer' : 'px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-2 transition shadow-sm cursor-pointer'">
+            [class]="themeService.isClassic() ? 'px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-sm cursor-pointer' : 'px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-sm cursor-pointer'">
             @if (isExporting()) {
               <hugeicons-icon [icon]="icons.loading" [size]="15" [strokeWidth]="2" class="animate-spin"></hugeicons-icon>
               <span>Procesando...</span>
@@ -88,19 +88,18 @@
     </div>
 
     <!-- Tarjetas de Métricas Rápidas -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
-
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 xl:gap-3 mt-3">
       <!-- Placas Usadas -->
-      <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
+      <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
         <span [class]="themeService.isClassic() ? 'text-[10px] font-semibold text-slate-500 uppercase tracking-wider block' : 'text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block'">Tableros Enteros</span>
-        <span [class]="themeService.isClassic() ? 'text-lg font-bold text-slate-800' : 'text-lg font-bold text-white'">{{ optimizationResult().totalSheetsUsed }} <span [class]="themeService.isClassic() ? 'text-xs text-slate-400 font-normal' : 'text-xs text-zinc-500 font-normal'">placas</span></span>
+        <span [class]="themeService.isClassic() ? 'text-base xl:text-lg font-bold text-slate-800' : 'text-base xl:text-lg font-bold text-white'">{{ optimizationResult().totalSheetsUsed }} <span [class]="themeService.isClassic() ? 'text-xs text-slate-400 font-normal' : 'text-xs text-zinc-500 font-normal'">placas</span></span>
       </div>
 
       <!-- Eficiencia General -->
-      <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
+      <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
         <span [class]="themeService.isClassic() ? 'text-[10px] font-semibold text-slate-500 uppercase tracking-wider block' : 'text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block'">Aprovechamiento</span>
         <div class="flex items-center gap-1.5">
-          <span class="text-lg font-bold text-emerald-600">{{ optimizationResult().overallEfficiency }}%</span>
+          <span class="text-base xl:text-lg font-bold text-emerald-600">{{ optimizationResult().overallEfficiency }}%</span>
           <div [class]="themeService.isClassic() ? 'w-12 h-2 bg-slate-200 rounded-full overflow-hidden' : 'w-12 h-2 bg-zinc-800 rounded-full overflow-hidden'">
             <div class="h-full bg-emerald-500 rounded-full" [style.width.%]="optimizationResult().overallEfficiency"></div>
           </div>
@@ -108,35 +107,34 @@
       </div>
 
       <!-- Desperdicio / Merma -->
-      <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
+      <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
         <span [class]="themeService.isClassic() ? 'text-[10px] font-semibold text-slate-500 uppercase tracking-wider block' : 'text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block'">Merma / Desecho</span>
-        <span class="text-lg font-bold text-rose-500">{{ optimizationResult().wasteAreaM2 }} <span [class]="themeService.isClassic() ? 'text-xs text-slate-400 font-normal' : 'text-xs text-zinc-500 font-normal'">m²</span></span>
+        <span class="text-base xl:text-lg font-bold text-rose-500">{{ optimizationResult().wasteAreaM2 }} <span [class]="themeService.isClassic() ? 'text-xs text-slate-400 font-normal' : 'text-xs text-zinc-500 font-normal'">m²</span></span>
       </div>
 
       <!-- Piezas Colocadas -->
-      <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
+      <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
         <span [class]="themeService.isClassic() ? 'text-[10px] font-semibold text-slate-500 uppercase tracking-wider block' : 'text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block'">Piezas Colocadas</span>
-        <span class="text-lg font-bold text-amber-500">{{ optimizationResult().totalPartsPlaced }} / {{ optimizationResult().totalPartsCount }}</span>
+        <span class="text-base xl:text-lg font-bold text-amber-500">{{ optimizationResult().totalPartsPlaced }} / {{ optimizationResult().totalPartsCount }}</span>
       </div>
 
       <!-- Sierra / Corte Metros -->
-      <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
+      <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
         <span [class]="themeService.isClassic() ? 'text-[10px] font-semibold text-slate-500 uppercase tracking-wider block' : 'text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block'">Corte de Sierra</span>
-        <span class="text-lg font-bold text-cyan-600">{{ optimizationResult().totalCutMeters }} <span [class]="themeService.isClassic() ? 'text-xs text-slate-400 font-normal' : 'text-xs text-zinc-500 font-normal'">ml</span></span>
+        <span class="text-base xl:text-lg font-bold text-cyan-600">{{ optimizationResult().totalCutMeters }} <span [class]="themeService.isClassic() ? 'text-xs text-slate-400 font-normal' : 'text-xs text-zinc-500 font-normal'">ml</span></span>
       </div>
 
       <!-- Tapacanto total -->
-      <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
+      <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-slate-50 border border-slate-200 rounded-xl' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl'">
         <span [class]="themeService.isClassic() ? 'text-[10px] font-semibold text-slate-500 uppercase tracking-wider block' : 'text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block'">Total Tapacantos</span>
-        <span class="text-lg font-bold text-orange-500">{{ (optimizationResult().thinEdgeMeters + optimizationResult().thickEdgeMeters).toFixed(1) }} <span [class]="themeService.isClassic() ? 'text-xs text-slate-400 font-normal' : 'text-xs text-zinc-500 font-normal'">ml</span></span>
+        <span class="text-base xl:text-lg font-bold text-orange-500">{{ (optimizationResult().thinEdgeMeters + optimizationResult().thickEdgeMeters).toFixed(1) }} <span [class]="themeService.isClassic() ? 'text-xs text-slate-400 font-normal' : 'text-xs text-zinc-500 font-normal'">ml</span></span>
       </div>
-
     </div>
   </div>
 
   @if (optimizationResult().sheets.length > 0) {
     <!-- SELECTOR DE PESTAÑAS DE TABLEROS (Oculto al imprimir) -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none print:hidden">
+    <div class="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none print:hidden">
       @for (sheet of optimizationResult().sheets; track sheet.sheetIndex; let sIdx = $index) {
         <button
           type="button"
@@ -144,7 +142,7 @@
           [class]="selectedSheetIndex() === sIdx
             ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md font-bold'
             : (themeService.isClassic() ? 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 font-medium shadow-xs' : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 font-medium')"
-          class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs whitespace-nowrap transition cursor-pointer">
+          class="flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs whitespace-nowrap transition cursor-pointer">
           <hugeicons-icon [icon]="icons.board" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           <span>Tablero #{{ sheet.sheetIndex }}: {{ sheet.material.name }}</span>
           <span [class]="selectedSheetIndex() === sIdx ? 'bg-zinc-950/20 text-zinc-950' : (themeService.isClassic() ? 'bg-slate-100 text-slate-600' : 'bg-zinc-800 text-zinc-400')" class="px-1.5 py-0.5 rounded text-[10px]">
@@ -158,12 +156,12 @@
     @if (currentSheet(); as sheet) {
       <div
         id="print-sheet-wrapper"
-        [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg space-y-4'">
+        [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 2xl:p-5 shadow-xs space-y-3.5' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5 sm:p-4 2xl:p-5 shadow-lg space-y-3.5'">
 
         <!-- Membrete Técnico de Impresión (Visible SOLO al imprimir o guardar PDF) -->
         <div class="hidden print:flex flex-row justify-between items-end border-b-2 border-slate-900 pb-2 mb-2">
           <div>
-            <h1 class="text-lg font-black text-slate-900 tracking-tight">PLANO DE CORTE TÉCNICO • TABLERO #{{ sheet.sheetIndex }}</h1>
+            <h1 class="text-lg font-black text-slate-900 tracking-tight">PLANO DE CORTE TÉCNICO · TABLERO #{{ sheet.sheetIndex }}</h1>
             <p class="text-xs text-slate-600">
               <strong>Proyecto:</strong> {{ project().name || 'Proyecto Cocina' }} &nbsp;|&nbsp;
               <strong>Material:</strong> {{ sheet.material.name }} ({{ sheet.material.thickness }} mm)
@@ -171,15 +169,15 @@
           </div>
           <div class="text-right text-xs font-mono font-bold text-slate-900">
             <div>Dimensión: {{ sheet.length }} × {{ sheet.width }} mm</div>
-            <div class="text-sky-700">Aprovechamiento: {{ sheet.efficiencyPercent }}% • Piezas: {{ sheet.placedParts.length }} • Sierra: {{ sheet.cutLengthMeters }} ml</div>
+            <div class="text-sky-700">Aprovechamiento: {{ sheet.efficiencyPercent }}% · Piezas: {{ sheet.placedParts.length }} · Sierra: {{ sheet.cutLengthMeters }} ml</div>
           </div>
         </div>
 
         <!-- Información de Cabecera del Tablero y Controles de Zoom -->
-        <div [class]="themeService.isClassic() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 print:hidden' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800 print:hidden'">
+        <div [class]="themeService.isClassic() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100 print:hidden' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-zinc-800 print:hidden'">
           <div>
-            <div class="flex items-center gap-2">
-              <h3 [class]="themeService.isClassic() ? 'text-base font-bold text-slate-800' : 'text-base font-bold text-white'">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 [class]="themeService.isClassic() ? 'text-sm xl:text-base font-bold text-slate-800' : 'text-sm xl:text-base font-bold text-white'">
                 Plano de Corte - Tablero #{{ sheet.sheetIndex }}
               </h3>
               <span [class]="themeService.isClassic() ? 'text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-mono' : 'text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono'">
@@ -187,12 +185,12 @@
               </span>
             </div>
             <p [class]="themeService.isClassic() ? 'text-xs text-slate-500 mt-0.5' : 'text-xs text-zinc-400 mt-0.5'">
-              {{ sheet.placedParts.length }} piezas ubicadas • {{ sheet.cutLengthMeters }} ml de corte • {{ sheet.usedAreaM2 }} m² utilizados
+              {{ sheet.placedParts.length }} piezas ubicadas · {{ sheet.cutLengthMeters }} ml de corte · {{ sheet.usedAreaM2 }} m² utilizados
             </p>
           </div>
 
           <!-- Controles de Zoom (Ocultos al imprimir) -->
-          <div class="flex items-center gap-2 print:hidden">
+          <div class="flex items-center gap-1.5 print:hidden shrink-0">
             <button
               type="button"
               (click)="zoomOut()"
@@ -200,7 +198,7 @@
               title="Alejar">
               <hugeicons-icon [icon]="icons.zoomOut" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             </button>
-            <span [class]="themeService.isClassic() ? 'text-xs text-slate-600 font-mono px-1' : 'text-xs text-zinc-400 font-mono px-1'">{{ (zoomLevel() * 100).toFixed(0) }}%</span>
+            <span [class]="themeService.isClassic() ? 'text-xs text-slate-600 font-mono px-1.5' : 'text-xs text-zinc-400 font-mono px-1.5'">{{ (zoomLevel() * 100).toFixed(0) }}%</span>
             <button
               type="button"
               (click)="zoomIn()"
@@ -211,304 +209,312 @@
             <button
               type="button"
               (click)="resetZoom()"
-              [class]="themeService.isClassic() ? 'p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 text-xs font-semibold px-2 cursor-pointer' : 'p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700 text-xs font-semibold px-2 cursor-pointer'"
+              [class]="themeService.isClassic() ? 'p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 text-xs font-semibold px-2.5 cursor-pointer' : 'p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700 text-xs font-semibold px-2.5 cursor-pointer'"
               title="Ajustar">
               Reset
             </button>
           </div>
         </div>
 
-        <!-- LIENZO SVG DEL TABLERO -->
-        <div
-          id="print-sheet-canvas-container"
-          [class]="themeService.isClassic() ? 'w-full bg-slate-100 rounded-xl border border-slate-200 overflow-auto p-4 flex justify-center items-center min-h-105' : 'w-full bg-zinc-950 rounded-xl border border-zinc-800 overflow-auto p-4 flex justify-center items-center min-h-105'">
+        <!-- GRILLA ADAPTATIVA: APILADA EN HD (1280px) Y LADO A LADO EN FHD (1920px) / 2K (2560px) -->
+        <div class="grid grid-cols-1 2xl:grid-cols-12 gap-4 items-start">
 
-          <div
-            id="print-sheet-inner-zoom"
-            [style.transform]="'scale(' + zoomLevel() + ')'"
-            class="origin-center transition-transform duration-200">
+          <!-- COLUMNA IZQUIERDA (8 cols en FHD/2K): LIENZO SVG DEL TABLERO + TOOLTIP -->
+          <div class="2xl:col-span-8 space-y-3 min-w-0">
+            <div
+              id="print-sheet-canvas-container"
+              [class]="themeService.isClassic() ? 'w-full bg-slate-100 rounded-xl border border-slate-200 overflow-auto scrollbar-thin p-2.5 sm:p-4 flex justify-center items-center' : 'w-full bg-zinc-950 rounded-xl border border-zinc-800 overflow-auto scrollbar-thin p-2.5 sm:p-4 flex justify-center items-center'">
+              <div
+                id="print-sheet-inner-zoom"
+                [style.transform]="'scale(' + zoomLevel() + ')'"
+                class="origin-center transition-transform duration-200 flex justify-center items-center w-full">
 
-            @let canvasW = 1000;
-            @let canvasH = (sheet.width / sheet.length) * 1000;
-            @let scaleFactor = canvasW / sheet.length;
-            @let trimPx = settings().trimMargin * scaleFactor;
+                @let canvasW = 1000;
+                @let canvasH = (sheet.width / sheet.length) * 1000;
+                @let scaleFactor = canvasW / sheet.length;
+                @let trimPx = settings().trimMargin * scaleFactor;
 
-            <svg
-              id="sheet-cut-diagram-svg"
-              [attr.width]="canvasW"
-              [attr.height]="canvasH"
-              [attr.viewBox]="'0 0 ' + canvasW + ' ' + canvasH"
-              class="print-board-svg shadow-2xl border-2 border-zinc-700 rounded select-none bg-zinc-900"
-              style="display: block; max-width: 100%;">
+                <svg
+                  id="sheet-cut-diagram-svg"
+                  [attr.width]="canvasW"
+                  [attr.height]="canvasH"
+                  [attr.viewBox]="'0 0 ' + canvasW + ' ' + canvasH"
+                  class="print-board-svg board-svg-responsive shadow-2xl border-2 border-zinc-700 rounded select-none bg-zinc-900">
 
-              <defs>
-                <!-- Textura de veta de madera para las piezas colocadas -->
-                <pattern id="sheetWoodTexture" width="60" height="60" patternUnits="userSpaceOnUse">
-                  <rect width="60" height="60" [attr.fill]="sheet.material.colorHex" />
-                  <path d="M 0 15 Q 30 18, 60 15 M 0 35 Q 30 32, 60 35 M 0 52 Q 30 55, 60 52" stroke="#000" stroke-width="0.8" opacity="0.12" fill="none" />
-                </pattern>
+                  <defs>
+                    <!-- Textura de veta de madera para las piezas colocadas -->
+                    <pattern id="sheetWoodTexture" width="60" height="60" patternUnits="userSpaceOnUse">
+                      <rect width="60" height="60" [attr.fill]="sheet.material.colorHex" />
+                      <path d="M 0 15 Q 30 18, 60 15 M 0 35 Q 30 32, 60 35 M 0 52 Q 30 55, 60 52" stroke="#000" stroke-width="0.8" opacity="0.12" fill="none" />
+                    </pattern>
 
-                <!-- Patrón achurado para retazos sobrantes -->
-                <pattern id="scrapHatch" width="12" height="12" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-                  <line x1="0" y1="0" x2="0" y2="12" stroke="#94a3b8" stroke-width="1.5" />
-                </pattern>
-              </defs>
+                    <!-- Patrón achurado para retazos sobrantes -->
+                    <pattern id="scrapHatch" width="12" height="12" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                      <line x1="0" y1="0" x2="0" y2="12" stroke="#94a3b8" stroke-width="1.5" />
+                    </pattern>
+                  </defs>
 
-              <!-- Tablero Crudo (Fondo) -->
-              <rect x="0" y="0" [attr.width]="canvasW" [attr.height]="canvasH" [attr.fill]="themeService.isClassic() ? '#cbd5e1' : '#27272a'" />
+                  <!-- Tablero Crudo (Fondo) -->
+                  <rect x="0" y="0" [attr.width]="canvasW" [attr.height]="canvasH" [attr.fill]="themeService.isClassic() ? '#cbd5e1' : '#27272a'" />
 
-              <!-- Margen de refilado perimetral (Línea punteada) -->
-              @if (trimPx > 0) {
-                <rect
-                  [attr.x]="trimPx"
-                  [attr.y]="trimPx"
-                  [attr.width]="canvasW - (2 * trimPx)"
-                  [attr.height]="canvasH - (2 * trimPx)"
-                  [attr.fill]="themeService.isClassic() ? '#e2e8f0' : '#18181b'"
-                  stroke="#ef4444"
-                  stroke-dasharray="4,4"
-                  stroke-width="1" />
-              }
-
-              <!-- SOBRANTES / RETAZOS ÚTILES (ACHURADOS) -->
-              @for (scrap of sheet.leftovers; track scrap.id) {
-                @let sx = scrap.x * scaleFactor;
-                @let sy = scrap.y * scaleFactor;
-                @let sw = scrap.length * scaleFactor;
-                @let sh = scrap.width * scaleFactor;
-
-                <g>
-                  <rect
-                    [attr.x]="sx"
-                    [attr.y]="sy"
-                    [attr.width]="sw"
-                    [attr.height]="sh"
-                    fill="url(#scrapHatch)"
-                    opacity="0.35"
-                    stroke="#64748b"
-                    stroke-width="0.5" />
-
-                  @if (sw > 50 && sh > 30) {
-                    <text
-                      [attr.x]="sx + (sw / 2)"
-                      [attr.y]="sy + (sh / 2)"
-                      text-anchor="middle"
-                      font-size="7"
-                      fill="#94a3b8"
-                      font-family="monospace">
-                      Retazo ({{ scrap.length }}×{{ scrap.width }})
-                    </text>
-                  }
-                </g>
-              }
-
-              <!-- PIEZAS COLOCADAS -->
-              @for (placed of sheet.placedParts; track placed.tag) {
-                @let px = placed.x * scaleFactor;
-                @let py = placed.y * scaleFactor;
-                @let pw = placed.length * scaleFactor;
-                @let ph = placed.width * scaleFactor;
-
-                <g
-                  class="cursor-pointer transition-opacity"
-                  (mouseenter)="hoveredPart.set(placed)"
-                  (mouseleave)="hoveredPart.set(null)">
-
-                  <!-- Fondo de la pieza -->
-                  <rect
-                    [attr.x]="px"
-                    [attr.y]="py"
-                    [attr.width]="pw"
-                    [attr.height]="ph"
-                    fill="url(#sheetWoodTexture)"
-                    stroke="#000000"
-                    stroke-width="1.2" />
-
-                  <!-- Resalte interactivo al posar el cursor -->
-                  @if (hoveredPart()?.tag === placed.tag) {
+                  <!-- Margen de refilado perimetral (Línea punteada) -->
+                  @if (trimPx > 0) {
                     <rect
-                      [attr.x]="px"
-                      [attr.y]="py"
-                      [attr.width]="pw"
-                      [attr.height]="ph"
-                      fill="#f59e0b"
-                      opacity="0.3"
-                      stroke="#fbbf24"
-                      stroke-width="2" />
+                      [attr.x]="trimPx"
+                      [attr.y]="trimPx"
+                      [attr.width]="canvasW - (2 * trimPx)"
+                      [attr.height]="canvasH - (2 * trimPx)"
+                      [attr.fill]="themeService.isClassic() ? '#e2e8f0' : '#18181b'"
+                      stroke="#ef4444"
+                      stroke-dasharray="4,4"
+                      stroke-width="1" />
                   }
 
-                  <!-- Indicadores de tapacantos -->
-                  @if (placed.part.edges.l1 !== 'none') {
-                    <line [attr.x1]="px" [attr.y1]="py + 1" [attr.x2]="px + pw" [attr.y2]="py + 1"
-                          [attr.stroke]="placed.part.edges.l1 === 'thick' ? '#06b6d4' : '#38bdf8'"
-                          [attr.stroke-width]="placed.part.edges.l1 === 'thick' ? '3' : '1.5'" />
-                  }
-                  @if (placed.part.edges.l2 !== 'none') {
-                    <line [attr.x1]="px" [attr.y1]="py + ph - 1" [attr.x2]="px + pw" [attr.y2]="py + ph - 1"
-                          [attr.stroke]="placed.part.edges.l2 === 'thick' ? '#06b6d4' : '#38bdf8'"
-                          [attr.stroke-width]="placed.part.edges.l2 === 'thick' ? '3' : '1.5'" />
-                  }
-                  @if (placed.part.edges.a1 !== 'none') {
-                    <line [attr.x1]="px + 1" [attr.y1]="py" [attr.x2]="px + 1" [attr.y2]="py + ph"
-                          [attr.stroke]="placed.part.edges.a1 === 'thick' ? '#f97316' : '#fb923c'"
-                          [attr.stroke-width]="placed.part.edges.a1 === 'thick' ? '3' : '1.5'" />
-                  }
-                  @if (placed.part.edges.a2 !== 'none') {
-                    <line [attr.x1]="px + pw - 1" [attr.y1]="py" [attr.x2]="px + pw - 1" [attr.y2]="py + ph"
-                          [attr.stroke]="placed.part.edges.a2 === 'thick' ? '#f97316' : '#fb923c'"
-                          [attr.stroke-width]="placed.part.edges.a2 === 'thick' ? '3' : '1.5'" />
-                  }
+                  <!-- SOBRANTES / RETAZOS ÚTILES (ACHURADOS) -->
+                  @for (scrap of sheet.leftovers; track scrap.id) {
+                    @let sx = scrap.x * scaleFactor;
+                    @let sy = scrap.y * scaleFactor;
+                    @let sw = scrap.length * scaleFactor;
+                    @let sh = scrap.width * scaleFactor;
 
-                  <!-- Textos dentro de la pieza -->
-                  @if (pw > 30 && ph > 18) {
-                    <text
-                      [attr.x]="px + 6"
-                      [attr.y]="py + 12"
-                      font-size="9"
-                      font-weight="bold"
-                      fill="#ffffff"
-                      style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
-                      {{ placed.tag }}
-                    </text>
+                    <g>
+                      <rect
+                        [attr.x]="sx"
+                        [attr.y]="sy"
+                        [attr.width]="sw"
+                        [attr.height]="sh"
+                        fill="url(#scrapHatch)"
+                        opacity="0.35"
+                        stroke="#64748b"
+                        stroke-width="0.5" />
 
-                    @if (pw > 70 && ph > 32) {
-                      <text
-                        [attr.x]="px + (pw / 2)"
-                        [attr.y]="py + (ph / 2) - 3"
-                        text-anchor="middle"
-                        font-size="8.5"
-                        font-weight="bold"
-                        fill="#ffffff"
-                        style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
-                        {{ placed.part.name }}
-                      </text>
-                    }
-
-                    <text
-                      [attr.x]="px + (pw / 2)"
-                      [attr.y]="py + (ph / 2) + 8"
-                      text-anchor="middle"
-                      font-size="8"
-                      font-family="monospace"
-                      font-weight="bold"
-                      fill="#fde68a"
-                      style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
-                      {{ placed.length }} × {{ placed.width }}
-                    </text>
-
-                    @if (placed.part.grain !== 'none' && pw > 80 && ph > 45) {
-                      <text
-                        [attr.x]="px + pw - 12"
-                        [attr.y]="py + 12"
-                        font-size="8"
-                        fill="#cbd5e1"
-                        font-weight="bold">
-                        {{ placed.rotated ? '↕' : '↔' }}
-                      </text>
-                    }
-                  }
-                </g>
-              }
-
-              <!-- LÍNEAS DE CORTE GUILLOTINA NUMERADAS -->
-              @for (line of sheet.cutLines; track line.stage) {
-                @let lx1 = line.x1 * scaleFactor;
-                @let ly1 = line.y1 * scaleFactor;
-                @let lx2 = line.x2 * scaleFactor;
-                @let ly2 = line.y2 * scaleFactor;
-
-                <g opacity="0.85">
-                  <line
-                    [attr.x1]="lx1"
-                    [attr.y1]="ly1"
-                    [attr.x2]="lx2"
-                    [attr.y2]="ly2"
-                    stroke="#ffffff"
-                    stroke-width="1.2"
-                    stroke-dasharray="3,2" />
-
-                  @let midX = (lx1 + lx2) / 2;
-                  @let midY = (ly1 + ly2) / 2;
-                  <circle [attr.cx]="midX" [attr.cy]="midY" r="5" fill="#f59e0b" stroke="#000" stroke-width="0.5" />
-                  <text [attr.x]="midX" [attr.y]="midY + 2.5" text-anchor="middle" font-size="5.5" font-weight="bold" fill="#000">
-                    {{ line.stage }}
-                  </text>
-                </g>
-              }
-
-            </svg>
-          </div>
-        </div>
-
-        <!-- Tooltip de Pieza Bajo el Cursor -->
-        @if (hoveredPart(); as hp) {
-          <div [class]="themeService.isClassic() ? 'p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-slate-800' : 'p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-zinc-200'">
-            <div class="flex items-center gap-3">
-              <span class="px-2 py-0.5 rounded bg-amber-500 text-zinc-950 font-bold font-mono">{{ hp.tag }}</span>
-              <div>
-                <span [class]="themeService.isClassic() ? 'font-bold text-slate-900' : 'font-bold text-white'">{{ hp.part.name }}</span>
-                <span [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'"> ({{ hp.part.moduleName || hp.part.groupName || 'Manual' }})</span>
-              </div>
-              <span class="font-mono text-amber-600 font-bold">{{ hp.length }} × {{ hp.width }} × {{ hp.part.thickness }} mm</span>
-            </div>
-            <div class="flex items-center gap-3 text-[11px]">
-              <span>Veta: <strong [class]="themeService.isClassic() ? 'text-slate-800' : 'text-zinc-100'">{{ hp.part.grain === 'length' ? 'Longitudinal' : hp.part.grain === 'width' ? 'Transversal' : 'Libre' }}</strong></span>
-              <span>Cantos: <strong class="text-cyan-600">L1: {{ hp.part.edges.l1 }}, L2: {{ hp.part.edges.l2 }}, A1: {{ hp.part.edges.a1 }}, A2: {{ hp.part.edges.a2 }}</strong></span>
-            </div>
-          </div>
-        }
-
-        <!-- Tabla de Piezas en este Tablero -->
-        <div class="pt-2">
-          <div class="flex items-center justify-between mb-2">
-            <h4 [class]="themeService.isClassic() ? 'text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5' : 'text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5'">
-              <hugeicons-icon [icon]="icons.list" [size]="15" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
-              <span>Lista de Piezas en este Tablero ({{ sheet.placedParts.length }} piezas)</span>
-            </h4>
-            <span [class]="themeService.isClassic() ? 'text-[11px] text-slate-400' : 'text-[11px] text-zinc-500'">Secuencia de corte guiada</span>
-          </div>
-
-          <div [class]="themeService.isClassic() ? 'overflow-x-auto max-h-48 border border-slate-200 rounded-xl' : 'overflow-x-auto max-h-48 border border-zinc-800 rounded-xl'">
-            <table class="w-full text-left text-xs">
-              <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold sticky top-0 border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold sticky top-0 border-b border-zinc-800'">
-                <tr>
-                  <th class="py-2 px-3">Etiqueta</th>
-                  <th class="py-2 px-3">Pieza</th>
-                  <th class="py-2 px-3">Módulo</th>
-                  <th class="py-2 px-3 text-right">Largo (mm)</th>
-                  <th class="py-2 px-3 text-right">Ancho (mm)</th>
-                  <th class="py-2 px-3 text-center">Rotada 90°</th>
-                  <th class="py-2 px-3 text-center">Tapacantos</th>
-                </tr>
-              </thead>
-              <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
-                @for (p of sheet.placedParts; track p.tag) {
-                  <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80' : 'hover:bg-zinc-800/40'">
-                    <td class="py-2 px-3 font-mono font-bold text-amber-600">{{ p.tag }}</td>
-                    <td [class]="themeService.isClassic() ? 'py-2 px-3 font-medium text-slate-800' : 'py-2 px-3 font-medium text-white'">{{ p.part.name }}</td>
-                    <td [class]="themeService.isClassic() ? 'py-2 px-3 text-slate-500' : 'py-2 px-3 text-zinc-400'">{{ p.part.moduleName || p.part.groupName || 'Manual' }}</td>
-                    <td class="py-2 px-3 text-right font-mono">{{ p.length }}</td>
-                    <td class="py-2 px-3 text-right font-mono">{{ p.width }}</td>
-                    <td class="py-2 px-3 text-center">
-                      @if (p.rotated) {
-                        <span class="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-700 text-[10px] font-bold">Sí (90°)</span>
-                      } @else {
-                        <span [class]="themeService.isClassic() ? 'text-slate-400 text-[10px]' : 'text-zinc-500 text-[10px]'">No</span>
+                      @if (sw > 50 && sh > 30) {
+                        <text
+                          [attr.x]="sx + (sw / 2)"
+                          [attr.y]="sy + (sh / 2)"
+                          text-anchor="middle"
+                          font-size="7"
+                          fill="#94a3b8"
+                          font-family="monospace">
+                          Retazo ({{ scrap.length }}×{{ scrap.width }})
+                        </text>
                       }
-                    </td>
-                    <td class="py-2 px-3 text-center font-mono text-[10px]">
-                      <span class="text-cyan-600">L1:{{ p.part.edges.l1 }}</span>
-                      <span class="text-cyan-600"> L2:{{ p.part.edges.l2 }}</span>
-                      <span class="text-orange-600"> A1:{{ p.part.edges.a1 }}</span>
-                      <span class="text-orange-600"> A2:{{ p.part.edges.a2 }}</span>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    </g>
+                  }
 
+                  <!-- PIEZAS COLOCADAS -->
+                  @for (placed of sheet.placedParts; track placed.tag) {
+                    @let px = placed.x * scaleFactor;
+                    @let py = placed.y * scaleFactor;
+                    @let pw = placed.length * scaleFactor;
+                    @let ph = placed.width * scaleFactor;
+
+                    <g
+                      class="cursor-pointer transition-opacity"
+                      (mouseenter)="hoveredPart.set(placed)"
+                      (mouseleave)="hoveredPart.set(null)">
+
+                      <!-- Fondo de la pieza -->
+                      <rect
+                        [attr.x]="px"
+                        [attr.y]="py"
+                        [attr.width]="pw"
+                        [attr.height]="ph"
+                        fill="url(#sheetWoodTexture)"
+                        stroke="#000000"
+                        stroke-width="1.2" />
+
+                      <!-- Resalte interactivo al posar el cursor -->
+                      @if (hoveredPart()?.tag === placed.tag) {
+                        <rect
+                          [attr.x]="px"
+                          [attr.y]="py"
+                          [attr.width]="pw"
+                          [attr.height]="ph"
+                          fill="#f59e0b"
+                          opacity="0.3"
+                          stroke="#fbbf24"
+                          stroke-width="2" />
+                      }
+
+                      <!-- Indicadores de tapacantos -->
+                      @if (placed.part.edges.l1 !== 'none') {
+                        <line [attr.x1]="px" [attr.y1]="py + 1" [attr.x2]="px + pw" [attr.y2]="py + 1"
+                              [attr.stroke]="placed.part.edges.l1 === 'thick' ? '#06b6d4' : '#38bdf8'"
+                              [attr.stroke-width]="placed.part.edges.l1 === 'thick' ? '3' : '1.5'" />
+                      }
+                      @if (placed.part.edges.l2 !== 'none') {
+                        <line [attr.x1]="px" [attr.y1]="py + ph - 1" [attr.x2]="px + pw" [attr.y2]="py + ph - 1"
+                              [attr.stroke]="placed.part.edges.l2 === 'thick' ? '#06b6d4' : '#38bdf8'"
+                              [attr.stroke-width]="placed.part.edges.l2 === 'thick' ? '3' : '1.5'" />
+                      }
+                      @if (placed.part.edges.a1 !== 'none') {
+                        <line [attr.x1]="px + 1" [attr.y1]="py" [attr.x2]="px + 1" [attr.y2]="py + ph"
+                              [attr.stroke]="placed.part.edges.a1 === 'thick' ? '#f97316' : '#fb923c'"
+                              [attr.stroke-width]="placed.part.edges.a1 === 'thick' ? '3' : '1.5'" />
+                      }
+                      @if (placed.part.edges.a2 !== 'none') {
+                        <line [attr.x1]="px + pw - 1" [attr.y1]="py" [attr.x2]="px + pw - 1" [attr.y2]="py + ph"
+                              [attr.stroke]="placed.part.edges.a2 === 'thick' ? '#f97316' : '#fb923c'"
+                              [attr.stroke-width]="placed.part.edges.a2 === 'thick' ? '3' : '1.5'" />
+                      }
+
+                      <!-- Textos dentro de la pieza -->
+                      @if (pw > 30 && ph > 18) {
+                        <text
+                          [attr.x]="px + 6"
+                          [attr.y]="py + 12"
+                          font-size="9"
+                          font-weight="bold"
+                          fill="#ffffff"
+                          style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
+                          {{ placed.tag }}
+                        </text>
+
+                        @if (pw > 70 && ph > 32) {
+                          <text
+                            [attr.x]="px + (pw / 2)"
+                            [attr.y]="py + (ph / 2) - 3"
+                            text-anchor="middle"
+                            font-size="8.5"
+                            font-weight="bold"
+                            fill="#ffffff"
+                            style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
+                            {{ placed.part.name }}
+                          </text>
+                        }
+
+                        <text
+                          [attr.x]="px + (pw / 2)"
+                          [attr.y]="py + (ph / 2) + 8"
+                          text-anchor="middle"
+                          font-size="8"
+                          font-family="monospace"
+                          font-weight="bold"
+                          fill="#fde68a"
+                          style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
+                          {{ placed.length }} × {{ placed.width }}
+                        </text>
+
+                        @if (placed.part.grain !== 'none' && pw > 80 && ph > 45) {
+                          <text
+                            [attr.x]="px + pw - 12"
+                            [attr.y]="py + 12"
+                            font-size="8"
+                            fill="#cbd5e1"
+                            font-weight="bold">
+                            {{ placed.rotated ? '↕' : '↔' }}
+                          </text>
+                        }
+                      }
+                    </g>
+                  }
+
+                  <!-- LÍNEAS DE CORTE GUILLOTINA NUMERADAS -->
+                  @for (line of sheet.cutLines; track line.stage) {
+                    @let lx1 = line.x1 * scaleFactor;
+                    @let ly1 = line.y1 * scaleFactor;
+                    @let lx2 = line.x2 * scaleFactor;
+                    @let ly2 = line.y2 * scaleFactor;
+
+                    <g opacity="0.85">
+                      <line
+                        [attr.x1]="lx1"
+                        [attr.y1]="ly1"
+                        [attr.x2]="lx2"
+                        [attr.y2]="ly2"
+                        stroke="#ffffff"
+                        stroke-width="1.2"
+                        stroke-dasharray="3,2" />
+
+                      @let midX = (lx1 + lx2) / 2;
+                      @let midY = (ly1 + ly2) / 2;
+
+                      <circle [attr.cx]="midX" [attr.cy]="midY" r="5" fill="#f59e0b" stroke="#000" stroke-width="0.5" />
+                      <text [attr.x]="midX" [attr.y]="midY + 2.5" text-anchor="middle" font-size="5.5" font-weight="bold" fill="#000">
+                        {{ line.stage }}
+                      </text>
+                    </g>
+                  }
+                </svg>
+              </div>
+            </div>
+
+            <!-- Tooltip de Pieza Bajo el Cursor -->
+            @if (hoveredPart(); as hp) {
+              <div [class]="themeService.isClassic() ? 'p-2.5 sm:p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-slate-800 print:hidden' : 'p-2.5 sm:p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-200 print:hidden'">
+                <div class="flex items-center gap-2.5">
+                  <span class="px-2 py-0.5 rounded bg-amber-500 text-zinc-950 font-bold font-mono">{{ hp.tag }}</span>
+                  <div>
+                    <span [class]="themeService.isClassic() ? 'font-bold text-slate-900' : 'font-bold text-white'">{{ hp.part.name }}</span>
+                    <span [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'"> ({{ hp.part.moduleName || hp.part.groupName || 'Manual' }})</span>
+                  </div>
+                  <span class="font-mono text-amber-600 font-bold">{{ hp.length }} × {{ hp.width }} × {{ hp.part.thickness }} mm</span>
+                </div>
+                <div class="flex items-center gap-3 text-[11px]">
+                  <span>Veta: <strong [class]="themeService.isClassic() ? 'text-slate-800' : 'text-zinc-100'">{{ hp.part.grain === 'length' ? 'Longitudinal' : hp.part.grain === 'width' ? 'Transversal' : 'Libre' }}</strong></span>
+                  <span>Cantos: <strong class="text-cyan-600">L1: {{ hp.part.edges.l1 }}, L2: {{ hp.part.edges.l2 }}, A1: {{ hp.part.edges.a1 }}, A2: {{ hp.part.edges.a2 }}</strong></span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- COLUMNA DERECHA (4 cols en FHD/2K): TABLA DE PIEZAS EN ESTE TABLERO -->
+          <div class="2xl:col-span-4 min-w-0 print:hidden">
+            <div class="flex items-center justify-between mb-2">
+              <h4 [class]="themeService.isClassic() ? 'text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5' : 'text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5'">
+                <hugeicons-icon [icon]="icons.list" [size]="15" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                <span>Piezas en Tablero ({{ sheet.placedParts.length }})</span>
+              </h4>
+              <span [class]="themeService.isClassic() ? 'text-[11px] text-slate-400' : 'text-[11px] text-zinc-500'">Secuencia guiada</span>
+            </div>
+
+            <div [class]="themeService.isClassic() ? 'overflow-x-auto overflow-y-auto scrollbar-thin max-h-60 2xl:max-h-[calc(100dvh-310px)] border border-slate-200 rounded-xl' : 'overflow-x-auto overflow-y-auto scrollbar-thin max-h-60 2xl:max-h-[calc(100dvh-310px)] border border-zinc-800 rounded-xl'">
+              <table class="w-full text-left text-xs">
+                <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold sticky top-0 border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold sticky top-0 border-b border-zinc-800'">
+                  <tr>
+                    <th class="py-2 px-2.5">#</th>
+                    <th class="py-2 px-2.5">Pieza</th>
+                    <th class="py-2 px-2.5 text-right">Medidas</th>
+                    <th class="py-2 px-2 text-center">Rot.</th>
+                    <th class="py-2 px-2.5 text-center">Cantos</th>
+                  </tr>
+                </thead>
+                <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
+                  @for (p of sheet.placedParts; track p.tag) {
+                    <tr
+                      (mouseenter)="hoveredPart.set(p)"
+                      (mouseleave)="hoveredPart.set(null)"
+                      [class]="hoveredPart()?.tag === p.tag
+                        ? 'bg-amber-500/15 font-semibold cursor-pointer'
+                        : (themeService.isClassic() ? 'hover:bg-slate-50/80 cursor-pointer' : 'hover:bg-zinc-800/40 cursor-pointer')">
+                      <td class="py-2 px-2.5 font-mono font-bold text-amber-600">{{ p.tag }}</td>
+                      <td class="py-2 px-2.5">
+                        <div [class]="themeService.isClassic() ? 'font-medium text-slate-800 truncate max-w-36' : 'font-medium text-white truncate max-w-36'" [title]="p.part.name">{{ p.part.name }}</div>
+                        <div [class]="themeService.isClassic() ? 'text-[10px] text-slate-400 truncate max-w-36' : 'text-[10px] text-zinc-500 truncate max-w-36'">{{ p.part.moduleName || p.part.groupName || 'Manual' }}</div>
+                      </td>
+                      <td class="py-2 px-2.5 text-right font-mono whitespace-nowrap">{{ p.length }} × {{ p.width }}</td>
+                      <td class="py-2 px-2 text-center">
+                        @if (p.rotated) {
+                          <span class="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-700 text-[10px] font-bold">90°</span>
+                        } @else {
+                          <span [class]="themeService.isClassic() ? 'text-slate-400 text-[10px]' : 'text-zinc-500 text-[10px]'">No</span>
+                        }
+                      </td>
+                      <td class="py-2 px-2.5 text-center font-mono text-[10px] whitespace-nowrap">
+                        <span class="text-cyan-600">L1:{{ p.part.edges.l1 }}</span>
+                        <span class="text-cyan-600"> L2:{{ p.part.edges.l2 }}</span>
+                        <span class="text-orange-600"> A1:{{ p.part.edges.a1 }}</span>
+                        <span class="text-orange-600"> A2:{{ p.part.edges.a2 }}</span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
       </div>
     }
   } @else {
@@ -518,5 +524,4 @@
       <p [class]="themeService.isClassic() ? 'text-xs text-slate-400 mt-1' : 'text-xs text-zinc-500 mt-1'">Agrega módulos en el Diseñador o piezas en la pestaña de Despiece para generar los diagramas de corte.</p>
     </div>
   }
-
 </div>

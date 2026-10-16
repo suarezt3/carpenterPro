@@ -3,3 +3,26 @@
   display: block;
   width: 100%;
 }
+
+/* Escalado proporcional del tablero SVG según la resolución (HD, FHD y 2K) */
+.board-svg-responsive {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100dvh - 270px);
+}
+
+/* Pantallas HD (1280x720 / 1366x768) con altura reducida */
+@media (max-height: 820px) {
+  .board-svg-responsive {
+    max-height: calc(100dvh - 220px);
+  }
+}
+
+/* Monitores Quad HD / 2K (2560x1440) */
+@media (min-width: 2200px) {
+  .board-svg-responsive {
+    max-height: calc(100dvh - 290px);
+  }
+}
