@@ -4225,15 +4225,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
       return;
     }
-
-    if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
+if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
       const rect = canvas.getBoundingClientRect();
       this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
       this.raycaster.setFromCamera(this.mouse, this.camera);
-      const currentIntersection = new THREE.Vector3();
 
+      const currentIntersection = new THREE.Vector3();
       if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersection)) {
         const deltaWorld = currentIntersection.clone().sub(this.dragPlaneIntersectionStart);
         const hit = this.activeGizmoHit;
@@ -4241,31 +4239,60 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
         if (hit.type === 'axis') {
           if (this.dragInitialParts.length > 1) {
-            // Group Translation for multiple selected pieces (drawer/cabinet)
+            // Calcular cota inferior inicial del grupo completo para no atravesar el piso (Y = 0)
+            let initialGrpMinY = Infinity;
+            for (const p of this.dragInitialParts) {
+              const b = this.getPartBounds(p);
+              if (b.minY < initialGrpMinY) initialGrpMinY = b.minY;
+            }
+            const minAllowedDy = -initialGrpMinY;
+
             let deltaX = 0;
             let deltaY = 0;
             let deltaZ = 0;
+
             if (hit.axis === 'x') {
               deltaX = Math.round(deltaWorld.x / snap) * snap;
             } else if (hit.axis === 'y') {
-              deltaY = Math.round(deltaWorld.y / snap) * snap;
+              deltaY = Math.max(minAllowedDy, Math.round(deltaWorld.y / snap) * snap);
             } else if (hit.axis === 'z') {
               deltaZ = Math.round(deltaWorld.z / snap) * snap;
             }
 
             if (this.isMagneticSnap()) {
-              if (hit.axis === 'x' || hit.axis === 'z') {
-                let grpMinX = Infinity;
-                let grpMaxX = -Infinity;
-                let grpMinY = Infinity;
-                let grpMaxY = -Infinity;
-                let grpMinZ = Infinity;
-                let grpMaxZ = -Infinity;
+              const externalParts = this.parts().filter(p => !this.dragInitialParts.some(dp => dp.id === p.id));
+              if (externalParts.length > 0) {
+                const groupSnap = this.calculateGroupMagneticSnap(
+                  this.dragInitialParts,
+                  externalParts,
+                  { effDx: deltaX, effDy: deltaY, effDz: deltaZ },
+                  38
+                );
+                if (groupSnap.isSnapped && groupSnap.snappedPair) {
+                  if (hit.axis === 'x' && groupSnap.snappedX) deltaX = groupSnap.effDx;
+                  if (hit.axis === 'y' && groupSnap.snappedY) deltaY = Math.max(minAllowedDy, groupSnap.effDy);
+                  if (hit.axis === 'z' && groupSnap.snappedZ) deltaZ = groupSnap.effDz;
+                  this.renderPartSnapGuides(
+                    groupSnap.snappedPair.moving,
+                    groupSnap.snappedPair.target,
+                    groupSnap.snappedPair.snapFace,
+                    groupSnap.snappedPair.axis,
+                    groupSnap.snappedPair.pos
+                  );
+                } else {
+                  this.clearPartSnapGuides();
+                }
+              }
+
+              if ((hit.axis === 'x' || hit.axis === 'z') && this.workspaceMode() === 'room') {
+                let grpMinX = Infinity, grpMaxX = -Infinity;
+                let grpMinY = Infinity, grpMaxY = -Infinity;
+                let grpMinZ = Infinity, grpMaxZ = -Infinity;
 
                 for (const p of this.dragInitialParts) {
                   const pBounds = this.getPartBounds(p, {
                     x: (p.posX ?? 0) + deltaX,
-                    y: Math.max(0, (p.posY ?? 0) + deltaY),
+                    y: (p.posY ?? 0) + deltaY,
                     z: (p.posZ ?? 0) + deltaZ
                   });
                   grpMinX = Math.min(grpMinX, pBounds.minX);
@@ -4283,7 +4310,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
                   maxY: grpMaxY,
                   minZ: grpMinZ,
                   maxZ: grpMaxZ
-                }, 30);
+                }, 45);
 
                 if (hit.axis === 'z' && wallSnap.isSnappedZ) {
                   deltaZ += wallSnap.deltaZ;
@@ -4298,19 +4325,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
                   this.clearWallSnapGuides();
                 }
               } else if (hit.axis === 'y') {
-                // Check magnetic snap of lowest horizontal part in group to table legs
-                const horizontalParts = this.dragInitialParts.filter(p => p.orientation === 'horizontal')
+                const horizontalParts = this.dragInitialParts
+                  .filter(p => p.orientation === 'horizontal')
                   .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0));
                 const lowestPart = horizontalParts.length > 0 ? horizontalParts[0] : this.dragInitialParts[0];
+
                 if (lowestPart) {
                   const testPos = {
                     x: (lowestPart.posX ?? 0) + deltaX,
-                    y: Math.max(0, (lowestPart.posY ?? 0) + deltaY),
+                    y: (lowestPart.posY ?? 0) + deltaY,
                     z: (lowestPart.posZ ?? 0) + deltaZ
                   };
                   const legSnap = this.applyTableLegSnap(lowestPart, testPos);
                   if (legSnap.isSnapped && legSnap.snappedLeg) {
-                    deltaY = legSnap.pos.y - (lowestPart.posY ?? 0);
+                    deltaY = Math.max(minAllowedDy, legSnap.pos.y - (lowestPart.posY ?? 0));
                     this.renderLegSnapGuides(legSnap.snappedLeg, lowestPart, legSnap.legTopY, legSnap.pos);
                   } else {
                     this.clearLegSnapGuides();
@@ -4320,14 +4348,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
             } else {
               this.clearWallSnapGuides();
               this.clearLegSnapGuides();
+              this.clearPartSnapGuides();
+            }
+
+            // Imán suave al suelo (Y = 0) y bloqueo estricto para no hundirse
+            if (initialGrpMinY + deltaY < 18) {
+              deltaY = minAllowedDy;
             }
 
             const updatesList: { part: Part; updates: Partial<Part> }[] = [];
             for (const p of this.dragInitialParts) {
+              const pBounds = this.getPartBounds(p);
               const upd: Partial<Part> = {
-                posX: (p.posX ?? 0) + deltaX,
-                posY: Math.max(0, (p.posY ?? 0) + deltaY),
-                posZ: (p.posZ ?? 0) + deltaZ
+                posX: Math.round((p.posX ?? 0) + deltaX),
+                posY: Math.round((p.posY ?? pBounds.sy / 2) + deltaY),
+                posZ: Math.round((p.posZ ?? 0) + deltaZ)
               };
               updatesList.push({ part: p, updates: upd });
             }
@@ -4336,20 +4371,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
               this.partModified.emit(updatesList[0]);
             }
           } else if (this.dragInitialPart) {
-            // Single Part Axis Translation with magnetic face snapping & table leg snapping
             const part = this.dragInitialPart;
+            const initBounds = this.getPartBounds(part);
+            const minPosY = initBounds.sy / 2;
             const updates: Partial<Part> = {};
             const targetPos = {
-              x: (part.posX ?? 0),
-              y: (part.posY ?? 0),
-              z: (part.posZ ?? 0)
+              x: part.posX ?? 0,
+              y: Math.max(minPosY, part.posY ?? minPosY),
+              z: part.posZ ?? 0
             };
 
             if (hit.axis === 'x') {
               const steppedDelta = Math.round(deltaWorld.x / snap) * snap;
               targetPos.x += steppedDelta;
               if (this.isMagneticSnap()) {
-                const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'x', 25);
+                const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'x', 38);
                 targetPos.x = snapRes.pos.x;
                 if (snapRes.isSnapped && snapRes.snappedPart) {
                   this.renderPartSnapGuides(part, snapRes.snappedPart, snapRes.snapFace, 'x', targetPos);
@@ -4357,7 +4393,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
                   this.clearPartSnapGuides();
                 }
 
-                const legSnap = this.applyTableLegSnap(part, targetPos, 'any', 25);
+                const legSnap = this.applyTableLegSnap(part, targetPos, 'any', 30);
                 if (legSnap.isSnapped && legSnap.snappedLeg) {
                   targetPos.x = legSnap.pos.x;
                   this.renderLegSnapGuides(legSnap.snappedLeg, part, legSnap.legTopY, targetPos);
@@ -4365,11 +4401,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
                   this.clearLegSnapGuides();
                 }
 
-                const pBounds = this.getPartBounds(part, targetPos);
-                const wallSnap = this.calculateWallSnap(pBounds, 30);
-                if (wallSnap.isSnappedX) {
-                  targetPos.x += wallSnap.deltaX;
-                  this.renderWallSnapGuides(wallSnap);
+                if (this.workspaceMode() === 'room') {
+                  const pBounds = this.getPartBounds(part, targetPos);
+                  const wallSnap = this.calculateWallSnap(pBounds, 45);
+                  if (wallSnap.isSnappedX) {
+                    targetPos.x += wallSnap.deltaX;
+                    this.renderWallSnapGuides(wallSnap);
+                  } else {
+                    this.clearWallSnapGuides();
+                  }
                 } else {
                   this.clearWallSnapGuides();
                 }
@@ -4378,60 +4418,39 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 this.clearLegSnapGuides();
                 this.clearPartSnapGuides();
               }
-              updates.posX = targetPos.x;
+              updates.posX = Math.round(targetPos.x);
             } else if (hit.axis === 'y') {
               const steppedDelta = Math.round(deltaWorld.y / snap) * snap;
-              targetPos.y = Math.max(0, targetPos.y + steppedDelta);
+              targetPos.y = Math.max(minPosY, targetPos.y + steppedDelta);
               if (this.isMagneticSnap()) {
                 const yDir: 'up' | 'down' | 'any' = steppedDelta > 1 ? 'up' : steppedDelta < -1 ? 'down' : 'any';
                 let isLegSnapped = false;
                 let isPartSnapped = false;
 
-                if (yDir === 'up') {
-                  // Moving UP: prioritize parts above (bottom face of tabletop, aprons, shelves)
-                  const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'y', 25, [], 'up');
+                if (yDir !== 'up') {
+                  const legSnap = this.applyTableLegSnap(part, targetPos, yDir, 30);
+                  if (legSnap.isSnapped && legSnap.snappedLeg) {
+                    targetPos.y = Math.max(minPosY, legSnap.pos.y);
+                    this.renderLegSnapGuides(legSnap.snappedLeg, part, legSnap.legTopY, targetPos);
+                    isLegSnapped = true;
+                    this.clearPartSnapGuides();
+                  }
+                }
+
+                if (!isLegSnapped) {
+                  const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'y', 38, [], yDir);
                   if (snapRes.isSnapped && snapRes.snappedPart) {
-                    targetPos.y = snapRes.pos.y;
+                    targetPos.y = Math.max(minPosY, snapRes.pos.y);
                     this.renderPartSnapGuides(part, snapRes.snappedPart, snapRes.snapFace, 'y', targetPos);
                     isPartSnapped = true;
                   }
                   this.clearLegSnapGuides();
-                } else if (yDir === 'down') {
-                  // Moving DOWN: check table leg snap first (locking at top of leg and preventing sink)
-                  const legSnap = this.applyTableLegSnap(part, targetPos, 'down', 25);
-                  if (legSnap.isSnapped && legSnap.snappedLeg) {
-                    targetPos.y = legSnap.pos.y;
-                    this.renderLegSnapGuides(legSnap.snappedLeg, part, legSnap.legTopY, targetPos);
-                    isLegSnapped = true;
-                    this.clearPartSnapGuides();
-                  } else {
-                    const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'y', 25, [], 'down');
-                    if (snapRes.isSnapped && snapRes.snappedPart) {
-                      targetPos.y = snapRes.pos.y;
-                      this.renderPartSnapGuides(part, snapRes.snappedPart, snapRes.snapFace, 'y', targetPos);
-                      isPartSnapped = true;
-                    }
-                    this.clearLegSnapGuides();
-                  }
-                } else {
-                  const legSnap = this.applyTableLegSnap(part, targetPos, 'any', 25);
-                  if (legSnap.isSnapped && legSnap.snappedLeg) {
-                    targetPos.y = legSnap.pos.y;
-                    this.renderLegSnapGuides(legSnap.snappedLeg, part, legSnap.legTopY, targetPos);
-                    isLegSnapped = true;
-                    this.clearPartSnapGuides();
-                  } else {
-                    const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'y', 25, [], 'any');
-                    if (snapRes.isSnapped && snapRes.snappedPart) {
-                      targetPos.y = snapRes.pos.y;
-                      this.renderPartSnapGuides(part, snapRes.snappedPart, snapRes.snapFace, 'y', targetPos);
-                      isPartSnapped = true;
-                    }
-                    this.clearLegSnapGuides();
-                  }
                 }
 
                 if (!isLegSnapped && !isPartSnapped) {
+                  if (targetPos.y - minPosY <= 18) {
+                    targetPos.y = minPosY;
+                  }
                   this.clearLegSnapGuides();
                   this.clearPartSnapGuides();
                 }
@@ -4439,13 +4458,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 this.clearLegSnapGuides();
                 this.clearPartSnapGuides();
               }
-              updates.posY = targetPos.y;
+              updates.posY = Math.round(Math.max(minPosY, targetPos.y));
               this.clearWallSnapGuides();
             } else if (hit.axis === 'z') {
               const steppedDelta = Math.round(deltaWorld.z / snap) * snap;
               targetPos.z += steppedDelta;
               if (this.isMagneticSnap()) {
-                const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'z', 25);
+                const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'z', 38);
                 targetPos.z = snapRes.pos.z;
                 if (snapRes.isSnapped && snapRes.snappedPart) {
                   this.renderPartSnapGuides(part, snapRes.snappedPart, snapRes.snapFace, 'z', targetPos);
@@ -4453,7 +4472,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
                   this.clearPartSnapGuides();
                 }
 
-                const legSnap = this.applyTableLegSnap(part, targetPos, 'any', 25);
+                const legSnap = this.applyTableLegSnap(part, targetPos, 'any', 30);
                 if (legSnap.isSnapped && legSnap.snappedLeg) {
                   targetPos.z = legSnap.pos.z;
                   this.renderLegSnapGuides(legSnap.snappedLeg, part, legSnap.legTopY, targetPos);
@@ -4461,11 +4480,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
                   this.clearLegSnapGuides();
                 }
 
-                const pBounds = this.getPartBounds(part, targetPos);
-                const wallSnap = this.calculateWallSnap(pBounds, 30);
-                if (wallSnap.isSnappedZ) {
-                  targetPos.z += wallSnap.deltaZ;
-                  this.renderWallSnapGuides(wallSnap);
+                if (this.workspaceMode() === 'room') {
+                  const pBounds = this.getPartBounds(part, targetPos);
+                  const wallSnap = this.calculateWallSnap(pBounds, 45);
+                  if (wallSnap.isSnappedZ) {
+                    targetPos.z += wallSnap.deltaZ;
+                    this.renderWallSnapGuides(wallSnap);
+                  } else {
+                    this.clearWallSnapGuides();
+                  }
                 } else {
                   this.clearWallSnapGuides();
                 }
@@ -4474,7 +4497,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 this.clearLegSnapGuides();
                 this.clearPartSnapGuides();
               }
-              updates.posZ = targetPos.z;
+              updates.posZ = Math.round(targetPos.z);
             }
 
             this.partModified.emit({ part, updates });
@@ -4488,7 +4511,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
           if (hit.handleTarget === 'length') {
             let axisDelta = 0;
             let posAxis: 'posX' | 'posY' | 'posZ' = 'posX';
-
             if (orient === 'horizontal' || orient === 'vertical_xy') {
               axisDelta = deltaWorld.x * hit.dir;
               posAxis = 'posX';
@@ -4496,16 +4518,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
               axisDelta = deltaWorld.y * hit.dir;
               posAxis = 'posY';
             }
-
             const steppedDelta = Math.round(axisDelta / snap) * snap;
             const res = this.applyMagneticSnapToStretch(part, 'length', posAxis, hit.dir, steppedDelta);
             updates.length = res.dim;
             updates[posAxis] = res.pos;
-
           } else if (hit.handleTarget === 'width') {
             let axisDelta = 0;
             let posAxis: 'posX' | 'posY' | 'posZ' = 'posZ';
-
             if (orient === 'horizontal' || orient === 'vertical_yz') {
               axisDelta = deltaWorld.z * hit.dir;
               posAxis = 'posZ';
@@ -4513,7 +4532,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
               axisDelta = deltaWorld.y * hit.dir;
               posAxis = 'posY';
             }
-
             const steppedDelta = Math.round(axisDelta / snap) * snap;
             const res = this.applyMagneticSnapToStretch(part, 'width', posAxis, hit.dir, steppedDelta);
             updates.width = res.dim;
@@ -4526,7 +4544,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return;
     }
 
-    // Direct Piece/Group Dragging (click & drag any piece surface)
+    // Direct Piece/Group Dragging (click & drag any piece or module surface)
     if (this.isDirectPieceDrag && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
       const distFromStart = Math.hypot(e.clientX - this.dragStartPointer.x, e.clientY - this.dragStartPointer.y);
       if (!this.directPieceDragThresholdPassed && distFromStart > 4) {
@@ -4551,20 +4569,32 @@ export class Furniture3dViewerComponent implements OnDestroy {
           const dz = Math.round(deltaWorld.z / snap) * snap;
 
           if (this.dragInitialParts.length > 1) {
-            // Group Drag: translate all pieces in group together with smart magnetic snap & wall snap
+            // Calcular la base inferior más baja del grupo/módulo para impedir que atraviese el suelo (Y = 0)
+            let initialGrpMinY = Infinity;
+            for (const p of this.dragInitialParts) {
+              const b = this.getPartBounds(p);
+              if (b.minY < initialGrpMinY) initialGrpMinY = b.minY;
+            }
+            const minAllowedDy = -initialGrpMinY;
+
             let effDx = dx;
-            let effDy = dy;
+            let effDy = Math.max(minAllowedDy, dy);
             let effDz = dz;
 
             if (this.isMagneticSnap()) {
-              // 1. Check piece-to-piece magnetic snapping between this dragged group and any external pieces
+              // 1. Imán inteligente entre este módulo/grupo y cualquier otra pieza o módulo externo
               const externalParts = this.parts().filter(p => !this.dragInitialParts.some(dp => dp.id === p.id));
               let groupSnapped = false;
               if (externalParts.length > 0) {
-                const groupSnap = this.calculateGroupMagneticSnap(this.dragInitialParts, externalParts, { effDx, effDy, effDz }, 25);
+                const groupSnap = this.calculateGroupMagneticSnap(
+                  this.dragInitialParts,
+                  externalParts,
+                  { effDx, effDy, effDz },
+                  38
+                );
                 if (groupSnap.isSnapped && groupSnap.snappedPair) {
                   effDx = groupSnap.effDx;
-                  effDy = groupSnap.effDy;
+                  effDy = Math.max(minAllowedDy, groupSnap.effDy);
                   effDz = groupSnap.effDz;
                   groupSnapped = true;
                   this.renderPartSnapGuides(
@@ -4581,19 +4611,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 this.clearPartSnapGuides();
               }
 
-              // 2. Check table legs magnetic snap for group (support on legs)
-              const horizontalParts = this.dragInitialParts.filter(p => p.orientation === 'horizontal')
+              // 2. Imán sobre patas de mesa (si existen)
+              const horizontalParts = this.dragInitialParts
+                .filter(p => p.orientation === 'horizontal')
                 .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0));
               const lowestPart = horizontalParts.length > 0 ? horizontalParts[0] : this.dragInitialParts[0];
+
               if (lowestPart) {
                 const testPos = {
                   x: (lowestPart.posX ?? 0) + effDx,
-                  y: Math.max(0, (lowestPart.posY ?? 0) + effDy),
+                  y: (lowestPart.posY ?? 0) + effDy,
                   z: (lowestPart.posZ ?? 0) + effDz
                 };
-                const legSnap = this.applyTableLegSnap(lowestPart, testPos, dy > 1 ? 'up' : dy < -1 ? 'down' : 'any', 25);
+                const legSnap = this.applyTableLegSnap(lowestPart, testPos, dy > 1 ? 'up' : dy < -1 ? 'down' : 'any', 30);
                 if (legSnap.isSnapped && legSnap.snappedLeg) {
-                  effDy = legSnap.pos.y - (lowestPart.posY ?? 0);
+                  effDy = Math.max(minAllowedDy, legSnap.pos.y - (lowestPart.posY ?? 0));
                   if (legSnap.pos.x !== testPos.x) effDx = legSnap.pos.x - (lowestPart.posX ?? 0);
                   if (legSnap.pos.z !== testPos.z) effDz = legSnap.pos.z - (lowestPart.posZ ?? 0);
                   this.renderLegSnapGuides(legSnap.snappedLeg, lowestPart, legSnap.legTopY, legSnap.pos);
@@ -4603,47 +4635,54 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 }
               }
 
-              let grpMinX = Infinity;
-              let grpMaxX = -Infinity;
-              let grpMinY = Infinity;
-              let grpMaxY = -Infinity;
-              let grpMinZ = Infinity;
-              let grpMaxZ = -Infinity;
+              // 3. Imán inteligente a paredes (SOLO activo en Modo Habitación 3D)
+              if (this.workspaceMode() === 'room') {
+                let grpMinX = Infinity, grpMaxX = -Infinity;
+                let grpMinY = Infinity, grpMaxY = -Infinity;
+                let grpMinZ = Infinity, grpMaxZ = -Infinity;
 
-              for (const p of this.dragInitialParts) {
-                const pBounds = this.getPartBounds(p, {
-                  x: (p.posX ?? 0) + effDx,
-                  y: Math.max(0, (p.posY ?? 0) + effDy),
-                  z: (p.posZ ?? 0) + effDz
-                });
-                grpMinX = Math.min(grpMinX, pBounds.minX);
-                grpMaxX = Math.max(grpMaxX, pBounds.maxX);
-                grpMinY = Math.min(grpMinY, pBounds.minY);
-                grpMaxY = Math.max(grpMaxY, pBounds.maxY);
-                grpMinZ = Math.min(grpMinZ, pBounds.minZ);
-                grpMaxZ = Math.max(grpMaxZ, pBounds.maxZ);
-              }
+                for (const p of this.dragInitialParts) {
+                  const pBounds = this.getPartBounds(p, {
+                    x: (p.posX ?? 0) + effDx,
+                    y: (p.posY ?? 0) + effDy,
+                    z: (p.posZ ?? 0) + effDz
+                  });
+                  grpMinX = Math.min(grpMinX, pBounds.minX);
+                  grpMaxX = Math.max(grpMaxX, pBounds.maxX);
+                  grpMinY = Math.min(grpMinY, pBounds.minY);
+                  grpMaxY = Math.max(grpMaxY, pBounds.maxY);
+                  grpMinZ = Math.min(grpMinZ, pBounds.minZ);
+                  grpMaxZ = Math.max(grpMaxZ, pBounds.maxZ);
+                }
 
-              const wallSnap = this.calculateWallSnap({
-                minX: grpMinX,
-                maxX: grpMaxX,
-                minY: grpMinY,
-                maxY: grpMaxY,
-                minZ: grpMinZ,
-                maxZ: grpMaxZ
-              }, 30);
+                const wallSnap = this.calculateWallSnap({
+                  minX: grpMinX,
+                  maxX: grpMaxX,
+                  minY: grpMinY,
+                  maxY: grpMaxY,
+                  minZ: grpMinZ,
+                  maxZ: grpMaxZ
+                }, 45);
 
-              if (wallSnap.isSnappedZ) {
-                effDz += wallSnap.deltaZ;
-              }
-              if (wallSnap.isSnappedX) {
-                effDx += wallSnap.deltaX;
-              }
+                if (wallSnap.isSnappedZ) {
+                  effDz += wallSnap.deltaZ;
+                }
+                if (wallSnap.isSnappedX) {
+                  effDx += wallSnap.deltaX;
+                }
 
-              if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
-                this.renderWallSnapGuides(wallSnap);
+                if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
+                  this.renderWallSnapGuides(wallSnap);
+                } else {
+                  this.clearWallSnapGuides();
+                }
               } else {
                 this.clearWallSnapGuides();
+              }
+
+              // Imán suave al suelo (Y = 0) si está a menos de 18mm del piso
+              if (initialGrpMinY + effDy <= 18) {
+                effDy = minAllowedDy;
               }
             } else {
               this.clearWallSnapGuides();
@@ -4651,12 +4690,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
               this.clearPartSnapGuides();
             }
 
+            // Bloqueo absoluto de piso en bloque (preserva el ensamble interno del módulo)
+            effDy = Math.max(minAllowedDy, effDy);
+
             const updatesList: { part: Part; updates: Partial<Part> }[] = [];
             for (const p of this.dragInitialParts) {
+              const pBounds = this.getPartBounds(p);
               const upd: Partial<Part> = {
-                posX: (p.posX ?? 0) + effDx,
-                posY: Math.max(0, (p.posY ?? 0) + effDy),
-                posZ: (p.posZ ?? 0) + effDz
+                posX: Math.round((p.posX ?? 0) + effDx),
+                posY: Math.round((p.posY ?? pBounds.sy / 2) + effDy),
+                posZ: Math.round((p.posZ ?? 0) + effDz)
               };
               updatesList.push({ part: p, updates: upd });
             }
@@ -4665,21 +4708,24 @@ export class Furniture3dViewerComponent implements OnDestroy {
               this.partModified.emit(updatesList[0]);
             }
           } else if (this.dragInitialPart) {
-            // Single Part Drag: translate piece with optional magnetic snapping & wall snap
+            // Arrastre de Pieza Individual con bloqueo estricto de suelo (minY >= 0) e imán entre piezas y muros
             const part = this.dragInitialPart;
+            const initBounds = this.getPartBounds(part);
+            const minPosY = initBounds.sy / 2;
+
             const targetPos = {
               x: (part.posX ?? 0) + dx,
-              y: Math.max(0, (part.posY ?? 0) + dy),
+              y: Math.max(minPosY, (part.posY ?? minPosY) + dy),
               z: (part.posZ ?? 0) + dz
             };
 
             if (this.isMagneticSnap()) {
               const yDir: 'up' | 'down' | 'any' = dy > 1 ? 'up' : dy < -1 ? 'down' : 'any';
 
-              const snapResX = this.applyMagneticSnapToPosition(part, targetPos, 'x', 25);
+              const snapResX = this.applyMagneticSnapToPosition(part, targetPos, 'x', 38);
               targetPos.x = snapResX.pos.x;
 
-              const snapResZ = this.applyMagneticSnapToPosition(part, targetPos, 'z', 25);
+              const snapResZ = this.applyMagneticSnapToPosition(part, targetPos, 'z', 38);
               targetPos.z = snapResZ.pos.z;
 
               let snappedYPart: Part | null = null;
@@ -4689,78 +4735,60 @@ export class Furniture3dViewerComponent implements OnDestroy {
               let snappedLegItem: ApplianceItem | null = null;
               let legTopElevation = 0;
 
-              if (yDir === 'up') {
-                // Moving UP: prioritize snapping to parts above (bottom face of tabletop, aprons, shelves)
-                const snapResY = this.applyMagneticSnapToPosition(part, targetPos, 'y', 25, [], 'up');
-                if (snapResY.isSnapped && snapResY.snappedPart) {
-                  targetPos.y = snapResY.pos.y;
-                  snappedYPart = snapResY.snappedPart;
-                  snappedYFace = snapResY.snapFace;
-                  isSnappedY = true;
-                }
-              } else if (yDir === 'down') {
-                // Moving DOWN: check table leg snap first (locking at top of leg and preventing sink)
-                const legSnap = this.applyTableLegSnap(part, targetPos, 'down', 25);
+              if (yDir !== 'up') {
+                const legSnap = this.applyTableLegSnap(part, targetPos, yDir, 30);
                 if (legSnap.isSnapped && legSnap.snappedLeg) {
-                  targetPos.y = legSnap.pos.y;
+                  targetPos.y = Math.max(minPosY, legSnap.pos.y);
                   isLegSnapped = true;
                   snappedLegItem = legSnap.snappedLeg;
                   legTopElevation = legSnap.legTopY;
-                } else {
-                  const snapResY = this.applyMagneticSnapToPosition(part, targetPos, 'y', 25, [], 'down');
-                  if (snapResY.isSnapped && snapResY.snappedPart) {
-                    targetPos.y = snapResY.pos.y;
-                    snappedYPart = snapResY.snappedPart;
-                    snappedYFace = snapResY.snapFace;
-                    isSnappedY = true;
-                  }
-                }
-              } else {
-                const legSnap = this.applyTableLegSnap(part, targetPos, 'any', 25);
-                if (legSnap.isSnapped && legSnap.snappedLeg) {
-                  targetPos.y = legSnap.pos.y;
-                  isLegSnapped = true;
-                  snappedLegItem = legSnap.snappedLeg;
-                  legTopElevation = legSnap.legTopY;
-                } else {
-                  const snapResY = this.applyMagneticSnapToPosition(part, targetPos, 'y', 25, [], 'any');
-                  if (snapResY.isSnapped && snapResY.snappedPart) {
-                    targetPos.y = snapResY.pos.y;
-                    snappedYPart = snapResY.snappedPart;
-                    snappedYFace = snapResY.snapFace;
-                    isSnappedY = true;
-                  }
                 }
               }
 
-              // Visual Guides:
+              if (!isLegSnapped) {
+                const snapResY = this.applyMagneticSnapToPosition(part, targetPos, 'y', 38, [], yDir);
+                if (snapResY.isSnapped && snapResY.snappedPart) {
+                  targetPos.y = Math.max(minPosY, snapResY.pos.y);
+                  snappedYPart = snapResY.snappedPart;
+                  snappedYFace = snapResY.snapFace;
+                  isSnappedY = true;
+                } else if (targetPos.y - minPosY <= 18) {
+                  targetPos.y = minPosY;
+                }
+              }
+
+              // Guías visuales de contacto magnético entre piezas o patas
               if (isLegSnapped && snappedLegItem) {
                 this.renderLegSnapGuides(snappedLegItem, part, legTopElevation, targetPos);
                 this.clearPartSnapGuides();
               } else {
                 this.clearLegSnapGuides();
-                if (isSnappedY && snappedYPart) {
-                  this.renderPartSnapGuides(part, snappedYPart, snappedYFace, 'y', targetPos);
-                } else if (snapResX.isSnapped && snapResX.snappedPart) {
+                if (snapResX.isSnapped && snapResX.snappedPart) {
                   this.renderPartSnapGuides(part, snapResX.snappedPart, snapResX.snapFace, 'x', targetPos);
                 } else if (snapResZ.isSnapped && snapResZ.snappedPart) {
                   this.renderPartSnapGuides(part, snapResZ.snappedPart, snapResZ.snapFace, 'z', targetPos);
+                } else if (isSnappedY && snappedYPart) {
+                  this.renderPartSnapGuides(part, snappedYPart, snappedYFace, 'y', targetPos);
                 } else {
                   this.clearPartSnapGuides();
                 }
               }
 
-              // Wall Snap
-              const partBounds = this.getPartBounds(part, targetPos);
-              const wallSnap = this.calculateWallSnap(partBounds, 30);
-              if (wallSnap.isSnappedZ) {
-                targetPos.z += wallSnap.deltaZ;
-              }
-              if (wallSnap.isSnappedX) {
-                targetPos.x += wallSnap.deltaX;
-              }
-              if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
-                this.renderWallSnapGuides(wallSnap);
+              // Imán de paredes (SOLO activo en Modo Habitación 3D)
+              if (this.workspaceMode() === 'room') {
+                const partBounds = this.getPartBounds(part, targetPos);
+                const wallSnap = this.calculateWallSnap(partBounds, 45);
+                if (wallSnap.isSnappedZ) {
+                  targetPos.z += wallSnap.deltaZ;
+                }
+                if (wallSnap.isSnappedX) {
+                  targetPos.x += wallSnap.deltaX;
+                }
+                if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
+                  this.renderWallSnapGuides(wallSnap);
+                } else {
+                  this.clearWallSnapGuides();
+                }
               } else {
                 this.clearWallSnapGuides();
               }
@@ -4770,10 +4798,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
               this.clearPartSnapGuides();
             }
 
+            // Garantía final de no sobrepasar el suelo (minY >= 0)
+            targetPos.y = Math.max(minPosY, targetPos.y);
+
             const updates: Partial<Part> = {
-              posX: targetPos.x,
-              posY: targetPos.y,
-              posZ: targetPos.z
+              posX: Math.round(targetPos.x),
+              posY: Math.round(targetPos.y),
+              posZ: Math.round(targetPos.z)
             };
             this.partModified.emit({ part, updates });
           }
@@ -6122,16 +6153,27 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const val = this.openTargetMap.get(grpParts[0].id) || 0;
     return val > 0.5;
   }
-
-  moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
+moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length === 0) return;
+
+    let effDelta = delta;
+    if (axis === 'y') {
+      let grpMinY = Infinity;
+      for (const p of grpParts) {
+        const b = this.getPartBounds(p);
+        if (b.minY < grpMinY) grpMinY = b.minY;
+      }
+      effDelta = Math.max(-grpMinY, delta);
+    }
+
     const updatesList: { part: Part; updates: Partial<Part> }[] = [];
     for (const p of grpParts) {
+      const b = this.getPartBounds(p);
       const upd: Partial<Part> = {};
-      if (axis === 'x') upd.posX = (p.posX ?? 0) + delta;
-      if (axis === 'y') upd.posY = Math.max(0, (p.posY ?? 0) + delta);
-      if (axis === 'z') upd.posZ = (p.posZ ?? 0) + delta;
+      if (axis === 'x') upd.posX = Math.round((p.posX ?? 0) + effDelta);
+      if (axis === 'y') upd.posY = Math.round((p.posY ?? b.sy / 2) + effDelta);
+      if (axis === 'z') upd.posZ = Math.round((p.posZ ?? 0) + effDelta);
       updatesList.push({ part: p, updates: upd });
     }
     this.multiplePartsModified.emit({ updates: updatesList });
@@ -6194,16 +6236,26 @@ export class Furniture3dViewerComponent implements OnDestroy {
   nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
     const selList = this.selectedParts();
     if (selList.length === 0) return;
-
     this.dragStarted.emit();
 
     if (selList.length > 1) {
+      let effDelta = delta;
+      if (axis === 'y') {
+        let grpMinY = Infinity;
+        for (const p of selList) {
+          const b = this.getPartBounds(p);
+          if (b.minY < grpMinY) grpMinY = b.minY;
+        }
+        effDelta = Math.max(-grpMinY, delta);
+      }
+
       const updatesList: { part: Part; updates: Partial<Part> }[] = [];
       for (const p of selList) {
+        const b = this.getPartBounds(p);
         const upd: Partial<Part> = {};
-        if (axis === 'x') upd.posX = (p.posX ?? 0) + delta;
-        if (axis === 'y') upd.posY = Math.max(0, (p.posY ?? 0) + delta);
-        if (axis === 'z') upd.posZ = (p.posZ ?? 0) + delta;
+        if (axis === 'x') upd.posX = Math.round((p.posX ?? 0) + effDelta);
+        if (axis === 'y') upd.posY = Math.round((p.posY ?? b.sy / 2) + effDelta);
+        if (axis === 'z') upd.posZ = Math.round((p.posZ ?? 0) + effDelta);
         updatesList.push({ part: p, updates: upd });
       }
       this.multiplePartsModified.emit({ updates: updatesList });
@@ -6214,15 +6266,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
 
     const sel = selList[0];
+    const bounds = this.getPartBounds(sel);
+    const minPosY = bounds.sy / 2;
+
     let targetPos = {
       x: sel.posX ?? 0,
-      y: sel.posY ?? 0,
+      y: Math.max(minPosY, sel.posY ?? minPosY),
       z: sel.posZ ?? 0
     };
-
     targetPos[axis] += delta;
     if (axis === 'y') {
-      targetPos.y = Math.max(0, targetPos.y);
+      targetPos.y = Math.max(minPosY, targetPos.y);
     }
 
     if (this.isMagneticSnap()) {
@@ -6235,6 +6289,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         axis === 'y' ? (delta > 0 ? 'up' : 'down') : 'any'
       );
       targetPos = snapRes.pos;
+      targetPos.y = Math.max(minPosY, targetPos.y);
+
       if (axis === 'y') {
         if (delta <= 0) {
           const legSnap = this.applyTableLegSnap(sel, targetPos, 'down', 25);
@@ -6250,10 +6306,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
+    targetPos.y = Math.max(minPosY, targetPos.y);
+
     const updates: Partial<Part> = {};
-    if (axis === 'x') updates.posX = targetPos.x;
-    if (axis === 'y') updates.posY = targetPos.y;
-    if (axis === 'z') updates.posZ = targetPos.z;
+    if (axis === 'x') updates.posX = Math.round(targetPos.x);
+    if (axis === 'y') updates.posY = Math.round(targetPos.y);
+    if (axis === 'z') updates.posZ = Math.round(targetPos.z);
 
     this.partModified.emit({ part: sel, updates });
   }
@@ -6405,18 +6463,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const t = part.thickness || 18;
     const L = customSize?.length ?? part.length;
     const W = customSize?.width ?? part.width;
-
     let sx = L;
     let sy = t;
     let sz = W;
 
     const orient = part.orientation || 'horizontal';
     if (orient === 'vertical_yz') {
-      const isCabinetSide = part.componentRole === 'side_left' || 
+      const isCabinetSide = part.componentRole === 'side_left' ||
                             part.componentRole === 'side_right' ||
-                            (part.name.toUpperCase().includes('LATERAL') && 
-                             !part.name.toUpperCase().includes('CAJ') && 
-                             part.componentRole !== 'drawer_box' && 
+                            (part.name.toUpperCase().includes('LATERAL') &&
+                             !part.name.toUpperCase().includes('CAJ') &&
+                             part.componentRole !== 'drawer_box' &&
                              part.componentRole !== 'drawer_lateral');
       const isDrawerLateral = !isCabinetSide && (
         part.componentRole === 'drawer_box' ||
@@ -6439,6 +6496,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
         part.name.toUpperCase().includes('CONTRA') ||
         part.name.toUpperCase().includes('TRASERA');
+
       if (isDrawerBoxHead) {
         sx = L;
         sy = W;
@@ -6460,6 +6518,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
         sy = W;
         sz = t;
       }
+    }
+
+    if (part.rotationX || part.rotationY || part.rotationZ) {
+      const rx = THREE.MathUtils.degToRad(part.rotationX || 0);
+      const ry = THREE.MathUtils.degToRad(part.rotationY || 0);
+      const rz = THREE.MathUtils.degToRad(part.rotationZ || 0);
+      const euler = new THREE.Euler(rx, ry, rz, 'XYZ');
+      const m = new THREE.Matrix4().makeRotationFromEuler(euler).elements;
+      const rSx = Math.abs(m[0]) * sx + Math.abs(m[4]) * sy + Math.abs(m[8]) * sz;
+      const rSy = Math.abs(m[1]) * sx + Math.abs(m[5]) * sy + Math.abs(m[9]) * sz;
+      const rSz = Math.abs(m[2]) * sx + Math.abs(m[6]) * sy + Math.abs(m[10]) * sz;
+      sx = Math.round(rSx * 10) / 10;
+      sy = Math.round(rSy * 10) / 10;
+      sz = Math.round(rSz * 10) / 10;
     }
 
     const px = customPos?.x ?? (part.posX ?? 0);
@@ -6486,16 +6558,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
     };
   }
 
-  private applyMagneticSnapToPosition(
+private applyMagneticSnapToPosition(
     movingPart: Part,
     proposedPos: { x: number; y: number; z: number },
     axis: 'x' | 'y' | 'z',
-    threshold = 25,
+    threshold = 38,
     excludedPartIds: string[] = [],
     direction: 'up' | 'down' | 'any' = 'any'
   ): { pos: { x: number; y: number; z: number }; isSnapped: boolean; snappedPart: Part | null; snapFace: number | null } {
     const movingBounds = this.getPartBounds(movingPart, proposedPos);
-    const otherParts = this.parts().filter(p => p.id !== movingPart.id && !excludedPartIds.includes(p.id));
+    const otherParts = this.parts().filter(
+      p => p.id !== movingPart.id && !excludedPartIds.includes(p.id) && !this.hiddenPartIds().has(p.id)
+    );
     if (otherParts.length === 0) {
       return { pos: proposedPos, isSnapped: false, snappedPart: null, snapFace: null };
     }
@@ -6504,13 +6578,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
     let bestOtherPart: Part | null = null;
     let bestFace: number | null = null;
     let minDistance = threshold;
+    const catchment = 120; // Margen de proximidad en los ejes perpendiculares para activar el imán
 
     for (const other of otherParts) {
       const otherBounds = this.getPartBounds(other);
 
       if (axis === 'x') {
-        const overlapY = movingBounds.minY < otherBounds.maxY + 60 && movingBounds.maxY > otherBounds.minY - 60;
-        const overlapZ = movingBounds.minZ < otherBounds.maxZ + 60 && movingBounds.maxZ > otherBounds.minZ - 60;
+        const overlapY = movingBounds.minY <= otherBounds.maxY + catchment && movingBounds.maxY >= otherBounds.minY - catchment;
+        const overlapZ = movingBounds.minZ <= otherBounds.maxZ + catchment && movingBounds.maxZ >= otherBounds.minZ - catchment;
         if (!overlapY || !overlapZ) continue;
 
         const hx = movingBounds.sx / 2;
@@ -6532,25 +6607,23 @@ export class Furniture3dViewerComponent implements OnDestroy {
           }
         }
       } else if (axis === 'y') {
-        const overlapX = movingBounds.minX < otherBounds.maxX + 60 && movingBounds.maxX > otherBounds.minX - 60;
-        const overlapZ = movingBounds.minZ < otherBounds.maxZ + 60 && movingBounds.maxZ > otherBounds.minZ - 60;
+        const overlapX = movingBounds.minX <= otherBounds.maxX + catchment && movingBounds.maxX >= otherBounds.minX - catchment;
+        const overlapZ = movingBounds.minZ <= otherBounds.maxZ + catchment && movingBounds.maxZ >= otherBounds.minZ - catchment;
         if (!overlapX || !overlapZ) continue;
 
         const hy = movingBounds.sy / 2;
         const currentY = movingPart.posY ?? hy;
         const candidates = [
-          { val: otherBounds.minY - hy, face: otherBounds.minY }, // Underneath top part (e.g. under tabletop / aprons)
-          { val: otherBounds.maxY + hy, face: otherBounds.maxY }, // On top of part (e.g. resting on shelf / base)
-          { val: otherBounds.minY + hy, face: otherBounds.minY }, // Flush bottom
-          { val: otherBounds.maxY - hy, face: otherBounds.maxY }  // Flush top
+          { val: otherBounds.maxY + hy, face: otherBounds.maxY }, // Apoyar encima de otra pieza
+          { val: otherBounds.minY - hy, face: otherBounds.minY }, // Pegar debajo de tapa/cubierta
+          { val: otherBounds.minY + hy, face: otherBounds.minY }, // Enrasar bases inferiores
+          { val: otherBounds.maxY - hy, face: otherBounds.maxY }  // Enrasar bordes superiores
         ];
 
         for (const cand of candidates) {
-          // Direction-aware filter:
-          // When moving UP, prioritize faces at or above current elevation
-          if (direction === 'up' && cand.val < currentY - 5) continue;
-          // When moving DOWN, prioritize faces at or below current elevation
-          if (direction === 'down' && cand.val > currentY + 5) continue;
+          if (cand.val < hy) continue; // Nunca permitir un snap que hunda la pieza bajo el suelo (Y < 0)
+          if (direction === 'up' && cand.val < currentY - threshold) continue;
+          if (direction === 'down' && cand.val > currentY + threshold) continue;
 
           const dist = Math.abs(proposedPos.y - cand.val);
           if (dist < minDistance) {
@@ -6561,8 +6634,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
           }
         }
       } else if (axis === 'z') {
-        const overlapX = movingBounds.minX < otherBounds.maxX + 60 && movingBounds.maxX > otherBounds.minX - 60;
-        const overlapY = movingBounds.minY < otherBounds.maxY + 60 && movingBounds.maxY > otherBounds.minY - 60;
+        const overlapX = movingBounds.minX <= otherBounds.maxX + catchment && movingBounds.maxX >= otherBounds.minX - catchment;
+        const overlapY = movingBounds.minY <= otherBounds.maxY + catchment && movingBounds.maxY >= otherBounds.minY - catchment;
         if (!overlapX || !overlapY) continue;
 
         const hz = movingBounds.sz / 2;
@@ -6604,50 +6677,60 @@ export class Furniture3dViewerComponent implements OnDestroy {
       minZ: number;
       maxZ: number;
     },
-    threshold = 30
+    threshold = 45
   ): WallSnapResult {
+    // El imán de paredes solo actúa en Modo Habitación 3D
+    if (this.workspaceMode() !== 'room') {
+      return {
+        isSnappedX: false,
+        isSnappedZ: false,
+        correctedX: bounds.minX,
+        correctedZ: bounds.minZ,
+        deltaX: 0,
+        deltaZ: 0
+      };
+    }
+
     const config = this.roomConfig();
     const offX = config.wallOffsetX || 0;
     const offZ = config.wallOffsetZ || 0;
     const wallThickness = config.wallThickness || 150;
     const mainWallLength = config.mainWallLength || 3600;
     const sideWallLength = config.sideWallLength || 2400;
-    const layout = config.layout || 'straight';
+    const layout = config.layout || 'single_wall';
 
     let deltaX = 0;
     let deltaZ = 0;
     let isSnappedX = false;
     let isSnappedZ = false;
 
-    // 1. MURO PRINCIPAL (Back Wall a lo largo de X)
-    // Su cara frontal interior está en Z = offZ + wallThickness
+    // 1. MURO PRINCIPAL (Posterior a lo largo de X): cara interior en Z = offZ + wallThickness
     const mainWallInnerZ = offZ + wallThickness;
     const mainWallMinX = offX;
     const mainWallMaxX = offX + mainWallLength;
 
-    // Verificar si el elemento está en el tramo horizontal del muro (con tolerancia de 100mm)
-    const inMainWallSpan = bounds.maxX >= mainWallMinX - 100 && bounds.minX <= mainWallMaxX + 100;
+    const inMainWallSpan = bounds.maxX >= mainWallMinX - 150 && bounds.minX <= mainWallMaxX + 150;
     if (inMainWallSpan) {
       const distZ = bounds.minZ - mainWallInnerZ;
-      if (Math.abs(distZ) <= threshold) {
+      // Atrae si está dentro del umbral (45mm) y bloquea si intenta atravesar el muro hacia atrás
+      if (distZ <= threshold && distZ >= -(wallThickness + 250)) {
         deltaZ = mainWallInnerZ - bounds.minZ;
         isSnappedZ = true;
       }
     }
 
-    // 2. MURO LATERAL IZQUIERDO (L y U)
+    // 2. MURO LATERAL IZQUIERDO (Esquina en L y Cocina en U): cara interior en X = offX + wallThickness
     let isLeftSnapped = false;
     let isRightSnapped = false;
     const sideWallInnerX = offX + wallThickness;
 
     if (layout === 'l_shape' || layout === 'u_shape') {
-      const sideWallMinZ = offZ + wallThickness;
+      const sideWallMinZ = offZ;
       const sideWallMaxZ = offZ + wallThickness + sideWallLength;
-
-      const inSideWallSpan = bounds.maxZ >= sideWallMinZ - 100 && bounds.minZ <= sideWallMaxZ + 100;
+      const inSideWallSpan = bounds.maxZ >= sideWallMinZ - 150 && bounds.minZ <= sideWallMaxZ + 150;
       if (inSideWallSpan) {
         const distX = bounds.minX - sideWallInnerX;
-        if (Math.abs(distX) <= threshold) {
+        if (distX <= threshold && distX >= -(wallThickness + 250)) {
           deltaX = sideWallInnerX - bounds.minX;
           isSnappedX = true;
           isLeftSnapped = true;
@@ -6655,17 +6738,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
-    // 3. MURO LATERAL DERECHO (Solo U)
+    // 3. MURO LATERAL DERECHO (Cocina en U): cara interior en X = offX + mainWallLength - wallThickness
     const rightWallLength = config.rightWallLength || sideWallLength;
     const rightWallInnerX = offX + mainWallLength - wallThickness;
-    if (layout === 'u_shape' && !isLeftSnapped) {
-      const rightWallMinZ = offZ + wallThickness;
-      const rightWallMaxZ = offZ + wallThickness + rightWallLength;
 
-      const inRightWallSpan = bounds.maxZ >= rightWallMinZ - 100 && bounds.minZ <= rightWallMaxZ + 100;
+    if (layout === 'u_shape' && !isLeftSnapped) {
+      const rightWallMinZ = offZ;
+      const rightWallMaxZ = offZ + wallThickness + rightWallLength;
+      const inRightWallSpan = bounds.maxZ >= rightWallMinZ - 150 && bounds.minZ <= rightWallMaxZ + 150;
       if (inRightWallSpan) {
         const distX = rightWallInnerX - bounds.maxX;
-        if (Math.abs(distX) <= threshold) {
+        if (distX <= threshold && distX >= -(wallThickness + 250)) {
           deltaX = rightWallInnerX - bounds.maxX;
           isSnappedX = true;
           isRightSnapped = true;
@@ -6754,13 +6837,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     const { mainWallContact, sideWallContact } = snapResult.contactGuide;
 
-    // Laser neon seam material
     const laserMat = new THREE.MeshBasicMaterial({
       color: 0x06b6d4,
       transparent: true,
       opacity: 0.95
     });
-    // Soft glowing highlight rectangle on the wall surface
+
     const washMat = new THREE.MeshBasicMaterial({
       color: 0x06b6d4,
       transparent: true,
@@ -6776,13 +6858,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const centerX = (xStart + xEnd) / 2;
       const centerY = (yMin + yMax) / 2;
 
-      // 1. Resplandor translúcido sobre el muro
       const washGeo = new THREE.PlaneGeometry(width, height);
       const washMesh = new THREE.Mesh(washGeo, washMat);
       washMesh.position.set(centerX, centerY, z);
       this.wallSnapGuideGroup.add(washMesh);
 
-      // 2. Líneas láser superior e inferior de contacto
       const lineT = 3.5;
       const topSeamGeo = new THREE.BoxGeometry(width, lineT, 1.5);
       const topSeam = new THREE.Mesh(topSeamGeo, laserMat);
@@ -6794,7 +6874,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
       bottomSeam.position.set(centerX, yMin, z + 0.3);
       this.wallSnapGuideGroup.add(bottomSeam);
 
-      // 3. Badge flotante en 3D
       const labelText = sideWallContact ? '🧲 Muros en Escuadra · 0 mm' : '🧲 Muro Posterior · 0 mm';
       const badgeSprite = this.createWallSnapBadge(labelText);
       badgeSprite.position.set(centerX, Math.min(2500, yMax + 75), z + 1.2);
@@ -6808,14 +6887,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const centerZ = (zStart + zEnd) / 2;
       const centerY = (yMin + yMax) / 2;
 
-      // 1. Resplandor translúcido sobre el muro lateral
       const washGeo = new THREE.PlaneGeometry(depth, height);
       const washMesh = new THREE.Mesh(washGeo, washMat);
       washMesh.rotation.y = Math.PI / 2;
       washMesh.position.set(x, centerY, centerZ);
       this.wallSnapGuideGroup.add(washMesh);
 
-      // 2. Líneas láser superior e inferior
       const lineT = 3.5;
       const topSeamGeo = new THREE.BoxGeometry(1.5, lineT, depth);
       const topSeam = new THREE.Mesh(topSeamGeo, laserMat);
@@ -6842,14 +6919,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const centerZ = (zStart + zEnd) / 2;
       const centerY = (yMin + yMax) / 2;
 
-      // 1. Resplandor translúcido sobre el muro lateral derecho
       const washGeo = new THREE.PlaneGeometry(depth, height);
       const washMesh = new THREE.Mesh(washGeo, washMat);
       washMesh.rotation.y = -Math.PI / 2;
       washMesh.position.set(x, centerY, centerZ);
       this.wallSnapGuideGroup.add(washMesh);
 
-      // 2. Líneas láser superior e inferior
       const lineT = 3.5;
       const topSeamGeo = new THREE.BoxGeometry(1.5, lineT, depth);
       const topSeam = new THREE.Mesh(topSeamGeo, laserMat);
@@ -6876,7 +6951,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Soft rounded pill background
       ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
       ctx.strokeStyle = '#06b6d4';
       ctx.lineWidth = 3.5;
@@ -6885,13 +6959,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
       ctx.fill();
       ctx.stroke();
 
-      // Text with cyan accent
       ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, canvas.width / 2, canvas.height / 2);
     }
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
     const mat = new THREE.SpriteMaterial({
@@ -6905,7 +6979,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
   }
 
   // --- SMART MAGNETIC SNAP & SUPPORT OVER TABLE LEGS ---
-
   private applyTableLegSnap(
     part: Part,
     proposedPos: { x: number; y: number; z: number },
@@ -6927,19 +7000,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const legHeight = leg.height || 720;
       const legTopY = legBaseY + legHeight;
 
-      // Distance from the bottom face of the piece to the top face of the leg
       const distFromTop = proposedMinY - legTopY;
-
-      // If user is intentionally moving UPWARDS away from the leg, do not stick to the leg below
       if (direction === 'up' && distFromTop > 2) {
         continue;
       }
 
-      // Footprint in horizontal plane (X, Z) with catchment margin (60 mm)
       const rot = ((leg.rotation || 0) % 360 + 360) % 360;
       const isRot90 = rot === 90 || rot === 270;
       const legDimX = isRot90 ? (leg.depth || 600) : (leg.width || 600);
       const legDimZ = isRot90 ? (leg.width || 600) : (leg.depth || 600);
+
       const halfW = legDimX / 2;
       const halfD = legDimZ / 2;
       const legMinX = (leg.position.x ?? 0) - halfW;
@@ -6953,7 +7023,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       if (!overlapX || !overlapZ) continue;
 
-      // Proximity magnet: within 25mm above top face, OR downward drag trying to penetrate below
       const isApproachingAbove = distFromTop >= 0 && distFromTop <= threshold;
       const isAttemptingToSink = distFromTop < 0 && distFromTop >= -threshold && direction !== 'up';
 
@@ -6962,7 +7031,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
         let snappedX = proposedPos.x;
         let snappedZ = proposedPos.z;
 
-        // Auto-centering snap when piece center aligns near leg center (+/- 25mm)
         if (Math.abs(proposedPos.x - leg.position.x) <= 25) {
           snappedX = leg.position.x;
         }
@@ -7012,7 +7080,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const legDimX = isRot90 ? (leg.depth || 600) : (leg.width || 600);
     const legDimZ = isRot90 ? (leg.width || 600) : (leg.depth || 600);
 
-    // Calculate contact rectangle
     const minX = Math.max(partBounds.minX, leg.position.x - legDimX / 2);
     const maxX = Math.min(partBounds.maxX, leg.position.x + legDimX / 2);
     const minZ = Math.max(partBounds.minZ, leg.position.z - legDimZ / 2);
@@ -7023,7 +7090,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const centerX = (minX + maxX) / 2;
     const centerZ = (minZ + maxZ) / 2;
 
-    // 1. Translucent glowing wash at the support contact plane
     const washGeo = new THREE.PlaneGeometry(contactW, contactD);
     const washMat = new THREE.MeshBasicMaterial({
       color: 0x10b981,
@@ -7037,7 +7103,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
     washMesh.position.set(centerX, legTopY + 0.6, centerZ);
     this.legSnapGuideGroup.add(washMesh);
 
-    // 2. High-visibility emerald laser boundary line
     const boxGeo = new THREE.BoxGeometry(contactW, 3, contactD);
     const edgeLinesGeo = new THREE.EdgesGeometry(boxGeo);
     const laserMat = new THREE.LineBasicMaterial({
@@ -7049,7 +7114,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
     perimeterLines.position.set(centerX, legTopY + 0.8, centerZ);
     this.legSnapGuideGroup.add(perimeterLines);
 
-    // 3. Technical floating 3D badge with elevation and zero clearance
     const badgeText = `🧲 Apoyo en Patas de Mesa · Cota Superior (${legTopY} mm)`;
     const badgeSprite = this.createLegSnapBadge(badgeText);
     badgeSprite.position.set(centerX, Math.max(legTopY + 80, partBounds.maxY + 60), centerZ);
@@ -7077,6 +7141,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       ctx.textBaseline = 'middle';
       ctx.fillText(text, canvas.width / 2, canvas.height / 2);
     }
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
     const mat = new THREE.SpriteMaterial({
@@ -7127,6 +7192,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       linewidth: 3,
       depthTest: false
     });
+
     const washMat = new THREE.MeshBasicMaterial({
       color: 0x0284c7,
       transparent: true,
@@ -7209,7 +7275,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.magneticSnapGroup.add(perimeterLines);
     }
 
-    const targetLabel = targetPart.name || 'Pieza';
+    const targetLabel = targetPart.groupName || targetPart.moduleName || targetPart.name || 'Pieza';
     const badgeText = `🧲 Imán: ${targetLabel} · Contacto 0 mm`;
     const badgeSprite = this.createPartSnapBadge(badgeText);
     badgeSprite.position.set(centerX, Math.max(centerY + 70, movingBounds.maxY + 50), centerZ);
@@ -7237,6 +7303,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       ctx.textBaseline = 'middle';
       ctx.fillText(text, canvas.width / 2, canvas.height / 2);
     }
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
     const mat = new THREE.SpriteMaterial({
@@ -7249,11 +7316,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return sprite;
   }
 
+  /**
+   * Calcula el imán magnético entre la caja envolvente exterior de un módulo/grupo arrastrado
+   * y otros módulos o piezas externas, permitiendo adosar muebles lado a lado, alinearlos al fondo
+   * o apilarlos verticalmente sin deformar el conjunto ni hundirlo bajo el suelo (Y = 0).
+   */
   private calculateGroupMagneticSnap(
     groupParts: Part[],
     externalParts: Part[],
     deltas: { effDx: number; effDy: number; effDz: number },
-    threshold = 25
+    threshold = 38
   ): {
     effDx: number;
     effDy: number;
@@ -7272,113 +7344,180 @@ export class Furniture3dViewerComponent implements OnDestroy {
     let snappedZ = false;
     let snappedPair: { moving: Part; target: Part; snapFace: number; axis: 'x' | 'y' | 'z'; pos: { x: number; y: number; z: number } } | null = null;
 
+    // 1. Calcular la caja envolvente inicial y propuesta del grupo en movimiento
+    let initGrpMinX = Infinity, initGrpMaxX = -Infinity;
+    let initGrpMinY = Infinity, initGrpMaxY = -Infinity;
+    let initGrpMinZ = Infinity, initGrpMaxZ = -Infinity;
+
+    for (const gp of groupParts) {
+      const b = this.getPartBounds(gp);
+      initGrpMinX = Math.min(initGrpMinX, b.minX);
+      initGrpMaxX = Math.max(initGrpMaxX, b.maxX);
+      initGrpMinY = Math.min(initGrpMinY, b.minY);
+      initGrpMaxY = Math.max(initGrpMaxY, b.maxY);
+      initGrpMinZ = Math.min(initGrpMinZ, b.minZ);
+      initGrpMaxZ = Math.max(initGrpMaxZ, b.maxZ);
+    }
+
+    const propMinX = initGrpMinX + deltas.effDx;
+    const propMaxX = initGrpMaxX + deltas.effDx;
+    const propMinY = initGrpMinY + deltas.effDy;
+    const propMaxY = initGrpMaxY + deltas.effDy;
+    const propMinZ = initGrpMinZ + deltas.effDz;
+    const propMaxZ = initGrpMaxZ + deltas.effDz;
+
+    // 2. Construir objetivos externos: cajas envolventes por cada grupo externo + piezas sueltas
+    const visibleExternals = externalParts.filter(ep => !this.hiddenPartIds().has(ep.id));
+    const targetBoxes: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number; repPart: Part }[] = [];
+
+    const externalGroupsMap = new Map<string, Part[]>();
+    for (const ep of visibleExternals) {
+      if (ep.groupId) {
+        const list = externalGroupsMap.get(ep.groupId) || [];
+        list.push(ep);
+        externalGroupsMap.set(ep.groupId, list);
+      } else {
+        const eb = this.getPartBounds(ep);
+        targetBoxes.push({ ...eb, repPart: ep });
+      }
+    }
+
+    for (const [, gParts] of externalGroupsMap.entries()) {
+      let gMinX = Infinity, gMaxX = -Infinity;
+      let gMinY = Infinity, gMaxY = -Infinity;
+      let gMinZ = Infinity, gMaxZ = -Infinity;
+      for (const p of gParts) {
+        const b = this.getPartBounds(p);
+        gMinX = Math.min(gMinX, b.minX);
+        gMaxX = Math.max(gMaxX, b.maxX);
+        gMinY = Math.min(gMinY, b.minY);
+        gMaxY = Math.max(gMaxY, b.maxY);
+        gMinZ = Math.min(gMinZ, b.minZ);
+        gMaxZ = Math.max(gMaxZ, b.maxZ);
+      }
+      targetBoxes.push({
+        minX: gMinX,
+        maxX: gMaxX,
+        minY: gMinY,
+        maxY: gMaxY,
+        minZ: gMinZ,
+        maxZ: gMaxZ,
+        repPart: gParts[0]
+      });
+    }
+
     let bestDistX = threshold;
     let bestDistY = threshold;
     let bestDistZ = threshold;
+    const catchment = 140;
+    const repMovingPart = groupParts[0];
 
-    for (const gp of groupParts) {
-      const curProposedPos = {
-        x: (gp.posX ?? 0) + deltas.effDx,
-        y: Math.max(0, (gp.posY ?? 0) + deltas.effDy),
-        z: (gp.posZ ?? 0) + deltas.effDz
-      };
-      const movingBounds = this.getPartBounds(gp, curProposedPos);
-      const hx = movingBounds.sx / 2;
-      const hy = movingBounds.sy / 2;
-      const hz = movingBounds.sz / 2;
+    for (const ext of targetBoxes) {
+      const overlapX = propMinX <= ext.maxX + catchment && propMaxX >= ext.minX - catchment;
+      const overlapY = propMinY <= ext.maxY + catchment && propMaxY >= ext.minY - catchment;
+      const overlapZ = propMinZ <= ext.maxZ + catchment && propMaxZ >= ext.minZ - catchment;
 
-      for (const ext of externalParts) {
-        const extBounds = this.getPartBounds(ext);
+      // --- EJE X (Adosar módulos lado a lado o enrasar laterales) ---
+      if (overlapY && overlapZ) {
+        const xCandidates = [
+          { corr: ext.maxX - propMinX, face: ext.maxX }, // Lateral izq toca lateral der externo
+          { corr: ext.minX - propMaxX, face: ext.minX }, // Lateral der toca lateral izq externo
+          { corr: ext.minX - propMinX, face: ext.minX }, // Enrasar caras izquierdas
+          { corr: ext.maxX - propMaxX, face: ext.maxX }  // Enrasar caras derechas
+        ];
+        for (const cand of xCandidates) {
+          const dist = Math.abs(cand.corr);
+          if (dist < bestDistX) {
+            bestDistX = dist;
+            resDx = Math.round(deltas.effDx + cand.corr);
+            snappedX = true;
+            snappedPair = {
+              moving: repMovingPart,
+              target: ext.repPart,
+              snapFace: cand.face,
+              axis: 'x',
+              pos: {
+                x: (repMovingPart.posX ?? 0) + resDx,
+                y: (repMovingPart.posY ?? 0) + resDy,
+                z: (repMovingPart.posZ ?? 0) + resDz
+              }
+            };
+          }
+        }
+      }
 
-        // --- Axis Y ---
-        const overlapX = movingBounds.minX < extBounds.maxX + 40 && movingBounds.maxX > extBounds.minX - 40;
-        const overlapZ = movingBounds.minZ < extBounds.maxZ + 40 && movingBounds.maxZ > extBounds.minZ - 40;
-        if (overlapX && overlapZ) {
-          const yCandidates = [
-            { val: extBounds.maxY + hy, face: extBounds.maxY },
-            { val: extBounds.minY - hy, face: extBounds.minY },
-            { val: extBounds.maxY - hy, face: extBounds.maxY },
-            { val: extBounds.minY + hy, face: extBounds.minY }
-          ];
-          for (const cand of yCandidates) {
-            const dist = Math.abs(curProposedPos.y - cand.val);
-            if (dist < bestDistY) {
-              bestDistY = dist;
-              resDy = cand.val - (gp.posY ?? 0);
-              snappedY = true;
+      // --- EJE Z (Alinear espaldas/frentes o adosar en profundidad) ---
+      if (overlapX && overlapY) {
+        const zCandidates = [
+          { corr: ext.minZ - propMinZ, face: ext.minZ }, // Enrasar fondos traseros
+          { corr: ext.maxZ - propMaxZ, face: ext.maxZ }, // Enrasar frentes
+          { corr: ext.maxZ - propMinZ, face: ext.maxZ }, // Fondo toca frente externo
+          { corr: ext.minZ - propMaxZ, face: ext.minZ }  // Frente toca fondo externo
+        ];
+        for (const cand of zCandidates) {
+          const dist = Math.abs(cand.corr);
+          if (dist < bestDistZ) {
+            bestDistZ = dist;
+            resDz = Math.round(deltas.effDz + cand.corr);
+            snappedZ = true;
+            if (!snappedX) {
               snappedPair = {
-                moving: gp,
-                target: ext,
+                moving: repMovingPart,
+                target: ext.repPart,
                 snapFace: cand.face,
-                axis: 'y',
-                pos: { x: curProposedPos.x, y: cand.val, z: curProposedPos.z }
+                axis: 'z',
+                pos: {
+                  x: (repMovingPart.posX ?? 0) + resDx,
+                  y: (repMovingPart.posY ?? 0) + resDy,
+                  z: (repMovingPart.posZ ?? 0) + resDz
+                }
               };
             }
           }
         }
+      }
 
-        // --- Axis X ---
-        const overlapY = movingBounds.minY < extBounds.maxY + 40 && movingBounds.maxY > extBounds.minY - 40;
-        if (overlapY && overlapZ) {
-          const xCandidates = [
-            { val: extBounds.minX - hx, face: extBounds.minX },
-            { val: extBounds.maxX + hx, face: extBounds.maxX },
-            { val: extBounds.minX + hx, face: extBounds.minX },
-            { val: extBounds.maxX - hx, face: extBounds.maxX },
-            { val: (extBounds.minX + extBounds.maxX) / 2, face: (extBounds.minX + extBounds.maxX) / 2 }
-          ];
-          for (const cand of xCandidates) {
-            const dist = Math.abs(curProposedPos.x - cand.val);
-            if (dist < bestDistX) {
-              bestDistX = dist;
-              resDx = cand.val - (gp.posX ?? 0);
-              snappedX = true;
-              if (!snappedPair) {
-                snappedPair = {
-                  moving: gp,
-                  target: ext,
-                  snapFace: cand.face,
-                  axis: 'x',
-                  pos: { x: cand.val, y: curProposedPos.y, z: curProposedPos.z }
-                };
-              }
-            }
-          }
-        }
-
-        // --- Axis Z ---
-        if (overlapX && overlapY) {
-          const zCandidates = [
-            { val: extBounds.minZ - hz, face: extBounds.minZ },
-            { val: extBounds.maxZ + hz, face: extBounds.maxZ },
-            { val: extBounds.minZ + hz, face: extBounds.minZ },
-            { val: extBounds.maxZ - hz, face: extBounds.maxZ },
-            { val: (extBounds.minZ + extBounds.maxZ) / 2, face: (extBounds.minZ + extBounds.maxZ) / 2 }
-          ];
-          for (const cand of zCandidates) {
-            const dist = Math.abs(curProposedPos.z - cand.val);
-            if (dist < bestDistZ) {
-              bestDistZ = dist;
-              resDz = cand.val - (gp.posZ ?? 0);
-              snappedZ = true;
-              if (!snappedPair) {
-                snappedPair = {
-                  moving: gp,
-                  target: ext,
-                  snapFace: cand.face,
-                  axis: 'z',
-                  pos: { x: curProposedPos.x, y: curProposedPos.y, z: cand.val }
-                };
-              }
+      // --- EJE Y (Apilar módulos verticalmente o nivelar alturas) ---
+      if (overlapX && overlapZ) {
+        const yCandidates = [
+          { corr: ext.maxY - propMinY, face: ext.maxY }, // Apoyar base sobre techo de otro módulo
+          { corr: ext.minY - propMaxY, face: ext.minY }, // Tocar con techo la base de módulo superior
+          { corr: ext.maxY - propMaxY, face: ext.maxY }, // Nivelar techos (ej. alacenas aéreas)
+          { corr: ext.minY - propMinY, face: ext.minY }  // Nivelar bases
+        ];
+        for (const cand of yCandidates) {
+          const candidateNewMinY = initGrpMinY + deltas.effDy + cand.corr;
+          if (candidateNewMinY < -0.5) continue; // Nunca permitir que el imán hunda el módulo bajo el suelo
+          const dist = Math.abs(cand.corr);
+          if (dist < bestDistY) {
+            bestDistY = dist;
+            resDy = Math.round(deltas.effDy + cand.corr);
+            snappedY = true;
+            if (!snappedX && !snappedZ) {
+              snappedPair = {
+                moving: repMovingPart,
+                target: ext.repPart,
+                snapFace: cand.face,
+                axis: 'y',
+                pos: {
+                  x: (repMovingPart.posX ?? 0) + resDx,
+                  y: (repMovingPart.posY ?? 0) + resDy,
+                  z: (repMovingPart.posZ ?? 0) + resDz
+                }
+              };
             }
           }
         }
       }
     }
 
+    // Garantizar que el delta Y nunca hunda la base del módulo por debajo de Y = 0
+    const minAllowedDy = -initGrpMinY;
+    resDy = Math.max(minAllowedDy, resDy);
+
     return {
       effDx: resDx,
-      effDy: Math.max(0, resDy),
+      effDy: resDy,
       effDz: resDz,
       snappedX,
       snappedY,

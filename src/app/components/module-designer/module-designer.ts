@@ -1256,7 +1256,8 @@ export class ModuleDesignerComponent {
 
   /**
    * Actualiza las propiedades de la pieza seleccionada. Si se modifican coordenadas espaciales
-   * (posX, posY, posZ) y la pieza pertenece a un grupo, desplaza todo el grupo en bloque.
+   * (posX, posY, posZ) y la pieza pertenece a un grupo, desplaza todo el grupo en bloque
+   * impidiendo que cualquier pieza o módulo sobrepase el nivel del suelo (Y = 0).
    */
   updateSelectedPart(changes: Partial<Part>) {
     const current = this.selectedPart();
@@ -1264,8 +1265,21 @@ export class ModuleDesignerComponent {
 
     if (current.groupId && (changes.posX !== undefined || changes.posY !== undefined || changes.posZ !== undefined)) {
       const dx = changes.posX !== undefined ? changes.posX - (current.posX ?? 0) : 0;
-      const dy = changes.posY !== undefined ? changes.posY - (current.posY ?? 0) : 0;
+      let dy = changes.posY !== undefined ? changes.posY - (current.posY ?? 0) : 0;
       const dz = changes.posZ !== undefined ? changes.posZ - (current.posZ ?? 0) : 0;
+
+      if (dy !== 0) {
+        const groupParts = this.currentParts().filter(p => p.groupId === current.groupId);
+        let grpMinY = Infinity;
+        for (const gp of groupParts) {
+          const b = this.joineryEngine.getPartBounds(gp);
+          if (b.minY < grpMinY) grpMinY = b.minY;
+        }
+        if (grpMinY !== Infinity) {
+          dy = Math.max(-grpMinY, dy);
+        }
+      }
+
       if (dx !== 0 || dy !== 0 || dz !== 0) {
         this.projectService.moveGroup(current.groupId, dx, dy, dz);
         const nonPosChanges = { ...changes };
@@ -1283,6 +1297,14 @@ export class ModuleDesignerComponent {
       ...current,
       ...changes
     };
+
+    // Asegurar que la base inferior de la pieza nunca quede por debajo del piso (minY >= 0)
+    const bounds = this.joineryEngine.getPartBounds(updated);
+    const minPosY = Math.round(bounds.sy / 2);
+    if ((updated.posY ?? 0) < minPosY) {
+      updated.posY = minPosY;
+    }
+
     this.projectService.updatePart(updated);
   }
 
