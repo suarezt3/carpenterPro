@@ -684,40 +684,46 @@
     @if (!isSidebarCollapsed()) {
       <div class="w-full lg:w-80 xl:w-84 2xl:w-92 min-[2200px]:w-104 shrink-0 bg-white border border-slate-200 rounded-2xl shadow-md overflow-hidden flex flex-col h-full min-h-0 text-slate-800">
 
-        <!-- Cabecera de Pestañas de la Bandeja -->
-        <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-1 shrink-0">
+<!-- Cabecera de Pestañas de la Bandeja -->
+        <div class="flex items-center justify-between border-b border-slate-200 bg-slate-100/90 p-1 gap-1 shrink-0">
           <div class="flex items-center gap-1 flex-1 min-w-0">
             <button
               type="button"
               (click)="activeDockTab.set('piece')"
-              [class]="activeDockTab() === 'piece' ? 'bg-white text-sky-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
-              class="flex-1 py-1.5 px-1.5 text-[11px] xl:text-xs rounded-xl flex items-center justify-center gap-1 transition cursor-pointer min-w-0">
-              <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-              <span class="truncate">Propiedades</span>
+              [class]="activeDockTab() === 'piece'
+                ? 'bg-white text-sky-700 font-bold shadow-xs border border-slate-200/90 ring-1 ring-sky-500/15'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'"
+              class="flex-auto py-1.5 px-2.5 text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap">
+              <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-sky-600]="activeDockTab() === 'piece'"></hugeicons-icon>
+              <span>Propiedades</span>
               @if (selectedPart()) {
-                <span class="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0 animate-pulse"></span>
               }
             </button>
 
             <button
               type="button"
               (click)="activeDockTab.set('catalog')"
-              [class]="activeDockTab() === 'catalog' ? 'bg-white text-amber-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
-              class="flex-1 py-1.5 px-1.5 text-[11px] xl:text-xs rounded-xl flex items-center justify-center gap-1 transition cursor-pointer min-w-0">
-              <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-              <span class="truncate">Catálogo</span>
+              [class]="activeDockTab() === 'catalog'
+                ? 'bg-white text-amber-700 font-bold shadow-xs border border-slate-200/90 ring-1 ring-amber-500/15'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'"
+              class="flex-auto py-1.5 px-2 text-xs rounded-xl flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap">
+              <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.2" class="shrink-0" [class.text-amber-600]="activeDockTab() === 'catalog'"></hugeicons-icon>
+              <span>Catálogo</span>
             </button>
 
             <button
               type="button"
               (click)="activeDockTab.set('appliances')"
-              [class]="activeDockTab() === 'appliances' ? 'bg-white text-emerald-700 font-bold shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'"
-              class="flex-1 py-1.5 px-1.5 text-[11px] xl:text-xs rounded-xl flex items-center justify-center gap-1 transition cursor-pointer min-w-0"
+              [class]="activeDockTab() === 'appliances'
+                ? 'bg-white text-emerald-700 font-bold shadow-xs border border-slate-200/90 ring-1 ring-emerald-500/15'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'"
+              class="flex-auto py-1.5 px-2 text-xs rounded-xl flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
               title="Repositorio y catálogo 3D de electrodomésticos y accesorios">
-              <hugeicons-icon [icon]="icons.appliance" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-              <span class="truncate">Equipos</span>
+              <hugeicons-icon [icon]="icons.appliance" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-emerald-600]="activeDockTab() === 'appliances'"></hugeicons-icon>
+              <span>Equipos</span>
               @if (appliances().length > 0) {
-                <span class="px-1 py-0.2 rounded-full text-[9px] bg-emerald-100 text-emerald-800 font-bold shrink-0">
+                <span class="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-100 text-emerald-800 font-bold shrink-0">
                   {{ appliances().length }}
                 </span>
               }
@@ -727,30 +733,42 @@
           <button
             type="button"
             (click)="toggleSidebar()"
-            class="p-1 text-slate-400 hover:text-slate-700 rounded-lg ml-0.5 cursor-pointer flex items-center justify-center shrink-0"
+            class="w-7 h-7 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg cursor-pointer flex items-center justify-center shrink-0 transition"
             title="Colapsar bandeja lateral (100% pantalla 3D)">
             <hugeicons-icon [icon]="icons.chevronRight" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           </button>
         </div>
 
-        <!-- PESTAÑA 1: PROPIEDADES DE LA PIEZA SELECCIONADA -->
+<!-- PESTAÑA 1: PROPIEDADES DE LA PIEZA SELECCIONADA -->
         @if (activeDockTab() === 'piece') {
-          <div class="p-3.5 space-y-3.5 overflow-y-auto flex-1 min-h-0">
+          <div class="p-3 space-y-3 overflow-y-auto scrollbar-thin flex-1 min-h-0">
 
             @if (selectedPart(); as sel) {
 
-              <!-- Nombre y Geometría de la Pieza -->
-              <div class="pb-2.5 border-b border-slate-200 space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <span class="text-[11px] font-bold uppercase tracking-wider text-sky-700 flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="1.9" class="text-sky-600 shrink-0"></hugeicons-icon>
-                    <span>Pieza Seleccionada</span>
-                  </span>
+              <!-- 1. CABECERA: NOMBRE DE LA PIEZA, MÓDULO Y ORIENTACIÓN RÁPIDA -->
+              <div class="p-2.5 bg-slate-50/90 border border-slate-200 rounded-xl space-y-2 shadow-2xs">
+                <div class="flex items-center justify-between gap-1.5">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-sky-700 truncate">
+                      Pieza Seleccionada
+                    </span>
+                    @if (getGroupName(sel.groupId); as gName) {
+                      <button
+                        type="button"
+                        (click)="sel.groupId && selectEntireGroup(sel.groupId)"
+                        class="inline-flex items-center gap-1 px-1.5 py-0.2 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 rounded text-[9px] font-bold truncate max-w-28 transition cursor-pointer"
+                        title="Seleccionar todo el grupo: {{ gName }}">
+                        <hugeicons-icon [icon]="icons.inbox" [size]="10" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span class="truncate">{{ gName }}</span>
+                      </button>
+                    }
+                  </div>
                   <button
                     type="button"
                     (click)="deselectPart()"
-                    class="text-slate-400 hover:text-slate-700 cursor-pointer flex items-center justify-center"
-                    title="Cerrar inspector">
+                    class="text-slate-400 hover:text-slate-700 p-0.5 rounded-md hover:bg-slate-200/60 cursor-pointer flex items-center justify-center transition"
+                    title="Deseleccionar pieza (Esc)">
                     <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                   </button>
                 </div>
@@ -760,18 +778,77 @@
                   type="text"
                   [value]="sel.name"
                   (input)="updateSelectedPart({ name: $any($event.target).value })"
-                  class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-hidden focus:border-sky-500 focus:bg-white"
+                  class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-2xs transition"
                   placeholder="Nombre de la pieza" />
 
-                <!-- Controles Paramétricos para Pieza Circular o Dibujo Libre -->
+                <!-- Selector Rápido de Disposición / Orientación en 3D -->
+                <div class="pt-1">
+                  <div class="flex items-center justify-between text-[10px] text-slate-500 font-semibold mb-1">
+                    <span>Disposición en el Mueble:</span>
+                    <button
+                      type="button"
+                      (click)="rotateSelectedPart90('y')"
+                      class="text-[10px] font-bold text-amber-600 hover:text-amber-700 flex items-center gap-0.5 cursor-pointer"
+                      title="Girar 90° e intercambiar Largo/Ancho (Tecla R)">
+                      <hugeicons-icon [icon]="icons.rotateRight" [size]="11" [strokeWidth]="2"></hugeicons-icon>
+                      <span>Girar 90° (R)</span>
+                    </button>
+                  </div>
+                  <div class="grid grid-cols-3 gap-1 bg-slate-200/70 p-0.5 rounded-lg text-[10px]">
+                    <button
+                      type="button"
+                      (click)="setPartOrientation('horizontal')"
+                      [class]="(sel.orientation || 'horizontal') === 'horizontal'
+                        ? 'bg-white text-sky-700 font-bold shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 font-medium'"
+                      class="py-1 px-1 rounded-md text-center transition cursor-pointer truncate"
+                      title="Horizontal: Piso, Techo, Mesada o Repisa">
+                      Horizontal
+                    </button>
+                    <button
+                      type="button"
+                      (click)="setPartOrientation('vertical_yz')"
+                      [class]="sel.orientation === 'vertical_yz'
+                        ? 'bg-white text-sky-700 font-bold shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 font-medium'"
+                      class="py-1 px-1 rounded-md text-center transition cursor-pointer truncate"
+                      title="Lateral (YZ): Costado Izquierdo, Derecho o División">
+                      Lateral (YZ)
+                    </button>
+                    <button
+                      type="button"
+                      (click)="setPartOrientation('vertical_xy')"
+                      [class]="sel.orientation === 'vertical_xy'
+                        ? 'bg-white text-sky-700 font-bold shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 font-medium'"
+                      class="py-1 px-1 rounded-md text-center transition cursor-pointer truncate"
+                      title="Frontal (XY): Puerta, Frente de Cajón, Fondo o Zócalo">
+                      Frontal (XY)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. DIMENSIONES DE CORTE (LARGO × ANCHO × ESPESOR) -->
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.ruler" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                    <span>Medidas de la Pieza</span>
+                  </span>
+                  <span class="text-[10px] font-mono font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
+                    {{ sel.length }} × {{ sel.width }} × {{ sel.thickness }} mm
+                  </span>
+                </div>
+
                 @if (sel.shapeType === 'circle') {
-                  <div class="p-2.5 bg-sky-50/80 border border-sky-200 rounded-xl space-y-1.5">
+                  <div class="p-2 bg-sky-50/80 border border-sky-200 rounded-lg space-y-1.5">
                     <div class="flex items-center justify-between">
-                      <span class="text-xs font-bold text-sky-900 flex items-center gap-1.5">
-                        <hugeicons-icon [icon]="icons.circleShape" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-                        <span>Pieza Circular (Cilindro / Rueda)</span>
+                      <span class="text-[11px] font-bold text-sky-900 flex items-center gap-1">
+                        <hugeicons-icon [icon]="icons.circleShape" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                        <span>Pieza Circular</span>
                       </span>
-                      <span class="text-[10px] font-mono font-bold bg-sky-100 text-sky-800 px-2 py-0.5 rounded">
+                      <span class="text-[10px] font-mono font-bold bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded">
                         Ø {{ sel.diameter || sel.length }} mm
                       </span>
                     </div>
@@ -787,7 +864,7 @@
                           class="w-full mt-0.5 px-2 py-1 bg-white border border-sky-200 rounded-lg text-center font-bold text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 shadow-2xs" />
                       </div>
                       <div>
-                        <span class="text-[10px] text-slate-500 font-medium">Longitud Eje (mm):</span>
+                        <span class="text-[10px] text-slate-500 font-medium">Altura / Eje (mm):</span>
                         <input
                           type="number"
                           min="10"
@@ -798,226 +875,76 @@
                       </div>
                     </div>
                   </div>
-                } @else if (sel.shapeType === 'freehand') {
-                  <div class="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-1">
-                    <div class="flex items-center justify-between">
-                      <span class="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                        <hugeicons-icon [icon]="icons.freehandWave" [size]="13" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
-                        <span>Geometría de Dibujo Libre</span>
-                      </span>
-                      <span class="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
-                        {{ sel.contourPoints?.length || 0 }} vértices
-                      </span>
-                    </div>
-                    <p class="text-[10px] text-emerald-700 leading-tight">
-                      Polígono libre extruido paramétricamente a {{ sel.thickness }} mm con caja envolvente de corte de {{ sel.length }} × {{ sel.width }} mm.
-                    </p>
-                  </div>
-                }
-
-                <!-- ROTACIÓN Y ORIENTACIÓN 3D (EJES X, Y, Z) -->
-                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-                      <span>Rotación 3D (Ejes X, Y, Z)</span>
-                    </span>
-                    <button
-                      type="button"
-                      (click)="resetSelectedPartRotation()"
-                      class="text-[10px] font-bold text-sky-600 hover:text-sky-800 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs transition cursor-pointer">
-                      0° Reset
-                    </button>
-                  </div>
-
-                  <div class="grid grid-cols-3 gap-1.5 text-xs">
-                    <!-- EJE X -->
-                    <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-rose-500">
-                      <div class="flex items-center justify-between text-[10px] font-extrabold text-rose-600 font-mono">
-                        <span>GIRO X</span>
-                        <span class="font-mono text-slate-700">{{ sel.rotationX || 0 }}°</span>
-                      </div>
-                      <div class="flex items-center gap-1 my-1">
-                        <button type="button" (click)="rotateSelectedPart3DAngle('x', -90)" class="flex-1 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px] cursor-pointer" title="-90° X">-90°</button>
-                        <button type="button" (click)="rotateSelectedPart3DAngle('x', 90)" class="flex-1 py-0.5 bg-rose-500 hover:bg-rose-600 text-white rounded font-bold text-[10px] cursor-pointer" title="+90° X">+90°</button>
-                      </div>
-                      <input
-                        type="number"
-                        step="15"
-                        [value]="sel.rotationX || 0"
-                        (input)="setPartRotationAngle('x', +$any($event.target).value)"
-                        class="w-full text-center font-mono font-bold text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded py-0.5 focus:outline-hidden focus:border-rose-500" />
-                    </div>
-
-                    <!-- EJE Y -->
-                    <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-emerald-500">
-                      <div class="flex items-center justify-between text-[10px] font-extrabold text-emerald-600 font-mono">
-                        <span>GIRO Y</span>
-                        <span class="font-mono text-slate-700">{{ sel.rotationY || 0 }}°</span>
-                      </div>
-                      <div class="flex items-center gap-1 my-1">
-                        <button type="button" (click)="rotateSelectedPart3DAngle('y', -90)" class="flex-1 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px] cursor-pointer" title="-90° Y">-90°</button>
-                        <button type="button" (click)="rotateSelectedPart3DAngle('y', 90)" class="flex-1 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded font-bold text-[10px] cursor-pointer" title="+90° Y">+90°</button>
-                      </div>
-                      <input
-                        type="number"
-                        step="15"
-                        [value]="sel.rotationY || 0"
-                        (input)="setPartRotationAngle('y', +$any($event.target).value)"
-                        class="w-full text-center font-mono font-bold text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded py-0.5 focus:outline-hidden focus:border-emerald-500" />
-                    </div>
-
-                    <!-- EJE Z -->
-                    <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-sky-500">
-                      <div class="flex items-center justify-between text-[10px] font-extrabold text-sky-600 font-mono">
-                        <span>GIRO Z</span>
-                        <span class="font-mono text-slate-700">{{ sel.rotationZ || 0 }}°</span>
-                      </div>
-                      <div class="flex items-center gap-1 my-1">
-                        <button type="button" (click)="rotateSelectedPart3DAngle('z', -90)" class="flex-1 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px] cursor-pointer" title="-90° Z">-90°</button>
-                        <button type="button" (click)="rotateSelectedPart3DAngle('z', 90)" class="flex-1 py-0.5 bg-sky-500 hover:bg-sky-600 text-white rounded font-bold text-[10px] cursor-pointer" title="+90° Z">+90°</button>
-                      </div>
-                      <input
-                        type="number"
-                        step="15"
-                        [value]="sel.rotationZ || 0"
-                        (input)="setPartRotationAngle('z', +$any($event.target).value)"
-                        class="w-full text-center font-mono font-bold text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded py-0.5 focus:outline-hidden focus:border-sky-500" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- LUZ LIBRE Y HUECOS ÚTILES -->
-              @if (clearanceInfo(); as clr) {
-                @if (clr.topClearance !== null || clr.bottomClearance !== null || clr.leftClearance !== null || clr.rightClearance !== null) {
-                  <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
-                    <div class="flex items-center justify-between">
-                      <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <hugeicons-icon [icon]="icons.clearanceVert" [size]="14" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
-                        <span>Luz Libre (Espacio Interior Útil)</span>
-                      </span>
-                      <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono border border-emerald-200">
-                        CAD 3D
-                      </span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                      <div class="p-2 bg-white rounded-lg border border-slate-200">
-                        <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
-                          <hugeicons-icon [icon]="icons.arrowUp" [size]="12" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
-                          <span>Hacia Arriba:</span>
+                } @else {
+                  <!-- Largo y Ancho para piezas rectangulares o de dibujo libre -->
+                  <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-bold text-slate-700">
+                          {{ sel.orientation === 'vertical_yz' ? 'Alto / Largo' : 'Largo' }}
                         </span>
-                        @if (clr.topClearance !== null) {
-                          <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.topClearance }} mm</p>
-                          <p class="text-[9px] text-slate-400 truncate" [title]="clr.topNeighborName || ''">
-                            hasta {{ clr.topNeighborName }}
-                          </p>
-                        } @else {
-                          <p class="font-mono text-slate-400 text-xs italic">Espacio abierto</p>
-                        }
+                        <span class="text-[9px] font-mono text-slate-400">mm</span>
                       </div>
-
-                      <div class="p-2 bg-white rounded-lg border border-slate-200">
-                        <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
-                          <hugeicons-icon [icon]="icons.arrowDown" [size]="12" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
-                          <span>Hacia Abajo:</span>
-                        </span>
-                        @if (clr.bottomClearance !== null) {
-                          <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.bottomClearance }} mm</p>
-                          <p class="text-[9px] text-slate-400 truncate" [title]="clr.bottomNeighborName || ''">
-                            hasta {{ clr.bottomNeighborName }}
-                          </p>
-                        } @else {
-                          <p class="font-mono text-slate-400 text-xs italic">Hasta el suelo</p>
-                        }
+                      <div class="flex items-center gap-1">
+                        <button
+                          type="button"
+                          (click)="adjustPartProperty('length', -10)"
+                          class="w-6 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold flex items-center justify-center transition cursor-pointer"
+                          title="-10 mm">-</button>
+                        <input
+                          type="number"
+                          min="20"
+                          step="1"
+                          [value]="sel.length"
+                          (input)="updateSelectedPart({ length: +$any($event.target).value })"
+                          class="w-full h-7 px-1 bg-slate-50 focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500" />
+                        <button
+                          type="button"
+                          (click)="adjustPartProperty('length', 10)"
+                          class="w-6 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold flex items-center justify-center transition cursor-pointer"
+                          title="+10 mm">+</button>
                       </div>
+                    </div>
 
-                      <div class="p-2 bg-white rounded-lg border border-slate-200">
-                        <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
-                          <hugeicons-icon [icon]="icons.arrowLeft" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-                          <span>Hacia Izquierda:</span>
+                    <div class="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-bold text-slate-700">
+                          {{ sel.orientation === 'vertical_xy' ? 'Alto / Ancho' : 'Ancho / Prof.' }}
                         </span>
-                        @if (clr.leftClearance !== null) {
-                          <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.leftClearance }} mm</p>
-                          <p class="text-[9px] text-slate-400 truncate" [title]="clr.leftNeighborName || ''">
-                            hasta {{ clr.leftNeighborName }}
-                          </p>
-                        } @else {
-                          <p class="font-mono text-slate-400 text-xs italic">Espacio abierto</p>
-                        }
+                        <span class="text-[9px] font-mono text-slate-400">mm</span>
                       </div>
-
-                      <div class="p-2 bg-white rounded-lg border border-slate-200">
-                        <span class="text-[10px] text-slate-500 flex items-center gap-1 mb-0.5">
-                          <hugeicons-icon [icon]="icons.arrowRight" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-                          <span>Hacia Derecha:</span>
-                        </span>
-                        @if (clr.rightClearance !== null) {
-                          <p class="font-mono font-bold text-slate-900 text-sm">{{ clr.rightClearance }} mm</p>
-                          <p class="text-[9px] text-slate-400 truncate" [title]="clr.rightNeighborName || ''">
-                            hasta {{ clr.rightNeighborName }}
-                          </p>
-                        } @else {
-                          <p class="font-mono text-slate-400 text-xs italic">Espacio abierto</p>
-                        }
+                      <div class="flex items-center gap-1">
+                        <button
+                          type="button"
+                          (click)="adjustPartProperty('width', -10)"
+                          class="w-6 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold flex items-center justify-center transition cursor-pointer"
+                          title="-10 mm">-</button>
+                        <input
+                          type="number"
+                          min="20"
+                          step="1"
+                          [value]="sel.width"
+                          (input)="updateSelectedPart({ width: +$any($event.target).value })"
+                          class="w-full h-7 px-1 bg-slate-50 focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500" />
+                        <button
+                          type="button"
+                          (click)="adjustPartProperty('width', 10)"
+                          class="w-6 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold flex items-center justify-center transition cursor-pointer"
+                          title="+10 mm">+</button>
                       </div>
                     </div>
                   </div>
                 }
-              }
 
-              <!-- TABLERO Y ESPESOR LIBRE -->
-              <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-                    <span>Tablero & Espesor</span>
-                  </span>
-                  <span class="text-xs font-mono font-bold text-sky-700 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
-                    {{ sel.thickness }} mm
-                  </span>
-                </div>
-
-                <!-- Selector de Color / Textura de Melamina -->
-                <div class="space-y-1">
+                <!-- Espesor de Pieza (Grosor) -->
+                <div class="pt-2 border-t border-slate-200/80 space-y-1.5">
                   <div class="flex items-center justify-between">
-                    <span class="text-[10px] text-slate-500 font-medium">Color o Textura de Melamina:</span>
-                    @if (selectedPartMaterial(); as smat) {
-                      <div class="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
-                        <span class="w-2.5 h-2.5 rounded-full border border-slate-300 shadow-2xs inline-block shrink-0" [style.background-color]="smat.colorHex"></span>
-                        <span>{{ smat.textureType === 'wood' ? 'Veta madera' : (smat.textureType === 'stone' ? 'Piedra/Mármol' : 'Color liso') }}</span>
-                      </div>
-                    }
-                  </div>
-                  <select
-                    [value]="sel.materialId"
-                    (change)="onMaterialChange($any($event.target).value)"
-                    class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition shadow-2xs cursor-pointer">
-                    @for (mat of materials(); track mat.id) {
-                      <option [value]="mat.id">
-                        {{ mat.name }}
-                      </option>
-                    }
-                  </select>
-                </div>
-
-                <!-- Asignación de Espesor Libre en mm -->
-                <div class="space-y-2 pt-2 border-t border-slate-200">
-                  <div class="flex items-center justify-between">
-                    <span class="text-[10px] text-slate-500 font-medium">Espesor de Pieza (Grosor libre):</span>
-                    <span class="text-[9px] text-slate-400 font-mono">Tipear o elegir rápido</span>
-                  </div>
-
-                  <div class="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      (click)="adjustPartProperty('thickness', -1)"
-                      class="h-8 px-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold transition flex items-center justify-center shadow-2xs cursor-pointer"
-                      title="Disminuir 1 mm">
-                      <hugeicons-icon [icon]="icons.minus" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                    </button>
-                    <div class="relative flex-1">
+                    <span class="text-[10px] text-slate-600 font-semibold">Espesor de Tablero (Grosor):</span>
+                    <div class="flex items-center gap-1">
+                      <button
+                        type="button"
+                        (click)="adjustPartProperty('thickness', -1)"
+                        class="w-5 h-5 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[11px] font-bold text-slate-600 flex items-center justify-center cursor-pointer">-</button>
                       <input
                         type="number"
                         min="1"
@@ -1025,73 +952,154 @@
                         step="1"
                         [value]="sel.thickness"
                         (input)="onThicknessChange(+$any($event.target).value)"
-                        class="w-full h-8 pl-3 pr-8 bg-white border border-slate-200 rounded-lg text-center text-xs font-bold text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition shadow-2xs"
-                        placeholder="Espesor mm" />
-                      <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono font-medium pointer-events-none">mm</span>
+                        class="w-12 h-5 bg-white border border-slate-200 rounded text-center text-[11px] font-bold text-slate-900 font-mono focus:outline-hidden focus:border-sky-500" />
+                      <span class="text-[10px] text-slate-400 font-mono">mm</span>
+                      <button
+                        type="button"
+                        (click)="adjustPartProperty('thickness', 1)"
+                        class="w-5 h-5 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[11px] font-bold text-slate-600 flex items-center justify-center cursor-pointer">+</button>
                     </div>
-                    <button
-                      type="button"
-                      (click)="adjustPartProperty('thickness', 1)"
-                      class="h-8 px-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold transition flex items-center justify-center shadow-2xs cursor-pointer"
-                      title="Aumentar 1 mm">
-                      <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                    </button>
                   </div>
 
-                  <div class="grid grid-cols-4 gap-1 pt-1">
+                  <div class="grid grid-cols-4 gap-1">
                     <button
                       type="button"
                       (click)="onThicknessChange(3)"
-                      [class]="sel.thickness === 3 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-2xs'"
-                      class="py-1 text-[11px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
+                      [class]="sel.thickness === 3 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                      class="py-1 text-[10px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
                       <span>3 mm</span>
                       <span class="text-[8px] opacity-75">Fondo</span>
                     </button>
                     <button
                       type="button"
                       (click)="onThicknessChange(15)"
-                      [class]="sel.thickness === 15 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-2xs'"
-                      class="py-1 text-[11px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
+                      [class]="sel.thickness === 15 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                      class="py-1 text-[10px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
                       <span>15 mm</span>
                       <span class="text-[8px] opacity-75">Ligero</span>
                     </button>
                     <button
                       type="button"
                       (click)="onThicknessChange(18)"
-                      [class]="sel.thickness === 18 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-2xs'"
-                      class="py-1 text-[11px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
+                      [class]="sel.thickness === 18 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                      class="py-1 text-[10px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
                       <span>18 mm</span>
                       <span class="text-[8px] opacity-75">Estándar</span>
                     </button>
                     <button
                       type="button"
                       (click)="onThicknessChange(36)"
-                      [class]="sel.thickness === 36 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-2xs'"
-                      class="py-1 text-[11px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
+                      [class]="sel.thickness === 36 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                      class="py-1 text-[10px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
                       <span>36 mm</span>
-                      <span class="text-[8px] opacity-75">Engrosado</span>
+                      <span class="text-[8px] opacity-75">Doble</span>
                     </button>
                   </div>
                 </div>
               </div>
 
-              <!-- POSICIÓN 3D EN MILÍMETROS -->
-              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
+              <!-- 3. MATERIAL MELAMINA Y TAPACANTOS (ACABADO DE LA PIEZA) -->
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                    <span>Material y Tapacantos</span>
+                  </span>
+                  @if (selectedPartMaterial(); as smat) {
+                    <span class="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                      <span class="w-2.5 h-2.5 rounded-full border border-slate-300 shadow-2xs shrink-0" [style.background-color]="smat.colorHex"></span>
+                      <span>{{ smat.textureType === 'wood' ? 'Veta madera' : (smat.textureType === 'stone' ? 'Piedra/Mármol' : 'Liso') }}</span>
+                    </span>
+                  }
+                </div>
+
+                <!-- Selector de Melamina con muestra de color integrada -->
+                <div class="flex items-center gap-2">
+                  @if (selectedPartMaterial(); as smat) {
+                    <div
+                      class="w-7 h-7 rounded-lg border border-slate-300 shadow-2xs shrink-0"
+                      [style.background-color]="smat.colorHex"
+                      [title]="smat.name">
+                    </div>
+                  }
+                  <select
+                    [value]="sel.materialId"
+                    (change)="onMaterialChange($any($event.target).value)"
+                    class="flex-1 min-w-0 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-sky-500 shadow-2xs cursor-pointer">
+                    @for (mat of materials(); track mat.id) {
+                      <option [value]="mat.id">{{ mat.name }}</option>
+                    }
+                  </select>
+                </div>
+
+                <!-- Tapacantos en los 4 Bordes (L1, L2, A1, A2) -->
+                @if ((sel.thickness || 18) > 6) {
+                  <div class="pt-2 border-t border-slate-200/80 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[10px] font-semibold text-slate-600">Tapacantos por Borde:</span>
+                      <span class="text-[9px] text-slate-400">Clic para alternar (Sin / 0.45 / 2.0mm)</span>
+                    </div>
+
+                    <div class="grid grid-cols-4 gap-1.5 text-center">
+                      <button
+                        type="button"
+                        (click)="togglePartEdge('l1')"
+                        [class]="sel.edges.l1 === 'thick' ? 'bg-amber-500 text-white font-bold border-amber-600' : (sel.edges.l1 === 'thin' ? 'bg-sky-500 text-white font-bold border-sky-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100')"
+                        class="py-1 px-1 rounded-lg border transition flex flex-col items-center shadow-2xs cursor-pointer"
+                        title="Canto Largo 1">
+                        <span class="text-[9px] uppercase font-mono">L1</span>
+                        <span class="text-[10px]">{{ sel.edges.l1 === 'thick' ? '2.0mm' : (sel.edges.l1 === 'thin' ? '0.45mm' : 'Sin') }}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="togglePartEdge('l2')"
+                        [class]="sel.edges.l2 === 'thick' ? 'bg-amber-500 text-white font-bold border-amber-600' : (sel.edges.l2 === 'thin' ? 'bg-sky-500 text-white font-bold border-sky-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100')"
+                        class="py-1 px-1 rounded-lg border transition flex flex-col items-center shadow-2xs cursor-pointer"
+                        title="Canto Largo 2">
+                        <span class="text-[9px] uppercase font-mono">L2</span>
+                        <span class="text-[10px]">{{ sel.edges.l2 === 'thick' ? '2.0mm' : (sel.edges.l2 === 'thin' ? '0.45mm' : 'Sin') }}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="togglePartEdge('a1')"
+                        [class]="sel.edges.a1 === 'thick' ? 'bg-amber-500 text-white font-bold border-amber-600' : (sel.edges.a1 === 'thin' ? 'bg-sky-500 text-white font-bold border-sky-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100')"
+                        class="py-1 px-1 rounded-lg border transition flex flex-col items-center shadow-2xs cursor-pointer"
+                        title="Canto Ancho 1">
+                        <span class="text-[9px] uppercase font-mono">A1</span>
+                        <span class="text-[10px]">{{ sel.edges.a1 === 'thick' ? '2.0mm' : (sel.edges.a1 === 'thin' ? '0.45mm' : 'Sin') }}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="togglePartEdge('a2')"
+                        [class]="sel.edges.a2 === 'thick' ? 'bg-amber-500 text-white font-bold border-amber-600' : (sel.edges.a2 === 'thin' ? 'bg-sky-500 text-white font-bold border-sky-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100')"
+                        class="py-1 px-1 rounded-lg border transition flex flex-col items-center shadow-2xs cursor-pointer"
+                        title="Canto Ancho 2">
+                        <span class="text-[9px] uppercase font-mono">A2</span>
+                        <span class="text-[10px]">{{ sel.edges.a2 === 'thick' ? '2.0mm' : (sel.edges.a2 === 'thin' ? '0.45mm' : 'Sin') }}</span>
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <!-- 4. POSICIÓN 3D EN MILÍMETROS Y ALINEACIÓN RÁPIDA -->
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-                    <span>Posición 3D en Milímetros</span>
+                    <span>Posición 3D (Coordenadas)</span>
                   </span>
-                  <span class="text-[9px] font-mono text-slate-500 font-semibold">
-                    Ejes XYZ
-                  </span>
+                  <span class="text-[9px] font-mono text-slate-400 font-semibold">Ejes X · Y · Z</span>
                 </div>
 
                 <div class="grid grid-cols-3 gap-1.5">
                   <!-- EJE X -->
-                  <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-rose-500">
+                  <div class="bg-white p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-rose-500">
                     <div class="flex items-center justify-between mb-1">
-                      <span class="text-[10px] font-extrabold text-rose-600 font-mono">EJE X</span>
+                      <span class="text-[10px] font-extrabold text-rose-600 font-mono">X</span>
                       <span class="text-[9px] text-slate-400">Izq/Der</span>
                     </div>
                     <input
@@ -1099,26 +1107,18 @@
                       step="5"
                       [value]="sel.posX ?? 0"
                       (input)="updateSelectedPart({ posX: +$any($event.target).value })"
-                      class="w-full px-1 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-rose-500 transition" />
-                    <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
-                      <button
-                        type="button"
-                        (click)="adjustPartProperty('posX', -10)"
-                        class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-rose-700 text-[9px] font-mono rounded font-bold transition cursor-pointer"
-                        title="-10 mm">-10</button>
-                      <span class="text-[9px] text-slate-400 font-mono">mm</span>
-                      <button
-                        type="button"
-                        (click)="adjustPartProperty('posX', 10)"
-                        class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-rose-700 text-[9px] font-mono rounded font-bold transition cursor-pointer"
-                        title="+10 mm">+10</button>
+                      class="w-full px-1 py-0.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-rose-500 transition" />
+                    <div class="flex items-center justify-between mt-1 pt-0.5 border-t border-slate-100">
+                      <button type="button" (click)="adjustPartProperty('posX', -10)" class="px-1 py-0.2 hover:bg-slate-100 text-slate-500 hover:text-rose-700 text-[9px] font-mono rounded font-bold cursor-pointer">-10</button>
+                      <span class="text-[8px] text-slate-400 font-mono">mm</span>
+                      <button type="button" (click)="adjustPartProperty('posX', 10)" class="px-1 py-0.2 hover:bg-slate-100 text-slate-500 hover:text-rose-700 text-[9px] font-mono rounded font-bold cursor-pointer">+10</button>
                     </div>
                   </div>
 
                   <!-- EJE Y -->
-                  <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-emerald-500">
+                  <div class="bg-white p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-emerald-500">
                     <div class="flex items-center justify-between mb-1">
-                      <span class="text-[10px] font-extrabold text-emerald-600 font-mono">EJE Y</span>
+                      <span class="text-[10px] font-extrabold text-emerald-600 font-mono">Y</span>
                       <span class="text-[9px] text-slate-400">Altura</span>
                     </div>
                     <input
@@ -1126,57 +1126,41 @@
                       step="5"
                       [value]="sel.posY ?? 0"
                       (input)="updateSelectedPart({ posY: +$any($event.target).value })"
-                      class="w-full px-1 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-emerald-500 transition" />
-                    <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
-                      <button
-                        type="button"
-                        (click)="adjustPartProperty('posY', -10)"
-                        class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-emerald-700 text-[9px] font-mono rounded font-bold transition cursor-pointer"
-                        title="-10 mm">-10</button>
-                      <span class="text-[9px] text-slate-400 font-mono">mm</span>
-                      <button
-                        type="button"
-                        (click)="adjustPartProperty('posY', 10)"
-                        class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-emerald-700 text-[9px] font-mono rounded font-bold transition cursor-pointer"
-                        title="+10 mm">+10</button>
+                      class="w-full px-1 py-0.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-emerald-500 transition" />
+                    <div class="flex items-center justify-between mt-1 pt-0.5 border-t border-slate-100">
+                      <button type="button" (click)="adjustPartProperty('posY', -10)" class="px-1 py-0.2 hover:bg-slate-100 text-slate-500 hover:text-emerald-700 text-[9px] font-mono rounded font-bold cursor-pointer">-10</button>
+                      <span class="text-[8px] text-slate-400 font-mono">mm</span>
+                      <button type="button" (click)="adjustPartProperty('posY', 10)" class="px-1 py-0.2 hover:bg-slate-100 text-slate-500 hover:text-emerald-700 text-[9px] font-mono rounded font-bold cursor-pointer">+10</button>
                     </div>
                   </div>
 
                   <!-- EJE Z -->
-                  <div class="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-sky-500">
+                  <div class="bg-white p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs border-t-2 border-t-sky-500">
                     <div class="flex items-center justify-between mb-1">
-                      <span class="text-[10px] font-extrabold text-sky-600 font-mono">EJE Z</span>
-                      <span class="text-[9px] text-slate-400">Prof.</span>
+                      <span class="text-[10px] font-extrabold text-sky-600 font-mono">Z</span>
+                      <span class="text-[9px] text-slate-400">Fondo</span>
                     </div>
                     <input
                       type="number"
                       step="5"
                       [value]="sel.posZ ?? 0"
                       (input)="updateSelectedPart({ posZ: +$any($event.target).value })"
-                      class="w-full px-1 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 transition" />
-                    <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100">
-                      <button
-                        type="button"
-                        (click)="adjustPartProperty('posZ', -10)"
-                        class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-sky-700 text-[9px] font-mono rounded font-bold transition cursor-pointer"
-                        title="-10 mm">-10</button>
-                      <span class="text-[9px] text-slate-400 font-mono">mm</span>
-                      <button
-                        type="button"
-                        (click)="adjustPartProperty('posZ', 10)"
-                        class="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-sky-700 text-[9px] font-mono rounded font-bold transition cursor-pointer"
-                        title="+10 mm">+10</button>
+                      class="w-full px-1 py-0.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-center text-xs font-black text-slate-900 font-mono focus:outline-hidden focus:border-sky-500 transition" />
+                    <div class="flex items-center justify-between mt-1 pt-0.5 border-t border-slate-100">
+                      <button type="button" (click)="adjustPartProperty('posZ', -10)" class="px-1 py-0.2 hover:bg-slate-100 text-slate-500 hover:text-sky-700 text-[9px] font-mono rounded font-bold cursor-pointer">-10</button>
+                      <span class="text-[8px] text-slate-400 font-mono">mm</span>
+                      <button type="button" (click)="adjustPartProperty('posZ', 10)" class="px-1 py-0.2 hover:bg-slate-100 text-slate-500 hover:text-sky-700 text-[9px] font-mono rounded font-bold cursor-pointer">+10</button>
                     </div>
                   </div>
                 </div>
 
-                <!-- ALINEACIONES RÁPIDAS CAD DE 1 CLIC -->
-                <div class="grid grid-cols-3 gap-1 pt-1 border-t border-slate-200">
+                <!-- Alineaciones Rápidas CAD -->
+                <div class="grid grid-cols-3 gap-1 pt-1 border-t border-slate-200/80">
                   <button
                     type="button"
                     (click)="alignPart('floor')"
                     class="py-1 px-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-                    title="Posicionar pieza directamente sobre el piso (Y=0)">
+                    title="Apoyar directamente sobre el suelo (Y=0)">
                     <hugeicons-icon [icon]="icons.alignBottom" [size]="12" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
                     <span>Al Suelo</span>
                   </button>
@@ -1184,7 +1168,7 @@
                     type="button"
                     (click)="alignPart('centerX')"
                     class="py-1 px-1 bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-                    title="Centrar pieza horizontalmente en el eje X (X=0)">
+                    title="Centrar en eje X (X=0)">
                     <hugeicons-icon [icon]="icons.alignCenter" [size]="12" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
                     <span>Centrar X</span>
                   </button>
@@ -1192,62 +1176,197 @@
                     type="button"
                     (click)="alignPart('centerZ')"
                     class="py-1 px-1 bg-white hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-                    title="Centrar pieza en profundidad en el eje Z (Z=0)">
+                    title="Centrar en profundidad Z (Z=0)">
                     <hugeicons-icon [icon]="icons.cameraFocus" [size]="12" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
                     <span>Centrar Z</span>
                   </button>
                 </div>
-
               </div>
 
-              <!-- TAPACANTOS INTELIGENTES (L1, L2, A1, A2) -->
-              <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+              <!-- 5. GIROS EN GRADOS 3D (EJES X, Y, Z) -->
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-slate-800">Tapacantos (Bordes):</span>
-                  <span class="text-[10px] text-slate-400">Clic para cambiar</span>
+                  <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                    <span>Inclinación / Giro 3D</span>
+                  </span>
+                  <button
+                    type="button"
+                    (click)="resetSelectedPartRotation()"
+                    class="text-[10px] font-bold text-sky-600 hover:text-sky-800 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs transition cursor-pointer">
+                    0° Reset
+                  </button>
                 </div>
 
-                <div class="grid grid-cols-4 gap-1.5 text-center">
-                  <button
-                    type="button"
-                    (click)="togglePartEdge('l1')"
-                    [class]="sel.edges.l1 === 'thick' ? 'bg-amber-500 text-white font-bold' : (sel.edges.l1 === 'thin' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-500 border border-slate-200')"
-                    class="p-1.5 rounded-lg transition flex flex-col items-center shadow-2xs cursor-pointer">
-                    <span class="text-[9px] uppercase font-mono">L1</span>
-                    <span class="text-[10px]">{{ sel.edges.l1 === 'thick' ? '2.0mm' : (sel.edges.l1 === 'thin' ? '0.45mm' : 'Sin') }}</span>
-                  </button>
+                <div class="grid grid-cols-3 gap-1.5 text-xs">
+                  <!-- GIRO X -->
+                  <div class="bg-white p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs">
+                    <div class="flex items-center justify-between text-[10px] font-extrabold text-rose-600 font-mono">
+                      <span>GIRO X</span>
+                      <span class="text-slate-700">{{ sel.rotationX || 0 }}°</span>
+                    </div>
+                    <div class="flex items-center gap-1 my-1">
+                      <button type="button" (click)="rotateSelectedPart3DAngle('x', -90)" class="flex-1 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px] cursor-pointer">-90°</button>
+                      <button type="button" (click)="rotateSelectedPart3DAngle('x', 90)" class="flex-1 py-0.5 bg-rose-500 hover:bg-rose-600 text-white rounded font-bold text-[10px] cursor-pointer">+90°</button>
+                    </div>
+                    <input
+                      type="number"
+                      step="15"
+                      [value]="sel.rotationX || 0"
+                      (input)="setPartRotationAngle('x', +$any($event.target).value)"
+                      class="w-full text-center font-mono font-bold text-[11px] bg-slate-50 border border-slate-200 rounded py-0.5 focus:outline-hidden focus:border-rose-500" />
+                  </div>
 
-                  <button
-                    type="button"
-                    (click)="togglePartEdge('l2')"
-                    [class]="sel.edges.l2 === 'thick' ? 'bg-amber-500 text-white font-bold' : (sel.edges.l2 === 'thin' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-500 border border-slate-200')"
-                    class="p-1.5 rounded-lg transition flex flex-col items-center shadow-2xs cursor-pointer">
-                    <span class="text-[9px] uppercase font-mono">L2</span>
-                    <span class="text-[10px]">{{ sel.edges.l2 === 'thick' ? '2.0mm' : (sel.edges.l2 === 'thin' ? '0.45mm' : 'Sin') }}</span>
-                  </button>
+                  <!-- GIRO Y -->
+                  <div class="bg-white p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs">
+                    <div class="flex items-center justify-between text-[10px] font-extrabold text-emerald-600 font-mono">
+                      <span>GIRO Y</span>
+                      <span class="text-slate-700">{{ sel.rotationY || 0 }}°</span>
+                    </div>
+                    <div class="flex items-center gap-1 my-1">
+                      <button type="button" (click)="rotateSelectedPart3DAngle('y', -90)" class="flex-1 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px] cursor-pointer">-90°</button>
+                      <button type="button" (click)="rotateSelectedPart3DAngle('y', 90)" class="flex-1 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded font-bold text-[10px] cursor-pointer">+90°</button>
+                    </div>
+                    <input
+                      type="number"
+                      step="15"
+                      [value]="sel.rotationY || 0"
+                      (input)="setPartRotationAngle('y', +$any($event.target).value)"
+                      class="w-full text-center font-mono font-bold text-[11px] bg-slate-50 border border-slate-200 rounded py-0.5 focus:outline-hidden focus:border-emerald-500" />
+                  </div>
 
-                  <button
-                    type="button"
-                    (click)="togglePartEdge('a1')"
-                    [class]="sel.edges.a1 === 'thick' ? 'bg-amber-500 text-white font-bold' : (sel.edges.a1 === 'thin' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-500 border border-slate-200')"
-                    class="p-1.5 rounded-lg transition flex flex-col items-center shadow-2xs cursor-pointer">
-                    <span class="text-[9px] uppercase font-mono">A1</span>
-                    <span class="text-[10px]">{{ sel.edges.a1 === 'thick' ? '2.0mm' : (sel.edges.a1 === 'thin' ? '0.45mm' : 'Sin') }}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    (click)="togglePartEdge('a2')"
-                    [class]="sel.edges.a2 === 'thick' ? 'bg-amber-500 text-white font-bold' : (sel.edges.a2 === 'thin' ? 'bg-sky-500 text-white font-bold' : 'bg-white text-slate-500 border border-slate-200')"
-                    class="p-1.5 rounded-lg transition flex flex-col items-center shadow-2xs cursor-pointer">
-                    <span class="text-[9px] uppercase font-mono">A2</span>
-                    <span class="text-[10px]">{{ sel.edges.a2 === 'thick' ? '2.0mm' : (sel.edges.a2 === 'thin' ? '0.45mm' : 'Sin') }}</span>
-                  </button>
+                  <!-- GIRO Z -->
+                  <div class="bg-white p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between shadow-2xs">
+                    <div class="flex items-center justify-between text-[10px] font-extrabold text-sky-600 font-mono">
+                      <span>GIRO Z</span>
+                      <span class="text-slate-700">{{ sel.rotationZ || 0 }}°</span>
+                    </div>
+                    <div class="flex items-center gap-1 my-1">
+                      <button type="button" (click)="rotateSelectedPart3DAngle('z', -90)" class="flex-1 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px] cursor-pointer">-90°</button>
+                      <button type="button" (click)="rotateSelectedPart3DAngle('z', 90)" class="flex-1 py-0.5 bg-sky-500 hover:bg-sky-600 text-white rounded font-bold text-[10px] cursor-pointer">+90°</button>
+                    </div>
+                    <input
+                      type="number"
+                      step="15"
+                      [value]="sel.rotationZ || 0"
+                      (input)="setPartRotationAngle('z', +$any($event.target).value)"
+                      class="w-full text-center font-mono font-bold text-[11px] bg-slate-50 border border-slate-200 rounded py-0.5 focus:outline-hidden focus:border-sky-500" />
+                  </div>
                 </div>
               </div>
 
-              <!-- MECANIZADOS Y PERFORACIONES PARAMÉTRICAS -->
-              <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+              <!-- 6. LUZ LIBRE (ESPACIO INTERIOR ÚTIL) -->
+              @if (clearanceInfo(); as clr) {
+                @if (clr.topClearance !== null || clr.bottomClearance !== null || clr.leftClearance !== null || clr.rightClearance !== null) {
+                  <div class="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-2.5 space-y-2 shadow-2xs">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.clearanceVert" [size]="14" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                        <span>Luz Libre (Huecos Útiles)</span>
+                      </span>
+                      <span class="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-mono">
+                        CAD 3D
+                      </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-1.5 text-xs">
+                      <div class="p-1.5 bg-white rounded-lg border border-slate-200">
+                        <span class="text-[10px] text-slate-500 flex items-center gap-1">
+                          <hugeicons-icon [icon]="icons.arrowUp" [size]="11" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                          <span>Arriba:</span>
+                        </span>
+                        @if (clr.topClearance !== null) {
+                          <p class="font-mono font-bold text-slate-900 text-xs">{{ clr.topClearance }} mm</p>
+                          <p class="text-[9px] text-slate-400 truncate">a {{ clr.topNeighborName }}</p>
+                        } @else {
+                          <p class="font-mono text-slate-400 text-[10px] italic">Libre</p>
+                        }
+                      </div>
+
+                      <div class="p-1.5 bg-white rounded-lg border border-slate-200">
+                        <span class="text-[10px] text-slate-500 flex items-center gap-1">
+                          <hugeicons-icon [icon]="icons.arrowDown" [size]="11" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                          <span>Abajo:</span>
+                        </span>
+                        @if (clr.bottomClearance !== null) {
+                          <p class="font-mono font-bold text-slate-900 text-xs">{{ clr.bottomClearance }} mm</p>
+                          <p class="text-[9px] text-slate-400 truncate">a {{ clr.bottomNeighborName }}</p>
+                        } @else {
+                          <p class="font-mono text-slate-400 text-[10px] italic">Al suelo</p>
+                        }
+                      </div>
+
+                      <div class="p-1.5 bg-white rounded-lg border border-slate-200">
+                        <span class="text-[10px] text-slate-500 flex items-center gap-1">
+                          <hugeicons-icon [icon]="icons.arrowLeft" [size]="11" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                          <span>Izquierda:</span>
+                        </span>
+                        @if (clr.leftClearance !== null) {
+                          <p class="font-mono font-bold text-slate-900 text-xs">{{ clr.leftClearance }} mm</p>
+                          <p class="text-[9px] text-slate-400 truncate">a {{ clr.leftNeighborName }}</p>
+                        } @else {
+                          <p class="font-mono text-slate-400 text-[10px] italic">Libre</p>
+                        }
+                      </div>
+
+                      <div class="p-1.5 bg-white rounded-lg border border-slate-200">
+                        <span class="text-[10px] text-slate-500 flex items-center gap-1">
+                          <hugeicons-icon [icon]="icons.arrowRight" [size]="11" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                          <span>Derecha:</span>
+                        </span>
+                        @if (clr.rightClearance !== null) {
+                          <p class="font-mono font-bold text-slate-900 text-xs">{{ clr.rightClearance }} mm</p>
+                          <p class="text-[9px] text-slate-400 truncate">a {{ clr.rightNeighborName }}</p>
+                        } @else {
+                          <p class="font-mono text-slate-400 text-[10px] italic">Libre</p>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                }
+              }
+
+              <!-- 7. CONVERTIR EN MESA (Solo visible si es una pieza Horizontal como Tapa, Barra o Escritorio) -->
+              @if ((sel.orientation || 'horizontal') === 'horizontal') {
+                <div class="p-2.5 bg-linear-to-r from-teal-50/80 to-slate-50 border border-teal-200/90 rounded-xl space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-teal-900 flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.tableBar" [size]="13" [strokeWidth]="2" class="text-teal-600 shrink-0"></hugeicons-icon>
+                      <span>Añadir 4 Patas de Mesa</span>
+                    </span>
+                    <span class="text-[9px] font-bold text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded uppercase">1 Clic</span>
+                  </div>
+                  <div class="grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      (click)="attachTableLegsToSelectedPart('hairpin')"
+                      class="p-1.5 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
+                      <hugeicons-icon [icon]="icons.tableBar" [size]="14" [strokeWidth]="2" class="text-slate-900"></hugeicons-icon>
+                      <span class="text-[10px] font-bold text-slate-800 leading-none">Horquilla</span>
+                      <span class="text-[8px] text-slate-400 font-mono">72cm</span>
+                    </button>
+                    <button
+                      type="button"
+                      (click)="attachTableLegsToSelectedPart('cylindrical_inox')"
+                      class="p-1.5 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
+                      <hugeicons-icon [icon]="icons.columns" [size]="14" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
+                      <span class="text-[10px] font-bold text-slate-800 leading-none">Inox Ø60</span>
+                      <span class="text-[8px] text-slate-400 font-mono">Regulable</span>
+                    </button>
+                    <button
+                      type="button"
+                      (click)="attachTableLegsToSelectedPart('scandinavian_wood')"
+                      class="p-1.5 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
+                      <hugeicons-icon [icon]="icons.woodLeg" [size]="14" [strokeWidth]="2" class="text-amber-700"></hugeicons-icon>
+                      <span class="text-[10px] font-bold text-slate-800 leading-none">Nórdica</span>
+                      <span class="text-[8px] text-slate-400 font-mono">Madera</span>
+                    </button>
+                  </div>
+                </div>
+              }
+
+              <!-- 8. MECANIZADOS Y PERFORACIONES CNC -->
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.cncTarget" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
@@ -1259,22 +1378,22 @@
                 </div>
 
                 @if (selectedPartDrillHoles().length > 0) {
-                  <div class="space-y-1.5 max-h-36 overflow-y-auto pr-1 text-xs">
+                  <div class="space-y-1 max-h-32 overflow-y-auto scrollbar-thin pr-1 text-xs">
                     @for (hole of selectedPartDrillHoles(); track hole.id) {
-                      <div class="p-2 bg-white rounded-lg border border-slate-200 flex items-start gap-2 shadow-2xs">
+                      <div class="p-1.5 bg-white rounded-lg border border-slate-200 flex items-start gap-2 shadow-2xs">
                         <span class="w-2 h-2 rounded-full mt-1 shrink-0"
                           [class]="hole.type === 'screw_4x50' ? 'bg-sky-500' : (hole.type === 'dowel_8x30' ? 'bg-amber-500' : 'bg-purple-500')">
                         </span>
                         <div class="min-w-0 flex-1">
                           <div class="flex items-center justify-between">
-                            <span class="font-bold text-slate-800">
+                            <span class="font-bold text-slate-800 text-[11px]">
                               {{ hole.type === 'screw_4x50' ? 'Tornillo 4x50' : (hole.type === 'dowel_8x30' ? 'Tarugo 8x30' : 'Bisagra 35mm') }}
                             </span>
                             <span class="font-mono text-[10px] text-slate-500">
                               Ø{{ hole.diameter }}×{{ hole.depth }}mm
                             </span>
                           </div>
-                          <p class="text-[10px] text-slate-400 truncate mt-0.5" [title]="hole.description">
+                          <p class="text-[10px] text-slate-400 truncate" [title]="hole.description">
                             {{ hole.description }}
                           </p>
                         </div>
@@ -1282,97 +1401,79 @@
                     }
                   </div>
                 } @else {
-                  <div class="p-2.5 text-center bg-white rounded-lg border border-slate-200 text-[11px] text-slate-400">
-                    Pieza sin uniones a 90° o no requiere perforaciones adicionales.
+                  <div class="p-2 text-center bg-white rounded-lg border border-slate-200 text-[11px] text-slate-400">
+                    Sin perforaciones activas en esta pieza.
                   </div>
                 }
               </div>
 
-              <!-- ACOPLAR PATAS DE MESA A ESTA PIEZA -->
-              <div class="p-2.5 bg-linear-to-r from-teal-50/80 to-slate-50 border border-teal-200/90 rounded-xl space-y-2">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-teal-900 flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.tableBar" [size]="13" [strokeWidth]="2" class="text-teal-600 shrink-0"></hugeicons-icon>
-                    <span>Convertir en Mesa (Añadir 4 Patas)</span>
-                  </span>
-                  <span class="text-[9px] font-bold text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded uppercase">Accesorios 3D</span>
-                </div>
-                <p class="text-[10px] text-slate-500 leading-tight">
-                  Instala 4 patas directamente bajo las 4 esquinas de esta pieza:
-                </p>
-                <div class="grid grid-cols-3 gap-1">
-                  <button
-                    type="button"
-                    (click)="attachTableLegsToSelectedPart('hairpin')"
-                    class="p-1.5 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
-                    <hugeicons-icon [icon]="icons.tableBar" [size]="14" [strokeWidth]="2" class="text-slate-900"></hugeicons-icon>
-                    <span class="text-[10px] font-bold text-slate-800 leading-none">Horquilla</span>
-                    <span class="text-[8px] text-slate-400 font-mono">Hairpin 72cm</span>
-                  </button>
-                  <button
-                    type="button"
-                    (click)="attachTableLegsToSelectedPart('cylindrical_inox')"
-                    class="p-1.5 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
-                    <hugeicons-icon [icon]="icons.columns" [size]="14" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
-                    <span class="text-[10px] font-bold text-slate-800 leading-none">Inox Ø60</span>
-                    <span class="text-[8px] text-slate-400 font-mono">Regulable</span>
-                  </button>
-                  <button
-                    type="button"
-                    (click)="attachTableLegsToSelectedPart('scandinavian_wood')"
-                    class="p-1.5 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-lg text-center transition flex flex-col items-center gap-0.5 cursor-pointer shadow-2xs">
-                    <hugeicons-icon [icon]="icons.woodLeg" [size]="14" [strokeWidth]="2" class="text-amber-700"></hugeicons-icon>
-                    <span class="text-[10px] font-bold text-slate-800 leading-none">Nórdica</span>
-                    <span class="text-[8px] text-slate-400 font-mono">Madera + Oro</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- ACCIONES (Duplicar / Eliminar) -->
-              <div class="pt-1 flex items-center gap-2">
+              <!-- 9. ACCIONES FINALES DE LA PIEZA (Duplicar / Ocultar / Eliminar) -->
+              <div class="pt-1 grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
                   (click)="duplicateSelectedPart()"
-                  class="flex-1 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer">
-                  <hugeicons-icon [icon]="icons.copy" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-                  <span>Duplicar Pieza</span>
+                  class="py-2 px-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-200 flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer"
+                  title="Crear copia de esta pieza">
+                  <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                  <span>Duplicar</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="hideSelectedPart()"
+                  class="py-2 px-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-200 flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer"
+                  title="Ocultar temporalmente (Tecla H)">
+                  <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+                  <span>Ocultar</span>
                 </button>
 
                 <button
                   type="button"
                   (click)="deleteSelectedPart()"
-                  class="flex-1 py-2 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl border border-rose-200 flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer">
-                  <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
-                  <span>Eliminar Pieza</span>
+                  class="py-2 px-2 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl border border-rose-200 flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer"
+                  title="Eliminar pieza (Supr)">
+                  <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
+                  <span>Eliminar</span>
                 </button>
               </div>
 
             } @else {
 
-              <!-- Estado vacío cuando no hay pieza seleccionada -->
-              <div class="p-8 text-center space-y-3">
-                <div class="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
-                  <hugeicons-icon [icon]="icons.cursorSelect" [size]="22" [strokeWidth]="1.8" class="text-sky-600"></hugeicons-icon>
+              <!-- ESTADO VACÍO CON ONBOARDING AMIGABLE -->
+              <div class="p-6 text-center space-y-4">
+                <div class="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200/80 flex items-center justify-center mx-auto text-sky-600 shadow-2xs">
+                  <hugeicons-icon [icon]="icons.cursorSelect" [size]="22" [strokeWidth]="1.8"></hugeicons-icon>
                 </div>
-                <div>
-                  <h4 class="text-sm font-bold text-slate-800">Ninguna pieza seleccionada</h4>
-                  <p class="text-xs text-slate-500 mt-1">
-                    Haz clic directamente sobre cualquier pieza en el lienzo 3D o usa el clic derecho para abrir el menú contextual.
+                <div class="space-y-1">
+                  <h4 class="text-sm font-bold text-slate-800">Selecciona una pieza en 3D</h4>
+                  <p class="text-xs text-slate-500 leading-relaxed">
+                    Haz clic sobre cualquier tabla o módulo en el lienzo 3D para editar sus medidas, material, tapacantos y posición.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  (click)="activeDockTab.set('catalog')"
-                  class="px-4 py-2 text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white rounded-xl transition shadow-xs cursor-pointer">
-                  Abrir Catálogo de Piezas (+)
-                </button>
+
+                <div class="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    (click)="activeDockTab.set('catalog')"
+                    class="w-full py-2 px-3 text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                    <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
+                    <span>Añadir Piezas o Cajones (Catálogo)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    (click)="openTemplatesModal()"
+                    class="w-full py-2 px-3 text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer">
+                    <hugeicons-icon [icon]="icons.templatesGrid" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    <span>Explorar Plantillas de Muebles</span>
+                  </button>
+                </div>
               </div>
 
             }
 
           </div>
         }
-
         <!-- PESTAÑA 2: CATÁLOGO DE PIEZAS Y ÁRBOL DE ENSAMBLE -->
         @if (activeDockTab() === 'catalog') {
           <div class="p-3.5 space-y-3.5 overflow-y-auto flex-1 min-h-0">
