@@ -61,6 +61,7 @@ import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
+import { SpatialReferenceGuideService } from '../../services/spatial-reference-guide.service';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
@@ -152,7 +153,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private readonly ngZone = inject(NgZone);
   private joineryEngine = inject(JoineryEngineService);
   readonly hardwareCatalog = inject(HardwareCatalogService);
-  private appliance3dBuilder = inject(Appliance3dBuilderService);
+ private appliance3dBuilder = inject(Appliance3dBuilderService);
+  private spatialGuideBuilder = inject(SpatialReferenceGuideService);
 
   // Iconos vectoriales estilizados para la cinta de herramientas CAD y menús 3D
   readonly icons = {
@@ -216,6 +218,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
     inbox: Archive01Icon,
     sun: Sun01Icon,
     moon: Moon02Icon,
+    humanGuide: cadSvg([
+      'M12 3.5A2.2 2.2 0 1 0 12 7.9A2.2 2.2 0 1 0 12 3.5Z',
+      'M8.5 10.5C8.5 9.4 9.4 8.5 10.5 8.5H13.5C14.6 8.5 15.5 9.4 15.5 10.5V15H14V20.5H10V15H8.5V10.5Z'
+    ]),
     cameraFocus: cadSvg([
       'M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8',
       'M16 4H18.5A1.5 1.5 0 0 1 20 5.5V8',
@@ -312,6 +318,36 @@ export class Furniture3dViewerComponent implements OnDestroy {
   showDrillHoles = signal<boolean>(true);
   showHardware = signal<boolean>(true); // Visualizar tiradores, bisagras y correderas 3D
   isWhiteTheme = signal<boolean>(true); // Default to clean pure white studio background
+
+  showReferenceGuide = signal<boolean>(true);
+  readonly isReferenceGuideSelected = signal<boolean>(false);
+  readonly referenceGuidePos = signal<{ x: number; z: number }>({ x: -1150, z: 350 });
+  private referenceGuideGroup = new THREE.Group();
+  private isReferenceGuideDragging = false;
+  private dragInitialGuidePos = { x: -1150, z: 350 };
+
+  toggleReferenceGuide() {
+    this.showReferenceGuide.update(v => !v);
+    if (!this.showReferenceGuide()) {
+      this.isReferenceGuideSelected.set(false);
+    }
+  }
+
+  private updateReferenceGuideScene() {
+    if (!this.scene) return;
+    this.disposeGroup(this.referenceGuideGroup);
+    if (!this.showReferenceGuide()) {
+      this.referenceGuideGroup.visible = false;
+      return;
+    }
+    this.referenceGuideGroup.visible = true;
+    const built = this.spatialGuideBuilder.buildGuideScene({
+      figurePos: this.referenceGuidePos(),
+      isSelected: this.isReferenceGuideSelected(),
+      isWhiteTheme: this.isWhiteTheme()
+    });
+    this.referenceGuideGroup.add(built);
+  }
 
   // Hardware visibility per group / per part
   readonly hiddenHardwareGroupIds = signal<Set<string>>(new Set<string>());
@@ -635,6 +671,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.updateAppliancesScene(appls, selId);
       }
     });
+
+    // 7. Actualizar Guía de Referencia Espacial y Escala Humana 3D
+ effect(() => {
+   this.showReferenceGuide();
+   this.referenceGuidePos();
+   this.isReferenceGuideSelected();
+   this.isWhiteTheme();
+   if (this.scene) {
+     this.updateReferenceGuideScene();
+   }
+ });
+
   }
 
   private initThree() {
@@ -697,6 +745,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.wallGizmoGroup);
     this.scene.add(this.appliancesGroup);
     this.scene.add(this.applianceGizmoGroup);
+    this.scene.add(this.referenceGuideGroup);
+ this.updateReferenceGuideScene();
 
     // Initial Appliances Setup
     this.updateAppliancesScene(this.appliances(), this.selectedApplianceId());
@@ -3733,6 +3783,35 @@ private createHandleMesh(
       }
     }
 
+    // 1.8. Selección y arrastre libre en el suelo del Maniquí de Escala y Guía de Frente
+ if (this.showReferenceGuide() && this.referenceGuideGroup.children.length > 0) {
+   const guideIntersects = this.raycaster.intersectObjects(this.referenceGuideGroup.children, true);
+   const hitGuide = guideIntersects.find(h => h.object.userData?.['isReferenceGuide']);
+   if (hitGuide) {
+     this.isReferenceGuideSelected.set(true);
+     this.partSelected.emit(null);
+     this.partsSelected.emit([]);
+     this.applianceSelected.emit(null);
+
+     if (e.button === 0) {
+       this.isReferenceGuideDragging = true;
+       this.dragInitialGuidePos = { ...this.referenceGuidePos() };
+       this.controls.enabled = false;
+       this.dragPlane.set(new THREE.Vector3(0, 1, 0), 0); // Plano del suelo Y = 0
+       const intersectPt = new THREE.Vector3();
+       if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPt)) {
+         this.dragPlaneIntersectionStart.copy(intersectPt);
+       }
+       canvas.style.cursor = 'grabbing';
+     }
+     e.preventDefault();
+     e.stopPropagation();
+     return;
+   } else {
+     this.isReferenceGuideSelected.set(false);
+   }
+ }
+
     // 2. Normal Piece & Handle selection (with Shift-Click multi-selection)
     const targets: THREE.Object3D[] = [];
     for (const item of this.pieceObjects) {
@@ -3863,6 +3942,24 @@ private createHandleMesh(
         this.rightPointerDragged = true;
       }
     }
+
+    // Arrastre en el suelo del Maniquí de Escala Humana y Guía de Frente
+ if (this.isReferenceGuideDragging) {
+   const rect = canvas.getBoundingClientRect();
+   this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+   this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+   this.raycaster.setFromCamera(this.mouse, this.camera);
+
+   const currentIntersect = new THREE.Vector3();
+   if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersect)) {
+     const deltaWorld = currentIntersect.clone().sub(this.dragPlaneIntersectionStart);
+     const snap = 10;
+     const newX = Math.round((this.dragInitialGuidePos.x + deltaWorld.x) / snap) * snap;
+     const newZ = Math.round((this.dragInitialGuidePos.z + deltaWorld.z) / snap) * snap;
+     this.referenceGuidePos.set({ x: newX, z: newZ });
+   }
+   return;
+ }
 
     // Direct Appliance 3D Face Handle Resizing (Tiradores interactivos en las caras de la caja 3D)
     if (this.isApplianceResizing && this.draggingAppliance && this.activeApplianceHandle) {
@@ -5157,6 +5254,13 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
       }
     }
 
+    if (this.isReferenceGuideDragging) {
+   this.isReferenceGuideDragging = false;
+   this.controls.enabled = true;
+   const canvas = this.canvasRef()?.nativeElement;
+   if (canvas) canvas.style.cursor = 'default';
+ }
+
     if (this.isApplianceDragging) {
       this.isApplianceDragging = false;
       this.draggingAppliance = null;
@@ -6442,7 +6546,19 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
       return;
     }
 
+  if (e.key === 'g' || e.key === 'G') {
+      e.preventDefault();
+      this.toggleReferenceGuide();
+      return;
+    }
+
     if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Del') {
+      if (this.isReferenceGuideSelected()) {
+        e.preventDefault();
+        this.showReferenceGuide.set(false);
+        this.isReferenceGuideSelected.set(false);
+        return;
+      }
       const selAppId = this.selectedApplianceId();
       if (selAppId) {
         e.preventDefault();

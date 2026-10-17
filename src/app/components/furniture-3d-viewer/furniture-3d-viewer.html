@@ -196,6 +196,17 @@
     </button>
 
     <!-- 15. REINICIAR CÁMARA -->
+   <!-- 14.5. GUÍA DE FRENTE Y ESCALA HUMANA 3D -->
+    <button
+      type="button"
+      (click)="toggleReferenceGuide()"
+      [class]="showReferenceGuide() ? 'text-sky-600 bg-sky-50 ring-1 ring-sky-300/80' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
+      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [title]="showReferenceGuide() ? 'Ocultar Guía de Frente y Escala Humana 1.72m (Tecla G o Supr al seleccionarla)' : 'Mostrar Guía de Frente y Escala Humana 1.72m (Tecla G)'">
+      <hugeicons-icon [icon]="icons.humanGuide" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+    </button>
+
+    <!-- 15. REINICIAR CÁMARA -->
     <button
       type="button"
       (click)="resetCamera()"
