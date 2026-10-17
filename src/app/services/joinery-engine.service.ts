@@ -28,7 +28,10 @@ export interface JoineryAnalysis {
 })
 export class JoineryEngineService {
 
-  // Computes precise 3D spatial bounding box of a piece
+  /**
+   * Calcula la caja envolvente 3D exacta (sx, sy, sz y límites min/max) de una pieza.
+   * Es la única fuente de verdad compartida entre el motor de uniones, el almacenamiento y el visor 3D.
+   */
   getPartBounds(part: Part): Part3DBounds {
     const t = part.thickness || 18;
     const L = part.length;
@@ -40,18 +43,24 @@ export class JoineryEngineService {
 
     const orient = part.orientation || 'horizontal';
     if (orient === 'vertical_yz') {
-      const isCabinetSide = part.componentRole === 'side_left' || 
-                            part.componentRole === 'side_right' ||
-                            (part.name.toUpperCase().includes('LATERAL') && 
-                             !part.name.toUpperCase().includes('CAJ') && 
-                             part.componentRole !== 'drawer_box' && 
-                             part.componentRole !== 'drawer_lateral');
-      const isDrawerLateral = !isCabinetSide && (
-        part.componentRole === 'drawer_box' ||
-        part.componentRole === 'drawer_lateral' ||
-        part.name.toUpperCase().includes('CAJ')
-      );
-      if (isDrawerLateral && L > W) {
+      const isCabinetSide =
+        part.componentRole === 'side_left' ||
+        part.componentRole === 'side_right' ||
+        part.componentRole === 'divider' ||
+        part.componentRole === 'door' ||
+        part.componentRole === 'back' ||
+        (part.name.toUpperCase().includes('LATERAL') &&
+          !part.name.toUpperCase().includes('CAJ') &&
+          part.componentRole !== 'drawer_box' &&
+          part.componentRole !== 'drawer_lateral');
+
+      const isDrawerBoxSide =
+        !isCabinetSide &&
+        (part.componentRole === 'drawer_box' ||
+          part.componentRole === 'drawer_lateral' ||
+          (part.name.toUpperCase().includes('LATERAL') && part.name.toUpperCase().includes('CAJ')));
+
+      if (isDrawerBoxSide && L > W) {
         sx = t;
         sy = W;
         sz = L;
@@ -61,30 +70,9 @@ export class JoineryEngineService {
         sz = W;
       }
     } else if (orient === 'vertical_xy') {
-      const isDoor = part.componentRole === 'door' || 
-        (part.name.toUpperCase().includes('PUERTA') && !part.name.toUpperCase().includes('CAJ'));
-      const isDrawerFront = part.componentRole === 'drawer_front';
-      const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
-        part.name.toUpperCase().includes('CONTRA') ||
-        part.name.toUpperCase().includes('TRASERA');
-      if (isDrawerBoxHead) {
-        sx = L;
-        sy = W;
-        sz = t;
-      } else if (isDoor) {
-        // Doors in vertical_xy have length along X (width) and width along Y (height)
-        sx = L;
-        sy = W;
-        sz = t;
-      } else if (isDrawerFront && W > L) {
-        sx = W;
-        sy = L;
-        sz = t;
-      } else {
-        sx = L;
-        sy = W;
-        sz = t;
-      }
+      sx = L;
+      sy = W;
+      sz = t;
     }
 
     const px = part.posX ?? 0;
@@ -108,8 +96,43 @@ export class JoineryEngineService {
     };
   }
 
+  /**
+   * Determina hacia qué dirección cardinal ('front' | 'right' | 'back' | 'left')
+   * mira una puerta o frente de cajón respecto al centro geométrico de su módulo o grupo.
+   */
+  getPartFacingDirection(part: Part, allParts: Part[]): 'front' | 'right' | 'back' | 'left' {
+    let contextParts: Part[] = [];
+    if (part.groupId) {
+      contextParts = allParts.filter(p => p.groupId === part.groupId);
+    } else if (part.moduleId) {
+      contextParts = allParts.filter(p => p.moduleId === part.moduleId);
+    }
+    if (contextParts.length <= 1) {
+      contextParts = allParts.length > 1 ? allParts : [part];
+    }
+
+    let minX = Infinity, maxX = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    for (const p of contextParts) {
+      const b = this.getPartBounds(p);
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+    }
+
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+    const dx = (part.posX ?? 0) - cx;
+    const dz = (part.posZ ?? 0) - cz;
+
+    if (part.orientation === 'vertical_yz') {
+      return dx >= 0 ? 'right' : 'left';
+    }
+    return dz >= 0 ? 'front' : 'back';
+  }
+
   // --- COLLISION DETECTION ENGINE ---
-  // Evaluates real-time 3D volumetric penetration between melamines (with 0.8mm clearance tolerance)
   detectCollisions(parts: Part[]): CollisionRecord[] {
     const collisions: CollisionRecord[] = [];
     if (!parts || parts.length < 2) return collisions;
@@ -126,16 +149,17 @@ export class JoineryEngineService {
         const overlapY = Math.min(b1.maxY, b2.maxY) - Math.max(b1.minY, b2.minY);
         const overlapZ = Math.min(b1.maxZ, b2.maxZ) - Math.max(b1.minZ, b2.minZ);
 
-        // If penetration exceeds tolerance in ALL three axes simultaneously, evaluate interference
         if (overlapX > tolerance && overlapY > tolerance && overlapZ > tolerance) {
-          // Joinery groove exception: if one piece is a back panel (MDF 3-6mm) and the other is a structural carcass part
-          // (side_left, side_right, top, bottom) in the same module/group, and penetration is shallow (<= 12mm),
-          // this is an intentional woodworking groove/ranura, not a dimensional error.
-          const isBackJoint = (b1.part.componentRole === 'back' && b2.part.componentRole && ['side_left', 'side_right', 'top', 'bottom'].includes(b2.part.componentRole)) ||
-                              (b2.part.componentRole === 'back' && b1.part.componentRole && ['side_left', 'side_right', 'top', 'bottom'].includes(b1.part.componentRole));
+          const isBackJoint =
+            (b1.part.componentRole === 'back' &&
+              b2.part.componentRole &&
+              ['side_left', 'side_right', 'top', 'bottom', 'shelf'].includes(b2.part.componentRole)) ||
+            (b2.part.componentRole === 'back' &&
+              b1.part.componentRole &&
+              ['side_left', 'side_right', 'top', 'bottom', 'shelf'].includes(b1.part.componentRole));
           const sameGroup = b1.part.groupId && b1.part.groupId === b2.part.groupId;
-          if (isBackJoint && sameGroup && (overlapX <= 12 || overlapY <= 12)) {
-            continue; // Skip legitimate groove insertion
+          if (isBackJoint && sameGroup && (overlapX <= 12 || overlapY <= 12 || overlapZ <= 12)) {
+            continue;
           }
 
           const vol = overlapX * overlapY * overlapZ;
@@ -157,7 +181,6 @@ export class JoineryEngineService {
   }
 
   // --- JOINERY & PARAMETRIC DRILLING ENGINE ---
-  // Computes woodworking drilling patterns for screws 4x50, dowels 8x30, and hinge cups 35mm
   calculateJoinery(parts: Part[]): JoineryAnalysis {
     const drillHolesByPart = new Map<string, DrillHole[]>();
     const allDrillHoles: DrillHole[] = [];
@@ -173,20 +196,21 @@ export class JoineryEngineService {
     const boundsList = parts.map(p => this.getPartBounds(p));
     const collisions = this.detectCollisions(parts);
 
-    // 1. Compute Hinge Cup Drill Holes for Door Panels ONLY (Ø35mm) - Strictly exclude drawer fronts
+    // 1. Compute Hinge Cup Drill Holes for Door Panels ONLY (Ø35mm)
     for (const b of boundsList) {
-      const isDrawer = b.part.componentRole === 'drawer_front' ||
-                       b.part.name.toUpperCase().includes('CAJON') ||
-                       b.part.name.toUpperCase().includes('CAJÓN') ||
-                       b.part.name.toUpperCase().includes('GAVETA') ||
-                       b.part.id.includes('caj_ind_');
-      const isDoor = !isDrawer && (
-        b.part.componentRole === 'door' || 
-        (b.part.name.toUpperCase().includes('PUERTA') && !b.part.name.toUpperCase().includes('CAJ'))
-      );
+      const isDrawer =
+        b.part.componentRole === 'drawer_front' ||
+        b.part.name.toUpperCase().includes('CAJON') ||
+        b.part.name.toUpperCase().includes('CAJÓN') ||
+        b.part.name.toUpperCase().includes('GAVETA') ||
+        b.part.id.includes('caj_ind_');
+      const isDoor =
+        !isDrawer &&
+        (b.part.componentRole === 'door' ||
+          (b.part.name.toUpperCase().includes('PUERTA') && !b.part.name.toUpperCase().includes('CAJ')));
 
       if (isDoor && b.sy >= 250) {
-        const holes = this.generateDoorHingeHoles(b);
+        const holes = this.generateDoorHingeHoles(b, parts);
         for (const h of holes) {
           drillHolesByPart.get(b.part.id)?.push(h);
           allDrillHoles.push(h);
@@ -194,22 +218,24 @@ export class JoineryEngineService {
       }
     }
 
-    // 2. Compute Technical System 32 Slide Drill Holes on Cabinet Side Panels (at 37mm from front edge)
-    // Compute strictly ONCE per physical drawer front facade to eliminate duplicate drill holes
+    // 2. Compute Technical System 32 Slide Drill Holes on Cabinet Side Panels
     for (const b of boundsList) {
-      const isInternalBox = b.part.componentRole === 'drawer_box' ||
-                            b.part.name.toUpperCase().includes('LATERAL') ||
-                            b.part.name.toUpperCase().includes('COSTADO') ||
-                            b.part.name.toUpperCase().includes('TRASERA') ||
-                            b.part.name.toUpperCase().includes('FONDO') ||
-                            b.part.name.toUpperCase().includes('CONTRAFRENTE') ||
-                            b.part.name.toUpperCase().includes('INTERIOR');
-      const isDrawerFront = !isInternalBox && (
-        b.part.componentRole === 'drawer_front' ||
-        b.part.hardwareConfig?.movableType === 'drawer' ||
-        (b.part.name.toUpperCase().includes('FRENTE') && (b.part.name.toUpperCase().includes('CAJ') || b.part.name.toUpperCase().includes('GAVET'))) ||
-        ((b.part.name.toUpperCase().startsWith('CAJ') || b.part.name.toUpperCase().startsWith('GAVET')) && !isInternalBox)
-      );
+      const isInternalBox =
+        b.part.componentRole === 'drawer_box' ||
+        b.part.name.toUpperCase().includes('LATERAL') ||
+        b.part.name.toUpperCase().includes('COSTADO') ||
+        b.part.name.toUpperCase().includes('TRASERA') ||
+        b.part.name.toUpperCase().includes('FONDO') ||
+        b.part.name.toUpperCase().includes('CONTRAFRENTE') ||
+        b.part.name.toUpperCase().includes('INTERIOR');
+      const isDrawerFront =
+        !isInternalBox &&
+        (b.part.componentRole === 'drawer_front' ||
+          b.part.hardwareConfig?.movableType === 'drawer' ||
+          (b.part.name.toUpperCase().includes('FRENTE') &&
+            (b.part.name.toUpperCase().includes('CAJ') || b.part.name.toUpperCase().includes('GAVET'))) ||
+          ((b.part.name.toUpperCase().startsWith('CAJ') || b.part.name.toUpperCase().startsWith('GAVET')) &&
+            !isInternalBox));
 
       if (isDrawerFront) {
         const slideHoles = this.generateSlideSystem32Holes(b, boundsList);
@@ -239,21 +265,21 @@ export class JoineryEngineService {
 
   private generateSlideSystem32Holes(drawer: Part3DBounds, allBounds: Part3DBounds[]): DrillHole[] {
     const holes: DrillHole[] = [];
-    const slideY = drawer.py - (drawer.sy * 0.15); // Center height of drawer slide runner
+    const slideY = drawer.py - drawer.sy * 0.15;
 
-    // Find flanking cabinet side panels or dividers in the same module / vicinity
-    const verticalSides = allBounds.filter(b => 
-      b.part.id !== drawer.part.id &&
-      b.sx <= 32 && b.sy >= 150 && // Vertical panel
-      drawer.py >= b.minY - 20 && drawer.py <= b.maxY + 20
+    const verticalSides = allBounds.filter(
+      b =>
+        b.part.id !== drawer.part.id &&
+        b.sx <= 32 &&
+        b.sy >= 150 &&
+        drawer.py >= b.minY - 20 &&
+        drawer.py <= b.maxY + 20
     );
 
-    // Left flank (closest vertical panel to left of drawer)
     const leftFlank = verticalSides
       .filter(b => b.maxX <= drawer.minX + 30 && b.maxX >= drawer.minX - 50)
       .sort((a, b) => b.maxX - a.maxX)[0];
 
-    // Right flank (closest vertical panel to right of drawer)
     const rightFlank = verticalSides
       .filter(b => b.minX >= drawer.maxX - 30 && b.minX <= drawer.maxX + 50)
       .sort((a, b) => a.minX - b.minX)[0];
@@ -266,13 +292,11 @@ export class JoineryEngineService {
     for (const { side, isLeft } of flanks) {
       if (!side) continue;
 
-      // Front edge of side panel in Z axis
       const frontEdgeZ = side.maxZ;
       const holePosX = isLeft ? side.maxX : side.minX;
       const normalAxis = 'x' as const;
-      const direction = (isLeft ? -1 : 1) as (1 | -1);
+      const direction = (isLeft ? -1 : 1) as 1 | -1;
 
-      // System 32 hole spacing standard: 37mm setback from front edge, then 32, 64, 128, 192, 256 mm
       const spacings = [37, 69, 101, 165, 229, 293];
       const maxReachableDepth = side.sz - 40;
 
@@ -304,11 +328,11 @@ export class JoineryEngineService {
     return holes;
   }
 
-  private generateDoorHingeHoles(b: Part3DBounds): DrillHole[] {
+  private generateDoorHingeHoles(b: Part3DBounds, allParts: Part[]): DrillHole[] {
     const holes: DrillHole[] = [];
-    const height = b.sy; // Door height
+    const height = b.sy;
+    const facing = this.getPartFacingDirection(b.part, allParts);
 
-    // Determine opening direction / hinge side
     let hingeSide = b.part.hardwareConfig?.openingDirection;
     if (!hingeSide) {
       const nameUpper = b.part.name.toUpperCase();
@@ -321,42 +345,70 @@ export class JoineryEngineService {
       }
     }
 
-    // Hinges placed on left, right, top or bottom side of door (22mm from edge to 35mm cup center)
-    let hingeOffsetX = b.minX + 22;
-    if (hingeSide === 'right') {
-      hingeOffsetX = b.maxX - 22;
-    } else if (hingeSide === 'top' || hingeSide === 'bottom') {
-      hingeOffsetX = b.px;
-    }
-
     const marginY = Math.min(100, height * 0.15);
-    let hingeYs = [
-      b.minY + marginY,
-      b.maxY - marginY
-    ];
+    let hingeYs = [b.minY + marginY, b.maxY - marginY];
 
     if (hingeSide === 'top') {
       hingeYs = [b.maxY - 22];
     } else if (hingeSide === 'bottom') {
       hingeYs = [b.minY + 22];
     } else if (height >= 950) {
-      hingeYs.push(b.py); // 3rd intermediate hinge
+      hingeYs.push(b.py);
     }
 
-    const sideText = hingeSide === 'right' ? 'derecho' : (hingeSide === 'top' ? 'superior' : (hingeSide === 'bottom' ? 'inferior' : 'izquierdo'));
+    const sideText =
+      hingeSide === 'right'
+        ? 'derecho'
+        : hingeSide === 'top'
+          ? 'superior'
+          : hingeSide === 'bottom'
+            ? 'inferior'
+            : 'izquierdo';
 
     for (let i = 0; i < hingeYs.length; i++) {
       const y = hingeYs[i];
+      let posX = b.px;
+      let posZ = b.pz;
+      let normalAxis: 'x' | 'z' = 'z';
+      let direction: 1 | -1 = 1;
+
+      if (facing === 'front') {
+        normalAxis = 'z';
+        direction = 1;
+        posZ = b.maxZ;
+        if (hingeSide === 'left') posX = b.minX + 22;
+        else if (hingeSide === 'right') posX = b.maxX - 22;
+      } else if (facing === 'back') {
+        normalAxis = 'z';
+        direction = -1;
+        posZ = b.minZ;
+        if (hingeSide === 'left') posX = b.maxX - 22;
+        else if (hingeSide === 'right') posX = b.minX + 22;
+      } else if (facing === 'right') {
+        normalAxis = 'x';
+        direction = 1;
+        posX = b.maxX;
+        if (hingeSide === 'left') posZ = b.maxZ - 22;
+        else if (hingeSide === 'right') posZ = b.minZ + 22;
+      } else {
+        // 'left'
+        normalAxis = 'x';
+        direction = -1;
+        posX = b.minX;
+        if (hingeSide === 'left') posZ = b.minZ + 22;
+        else if (hingeSide === 'right') posZ = b.maxZ - 22;
+      }
+
       holes.push({
         id: `hinge_${b.part.id}_${i}`,
         type: 'hinge_35',
         diameter: 35,
         depth: 12.5,
-        posX: hingeOffsetX,
+        posX,
         posY: y,
-        posZ: b.maxZ, // Front face
-        normalAxis: 'z',
-        direction: 1,
+        posZ,
+        normalAxis,
+        direction,
         surfaceType: 'face',
         partId: b.part.id,
         partName: b.part.name,
@@ -373,26 +425,30 @@ export class JoineryEngineService {
     drillMap: Map<string, DrillHole[]>,
     allDrills: DrillHole[]
   ) {
-    // Exclude doors, drawer fronts, and non-structural decorative parts from carcass joint drilling
-    const isMovable1 = b1.part.componentRole === 'door' || b1.part.componentRole === 'drawer_front' || 
-                       b1.part.name.toUpperCase().includes('PUERTA') || b1.part.name.toUpperCase().includes('CAJON') ||
-                       b1.part.name.toUpperCase().includes('CAJÓN') || b1.part.name.toUpperCase().includes('GAVETA') ||
-                       b1.part.name.toUpperCase().includes('FRENTE');
-    const isMovable2 = b2.part.componentRole === 'door' || b2.part.componentRole === 'drawer_front' || 
-                       b2.part.name.toUpperCase().includes('PUERTA') || b2.part.name.toUpperCase().includes('CAJON') ||
-                       b2.part.name.toUpperCase().includes('CAJÓN') || b2.part.name.toUpperCase().includes('GAVETA') ||
-                       b2.part.name.toUpperCase().includes('FRENTE');
+    const isMovable1 =
+      b1.part.componentRole === 'door' ||
+      b1.part.componentRole === 'drawer_front' ||
+      b1.part.name.toUpperCase().includes('PUERTA') ||
+      b1.part.name.toUpperCase().includes('CAJON') ||
+      b1.part.name.toUpperCase().includes('CAJÓN') ||
+      b1.part.name.toUpperCase().includes('GAVETA') ||
+      b1.part.name.toUpperCase().includes('FRENTE');
+    const isMovable2 =
+      b2.part.componentRole === 'door' ||
+      b2.part.componentRole === 'drawer_front' ||
+      b2.part.name.toUpperCase().includes('PUERTA') ||
+      b2.part.name.toUpperCase().includes('CAJON') ||
+      b2.part.name.toUpperCase().includes('CAJÓN') ||
+      b2.part.name.toUpperCase().includes('GAVETA') ||
+      b2.part.name.toUpperCase().includes('FRENTE');
     if (isMovable1 || isMovable2) return;
 
-    const contactTolerance = 3.0; // mm contact tolerance
-
+    const contactTolerance = 3.0;
     const overlapX = Math.min(b1.maxX, b2.maxX) - Math.max(b1.minX, b2.minX);
     const overlapZ = Math.min(b1.maxZ, b2.maxZ) - Math.max(b1.minZ, b2.minZ);
 
     if (overlapZ < 60) return;
 
-    // --- CASE 1: X-JOINT (Vertical Side / Divider meeting Horizontal Shelf / Tie) ---
-    // One piece has thickness along X (sx <= 32) and the other has thickness along Y (sy <= 32)
     const isSide1 = b1.sx <= 32 && b1.sy >= 60;
     const isSide2 = b2.sx <= 32 && b2.sy >= 60;
     const isShelf1 = b1.sy <= 32 && b1.sx >= 60;
@@ -410,17 +466,7 @@ export class JoineryEngineService {
         const minZ = Math.max(side.minZ, shelf.minZ);
         const maxZ = Math.min(side.maxZ, shelf.maxZ);
 
-        this.distributeScrewAndDowelHoles(
-          side,
-          shelf,
-          'x',
-          contactX,
-          contactY,
-          minZ,
-          maxZ,
-          drillMap,
-          allDrills
-        );
+        this.distributeScrewAndDowelHoles(side, shelf, 'x', contactX, contactY, minZ, maxZ, drillMap, allDrills);
         return;
       }
     } else if (isSide2 && isShelf1) {
@@ -435,22 +481,11 @@ export class JoineryEngineService {
         const minZ = Math.max(side.minZ, shelf.minZ);
         const maxZ = Math.min(side.maxZ, shelf.maxZ);
 
-        this.distributeScrewAndDowelHoles(
-          side,
-          shelf,
-          'x',
-          contactX,
-          contactY,
-          minZ,
-          maxZ,
-          drillMap,
-          allDrills
-        );
+        this.distributeScrewAndDowelHoles(side, shelf, 'x', contactX, contactY, minZ, maxZ, drillMap, allDrills);
         return;
       }
     }
 
-    // --- CASE 2: Y-JOINT (Horizontal Top/Bottom Panel meeting Vertical Side or Divider) ---
     if ((isShelf1 && isSide2) || (isShelf2 && isSide1)) {
       const horizontal = isShelf1 ? b1 : b2;
       const vertical = isShelf1 ? b2 : b1;
@@ -479,7 +514,6 @@ export class JoineryEngineService {
     }
   }
 
-  // Generates 4x50mm screws at 50mm from ends + 8x30mm dowels for alignment
   private distributeScrewAndDowelHoles(
     passing: Part3DBounds,
     butt: Part3DBounds,
@@ -506,15 +540,13 @@ export class JoineryEngineService {
       dowelZs.push((startZ + midZ) / 2);
       dowelZs.push((midZ + endZ) / 2);
     } else {
-      dowelZs.push((startZ + endZ) / 2); // 1 central dowel
+      dowelZs.push((startZ + endZ) / 2);
     }
 
-    // Screws (4x50mm)
     screwZs.forEach((z, idx) => {
       const posX = axis === 'x' ? contactAxisPos : contactCrossPos;
       const posY = axis === 'x' ? contactCrossPos : contactAxisPos;
 
-      // 1. Passing Hole on passing panel (Ø4.5mm pasante con avellanado)
       const passHole: DrillHole = {
         id: `screw_pass_${passing.part.id}_${butt.part.id}_${idx}`,
         type: 'screw_4x50',
@@ -535,7 +567,6 @@ export class JoineryEngineService {
       drillMap.get(passing.part.id)?.push(passHole);
       allDrills.push(passHole);
 
-      // 2. Guide Hole on butting edge (Ø3.0mm x 40mm)
       const guideHole: DrillHole = {
         id: `screw_guide_${butt.part.id}_${passing.part.id}_${idx}`,
         type: 'screw_4x50',
@@ -557,7 +588,6 @@ export class JoineryEngineService {
       allDrills.push(guideHole);
     });
 
-    // Dowels (8x30mm)
     dowelZs.forEach((z, idx) => {
       const posX = axis === 'x' ? contactAxisPos : contactCrossPos;
       const posY = axis === 'x' ? contactCrossPos : contactAxisPos;
@@ -566,7 +596,7 @@ export class JoineryEngineService {
         id: `dowel_pass_${passing.part.id}_${butt.part.id}_${idx}`,
         type: 'dowel_8x30',
         diameter: 8.0,
-        depth: 12.0, // 12mm depth into face
+        depth: 12.0,
         posX,
         posY,
         posZ: z,
@@ -586,7 +616,7 @@ export class JoineryEngineService {
         id: `dowel_edge_${butt.part.id}_${passing.part.id}_${idx}`,
         type: 'dowel_8x30',
         diameter: 8.0,
-        depth: 20.0, // 20mm depth into edge
+        depth: 20.0,
         posX,
         posY,
         posZ: z,

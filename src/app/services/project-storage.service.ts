@@ -13,6 +13,7 @@ import {
   ApplianceItem
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
+import { JoineryEngineService } from './joinery-engine.service';
 import { SupabaseService, CloudProjectRecord } from './supabase.service';
 import { FurnitureTemplate } from './templates-catalog.service';
 
@@ -74,6 +75,7 @@ export function cleanMaterialName(name: string): string {
 })
 export class ProjectStorageService {
   private cabinetGen = inject(CabinetGeneratorService);
+  private joineryEngine = inject(JoineryEngineService);
   readonly supabase = inject(SupabaseService);
   private autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -259,7 +261,6 @@ export class ProjectStorageService {
   }
 
   constructor() {
-    // Si no existía proyecto en localStorage, guarda el proyecto demo inicial
     if (this.isBrowser() && !localStorage.getItem(STORAGE_KEY)) {
       this.saveToStorage(this.currentProject());
     }
@@ -666,10 +667,6 @@ export class ProjectStorageService {
   // HISTORIAL DE CAMBIOS (UNDO / REDO)
   // ==========================================
 
-  /**
-   * Guarda una copia profunda del estado actual antes de aplicar una mutación.
-   * Mantiene un límite máximo de 35 estados en memoria.
-   */
   pushSnapshot() {
     try {
       const snap = JSON.parse(JSON.stringify(this.currentProject()));
@@ -685,10 +682,6 @@ export class ProjectStorageService {
     }
   }
 
-  /**
-   * Limpia las pilas de Undo/Redo cuando el usuario cambia de proyecto o crea uno nuevo,
-   * evitando que Ctrl+Z mezcle estados de proyectos distintos.
-   */
   clearHistory() {
     this.undoStack = [];
     this.redoStack = [];
@@ -696,9 +689,6 @@ export class ProjectStorageService {
     this.canRedo.set(false);
   }
 
-  /**
-   * Restaura el estado inmediatamente anterior en la pila `undoStack`.
-   */
   undo() {
     if (this.undoStack.length === 0) return;
     try {
@@ -714,9 +704,6 @@ export class ProjectStorageService {
     }
   }
 
-  /**
-   * Reaplica un estado deshecho previamente desde la pila `redoStack`.
-   */
   redo() {
     if (this.redoStack.length === 0) return;
     try {
@@ -736,11 +723,6 @@ export class ProjectStorageService {
   // PERSISTENCIA LOCAL Y EN LA NUBE (SUPABASE)
   // ==========================================
 
-  /**
-   * Método central para mutar el proyecto activo.
-   * Registra automáticamente el snapshot en el historial (si `recordHistory` es true)
-   * y persiste en localStorage (y en Supabase si autoSync está activo).
-   */
   updateProject(mutator: (p: Project) => Project, recordHistory = true) {
     if (recordHistory) {
       this.pushSnapshot();
@@ -761,9 +743,6 @@ export class ProjectStorageService {
     }));
   }
 
-  /**
-   * Guarda el proyecto completo en localStorage y actualiza el índice ligero `savedProjects`.
-   */
   saveToStorage(project: Project) {
     if (!this.isBrowser()) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
@@ -789,7 +768,6 @@ export class ProjectStorageService {
     localStorage.setItem(`melamipro_project_${project.id}`, JSON.stringify(project));
     this.savedProjects.set(list);
 
-    // Sincronizar con Supabase con debounce de 1.5s únicamente si el usuario activó autoSync
     if (this.autoSyncEnabled()) {
       this.scheduleCloudAutoSync(project);
     } else if (this.autoSyncTimeout) {
@@ -811,11 +789,6 @@ export class ProjectStorageService {
     return this.supabase.saveProject(this.currentProject());
   }
 
-  /**
-   * Carga un proyecto desde Supabase. Si el registro no incluye el objeto `data`,
-   * lo descarga bajo demanda usando `getProjectById`, limpia el historial Undo/Redo
-   * y actualiza el almacenamiento local.
-   */
   async loadCloudProject(record: CloudProjectRecord) {
     if (!record) return;
     let projectData = record.data;
@@ -982,14 +955,8 @@ export class ProjectStorageService {
       if (existingParts.length > 0) {
         let maxX = -Infinity;
         for (const part of existingParts) {
-          let halfW = 0;
-          if (part.orientation === 'horizontal' || part.orientation === 'vertical_xy') {
-            halfW = (part.length || 0) / 2;
-          } else {
-            halfW = (part.thickness || 18) / 2;
-          }
-          const rightEdge = (part.posX || 0) + halfW;
-          if (rightEdge > maxX) maxX = rightEdge;
+          const b = this.joineryEngine.getPartBounds(part);
+          if (b.maxX > maxX) maxX = b.maxX;
         }
         if (maxX !== -Infinity) {
           offsetX = Math.round(maxX + (template.dimensions.width / 2) + 200);
@@ -1316,7 +1283,7 @@ export class ProjectStorageService {
         if (pt.groupId !== groupId) return pt;
         const isDoor = pt.componentRole === 'door' || pt.componentRole === 'drawer_front';
         const isBack = pt.componentRole === 'back' && pt.thickness <= 6;
-        if (isBack) return pt; // Mantener fondo delgado MDF
+        if (isBack) return pt;
 
         if (target === 'doors' && !isDoor) return pt;
         if (target === 'structure' && isDoor) return pt;
@@ -1377,6 +1344,19 @@ export class ProjectStorageService {
 
   moveGroup(groupId: string, deltaX: number, deltaY: number, deltaZ: number) {
     this.updateProject(p => {
+      const groupParts = p.parts.filter(pt => pt.groupId === groupId);
+      let effDy = deltaY;
+      if (groupParts.length > 0 && deltaY < 0) {
+        let grpMinY = Infinity;
+        for (const gp of groupParts) {
+          const b = this.joineryEngine.getPartBounds(gp);
+          if (b.minY < grpMinY) grpMinY = b.minY;
+        }
+        if (grpMinY !== Infinity) {
+          effDy = Math.max(-grpMinY, deltaY);
+        }
+      }
+
       return {
         ...p,
         parts: p.parts.map(pt => {
@@ -1384,7 +1364,7 @@ export class ProjectStorageService {
             return {
               ...pt,
               posX: Math.round(((pt.posX ?? 0) + deltaX) * 10) / 10,
-              posY: Math.round(((pt.posY ?? 0) + deltaY) * 10) / 10,
+              posY: Math.round(((pt.posY ?? 0) + effDy) * 10) / 10,
               posZ: Math.round(((pt.posZ ?? 0) + deltaZ) * 10) / 10
             };
           }
@@ -1404,13 +1384,15 @@ export class ProjectStorageService {
     const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
     if (groupParts.length === 0) return null;
 
-    const frontPart = groupParts.find(p => p.componentRole === 'drawer_front' || p.id.includes('frente') || p.name.toUpperCase().includes('FRENTE')) || groupParts[0];
-    const frontHeight = frontPart.orientation === 'vertical_xy'
-      ? (frontPart.width > 0 ? frontPart.width : frontPart.length)
-      : (frontPart.orientation === 'vertical_yz' ? (frontPart.width > 0 ? frontPart.width : frontPart.length) : frontPart.width);
-
-    const effectiveHeight = frontHeight && frontHeight > 40 ? frontHeight : 180;
-    const deltaY = Math.round(effectiveHeight + 15);
+    let grpMinY = Infinity;
+    let grpMaxY = -Infinity;
+    for (const gp of groupParts) {
+      const b = this.joineryEngine.getPartBounds(gp);
+      if (b.minY < grpMinY) grpMinY = b.minY;
+      if (b.maxY > grpMaxY) grpMaxY = b.maxY;
+    }
+    const groupHeight = grpMaxY > grpMinY ? grpMaxY - grpMinY : 180;
+    const deltaY = Math.round(groupHeight + 15);
 
     const existingGroups = currentProj.groups || [];
     let nextName = `${group.name} (Copia)`;
@@ -1489,23 +1471,35 @@ export class ProjectStorageService {
     return { newGroup, newPartIds };
   }
 
+  /**
+   * Rota rígidamente un módulo, cajón o grupo de piezas en el plano horizontal (90°, -90° o 180°)
+   * alrededor de su centro geométrico real (cx, cz), preservando intacta la altura vertical (sy)
+   * de cada pieza y evitando pérdida de precisión decimal (.5 mm).
+   */
   rotateGroupRigidly(groupId: string, angleDelta: 90 | -90 | 180) {
     this.updateProject(p => {
       const groupParts = p.parts.filter(pt => pt.groupId === groupId);
       if (groupParts.length === 0) return p;
 
-      const minX = Math.min(...groupParts.map(pt => pt.posX ?? 0));
-      const maxX = Math.max(...groupParts.map(pt => pt.posX ?? 0));
-      const minZ = Math.min(...groupParts.map(pt => pt.posZ ?? 0));
-      const maxZ = Math.max(...groupParts.map(pt => pt.posZ ?? 0));
-      const cx = (minX + maxX) / 2;
-      const cz = (minZ + maxZ) / 2;
+      let grpMinX = Infinity, grpMaxX = -Infinity;
+      let grpMinZ = Infinity, grpMaxZ = -Infinity;
+      for (const pt of groupParts) {
+        const b = this.joineryEngine.getPartBounds(pt);
+        if (b.minX < grpMinX) grpMinX = b.minX;
+        if (b.maxX > grpMaxX) grpMaxX = b.maxX;
+        if (b.minZ < grpMinZ) grpMinZ = b.minZ;
+        if (b.maxZ > grpMaxZ) grpMaxZ = b.maxZ;
+      }
+
+      const cx = (grpMinX + grpMaxX) / 2;
+      const cz = (grpMinZ + grpMaxZ) / 2;
 
       const updatedParts = p.parts.map(pt => {
         if (pt.groupId !== groupId) return pt;
 
-        const dx = (pt.posX ?? 0) - cx;
-        const dz = (pt.posZ ?? 0) - cz;
+        const oldBounds = this.joineryEngine.getPartBounds(pt);
+        const dx = oldBounds.px - cx;
+        const dz = oldBounds.pz - cz;
         let newDx = dx;
         let newDz = dz;
 
@@ -1520,21 +1514,55 @@ export class ProjectStorageService {
           newDz = -dz;
         }
 
-        const newPosX = Math.round(cx + newDx);
-        const newPosZ = Math.round(cz + newDz);
+        const newPosX = Math.round((cx + newDx) * 10) / 10;
+        const newPosZ = Math.round((cz + newDz) * 10) / 10;
 
-        let newOrientation = pt.orientation;
+        const currentOrient = pt.orientation || 'horizontal';
+        let newOrientation = currentOrient;
         let newLength = pt.length;
         let newWidth = pt.width;
 
         if (Math.abs(angleDelta) === 90) {
-          if (pt.orientation === 'vertical_xy') {
-            newOrientation = 'vertical_yz';
-          } else if (pt.orientation === 'vertical_yz') {
-            newOrientation = 'vertical_xy';
-          } else if (pt.orientation === 'horizontal') {
+          if (currentOrient === 'horizontal') {
+            newOrientation = 'horizontal';
             newLength = pt.width;
             newWidth = pt.length;
+          } else if (currentOrient === 'vertical_xy') {
+            newOrientation = 'vertical_yz';
+            const horizontalSpan = oldBounds.sx;
+            const verticalHeight = oldBounds.sy;
+
+            const isCabinetSide =
+              pt.componentRole === 'side_left' ||
+              pt.componentRole === 'side_right' ||
+              pt.componentRole === 'divider' ||
+              pt.componentRole === 'door' ||
+              pt.componentRole === 'back' ||
+              (pt.name.toUpperCase().includes('LATERAL') &&
+                !pt.name.toUpperCase().includes('CAJ') &&
+                pt.componentRole !== 'drawer_box' &&
+                pt.componentRole !== 'drawer_lateral');
+
+            const isDrawerBoxSide =
+              !isCabinetSide &&
+              (pt.componentRole === 'drawer_box' ||
+                pt.componentRole === 'drawer_lateral' ||
+                (pt.name.toUpperCase().includes('LATERAL') && pt.name.toUpperCase().includes('CAJ')));
+
+            if (isDrawerBoxSide && horizontalSpan > verticalHeight) {
+              newLength = horizontalSpan;
+              newWidth = verticalHeight;
+            } else {
+              newLength = verticalHeight;
+              newWidth = horizontalSpan;
+            }
+          } else if (currentOrient === 'vertical_yz') {
+            newOrientation = 'vertical_xy';
+            const horizontalSpan = oldBounds.sz;
+            const verticalHeight = oldBounds.sy;
+            // En vertical_xy todas las piezas mapean sx = length y sy = width
+            newLength = horizontalSpan;
+            newWidth = verticalHeight;
           }
         }
 
@@ -1555,28 +1583,74 @@ export class ProjectStorageService {
     });
   }
 
+  /**
+   * Detecta la dirección cardinal ('front' | 'right' | 'back' | 'left') hacia la que mira
+   * el frente de un módulo, armario, estantería o cajón.
+   */
   getGroupFacingDirection(groupId: string): 'front' | 'right' | 'back' | 'left' {
     const currentProj = this.currentProject();
     if (!currentProj) return 'front';
     const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
     if (groupParts.length === 0) return 'front';
 
-    const minX = Math.min(...groupParts.map(pt => pt.posX ?? 0));
-    const maxX = Math.max(...groupParts.map(pt => pt.posX ?? 0));
-    const minZ = Math.min(...groupParts.map(pt => pt.posZ ?? 0));
-    const maxZ = Math.max(...groupParts.map(pt => pt.posZ ?? 0));
-    const cx = (minX + maxX) / 2;
-    const cz = (minZ + maxZ) / 2;
-
-    const frontPart = groupParts.find(p => p.componentRole === 'drawer_front' || p.id.includes('frente') || p.name.toUpperCase().includes('FRENTE')) || groupParts[0];
-    const dx = (frontPart.posX ?? 0) - cx;
-    const dz = (frontPart.posZ ?? 0) - cz;
-
-    if (frontPart.orientation === 'vertical_yz') {
-      return (Math.abs(dx) > 10 ? dx >= 0 : (frontPart.posX ?? 0) >= 0) ? 'right' : 'left';
-    } else {
-      return (Math.abs(dz) > 10 ? dz >= 0 : (frontPart.posZ ?? 0) >= 0) ? 'front' : 'back';
+    let grpMinX = Infinity, grpMaxX = -Infinity;
+    let grpMinZ = Infinity, grpMaxZ = -Infinity;
+    for (const pt of groupParts) {
+      const b = this.joineryEngine.getPartBounds(pt);
+      if (b.minX < grpMinX) grpMinX = b.minX;
+      if (b.maxX > grpMaxX) grpMaxX = b.maxX;
+      if (b.minZ < grpMinZ) grpMinZ = b.minZ;
+      if (b.maxZ > grpMaxZ) grpMaxZ = b.maxZ;
     }
+    const cx = (grpMinX + grpMaxX) / 2;
+    const cz = (grpMinZ + grpMaxZ) / 2;
+
+    // 1. Priorizar puertas, frentes de cajón o zócalos frontales
+    const frontPart = groupParts.find(
+      p =>
+        p.componentRole === 'door' ||
+        p.componentRole === 'drawer_front' ||
+        p.componentRole === 'plinth' ||
+        p.id.includes('frente') ||
+        p.name.toUpperCase().includes('FRENTE') ||
+        p.name.toUpperCase().includes('PUERTA')
+    );
+
+    if (frontPart) {
+      const dx = (frontPart.posX ?? 0) - cx;
+      const dz = (frontPart.posZ ?? 0) - cz;
+      if (frontPart.orientation === 'vertical_yz') {
+        return dx >= 0 ? 'right' : 'left';
+      }
+      return dz >= 0 ? 'front' : 'back';
+    }
+
+    // 2. Si es un módulo abierto sin puertas, usar el panel de fondo trasero (el frente es el lado opuesto al fondo)
+    const backPart = groupParts.find(
+      p =>
+        p.componentRole === 'back' ||
+        (p.name.toUpperCase().includes('FONDO') && p.orientation !== 'horizontal') ||
+        p.name.toUpperCase().includes('TRASERA')
+    );
+
+    if (backPart) {
+      const dx = (backPart.posX ?? 0) - cx;
+      const dz = (backPart.posZ ?? 0) - cz;
+      if (backPart.orientation === 'vertical_yz') {
+        return dx >= 0 ? 'left' : 'right';
+      }
+      return dz >= 0 ? 'back' : 'front';
+    }
+
+    // 3. Fallback por orientación de los laterales estructurales
+    const sidePart = groupParts.find(
+      p => p.componentRole === 'side_left' || p.componentRole === 'side_right' || p.name.toUpperCase().includes('LATERAL')
+    );
+    if (sidePart) {
+      return sidePart.orientation === 'vertical_xy' ? 'right' : 'front';
+    }
+
+    return 'front';
   }
 
   addParametricDrawer(cfg: ParametricDrawerConfig): PartGroup {
