@@ -663,7 +663,7 @@
     </div>
   }
 
-  <!-- MENÚ CONTEXTUAL DE CLIC DERECHO -->
+ <!-- MENÚ CONTEXTUAL DE CLIC DERECHO (INTELIGENTE SEGÚN PIEZA / CAJÓN / PUERTA / ESPACIO VACÍO) -->
   @if (contextMenuPos(); as pos) {
     <button
       type="button"
@@ -675,22 +675,42 @@
     <div
       [style.left.px]="pos.x"
       [style.top.px]="pos.y"
-      class="absolute z-50 bg-white text-slate-800 rounded-2xl border border-slate-200/90 shadow-2xl p-1.5 flex flex-col gap-0.5 min-w-55 max-h-[calc(100%-1.5rem)] overflow-y-auto scrollbar-thin text-xs font-medium animate-in fade-in zoom-in-95 select-none pointer-events-auto">
+      class="absolute z-50 bg-white text-slate-800 rounded-2xl border border-slate-200/90 shadow-2xl p-1.5 flex flex-col gap-0.5 w-64 max-h-[calc(100%-1.5rem)] overflow-y-auto scrollbar-thin text-xs font-medium animate-in fade-in zoom-in-95 select-none pointer-events-auto">
 
       @if (contextMenuPart(); as part) {
-        <div class="px-2.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
-            <span class="font-bold text-slate-900 truncate">{{ part.name }}</span>
+        @let category = contextMenuCategory();
+        @let grp = contextMenuGroup();
+        @let frontRef = contextMenuEffectiveFrontPart() || part;
+
+        <!-- CABECERA DEL MENÚ CON ROL CLARO -->
+        <div class="px-2.5 py-1.5 border-b border-slate-100 flex flex-col gap-0.5">
+          <div class="flex items-center justify-between gap-1.5">
+            <div class="flex items-center gap-1.5 truncate">
+              <span
+                class="w-2 h-2 rounded-full shrink-0"
+                [class]="category === 'drawer' ? 'bg-indigo-500' : (category === 'door' ? 'bg-blue-500' : 'bg-sky-500')">
+              </span>
+              <span class="font-bold text-slate-900 truncate">{{ part.name }}</span>
+            </div>
+            <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ part.length }}×{{ part.width }}</span>
           </div>
-          <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ part.length }}×{{ part.width }}</span>
+
+          <div class="flex items-center justify-between text-[10px] text-slate-400 pl-3.5">
+            <span class="truncate">{{ grp ? grp.name : (part.moduleName || 'Pieza individual') }}</span>
+            <span
+              class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px]"
+              [class]="category === 'drawer' ? 'bg-indigo-50 text-indigo-700' : (category === 'door' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600')">
+              {{ category === 'drawer' ? 'Cajón' : (category === 'door' ? 'Puerta' : 'Estructura') }}
+            </span>
+          </div>
         </div>
 
-        @if (part.groupId) {
+        <!-- BOTÓN EDITAR MÓDULO COMPLETO (Solo para Módulos/Armarios, no para cajones sueltos) -->
+        @if (part.groupId && isContextMenuCabinetModule()) {
           <button
             type="button"
             (click)="$event.stopPropagation(); onEditModuleFromContext(part.groupId, $event)"
-            class="w-full my-1 py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 text-indigo-700 font-bold rounded-xl flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
+            class="w-full my-1 py-1.5 px-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 text-indigo-700 font-bold rounded-xl flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
             <div class="flex items-center gap-1.5">
               <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="2" class="text-indigo-600"></hugeicons-icon>
               <span>Editar Módulo Completo</span>
@@ -699,96 +719,240 @@
           </button>
         }
 
-        <div class="p-1.5 bg-blue-50/70 rounded-xl border border-blue-100 flex flex-col gap-1 my-1">
-          @if (isAnimatablePart(part)) {
+        <!-- ========================================================= -->
+        <!-- CASO 1: MENÚ EXCLUSIVO PARA CAJONES (SIN BISAGRAS/PUERTA) -->
+        <!-- ========================================================= -->
+        @if (category === 'drawer') {
+          <div class="p-1.5 bg-indigo-50/60 rounded-xl border border-indigo-100 flex flex-col gap-1 my-1">
+            <!-- Animar / Abrir o Cerrar Cajón -->
             <button
               type="button"
               (click)="toggleContextMenuAnimation()"
-              class="w-full py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
+              class="w-full py-1.5 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
+              <div class="flex items-center gap-1.5">
+                <hugeicons-icon [icon]="isPartOpen(frontRef.id) ? icons.doorOpen : icons.doorClosed" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                <span>{{ isPartOpen(frontRef.id) ? 'Cerrar Cajón' : 'Abrir / Deslizar Cajón' }}</span>
+              </div>
+              <span class="text-[10px] font-mono opacity-85 uppercase">3D</span>
+            </button>
+
+            <!-- Submenú: Tirador / Manija del Cajón -->
+            <div class="relative">
+              <button
+                type="button"
+                (click)="toggleHandleSubmenu()"
+                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
+                <div class="flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.hardwareTool" [size]="13" [strokeWidth]="2" class="text-amber-600"></hugeicons-icon>
+                  <span>Tirador / Manija del Cajón</span>
+                </div>
+                <hugeicons-icon [icon]="showHandleSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+              </button>
+
+              @if (showHandleSubmenu()) {
+                <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
+                  <!-- Selector rápido de acabado del tirador -->
+                  <div class="flex items-center justify-between gap-1 px-1 pb-1 border-b border-slate-100">
+                    <span class="text-[9px] font-bold uppercase text-slate-400">Acabado:</span>
+                    <div class="flex items-center gap-1">
+                      <button
+                        type="button"
+                        (click)="setContextMenuPartHandleFinish('brushed_steel')"
+                        [class]="(frontRef.hardwareConfig?.handleFinish || 'brushed_steel') === 'brushed_steel' ? 'bg-slate-800 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                        class="px-1.5 py-0.5 rounded text-[9px] cursor-pointer transition">
+                        Inox
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setContextMenuPartHandleFinish('black')"
+                        [class]="frontRef.hardwareConfig?.handleFinish === 'black' ? 'bg-slate-900 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                        class="px-1.5 py-0.5 rounded text-[9px] cursor-pointer transition">
+                        Negro
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setContextMenuPartHandleFinish('gold')"
+                        [class]="frontRef.hardwareConfig?.handleFinish === 'gold' ? 'bg-amber-500 text-white font-bold' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'"
+                        class="px-1.5 py-0.5 rounded text-[9px] cursor-pointer transition">
+                        Dorado
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="max-h-44 overflow-y-auto scrollbar-thin flex flex-col gap-0.5">
+                    @for (hOpt of hardwareCatalog.handleOptions; track hOpt.id) {
+                      <button
+                        type="button"
+                        (click)="setContextMenuPartHandle(hOpt.id)"
+                        [class]="(frontRef.hardwareConfig?.handleType || 'bar_modern') === hOpt.id ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
+                        class="px-2 py-1 rounded-lg flex items-center justify-between text-left cursor-pointer">
+                        <div class="flex items-center gap-1.5 truncate">
+                          <hugeicons-icon [icon]="icons.hardwareTool" [size]="12" [strokeWidth]="1.8" class="text-slate-400 shrink-0"></hugeicons-icon>
+                          <span class="truncate">{{ hOpt.name }}</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ hOpt.defaultLength ? hOpt.defaultLength + 'mm' : '' }}</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Submenú: Tipo de Corredera -->
+            <div class="relative">
+              <button
+                type="button"
+                (click)="toggleSlideSubmenu()"
+                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
+                <div class="flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
+                  <span>Tipo de Corredera</span>
+                </div>
+                <hugeicons-icon [icon]="showSlideSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+              </button>
+
+              @if (showSlideSubmenu()) {
+                <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
+                  @for (slide of hardwareCatalog.slideOptions; track slide.id) {
+                    <button
+                      type="button"
+                      (click)="setContextMenuPartSlide(slide.id)"
+                      [class]="(frontRef.hardwareConfig?.slideType || 'telescopic') === slide.id ? 'bg-sky-50 text-sky-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
+                      class="px-2 py-1 rounded-lg flex items-center justify-between text-left cursor-pointer">
+                      <div class="flex items-center gap-1.5 truncate">
+                        <hugeicons-icon [icon]="icons.layers" [size]="12" [strokeWidth]="1.8" class="text-slate-400 shrink-0"></hugeicons-icon>
+                        <span class="truncate">{{ slide.name }}</span>
+                      </div>
+                      <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ slide.loadCapacityKg ? slide.loadCapacityKg + 'kg' : '' }}</span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- ========================================================= -->
+        <!-- CASO 2: MENÚ EXCLUSIVO PARA PUERTAS (SIN CORREDERAS)      -->
+        <!-- ========================================================= -->
+        @if (category === 'door') {
+          <div class="p-1.5 bg-blue-50/70 rounded-xl border border-blue-100 flex flex-col gap-1 my-1">
+            <!-- Animar / Abrir o Cerrar Puerta -->
+            <button
+              type="button"
+              (click)="toggleContextMenuAnimation()"
+              class="w-full py-1.5 px-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
               <div class="flex items-center gap-1.5">
                 <hugeicons-icon [icon]="isPartOpen(part.id) ? icons.doorOpen : icons.doorClosed" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                <span>{{ isPartOpen(part.id) ? 'Cerrar Pieza / Cajón' : 'Animar / Abrir Pieza' }}</span>
+                <span>{{ isPartOpen(part.id) ? 'Cerrar Puerta' : 'Abrir Puerta en 3D' }}</span>
               </div>
-              <span class="text-[10px] font-mono opacity-80 uppercase">3D</span>
-            </button>
-          }
-
-          <!-- Submenú: Convertir Tipo de Pieza -->
-          <div class="relative">
-            <button
-              type="button"
-              (click)="toggleMovableRoleSubmenu()"
-              class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
-              <div class="flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-blue-600"></hugeicons-icon>
-                <span>Tipo (Puerta / Cajón / Estante)</span>
-              </div>
-              <hugeicons-icon [icon]="showMovableRoleSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+              <span class="text-[10px] font-mono opacity-85 uppercase">3D</span>
             </button>
 
-            @if (showMovableRoleSubmenu()) {
-              <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
-                <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1">Puertas Batientes / Elevables:</span>
-                <button type="button" (click)="setContextMenuPartMovable('door', 'left')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'door' && (part.hardwareConfig?.openingDirection ?? 'left') === 'left'">
-                  <hugeicons-icon [icon]="icons.arrowLeft" [size]="13" [strokeWidth]="2" class="text-blue-500"></hugeicons-icon>
-                  <span>Puerta (Bisagra Izquierda)</span>
-                </button>
-                <button type="button" (click)="setContextMenuPartMovable('door', 'right')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'door' && part.hardwareConfig?.openingDirection === 'right'">
-                  <hugeicons-icon [icon]="icons.arrowRight" [size]="13" [strokeWidth]="2" class="text-blue-500"></hugeicons-icon>
-                  <span>Puerta (Bisagra Derecha)</span>
-                </button>
-                <button type="button" (click)="setContextMenuPartMovable('door', 'top')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'door' && part.hardwareConfig?.openingDirection === 'top'">
-                  <hugeicons-icon [icon]="icons.arrowUp" [size]="13" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
-                  <span>Puerta Basculante Superior</span>
-                </button>
-                <div class="h-px bg-slate-100 my-0.5"></div>
-                <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1">Cajones y Estructura:</span>
-                <button type="button" (click)="setContextMenuPartMovable('drawer_front', 'top')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'drawer_front'">
-                  <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-emerald-500"></hugeicons-icon>
-                  <span>Frente de Cajón Móvil</span>
-                </button>
-                <button type="button" (click)="setContextMenuPartMovable('shelf')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.componentRole === 'shelf'">
-                  <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
-                  <span>Estante / Pieza Fija</span>
-                </button>
-              </div>
-            }
-          </div>
+            <!-- Submenú: Sentido de Apertura de la Puerta -->
+            <div class="relative">
+              <button
+                type="button"
+                (click)="toggleMovableRoleSubmenu()"
+                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
+                <div class="flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-blue-600"></hugeicons-icon>
+                  <span>Sentido de Apertura</span>
+                </div>
+                <hugeicons-icon [icon]="showMovableRoleSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+              </button>
 
-          <!-- Submenú: Tirador / Manija -->
-          <div class="relative">
-            <button
-              type="button"
-              (click)="toggleHandleSubmenu()"
-              class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
-              <div class="flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.hardwareTool" [size]="13" [strokeWidth]="2" class="text-amber-600"></hugeicons-icon>
-                <span>Asignar Tirador / Manija</span>
-              </div>
-              <hugeicons-icon [icon]="showHandleSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
-            </button>
-
-            @if (showHandleSubmenu()) {
-              <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md max-h-48 overflow-y-auto scrollbar-thin">
-                @for (hOpt of hardwareCatalog.handleOptions; track hOpt.id) {
-                  <button
-                    type="button"
-                    (click)="setContextMenuPartHandle(hOpt.id, part.hardwareConfig?.handleFinish || 'brushed_steel')"
-                    [class]="(part.hardwareConfig?.handleType || 'bar_modern') === hOpt.id ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
-                    class="px-2 py-1 rounded-lg flex items-center justify-between text-left cursor-pointer">
-                    <div class="flex items-center gap-1.5 truncate">
-                      <hugeicons-icon [icon]="icons.hardwareTool" [size]="12" [strokeWidth]="1.8" class="text-slate-400 shrink-0"></hugeicons-icon>
-                      <span class="truncate">{{ hOpt.name }}</span>
-                    </div>
-                    <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ hOpt.defaultLength ? hOpt.defaultLength + 'mm' : '' }}</span>
+              @if (showMovableRoleSubmenu()) {
+                <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
+                  <button type="button" (click)="setContextMenuPartMovable('door', 'left')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="(part.hardwareConfig?.openingDirection ?? 'left') === 'left'">
+                    <hugeicons-icon [icon]="icons.arrowLeft" [size]="13" [strokeWidth]="2" class="text-blue-500"></hugeicons-icon>
+                    <span>Bisagra a la Izquierda</span>
                   </button>
-                }
-              </div>
-            }
-          </div>
+                  <button type="button" (click)="setContextMenuPartMovable('door', 'right')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.hardwareConfig?.openingDirection === 'right'">
+                    <hugeicons-icon [icon]="icons.arrowRight" [size]="13" [strokeWidth]="2" class="text-blue-500"></hugeicons-icon>
+                    <span>Bisagra a la Derecha</span>
+                  </button>
+                  <button type="button" (click)="setContextMenuPartMovable('door', 'top')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.hardwareConfig?.openingDirection === 'top'">
+                    <hugeicons-icon [icon]="icons.arrowUp" [size]="13" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+                    <span>Basculante Superior (Pistón)</span>
+                  </button>
+                  <button type="button" (click)="setContextMenuPartMovable('door', 'bottom')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.hardwareConfig?.openingDirection === 'bottom'">
+                    <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+                    <span>Abatible Inferior</span>
+                  </button>
+                  @if (!part.groupId) {
+                    <div class="h-px bg-slate-100 my-0.5"></div>
+                    <button type="button" (click)="setContextMenuPartMovable('shelf')" class="px-2 py-1 rounded-lg hover:bg-slate-50 text-slate-500 flex items-center gap-1.5 text-left cursor-pointer">
+                      <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+                      <span>Convertir en Pieza Fija</span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
 
-          <!-- Submenú: Bisagras -->
-          @if (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) {
+            <!-- Submenú: Tirador / Manija de la Puerta -->
+            <div class="relative">
+              <button
+                type="button"
+                (click)="toggleHandleSubmenu()"
+                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
+                <div class="flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.hardwareTool" [size]="13" [strokeWidth]="2" class="text-amber-600"></hugeicons-icon>
+                  <span>Asignar Tirador / Manija</span>
+                </div>
+                <hugeicons-icon [icon]="showHandleSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+              </button>
+
+              @if (showHandleSubmenu()) {
+                <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
+                  <div class="flex items-center justify-between gap-1 px-1 pb-1 border-b border-slate-100">
+                    <span class="text-[9px] font-bold uppercase text-slate-400">Acabado:</span>
+                    <div class="flex items-center gap-1">
+                      <button
+                        type="button"
+                        (click)="setContextMenuPartHandleFinish('brushed_steel')"
+                        [class]="(part.hardwareConfig?.handleFinish || 'brushed_steel') === 'brushed_steel' ? 'bg-slate-800 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                        class="px-1.5 py-0.5 rounded text-[9px] cursor-pointer transition">
+                        Inox
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setContextMenuPartHandleFinish('black')"
+                        [class]="part.hardwareConfig?.handleFinish === 'black' ? 'bg-slate-900 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                        class="px-1.5 py-0.5 rounded text-[9px] cursor-pointer transition">
+                        Negro
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setContextMenuPartHandleFinish('gold')"
+                        [class]="part.hardwareConfig?.handleFinish === 'gold' ? 'bg-amber-500 text-white font-bold' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'"
+                        class="px-1.5 py-0.5 rounded text-[9px] cursor-pointer transition">
+                        Dorado
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="max-h-44 overflow-y-auto scrollbar-thin flex flex-col gap-0.5">
+                    @for (hOpt of hardwareCatalog.handleOptions; track hOpt.id) {
+                      <button
+                        type="button"
+                        (click)="setContextMenuPartHandle(hOpt.id)"
+                        [class]="(part.hardwareConfig?.handleType || 'bar_modern') === hOpt.id ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
+                        class="px-2 py-1 rounded-lg flex items-center justify-between text-left cursor-pointer">
+                        <div class="flex items-center gap-1.5 truncate">
+                          <hugeicons-icon [icon]="icons.hardwareTool" [size]="12" [strokeWidth]="1.8" class="text-slate-400 shrink-0"></hugeicons-icon>
+                          <span class="truncate">{{ hOpt.name }}</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ hOpt.defaultLength ? hOpt.defaultLength + 'mm' : '' }}</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Submenú: Bisagras Cazoleta Ø35mm -->
             <div class="relative">
               <button
                 type="button"
@@ -818,55 +982,139 @@
                 </div>
               }
             </div>
-          }
+          </div>
+        }
 
-          <!-- Submenú: Correderas -->
-          @if (part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('CAJON') || part.name.toUpperCase().includes('CAJÓN') || part.name.toUpperCase().includes('GAVETA') || part.hardwareConfig?.movableType === 'drawer') {
-            <div class="relative">
-              <button
-                type="button"
-                (click)="toggleSlideSubmenu()"
-                class="w-full px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
-                <div class="flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
-                  <span>Tipo de Corredera</span>
-                </div>
-                <hugeicons-icon [icon]="showSlideSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
-              </button>
+        <!-- ========================================================= -->
+        <!-- CASO 3: PIEZA SUELTA DIBUJADA MANUALMENTE (CONVERTIR ROL) -->
+        <!-- ========================================================= -->
+        @if (category === 'structural' && !part.groupId && !part.moduleId) {
+          <div class="relative my-0.5">
+            <button
+              type="button"
+              (click)="toggleMovableRoleSubmenu()"
+              class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
+              <div class="flex items-center gap-2">
+                <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
+                <span>Convertir Pieza en...</span>
+              </div>
+              <hugeicons-icon [icon]="showMovableRoleSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+            </button>
 
-              @if (showSlideSubmenu()) {
-                <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
-                  @for (slide of hardwareCatalog.slideOptions; track slide.id) {
-                    <button
-                      type="button"
-                      (click)="setContextMenuPartSlide(slide.id)"
-                      [class]="(part.hardwareConfig?.slideType || 'telescopic') === slide.id ? 'bg-sky-50 text-sky-700 font-bold' : 'hover:bg-slate-50 text-slate-700'"
-                      class="px-2 py-1 rounded-lg flex items-center justify-between text-left cursor-pointer">
-                      <div class="flex items-center gap-1.5 truncate">
-                        <hugeicons-icon [icon]="icons.layers" [size]="12" [strokeWidth]="1.8" class="text-slate-400 shrink-0"></hugeicons-icon>
-                        <span class="truncate">{{ slide.name }}</span>
-                      </div>
-                      <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ slide.loadCapacityKg ? slide.loadCapacityKg + 'kg' : '' }}</span>
-                    </button>
-                  }
+            @if (showMovableRoleSubmenu()) {
+              <div class="bg-slate-50 border border-slate-200 rounded-xl p-1.5 my-0.5 flex flex-col gap-1 text-xs shadow-xs">
+                <button type="button" (click)="setContextMenuPartMovable('door', 'left')" class="px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center gap-1.5 text-left cursor-pointer">
+                  <hugeicons-icon [icon]="icons.doorOpen" [size]="13" [strokeWidth]="2" class="text-blue-500"></hugeicons-icon>
+                  <span>Puerta Batiente (Izquierda)</span>
+                </button>
+                <button type="button" (click)="setContextMenuPartMovable('door', 'right')" class="px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center gap-1.5 text-left cursor-pointer">
+                  <hugeicons-icon [icon]="icons.doorOpen" [size]="13" [strokeWidth]="2" class="text-blue-500"></hugeicons-icon>
+                  <span>Puerta Batiente (Derecha)</span>
+                </button>
+                <button type="button" (click)="setContextMenuPartMovable('drawer_front', 'top')" class="px-2 py-1 rounded-lg hover:bg-white text-slate-700 flex items-center gap-1.5 text-left cursor-pointer">
+                  <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-indigo-500"></hugeicons-icon>
+                  <span>Frente de Cajón Móvil</span>
+                </button>
+              </div>
+            }
+          </div>
+          <div class="h-px bg-slate-100 my-0.5"></div>
+        }
+
+        <!-- ========================================================= -->
+        <!-- SECCIÓN UNIVERSAL: MATERIAL, CANTOS, GIRO Y VISIBILIDAD   -->
+        <!-- ========================================================= -->
+
+        <!-- Submenú Cambiar Material (Permite aplicar a la pieza o a todo el cajón/módulo) -->
+        <div class="relative">
+          <button
+            type="button"
+            (click)="toggleQuickMaterialPicker()"
+            class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
+            <div class="flex items-center gap-2">
+              <hugeicons-icon [icon]="icons.palette" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+              <span>Cambiar Material</span>
+            </div>
+            <hugeicons-icon [icon]="showQuickMaterialPicker() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+          </button>
+
+          @if (showQuickMaterialPicker()) {
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-1.5 my-0.5 flex flex-col gap-1 text-xs max-h-48 overflow-y-auto scrollbar-thin">
+              @if (grp) {
+                <div class="flex items-center gap-1 p-0.5 bg-slate-200/70 rounded-lg text-[10px]">
+                  <button
+                    type="button"
+                    (click)="applyMaterialToWholeGroup.set(false)"
+                    [class]="!applyMaterialToWholeGroup() ? 'bg-white text-slate-900 font-bold shadow-2xs' : 'text-slate-600'"
+                    class="flex-1 py-1 rounded-md text-center cursor-pointer transition">
+                    Solo esta pieza
+                  </button>
+                  <button
+                    type="button"
+                    (click)="applyMaterialToWholeGroup.set(true)"
+                    [class]="applyMaterialToWholeGroup() ? 'bg-indigo-600 text-white font-bold shadow-2xs' : 'text-slate-600'"
+                    class="flex-1 py-1 rounded-md text-center cursor-pointer transition">
+                    Todo el {{ category === 'drawer' ? 'cajón' : 'módulo' }}
+                  </button>
                 </div>
+              }
+              @for (mat of materials(); track mat.id) {
+                <button
+                  type="button"
+                  (click)="assignQuickMaterial(mat.id, applyMaterialToWholeGroup())"
+                  [class]="part.materialId === mat.id ? 'bg-sky-50 text-sky-700 font-bold border border-sky-200' : 'hover:bg-white text-slate-700'"
+                  class="px-2 py-1.5 rounded-lg text-left truncate flex items-center gap-2 cursor-pointer">
+                  <span class="w-2.5 h-2.5 rounded-full border border-slate-300 shrink-0" [style.background-color]="mat.colorHex"></span>
+                  <span class="truncate text-xs">{{ mat.name }}</span>
+                </button>
               }
             </div>
           }
         </div>
 
+        <!-- Fila Rápida de Tapacantos (Solo para piezas de espesor > 6mm) -->
+        @if ((part.thickness || 18) > 6) {
+          <div class="px-2.5 py-1 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-1 my-0.5">
+            <span class="text-[10px] font-bold text-slate-500 uppercase">Cantos:</span>
+            <div class="flex items-center gap-1">
+              <button type="button" (click)="toggleEdgeBandingQuick('l1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.l1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo Superior / L1">L1</button>
+              <button type="button" (click)="toggleEdgeBandingQuick('l2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.l2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo Inferior / L2">L2</button>
+              <button type="button" (click)="toggleEdgeBandingQuick('a1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.a1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho Izquierdo / A1">A1</button>
+              <button type="button" (click)="toggleEdgeBandingQuick('a2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.a2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho Derecho / A2">A2</button>
+            </div>
+          </div>
+        }
+
         <div class="h-px bg-slate-100 my-0.5"></div>
 
-        <!-- Duplicar -->
+        <!-- Duplicar y Rotar (Adaptado a Cajón/Módulo o Pieza Individual) -->
+        @if (grp) {
+          <button
+            type="button"
+            (click)="duplicateContextMenuGroup()"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.copy" [size]="14" [strokeWidth]="2" class="text-emerald-600"></hugeicons-icon>
+            <span>Duplicar {{ category === 'drawer' ? 'Cajón Completo' : 'Módulo Completo' }}</span>
+          </button>
+
+          <button
+            type="button"
+            (click)="rotateContextMenuGroup90()"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+            <span>Girar {{ category === 'drawer' ? 'Cajón' : 'Módulo' }} 90° (R)</span>
+          </button>
+        }
+
         <button
           type="button"
           (click)="duplicateContextMenuPart()"
           class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <hugeicons-icon [icon]="icons.copy" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
-          <span>Duplicar Pieza</span>
+          <span>Duplicar Solo Esta Pieza</span>
         </button>
 
-        <!-- Submenú Rotación 3D -->
+        <!-- Submenú Rotación 3D Individual -->
         <div class="relative">
           <button
             type="button"
@@ -874,7 +1122,7 @@
             class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
             <div class="flex items-center gap-2">
               <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
-              <span>Rotación y Orientación 3D</span>
+              <span>Rotación de Pieza 3D</span>
             </div>
             <hugeicons-icon [icon]="showRotateSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
           </button>
@@ -919,19 +1167,29 @@
             type="button"
             (click)="alignContextMenuPart('centerX')"
             class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
-            Centrar Mueble
+            Centrar en X
           </button>
         </div>
 
         <div class="h-px bg-slate-100 my-0.5"></div>
 
-        <!-- Aislar / Ocultar -->
+        <!-- Aislar / Ocultar (Por Pieza o por Cajón/Módulo) -->
+        @if (grp) {
+          <button
+            type="button"
+            (click)="isolateContextMenuGroup()"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.cameraFocus" [size]="14" [strokeWidth]="2" class="text-indigo-600"></hugeicons-icon>
+            <span>Aislar {{ category === 'drawer' ? 'Cajón' : 'Módulo' }} (Ocultar demás)</span>
+          </button>
+        }
+
         <button
           type="button"
           (click)="isolatePart(part)"
           class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
-          <hugeicons-icon [icon]="icons.cameraFocus" [size]="14" [strokeWidth]="2" class="text-indigo-500"></hugeicons-icon>
-          <span>Aislar Pieza (Ocultar demás)</span>
+          <hugeicons-icon [icon]="icons.cameraFocus" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
+          <span>Aislar Solo Esta Pieza</span>
         </button>
 
         <button
@@ -939,49 +1197,8 @@
           (click)="hidePart(part)"
           class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
           <hugeicons-icon [icon]="icons.eyeOff" [size]="14" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
-          <span>Ocultar Temporalmente</span>
+          <span>Ocultar Pieza Temporalmente</span>
         </button>
-
-        <!-- Submenú Cambiar Material -->
-        <div class="relative">
-          <button
-            type="button"
-            (click)="toggleQuickMaterialPicker()"
-            class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
-            <div class="flex items-center gap-2">
-              <hugeicons-icon [icon]="icons.palette" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
-              <span>Cambiar Material</span>
-            </div>
-            <hugeicons-icon [icon]="showQuickMaterialPicker() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
-          </button>
-
-          @if (showQuickMaterialPicker()) {
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-1.5 my-0.5 flex flex-col gap-1 text-xs max-h-40 overflow-y-auto scrollbar-thin">
-              <span class="text-[10px] uppercase font-bold text-slate-400 px-1">Melaminas:</span>
-              @for (mat of materials(); track mat.id) {
-                <button
-                  type="button"
-                  (click)="assignQuickMaterial(mat.id)"
-                  [class]="part.materialId === mat.id ? 'bg-sky-50 text-sky-700 font-bold border border-sky-200' : 'hover:bg-white text-slate-700'"
-                  class="px-2 py-1.5 rounded-lg text-left truncate flex items-center gap-2 cursor-pointer">
-                  <span class="w-2.5 h-2.5 rounded-full border border-slate-300 shrink-0" [style.background-color]="mat.colorHex"></span>
-                  <span class="truncate text-xs">{{ mat.name }}</span>
-                </button>
-              }
-            </div>
-          }
-        </div>
-
-        <!-- Fila Rápida de Tapacantos -->
-        <div class="px-2 py-1 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-1 my-0.5">
-          <span class="text-[10px] font-bold text-slate-500 uppercase">Cantos:</span>
-          <div class="flex items-center gap-1">
-            <button type="button" (click)="toggleEdgeBandingQuick('l1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.l1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo 1">L1</button>
-            <button type="button" (click)="toggleEdgeBandingQuick('l2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.l2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Largo 2">L2</button>
-            <button type="button" (click)="toggleEdgeBandingQuick('a1')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.a1 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho 1">A1</button>
-            <button type="button" (click)="toggleEdgeBandingQuick('a2')" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer" [class]="part.edges.a2 !== 'none' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-400 border border-slate-200'" title="Ancho 2">A2</button>
-          </div>
-        </div>
 
         <div class="h-px bg-slate-100 my-0.5"></div>
 
@@ -995,19 +1212,24 @@
         </button>
 
       } @else {
-        <!-- Menú contextual sobre espacio vacío del lienzo 3D -->
-        <div class="px-2.5 py-1.5 border-b border-slate-100 text-slate-500 text-[11px] font-semibold">
-          Espacio de Trabajo 3D
+        <!-- ========================================================= -->
+        <!-- MENÚ CONTEXTUAL SOBRE ESPACIO VACÍO DEL LIENZO 3D         -->
+        <!-- ========================================================= -->
+        <div class="px-2.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
+          <span class="text-slate-700 text-[11px] font-bold">Espacio de Trabajo 3D</span>
+          <span class="text-[9px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded">Escenario</span>
         </div>
+
         @if (hiddenPartIds().size > 0) {
           <button
             type="button"
             (click)="showAllParts()"
-            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
-            <hugeicons-icon [icon]="icons.eye" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
-            <span>Mostrar Todas las Piezas ({{ hiddenPartIds().size }} ocultas)</span>
+            class="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold flex items-center gap-2 text-left transition cursor-pointer my-0.5">
+            <hugeicons-icon [icon]="icons.eye" [size]="14" [strokeWidth]="2" class="text-amber-600"></hugeicons-icon>
+            <span>Mostrar Todas ({{ hiddenPartIds().size }} ocultas)</span>
           </button>
         }
+
         <button
           type="button"
           (click)="setActiveTool('draw_rect'); closeContextMenu()"
@@ -1015,6 +1237,7 @@
           <hugeicons-icon [icon]="icons.squareShape" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
           <span>Dibujar Rectángulo 3D (R)</span>
         </button>
+
         <button
           type="button"
           (click)="setActiveTool('draw_circle'); closeContextMenu()"
@@ -1022,6 +1245,7 @@
           <hugeicons-icon [icon]="icons.circleShape" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
           <span>Dibujar Círculo 3D (C)</span>
         </button>
+
         <button
           type="button"
           (click)="setActiveTool('draw_freehand'); closeContextMenu()"
@@ -1029,6 +1253,7 @@
           <hugeicons-icon [icon]="icons.freehandWave" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
           <span>Dibujo Libre a Mano Alzada (F)</span>
         </button>
+
         <button
           type="button"
           (click)="setActiveTool('push_pull'); closeContextMenu()"
@@ -1036,6 +1261,33 @@
           <hugeicons-icon [icon]="icons.pushPull" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
           <span>Herramienta Empujar / Tirar (P)</span>
         </button>
+
+        <button
+          type="button"
+          (click)="setActiveTool('measure'); closeContextMenu()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+          <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+          <span>Cinta Métrica 3D (T)</span>
+        </button>
+
+        <div class="h-px bg-slate-100 my-0.5"></div>
+
+        <button
+          type="button"
+          (click)="toggleAllDoorsAndDrawers(); closeContextMenu()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+          <hugeicons-icon [icon]="isAllOpen() ? icons.doorClosed : icons.doorOpen" [size]="14" [strokeWidth]="2" class="text-blue-600"></hugeicons-icon>
+          <span>{{ isAllOpen() ? 'Cerrar Todas las Puertas/Cajones' : 'Abrir Todas las Puertas/Cajones' }}</span>
+        </button>
+
+        <button
+          type="button"
+          (click)="toggleReferenceGuide(); closeContextMenu()"
+          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+          <hugeicons-icon [icon]="icons.humanGuide" [size]="14" [strokeWidth]="2" class="text-indigo-500"></hugeicons-icon>
+          <span>{{ showReferenceGuide() ? 'Ocultar Guía Escala Humana (G)' : 'Mostrar Guía Escala Humana (G)' }}</span>
+        </button>
+
         <button
           type="button"
           (click)="resetCamera(); closeContextMenu()"
