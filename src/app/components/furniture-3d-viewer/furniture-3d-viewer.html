@@ -663,7 +663,7 @@
     </div>
   }
 
- <!-- MENÚ CONTEXTUAL DE CLIC DERECHO (INTELIGENTE SEGÚN PIEZA / CAJÓN / PUERTA / ESPACIO VACÍO) -->
+<!-- MENÚ CONTEXTUAL DE CLIC DERECHO (INTELIGENTE SEGÚN PIEZA / CAJÓN / PUERTA / ESPACIO VACÍO) -->
   @if (contextMenuPos(); as pos) {
     <button
       type="button"
@@ -681,14 +681,15 @@
         @let category = contextMenuCategory();
         @let grp = contextMenuGroup();
         @let frontRef = contextMenuEffectiveFrontPart() || part;
+        @let isLocked = isPartOrGroupLocked(part);
 
-        <!-- CABECERA DEL MENÚ CON ROL CLARO -->
+        <!-- CABECERA DEL MENÚ CON ROL CLARO Y ESTADO CONGELADO -->
         <div class="px-2.5 py-1.5 border-b border-slate-100 flex flex-col gap-0.5">
           <div class="flex items-center justify-between gap-1.5">
             <div class="flex items-center gap-1.5 truncate">
               <span
                 class="w-2 h-2 rounded-full shrink-0"
-                [class]="category === 'drawer' ? 'bg-indigo-500' : (category === 'door' ? 'bg-blue-500' : 'bg-sky-500')">
+                [class]="isLocked ? 'bg-amber-500' : (category === 'drawer' ? 'bg-indigo-500' : (category === 'door' ? 'bg-blue-500' : 'bg-sky-500'))">
               </span>
               <span class="font-bold text-slate-900 truncate">{{ part.name }}</span>
             </div>
@@ -697,12 +698,54 @@
 
           <div class="flex items-center justify-between text-[10px] text-slate-400 pl-3.5">
             <span class="truncate">{{ grp ? grp.name : (part.moduleName || 'Pieza individual') }}</span>
-            <span
-              class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px]"
-              [class]="category === 'drawer' ? 'bg-indigo-50 text-indigo-700' : (category === 'door' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600')">
-              {{ category === 'drawer' ? 'Cajón' : (category === 'door' ? 'Puerta' : 'Estructura') }}
-            </span>
+            <div class="flex items-center gap-1 shrink-0">
+              @if (isLocked) {
+                <span class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px] bg-amber-100 text-amber-800 flex items-center gap-0.5">
+                  <hugeicons-icon [icon]="icons.lock" [size]="10" [strokeWidth]="2.2"></hugeicons-icon>
+                  <span>Congelado</span>
+                </span>
+              }
+              <span
+                class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px]"
+                [class]="category === 'drawer' ? 'bg-indigo-50 text-indigo-700' : (category === 'door' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600')">
+                {{ category === 'drawer' ? 'Cajón' : (category === 'door' ? 'Puerta' : 'Estructura') }}
+              </span>
+            </div>
           </div>
+        </div>
+
+        <!-- BOTONES DE CONGELAR / DESCONGELAR POSICIÓN (ACCESO RÁPIDO ARRIBA) -->
+        <div class="p-1 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col gap-1 my-0.5">
+          @if (grp) {
+            <button
+              type="button"
+              (click)="toggleGroupLockFromContext()"
+              [class]="isLocked
+                ? 'bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-2xs'
+                : 'bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200/80 font-semibold'"
+              class="w-full py-1.5 px-2.5 rounded-lg flex items-center justify-between text-xs transition cursor-pointer">
+              <div class="flex items-center gap-1.5 truncate">
+                <hugeicons-icon [icon]="icons.lock" [size]="13" [strokeWidth]="2" [class.text-amber-500]="!isLocked"></hugeicons-icon>
+                <span class="truncate">
+                  {{ isLocked ? 'Descongelar ' + (category === 'drawer' ? 'Cajón' : 'Módulo') : 'Congelar ' + (category === 'drawer' ? 'Cajón Completo' : 'Módulo Completo') }}
+                </span>
+              </div>
+              <span class="text-[9px] font-mono uppercase opacity-80 shrink-0">{{ isLocked ? 'Fijo' : 'Bloquear' }}</span>
+            </button>
+          }
+
+          <button
+            type="button"
+            (click)="togglePartLockFromContext()"
+            [class]="part.isLocked
+              ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold border border-amber-300'
+              : 'hover:bg-white text-slate-600 hover:text-slate-900'"
+            class="w-full py-1 px-2 rounded-lg flex items-center justify-between text-[11px] transition cursor-pointer">
+            <div class="flex items-center gap-1.5 truncate">
+              <hugeicons-icon [icon]="icons.lock" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+              <span class="truncate">{{ part.isLocked ? 'Descongelar Solo Esta Pieza' : 'Congelar Solo Esta Pieza' }}</span>
+            </div>
+          </button>
         </div>
 
         <!-- BOTÓN EDITAR MÓDULO COMPLETO (Solo para Módulos/Armarios, no para cajones sueltos) -->
@@ -710,7 +753,7 @@
           <button
             type="button"
             (click)="$event.stopPropagation(); onEditModuleFromContext(part.groupId, $event)"
-            class="w-full my-1 py-1.5 px-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 text-indigo-700 font-bold rounded-xl flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
+            class="w-full my-0.5 py-1.5 px-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 text-indigo-700 font-bold rounded-xl flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
             <div class="flex items-center gap-1.5">
               <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="2" class="text-indigo-600"></hugeicons-icon>
               <span>Editar Módulo Completo</span>
@@ -724,7 +767,6 @@
         <!-- ========================================================= -->
         @if (category === 'drawer') {
           <div class="p-1.5 bg-indigo-50/60 rounded-xl border border-indigo-100 flex flex-col gap-1 my-1">
-            <!-- Animar / Abrir o Cerrar Cajón -->
             <button
               type="button"
               (click)="toggleContextMenuAnimation()"
@@ -736,7 +778,6 @@
               <span class="text-[10px] font-mono opacity-85 uppercase">3D</span>
             </button>
 
-            <!-- Submenú: Tirador / Manija del Cajón -->
             <div class="relative">
               <button
                 type="button"
@@ -751,7 +792,6 @@
 
               @if (showHandleSubmenu()) {
                 <div class="bg-white border border-slate-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-md">
-                  <!-- Selector rápido de acabado del tirador -->
                   <div class="flex items-center justify-between gap-1 px-1 pb-1 border-b border-slate-100">
                     <span class="text-[9px] font-bold uppercase text-slate-400">Acabado:</span>
                     <div class="flex items-center gap-1">
@@ -798,7 +838,6 @@
               }
             </div>
 
-            <!-- Submenú: Tipo de Corredera -->
             <div class="relative">
               <button
                 type="button"
@@ -837,7 +876,6 @@
         <!-- ========================================================= -->
         @if (category === 'door') {
           <div class="p-1.5 bg-blue-50/70 rounded-xl border border-blue-100 flex flex-col gap-1 my-1">
-            <!-- Animar / Abrir o Cerrar Puerta -->
             <button
               type="button"
               (click)="toggleContextMenuAnimation()"
@@ -849,7 +887,6 @@
               <span class="text-[10px] font-mono opacity-85 uppercase">3D</span>
             </button>
 
-            <!-- Submenú: Sentido de Apertura de la Puerta -->
             <div class="relative">
               <button
                 type="button"
@@ -891,7 +928,6 @@
               }
             </div>
 
-            <!-- Submenú: Tirador / Manija de la Puerta -->
             <div class="relative">
               <button
                 type="button"
@@ -952,7 +988,6 @@
               }
             </div>
 
-            <!-- Submenú: Bisagras Cazoleta Ø35mm -->
             <div class="relative">
               <button
                 type="button"
@@ -1025,7 +1060,7 @@
         <!-- SECCIÓN UNIVERSAL: MATERIAL, CANTOS, GIRO Y VISIBILIDAD   -->
         <!-- ========================================================= -->
 
-        <!-- Submenú Cambiar Material (Permite aplicar a la pieza o a todo el cajón/módulo) -->
+        <!-- Submenú Cambiar Material -->
         <div class="relative">
           <button
             type="button"
@@ -1072,7 +1107,7 @@
           }
         </div>
 
-        <!-- Fila Rápida de Tapacantos (Solo para piezas de espesor > 6mm) -->
+        <!-- Fila Rápida de Tapacantos -->
         @if ((part.thickness || 18) > 6) {
           <div class="px-2.5 py-1 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-1 my-0.5">
             <span class="text-[10px] font-bold text-slate-500 uppercase">Cantos:</span>
@@ -1087,7 +1122,7 @@
 
         <div class="h-px bg-slate-100 my-0.5"></div>
 
-        <!-- Duplicar y Rotar (Adaptado a Cajón/Módulo o Pieza Individual) -->
+        <!-- Duplicar y Rotar -->
         @if (grp) {
           <button
             type="button"
@@ -1097,13 +1132,15 @@
             <span>Duplicar {{ category === 'drawer' ? 'Cajón Completo' : 'Módulo Completo' }}</span>
           </button>
 
-          <button
-            type="button"
-            (click)="rotateContextMenuGroup90()"
-            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
-            <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
-            <span>Girar {{ category === 'drawer' ? 'Cajón' : 'Módulo' }} 90° (R)</span>
-          </button>
+          @if (!isLocked) {
+            <button
+              type="button"
+              (click)="rotateContextMenuGroup90()"
+              class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+              <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+              <span>Girar {{ category === 'drawer' ? 'Cajón' : 'Módulo' }} 90° (R)</span>
+            </button>
+          }
         }
 
         <button
@@ -1114,66 +1151,68 @@
           <span>Duplicar Solo Esta Pieza</span>
         </button>
 
-        <!-- Submenú Rotación 3D Individual -->
-        <div class="relative">
-          <button
-            type="button"
-            (click)="toggleRotateSubmenu()"
-            class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
-            <div class="flex items-center gap-2">
-              <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
-              <span>Rotación de Pieza 3D</span>
-            </div>
-            <hugeicons-icon [icon]="showRotateSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
-          </button>
+        @if (!isLocked) {
+          <!-- Submenú Rotación 3D Individual -->
+          <div class="relative">
+            <button
+              type="button"
+              (click)="toggleRotateSubmenu()"
+              class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
+              <div class="flex items-center gap-2">
+                <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+                <span>Rotación de Pieza 3D</span>
+              </div>
+              <hugeicons-icon [icon]="showRotateSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+            </button>
 
-          @if (showRotateSubmenu()) {
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-2 my-0.5 flex flex-col gap-1.5 text-xs shadow-xs">
-              <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                <span>Giros Rápidos (90°):</span>
-                <button type="button" (click)="resetPartRotation(part)" class="text-sky-600 hover:text-sky-800 font-bold transition cursor-pointer">Reset 0°</button>
+            @if (showRotateSubmenu()) {
+              <div class="bg-slate-50 border border-slate-200 rounded-xl p-2 my-0.5 flex flex-col gap-1.5 text-xs shadow-xs">
+                <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <span>Giros Rápidos (90°):</span>
+                  <button type="button" (click)="resetPartRotation(part)" class="text-sky-600 hover:text-sky-800 font-bold transition cursor-pointer">Reset 0°</button>
+                </div>
+                <div class="flex items-center justify-between gap-1">
+                  <span class="font-bold text-rose-600 text-[11px] w-12">Eje X:</span>
+                  <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationX || 0 }}°</span>
+                  <button type="button" (click)="rotatePart3dAngle(part, 'x', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
+                  <button type="button" (click)="rotatePart3dAngle(part, 'x', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
+                </div>
+                <div class="flex items-center justify-between gap-1">
+                  <span class="font-bold text-emerald-600 text-[11px] w-12">Eje Y:</span>
+                  <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationY || 0 }}°</span>
+                  <button type="button" (click)="rotatePart3dAngle(part, 'y', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
+                  <button type="button" (click)="rotatePart3dAngle(part, 'y', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
+                </div>
+                <div class="flex items-center justify-between gap-1">
+                  <span class="font-bold text-sky-600 text-[11px] w-12">Eje Z:</span>
+                  <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationZ || 0 }}°</span>
+                  <button type="button" (click)="rotatePart3dAngle(part, 'z', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
+                  <button type="button" (click)="rotatePart3dAngle(part, 'z', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
+                </div>
               </div>
-              <div class="flex items-center justify-between gap-1">
-                <span class="font-bold text-rose-600 text-[11px] w-12">Eje X:</span>
-                <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationX || 0 }}°</span>
-                <button type="button" (click)="rotatePart3dAngle(part, 'x', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
-                <button type="button" (click)="rotatePart3dAngle(part, 'x', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
-              </div>
-              <div class="flex items-center justify-between gap-1">
-                <span class="font-bold text-emerald-600 text-[11px] w-12">Eje Y:</span>
-                <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationY || 0 }}°</span>
-                <button type="button" (click)="rotatePart3dAngle(part, 'y', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
-                <button type="button" (click)="rotatePart3dAngle(part, 'y', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
-              </div>
-              <div class="flex items-center justify-between gap-1">
-                <span class="font-bold text-sky-600 text-[11px] w-12">Eje Z:</span>
-                <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationZ || 0 }}°</span>
-                <button type="button" (click)="rotatePart3dAngle(part, 'z', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
-                <button type="button" (click)="rotatePart3dAngle(part, 'z', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
-              </div>
-            </div>
-          }
-        </div>
+            }
+          </div>
 
-        <!-- Alineación Rápida -->
-        <div class="grid grid-cols-2 gap-1 px-1 my-0.5">
-          <button
-            type="button"
-            (click)="alignContextMenuPart('floor')"
-            class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
-            Al Suelo (Y=0)
-          </button>
-          <button
-            type="button"
-            (click)="alignContextMenuPart('centerX')"
-            class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
-            Centrar en X
-          </button>
-        </div>
+          <!-- Alineación Rápida -->
+          <div class="grid grid-cols-2 gap-1 px-1 my-0.5">
+            <button
+              type="button"
+              (click)="alignContextMenuPart('floor')"
+              class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
+              Al Suelo (Y=0)
+            </button>
+            <button
+              type="button"
+              (click)="alignContextMenuPart('centerX')"
+              class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
+              Centrar en X
+            </button>
+          </div>
+        }
 
         <div class="h-px bg-slate-100 my-0.5"></div>
 
-        <!-- Aislar / Ocultar (Por Pieza o por Cajón/Módulo) -->
+        <!-- Aislar / Ocultar -->
         @if (grp) {
           <button
             type="button"
@@ -1298,7 +1337,6 @@
       }
     </div>
   }
-
   <!-- BARRA DE ESTADO INFERIOR CAD Y CUADRO DE MEDIDAS -->
   <div class="absolute bottom-0 left-0 right-0 h-7 2xl:h-8 bg-white/95 text-slate-600 backdrop-blur-md border-t border-slate-200/90 px-3 flex items-center justify-between text-xs z-20 pointer-events-auto">
     <!-- Izquierda: Guía contextual de la herramienta activa -->

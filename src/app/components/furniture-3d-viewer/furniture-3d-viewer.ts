@@ -1304,7 +1304,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       else doorPivot.rotation.z = cur * (Math.PI / 2.2);
     }
   }
-  // Create Interactive 3D Gizmo: Edge Stretch Handles (Translation is done cleanly via direct mouse drag)
+// Create Interactive 3D Gizmo: Edge Stretch Handles (Translation is done cleanly via direct mouse drag)
   private buildGizmo(
     part: Part,
     px: number,
@@ -1314,6 +1314,11 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
     sy: number,
     sz: number
   ) {
+    // Si la pieza o su módulo están congelados, no mostrar tiradores de estiramiento 3D
+    if (this.isPartOrGroupLocked(part)) {
+      return;
+    }
+
     const group = new THREE.Group();
     group.position.set(px, py, pz);
 
@@ -1389,7 +1394,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       } else {
         // Length along Y (Height), Width along Z
         const handleLPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16, 0), 0x2563eb, 'length', 1);
-        const handleLMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16), 0x2563eb, 'length', -1);
+        const handleLMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16, 0), 0x2563eb, 'length', -1);
         const handleWPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0xf59e0b, 'width', 1);
         const handleWMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0xf59e0b, 'width', -1);
         group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
@@ -3276,6 +3281,54 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     }
   }
 
+ /**
+   * Verifica si una pieza está congelada directamente (part.isLocked)
+   * o si pertenece a un cajón/módulo congelado (group.isLocked) o si alguna pieza de su grupo está congelada.
+   */
+  isPartOrGroupLocked(part: Part | null | undefined): boolean {
+    if (!part) return false;
+    if (part.isLocked) return true;
+    if (part.groupId) {
+      const grp = this.partGroups().find(g => g.id === part.groupId);
+      if (grp?.isLocked) return true;
+      return this.parts().some(p => p.groupId === part.groupId && !!p.isLocked);
+    }
+    return false;
+  }
+
+  /**
+   * Congela o descongela únicamente la pieza actual desde el menú contextual.
+   */
+  togglePartLockFromContext() {
+    const part = this.contextMenuPart();
+    if (!part) return;
+    const nextLocked = !part.isLocked;
+    this.partModified.emit({ part, updates: { isLocked: nextLocked } });
+    this.closeContextMenu();
+  }
+
+  /**
+   * Congela o descongela todas las piezas de un cajón o módulo completo en bloque.
+   */
+  toggleGroupLockFromContext() {
+    const part = this.contextMenuPart();
+    if (!part?.groupId) return;
+    const grpParts = this.parts().filter(p => p.groupId === part.groupId);
+    if (grpParts.length === 0) return;
+
+    const currentlyLocked = this.isPartOrGroupLocked(part);
+    const nextLocked = !currentlyLocked;
+    const updatesList = grpParts.map(p => ({
+      part: p,
+      updates: { isLocked: nextLocked }
+    }));
+    this.multiplePartsModified.emit({ updates: updatesList });
+    if (updatesList.length > 0) {
+      this.partModified.emit(updatesList[0]);
+    }
+    this.closeContextMenu();
+  }
+
   // Pointer Down: Detect clicks on Gizmo controls vs Pieces vs Empty space vs Measurement picking
   private onPointerDown(e: PointerEvent) {
     const canvas = this.canvasRef()?.nativeElement;
@@ -3302,8 +3355,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
 
     // 0. Measurement Tape drag mode (Point A -> Clic y arrastrar para estirar y soltar para fijar la cota)
     if (this.isMeasureMode()) {
-      // If a measurement is already persistent and the user clicks/drags to orbit/inspect,
-      // DO NOT clear or restart the measurement! Let OrbitControls handle it!
       if (this.isMeasurementPersistent()) {
         return;
       }
@@ -3454,6 +3505,14 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         const hit = intersects[0].object as THREE.Mesh;
         const part = hit.userData['part'] as Part;
         if (part) {
+          if (this.isPartOrGroupLocked(part)) {
+            this.partsSelected.emit([part.id]);
+            this.partSelected.emit(part);
+            canvas.style.cursor = 'not-allowed';
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
           this.rotatePart90(part, 'y');
           this.partsSelected.emit([part.id]);
           this.partSelected.emit(part);
@@ -3475,6 +3534,17 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         if (!hit.face) return;
         const mesh = hit.object as THREE.Mesh;
         const part = mesh.userData['part'] as Part;
+
+        // Si la pieza o su grupo están congelados, impedir estirarla con Empujar/Tirar
+        if (this.isPartOrGroupLocked(part)) {
+          this.partsSelected.emit([part.id]);
+          this.partSelected.emit(part);
+          canvas.style.cursor = 'not-allowed';
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+
         const faceNormal = hit.face.normal.clone();
 
         const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
@@ -3512,7 +3582,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             posAxis = 'posZ';
             axisName = 'Ancho';
           } else {
-            // Y normal face is the top or bottom board face -> Thickness!
             targetDim = 'thickness';
             posAxis = 'posY';
             axisName = 'Espesor';
@@ -3527,13 +3596,11 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             posAxis = 'posZ';
             axisName = 'Fondo';
           } else {
-            // X normal face is perpendicular to board plane -> Thickness!
             targetDim = 'thickness';
             posAxis = 'posX';
             axisName = 'Espesor';
           }
         } else {
-          // vertical_xy
           if (axis === 'x') {
             targetDim = 'length';
             posAxis = 'posX';
@@ -3543,7 +3610,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             posAxis = 'posY';
             axisName = 'Alto';
           } else {
-            // Z normal face is perpendicular to board plane -> Thickness!
             targetDim = 'thickness';
             posAxis = 'posZ';
             axisName = 'Espesor';
@@ -3554,7 +3620,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         this.controls.enabled = false;
         this.dragStarted.emit();
 
-        // Select piece
         this.partsSelected.emit([part.id]);
         this.partSelected.emit(part);
 
@@ -3641,19 +3706,22 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         const selParts = this.selectedParts();
 
         if (hitData && hitData.isGizmo && selParts.length > 0) {
+          if (selParts.some(p => this.isPartOrGroupLocked(p))) {
+            canvas.style.cursor = 'not-allowed';
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+
           this.isDragging = true;
           this.activeGizmoHit = hitData;
           this.dragStartPointer = { x: e.clientX, y: e.clientY };
           this.dragInitialPart = { ...selParts[0] };
           this.dragInitialParts = selParts.map(p => ({ ...p }));
 
-          // Notify parent to capture history snapshot before starting continuous drag
           this.dragStarted.emit();
-
-          // Disable camera rotation while dragging gizmo
           this.controls.enabled = false;
 
-          // Set up a raycasting plane facing the camera or orthogonal to axis
           const centroid = this.calculateCentroid(selParts);
           const piecePos = new THREE.Vector3(centroid.x, centroid.y, centroid.z);
           const camDir = new THREE.Vector3();
@@ -3696,7 +3764,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           this.dragStarted.emit();
           this.controls.enabled = false;
 
-          // Camera-facing drag plane through the handle position
           const camDir = new THREE.Vector3();
           this.camera.getWorldDirection(camDir);
           const handlePos = hit.position.clone();
@@ -3737,7 +3804,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           this.selectedWallType.set(null);
           this.wallSelected.emit(null);
 
-          // Iniciar arrastre libre inmediato del equipo con el ratón
           if (e.button === 0) {
             this.isApplianceDragging = true;
             this.draggingAppliance = { ...foundApp };
@@ -3746,7 +3812,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             this.dragStarted.emit();
             this.controls.enabled = false;
 
-            // Plano orientado a la cámara pasando por el centro del equipo para permitir desplazamiento 3D libre y elevación directa
             const camDir = new THREE.Vector3();
             this.camera.getWorldDirection(camDir);
             const appCenterPos = new THREE.Vector3(
@@ -3774,33 +3839,33 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     }
 
     // 1.8. Selección y arrastre libre en el suelo del Maniquí de Escala y Guía de Frente
- if (this.showReferenceGuide() && this.referenceGuideGroup.children.length > 0) {
-   const guideIntersects = this.raycaster.intersectObjects(this.referenceGuideGroup.children, true);
-   const hitGuide = guideIntersects.find(h => h.object.userData?.['isReferenceGuide']);
-   if (hitGuide) {
-     this.isReferenceGuideSelected.set(true);
-     this.partSelected.emit(null);
-     this.partsSelected.emit([]);
-     this.applianceSelected.emit(null);
+    if (this.showReferenceGuide() && this.referenceGuideGroup.children.length > 0) {
+      const guideIntersects = this.raycaster.intersectObjects(this.referenceGuideGroup.children, true);
+      const hitGuide = guideIntersects.find(h => h.object.userData?.['isReferenceGuide']);
+      if (hitGuide) {
+        this.isReferenceGuideSelected.set(true);
+        this.partSelected.emit(null);
+        this.partsSelected.emit([]);
+        this.applianceSelected.emit(null);
 
-     if (e.button === 0) {
-       this.isReferenceGuideDragging = true;
-       this.dragInitialGuidePos = { ...this.referenceGuidePos() };
-       this.controls.enabled = false;
-       this.dragPlane.set(new THREE.Vector3(0, 1, 0), 0); // Plano del suelo Y = 0
-       const intersectPt = new THREE.Vector3();
-       if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPt)) {
-         this.dragPlaneIntersectionStart.copy(intersectPt);
-       }
-       canvas.style.cursor = 'grabbing';
-     }
-     e.preventDefault();
-     e.stopPropagation();
-     return;
-   } else {
-     this.isReferenceGuideSelected.set(false);
-   }
- }
+        if (e.button === 0) {
+          this.isReferenceGuideDragging = true;
+          this.dragInitialGuidePos = { ...this.referenceGuidePos() };
+          this.controls.enabled = false;
+          this.dragPlane.set(new THREE.Vector3(0, 1, 0), 0);
+          const intersectPt = new THREE.Vector3();
+          if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPt)) {
+            this.dragPlaneIntersectionStart.copy(intersectPt);
+          }
+          canvas.style.cursor = 'grabbing';
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      } else {
+        this.isReferenceGuideSelected.set(false);
+      }
+    }
 
     // 2. Normal Piece & Handle selection (with Shift-Click multi-selection)
     const targets: THREE.Object3D[] = [];
@@ -3819,7 +3884,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       let isDrawer = topHit.userData['isDrawer'];
       let isHandle = topHit.userData['isHandle'];
 
-      // Ascend parent hierarchy if hit was a handle sub-mesh or drill cylinder
       let currObj: THREE.Object3D | null = topHit;
       while (currObj && !part && currObj !== this.furnitureGroup && currObj !== this.scene) {
         if (currObj.userData?.['part']) {
@@ -3833,7 +3897,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       }
 
       if (part) {
-        // Clicking a 3D handle toggles opening animation
         if (isHandle) {
           this.togglePartOpen(part.id);
         }
@@ -3850,7 +3913,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             this.partSelected.emit(null);
           }
         } else {
-          // If part belongs to a group (e.g. modular drawer), select the entire group for block translation!
           let partsToSelect: Part[] = [];
           const curIds = this.activeSelectedIds();
           if (part.groupId) {
@@ -3868,9 +3930,14 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             this.partSelected.emit(part);
           }
 
-          // Direct Drag Support:
-          // If user clicked with left mouse button on an interactive part/group (or Move/Select tool is active)
-          // prepare direct dragging using a screen-facing plane passing through the hit point
+          // Si la pieza o alguna pieza del grupo seleccionado está CONGELADA (isLocked),
+          // permitimos seleccionarla pero NO iniciamos el arrastre con el mouse (isDirectPieceDrag = false)
+          const anyLocked = this.isPartOrGroupLocked(part) || partsToSelect.some(p => this.isPartOrGroupLocked(p));
+          if (anyLocked) {
+            this.isDirectPieceDrag = false;
+            return;
+          }
+
           if (e.button === 0 && (this.activeTool() === 'select' || this.activeTool() === 'move') && !isHandle) {
             this.isDirectPieceDrag = true;
             this.directPieceDragThresholdPassed = false;
@@ -3878,7 +3945,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             this.dragInitialPart = { ...part };
             this.dragInitialParts = partsToSelect.map(p => ({ ...p }));
 
-            // Setup camera-facing plane through the hit intersection point
             const camDir = new THREE.Vector3();
             this.camera.getWorldDirection(camDir);
             const hitPoint = intersects[0].point.clone();
@@ -3894,7 +3960,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         }
       }
     } else {
-      // If in room mode, check if clicked on a wall
       if (this.workspaceMode() === 'room') {
         const roomHits = this.raycaster.intersectObjects(this.roomGroup.children, true);
         const wallHit = roomHits.find(h => h.object.userData?.['isWall']);
@@ -3913,7 +3978,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       }
       this.selectedWallType.set(null);
       this.wallSelected.emit(null);
-      // Clicked background -> deselect
       this.partsSelected.emit([]);
       this.partSelected.emit(null);
       this.applianceSelected.emit(null);
@@ -6503,10 +6567,15 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     }
     this.updateMagneticSnapIndicator(null);
   }
-
-  nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
+nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
     const selList = this.selectedParts();
     if (selList.length === 0) return;
+
+    // Si alguna de las piezas seleccionadas o su grupo está congelado, bloquear el movimiento por teclado
+    if (selList.some(p => this.isPartOrGroupLocked(p))) {
+      return;
+    }
+
     this.dragStarted.emit();
 
     if (selList.length > 1) {

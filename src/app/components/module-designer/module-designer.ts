@@ -303,11 +303,16 @@ export class ModuleDesignerComponent {
     ]),
     warning: Alert02Icon,
     info: InformationCircleIcon,
-    expandArea: cadSvg([
+ expandArea: cadSvg([
       'M4 9V4H9',
       'M15 4H20V9',
       'M20 15V20H15',
       'M9 20H4V15'
+    ]),
+    lock: cadSvg([
+      'M6 10V8A6 6 0 0 1 18 8V10',
+      'M5 10H19A1 1 0 0 1 20 11V20A1 1 0 0 1 19 21H5A1 1 0 0 1 4 20V11A1 1 0 0 1 5 10Z',
+      'M12 14V17'
     ])
   };
 
@@ -2381,7 +2386,7 @@ export class ModuleDesignerComponent {
     this.showToast(`👁️ "${partName}" oculta temporalmente (Alt+H para mostrar)`);
   }
 
-  hideActiveGroup() {
+hideActiveGroup() {
     const gId = this.activeSelectedGroupId();
     if (!gId) return;
     const group = this.groups().find(g => g.id === gId);
@@ -2400,6 +2405,110 @@ export class ModuleDesignerComponent {
     this.deselectAll();
 
     this.showToast(`👁️ "${groupName}" oculto (${groupParts.length} piezas). Alt+H para mostrar`);
+  }
+
+  // --- CONGELAR / DESCONGELAR PIEZAS Y MÓDULOS (BLOQUEO DE POSICIÓN) ---
+
+  isPartLocked(partId: string): boolean {
+    const part = this.currentParts().find(p => p.id === partId);
+    if (!part) return false;
+    if (part.isLocked) return true;
+    if (part.groupId) {
+      return this.isGroupLocked(part.groupId);
+    }
+    return false;
+  }
+
+  isGroupLocked(groupId: string): boolean {
+    const grp = this.groups().find(g => g.id === groupId);
+    if (grp?.isLocked) return true;
+    const groupParts = this.currentParts().filter(p => p.groupId === groupId);
+    return groupParts.length > 0 && groupParts.some(p => !!p.isLocked);
+  }
+
+  isActiveSelectionLocked(): boolean {
+    const gId = this.activeSelectedGroupId();
+    if (gId) {
+      return this.isGroupLocked(gId);
+    }
+    const selIds = this.selectedPartIds();
+    if (selIds.length > 1) {
+      return this.currentParts()
+        .filter(p => selIds.includes(p.id))
+        .some(p => !!p.isLocked);
+    }
+    const sel = this.selectedPart();
+    return sel ? this.isPartLocked(sel.id) : false;
+  }
+
+  toggleSelectedPartLock(event?: Event) {
+    event?.stopPropagation();
+    const sel = this.selectedPart();
+    if (!sel) return;
+    this.togglePartLockById(sel.id, event);
+  }
+
+  togglePartLockById(partId: string, event?: Event) {
+    event?.stopPropagation();
+    const part = this.currentParts().find(p => p.id === partId);
+    if (!part) return;
+    const nextLocked = !part.isLocked;
+    this.projectService.updatePart({ ...part, isLocked: nextLocked });
+    this.showToast(
+      nextLocked
+        ? `🔒 "${part.name}" congelada (fija en su posición)`
+        : `🔓 "${part.name}" descongelada`
+    );
+  }
+
+  toggleActiveGroupLock(event?: Event) {
+    event?.stopPropagation();
+    const gId = this.activeSelectedGroupId();
+    if (gId) {
+      this.toggleGroupLockById(gId, event);
+      return;
+    }
+
+    const selIds = this.selectedPartIds();
+    if (selIds.length > 1) {
+      const selParts = this.currentParts().filter(p => selIds.includes(p.id));
+      const anyLocked = selParts.some(p => !!p.isLocked);
+      const nextLocked = !anyLocked;
+      const updatesList = selParts.map(p => ({
+        partId: p.id,
+        updates: { isLocked: nextLocked }
+      }));
+      this.projectService.updateMultipleParts(updatesList);
+      this.showToast(
+        nextLocked
+          ? `🔒 ${selParts.length} piezas congeladas`
+          : `🔓 ${selParts.length} piezas descongeladas`
+      );
+    }
+  }
+
+  toggleGroupLockById(groupId: string, event?: Event) {
+    event?.stopPropagation();
+    const grp = this.groups().find(g => g.id === groupId);
+    const groupParts = this.currentParts().filter(p => p.groupId === groupId);
+    if (groupParts.length === 0) return;
+
+    const currentlyLocked = this.isGroupLocked(groupId);
+    const nextLocked = !currentlyLocked;
+
+    this.projectService.updateGroup(groupId, { isLocked: nextLocked });
+    const updatesList = groupParts.map(p => ({
+      partId: p.id,
+      updates: { isLocked: nextLocked }
+    }));
+    this.projectService.updateMultipleParts(updatesList, false);
+
+    const groupName = grp ? grp.name : 'Módulo';
+    this.showToast(
+      nextLocked
+        ? `🔒 "${groupName}" congelado (no se moverá por error)`
+        : `🔓 "${groupName}" descongelado`
+    );
   }
 
   togglePartVisibility(partId: string, event?: MouseEvent) {

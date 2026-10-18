@@ -84,6 +84,7 @@ export interface PartGroup {
   colorHex?: string;
   frontGap?: number; // Holgura lateral para correderas (26mm total)
   parametricConfig?: ParametricCabinetConfig;
+  isLocked?: boolean;
 }
 
 export interface ParametricDrawerConfig {
@@ -168,6 +169,7 @@ export interface Part {
   radius?: number; // mm (para piezas circulares)
   diameter?: number; // mm (para piezas circulares)
   contourPoints?: { x: number; y: number }[]; // Puntos del polígono 2D en mm para piezas de forma libre
+  isLocked?: boolean;
 }
 
 export type FurnitureModuleType =
