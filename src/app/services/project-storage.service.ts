@@ -1866,6 +1866,8 @@ export class ProjectStorageService {
           handleType: 'bar_modern',
           handlePosition: 'centered',
           slideType: 'telescopic',
+          slideClearancePerSide: Math.round((gap / 2) * 10) / 10,
+          slideLength: boxLen,
           isOpen: false
         },
         notes: 'Frente visto con tirador y cantos gruesos'

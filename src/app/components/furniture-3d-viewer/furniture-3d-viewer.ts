@@ -1198,16 +1198,8 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       } else if (isDrawer) {
         mesh.position.set(px, py, pz);
 
-        const hasSeparateBoxParts = parts.some(
-          other =>
-            other.id !== part.id &&
-            ((other.groupId && other.groupId === part.groupId) ||
-              ((other.componentRole === 'drawer_box' ||
-                other.name.toUpperCase().includes('GAVETA') ||
-                other.name.toUpperCase().includes('CAJÓN') ||
-                other.name.toUpperCase().includes('CAJON')) &&
-                Math.abs((other.posY || 0) - (part.posY || 0)) < 150))
-        );
+        const matchedBox = this.findDrawerBoxPartsForFront(part, parts);
+        const hasSeparateBoxParts = !!(matchedBox.latIzq || matchedBox.latDer || matchedBox.fondo);
 
         if (isDrawerFront && !hasSeparateBoxParts) {
           const drawerBoxMesh = this.createDrawerBoxMesh(part, sx, sy, sz, drawerFacing);
@@ -1225,8 +1217,19 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         const curOpen = this.openCurrentMap.get(part.id) || 0;
         if (curOpen > 0) {
           const maxSlide = 320;
-          if (slideAxis === 'x') mesh.position.x += curOpen * maxSlide * slideDir;
-          else mesh.position.z += curOpen * maxSlide * slideDir;
+          const slideOffset = curOpen * maxSlide;
+          if (slideAxis === 'x') mesh.position.x += slideOffset * slideDir;
+          else mesh.position.z += slideOffset * slideDir;
+          if (slideGroup) {
+            slideGroup.traverse(child => {
+              const stage = child.userData?.['telescopicStage'];
+              if (stage === 'outer') {
+                child.position.z = -slideOffset;
+              } else if (stage === 'mid') {
+                child.position.z = -slideOffset * 0.5;
+              }
+            });
+          }
         }
 
         this.furnitureGroup.add(mesh);
@@ -2309,6 +2312,125 @@ private createHandleMesh(
 
     return group;
   }
+  /**
+   * Identifica exclusivamente las piezas internas de la caja de un cajón (costados izquierdo/derecho,
+   * contrafrente, trasera y fondo) asociadas a un Frente de Cajón, excluyendo SIEMPRE las paredes
+   * estructurales exteriores del gabinete (side_left, side_right, divider, top, bottom, plinth, back).
+   */
+  private findDrawerBoxPartsForFront(
+    frontPart: Part,
+    allParts: Part[]
+  ): {
+    latIzq?: Part;
+    latDer?: Part;
+    contraFrente?: Part;
+    trasera?: Part;
+    fondo?: Part;
+  } {
+    const isStructuralCabinetPart = (p: Part): boolean => {
+      if (p.id === frontPart.id) return true;
+      const role = p.componentRole;
+      if (
+        role === 'side_left' ||
+        role === 'side_right' ||
+        role === 'divider' ||
+        role === 'top' ||
+        role === 'bottom' ||
+        role === 'plinth' ||
+        role === 'back' ||
+        role === 'door' ||
+        role === 'drawer_front' ||
+        role === 'shelf' ||
+        role === 'tie'
+      ) {
+        return true;
+      }
+      // Si el nombre es "Lateral Izquierdo" o "Lateral Derecho" a secas (sin mencionar Cajón/Gaveta) y su alto > 350mm, es pared de mueble
+      const upper = p.name.toUpperCase();
+      const maxDim = Math.max(p.length || 0, p.width || 0);
+      if (
+        role !== 'drawer_box' &&
+        role !== 'drawer_lateral' &&
+        !upper.includes('CAJ') &&
+        !upper.includes('GAVET') &&
+        !p.id.includes('_caj') &&
+        !p.id.includes('caj_') &&
+        maxDim > 320 &&
+        (upper === 'LATERAL IZQUIERDO' || upper === 'LATERAL DERECHO')
+      ) {
+        return true;
+      }
+      return false;
+    };
+
+    const candidates = allParts.filter(p => !isStructuralCabinetPart(p));
+
+    // 1. Coincidencia exacta por prefijo de instancia del cajón (ej. mod_1_caj1_xxx, caj1_, grp_caj_xxx)
+    const prefix = frontPart.id.includes('_frente')
+      ? frontPart.id.split('_frente')[0]
+      : frontPart.id.includes('_front')
+        ? frontPart.id.split('_front')[0]
+        : '';
+
+    let scopedCandidates: Part[] = [];
+    if (prefix) {
+      scopedCandidates = candidates.filter(p => p.id.startsWith(prefix));
+    }
+
+    // 2. Si no hubo coincidencia por prefijo, buscar dentro del mismo grupo o por proximidad espacial en Y y X
+    const frontBounds = this.getPartBounds(frontPart);
+    if (scopedCandidates.length === 0) {
+      const verticalTolerance = Math.max(110, frontBounds.sy * 0.75);
+      scopedCandidates = candidates.filter(p => {
+        if (frontPart.groupId && p.groupId && p.groupId !== frontPart.groupId) return false;
+        const pb = this.getPartBounds(p);
+        const sameLevelY = Math.abs(pb.py - frontBounds.py) <= verticalTolerance;
+        const insideSpanX = pb.minX >= frontBounds.minX - 25 && pb.maxX <= frontBounds.maxX + 25;
+        const insideSpanZ = pb.minZ >= frontBounds.minZ - 650 && pb.maxZ <= frontBounds.maxZ + 650;
+        return sameLevelY && insideSpanX && insideSpanZ;
+      });
+    }
+
+    let latIzq = scopedCandidates.find(
+      p => p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ') || p.name.toUpperCase().includes('COSTADO IZQ')
+    );
+    let latDer = scopedCandidates.find(
+      p => p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER') || p.name.toUpperCase().includes('COSTADO DER')
+    );
+
+    // Fallback geométrico para cajones creados pieza por pieza manualmente sin nombres estándar
+    if (!latIzq || !latDer) {
+      const isFrontXY = frontPart.orientation !== 'vertical_yz';
+      const sidePanelOrient = isFrontXY ? 'vertical_yz' : 'vertical_xy';
+      const manualSides = scopedCandidates
+        .filter(p => p.orientation === sidePanelOrient)
+        .sort((a, b) => (isFrontXY ? (a.posX ?? 0) - (b.posX ?? 0) : (a.posZ ?? 0) - (b.posZ ?? 0)));
+      if (manualSides.length >= 2) {
+        if (!latIzq) latIzq = manualSides[0];
+        if (!latDer) latDer = manualSides[manualSides.length - 1];
+      }
+    }
+
+    const contraFrente = scopedCandidates.find(
+      p =>
+        p.id.includes('_frente_int') ||
+        p.id.includes('_contrafrente') ||
+        p.name.toUpperCase().includes('CONTRAFRENTE') ||
+        p.name.toUpperCase().includes('CONTRA-FRENTE') ||
+        p.name.toUpperCase().includes('FRENTE INTERIOR')
+    );
+    const trasera = scopedCandidates.find(
+      p => p.id.includes('_trasera') || p.name.toUpperCase().includes('TRASERA')
+    );
+    const fondo = scopedCandidates.find(
+      p =>
+        p.id.includes('_fondo') ||
+        (p.orientation === 'horizontal' && (p.name.toUpperCase().includes('FONDO') || p.componentRole === 'drawer_box'))
+    );
+
+    return { latIzq, latDer, contraFrente, trasera, fondo };
+  }
+
   private createDrawerBoxMesh(
     part: Part,
     sx: number,
@@ -2322,25 +2444,34 @@ private createHandleMesh(
     const frontWidth = isSideFacing ? sz : sx;
     const frontThickness = isSideFacing ? sx : sz;
     const frontHeight = sy;
-    const availableDepth = Math.max(250, (part.width || 450) - 25);
-    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
-    const boxDepth = standardLengths.filter(l => l <= availableDepth).pop() || 350;
-    const boxHeight = Math.max(80, Math.min(Math.floor(frontHeight * 0.72), 220));
 
-    // Standard clearances: 12.7mm (1/2") telescopic slide per side + 18mm carcass side panels
-    const carcassSideT = 18;
-    const clearance = 12.7;
-    const boxOuterWidth = Math.max(120, frontWidth - (2 * carcassSideT) - (2 * clearance));
-    const boxInnerWidth = Math.max(80, boxOuterWidth - (2 * t));
+    const slideType = part.hardwareConfig?.slideType || 'telescopic';
+    const defaultClearance = slideType === 'undermount' ? 5 : 13;
+    const clearance =
+      part.hardwareConfig?.slideClearancePerSide !== undefined &&
+      Number.isFinite(Number(part.hardwareConfig.slideClearancePerSide))
+        ? Math.max(2, Math.min(35, Number(part.hardwareConfig.slideClearancePerSide)))
+        : defaultClearance;
+
+    const boxDepth =
+      part.hardwareConfig?.slideLength && part.hardwareConfig.slideLength >= 200
+        ? part.hardwareConfig.slideLength
+        : 350;
+    const boxHeight = Math.max(70, Math.min(Math.floor(frontHeight * 0.72), 200));
+
+    // Descuento lateral de paredes de gabinete (15mm por lado) + luz lateral de corredera configurada
+    const carcassSideT = 15;
+    const boxOuterWidth = Math.max(100, frontWidth - 2 * carcassSideT - 2 * clearance);
+    const boxInnerWidth = Math.max(60, boxOuterWidth - 2 * t);
 
     const boxMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc, // Clean melamine interior
+      color: 0xf8fafc,
       roughness: 0.65,
       metalness: 0.05
     });
 
     const bottomMat = new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0, // MDF bottom board
+      color: 0xe2e8f0,
       roughness: 0.7,
       metalness: 0.02
     });
@@ -2361,13 +2492,13 @@ private createHandleMesh(
       boxGroup.add(pMesh);
     };
 
-    const centerY = - (frontHeight - boxHeight) * 0.15;
-    const centerZ = - (frontThickness / 2) - (boxDepth / 2);
+    const centerY = -(frontHeight - boxHeight) * 0.12;
+    const centerZ = -(frontThickness / 2) - 2 - boxDepth / 2;
 
     // 1. Lateral Izquierdo de la gaveta
     addBoxPart(
       new THREE.BoxGeometry(t, boxHeight, boxDepth),
-      - (boxOuterWidth / 2) + (t / 2),
+      -(boxOuterWidth / 2) + t / 2,
       centerY,
       centerZ,
       boxMat
@@ -2376,7 +2507,7 @@ private createHandleMesh(
     // 2. Lateral Derecho de la gaveta
     addBoxPart(
       new THREE.BoxGeometry(t, boxHeight, boxDepth),
-      (boxOuterWidth / 2) - (t / 2),
+      boxOuterWidth / 2 - t / 2,
       centerY,
       centerZ,
       boxMat
@@ -2387,7 +2518,7 @@ private createHandleMesh(
       new THREE.BoxGeometry(boxInnerWidth, boxHeight, t),
       0,
       centerY,
-      - (frontThickness / 2) - boxDepth + (t / 2),
+      -(frontThickness / 2) - 2 - boxDepth + t / 2,
       boxMat
     );
 
@@ -2396,21 +2527,20 @@ private createHandleMesh(
       new THREE.BoxGeometry(boxInnerWidth, boxHeight, t),
       0,
       centerY,
-      - (frontThickness / 2) - (t / 2),
+      -(frontThickness / 2) - 2 - t / 2,
       boxMat
     );
 
-    // 5. Fondo de la gaveta (MDF 6mm)
-    const bottomThickness = 6;
+    // 5. Fondo de la gaveta (MDF 3mm)
+    const bottomThickness = 3;
     addBoxPart(
-      new THREE.BoxGeometry(boxOuterWidth - 8, bottomThickness, boxDepth - 8),
+      new THREE.BoxGeometry(boxOuterWidth, bottomThickness, boxDepth),
       0,
-      centerY - (boxHeight / 2) + 8,
+      centerY - boxHeight / 2 - bottomThickness / 2,
       centerZ,
       bottomMat
     );
 
-    // Orient whole box according to drawer facing
     if (drawerFacing === 'back') {
       boxGroup.rotation.y = Math.PI;
     } else if (drawerFacing === 'right') {
@@ -2434,22 +2564,67 @@ private createHandleMesh(
     if (hw.slideType === 'none') return group;
 
     const slideType = hw.slideType || 'telescopic';
+    const allParts = this.parts();
+    const px = part.posX ?? 0;
+    const py = part.posY ?? 0;
+    const pz = part.posZ ?? 0;
+    const isSideFacing = drawerFacing === 'right' || drawerFacing === 'left';
 
-    // Commercial standard nominal lengths: 250, 300, 350, 400, 450, 500, 550, 600 mm
-    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
-    const availableDepth = Math.max(250, (part.width || 450) - 25);
-    const nominalLength = standardLengths.filter(l => l <= availableDepth).pop() || 350;
+    // 1. Buscar exclusivamente los costados internos de la caja de ESTE cajón (nunca los laterales del mueble)
+    const matchedBox = this.findDrawerBoxPartsForFront(part, allParts);
+    const drawerLatIzq = matchedBox.latIzq;
+    const drawerLatDer = matchedBox.latDer;
+    const refLat = drawerLatIzq || drawerLatDer;
+    const refLatBounds = refLat ? this.getPartBounds(refLat) : null;
 
-    // Standard dimensions per slide type
-    let railHeight = 45; // mm standard heavy duty
-    let railThickness = 12.7; // 1/2" side gap per side
-    if (slideType === 'telescopic_35') {
-      railHeight = 35;
-      railThickness = 12.5;
-    } else if (slideType === 'undermount') {
-      railHeight = 28;
-      railThickness = 21; // under-mount bottom clearance
+    // 2. Determinar largo real de la corredera según el costado real de la caja del cajón
+    let nominalLength = 350;
+    if (refLatBounds) {
+      nominalLength = Math.max(180, isSideFacing ? refLatBounds.sx : refLatBounds.sz);
+    } else if (hw.slideLength && hw.slideLength >= 180) {
+      nominalLength = hw.slideLength;
     }
+
+    // 3. Determinar luz lateral por lado (espacio libre entre la caja del cajón y la pared interna del mueble)
+    const defaultClearancePerSide = slideType === 'undermount' ? 5 : 13;
+    let clearancePerSide =
+      hw.slideClearancePerSide !== undefined && Number.isFinite(Number(hw.slideClearancePerSide))
+        ? Math.max(2, Math.min(35, Number(hw.slideClearancePerSide)))
+        : defaultClearancePerSide;
+
+    // Si existen paredes laterales del gabinete, medir la luz libre real para garantizar cero desborde hacia afuera
+    if (drawerLatIzq && drawerLatDer && !isSideFacing) {
+      const b1 = this.getPartBounds(drawerLatIzq);
+      const b2 = this.getPartBounds(drawerLatDer);
+      const boxMinX = Math.min(b1.minX, b2.minX);
+      const boxMaxX = Math.max(b1.maxX, b2.maxX);
+      const cabinetWalls = allParts.filter(
+        p =>
+          (p.componentRole === 'side_left' || p.componentRole === 'side_right' || p.componentRole === 'divider') &&
+          (!part.groupId || p.groupId === part.groupId)
+      );
+      for (const cw of cabinetWalls) {
+        const wb = this.getPartBounds(cw);
+        if (wb.maxX <= boxMinX + 1 && boxMinX - wb.maxX >= 2 && boxMinX - wb.maxX <= 40) {
+          clearancePerSide = Math.min(clearancePerSide, boxMinX - wb.maxX);
+        }
+        if (wb.minX >= boxMaxX - 1 && wb.minX - boxMaxX >= 2 && wb.minX - boxMaxX <= 40) {
+          clearancePerSide = Math.min(clearancePerSide, wb.minX - boxMaxX);
+        }
+      }
+    }
+
+    // 4. Dimensiones físicas del riel confinadas estrictamente dentro de la luz lateral y altura del costado
+    const boxSideHeight = refLatBounds ? refLatBounds.sy : Math.max(70, sy * 0.7);
+    let railHeight = slideType === 'telescopic_35' ? 35 : slideType === 'undermount' ? 24 : 45;
+    railHeight = Math.min(railHeight, Math.max(20, boxSideHeight - 8));
+
+    // Espesor del riel confinado estrictamente dentro de clearancePerSide (con margen de seguridad de 0.4mm)
+    const maxAllowedThickness = Math.max(3.5, clearancePerSide - 0.4);
+    const railThickness =
+      slideType === 'undermount'
+        ? Math.min(16, Math.max(8, clearancePerSide))
+        : Math.min(12.4, maxAllowedThickness);
 
     const slideSteelMat = new THREE.MeshStandardMaterial({
       color: 0x94a3b8,
@@ -2464,162 +2639,171 @@ private createHandleMesh(
     });
 
     const damperMat = new THREE.MeshStandardMaterial({
-      color: 0x0284c7, // Hydraulic blue damper
+      color: 0x0284c7,
       metalness: 0.5,
       roughness: 0.3
     });
 
     const clipMat = new THREE.MeshStandardMaterial({
-      color: 0xea580c, // Undermount front quick-release orange clip
+      color: 0xea580c,
       roughness: 0.35
     });
 
+    /**
+     * Construye el ensamble 3D de una corredera con 3 sub-grupos cinemáticos:
+     * - outerRailGroup (telescopicStage: 'outer'): Fijo en la pared interna del mueble (compensación -100% al abrir)
+     * - midCarriageGroup (telescopicStage: 'mid'): Patín intermedio de rodamientos (compensación -50% al abrir)
+     * - innerMemberGroup (telescopicStage: 'inner'): Perfil móvil atornillado al costado del cajón (100% solidario al cajón)
+     */
     const createSingleSlideAssembly = (isLeft: boolean): THREE.Group => {
       const slideAssembly = new THREE.Group();
+      const outerRailGroup = new THREE.Group();
+      outerRailGroup.userData = { telescopicStage: 'outer' };
+
+      const midCarriageGroup = new THREE.Group();
+      midCarriageGroup.userData = { telescopicStage: 'mid' };
+
+      const innerMemberGroup = new THREE.Group();
+      innerMemberGroup.userData = { telescopicStage: 'inner' };
 
       if (slideType === 'undermount') {
         // --- CORREDERA OCULTA BAJO CAJÓN (TANDEM) ---
         const mainTrack = new THREE.Mesh(
-          new THREE.BoxGeometry(18, railHeight, nominalLength),
+          new THREE.BoxGeometry(railThickness, railHeight, nominalLength),
           slideSteelMat
         );
         mainTrack.position.set(0, 0, -nominalLength / 2);
-        slideAssembly.add(mainTrack);
+        outerRailGroup.add(mainTrack);
 
-        // Front 3D quick-release locking catch
-        const frontClip = new THREE.Mesh(
-          new THREE.BoxGeometry(22, 14, 25),
-          clipMat
-        );
-        frontClip.position.set(0, -railHeight / 2 + 7, -12.5);
-        slideAssembly.add(frontClip);
-
-        // Synchronizer pinion / rear damper
         const rearDamper = new THREE.Mesh(
-          new THREE.BoxGeometry(14, 12, 45),
+          new THREE.BoxGeometry(railThickness * 0.8, 12, Math.min(45, nominalLength * 0.2)),
           damperMat
         );
         rearDamper.position.set(0, 0, -nominalLength + 25);
-        slideAssembly.add(rearDamper);
+        outerRailGroup.add(rearDamper);
+
+        const frontClip = new THREE.Mesh(
+          new THREE.BoxGeometry(railThickness, 12, 24),
+          clipMat
+        );
+        frontClip.position.set(0, -railHeight / 2 + 6, -12);
+        innerMemberGroup.add(frontClip);
       } else {
-        // --- CORREDERA TELESCÓPICA (45mm, SOFT-CLOSE O 35mm) ---
-        // 1. Carcase Outer Member (Stationary C-profile against internal side wall)
+        // --- CORREDERA TELESCÓPICA DE 3 CUERPOS (45mm, CIERRE SUAVE, 35mm, RODILLO) ---
+        // Distribución transversal exacta dentro de [-railThickness/2, +railThickness/2]
+        const outerW = railThickness * 0.35;
+        const midW = railThickness * 0.28;
+        const innerW = railThickness * 0.35;
+
+        const outerOffsetX = (isLeft ? -1 : 1) * (railThickness / 2 - outerW / 2);
+        const innerOffsetX = (isLeft ? 1 : -1) * (railThickness / 2 - innerW / 2);
+
+        // 1. Perfil Exterior de Gabinete (Fijo en la cara interna del lateral del mueble)
         const outerProfile = new THREE.Mesh(
-          new THREE.BoxGeometry(4.5, railHeight, nominalLength),
+          new THREE.BoxGeometry(outerW, railHeight, nominalLength),
           slideSteelMat
         );
-        outerProfile.position.set(isLeft ? -3.5 : 3.5, 0, -nominalLength / 2);
-        slideAssembly.add(outerProfile);
+        outerProfile.position.set(outerOffsetX, 0, -nominalLength / 2);
+        outerRailGroup.add(outerProfile);
 
-        // 2. Intermediate Ball-Bearing Carriage
-        const intermediateProfile = new THREE.Mesh(
-          new THREE.BoxGeometry(3.5, railHeight * 0.72, nominalLength * 0.9),
-          ballBearingMat
-        );
-        intermediateProfile.position.set(0, 0, -nominalLength / 2 + 10);
-        slideAssembly.add(intermediateProfile);
-
-        // 3. Inner Drawer Member (Attached to drawer box)
-        const innerProfile = new THREE.Mesh(
-          new THREE.BoxGeometry(4.0, railHeight * 0.55, nominalLength * 0.85),
-          slideSteelMat
-        );
-        innerProfile.position.set(isLeft ? 3.5 : -3.5, 0, -nominalLength / 2 + 15);
-        slideAssembly.add(innerProfile);
-
-        // System 32 stamped mounting hole visual dots on rail
-        const holeGeo = new THREE.CylinderGeometry(2.2, 2.2, 5, 12);
+        // Perforaciones Sistema 32 en el perfil fijo del gabinete
+        const holeGeo = new THREE.CylinderGeometry(2.0, 2.0, outerW + 0.6, 10);
         const holeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
-        const holeSpacings = [37, 69, 101, 165, 229];
+        const holeSpacings = [37, 69, 101, 165, 229, 293];
         for (const distFromFront of holeSpacings) {
-          if (distFromFront < nominalLength - 30) {
+          if (distFromFront < nominalLength - 25) {
             const dot = new THREE.Mesh(holeGeo, holeMat);
             dot.rotation.z = Math.PI / 2;
-            dot.position.set(isLeft ? -3.5 : 3.5, 0, -distFromFront);
-            slideAssembly.add(dot);
+            dot.position.set(outerOffsetX, 0, -distFromFront);
+            outerRailGroup.add(dot);
           }
         }
 
-        // Soft-Close Hydraulic Piston & Spring Return Unit
+        // Pistón hidráulico de cierre suave en el perfil fijo
         if (slideType === 'soft_close') {
           const piston = new THREE.Mesh(
-            new THREE.CylinderGeometry(3.2, 3.2, 50, 12),
+            new THREE.CylinderGeometry(Math.min(2.8, railThickness * 0.22), Math.min(2.8, railThickness * 0.22), Math.min(50, nominalLength * 0.2), 12),
             damperMat
           );
           piston.rotation.x = Math.PI / 2;
-          piston.position.set(isLeft ? -1 : 1, -railHeight * 0.2, -nominalLength + 35);
-          slideAssembly.add(piston);
+          piston.position.set(outerOffsetX * 0.5, -railHeight * 0.2, -nominalLength + 35);
+          outerRailGroup.add(piston);
+        }
 
+        // 2. Carro Intermedio de Rodamientos (Avanza al 50% de la apertura)
+        const intermediateProfile = new THREE.Mesh(
+          new THREE.BoxGeometry(midW, railHeight * 0.72, nominalLength * 0.92),
+          ballBearingMat
+        );
+        intermediateProfile.position.set(0, 0, -nominalLength / 2 + 8);
+        midCarriageGroup.add(intermediateProfile);
+
+        // 3. Perfil Interior de Cajón (Pegado a la cara exterior del costado del cajón, avanza al 100%)
+        const innerProfile = new THREE.Mesh(
+          new THREE.BoxGeometry(innerW, railHeight * 0.54, nominalLength * 0.88),
+          slideSteelMat
+        );
+        innerProfile.position.set(innerOffsetX, 0, -nominalLength / 2 + 12);
+        innerMemberGroup.add(innerProfile);
+
+        if (slideType === 'soft_close') {
           const triggerCatch = new THREE.Mesh(
-            new THREE.BoxGeometry(5, 10, 16),
+            new THREE.BoxGeometry(innerW, 9, 15),
             damperMat
           );
-          triggerCatch.position.set(isLeft ? 1 : -1, railHeight * 0.2, -nominalLength + 55);
-          slideAssembly.add(triggerCatch);
+          triggerCatch.position.set(innerOffsetX * 0.5, railHeight * 0.18, -nominalLength + 55);
+          innerMemberGroup.add(triggerCatch);
         }
       }
 
+      slideAssembly.add(outerRailGroup, midCarriageGroup, innerMemberGroup);
       return slideAssembly;
     };
 
-    // Calculate positions relative to drawer lateral panels or carcass
-    const allParts = this.parts();
-    const px = part.posX ?? 0;
-    const pz = part.posZ ?? 0;
-    const isSideFacing = drawerFacing === 'right' || drawerFacing === 'left';
-
-    // 1. Find lateral box panels belonging to this drawer:
-    let drawerLatIzq: Part | undefined;
-    let drawerLatDer: Part | undefined;
-
-    if (part.groupId) {
-      drawerLatIzq = allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ')));
-      drawerLatDer = allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER')));
-    }
-
-    if (!drawerLatIzq || !drawerLatDer) {
-      const prefix = part.id.includes('_frente') ? part.id.split('_frente')[0] : (part.id.includes('_front') ? part.id.split('_front')[0] : '');
-      if (prefix) {
-        if (!drawerLatIzq) drawerLatIzq = allParts.find(p => p.id.startsWith(prefix) && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ')));
-        if (!drawerLatDer) drawerLatDer = allParts.find(p => p.id.startsWith(prefix) && (p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER')));
-      }
-    }
-
-    let posY = -sy * 0.15;
+    // 5. Posicionamiento vertical (posY) alineado exactamente con el centro del costado de la caja del cajón
+    let posY = refLatBounds ? refLatBounds.py - py : -sy * 0.12;
     if (slideType === 'undermount') {
-      posY = -sy / 2 + 14;
+      posY = refLatBounds ? refLatBounds.minY - py + railHeight / 2 + 2 : -sy / 2 + 16;
     }
 
     if (!isSideFacing) {
-      // --- DRAWER FACES FRONT (+Z) OR BACK (-Z) ---
-      // Front is in XY. Laterals have thickness along X.
+      // --- CAJÓN ORIENTADO AL FRENTE (+Z) O ATRÁS (-Z) ---
       let leftX = 0;
       let rightX = 0;
 
       if (drawerLatIzq && drawerLatDer) {
-        const x1 = drawerLatIzq.posX ?? 0;
-        const x2 = drawerLatDer.posX ?? 0;
-        const minX = Math.min(x1, x2);
-        const maxX = Math.max(x1, x2);
-        const t1 = (x1 === minX ? drawerLatIzq : drawerLatDer).thickness || 15;
-        const t2 = (x2 === maxX ? drawerLatDer : drawerLatIzq).thickness || 15;
-        // Mount strictly to outside faces of lateral panels
-        leftX = (minX - (t1 / 2) - px) - (railThickness / 2);
-        rightX = (maxX + (t2 / 2) - px) + (railThickness / 2);
-      } else {
-        const boxHalfWidth = Math.max(50, (sx / 2) - 13);
-        leftX = -boxHalfWidth - (railThickness / 2);
-        rightX = boxHalfWidth + (railThickness / 2);
-      }
+        const b1 = this.getPartBounds(drawerLatIzq);
+        const b2 = this.getPartBounds(drawerLatDer);
+        const leftBoxOuterX = Math.min(b1.minX, b2.minX);
+        const rightBoxOuterX = Math.max(b1.maxX, b2.maxX);
+        const leftBoxInnerX = Math.min(b1.maxX, b2.maxX);
+        const rightBoxInnerX = Math.max(b1.minX, b2.minX);
 
-      if (slideType === 'undermount') {
-        leftX = (-sx / 2) + 28;
-        rightX = (sx / 2) - 28;
+        if (slideType === 'undermount') {
+          // Corredera oculta alojada bajo el fondo, pegada a la cara interna de los costados de la caja
+          leftX = (leftBoxInnerX - px) + railThickness / 2 + 0.5;
+          rightX = (rightBoxInnerX - px) - railThickness / 2 - 0.5;
+        } else {
+          // Corredera lateral pegada estrictamente a la cara exterior de los costados de la caja dentro de la luz libre
+          leftX = (leftBoxOuterX - px) - railThickness / 2 - 0.15;
+          rightX = (rightBoxOuterX - px) + railThickness / 2 + 0.15;
+        }
+      } else {
+        // Fallback para frente individual sin piezas de caja separadas (alineado con createDrawerBoxMesh)
+        const carcassSideT = 15;
+        const boxOuterWidth = Math.max(100, sx - 2 * carcassSideT - 2 * clearancePerSide);
+        if (slideType === 'undermount') {
+          leftX = -(boxOuterWidth / 2) + 15 + railThickness / 2;
+          rightX = boxOuterWidth / 2 - 15 - railThickness / 2;
+        } else {
+          leftX = -(boxOuterWidth / 2) - railThickness / 2 - 0.15;
+          rightX = boxOuterWidth / 2 + railThickness / 2 + 0.15;
+        }
       }
 
       if (drawerFacing === 'front') {
-        // Faces +Z (0°): slides extend along -Z
-        const posZ = -sz / 2 - 2;
+        // Inicia exactamente en el borde frontal del costado de la caja (o detrás del frente exterior)
+        const posZ = refLatBounds ? refLatBounds.maxZ - pz : -sz / 2 - 2;
         const leftSlide = createSingleSlideAssembly(true);
         leftSlide.position.set(leftX, posY, posZ);
         leftSlide.rotation.y = 0;
@@ -2628,11 +2812,9 @@ private createHandleMesh(
         rightSlide.position.set(rightX, posY, posZ);
         rightSlide.rotation.y = 0;
 
-        group.add(leftSlide);
-        group.add(rightSlide);
+        group.add(leftSlide, rightSlide);
       } else {
-        // Faces -Z (180°): slides extend along +Z
-        const posZ = sz / 2 + 2;
+        const posZ = refLatBounds ? refLatBounds.minZ - pz : sz / 2 + 2;
         const leftSlide = createSingleSlideAssembly(false);
         leftSlide.position.set(rightX, posY, posZ);
         leftSlide.rotation.y = Math.PI;
@@ -2641,39 +2823,42 @@ private createHandleMesh(
         rightSlide.position.set(leftX, posY, posZ);
         rightSlide.rotation.y = Math.PI;
 
-        group.add(leftSlide);
-        group.add(rightSlide);
+        group.add(leftSlide, rightSlide);
       }
     } else {
-      // --- DRAWER FACES RIGHT (+X) OR LEFT (-X) ---
-      // Front is in YZ (thickness in X, width in Z). Laterals have thickness along Z.
+      // --- CAJÓN ORIENTADO A LA DERECHA (+X) O IZQUIERDA (-X) ---
       let leftZ = 0;
       let rightZ = 0;
 
       if (drawerLatIzq && drawerLatDer) {
-        const z1 = drawerLatIzq.posZ ?? 0;
-        const z2 = drawerLatDer.posZ ?? 0;
-        const minZ = Math.min(z1, z2);
-        const maxZ = Math.max(z1, z2);
-        const t1 = (z1 === minZ ? drawerLatIzq : drawerLatDer).thickness || 15;
-        const t2 = (z2 === maxZ ? drawerLatDer : drawerLatIzq).thickness || 15;
-        // Mount strictly to outside faces of lateral panels
-        leftZ = (minZ - (t1 / 2) - pz) - (railThickness / 2);
-        rightZ = (maxZ + (t2 / 2) - pz) + (railThickness / 2);
-      } else {
-        const boxHalfWidth = Math.max(50, (sz / 2) - 13);
-        leftZ = -boxHalfWidth - (railThickness / 2);
-        rightZ = boxHalfWidth + (railThickness / 2);
-      }
+        const b1 = this.getPartBounds(drawerLatIzq);
+        const b2 = this.getPartBounds(drawerLatDer);
+        const leftBoxOuterZ = Math.min(b1.minZ, b2.minZ);
+        const rightBoxOuterZ = Math.max(b1.maxZ, b2.maxZ);
+        const leftBoxInnerZ = Math.min(b1.maxZ, b2.maxZ);
+        const rightBoxInnerZ = Math.max(b1.minZ, b2.minZ);
 
-      if (slideType === 'undermount') {
-        leftZ = (-sz / 2) + 28;
-        rightZ = (sz / 2) - 28;
+        if (slideType === 'undermount') {
+          leftZ = (leftBoxInnerZ - pz) + railThickness / 2 + 0.5;
+          rightZ = (rightBoxInnerZ - pz) - railThickness / 2 - 0.5;
+        } else {
+          leftZ = (leftBoxOuterZ - pz) - railThickness / 2 - 0.15;
+          rightZ = (rightBoxOuterZ - pz) + railThickness / 2 + 0.15;
+        }
+      } else {
+        const carcassSideT = 15;
+        const boxOuterWidth = Math.max(100, sz - 2 * carcassSideT - 2 * clearancePerSide);
+        if (slideType === 'undermount') {
+          leftZ = -(boxOuterWidth / 2) + 15 + railThickness / 2;
+          rightZ = boxOuterWidth / 2 - 15 - railThickness / 2;
+        } else {
+          leftZ = -(boxOuterWidth / 2) - railThickness / 2 - 0.15;
+          rightZ = boxOuterWidth / 2 + railThickness / 2 + 0.15;
+        }
       }
 
       if (drawerFacing === 'right') {
-        // Faces +X (90°): slides start at -sx/2 - 2 and extend along -X (rotation.y = Math.PI / 2)
-        const posX = -sx / 2 - 2;
+        const posX = refLatBounds ? refLatBounds.maxX - px : -sx / 2 - 2;
         const leftSlide = createSingleSlideAssembly(false);
         leftSlide.position.set(posX, posY, leftZ);
         leftSlide.rotation.y = Math.PI / 2;
@@ -2682,11 +2867,9 @@ private createHandleMesh(
         rightSlide.position.set(posX, posY, rightZ);
         rightSlide.rotation.y = Math.PI / 2;
 
-        group.add(leftSlide);
-        group.add(rightSlide);
+        group.add(leftSlide, rightSlide);
       } else {
-        // Faces -X (270°): slides start at +sx/2 + 2 and extend along +X (rotation.y = -Math.PI / 2)
-        const posX = sx / 2 + 2;
+        const posX = refLatBounds ? refLatBounds.minX - px : sx / 2 + 2;
         const leftSlide = createSingleSlideAssembly(true);
         leftSlide.position.set(posX, posY, rightZ);
         leftSlide.rotation.y = -Math.PI / 2;
@@ -2695,14 +2878,13 @@ private createHandleMesh(
         rightSlide.position.set(posX, posY, leftZ);
         rightSlide.rotation.y = -Math.PI / 2;
 
-        group.add(leftSlide);
-        group.add(rightSlide);
+        group.add(leftSlide, rightSlide);
       }
     }
 
     group.traverse(child => {
       if (child instanceof THREE.Mesh) {
-        child.userData = { isSlide: true, part, parentPartId: part.id };
+        child.userData = { ...child.userData, isSlide: true, part, parentPartId: part.id };
       }
     });
 
@@ -6012,12 +6194,106 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
   setContextMenuPartSlide(slideType: SlideType) {
     const targetPart = this.contextMenuEffectiveFrontPart() || this.contextMenuPart();
     if (!targetPart) return;
+    const defaultClr = slideType === 'undermount' ? 5 : 13;
     const hw: PartHardwareConfig = {
       ...(targetPart.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(targetPart)),
-      slideType
+      slideType,
+      slideClearancePerSide: defaultClr
     };
-    this.partModified.emit({ part: targetPart, updates: { hardwareConfig: hw } });
-    this.closeContextMenu();
+    this.applyDrawerClearanceAndHardware(targetPart, hw, defaultClr);
+    this.contextMenuPart.set({ ...targetPart, hardwareConfig: hw });
+  }
+
+  setContextMenuPartSlideClearance(clearanceMm: number) {
+    const targetPart = this.contextMenuEffectiveFrontPart() || this.contextMenuPart();
+    if (!targetPart) return;
+    const num = Number(clearanceMm);
+    if (!Number.isFinite(num)) return;
+    const clamped = Math.max(2, Math.min(35, Math.round(num * 10) / 10));
+    const hw: PartHardwareConfig = {
+      ...(targetPart.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(targetPart)),
+      slideType: targetPart.hardwareConfig?.slideType || 'telescopic',
+      slideClearancePerSide: clamped
+    };
+    this.applyDrawerClearanceAndHardware(targetPart, hw, clamped);
+    this.contextMenuPart.set({ ...targetPart, hardwareConfig: hw });
+  }
+
+  private applyDrawerClearanceAndHardware(frontPart: Part, hw: PartHardwareConfig, newClearancePerSide: number) {
+    const allParts = this.parts();
+    const matched = this.findDrawerBoxPartsForFront(frontPart, allParts);
+    const updatesList: { part: Part; updates: Partial<Part> }[] = [
+      { part: frontPart, updates: { hardwareConfig: hw } }
+    ];
+
+    if (matched.latIzq && matched.latDer && frontPart.orientation !== 'vertical_yz') {
+      const b1 = this.getPartBounds(matched.latIzq);
+      const b2 = this.getPartBounds(matched.latDer);
+      const leftPart = b1.px <= b2.px ? matched.latIzq : matched.latDer;
+      const rightPart = b1.px <= b2.px ? matched.latDer : matched.latIzq;
+      const leftB = b1.px <= b2.px ? b1 : b2;
+      const rightB = b1.px <= b2.px ? b2 : b1;
+
+      const oldBoxOuterWidth = rightB.maxX - leftB.minX;
+      const oldClr =
+        frontPart.hardwareConfig?.slideClearancePerSide !== undefined &&
+        Number.isFinite(Number(frontPart.hardwareConfig.slideClearancePerSide))
+          ? Number(frontPart.hardwareConfig.slideClearancePerSide)
+          : frontPart.hardwareConfig?.slideType === 'undermount'
+            ? 5
+            : 13;
+
+      // Buscar paredes laterales del gabinete si existen para calcular el hueco interior exacto
+      let carcassInnerWidth = oldBoxOuterWidth + 2 * oldClr;
+      let boxCenterX = (leftB.minX + rightB.maxX) / 2;
+
+      const cabinetWalls = allParts.filter(
+        p =>
+          (p.componentRole === 'side_left' || p.componentRole === 'side_right' || p.componentRole === 'divider') &&
+          (!frontPart.groupId || p.groupId === frontPart.groupId)
+      );
+      const leftWall = cabinetWalls
+        .map(p => this.getPartBounds(p))
+        .filter(wb => wb.maxX <= leftB.minX + 35 && wb.maxX >= leftB.minX - 50)
+        .sort((a, b) => b.maxX - a.maxX)[0];
+      const rightWall = cabinetWalls
+        .map(p => this.getPartBounds(p))
+        .filter(wb => wb.minX >= rightB.maxX - 35 && wb.minX <= rightB.maxX + 50)
+        .sort((a, b) => a.minX - b.minX)[0];
+
+      if (leftWall && rightWall && rightWall.minX > leftWall.maxX + 100) {
+        carcassInnerWidth = rightWall.minX - leftWall.maxX;
+        boxCenterX = (leftWall.maxX + rightWall.minX) / 2;
+      }
+
+      const newBoxOuterWidth = Math.max(100, Math.round((carcassInnerWidth - 2 * newClearancePerSide) * 10) / 10);
+      const sideT = leftPart.thickness || 15;
+      const newBoxInnerWidth = Math.max(60, Math.round((newBoxOuterWidth - 2 * sideT) * 10) / 10);
+
+      updatesList.push({
+        part: leftPart,
+        updates: { posX: Math.round((boxCenterX - newBoxOuterWidth / 2 + sideT / 2) * 10) / 10 }
+      });
+      updatesList.push({
+        part: rightPart,
+        updates: { posX: Math.round((boxCenterX + newBoxOuterWidth / 2 - sideT / 2) * 10) / 10 }
+      });
+      if (matched.contraFrente) {
+        updatesList.push({ part: matched.contraFrente, updates: { length: newBoxInnerWidth, posX: boxCenterX } });
+      }
+      if (matched.trasera) {
+        updatesList.push({ part: matched.trasera, updates: { length: newBoxInnerWidth, posX: boxCenterX } });
+      }
+      if (matched.fondo) {
+        updatesList.push({ part: matched.fondo, updates: { length: newBoxOuterWidth, posX: boxCenterX } });
+      }
+
+      this.multiplePartsModified.emit({ updates: updatesList });
+      this.partModified.emit(updatesList[0]);
+      return;
+    }
+
+    this.partModified.emit({ part: frontPart, updates: { hardwareConfig: hw } });
   }
 
   toggleContextMenuAnimation() {
@@ -8138,19 +8414,33 @@ private updateOpeningAnimations(delta = 0.016) {
         const maxSlide = 320;
         const axis = p.slideAxis || 'z';
         const dir = p.slideDir ?? 1;
+        const slideOffset = cur * maxSlide;
 
         if (axis === 'x') {
-          p.mesh.position.x = p.originalPos.x + expX + cur * maxSlide * dir;
+          p.mesh.position.x = p.originalPos.x + expX + slideOffset * dir;
           p.mesh.position.y = p.originalPos.y + expY;
           p.mesh.position.z = p.originalPos.z + expZ;
         } else if (axis === 'y') {
           p.mesh.position.x = p.originalPos.x + expX;
-          p.mesh.position.y = p.originalPos.y + expY + cur * maxSlide * dir;
+          p.mesh.position.y = p.originalPos.y + expY + slideOffset * dir;
           p.mesh.position.z = p.originalPos.z + expZ;
         } else {
           p.mesh.position.x = p.originalPos.x + expX;
           p.mesh.position.y = p.originalPos.y + expY;
-          p.mesh.position.z = p.originalPos.z + expZ + cur * maxSlide * dir;
+          p.mesh.position.z = p.originalPos.z + expZ + slideOffset * dir;
+        }
+
+        // Cinemática telescópica de 3 cuerpos: el riel exterior permanece fijo en el mueble (-100%),
+        // el carro intermedio de balines avanza a media carrera (-50%) y el perfil interior avanza con el cajón (0%).
+        if (p.slideGroup) {
+          p.slideGroup.traverse(child => {
+            const stage = child.userData?.['telescopicStage'];
+            if (stage === 'outer') {
+              child.position.z = -slideOffset;
+            } else if (stage === 'mid') {
+              child.position.z = -slideOffset * 0.5;
+            }
+          });
         }
       }
     }

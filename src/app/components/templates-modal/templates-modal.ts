@@ -31,7 +31,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { ThemeService } from '../../services/theme.service';
 import { TemplatesCatalogService, FurnitureTemplate } from '../../services/templates-catalog.service';
-import { Material, ParametricCabinetConfig, HandleType, HandleFinish } from '../../models/melamine.models';
+import { Material, ParametricCabinetConfig, HandleType, HandleFinish, SlideType } from '../../models/melamine.models';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
@@ -240,7 +240,8 @@ export class TemplatesModalComponent {
   drawersCount = signal<number>(0);
   drawerDistribution = signal<'uniform' | 'manual'>('uniform');
   drawerManualHeights = signal<number[]>([]);
-  slideType = signal<'telescopic' | 'undermount' | 'roller'>('telescopic');
+  slideType = signal<SlideType>('telescopic');
+  slideClearancePerSide = signal<number>(13);
 
   // Zócalo / Base inferior (especialmente para Cajoneras y muebles bajos)
   hasPlinth = signal<boolean>(false);
@@ -304,7 +305,15 @@ export class TemplatesModalComponent {
 
     this.drawersCount.set(safeDrawersCount);
     this.drawerDistribution.set(cfg.drawerDistribution || 'uniform');
-    if (cfg.slideType) this.slideType.set(cfg.slideType);
+    const resolvedSlide = cfg.slideType || 'telescopic';
+    this.slideType.set(resolvedSlide);
+    const defaultClr = resolvedSlide === 'undermount' ? 5 : 13;
+    const rawClr = Number(cfg.slideClearancePerSide);
+    this.slideClearancePerSide.set(
+      cfg.slideClearancePerSide !== undefined && Number.isFinite(rawClr) && rawClr >= 2 && rawClr <= 35
+        ? Math.round(rawClr * 10) / 10
+        : defaultClr
+    );
 
     if (
       cfg.drawerManualHeights &&
@@ -437,6 +446,13 @@ export class TemplatesModalComponent {
   readonly drawerFrontCutWidth = computed(() => {
     const w = Number(this.width()) || 600;
     return Math.max(50, Math.round(w - 4));
+  });
+
+  // Ancho exterior de la caja del cajón descontando la luz lateral de correderas
+  readonly drawerBoxOuterWidth = computed(() => {
+    const innerW = this.innerWidth();
+    const clrPerSide = Number(this.slideClearancePerSide()) || 13;
+    return Math.max(80, Math.round((innerW - clrPerSide * 2) * 10) / 10);
   });
 
   // Altura disponible de fachada para los cajones
@@ -671,6 +687,7 @@ export class TemplatesModalComponent {
         this.drawersCount.set(3);
         this.drawerDistribution.set('uniform');
         this.slideType.set('telescopic');
+        this.slideClearancePerSide.set(13);
         this.hasPlinth.set(true);
         this.plinthHeight.set(80);
         this.shelvesCount.set(0);
@@ -775,6 +792,18 @@ export class TemplatesModalComponent {
     if (mode === 'manual') {
       this.syncManualDrawerHeights();
     }
+  }
+
+  setSlideType(type: SlideType) {
+    this.slideType.set(type);
+    this.slideClearancePerSide.set(type === 'undermount' ? 5 : 13);
+  }
+
+  setSlideClearancePerSide(val: number) {
+    const num = Number(val);
+    if (!Number.isFinite(num)) return;
+    const clamped = Math.max(2, Math.min(35, Math.round(num * 10) / 10));
+    this.slideClearancePerSide.set(clamped);
   }
 
   syncManualDrawerHeights() {
@@ -911,6 +940,7 @@ export class TemplatesModalComponent {
       drawerDistribution: this.drawerDistribution(),
       drawerManualHeights: this.drawerDistribution() === 'manual' ? this.drawerManualHeights() : undefined,
       slideType: this.slideType(),
+      slideClearancePerSide: this.slideClearancePerSide(),
       hasPlinth: this.hasPlinth(),
       plinthHeight: this.plinthHeight(),
       structureMaterialId: structMat,
@@ -988,6 +1018,9 @@ export class TemplatesModalComponent {
         drawerDistribution: t.parametricConfig.drawerDistribution || 'uniform',
         drawerManualHeights: t.parametricConfig.drawerManualHeights,
         slideType: t.parametricConfig.slideType || 'telescopic',
+        slideClearancePerSide:
+          t.parametricConfig.slideClearancePerSide ??
+          (t.parametricConfig.slideType === 'undermount' ? 5 : 13),
         hasPlinth: t.parametricConfig.hasPlinth ?? false,
         plinthHeight: t.parametricConfig.plinthHeight || 80,
         structureMaterialId: t.parametricConfig.structureMaterialId || this.structureMaterialId() || defMat,

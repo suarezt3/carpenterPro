@@ -71,6 +71,8 @@ export interface PartHardwareConfig {
   hingeType?: HingeType;
   openingDirection?: OpeningDirection;
   slideType?: SlideType;
+  slideClearancePerSide?: number; // Luz lateral por lado en mm (ej. 13mm telescópica, 5mm oculta)
+  slideLength?: number; // Largo de corredera en mm (ej. 350, 400, 450)
   isOpen?: boolean;
 }
 
@@ -129,7 +131,8 @@ export interface ParametricCabinetConfig {
   drawersCount?: number; // 0 a 6
   drawerDistribution?: 'uniform' | 'manual';
   drawerManualHeights?: number[]; // Altura exterior de cada frente de cajón (de abajo hacia arriba) en mm
-  slideType?: 'telescopic' | 'undermount' | 'roller';
+  slideType?: SlideType;
+  slideClearancePerSide?: number; // Luz lateral por lado en mm entre costado de cajón y pared interna del mueble (default: 13mm telescópica, 5mm oculta)
   hasPlinth?: boolean; // Zócalo inferior integrado
   plinthHeight?: number; // Altura de zócalo en mm (ej. 70 - 100 mm)
   structureMaterialId: string;

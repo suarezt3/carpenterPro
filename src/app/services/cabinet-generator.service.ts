@@ -851,8 +851,13 @@ export class CabinetGeneratorService {
       // Medida estándar de corredera que cabe holgadamente en la profundidad libre interior
       const slideLength = this.getStandardSlideLength(internalClearDepth);
 
-      // Ancho exterior de la caja del cajón descontando las correderas (26mm total = 13mm por lado)
-      const slideClearanceTotal = slideType === 'undermount' ? 10 : 26;
+      // Luz lateral por lado entre caja de cajón y pared interna del mueble (ej. 13mm telescópica, 5mm oculta)
+      const defaultClearancePerSide = slideType === 'undermount' ? 5 : 13;
+      const slideClearancePerSide =
+        config.slideClearancePerSide !== undefined && Number.isFinite(Number(config.slideClearancePerSide))
+          ? Math.max(0, Math.min(40, Number(config.slideClearancePerSide)))
+          : defaultClearancePerSide;
+      const slideClearanceTotal = slideClearancePerSide * 2;
       const boxOuterWidth = Math.max(100, innerWidth - slideClearanceTotal);
       const boxSideT = Math.min(t, 15); // Costados de cajón en 15mm (o menor) para ligereza
       const boxInnerWidth = Math.max(60, boxOuterWidth - 2 * boxSideT);
@@ -915,6 +920,8 @@ export class CabinetGeneratorService {
             isMovable: true,
             movableType: 'drawer',
             slideType,
+            slideClearancePerSide,
+            slideLength,
             handleType: hType,
             handleFinish: hFinish,
             handlePosition: config.handlePosition || 'horizontal',
@@ -1447,6 +1454,12 @@ export class CabinetGeneratorService {
         drawerDistribution: raw.drawerDistribution === 'manual' ? 'manual' : 'uniform',
         drawerManualHeights: validDrawerHeights,
         slideType: raw.slideType || 'telescopic',
+        slideClearancePerSide:
+          raw.slideClearancePerSide !== undefined && Number.isFinite(Number(raw.slideClearancePerSide))
+            ? Math.max(0, Math.min(40, Number(raw.slideClearancePerSide)))
+            : raw.slideType === 'undermount'
+              ? 5
+              : 13,
         hasPlinth,
         plinthHeight,
         structureMaterialId: raw.structureMaterialId || 'mat-1',
@@ -1533,9 +1546,22 @@ export class CabinetGeneratorService {
       drawersCount,
       drawerDistribution: allSameHeight ? 'uniform' : 'manual',
       drawerManualHeights: drawerHeights.length > 0 ? drawerHeights : undefined,
-      slideType: (drawerFrontParts[0]?.hardwareConfig?.slideType === 'undermount' || drawerFrontParts[0]?.hardwareConfig?.slideType === 'roller')
-        ? drawerFrontParts[0].hardwareConfig.slideType
-        : 'telescopic',
+      slideType: drawerFrontParts[0]?.hardwareConfig?.slideType || 'telescopic',
+      slideClearancePerSide: (() => {
+        if (
+          drawerFrontParts[0]?.hardwareConfig?.slideClearancePerSide !== undefined &&
+          Number.isFinite(Number(drawerFrontParts[0].hardwareConfig.slideClearancePerSide))
+        ) {
+          return Number(drawerFrontParts[0].hardwareConfig.slideClearancePerSide);
+        }
+        const fondoCaj = parts.find(
+          p => p.componentRole === 'drawer_box' && (p.id.includes('_fondo') || p.orientation === 'horizontal')
+        );
+        if (fondoCaj && innerWidth > fondoCaj.length) {
+          return Math.round(((innerWidth - fondoCaj.length) / 2) * 10) / 10;
+        }
+        return drawerFrontParts[0]?.hardwareConfig?.slideType === 'undermount' ? 5 : 13;
+      })(),
       hasPlinth: !!plinthPart,
       plinthHeight: plinthPart ? Math.round(Number(plinthPart.width) || 80) : 80,
       structureMaterialId: sidePart?.materialId || 'mat-1',

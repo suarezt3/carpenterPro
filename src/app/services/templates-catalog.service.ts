@@ -100,6 +100,8 @@ export class TemplatesCatalogService {
           isMovable: true,
           movableType: 'drawer',
           slideType: 'telescopic',
+          slideClearancePerSide: boxClearancePerSide,
+          slideLength,
           handleType: 'bar_modern',
           handleFinish: 'brushed_steel',
           handlePosition: 'horizontal'

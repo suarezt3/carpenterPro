@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para corregir los solapamientos y la agrupación de la Cajonera de 3 Cajones en el catálogo, e incorporar el soporte completo para cajoneras corredizas paramétricas (categoría Cajonera + cajones en módulos) en el Asistente de Módulos, con edición posterior desde la barra superior y menú contextual 3D.",
-  "updatedAt": "2026-10-20T03:36:50.751365435Z",
+  "summary": "Plan de implementación para corregir el posicionamiento 3D y cinemática de rieles de cajones (perfil fijo en mueble + perfil móvil en cajón), asegurar cero solapamiento dentro de la luz lateral, y habilitar el control de luz de corredera tanto en el Asistente Paramétrico como en la pestaña Pieza y menú contextual para cajones manuales.",
+  "updatedAt": "2026-10-20T11:59:14.809340031Z",
   "requestFeedback": true,
   "userFacing": true
 }

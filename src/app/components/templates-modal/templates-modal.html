@@ -446,36 +446,93 @@
                   </div>
                 }
 
-                <!-- Tipo de corredera y espesor de frente -->
-                <div class="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span class="block text-[11px] font-bold text-slate-700 mb-1">Sistema de Corredera:</span>
-                    <select
-                      [value]="slideType()"
-                      (change)="slideType.set($any($event.target).value)"
-                      class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
-                      <option value="telescopic">Telescópica Extracción Total (13mm/lado)</option>
-                      <option value="undermount">Oculta Cierre Suave Tandém</option>
-                      <option value="roller">Corredera Simple de Rodillo</option>
-                    </select>
+                <!-- Tipo de corredera, luz lateral por lado y espesor de frente -->
+                <div class="pt-2 border-t border-slate-100 space-y-3 text-xs">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <span class="block text-[11px] font-bold text-slate-700 mb-1">Sistema de Corredera (Riel):</span>
+                      <select
+                        [value]="slideType()"
+                        (change)="setSlideType($any($event.target).value)"
+                        class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                        <option value="telescopic">Telescópica 45mm Extracción Total (13mm/lado)</option>
+                        <option value="soft_close">Telescópica Cierre Suave Hidráulica (13mm/lado)</option>
+                        <option value="telescopic_35">Telescópica Ligera 35mm (13mm/lado)</option>
+                        <option value="undermount">Oculta Bajo Cajón Tandem (5mm/lado)</option>
+                        <option value="roller">Corredera Simple de Rodillo (13mm/lado)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <span class="block text-[11px] font-bold text-slate-700 mb-1">Espesor Frentes de Cajón:</span>
+                      <div class="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          (click)="doorThickness.set(15)"
+                          [class]="doorThickness() === 15 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                          class="flex-1 py-1.5 rounded-md font-mono text-xs transition cursor-pointer">
+                          15 mm
+                        </button>
+                        <button
+                          type="button"
+                          (click)="doorThickness.set(18)"
+                          [class]="doorThickness() === 18 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                          class="flex-1 py-1.5 rounded-md font-mono text-xs transition cursor-pointer">
+                          18 mm
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span class="block text-[11px] font-bold text-slate-700 mb-1">Espesor Frentes de Cajón:</span>
-                    <div class="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        (click)="doorThickness.set(15)"
-                        [class]="doorThickness() === 15 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                        class="flex-1 py-1.5 rounded-md font-mono text-xs transition cursor-pointer">
-                        15 mm
-                      </button>
-                      <button
-                        type="button"
-                        (click)="doorThickness.set(18)"
-                        [class]="doorThickness() === 18 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                        class="flex-1 py-1.5 rounded-md font-mono text-xs transition cursor-pointer">
-                        18 mm
-                      </button>
+
+                  <!-- Control de Luz Lateral entre Caja del Cajón y Pared del Mueble -->
+                  <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span class="text-[11px] font-bold text-slate-800 block">
+                          Luz Lateral por Lado (Espacio para Riel):
+                        </span>
+                        <span class="text-[10px] text-slate-500 font-mono">
+                          Descuento total: <strong class="text-indigo-700">{{ slideClearancePerSide() * 2 }} mm</strong> · Ancho ext. caja: <strong class="text-emerald-700">{{ drawerBoxOuterWidth() }} mm</strong>
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-1.5">
+                        <div class="flex items-center gap-1">
+                          <button
+                            type="button"
+                            (click)="setSlideClearancePerSide(13)"
+                            [class]="slideClearancePerSide() === 13 ? 'bg-indigo-600 text-white font-bold' : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'"
+                            class="px-2 py-1 rounded text-[10px] font-mono transition cursor-pointer"
+                            title="Estándar corredera telescópica (13mm por lado = 26mm total)">
+                            13 mm
+                          </button>
+                          <button
+                            type="button"
+                            (click)="setSlideClearancePerSide(12.7)"
+                            [class]="slideClearancePerSide() === 12.7 ? 'bg-indigo-600 text-white font-bold' : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'"
+                            class="px-2 py-1 rounded text-[10px] font-mono transition cursor-pointer"
+                            title="Media pulgada exacta (12.7mm por lado = 25.4mm total)">
+                            12.7 mm
+                          </button>
+                          <button
+                            type="button"
+                            (click)="setSlideClearancePerSide(5)"
+                            [class]="slideClearancePerSide() === 5 ? 'bg-indigo-600 text-white font-bold' : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'"
+                            class="px-2 py-1 rounded text-[10px] font-mono transition cursor-pointer"
+                            title="Corredera oculta Tandem (5mm por lado = 10mm total)">
+                            5 mm
+                          </button>
+                        </div>
+                        <div class="relative w-20">
+                          <input
+                            type="number"
+                            [value]="slideClearancePerSide()"
+                            (input)="setSlideClearancePerSide(+$any($event.target).value)"
+                            min="2"
+                            max="35"
+                            step="0.5"
+                            class="w-full pr-6 pl-2 py-1 text-xs font-mono font-bold bg-white border border-slate-200 rounded text-right focus:border-indigo-500 focus:outline-hidden" />
+                          <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">mm</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
