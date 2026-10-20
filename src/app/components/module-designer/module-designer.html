@@ -794,6 +794,14 @@
                         <hugeicons-icon [icon]="icons.inbox" [size]="10" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                         <span class="truncate">{{ gName }}</span>
                       </button>
+                      <button
+                        type="button"
+                        (click)="sel.groupId && openEditGroup(sel.groupId, $event)"
+                        class="inline-flex items-center gap-1 px-1.5 py-0.2 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded text-[9px] font-bold transition cursor-pointer shrink-0"
+                        title="Editar dimensiones, cajones o puertas del módulo en el Asistente">
+                        <hugeicons-icon [icon]="icons.tune" [size]="10" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span>Editar Módulo</span>
+                      </button>
                     }
                   </div>
                   <button
@@ -1829,6 +1837,16 @@
                             [class.text-amber-500]="isGroupHidden(grp.id)">
                           </hugeicons-icon>
                           <span class="truncate max-w-24 text-[11px]">{{ grp.name }}</span>
+                        </button>
+
+                        <!-- Botón Editar Módulo en Asistente -->
+                        <button
+                          type="button"
+                          (click)="openEditGroup(grp.id, $event)"
+                          [class]="activeSelectedGroupId() === grp.id ? 'text-white/90 hover:text-white bg-white/15' : 'text-indigo-500 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100'"
+                          class="p-0.5 rounded transition cursor-pointer flex items-center justify-center"
+                          title="Editar cajonera o módulo en el Asistente Paramétrico">
+                          <hugeicons-icon [icon]="icons.tune" [size]="12" [strokeWidth]="2"></hugeicons-icon>
                         </button>
 
                         <!-- Botón Congelar / Descongelar Módulo -->

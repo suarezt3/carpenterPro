@@ -5693,7 +5693,12 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
   readonly isContextMenuDrawerGroup = computed<boolean>(() => {
     const grp = this.contextMenuGroup();
     if (!grp) return false;
-    return grp.type === 'drawer' || grp.name.toUpperCase().includes('CAJ') || grp.name.toUpperCase().includes('GAVET');
+    const grpParts = this.parts().filter(p => p.groupId === grp.id);
+    const hasCabinetCarcass = grpParts.some(
+      p => p.componentRole === 'side_left' || p.componentRole === 'side_right' || p.componentRole === 'plinth'
+    );
+    if (hasCabinetCarcass || grp.parametricConfig) return false;
+    return grp.type === 'drawer';
   });
 
   readonly isContextMenuCabinetModule = computed<boolean>(() => {
@@ -5747,31 +5752,30 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     if (!part) return null;
     if (this.contextMenuCategory() !== 'drawer') return part;
 
-    if (part.componentRole === 'drawer_front' || part.name.toUpperCase().includes('FRENTE')) {
+    if (part.componentRole === 'drawer_front' || (part.name.toUpperCase().includes('FRENTE') && !part.name.toUpperCase().includes('CONTRAFRENTE') && !part.name.toUpperCase().includes('INTERIOR'))) {
       return part;
     }
 
     const allParts = this.parts();
-    if (part.groupId) {
-      const groupFront = allParts.find(
-        p =>
-          p.groupId === part.groupId &&
-          (p.componentRole === 'drawer_front' ||
-            p.id.includes('_frente') ||
-            p.name.toUpperCase().includes('FRENTE'))
-      );
-      if (groupFront) return groupFront;
-    }
-
     const boxSubKeywords = ['_lat_izq', '_lat_der', '_contrafrente', '_trasera', '_frente_int', '_fondo'];
     for (const kw of boxSubKeywords) {
       if (part.id.includes(kw)) {
         const prefix = part.id.split(kw)[0];
         const foundFront = allParts.find(
-          p => p.id.startsWith(prefix) && (p.componentRole === 'drawer_front' || p.id.includes('_frente'))
+          p => p.id.startsWith(prefix) && (p.componentRole === 'drawer_front' || (p.id.includes('_frente') && !p.id.includes('_frente_int')))
         );
         if (foundFront) return foundFront;
       }
+    }
+
+    if (part.groupId && this.isContextMenuDrawerGroup()) {
+      const groupFront = allParts.find(
+        p =>
+          p.groupId === part.groupId &&
+          (p.componentRole === 'drawer_front' ||
+            (p.id.includes('_frente') && !p.id.includes('_frente_int')))
+      );
+      if (groupFront) return groupFront;
     }
 
     return part;
@@ -6485,6 +6489,12 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
   isGroupOpen(groupId: string): boolean {
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length === 0) return false;
+    const movableParts = grpParts.filter(
+      p => p.componentRole === 'door' || p.componentRole === 'drawer_front' || p.componentRole === 'drawer_box'
+    );
+    if (movableParts.length > 0) {
+      return movableParts.some(p => (this.openTargetMap.get(p.id) || 0) > 0.5);
+    }
     const val = this.openTargetMap.get(grpParts[0].id) || 0;
     return val > 0.5;
   }
@@ -8031,9 +8041,15 @@ private applyMagneticSnapToPosition(
 
     const targetPiece = this.pieceObjects.find(p => p.part.id === partId);
     if (targetPiece) {
-      // 1. If part belongs to a PartGroup (e.g. modular drawer), synchronize ALL parts in that group
-      if (targetPiece.part.groupId) {
-        const gId = targetPiece.part.groupId;
+      const gId = targetPiece.part.groupId;
+      const grp = gId ? this.partGroups().find(g => g.id === gId) : null;
+      const grpParts = gId ? this.getPartsForGroup(gId) : [];
+      const isStandaloneDrawerGroup =
+        grp?.type === 'drawer' &&
+        !grpParts.some(p => p.componentRole === 'side_left' || p.componentRole === 'side_right');
+
+      // 1. If part belongs to a standalone modular drawer group (no cabinet carcass), synchronize ALL parts in that group
+      if (gId && isStandaloneDrawerGroup) {
         for (const p of this.pieceObjects) {
           if (p.part.groupId === gId) {
             this.openTargetMap.set(p.part.id, next);
@@ -8044,7 +8060,7 @@ private applyMagneticSnapToPosition(
         const targetPart = targetPiece.part;
 
         // Extract drawer instance identifier prefix if present
-        const boxSubKeywords = ['_frente', '_lat_izq', '_lat_der', '_contrafrente', '_trasera', '_frente_int', '_fondo'];
+        const boxSubKeywords = ['_frente_int', '_frente', '_lat_izq', '_lat_der', '_contrafrente', '_trasera', '_fondo_caj', '_fondo'];
         let specificPrefix = '';
         for (const kw of boxSubKeywords) {
           if (targetPart.id.includes(kw)) {

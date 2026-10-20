@@ -946,7 +946,7 @@ export class ProjectStorageService {
     }));
   }
 
-  loadTemplateFurniture(template: FurnitureTemplate, mode: 'replace' | 'append' = 'replace') {
+  loadTemplateFurniture(template: FurnitureTemplate, mode: 'replace' | 'append' = 'replace'): PartGroup | null {
     const mats = this.currentProject().materials;
     let offsetX = 0;
 
@@ -964,21 +964,67 @@ export class ProjectStorageService {
       }
     }
 
-    const newParts = template.generateParts(mats, offsetX);
+    const groupId = `group_tpl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    let groupName = template.name;
+    if (mode === 'append') {
+      const existingGroupNames = (this.currentProject().groups || []).map(g => g.name.toLowerCase());
+      let idx = 2;
+      while (existingGroupNames.includes(groupName.toLowerCase())) {
+        groupName = `${template.name} ${idx}`;
+        idx++;
+      }
+    }
+
+    const rawParts = template.generateParts(mats, offsetX);
+    const newParts: Part[] = rawParts.map(pt => ({
+      ...pt,
+      groupId,
+      groupName,
+      moduleId: groupId,
+      moduleName: groupName
+    }));
+
+    const tempGroup: PartGroup = {
+      id: groupId,
+      name: groupName,
+      type: 'assembly',
+      isOpen: false,
+      parametricConfig: template.parametricConfig
+        ? ({
+            ...template.parametricConfig,
+            name: groupName,
+            posX: offsetX
+          } as ParametricCabinetConfig)
+        : undefined
+    };
+
+    const fullConfig = this.cabinetGen.reconstructConfigFromParts(newParts, tempGroup);
+    const createdGroup: PartGroup = {
+      ...tempGroup,
+      parametricConfig: {
+        ...fullConfig,
+        name: groupName,
+        posX: offsetX
+      }
+    };
 
     if (mode === 'replace') {
       this.updateProject(p => ({
         ...p,
         name: template.name,
         modules: [],
+        groups: [createdGroup],
         parts: newParts
       }));
     } else {
       this.updateProject(p => ({
         ...p,
+        groups: [...(p.groups || []), createdGroup],
         parts: [...p.parts, ...newParts]
       }));
     }
+
+    return createdGroup;
   }
 
   loadDeskBarFurniture() {

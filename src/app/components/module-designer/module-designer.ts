@@ -998,13 +998,16 @@ export class ModuleDesignerComponent {
     const groupParts = this.currentParts().filter(p => p.groupId === event.groupId);
     const sidePart = groupParts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || groupParts[0];
     const topOrBottom = groupParts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
-    const doorPart = groupParts.find(p => p.componentRole === 'door');
+    const frontPart = groupParts.find(p => p.componentRole === 'door' || p.componentRole === 'drawer_front');
 
     const posX = topOrBottom?.posX ?? event.config.posX ?? 0;
-    const posY = sidePart?.posY ?? event.config.posY;
-    const doorOffsetZ = doorPart ? (Number(doorPart.thickness || event.config.doorThickness || 15) / 2) : 0;
+    const sideBottomY = sidePart ? (sidePart.posY ?? (sidePart.length / 2)) - (sidePart.length / 2) : 0;
+    const posY = sideBottomY > 5
+      ? Math.round(sideBottomY + event.config.height / 2)
+      : Math.round(event.config.height / 2);
+    const frontOffsetZ = frontPart ? (Number(frontPart.thickness || event.config.doorThickness || 15) / 2) : 0;
     const posZ = sidePart !== undefined && sidePart.posZ !== undefined
-      ? sidePart.posZ + doorOffsetZ
+      ? sidePart.posZ + frontOffsetZ
       : (event.config.posZ ?? 0);
 
     const finalConfig: ParametricCabinetConfig = {
@@ -1996,7 +1999,14 @@ export class ModuleDesignerComponent {
   }
 
   onTemplateSelected(event: { template: FurnitureTemplate; mode: 'replace' | 'append' }) {
-    this.projectService.loadTemplateFurniture(event.template, event.mode);
+    const createdGroup = this.projectService.loadTemplateFurniture(event.template, event.mode);
+    if (createdGroup) {
+      this.selectEntireGroup(createdGroup.id);
+      this.openGroupCardIds.update(s => new Set(s).add(createdGroup.id));
+      this.activeDockTab.set('catalog');
+      this.showToast(`✨ Módulo "${createdGroup.name}" cargado como conjunto editable`);
+      return;
+    }
     const parts = this.currentParts();
     if (parts.length > 0) {
       const top = parts.find(p => p.name.toUpperCase().includes('TECHO') || p.name.toUpperCase().includes('TAPA') || p.name.toUpperCase().includes('ENCIMERA')) || parts[0];

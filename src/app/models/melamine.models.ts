@@ -56,6 +56,7 @@ export type SlideType =
   | 'soft_close'     // Telescópica con Cierre Suave
   | 'undermount'     // Corredera Oculta bajo fondo
   | 'telescopic_35'  // Telescópica Ligera 35mm
+  | 'roller'         // Corredera Simple de Rodillo
   | 'none';
 
 export type OpeningDirection = 'left' | 'right' | 'top' | 'bottom';
@@ -109,8 +110,8 @@ export interface ParametricCabinetConfig {
   id?: string;
   code: string; // ej. "MALT1PU001"
   name: string; // ej. "Módulo Alto 1 Puerta (MAL-1P)"
-  moduleType: 'wall_cabinet' | 'base_cabinet' | 'tall_cabinet' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
-  category?: 'kitchen_base' | 'kitchen_wall' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
+  moduleType: 'wall_cabinet' | 'base_cabinet' | 'tall_cabinet' | 'drawer_unit' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
+  category?: 'kitchen_base' | 'kitchen_wall' | 'drawer_unit' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
   width: number; // Ancho exterior X (ej. 600 mm)
   height: number; // Altura exterior Y (ej. 800 mm)
   depth: number; // Profundidad exterior Z (ej. 320 mm)
@@ -124,13 +125,20 @@ export interface ParametricCabinetConfig {
   doorOpening: 'left' | 'right' | 'top' | 'bottom' | 'double' | 'none'; // Izquierda, Derecha, Doble, Elevable superior, Abatible, Ninguna
   hasHandle?: boolean;
   hasBackPanel?: boolean;
+  // Parámetros de Cajones Corredizos (0 a 6 cajones)
+  drawersCount?: number; // 0 a 6
+  drawerDistribution?: 'uniform' | 'manual';
+  drawerManualHeights?: number[]; // Altura exterior de cada frente de cajón (de abajo hacia arriba) en mm
+  slideType?: 'telescopic' | 'undermount' | 'roller';
+  hasPlinth?: boolean; // Zócalo inferior integrado
+  plinthHeight?: number; // Altura de zócalo en mm (ej. 70 - 100 mm)
   structureMaterialId: string;
   doorMaterialId: string;
   backMaterialId: string;
   handleType: HandleType;
   handleFinish: HandleFinish;
   handlePosition?: 'vertical' | 'horizontal' | 'centered';
-  facadeGap: number; // Holgura perimetral puerta (default: 3 mm)
+  facadeGap: number; // Holgura perimetral puerta/cajón (default: 3 mm)
   posX?: number;
   posY?: number; // Elevación sobre el piso
   posZ?: number;

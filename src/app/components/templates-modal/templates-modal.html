@@ -75,9 +75,18 @@
       <!-- ========================================== -->
       @if (activeView() === 'assistant') {
 
-        <!-- BARRA DE CATEGORÍAS PRESETS (Cocina, Closet, Baño, etc.) -->
+        <!-- BARRA DE CATEGORÍAS PRESETS (Cocina, Cajonera, Closet, Baño, etc.) -->
         <div class="px-5 sm:px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
           <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Tipo:</span>
+
+          <button
+            type="button"
+            (click)="selectPreset('drawer_unit')"
+            [class]="activePreset() === 'drawer_unit' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
+            class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+            <hugeicons-icon [icon]="icons.drawerUnit" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
+            <span>Cajonera</span>
+          </button>
 
           <button
             type="button"
@@ -151,7 +160,7 @@
                 [value]="moduleName()"
                 (input)="moduleName.set($any($event.target).value)"
                 class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden transition"
-                placeholder="ej. Módulo Cocina Bajo 1, Alacena 2P" />
+                placeholder="ej. Cajonera 3 Cajones, Módulo Cocina Bajo" />
             </div>
 
             <!-- 2. Dimensiones Exteriores (Ancho, Alto, Fondo) -->
@@ -210,7 +219,7 @@
                     @for (ph of heightPresets(); track ph) {
                       <button
                         type="button"
-                        (click)="height.set(ph)"
+                        (click)="height.set(ph); syncManualDrawerHeights(); syncManualOffsets()"
                         [class]="height() === ph ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
                         class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
                         {{ ph }}
@@ -223,7 +232,7 @@
                     id="height-input-param"
                     type="number"
                     [value]="height()"
-                    (input)="height.set(+$any($event.target).value)"
+                    (input)="height.set(+$any($event.target).value); syncManualDrawerHeights(); syncManualOffsets()"
                     min="200"
                     max="2600"
                     step="10"
@@ -285,98 +294,286 @@
                   </button>
                 </div>
               </div>
+
+              <!-- Zócalo / Base Inferior -->
+              @if (activePreset() !== 'kitchen_wall') {
+                <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <label class="inline-flex items-center cursor-pointer gap-2">
+                    <input
+                      type="checkbox"
+                      [checked]="hasPlinth()"
+                      (change)="hasPlinth.set($any($event.target).checked); syncManualDrawerHeights()"
+                      class="rounded text-indigo-600 focus:ring-0" />
+                    <span class="font-bold text-slate-700">Zócalo Frontal Inferior:</span>
+                  </label>
+                  @if (hasPlinth()) {
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[11px] text-slate-500">Altura zócalo:</span>
+                      <div class="relative w-20">
+                        <input
+                          type="number"
+                          [value]="plinthHeight()"
+                          (input)="plinthHeight.set(+$any($event.target).value); syncManualDrawerHeights()"
+                          min="40"
+                          max="200"
+                          step="5"
+                          class="w-full pr-6 pl-2 py-1 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded text-right focus:bg-white focus:border-indigo-500 focus:outline-hidden" />
+                        <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">mm</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
             </div>
 
-            <!-- 3. Configuración de Puertas -->
-            <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
-                <span>Configuración de Puertas</span>
-              </span>
+            <!-- 3. Cajones Corredizos (1 a 6 cajones con altura uniforme o manual) -->
+            <div class="p-3.5 rounded-xl border border-indigo-200/80 bg-white shadow-2xs space-y-3">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.drawerUnit" [size]="15" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+                  <span>Cajones Corredizos</span>
+                </span>
 
-              <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-
-                <!-- Sin Puerta -->
-                <button
-                  type="button"
-                  (click)="doorOpening.set('none')"
-                  [class]="doorOpening() === 'none' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.squareShape" [size]="17" [strokeWidth]="1.9" [class.text-indigo-600]="doorOpening() === 'none'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">Sin Puerta</span>
-                  <span class="text-[9px] text-slate-400">Abierto</span>
-                </button>
-
-                <!-- Abre Izquierda -->
-                <button
-                  type="button"
-                  (click)="doorOpening.set('left')"
-                  [class]="doorOpening() === 'left' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.arrowLeft" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'left'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">1 Puerta</span>
-                  <span class="text-[9px] text-slate-400">Abre Izq</span>
-                </button>
-
-                <!-- Abre Derecha -->
-                <button
-                  type="button"
-                  (click)="doorOpening.set('right')"
-                  [class]="doorOpening() === 'right' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.arrowRight" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'right'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">1 Puerta</span>
-                  <span class="text-[9px] text-slate-400">Abre Der</span>
-                </button>
-
-                <!-- Doble Puerta -->
-                <button
-                  type="button"
-                  (click)="doorOpening.set('double')"
-                  [class]="doorOpening() === 'double' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.doubleArrows" [size]="17" [strokeWidth]="1.9" [class.text-indigo-600]="doorOpening() === 'double'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">2 Puertas</span>
-                  <span class="text-[9px] text-slate-400">Dobles</span>
-                </button>
-
-                <!-- Elevable Gas -->
-                <button
-                  type="button"
-                  (click)="doorOpening.set('top')"
-                  [class]="doorOpening() === 'top' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer col-span-2 sm:col-span-1">
-                  <hugeicons-icon [icon]="icons.arrowUp" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'top'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">Elevable</span>
-                  <span class="text-[9px] text-slate-400">Pistón Gas</span>
-                </button>
+                <!-- Stepper de cantidad de cajones -->
+                <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    (click)="setDrawersCount(drawersCount() - 1)"
+                    [disabled]="drawersCount() <= (activePreset() === 'drawer_unit' ? 1 : 0)"
+                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
+                    -
+                  </button>
+                  <span class="text-xs font-mono font-bold px-2 text-indigo-950">
+                    {{ drawersCount() }} {{ drawersCount() === 1 ? 'cajón' : 'cajones' }}
+                  </span>
+                  <button
+                    type="button"
+                    (click)="setDrawersCount(drawersCount() + 1)"
+                    [disabled]="drawersCount() >= 6"
+                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
+                    +
+                  </button>
+                </div>
               </div>
 
-              @if (doorOpening() !== 'none') {
-                <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span class="font-bold text-slate-700">Espesor Puerta(s):</span>
-                  <div class="flex items-center gap-1.5">
+              <!-- Botones rápidos de cantidad de cajones -->
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[11px] text-slate-500 font-medium mr-1">Cantidad rápida:</span>
+                @for (n of (activePreset() === 'drawer_unit' ? [1, 2, 3, 4, 5, 6] : [0, 1, 2, 3, 4, 5, 6]); track n) {
+                  <button
+                    type="button"
+                    (click)="setDrawersCount(n)"
+                    [class]="drawersCount() === n ? 'bg-indigo-600 text-white font-bold shadow-2xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium'"
+                    class="px-2.5 py-1 rounded-lg text-xs font-mono transition cursor-pointer">
+                    {{ n === 0 ? 'Sin cajones' : n }}
+                  </button>
+                }
+              </div>
+
+              @if (drawersCount() > 0) {
+                <!-- Selector Distribución de Cajones: Uniforme vs Manual -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <span class="text-xs text-slate-600 font-bold">Altura de Frentes:</span>
+                  <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs">
                     <button
                       type="button"
-                      (click)="doorThickness.set(15)"
-                      [class]="doorThickness() === 15 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                      class="px-2.5 py-1 rounded-md font-mono text-xs transition cursor-pointer">
-                      15 mm
+                      (click)="setDrawerDistribution('uniform')"
+                      [class]="drawerDistribution() === 'uniform' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.equalizer" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                      <span>Uniforme Automática</span>
                     </button>
                     <button
                       type="button"
-                      (click)="doorThickness.set(18)"
-                      [class]="doorThickness() === 18 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                      class="px-2.5 py-1 rounded-md font-mono text-xs transition cursor-pointer">
-                      18 mm
+                      (click)="setDrawerDistribution('manual')"
+                      [class]="drawerDistribution() === 'manual' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.editAttributes" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                      <span>Manual por Cajón</span>
                     </button>
+                  </div>
+                </div>
+
+                @if (drawerDistribution() === 'uniform') {
+                  <div class="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 text-[11px] text-indigo-950 flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 font-medium">
+                      <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+                      <span>Medida de corte de cada frente ({{ drawersCount() }} iguales):</span>
+                    </div>
+                    <strong class="font-mono text-indigo-700 font-bold text-xs">
+                      {{ drawerFrontCutWidth() }} × {{ uniformDrawerFrontHeight() }} mm
+                    </strong>
+                  </div>
+                } @else {
+                  <!-- Modo Manual: Inputs de altura de frente para cada cajón -->
+                  <div class="space-y-2 pt-1 border-t border-slate-100">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[11px] text-slate-500 font-medium">
+                        Altura de frente individual por cajón (de abajo hacia arriba):
+                      </span>
+                      @if (drawersCount() > 1 && (doorOpening() === 'none' || activePreset() === 'drawer_unit')) {
+                        <button
+                          type="button"
+                          (click)="balanceRemainingDrawerHeight()"
+                          class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded border border-indigo-200 transition cursor-pointer">
+                          Ajustar último al hueco
+                        </button>
+                      }
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      @for (d of effectiveDrawersList(); track d.index) {
+                        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
+                          <div>
+                            <span class="text-xs font-bold text-slate-700 block">
+                              Cajón {{ d.index }} {{ d.index === 1 ? '(Inf)' : (d.index === drawersCount() ? '(Sup)' : '') }}
+                            </span>
+                            <span class="text-[10px] text-slate-400 font-mono">Caja int: {{ d.boxHeight }} mm</span>
+                          </div>
+                          <div class="relative w-24">
+                            <input
+                              type="number"
+                              [value]="d.frontHeight"
+                              (input)="updateManualDrawerHeight(d.index - 1, +$any($event.target).value)"
+                              min="60"
+                              max="600"
+                              step="5"
+                              class="w-full pr-6 pl-2 py-1 text-xs font-mono font-bold bg-white border border-slate-200 rounded text-right focus:border-indigo-500 focus:outline-hidden" />
+                            <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">mm</span>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <!-- Tipo de corredera y espesor de frente -->
+                <div class="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span class="block text-[11px] font-bold text-slate-700 mb-1">Sistema de Corredera:</span>
+                    <select
+                      [value]="slideType()"
+                      (change)="slideType.set($any($event.target).value)"
+                      class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                      <option value="telescopic">Telescópica Extracción Total (13mm/lado)</option>
+                      <option value="undermount">Oculta Cierre Suave Tandém</option>
+                      <option value="roller">Corredera Simple de Rodillo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <span class="block text-[11px] font-bold text-slate-700 mb-1">Espesor Frentes de Cajón:</span>
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        (click)="doorThickness.set(15)"
+                        [class]="doorThickness() === 15 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                        class="flex-1 py-1.5 rounded-md font-mono text-xs transition cursor-pointer">
+                        15 mm
+                      </button>
+                      <button
+                        type="button"
+                        (click)="doorThickness.set(18)"
+                        [class]="doorThickness() === 18 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                        class="flex-1 py-1.5 rounded-md font-mono text-xs transition cursor-pointer">
+                        18 mm
+                      </button>
+                    </div>
                   </div>
                 </div>
               }
             </div>
 
-            <!-- 4. Manijas y Tiradores (visible si tiene puerta) -->
-            @if (doorOpening() !== 'none') {
+            <!-- 4. Configuración de Puertas (Opcional en Cajonera o combinada en otros módulos) -->
+            @if (activePreset() !== 'drawer_unit') {
+              <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                  <span>Configuración de Puertas</span>
+                </span>
+
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+
+                  <!-- Sin Puerta -->
+                  <button
+                    type="button"
+                    (click)="doorOpening.set('none')"
+                    [class]="doorOpening() === 'none' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                    class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
+                    <hugeicons-icon [icon]="icons.squareShape" [size]="17" [strokeWidth]="1.9" [class.text-indigo-600]="doorOpening() === 'none'"></hugeicons-icon>
+                    <span class="text-[11px] font-bold">Sin Puerta</span>
+                    <span class="text-[9px] text-slate-400">Abierto / Cajones</span>
+                  </button>
+
+                  <!-- Abre Izquierda -->
+                  <button
+                    type="button"
+                    (click)="doorOpening.set('left')"
+                    [class]="doorOpening() === 'left' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                    class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
+                    <hugeicons-icon [icon]="icons.arrowLeft" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'left'"></hugeicons-icon>
+                    <span class="text-[11px] font-bold">1 Puerta</span>
+                    <span class="text-[9px] text-slate-400">Abre Izq</span>
+                  </button>
+
+                  <!-- Abre Derecha -->
+                  <button
+                    type="button"
+                    (click)="doorOpening.set('right')"
+                    [class]="doorOpening() === 'right' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                    class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
+                    <hugeicons-icon [icon]="icons.arrowRight" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'right'"></hugeicons-icon>
+                    <span class="text-[11px] font-bold">1 Puerta</span>
+                    <span class="text-[9px] text-slate-400">Abre Der</span>
+                  </button>
+
+                  <!-- Doble Puerta -->
+                  <button
+                    type="button"
+                    (click)="doorOpening.set('double')"
+                    [class]="doorOpening() === 'double' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                    class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
+                    <hugeicons-icon [icon]="icons.doubleArrows" [size]="17" [strokeWidth]="1.9" [class.text-indigo-600]="doorOpening() === 'double'"></hugeicons-icon>
+                    <span class="text-[11px] font-bold">2 Puertas</span>
+                    <span class="text-[9px] text-slate-400">Dobles</span>
+                  </button>
+
+                  <!-- Elevable Gas -->
+                  <button
+                    type="button"
+                    (click)="doorOpening.set('top')"
+                    [class]="doorOpening() === 'top' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                    class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer col-span-2 sm:col-span-1">
+                    <hugeicons-icon [icon]="icons.arrowUp" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'top'"></hugeicons-icon>
+                    <span class="text-[11px] font-bold">Elevable</span>
+                    <span class="text-[9px] text-slate-400">Pistón Gas</span>
+                  </button>
+                </div>
+
+                @if (doorOpening() !== 'none' && drawersCount() === 0) {
+                  <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-700">Espesor Puerta(s):</span>
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        (click)="doorThickness.set(15)"
+                        [class]="doorThickness() === 15 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                        class="px-2.5 py-1 rounded-md font-mono text-xs transition cursor-pointer">
+                        15 mm
+                      </button>
+                      <button
+                        type="button"
+                        (click)="doorThickness.set(18)"
+                        [class]="doorThickness() === 18 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                        class="px-2.5 py-1 rounded-md font-mono text-xs transition cursor-pointer">
+                        18 mm
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- 5. Manijas y Tiradores (visible si tiene puerta o cajones) -->
+            @if (doorOpening() !== 'none' || drawersCount() > 0) {
               <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
@@ -393,7 +590,7 @@
                       class="sr-only peer" />
                     <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                     <span class="ml-2 text-xs font-semibold text-slate-700">
-                      {{ hasHandle() ? 'Con Manija' : 'Sin Manija (Push)' }}
+                      {{ hasHandle() ? 'Con Manija' : 'Sin Manija (Push / Gola)' }}
                     </span>
                   </label>
                 </div>
@@ -439,9 +636,9 @@
                         [value]="handlePosition()"
                         (change)="handlePosition.set($any($event.target).value)"
                         class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                        <option value="horizontal">Horizontal (Centrado)</option>
                         <option value="vertical">Vertical</option>
-                        <option value="horizontal">Horizontal</option>
-                        <option value="centered">Centrado</option>
+                        <option value="centered">Pomo / Centro</option>
                       </select>
                     </div>
                   </div>
@@ -449,101 +646,103 @@
               </div>
             }
 
-            <!-- 5. Entrepaños y Repisas (Uniforme vs Manual) -->
-            <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.tableRows" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
-                  <span>Entrepaños / Repisas</span>
-                </span>
-
-                <!-- Stepper de cantidad -->
-                <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                  <button
-                    type="button"
-                    (click)="setShelvesCount(shelvesCount() - 1)"
-                    [disabled]="shelvesCount() <= 0"
-                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
-                    -
-                  </button>
-                  <span class="text-xs font-mono font-bold px-2 text-slate-900">
-                    {{ shelvesCount() }} {{ shelvesCount() === 1 ? 'entrepaño' : 'entrepaños' }}
+            <!-- 6. Entrepaños y Repisas (Oculto cuando es Cajonera pura sin espacio de puertas) -->
+            @if (activePreset() !== 'drawer_unit') {
+              <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.tableRows" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                    <span>Entrepaños / Repisas Interiores</span>
                   </span>
-                  <button
-                    type="button"
-                    (click)="setShelvesCount(shelvesCount() + 1)"
-                    [disabled]="shelvesCount() >= 8"
-                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
-                    +
-                  </button>
-                </div>
-              </div>
 
-              @if (shelvesCount() > 0) {
-                <!-- Selector Distribución: Uniforme vs Manual -->
-                <div class="flex items-center gap-2 pt-1">
-                  <span class="text-xs text-slate-500 font-medium">Distribución:</span>
-                  <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs">
+                  <!-- Stepper de cantidad -->
+                  <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
                     <button
                       type="button"
-                      (click)="setShelfDistribution('uniform')"
-                      [class]="shelfDistribution() === 'uniform' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
-                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
-                      <hugeicons-icon [icon]="icons.equalizer" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                      <span>Uniforme Automática</span>
+                      (click)="setShelvesCount(shelvesCount() - 1)"
+                      [disabled]="shelvesCount() <= 0"
+                      class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
+                      -
                     </button>
-                    <button
-                      type="button"
-                      (click)="setShelfDistribution('manual')"
-                      [class]="shelfDistribution() === 'manual' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
-                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
-                      <hugeicons-icon [icon]="icons.editAttributes" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                      <span>Ajuste Manual</span>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Detalle de distribución -->
-                @if (shelfDistribution() === 'uniform') {
-                  <div class="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 text-[11px] text-indigo-900 flex items-center justify-between">
-                    <div class="flex items-center gap-1.5 font-medium">
-                      <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
-                      <span>Luz libre uniforme entre cada nivel:</span>
-                    </div>
-                    <strong class="font-mono text-indigo-700 font-bold text-xs">
-                      {{ uniformShelfGap() }} mm
-                    </strong>
-                  </div>
-                } @else {
-                  <!-- Modo Manual: Inputs de cota por cada entrepaño -->
-                  <div class="space-y-2 pt-1 border-t border-slate-100">
-                    <span class="text-[11px] text-slate-500 font-medium block">
-                      Indica la cota exacta (altura en mm desde la base interior del mueble):
+                    <span class="text-xs font-mono font-bold px-2 text-slate-900">
+                      {{ shelvesCount() }} {{ shelvesCount() === 1 ? 'entrepaño' : 'entrepaños' }}
                     </span>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      @for (s of effectiveShelvesList(); track s.index) {
-                        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
-                          <span class="text-xs font-bold text-slate-700">Entrepaño {{ s.index }}:</span>
-                          <div class="relative w-24">
-                            <input
-                              type="number"
-                              [value]="s.offset"
-                              (input)="updateManualShelfOffset(s.index - 1, +$any($event.target).value)"
-                              min="30"
-                              [max]="innerHeight() - 30"
-                              step="5"
-                              class="w-full pr-6 pl-2 py-1 text-xs font-mono font-bold bg-white border border-slate-200 rounded text-right focus:border-indigo-500 focus:outline-hidden" />
-                            <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">mm</span>
-                          </div>
-                        </div>
-                      }
+                    <button
+                      type="button"
+                      (click)="setShelvesCount(shelvesCount() + 1)"
+                      [disabled]="shelvesCount() >= 8"
+                      class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                @if (shelvesCount() > 0) {
+                  <!-- Selector Distribución: Uniforme vs Manual -->
+                  <div class="flex items-center gap-2 pt-1">
+                    <span class="text-xs text-slate-500 font-medium">Distribución:</span>
+                    <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs">
+                      <button
+                        type="button"
+                        (click)="setShelfDistribution('uniform')"
+                        [class]="shelfDistribution() === 'uniform' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                        class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.equalizer" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span>Uniforme Automática</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setShelfDistribution('manual')"
+                        [class]="shelfDistribution() === 'manual' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                        class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.editAttributes" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span>Ajuste Manual</span>
+                      </button>
                     </div>
                   </div>
-                }
-              }
-            </div>
 
-            <!-- 6. Fondo Trasero MDF 3mm -->
+                  <!-- Detalle de distribución -->
+                  @if (shelfDistribution() === 'uniform') {
+                    <div class="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 text-[11px] text-indigo-900 flex items-center justify-between">
+                      <div class="flex items-center gap-1.5 font-medium">
+                        <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+                        <span>Luz libre uniforme entre cada nivel:</span>
+                      </div>
+                      <strong class="font-mono text-indigo-700 font-bold text-xs">
+                        {{ uniformShelfGap() }} mm
+                      </strong>
+                    </div>
+                  } @else {
+                    <!-- Modo Manual: Inputs de cota por cada entrepaño -->
+                    <div class="space-y-2 pt-1 border-t border-slate-100">
+                      <span class="text-[11px] text-slate-500 font-medium block">
+                        Indica la cota exacta (altura en mm desde la base interior del mueble):
+                      </span>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        @for (s of effectiveShelvesList(); track s.index) {
+                          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
+                            <span class="text-xs font-bold text-slate-700">Entrepaño {{ s.index }}:</span>
+                            <div class="relative w-24">
+                              <input
+                                type="number"
+                                [value]="s.offset"
+                                (input)="updateManualShelfOffset(s.index - 1, +$any($event.target).value)"
+                                min="30"
+                                [max]="innerHeight() - 30"
+                                step="5"
+                                class="w-full pr-6 pl-2 py-1 text-xs font-mono font-bold bg-white border border-slate-200 rounded text-right focus:border-indigo-500 focus:outline-hidden" />
+                              <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">mm</span>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+                }
+              </div>
+            }
+
+            <!-- 7. Fondo Trasero MDF 3mm -->
             <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs flex items-center justify-between">
               <div>
                 <span class="text-xs font-bold text-slate-800 block">Fondo Trasero (MDF 3mm)</span>
@@ -562,7 +761,7 @@
               </label>
             </div>
 
-            <!-- 7. Materiales & Acabados Iniciales -->
+            <!-- 8. Materiales & Acabados Iniciales -->
             <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
               <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <hugeicons-icon [icon]="icons.palette" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
@@ -572,7 +771,7 @@
               <!-- Selector Material Estructura -->
               <div>
                 <span class="block text-[11px] font-bold text-slate-700 mb-1.5">
-                  Material de la Estructura (Laterales, Piso, Techo, Repisas):
+                  Material de la Estructura (Laterales, Piso, Techo, Cajas):
                 </span>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   @for (mat of materials(); track mat.id) {
@@ -593,11 +792,11 @@
                 </div>
               </div>
 
-              <!-- Material Puerta -->
-              @if (doorOpening() !== 'none') {
+              <!-- Material Puertas y Frentes de Cajón -->
+              @if (doorOpening() !== 'none' || drawersCount() > 0) {
                 <div class="pt-2 border-t border-slate-100 space-y-2">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-700">Material de las Puertas:</span>
+                    <span class="text-xs font-bold text-slate-700">Material de Frentes y Puertas:</span>
                     <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
                       <input
                         type="checkbox"
@@ -661,61 +860,103 @@
                   <!-- Espesor interior de laterales y tapas -->
                   <rect x="30" y="25" width="140" height="190" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
 
-                  <!-- Entrepaños / Repisas calculadas -->
-                  @for (s of effectiveShelvesList(); track s.index) {
-                    @let shelfSvgY = 215 - (190 * (s.percentage / 100));
-                    <line x1="30" [attr.y1]="shelfSvgY" x2="170" [attr.y2]="shelfSvgY" stroke="#64748b" stroke-width="3" />
+                  <!-- Zócalo inferior si está activo -->
+                  @if (hasPlinth()) {
+                    @let plinthSvgH = Math.max(8, Math.min(40, (effectivePlinthHeight() / height()) * 200));
+                    <rect
+                      x="27"
+                      [attr.y]="220 - plinthSvgH"
+                      width="146"
+                      [attr.height]="plinthSvgH"
+                      fill="#e2e8f0"
+                      stroke="#64748b"
+                      stroke-width="1.5" />
                   }
 
-                  <!-- Fachada / Puertas -->
-                  @if (doorOpening() === 'left') {
-                    <!-- 1 Puerta completa (Abre Izq) -->
-                    <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <!-- Líneas punteadas de abatimiento (Vértice en la derecha) -->
-                    <line x1="27" y1="22" x2="173" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <line x1="27" y1="218" x2="173" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <!-- Bisagras a la izquierda -->
-                    <rect x="23" y="38" width="4" height="14" fill="#0284c7" rx="1" />
-                    <rect x="23" y="188" width="4" height="14" fill="#0284c7" rx="1" />
-                    <!-- Manija a la derecha -->
-                    @if (hasHandle()) {
-                      <rect x="162" y="105" width="4" height="28" fill="#1e293b" rx="1" />
+                  <!-- Entrepaños / Repisas calculadas -->
+                  @if (activePreset() !== 'drawer_unit') {
+                    @for (s of effectiveShelvesList(); track s.index) {
+                      @let shelfSvgY = 215 - (190 * (s.percentage / 100));
+                      <line x1="30" [attr.y1]="shelfSvgY" x2="170" [attr.y2]="shelfSvgY" stroke="#64748b" stroke-width="3" />
                     }
-                  } @else if (doorOpening() === 'right') {
-                    <!-- 1 Puerta completa (Abre Der) -->
-                    <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <!-- Líneas punteadas de abatimiento (Vértice en la izquierda) -->
-                    <line x1="173" y1="22" x2="27" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <line x1="173" y1="218" x2="27" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <!-- Bisagras a la derecha -->
-                    <rect x="173" y="38" width="4" height="14" fill="#0284c7" rx="1" />
-                    <rect x="173" y="188" width="4" height="14" fill="#0284c7" rx="1" />
-                    <!-- Manija a la izquierda -->
+                  }
+
+                  <!-- Frentes de Cajones Corredizos -->
+                  @for (d of effectiveDrawersList(); track d.index) {
+                    @let dSvgH = Math.max(12, (d.heightPct / 100) * 196 - 1.5);
+                    @let dSvgY = 218 - ((d.bottomPct + d.heightPct) / 100) * 196;
+                    <rect
+                      x="27"
+                      [attr.y]="dSvgY"
+                      width="146"
+                      [attr.height]="dSvgH"
+                      fill="rgba(79, 70, 229, 0.12)"
+                      stroke="#4f46e5"
+                      stroke-width="1.6"
+                      rx="1.5" />
                     @if (hasHandle()) {
-                      <rect x="34" y="105" width="4" height="28" fill="#1e293b" rx="1" />
+                      <rect
+                        x="86"
+                        [attr.y]="dSvgY + (dSvgH / 2) - 2"
+                        width="28"
+                        height="3.5"
+                        fill="#1e293b"
+                        rx="1" />
                     }
-                  } @else if (doorOpening() === 'double') {
-                    <!-- 2 Puertas Dobles (Puerta Izquierda y Derecha) -->
-                    <rect x="27" y="22" width="71" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <rect x="102" y="22" width="71" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <!-- Abatimiento puerta izq -->
-                    <line x1="27" y1="22" x2="98" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                    <line x1="27" y1="218" x2="98" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                    <!-- Abatimiento puerta der -->
-                    <line x1="173" y1="22" x2="102" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                    <line x1="173" y1="218" x2="102" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                    <!-- Manijas en el centro -->
-                    @if (hasHandle()) {
-                      <rect x="91" y="105" width="3" height="26" fill="#1e293b" rx="1" />
-                      <rect x="106" y="105" width="3" height="26" fill="#1e293b" rx="1" />
-                    }
-                  } @else if (doorOpening() === 'top') {
-                    <!-- 1 Puerta Elevable Superior -->
-                    <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <line x1="27" y1="22" x2="100" y2="218" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <line x1="173" y1="22" x2="100" y2="218" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    @if (hasHandle()) {
-                      <rect x="85" y="206" width="30" height="4" fill="#1e293b" rx="1" />
+                    <text
+                      x="166"
+                      [attr.y]="dSvgY + (dSvgH / 2) + 3"
+                      font-size="7.5"
+                      font-family="monospace"
+                      font-weight="bold"
+                      fill="#4338ca"
+                      text-anchor="end">
+                      {{ d.frontHeight }}mm
+                    </text>
+                  }
+
+                  <!-- Fachada / Puertas (en el área libre de cajones) -->
+                  @if (activePreset() !== 'drawer_unit' && doorOpening() !== 'none') {
+                    @let drawersSvgSpan = (effectiveDrawersList().length > 0)
+                      ? ((effectiveDrawersList().length * uniformDrawerFrontHeight()) / height()) * 196
+                      : 0;
+                    @let isTopDrw = activePreset() === 'kitchen_base';
+                    @let doorSvgY = isTopDrw ? (22 + drawersSvgSpan) : 22;
+                    @let doorSvgH = Math.max(30, 196 - drawersSvgSpan - (hasPlinth() ? (effectivePlinthHeight() / height()) * 196 : 0));
+                    @let doorMidY = doorSvgY + doorSvgH / 2;
+
+                    @if (doorOpening() === 'left') {
+                      <rect x="27" [attr.y]="doorSvgY" width="146" [attr.height]="doorSvgH" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <line x1="27" [attr.y1]="doorSvgY" x2="173" [attr.y2]="doorMidY" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="27" [attr.y1]="doorSvgY + doorSvgH" x2="173" [attr.y2]="doorMidY" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      @if (hasHandle()) {
+                        <rect x="162" [attr.y]="doorMidY - 14" width="4" height="28" fill="#1e293b" rx="1" />
+                      }
+                    } @else if (doorOpening() === 'right') {
+                      <rect x="27" [attr.y]="doorSvgY" width="146" [attr.height]="doorSvgH" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <line x1="173" [attr.y1]="doorSvgY" x2="27" [attr.y2]="doorMidY" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="173" [attr.y1]="doorSvgY + doorSvgH" x2="27" [attr.y2]="doorMidY" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      @if (hasHandle()) {
+                        <rect x="34" [attr.y]="doorMidY - 14" width="4" height="28" fill="#1e293b" rx="1" />
+                      }
+                    } @else if (doorOpening() === 'double') {
+                      <rect x="27" [attr.y]="doorSvgY" width="71" [attr.height]="doorSvgH" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <rect x="102" [attr.y]="doorSvgY" width="71" [attr.height]="doorSvgH" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <line x1="27" [attr.y1]="doorSvgY" x2="98" [attr.y2]="doorMidY" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <line x1="27" [attr.y1]="doorSvgY + doorSvgH" x2="98" [attr.y2]="doorMidY" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <line x1="173" [attr.y1]="doorSvgY" x2="102" [attr.y2]="doorMidY" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <line x1="173" [attr.y1]="doorSvgY + doorSvgH" x2="102" [attr.y2]="doorMidY" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      @if (hasHandle()) {
+                        <rect x="91" [attr.y]="doorMidY - 13" width="3" height="26" fill="#1e293b" rx="1" />
+                        <rect x="106" [attr.y]="doorMidY - 13" width="3" height="26" fill="#1e293b" rx="1" />
+                      }
+                    } @else if (doorOpening() === 'top') {
+                      <rect x="27" [attr.y]="doorSvgY" width="146" [attr.height]="doorSvgH" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <line x1="27" [attr.y1]="doorSvgY" x2="100" [attr.y2]="doorSvgY + doorSvgH" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="173" [attr.y1]="doorSvgY" x2="100" [attr.y2]="doorSvgY + doorSvgH" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      @if (hasHandle()) {
+                        <rect x="85" [attr.y]="doorSvgY + doorSvgH - 12" width="30" height="4" fill="#1e293b" rx="1" />
+                      }
                     }
                   }
 
@@ -736,8 +977,13 @@
                   <strong class="text-slate-800 font-bold">{{ innerWidth() }} × {{ innerHeight() }} × {{ innerDepth() }} mm</strong>
                 </div>
                 <div class="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                  <span class="text-slate-400 block font-sans text-[10px]">Corte Puerta(s):</span>
-                  @if (doorOpening() !== 'none') {
+                  @if (drawersCount() > 0) {
+                    <span class="text-slate-400 block font-sans text-[10px]">Frente(s) Cajón:</span>
+                    <strong class="text-indigo-600 font-bold">
+                      {{ drawerFrontCutWidth() }} × {{ uniformDrawerFrontHeight() }} mm (×{{ drawersCount() }})
+                    </strong>
+                  } @else if (doorOpening() !== 'none') {
+                    <span class="text-slate-400 block font-sans text-[10px]">Corte Puerta(s):</span>
                     <strong class="text-indigo-600 font-bold">
                       {{ doorCutWidth() }} × {{ doorCutHeight() }} mm
                       @if (doorOpening() === 'double') {
@@ -745,7 +991,8 @@
                       }
                     </strong>
                   } @else {
-                    <strong class="text-slate-400 font-bold">Sin puertas</strong>
+                    <span class="text-slate-400 block font-sans text-[10px]">Fachada:</span>
+                    <strong class="text-slate-400 font-bold">Módulo Abierto</strong>
                   }
                 </div>
               </div>
@@ -755,9 +1002,9 @@
             <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 flex items-start gap-2.5">
               <hugeicons-icon [icon]="icons.lightbulb" [size]="16" [strokeWidth]="2" class="text-amber-600 shrink-0 mt-0.5"></hugeicons-icon>
               <div>
-                <strong class="font-bold text-amber-950 block">Edición post-creación:</strong>
+                <strong class="font-bold text-amber-950 block">Re-edición completa en 3D:</strong>
                 <p class="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
-                  Al pulsar "Crear Módulo", todas las piezas se insertarán en 3D ensambladas y agrupadas. Podrás cambiar el material o color del mueble completo o de piezas individuales en cualquier momento desde el inspector.
+                  El mueble o cajonera se crea como un <strong>único módulo agrupado</strong> sin solapamientos. En cualquier momento podrás darle <strong>clic derecho → Editar Módulo</strong> o usar el botón <strong>Editar Módulo</strong> de la cinta superior para agregar/quitar cajones o ajustar medidas.
                 </p>
               </div>
             </div>
@@ -954,21 +1201,37 @@
                   </div>
 
                   <!-- Acciones de tarjeta -->
-                  <div class="px-4 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      (click)="onSelectTemplate(tpl, 'append')"
-                      class="py-1.5 px-3 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg flex items-center gap-1.5 transition cursor-pointer">
-                      <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.2" class="shrink-0"></hugeicons-icon>
-                      <span>Añadir</span>
-                    </button>
-                    <button
-                      type="button"
-                      (click)="onSelectTemplate(tpl, 'replace')"
-                      class="py-1.5 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
-                      <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                      <span>Cargar en 3D</span>
-                    </button>
+                  <div class="px-4 py-3 border-t border-slate-100 bg-slate-50/60 flex flex-wrap items-center justify-between gap-2">
+                    @if (tpl.parametricConfig) {
+                      <button
+                        type="button"
+                        (click)="onConfigureTemplate(tpl)"
+                        class="py-1.5 px-2.5 text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                        title="Personalizar medidas, cajones, alturas y manijas en el Asistente antes de crear">
+                        <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span>Configurar en Asistente</span>
+                      </button>
+                    } @else {
+                      <span></span>
+                    }
+                    <div class="flex items-center gap-1.5 ml-auto">
+                      <button
+                        type="button"
+                        (click)="onSelectTemplate(tpl, 'append')"
+                        class="py-1.5 px-2.5 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                        title="Añadir como módulo agrupado sin borrar el diseño actual">
+                        <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.2" class="shrink-0"></hugeicons-icon>
+                        <span>Añadir</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="onSelectTemplate(tpl, 'replace')"
+                        class="py-1.5 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+                        title="Cargar en 3D como un único módulo agrupado y editable">
+                        <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span>Cargar en 3D</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               }

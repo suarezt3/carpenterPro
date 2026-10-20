@@ -45,20 +45,37 @@ export class TemplatesCatalogService {
     carcassInnerWidth: number,
     availableDepth: number,
     posX: number,
-    posY: number,
-    posZ: number,
+    frontCenterY: number,
+    frontCenterZ: number,
+    slotMinY: number,
+    slotMaxY: number,
     matFront: { id: string; name: string; thickness: number },
     matBody: { id: string; name: string; thickness: number },
     matBottom: { id: string; name: string; thickness: number },
     t = 18
   ): Part[] {
     const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
-    const targetDepth = availableDepth - 35;
+    const targetDepth = availableDepth - 25;
     const slideLength = standardLengths.filter(l => l <= targetDepth).pop() || 400;
-    const boxHeight = Math.max(90, Math.min(Math.floor(frontHeight * 0.70), 180));
-    const boxClearancePerSide = 12.7; // 1/2" side clearance for telescopic slides
-    const boxOuterWidth = carcassInnerWidth - (boxClearancePerSide * 2);
-    const boxInnerWidth = boxOuterWidth - (t * 2);
+
+    const bottomT = Math.min(6, matBottom.thickness || 3);
+    const boxSideT = Math.min(t, 15);
+    const availableSlotH = Math.max(60, slotMaxY - slotMinY);
+    const boxHeight = Math.max(55, Math.min(180, availableSlotH - bottomT - 6));
+
+    const boxClearancePerSide = 13; // 13mm side clearance per side for telescopic slides (26mm total)
+    const boxOuterWidth = carcassInnerWidth - boxClearancePerSide * 2;
+    const boxInnerWidth = boxOuterWidth - boxSideT * 2;
+
+    const boxBottomCenterY = slotMinY + bottomT / 2;
+    const boxSidesCenterY = slotMinY + bottomT + boxHeight / 2;
+
+    // Box starts 2mm behind the back face of the front facade so there is zero overlap
+    const boxFrontEdgeZ = frontCenterZ - t / 2 - 2;
+    const boxCenterZ = boxFrontEdgeZ - slideLength / 2;
+    const boxInnerFrontCenterZ = boxFrontEdgeZ - boxSideT / 2;
+    const boxRearCenterZ = boxFrontEdgeZ - slideLength + boxSideT / 2;
+
     const uid = crypto.randomUUID().slice(0, 6);
 
     return [
@@ -75,8 +92,8 @@ export class TemplatesCatalogService {
         grain: 'length',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
         posX,
-        posY,
-        posZ,
+        posY: frontCenterY,
+        posZ: frontCenterZ,
         orientation: 'vertical_xy',
         componentRole: 'drawer_front',
         hardwareConfig: {
@@ -94,15 +111,15 @@ export class TemplatesCatalogService {
         name: `${drawerName} - Lateral Izquierdo`,
         length: slideLength,
         width: boxHeight,
-        thickness: t,
+        thickness: boxSideT,
         quantity: 1,
         materialId: matBody.id,
         materialName: matBody.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: posX - (boxOuterWidth / 2) + (t / 2),
-        posY: posY - ((frontHeight - boxHeight) * 0.15),
-        posZ: posZ - (t / 2) - (slideLength / 2),
+        posX: posX - boxOuterWidth / 2 + boxSideT / 2,
+        posY: boxSidesCenterY,
+        posZ: boxCenterZ,
         orientation: 'vertical_yz',
         componentRole: 'drawer_box',
         hardwareConfig: {
@@ -118,15 +135,15 @@ export class TemplatesCatalogService {
         name: `${drawerName} - Lateral Derecho`,
         length: slideLength,
         width: boxHeight,
-        thickness: t,
+        thickness: boxSideT,
         quantity: 1,
         materialId: matBody.id,
         materialName: matBody.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: posX + (boxOuterWidth / 2) - (t / 2),
-        posY: posY - ((frontHeight - boxHeight) * 0.15),
-        posZ: posZ - (t / 2) - (slideLength / 2),
+        posX: posX + boxOuterWidth / 2 - boxSideT / 2,
+        posY: boxSidesCenterY,
+        posZ: boxCenterZ,
         orientation: 'vertical_yz',
         componentRole: 'drawer_box',
         hardwareConfig: {
@@ -142,15 +159,15 @@ export class TemplatesCatalogService {
         name: `${drawerName} - Trasera Interior`,
         length: boxInnerWidth,
         width: boxHeight,
-        thickness: t,
+        thickness: boxSideT,
         quantity: 1,
         materialId: matBody.id,
         materialName: matBody.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
         posX,
-        posY: posY - ((frontHeight - boxHeight) * 0.15),
-        posZ: posZ - t - slideLength + (t / 2),
+        posY: boxSidesCenterY,
+        posZ: boxRearCenterZ,
         orientation: 'vertical_xy',
         componentRole: 'drawer_box',
         hardwareConfig: {
@@ -166,15 +183,15 @@ export class TemplatesCatalogService {
         name: `${drawerName} - Contrafrente Interior`,
         length: boxInnerWidth,
         width: boxHeight,
-        thickness: t,
+        thickness: boxSideT,
         quantity: 1,
         materialId: matBody.id,
         materialName: matBody.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
         posX,
-        posY: posY - ((frontHeight - boxHeight) * 0.15),
-        posZ: posZ - t - (t / 2),
+        posY: boxSidesCenterY,
+        posZ: boxInnerFrontCenterZ,
         orientation: 'vertical_xy',
         componentRole: 'drawer_box',
         hardwareConfig: {
@@ -184,21 +201,21 @@ export class TemplatesCatalogService {
           handleType: 'none'
         }
       },
-      // 6. Fondo de Cajón (Tablero MDF)
+      // 6. Fondo de Cajón (Tablero MDF apoyado en la base de la caja sin solapar laterales)
       {
         id: `${drawerIdPrefix}_fondo_${uid}`,
         name: `${drawerName} - Fondo MDF`,
-        length: boxOuterWidth - 10,
-        width: slideLength - 10,
-        thickness: 6,
+        length: boxOuterWidth,
+        width: slideLength,
+        thickness: bottomT,
         quantity: 1,
         materialId: matBottom.id,
         materialName: matBottom.name,
         grain: 'none',
         edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
         posX,
-        posY: posY - (boxHeight / 2) + 8,
-        posZ: posZ - (t / 2) - (slideLength / 2),
+        posY: boxBottomCenterY,
+        posZ: boxCenterZ,
         orientation: 'horizontal',
         componentRole: 'drawer_box',
         hardwareConfig: {
@@ -212,9 +229,7 @@ export class TemplatesCatalogService {
   }
 
   /**
-   * The catalog is restricted to the 2 refined initial templates requested by the user:
-   * 1. Cajonera de 3 Cajones (3 gavetas con despiece de 5 piezas, 1 tirador por frente, correderas en costados)
-   * 2. Módulo Bajo de Cocina con 1 Puerta y Repisa (módulo estándar de 600mm)
+   * The catalog templates include full parametric metadata and zero-overlap 3D assembly.
    */
   readonly templates: FurnitureTemplate[] = [
     // --- 1. CAJONERA DE 3 CAJONES ---
@@ -224,78 +239,111 @@ export class TemplatesCatalogService {
       category: 'cajones',
       categoryLabel: 'Cajoneras',
       dimensions: { width: 600, height: 750, depth: 500 },
-      description: 'Cajonera independiente de 3 gavetas con correderas telescópicas en costados, cajas interiores de 5 piezas y tiradores centrados.',
+      description: 'Cajonera modular de 3 gavetas con correderas telescópicas en costados, cajas interiores de 5 piezas sin solapamientos y tiradores centrados.',
       icon: 'table_rows',
-      badge: '3 Cajones',
-      partsCount: 24, // 6 piezas de mueble + (6 piezas x 3 gavetas) = 24 piezas de despiece
+      badge: '3 Cajones Paramétrica',
+      partsCount: 24,
       previewColor: { top: '#b45309', body: '#f8fafc', front: '#f1f5f9', accent: '#64748b' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'CAJ3GAV001',
+        name: 'Cajonera de 3 Cajones',
+        moduleType: 'drawer_unit',
+        category: 'drawer_unit',
+        width: 600,
+        height: 750,
+        depth: 500,
+        structureThickness: 18,
+        doorThickness: 18,
+        backThickness: 3,
+        backType: 'groove',
+        hasBackPanel: true,
+        shelvesCount: 0,
+        doorOpening: 'none',
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel',
+        handlePosition: 'horizontal',
+        drawersCount: 3,
+        drawerDistribution: 'uniform',
+        slideType: 'telescopic',
+        hasPlinth: true,
+        plinthHeight: 70,
+        facadeGap: 3
+      },
       generateParts: (mats, offsetX = 0) => {
         const matBody = this.getMaterial(mats, 'blanco');
         const matTop = this.getMaterial(mats, 'roble');
         const matBottom = this.getMaterial(mats, 'durolac') || this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_3', name: 'MDF Durolac Blanco', thickness: 3 };
         const t = matBody.thickness || 18;
+        const backT = Math.min(6, matBottom.thickness || 3);
         const width = 600;
         const height = 750;
         const depth = 500;
-        const carcassInnerWidth = width - (2 * t); // 564 mm
-        const carcassDepth = depth - 20; // 480 mm
+        const plinthH = 70;
+        const carcassInnerWidth = width - 2 * t; // 564 mm
+        const carcassDepth = depth - t; // 482 mm
+        const carcassCenterZ = -t / 2;
+        const carcassBackZ = carcassCenterZ - carcassDepth / 2;
+        const carcassFrontZ = carcassCenterZ + carcassDepth / 2;
+        const innerH = height - plinthH - 2 * t;
 
         const carcassParts: Part[] = [
-          // Tapa / Cubierta Superior
+          // Lateral Izquierdo (Altura completa)
+          {
+            id: 'caj3_lat_izq_' + crypto.randomUUID().slice(0, 6),
+            name: 'Lateral Izquierdo',
+            length: height,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX - width / 2 + t / 2,
+            posY: height / 2,
+            posZ: carcassCenterZ,
+            orientation: 'vertical_yz',
+            componentRole: 'side_left'
+          },
+          // Lateral Derecho (Altura completa)
+          {
+            id: 'caj3_lat_der_' + crypto.randomUUID().slice(0, 6),
+            name: 'Lateral Derecho',
+            length: height,
+            width: carcassDepth,
+            thickness: t,
+            quantity: 1,
+            materialId: matBody.id,
+            materialName: matBody.name,
+            grain: 'length',
+            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+            posX: offsetX + width / 2 - t / 2,
+            posY: height / 2,
+            posZ: carcassCenterZ,
+            orientation: 'vertical_yz',
+            componentRole: 'side_right'
+          },
+          // Techo / Tapa Superior (Entre laterales, sin solapar)
           {
             id: 'caj3_tapa_' + crypto.randomUUID().slice(0, 6),
-            name: 'Cubierta Superior',
-            length: width,
-            width: depth,
+            name: 'Techo Superior',
+            length: carcassInnerWidth,
+            width: carcassDepth,
             thickness: t,
             quantity: 1,
             materialId: matTop.id,
             materialName: matTop.name,
             grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            edges: { l1: 'thick', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX,
-            posY: height - (t / 2),
-            posZ: 0,
+            posY: height - t / 2,
+            posZ: carcassCenterZ,
             orientation: 'horizontal',
             componentRole: 'top'
           },
-          // Lateral Izquierdo
-          {
-            id: 'caj3_lat_izq_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Izquierdo',
-            length: height - t,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX - (width / 2) + (t / 2),
-            posY: (height - t) / 2,
-            posZ: 10,
-            orientation: 'vertical_yz',
-            componentRole: 'side_left'
-          },
-          // Lateral Derecho
-          {
-            id: 'caj3_lat_der_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Derecho',
-            length: height - t,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX + (width / 2) - (t / 2),
-            posY: (height - t) / 2,
-            posZ: 10,
-            orientation: 'vertical_yz',
-            componentRole: 'side_right'
-          },
-          // Piso Inferior
+          // Piso Inferior (Sobre zócalo de 70mm, entre laterales)
           {
             id: 'caj3_piso_' + crypto.randomUUID().slice(0, 6),
             name: 'Piso Inferior',
@@ -308,17 +356,17 @@ export class TemplatesCatalogService {
             grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX,
-            posY: 70 + (t / 2), // Sobre zócalo de 70mm
-            posZ: 10,
+            posY: plinthH + t / 2,
+            posZ: carcassCenterZ,
             orientation: 'horizontal',
             componentRole: 'bottom'
           },
-          // Zócalo Frontal
+          // Zócalo Frontal (Debajo del piso inferior, cero solapamiento)
           {
             id: 'caj3_zocalo_' + crypto.randomUUID().slice(0, 6),
             name: 'Zócalo Frontal',
             length: carcassInnerWidth,
-            width: 70,
+            width: plinthH,
             thickness: t,
             quantity: 1,
             materialId: matBody.id,
@@ -326,52 +374,63 @@ export class TemplatesCatalogService {
             grain: 'length',
             edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX,
-            posY: 35,
-            posZ: (carcassDepth / 2) - 15,
+            posY: plinthH / 2,
+            posZ: carcassFrontZ - 15 - t / 2,
             orientation: 'vertical_xy',
             componentRole: 'plinth'
           },
-          // Fondo Trasera MDF
+          // Fondo Trasera MDF (Entre piso y techo, sin solapar)
           {
             id: 'caj3_fondo_mdf_' + crypto.randomUUID().slice(0, 6),
-            name: 'Fondo Trasera MDF',
-            length: carcassInnerWidth,
-            width: height - t - 70,
-            thickness: 6,
+            name: 'Fondo Trasero MDF',
+            length: carcassInnerWidth - 2,
+            width: innerH - 2,
+            thickness: backT,
             quantity: 1,
             materialId: matBottom.id,
             materialName: matBottom.name,
             grain: 'none',
             edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
             posX: offsetX,
-            posY: 70 + ((height - t - 70) / 2),
-            posZ: - (carcassDepth / 2) + 5,
+            posY: plinthH + t + innerH / 2,
+            posZ: carcassBackZ + 15 + backT / 2,
             orientation: 'vertical_xy',
             componentRole: 'back'
           }
         ];
 
-        // 3 Cajones: Altura total útil para frentes = 750 - 70 (zócalo) - 18 (tapa) = 662 mm
-        // 3 frentes de 216 mm con holgura de 3 mm entre frentes
-        const frontWidth = width - 4; // 596 mm (2mm holgura a cada lado)
-        const frontH = 216;
-        const frontZ = (depth / 2) - (t / 2); // Enrasado con frente del mueble
+        // 3 Cajones uniformes cubriendo de zócalo (70mm) a tope (750mm):
+        // Altura disponible de fachada = 750 - 70 - 3 = 677 mm -> 3 frentes de 223 mm con 3 mm de holgura
+        const frontWidth = width - 4; // 596 mm
+        const frontH = 223;
+        const gap = 3;
+        const frontCenterZ = carcassFrontZ + t / 2;
+        const internalAvailableDepth = carcassDepth - 15 - backT;
 
-        const y1 = 70 + (frontH / 2) + 2;        // Gaveta 1 (Inferior)
-        const y2 = y1 + frontH + 4;              // Gaveta 2 (Media)
-        const y3 = y2 + frontH + 4;              // Gaveta 3 (Superior)
+        const b1 = plinthH + 1.5;
+        const b2 = b1 + frontH + gap;
+        const b3 = b2 + frontH + gap;
+
+        const floorTopY = plinthH + t;
+        const roofBottomY = height - t;
 
         const drawer1Parts = this.generateDrawerBoxParts(
-          'caj1', 'Cajón Inferior', frontWidth, frontH, carcassInnerWidth, carcassDepth,
-          offsetX, y1, frontZ, matBody, matBody, matBottom, t
+          'caj1', 'Cajón 1', frontWidth, frontH, carcassInnerWidth, internalAvailableDepth,
+          offsetX, b1 + frontH / 2, frontCenterZ,
+          Math.max(floorTopY + 6, b1 + 8), b1 + frontH - 8,
+          matBody, matBody, matBottom, t
         );
         const drawer2Parts = this.generateDrawerBoxParts(
-          'caj2', 'Cajón Medio', frontWidth, frontH, carcassInnerWidth, carcassDepth,
-          offsetX, y2, frontZ, matBody, matBody, matBottom, t
+          'caj2', 'Cajón 2', frontWidth, frontH, carcassInnerWidth, internalAvailableDepth,
+          offsetX, b2 + frontH / 2, frontCenterZ,
+          b2 + 8, b2 + frontH - 8,
+          matBody, matBody, matBottom, t
         );
         const drawer3Parts = this.generateDrawerBoxParts(
-          'caj3', 'Cajón Superior', frontWidth, frontH, carcassInnerWidth, carcassDepth,
-          offsetX, y3, frontZ, matBody, matBody, matBottom, t
+          'caj3', 'Cajón 3', frontWidth, frontH, carcassInnerWidth, internalAvailableDepth,
+          offsetX, b3 + frontH / 2, frontCenterZ,
+          b3 + 8, Math.min(roofBottomY - 6, b3 + frontH - 8),
+          matBody, matBody, matBottom, t
         );
 
         return [...carcassParts, ...drawer1Parts, ...drawer2Parts, ...drawer3Parts];
@@ -390,6 +449,30 @@ export class TemplatesCatalogService {
       badge: 'Cocina Estándar',
       partsCount: 9,
       previewColor: { top: '#334155', body: '#ffffff', front: '#f8fafc', accent: '#0284c7' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'MBAJ1P001',
+        name: 'Módulo Bajo Cocina 1P',
+        moduleType: 'base_cabinet',
+        category: 'kitchen_base',
+        width: 600,
+        height: 850,
+        depth: 600,
+        structureThickness: 18,
+        doorThickness: 18,
+        backThickness: 3,
+        backType: 'groove',
+        hasBackPanel: true,
+        shelvesCount: 1,
+        doorOpening: 'left',
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel',
+        handlePosition: 'vertical',
+        hasPlinth: true,
+        plinthHeight: 100,
+        facadeGap: 3
+      },
       generateParts: (mats, offsetX = 0) => {
         const matBody = this.getMaterial(mats, 'blanco');
         const matDoor = this.getMaterial(mats, 'blanco');
