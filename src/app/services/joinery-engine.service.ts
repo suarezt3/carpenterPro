@@ -265,42 +265,11 @@ export class JoineryEngineService {
 
   private generateSlideSystem32Holes(drawer: Part3DBounds, allBounds: Part3DBounds[]): DrillHole[] {
     const holes: DrillHole[] = [];
-    const slideType = drawer.part.hardwareConfig?.slideType || 'telescopic';
-    if (slideType === 'none') return holes;
-
-    // Buscar el costado real de la caja del cajón para alinear las perforaciones Sistema 32 con el eje del riel
-    const prefix = drawer.part.id.includes('_frente')
-      ? drawer.part.id.split('_frente')[0]
-      : drawer.part.id.includes('_front')
-        ? drawer.part.id.split('_front')[0]
-        : '';
-
-    const matchingBoxSide = allBounds.find(b => {
-      if (b.part.id === drawer.part.id) return false;
-      const role = b.part.componentRole;
-      if (role === 'side_left' || role === 'side_right' || role === 'divider') return false;
-      if (prefix && b.part.id.startsWith(prefix) && (b.part.id.includes('lat_izq') || b.part.id.includes('lat_der'))) {
-        return true;
-      }
-      return (
-        (role === 'drawer_box' || role === 'drawer_lateral') &&
-        b.part.orientation === 'vertical_yz' &&
-        Math.abs(b.py - drawer.py) < Math.max(90, drawer.sy * 0.65) &&
-        b.minX > drawer.minX &&
-        b.maxX < drawer.maxX
-      );
-    });
-
-    let slideY = matchingBoxSide ? matchingBoxSide.py : drawer.py - drawer.sy * 0.15;
-    if (slideType === 'undermount') {
-      slideY = matchingBoxSide ? matchingBoxSide.minY + 14 : drawer.minY + 14;
-    }
+    const slideY = drawer.py - drawer.sy * 0.15;
 
     const verticalSides = allBounds.filter(
       b =>
         b.part.id !== drawer.part.id &&
-        b.part.componentRole !== 'drawer_box' &&
-        b.part.componentRole !== 'drawer_lateral' &&
         b.sx <= 32 &&
         b.sy >= 150 &&
         drawer.py >= b.minY - 20 &&
@@ -308,11 +277,11 @@ export class JoineryEngineService {
     );
 
     const leftFlank = verticalSides
-      .filter(b => b.maxX <= drawer.minX + 35 && b.maxX >= drawer.minX - 50)
+      .filter(b => b.maxX <= drawer.minX + 30 && b.maxX >= drawer.minX - 50)
       .sort((a, b) => b.maxX - a.maxX)[0];
 
     const rightFlank = verticalSides
-      .filter(b => b.minX >= drawer.maxX - 35 && b.minX <= drawer.maxX + 50)
+      .filter(b => b.minX >= drawer.maxX - 30 && b.minX <= drawer.maxX + 50)
       .sort((a, b) => a.minX - b.minX)[0];
 
     const flanks = [

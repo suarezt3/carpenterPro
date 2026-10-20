@@ -794,14 +794,6 @@
                         <hugeicons-icon [icon]="icons.inbox" [size]="10" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                         <span class="truncate">{{ gName }}</span>
                       </button>
-                      <button
-                        type="button"
-                        (click)="sel.groupId && openEditGroup(sel.groupId, $event)"
-                        class="inline-flex items-center gap-1 px-1.5 py-0.2 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded text-[9px] font-bold transition cursor-pointer shrink-0"
-                        title="Editar dimensiones, cajones o puertas del módulo en el Asistente">
-                        <hugeicons-icon [icon]="icons.tune" [size]="10" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                        <span>Editar Módulo</span>
-                      </button>
                     }
                   </div>
                   <button
@@ -1037,131 +1029,6 @@
                   </div>
                 </div>
               </div>
-
-              <!-- 2.B CORREDERA Y LUZ LATERAL DE CAJÓN (CAJONES PARAMÉTRICOS Y MANUALES) -->
-              @if (selectedEffectiveDrawerFront(); as drawerFront) {
-                <div class="bg-amber-50/70 p-2.5 rounded-xl border border-amber-200/80 space-y-2.5 shadow-2xs">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                      <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
-                      <span>Corredera y Luz Lateral</span>
-                    </span>
-                    <button
-                      type="button"
-                      (click)="toggleSelectedDrawer3DOpen()"
-                      class="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[10px] font-bold flex items-center gap-1 transition shadow-2xs cursor-pointer">
-                      <hugeicons-icon [icon]="isSelectedDrawerOpen() ? icons.doorOpen : icons.doorClosed" [size]="11" [strokeWidth]="2"></hugeicons-icon>
-                      <span>{{ isSelectedDrawerOpen() ? 'Cerrar 3D' : 'Abrir 3D' }}</span>
-                    </button>
-                  </div>
-
-                  <!-- Selector de Tipo de Riel / Corredera -->
-                  <div>
-                    <span class="block text-[10px] font-semibold text-amber-800 mb-1">Tipo de Riel / Corredera</span>
-                    <select
-                      [value]="drawerFront.hardwareConfig?.slideType || 'telescopic'"
-                      (change)="setSelectedDrawerSlideType($any($event.target).value)"
-                      class="w-full px-2.5 py-1.5 bg-white border border-amber-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-hidden focus:border-amber-500">
-                      @for (slide of hardwareCatalog.slideOptions; track slide.id) {
-                        <option [value]="slide.id">
-                          {{ slide.name }} {{ slide.loadCapacityKg ? '(' + slide.loadCapacityKg + ' kg)' : '' }}
-                        </option>
-                      }
-                    </select>
-                  </div>
-
-                  @if ((drawerFront.hardwareConfig?.slideType || 'telescopic') !== 'none') {
-                    <!-- Control de Luz Lateral por Lado (mm) -->
-                    <div class="p-2 bg-white/90 rounded-lg border border-amber-200/70 space-y-1.5">
-                      <div class="flex items-center justify-between">
-                        <div>
-                          <span class="block text-[10px] font-bold text-slate-700">Luz Lateral por Lado (Riel)</span>
-                          <span class="block text-[9px] text-slate-500">
-                            Descuento total a la caja: <strong class="font-mono text-amber-700">{{ ((drawerFront.hardwareConfig?.slideClearancePerSide ?? ((drawerFront.hardwareConfig?.slideType === 'undermount') ? 5 : 13)) * 2).toFixed(1) }} mm</strong>
-                          </span>
-                        </div>
-                        <div class="flex items-center gap-1">
-                          <input
-                            type="number"
-                            min="2"
-                            max="35"
-                            step="0.5"
-                            [value]="drawerFront.hardwareConfig?.slideClearancePerSide ?? ((drawerFront.hardwareConfig?.slideType === 'undermount') ? 5 : 13)"
-                            (change)="setSelectedDrawerSlideClearance($any($event.target).value)"
-                            class="w-14 h-6 px-1.5 bg-amber-50/60 border border-amber-300 rounded text-center text-xs font-black text-amber-900 font-mono focus:outline-hidden focus:border-amber-500" />
-                          <span class="text-[10px] font-mono text-slate-500">mm</span>
-                        </div>
-                      </div>
-
-                      <div class="grid grid-cols-3 gap-1 pt-0.5">
-                        <button
-                          type="button"
-                          (click)="setSelectedDrawerSlideClearance(13)"
-                          [class]="(drawerFront.hardwareConfig?.slideClearancePerSide ?? ((drawerFront.hardwareConfig?.slideType === 'undermount') ? 5 : 13)) === 13 ? 'bg-amber-600 text-white font-bold border-amber-600' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'"
-                          class="py-1 px-1.5 rounded border text-[10px] font-mono transition text-center cursor-pointer">
-                          13 mm (Telesc.)
-                        </button>
-                        <button
-                          type="button"
-                          (click)="setSelectedDrawerSlideClearance(12.7)"
-                          [class]="(drawerFront.hardwareConfig?.slideClearancePerSide ?? 0) === 12.7 ? 'bg-amber-600 text-white font-bold border-amber-600' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'"
-                          class="py-1 px-1.5 rounded border text-[10px] font-mono transition text-center cursor-pointer">
-                          12.7 mm (1/2")
-                        </button>
-                        <button
-                          type="button"
-                          (click)="setSelectedDrawerSlideClearance(5)"
-                          [class]="(drawerFront.hardwareConfig?.slideClearancePerSide ?? ((drawerFront.hardwareConfig?.slideType === 'undermount') ? 5 : 13)) === 5 ? 'bg-amber-600 text-white font-bold border-amber-600' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'"
-                          class="py-1 px-1.5 rounded border text-[10px] font-mono transition text-center cursor-pointer">
-                          5 mm (Oculta)
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Largo Nominal de Riel (útil para cajones manuales) -->
-                    <div class="flex items-center justify-between pt-0.5">
-                      <span class="text-[10px] font-semibold text-amber-800">Largo Nominal de Riel:</span>
-                      <select
-                        [value]="drawerFront.hardwareConfig?.slideLength || 450"
-                        (change)="setSelectedDrawerSlideLength($any($event.target).value)"
-                        class="px-2 py-1 bg-white border border-amber-200 rounded-lg text-[11px] font-mono font-bold text-slate-800 focus:outline-hidden focus:border-amber-500">
-                        <option [value]="250">250 mm</option>
-                        <option [value]="300">300 mm</option>
-                        <option [value]="350">350 mm</option>
-                        <option [value]="400">400 mm</option>
-                        <option [value]="450">450 mm</option>
-                        <option [value]="500">500 mm</option>
-                        <option [value]="550">550 mm</option>
-                      </select>
-                    </div>
-                  }
-
-                  @if (!sel.groupId) {
-                    <div class="pt-1 border-t border-amber-200/60 flex justify-end">
-                      <button
-                        type="button"
-                        (click)="convertSelectedDrawerToFixedPiece()"
-                        class="text-[10px] text-slate-500 hover:text-slate-700 underline cursor-pointer">
-                        Convertir en tablero fijo sin corredera
-                      </button>
-                    </div>
-                  }
-                </div>
-              } @else if (sel.orientation !== 'horizontal' && !sel.groupId && sel.componentRole !== 'side_left' && sel.componentRole !== 'side_right' && sel.componentRole !== 'back') {
-                <!-- Asignación rápida de riel para pieza vertical creada manualmente -->
-                <div class="bg-amber-50/50 p-2 rounded-xl border border-amber-200/70 flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-1.5 min-w-0">
-                    <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
-                    <span class="text-[11px] font-semibold text-slate-700 truncate">¿Es un frente de cajón manual?</span>
-                  </div>
-                  <button
-                    type="button"
-                    (click)="convertSelectedPartToDrawerFront()"
-                    class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] rounded-lg transition shrink-0 shadow-2xs cursor-pointer">
-                    Asignar Riel
-                  </button>
-                </div>
-              }
 
               <!-- 3. MATERIAL MELAMINA Y TAPACANTOS (ACABADO DE LA PIEZA) -->
               <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
@@ -1962,16 +1829,6 @@
                             [class.text-amber-500]="isGroupHidden(grp.id)">
                           </hugeicons-icon>
                           <span class="truncate max-w-24 text-[11px]">{{ grp.name }}</span>
-                        </button>
-
-                        <!-- Botón Editar Módulo en Asistente -->
-                        <button
-                          type="button"
-                          (click)="openEditGroup(grp.id, $event)"
-                          [class]="activeSelectedGroupId() === grp.id ? 'text-white/90 hover:text-white bg-white/15' : 'text-indigo-500 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100'"
-                          class="p-0.5 rounded transition cursor-pointer flex items-center justify-center"
-                          title="Editar cajonera o módulo en el Asistente Paramétrico">
-                          <hugeicons-icon [icon]="icons.tune" [size]="12" [strokeWidth]="2"></hugeicons-icon>
                         </button>
 
                         <!-- Botón Congelar / Descongelar Módulo -->

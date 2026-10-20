@@ -60,8 +60,7 @@ import {
   ApplianceType,
   APPLIANCES_CATALOG_PRESETS,
   APPLIANCE_FINISH_OPTIONS,
-  ParametricCabinetConfig,
-  SlideType
+  ParametricCabinetConfig
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -999,16 +998,13 @@ export class ModuleDesignerComponent {
     const groupParts = this.currentParts().filter(p => p.groupId === event.groupId);
     const sidePart = groupParts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || groupParts[0];
     const topOrBottom = groupParts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
-    const frontPart = groupParts.find(p => p.componentRole === 'door' || p.componentRole === 'drawer_front');
+    const doorPart = groupParts.find(p => p.componentRole === 'door');
 
     const posX = topOrBottom?.posX ?? event.config.posX ?? 0;
-    const sideBottomY = sidePart ? (sidePart.posY ?? (sidePart.length / 2)) - (sidePart.length / 2) : 0;
-    const posY = sideBottomY > 5
-      ? Math.round(sideBottomY + event.config.height / 2)
-      : Math.round(event.config.height / 2);
-    const frontOffsetZ = frontPart ? (Number(frontPart.thickness || event.config.doorThickness || 15) / 2) : 0;
+    const posY = sidePart?.posY ?? event.config.posY;
+    const doorOffsetZ = doorPart ? (Number(doorPart.thickness || event.config.doorThickness || 15) / 2) : 0;
     const posZ = sidePart !== undefined && sidePart.posZ !== undefined
-      ? sidePart.posZ + frontOffsetZ
+      ? sidePart.posZ + doorOffsetZ
       : (event.config.posZ ?? 0);
 
     const finalConfig: ParametricCabinetConfig = {
@@ -1070,250 +1066,6 @@ export class ModuleDesignerComponent {
     const ids = this.selectedPartIds();
     return this.currentParts().filter(p => ids.includes(p.id));
   });
-
-  /**
-   * Si la pieza seleccionada es un frente de cajón o parte de la caja de un cajón (costado, fondo, contrafrente),
-   * resuelve la pieza portadora de la configuración de herraje/corredera (frente del cajón o pieza principal).
-   */
-  readonly selectedEffectiveDrawerFront = computed<Part | null>(() => {
-    const sel = this.selectedPart();
-    if (!sel) return null;
-
-    const isFront =
-      sel.componentRole === 'drawer_front' ||
-      sel.hardwareConfig?.movableType === 'drawer' ||
-      sel.name.toUpperCase().includes('FRENTE CAJ') ||
-      sel.name.toUpperCase().includes('FRENTE DE CAJ');
-    if (isFront) return sel;
-
-    const upper = sel.name.toUpperCase();
-    const isDrawerBoxPiece =
-      sel.componentRole === 'drawer_box' ||
-      upper.includes('CAJÓN') ||
-      upper.includes('CAJON') ||
-      upper.includes('GAVETA') ||
-      upper.includes('CONTRAFRENTE');
-
-    if (!isDrawerBoxPiece) return null;
-
-    const allParts = this.currentParts();
-    const candidates = allParts.filter(
-      p =>
-        (p.componentRole === 'drawer_front' || p.hardwareConfig?.movableType === 'drawer') &&
-        (!sel.groupId || p.groupId === sel.groupId)
-    );
-    if (candidates.length === 0) return sel;
-    if (candidates.length === 1) return candidates[0];
-
-    // Emparejar por prefijo (ej. CAJÓN 2) o por cercanía vertical Y
-    const numMatch = upper.match(/(?:CAJ[ÓO]N|GAVETA)\s*(\d+)/i);
-    if (numMatch) {
-      const idxStr = numMatch[1];
-      const byNum = candidates.find(c => {
-        const m = c.name.toUpperCase().match(/(?:CAJ[ÓO]N|GAVETA)\s*(\d+)/i);
-        return m && m[1] === idxStr;
-      });
-      if (byNum) return byNum;
-    }
-
-    const selY = sel.posY ?? 0;
-    return (
-      [...candidates].sort((a, b) => Math.abs((a.posY ?? 0) - selY) - Math.abs((b.posY ?? 0) - selY))[0] ||
-      sel
-    );
-  });
-
-  readonly isSelectedPartDrawer = computed<boolean>(() => this.selectedEffectiveDrawerFront() !== null);
-
-  convertSelectedPartToDrawerFront() {
-    const sel = this.selectedPart();
-    if (!sel) return;
-    const hw: PartHardwareConfig = {
-      ...(sel.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(sel)),
-      isMovable: true,
-      movableType: 'drawer',
-      slideType: sel.hardwareConfig?.slideType || 'telescopic',
-      slideClearancePerSide: sel.hardwareConfig?.slideClearancePerSide ?? 13,
-      slideLength: sel.hardwareConfig?.slideLength || 400,
-      handleType: sel.hardwareConfig?.handleType || 'bar_modern',
-      handleFinish: sel.hardwareConfig?.handleFinish || 'brushed_steel',
-      handlePosition: 'horizontal'
-    };
-    this.updateSelectedPart({
-      componentRole: 'drawer_front',
-      hardwareConfig: hw
-    });
-    this.showToast('🗄️ Pieza configurada como Frente de Cajón con riel telescópico');
-  }
-
-  convertSelectedDrawerToFixedPiece() {
-    const sel = this.selectedPart();
-    if (!sel) return;
-    this.updateSelectedPart({
-      componentRole: 'free',
-      hardwareConfig: {
-        isMovable: false,
-        movableType: 'none',
-        slideType: 'none',
-        handleType: 'none'
-      }
-    });
-    this.showToast('🪵 Pieza convertida en tablero fijo');
-  }
-
-  setSelectedDrawerSlideType(slideType: SlideType) {
-    const frontPart = this.selectedEffectiveDrawerFront();
-    if (!frontPart) return;
-    const defaultClr = slideType === 'undermount' ? 5 : 13;
-    const hw: PartHardwareConfig = {
-      ...(frontPart.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(frontPart)),
-      isMovable: true,
-      movableType: 'drawer',
-      slideType,
-      slideClearancePerSide: defaultClr
-    };
-    this.applyDrawerHardwareAndClearanceToGroup(frontPart, hw, defaultClr);
-    const slideName = this.hardwareCatalog.getSlideSpec(slideType)?.name || slideType;
-    this.showToast(`🔩 Corredera: ${slideName} (${slideType === 'none' ? 'Sin riel' : `Luz ${defaultClr} mm/lado`})`);
-  }
-
-  setSelectedDrawerSlideClearance(rawClearance: number | string) {
-    const frontPart = this.selectedEffectiveDrawerFront();
-    if (!frontPart) return;
-    const num = Number(rawClearance);
-    if (!Number.isFinite(num)) return;
-    const clamped = Math.max(2, Math.min(35, Math.round(num * 10) / 10));
-    const hw: PartHardwareConfig = {
-      ...(frontPart.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(frontPart)),
-      isMovable: true,
-      movableType: 'drawer',
-      slideType: frontPart.hardwareConfig?.slideType || 'telescopic',
-      slideClearancePerSide: clamped
-    };
-    this.applyDrawerHardwareAndClearanceToGroup(frontPart, hw, clamped);
-    this.showToast(`📏 Luz lateral ajustada a ${clamped} mm por lado (${clamped * 2} mm total)`);
-  }
-
-  setSelectedDrawerSlideLength(rawLength: number | string) {
-    const frontPart = this.selectedEffectiveDrawerFront();
-    if (!frontPart) return;
-    const num = Number(rawLength);
-    if (!Number.isFinite(num) || num < 180) return;
-    const clamped = Math.max(180, Math.min(700, Math.round(num)));
-    const hw: PartHardwareConfig = {
-      ...(frontPart.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(frontPart)),
-      isMovable: true,
-      movableType: 'drawer',
-      slideLength: clamped
-    };
-    this.projectService.updatePart({ ...frontPart, hardwareConfig: hw });
-    this.showToast(`📐 Largo nominal de corredera: ${clamped} mm`);
-  }
-
-  toggleSelectedDrawer3DOpen() {
-    const frontPart = this.selectedEffectiveDrawerFront();
-    if (!frontPart) return;
-    this.viewer3d()?.togglePartOpen(frontPart.id);
-  }
-
-  isSelectedDrawerOpen(): boolean {
-    const frontPart = this.selectedEffectiveDrawerFront();
-    if (!frontPart) return false;
-    return this.viewer3d()?.isPartOpen(frontPart.id) ?? false;
-  }
-
-  private applyDrawerHardwareAndClearanceToGroup(
-    frontPart: Part,
-    hw: PartHardwareConfig,
-    newClearancePerSide: number
-  ) {
-    const allParts = this.currentParts();
-    const updatesList: { partId: string; updates: Partial<Part> }[] = [
-      { partId: frontPart.id, updates: { hardwareConfig: hw } }
-    ];
-
-    // Buscar piezas de la caja de este cajón para recalcular su ancho si existen
-    const upperFront = frontPart.name.toUpperCase();
-    const numMatch = upperFront.match(/(?:CAJ[ÓO]N|GAVETA)\s*(\d+)/i);
-    const drawerNum = numMatch ? numMatch[1] : null;
-    const frontBounds = this.joineryEngine.getPartBounds(frontPart);
-
-    const sameDrawerParts = allParts.filter(p => {
-      if (p.id === frontPart.id) return false;
-      if (frontPart.groupId && p.groupId !== frontPart.groupId) return false;
-      const isBoxRole =
-        p.componentRole === 'drawer_box' ||
-        p.name.toUpperCase().includes('CAJÓN') ||
-        p.name.toUpperCase().includes('CAJON') ||
-        p.name.toUpperCase().includes('GAVETA');
-      if (!isBoxRole) return false;
-      if (drawerNum) {
-        const m = p.name.toUpperCase().match(/(?:CAJ[ÓO]N|GAVETA)\s*(\d+)/i);
-        if (m) return m[1] === drawerNum;
-      }
-      const b = this.joineryEngine.getPartBounds(p);
-      return b.maxY >= frontBounds.minY - 20 && b.minY <= frontBounds.maxY + 20;
-    });
-
-    const sideParts = sameDrawerParts
-      .filter(p => p.orientation === 'vertical_yz')
-      .sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
-
-    if (sideParts.length >= 2 && frontPart.orientation !== 'vertical_yz') {
-      const leftPart = sideParts[0];
-      const rightPart = sideParts[sideParts.length - 1];
-      const leftB = this.joineryEngine.getPartBounds(leftPart);
-      const rightB = this.joineryEngine.getPartBounds(rightPart);
-
-      const oldBoxOuterWidth = rightB.maxX - leftB.minX;
-      const oldClr =
-        frontPart.hardwareConfig?.slideClearancePerSide !== undefined &&
-        Number.isFinite(Number(frontPart.hardwareConfig.slideClearancePerSide))
-          ? Number(frontPart.hardwareConfig.slideClearancePerSide)
-          : frontPart.hardwareConfig?.slideType === 'undermount'
-            ? 5
-            : 13;
-
-      let carcassInnerWidth = oldBoxOuterWidth + 2 * oldClr;
-      let boxCenterX = (leftB.minX + rightB.maxX) / 2;
-
-      const cabinetWalls = allParts.filter(
-        p =>
-          (p.componentRole === 'side_left' || p.componentRole === 'side_right' || p.componentRole === 'divider') &&
-          (!frontPart.groupId || p.groupId === frontPart.groupId)
-      );
-      let leftWallMaxX = -Infinity;
-      let rightWallMinX = Infinity;
-      for (const cw of cabinetWalls) {
-        const wb = this.joineryEngine.getPartBounds(cw);
-        if (wb.maxX <= leftB.minX + 35 && wb.maxX > leftWallMaxX) leftWallMaxX = wb.maxX;
-        if (wb.minX >= rightB.maxX - 35 && wb.minX < rightWallMinX) rightWallMinX = wb.minX;
-      }
-      if (Number.isFinite(leftWallMaxX) && Number.isFinite(rightWallMinX) && rightWallMinX - leftWallMaxX > 120) {
-        carcassInnerWidth = rightWallMinX - leftWallMaxX;
-        boxCenterX = (leftWallMaxX + rightWallMinX) / 2;
-      }
-
-      const sideT = leftPart.thickness || 15;
-      const newBoxOuterWidth = Math.max(100, Math.round((carcassInnerWidth - 2 * newClearancePerSide) * 10) / 10);
-      const newBoxInnerWidth = Math.max(60, Math.round((newBoxOuterWidth - 2 * sideT) * 10) / 10);
-      const halfSpanX = (newBoxOuterWidth - sideT) / 2;
-
-      updatesList.push(
-        { partId: leftPart.id, updates: { posX: Math.round((boxCenterX - halfSpanX) * 10) / 10 } },
-        { partId: rightPart.id, updates: { posX: Math.round((boxCenterX + halfSpanX) * 10) / 10 } }
-      );
-
-      for (const p of sameDrawerParts) {
-        if (p.id === leftPart.id || p.id === rightPart.id) continue;
-        if (p.orientation === 'vertical_xy' || p.orientation === 'horizontal') {
-          updatesList.push({ partId: p.id, updates: { length: newBoxInnerWidth, posX: boxCenterX } });
-        }
-      }
-    }
-
-    this.projectService.updateMultipleParts(updatesList);
-  }
 
   readonly totalAreaM2 = computed(() => {
     const parts = this.currentParts();
@@ -2166,17 +1918,7 @@ export class ModuleDesignerComponent {
           posY: 180,
           posZ: 295,
           orientation: 'vertical_xy',
-          componentRole: 'drawer_front',
-          hardwareConfig: {
-            isMovable: true,
-            movableType: 'drawer',
-            slideType: 'telescopic',
-            slideClearancePerSide: 13,
-            slideLength: 450,
-            handleType: 'bar_modern',
-            handleFinish: 'brushed_steel',
-            handlePosition: 'horizontal'
-          }
+          componentRole: 'drawer_front'
         };
         break;
 
@@ -2254,14 +1996,7 @@ export class ModuleDesignerComponent {
   }
 
   onTemplateSelected(event: { template: FurnitureTemplate; mode: 'replace' | 'append' }) {
-    const createdGroup = this.projectService.loadTemplateFurniture(event.template, event.mode);
-    if (createdGroup) {
-      this.selectEntireGroup(createdGroup.id);
-      this.openGroupCardIds.update(s => new Set(s).add(createdGroup.id));
-      this.activeDockTab.set('catalog');
-      this.showToast(`✨ Módulo "${createdGroup.name}" cargado como conjunto editable`);
-      return;
-    }
+    this.projectService.loadTemplateFurniture(event.template, event.mode);
     const parts = this.currentParts();
     if (parts.length > 0) {
       const top = parts.find(p => p.name.toUpperCase().includes('TECHO') || p.name.toUpperCase().includes('TAPA') || p.name.toUpperCase().includes('ENCIMERA')) || parts[0];

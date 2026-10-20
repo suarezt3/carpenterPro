@@ -865,52 +865,6 @@
                       <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ slide.loadCapacityKg ? slide.loadCapacityKg + 'kg' : '' }}</span>
                     </button>
                   }
-
-                  @if ((frontRef.hardwareConfig?.slideType || 'telescopic') !== 'none') {
-                    <div class="mt-1 pt-1.5 border-t border-slate-100 px-1.5 pb-1 space-y-1.5">
-                      <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Luz lateral / lado</span>
-                        <span class="text-[10px] font-mono font-bold text-sky-700">
-                          {{ frontRef.hardwareConfig?.slideClearancePerSide ?? ((frontRef.hardwareConfig?.slideType === 'undermount') ? 5 : 13) }} mm
-                        </span>
-                      </div>
-                      <div class="flex items-center gap-1">
-                        <button
-                          type="button"
-                          (click)="setContextMenuPartSlideClearance(13)"
-                          [class]="(frontRef.hardwareConfig?.slideClearancePerSide ?? ((frontRef.hardwareConfig?.slideType === 'undermount') ? 5 : 13)) === 13 ? 'bg-sky-600 text-white font-bold border-sky-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'"
-                          class="flex-1 py-0.5 px-1.5 rounded border text-[10px] font-mono transition cursor-pointer"
-                          title="Estándar corredera telescópica (13 mm por lado)">
-                          13mm
-                        </button>
-                        <button
-                          type="button"
-                          (click)="setContextMenuPartSlideClearance(12.7)"
-                          [class]="(frontRef.hardwareConfig?.slideClearancePerSide ?? 0) === 12.7 ? 'bg-sky-600 text-white font-bold border-sky-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'"
-                          class="flex-1 py-0.5 px-1.5 rounded border text-[10px] font-mono transition cursor-pointer"
-                          title="Medida exacta 1/2 pulgada (12.7 mm por lado)">
-                          12.7
-                        </button>
-                        <button
-                          type="button"
-                          (click)="setContextMenuPartSlideClearance(5)"
-                          [class]="(frontRef.hardwareConfig?.slideClearancePerSide ?? ((frontRef.hardwareConfig?.slideType === 'undermount') ? 5 : 13)) === 5 ? 'bg-sky-600 text-white font-bold border-sky-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'"
-                          class="flex-1 py-0.5 px-1.5 rounded border text-[10px] font-mono transition cursor-pointer"
-                          title="Corredera oculta Tandem (5 mm por lado)">
-                          5mm
-                        </button>
-                        <input
-                          type="number"
-                          min="2"
-                          max="35"
-                          step="0.5"
-                          [value]="frontRef.hardwareConfig?.slideClearancePerSide ?? ((frontRef.hardwareConfig?.slideType === 'undermount') ? 5 : 13)"
-                          (change)="setContextMenuPartSlideClearance(+$any($event.target).value)"
-                          class="w-12 px-1 py-0.5 text-center font-mono text-[10px] font-bold bg-slate-50 border border-slate-200 rounded focus:outline-none focus:border-sky-500 text-slate-800"
-                          title="Luz lateral personalizada por lado (mm)" />
-                      </div>
-                    </div>
-                  }
                 </div>
               }
             </div>

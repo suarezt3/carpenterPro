@@ -1,6 +1,0 @@
-{
-  "summary": "Plan de implementación para corregir el posicionamiento 3D y cinemática de rieles de cajones (perfil fijo en mueble + perfil móvil en cajón), asegurar cero solapamiento dentro de la luz lateral, y habilitar el control de luz de corredera tanto en el Asistente Paramétrico como en la pestaña Pieza y menú contextual para cajones manuales.",
-  "updatedAt": "2026-10-20T11:59:14.809340031Z",
-  "requestFeedback": true,
-  "userFacing": true
-}
