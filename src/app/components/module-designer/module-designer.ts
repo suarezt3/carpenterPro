@@ -1490,6 +1490,11 @@ export class ModuleDesignerComponent {
   }
 
   rotateSelectedPart90(axis: 'x' | 'y' | 'z' = 'y') {
+    const groupId = this.activeSelectedGroupId();
+    if (groupId) {
+      this.rotateSelectedGroup(90);
+      return;
+    }
     const sel = this.selectedPart();
     if (!sel) return;
     const viewer = this.viewer3d();
@@ -1504,6 +1509,14 @@ export class ModuleDesignerComponent {
   }
 
   rotateSelectedPart3DAngle(axis: 'x' | 'y' | 'z', delta: number) {
+    if (this.isAnyGroupSelected()) {
+      if (axis === 'y') {
+        this.rotateSelectedGroup(delta > 0 ? 90 : -90);
+      } else {
+        this.showToast('ℹ️ Para inclinar piezas en X/Z, desagrupa el módulo primero');
+      }
+      return;
+    }
     const sel = this.selectedPart();
     if (!sel) return;
     const prop = axis === 'x' ? 'rotationX' : (axis === 'y' ? 'rotationY' : 'rotationZ');
@@ -1514,6 +1527,7 @@ export class ModuleDesignerComponent {
   }
 
   setPartRotationAngle(axis: 'x' | 'y' | 'z', angle: number) {
+    if (this.isAnyGroupSelected()) return;
     const sel = this.selectedPart();
     if (!sel || isNaN(angle)) return;
     const normAngle = ((Math.round(angle) % 360) + 360) % 360;
@@ -1522,6 +1536,11 @@ export class ModuleDesignerComponent {
   }
 
   resetSelectedPartRotation() {
+    if (this.isAnyGroupSelected()) {
+      this.setGroupFaceDirection('front');
+      this.showToast('↺ Orientación del módulo restablecida al frente');
+      return;
+    }
     this.updateSelectedPart({ rotationX: 0, rotationY: 0, rotationZ: 0 });
     this.showToast('↺ Rotación restablecida a 0°');
   }
@@ -1626,6 +1645,10 @@ export class ModuleDesignerComponent {
   }
 
   duplicateSelectedPart() {
+    if (this.isAnyGroupSelected()) {
+      this.duplicateSelectedGroup();
+      return;
+    }
     const selId = this.selectedPartId();
     if (!selId) return;
 
@@ -2368,6 +2391,10 @@ export class ModuleDesignerComponent {
   }
 
   hideSelectedPart() {
+    if (this.isAnyGroupSelected()) {
+      this.hideActiveGroup();
+      return;
+    }
     const selId = this.selectedPartId();
     if (!selId) return;
     const part = this.currentParts().find(p => p.id === selId);
