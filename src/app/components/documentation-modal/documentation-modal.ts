@@ -2,12 +2,15 @@ import { Component, ChangeDetectionStrategy, input, output, signal, computed, in
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   Archive01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
   Cancel01Icon,
   CheckListIcon,
   CheckmarkCircle02Icon,
   Compass01Icon,
   InformationCircleIcon,
   Layers01Icon,
+  LockIcon,
   Note01Icon,
   RulerIcon,
   Search01Icon,
@@ -37,7 +40,8 @@ export interface DocArticle {
 
 /**
  * Modal de documentación técnica interactiva y manual de usuario.
- * Permite buscar guías paso a paso por categoría, herramienta CAD, mecanizados CNC o atajos de teclado.
+ * Permite consultar guías paso a paso por categoría, herramienta CAD, mecanizados CNC,
+ * escala humana, bloqueo de piezas, atajos de teclado y optimización de corte.
  */
 @Component({
   selector: 'app-documentation-modal',
@@ -65,6 +69,9 @@ export class DocumentationModalComponent {
     listNumbered: CheckListIcon,
     lightbulb: InformationCircleIcon,
     verified: CheckmarkCircle02Icon,
+    arrowLeft: ArrowLeft01Icon,
+    arrowRight: ArrowRight01Icon,
+    lock: LockIcon,
     keyboard: docSvg([
       'M3 6H21V18H3V6Z',
       'M7 10H8',
@@ -81,6 +88,22 @@ export class DocumentationModalComponent {
     doorSwing: docSvg([
       'M5 3H19V21H5V3Z',
       'M12 3L17.5 5.5V18.5L12 21V3Z'
+    ]),
+    humanFigure: docSvg([
+      'M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+      'M9 7h6a2 2 0 0 1 2 2v5h-2v7h-2v-6h-2v6H9v-7H7V9a2 2 0 0 1 2-2z'
+    ]),
+    mouseContext: docSvg([
+      'M12 2C8.686 2 6 4.686 6 8v8c0 3.314 2.686 6 6 6s6-2.686 6-6V8c0-3.314-2.686-6-6-6z',
+      'M12 6v4',
+      'M12 2v8h6'
+    ]),
+    roomEnvironment: docSvg([
+      'M3 21h18',
+      'M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16',
+      'M9 9h6',
+      'M9 13h6',
+      'M9 17h6'
     ])
   };
 
@@ -91,19 +114,165 @@ export class DocumentationModalComponent {
   // Signals reactivos para el buscador, categoría activa y artículo seleccionado
   readonly searchQuery = signal<string>('');
   readonly activeCategory = signal<string>('all');
-  readonly selectedArticleId = signal<string>('mecanizados_cnc');
+  readonly selectedArticleId = signal<string>('escala_humana_brujula');
 
   readonly categories = [
     { id: 'all', label: 'Todas las Guías', icon: 'auto_stories' },
+    { id: 'herramientas_3d', label: 'Herramientas 3D CAD', icon: 'architecture' },
     { id: 'mecanizados', label: 'Mecanizados CNC', icon: 'adjust', badge: 'Auto' },
     { id: 'cinta_metrica', label: 'Cinta Métrica 3D', icon: 'straighten', badge: 'Imán' },
-    { id: 'herramientas_3d', label: 'Herramientas 3D CAD', icon: 'architecture' },
     { id: 'modulos_piezas', label: 'Módulos y Plantillas', icon: 'view_in_ar' },
     { id: 'optimizador', label: 'Corte y Fabricación', icon: 'precision_manufacturing' },
     { id: 'atajos', label: 'Atajos de Teclado', icon: 'keyboard' }
   ];
 
   readonly articles: DocArticle[] = [
+    // 1. NUEVA GUÍA: Escala Humana 1.72m y Brújula de Frente (+Z)
+    {
+      id: 'escala_humana_brujula',
+      category: 'herramientas_3d',
+      title: 'Guía de Escala Humana 1.72 m y Brújula Cardinal (+Z)',
+      shortDesc: 'Maniquí arquitectónico a escala real (1720 mm) con regla ergonómica vertical y badges cardinales en el piso para verificar alturas de trabajo.',
+      icon: 'human',
+      iconColor: 'text-sky-500',
+      badge: 'Ergonomía CAD',
+      steps: [
+        'En el visor 3D observarás el maniquí arquitectónico estilizado a escala humana real (1720 mm / 1.72 m de estatura) ubicado sobre el suelo del taller.',
+        'La figura incluye una regla milimétrica vertical que marca alturas antropométricas clave: zócalo (100 mm), mesada de cocina (900 mm), antepecho (1450 mm) y alcance visual (1600-1720 mm).',
+        'En el suelo, la Brújula Cardinal proyecta indicadores en los 4 extremos: destacando en azul cian "▼ FRENTE (+Z) · VISTA FRONTAL", y en gris "▲ ATRÁS / FONDO (-Z)", "IZQUIERDA (-X)" y "DERECHA (+X)".',
+        'Para mover el maniquí de lugar: haz clic sobre su base circular o cuerpo en el 3D y arrástralo suavemente con el ratón hacia donde quieras comparar proporciones ergonómicas con tu mueble.',
+        'Para ocultar o mostrar la guía humana y la brújula en cualquier momento, pulsa el botón del icono de figura humana en la barra de herramientas o el atajo de teclado [ G ].'
+      ],
+      tips: [
+        'Usa la escala humana al diseñar alacenas de cocina: podrás comprobar a simple vista si el usuario final alcanzará las repisas superiores sin necesidad de escalones.',
+        'El badge "FRENTE (+Z)" te asegura que nunca diseñarás un mueble con las puertas hacia atrás o con las correderas al revés.',
+        'La figura no se incluye en el despiece de corte ni en la exportación CNC; es exclusivamente una referencia visual de modelado.'
+      ],
+      technicalDetails: [
+        { label: 'Estatura estándar', value: '1720 mm (1.72 m) proporción ergonómica' },
+        { label: 'Marcadores de piso', value: 'FRENTE (+Z), ATRÁS (-Z), IZQ (-X), DER (+X)' },
+        { label: 'Interacción', value: 'Arrastre libre en plano XZ del suelo con el ratón' },
+        { label: 'Visibilidad', value: 'Conmutable con botón o atajo de teclado [ G ]' }
+      ]
+    },
+
+    // 2. NUEVA GUÍA: Congelar / Fijar Piezas y Módulos (Candado)
+    {
+      id: 'bloqueo_congelar_piezas',
+      category: 'herramientas_3d',
+      title: 'Congelar / Fijar Piezas y Módulos (Candado 🔒)',
+      shortDesc: 'Bloquea piezas individuales o conjuntos completos contra desplazamientos accidentales, modificaciones o borrados involuntarios.',
+      icon: 'lock',
+      iconColor: 'text-amber-500',
+      badge: 'Protección de Diseño',
+      steps: [
+        'Selecciona la pieza o conjunto que deseas proteger en el visor 3D.',
+        'Puedes congelar el elemento de dos formas rápidas:',
+        '• Desde el Menú Contextual (Clic Derecho): Haz clic derecho sobre la pieza y selecciona "Congelar Solo Esta Pieza" o "Congelar Módulo Completo / Cajón Completo".',
+        '• Desde la Cinta de Acciones Superior: Pulsa el botón con icono de candado.',
+        'Una vez congelada, la pieza mostrará un distintivo ámbar con candado [ 🔒 Fijo ].',
+        'La pieza o grupo congelado queda 100% blindado: no podrá ser movido por arrastre de ratón, ni estirado con Empujar/Tirar, ni eliminado con la tecla Supr.',
+        'Para descongelar y volver a editar, haz clic derecho sobre el elemento y selecciona "Descongelar", o vuelve a pulsar el candado en la barra superior.'
+      ],
+      tips: [
+        'Congela los laterales y la base de tu mueble una vez definidas sus dimensiones principales; así podrás mover y ajustar repisas internas o cajones sin mover la estructura exterior.',
+        'Si congelas un cajón completo, tanto el frente, los costados, la trasera, el fondo y las correderas quedarán protegidos en un solo clic.',
+        'Las piezas congeladas siguen apareciendo normalmente en el despiece de corte y presupuesto.'
+      ],
+      technicalDetails: [
+        { label: 'Alcance', value: 'Pieza individual (part.isLocked) o Grupo (group.isLocked)' },
+        { label: 'Efecto', value: 'Inhabilita traslación, Push/Pull, rotación y borrado' },
+        { label: 'Identificador', value: 'Indicador visual ámbar con candado en 3D y listas' },
+        { label: 'Persistencia', value: 'Se guarda en Supabase y archivo JSON de proyecto' }
+      ]
+    },
+
+    // 3. NUEVA GUÍA: Menú Contextual Inteligente de Clic Derecho
+    {
+      id: 'menu_contextual_inteligente',
+      category: 'herramientas_3d',
+      title: 'Menú Contextual Inteligente de Clic Derecho',
+      shortDesc: 'Menú contextual 3D adaptativo que cambia sus opciones dinámicamente según hagas clic en un Cajón, Puerta, Estructura o en el Espacio Vacío.',
+      icon: 'mouse',
+      iconColor: 'text-indigo-500',
+      badge: 'Productividad 3D',
+      steps: [
+        'Haz clic con el botón derecho del ratón en cualquier punto del visor 3D.',
+        'El menú detecta automáticamente qué elemento se encuentra bajo el cursor y te ofrece acciones específicas:',
+        '• Clic en un Cajón: Acceso inmediato para probar apertura/cierre de correderas, congelar el cajón completo, duplicarlo, editar su manija o separar frente.',
+        '• Clic en una Puerta: Alternar bisagra reversible (Izquierda / Derecha), abrir/cerrar puerta batiente, cambiar modelo de tirador o bloquear.',
+        '• Clic en Pieza de Estructura: Rotar 90°, cambiar orientación (Horizontal / Vertical), duplicar, congelar o eliminar pieza.',
+        '• Clic en Suelo o Espacio Vacío: Opciones rápidas para crear una nueva pieza rectangular, alternar la guía de escala humana, centrar cámara o restablecer vista.',
+        'Para cerrar el menú contextual, simplemente haz clic izquierdo en cualquier parte del lienzo o presiona [ Esc ].'
+      ],
+      tips: [
+        'El menú contextual elimina la necesidad de buscar opciones en paneles laterales: tienes las acciones más frecuentes a la distancia de un solo clic.',
+        'Si tienes seleccionadas varias piezas con Shift+Clic, el menú contextual te ofrecerá opciones aplicables a la selección múltiple (ej. Agrupar o Congelar Selección).'
+      ],
+      technicalDetails: [
+        { label: 'Detección Raycaster', value: 'Análisis de colisión 3D en coordenadas exactas del cursor' },
+        { label: 'Modos contextuales', value: 'Cajón, Puerta, Pieza estructural y Espacio vacío' },
+        { label: 'Animaciones', value: 'Apertura de bisagras y extracción de correderas directa' }
+      ]
+    },
+
+    // 4. NUEVA GUÍA: Modo Habitación 3D, Electrodomésticos y Patas de Mesa
+    {
+      id: 'habitacion_electrodomesticos_patas',
+      category: 'modulos_piezas',
+      title: 'Modo Habitación 3D, Electrodomésticos y Patas de Mesa',
+      shortDesc: 'Ambiente realista de taller/cuarto con paredes y piso, inserción en 1 clic de electrodomésticos normalizados y patas de mesa de diseño.',
+      icon: 'room',
+      iconColor: 'text-emerald-500',
+      badge: 'Visualización y Ambientación',
+      steps: [
+        'En la barra de herramientas puedes alternar el Modo Habitación para proyectar paredes perimetrales y piso con acabados personalizables.',
+        'En el menú de inserción rápida dispones de dos catálogos especializados:',
+        '• Electrodomésticos Paramétricos: Inserta refrigeradores (nevera simple o Side-by-Side), hornos empotrables, microondas, campanas extractoras, fregaderos de cocina (planchas de acero inoxidable) y lavavajillas con medidas comerciales estandarizadas.',
+        '• Patas de Mesa y Estructuras: Añade patas estilo Horquilla (Hairpin de varilla metálica negra/dorada), Cilíndricas en acero inoxidable regulables en altura, o patas cónicas Escandinavas de madera maciza.',
+        'Los electrodomésticos y patas se integran al espacio 3D para verificar que los huecos de encastre (nichos) cuenten con las tolerancias de ventilación requeridas.',
+        'Puedes mover y reubicar los electrodomésticos haciendo clic sostenido y arrastrándolos igual que cualquier módulo.'
+      ],
+      tips: [
+        'Al diseñar un mueble bajo para fregadero, coloca el fregadero 3D sobre la cubierta para calcular el rebaje y verificar que las divisiones internas no choquen con las cañerías del sifón.',
+        'Las patas de mesa calculan automáticamente su costo unitario en el módulo de presupuesto de herrajes.'
+      ],
+      technicalDetails: [
+        { label: 'Catálogo Electrodomésticos', value: 'Refrigerador, Horno, Microondas, Fregadero, Campana, Lavavajillas' },
+        { label: 'Estilos de Patas', value: 'Hairpin 3 varillas, Cilíndrica Inox, Escandinava madera' },
+        { label: 'Iluminación', value: 'Luz ambiental suave, focos direccionales y modo día/noche' }
+      ]
+    },
+
+    // 5. NUEVA GUÍA: Parámetros de Taller, Kerf de Sierra, Tapacantos y Cuaderno de Notas
+    {
+      id: 'parametros_taller_notas',
+      category: 'optimizador',
+      title: 'Parámetros de Taller, Kerf de Sierra, Tapacantos y Notas',
+      shortDesc: 'Configuración milimétrica del corte: espesor de la hoja de sierra (kerf), refilado perimetral, gestión de cantos y cuaderno de notas del proyecto.',
+      icon: 'precision_manufacturing',
+      iconColor: 'text-purple-500',
+      badge: 'Precisión de Fabricación',
+      steps: [
+        'Antes de enviar a corte, ajusta los parámetros de fabricación en la pestaña del Optimizador o en Ajustes del Proyecto:',
+        '• Espesor de Sierra (Kerf): Configura el ancho exacto del disco de corte de tu seccionadora (estándar 3.2 mm a 4.0 mm). El optimizador descontará este material en cada pasada para garantizar que las piezas no queden milímetros más pequeñas.',
+        '• Refilado de Fábrica (Trim Margin): Establece el despunte perimetral del tablero (ej. 10 mm por lado). Elimina bordes golpeados, con humedad o cera del transporte de la placa.',
+        '• Tapacantos (Canto Delgado 0.45 mm vs Grueso 2.0 mm): Define qué caras llevan canto (L1, L2, A1, A2). El sistema descuenta el espesor del canto grueso en las medidas de corte para que la pieza terminada mida exactamente lo proyectado.',
+        '• Cuaderno de Notas y Checklist: Abre el modal de notas desde la barra superior para registrar instrucciones especiales del cliente, requerimientos de instalación en obra y lista de chequeo.'
+      ],
+      tips: [
+        'Si contratas el servicio de corte en un centro de distribución (ej. Masisa, Arauco, Pelíkano), consulta el kerf de su seccionadora (generalmente 4.0 mm u 4.4 mm) e ingrésalo para obtener planos de corte 100% idénticos.',
+        'El cálculo de metros lineales de tapacanto distingue entre canto delgado y grueso para presupuestar rollos con exactitud.'
+      ],
+      technicalDetails: [
+        { label: 'Rango Kerf de sierra', value: '1.0 mm a 6.0 mm (Estándar recomendado: 4.0 mm)' },
+        { label: 'Refilado perimetral', value: '0 mm a 30 mm por borde (Estándar: 10 mm)' },
+        { label: 'Compensación de cantos', value: 'Descuento automático de canto grueso (2 mm) en lista de corte' },
+        { label: 'Cuaderno de notas', value: 'Sincronizado en tiempo real con persistencia en nube' }
+      ]
+    },
+
+    // 6. Mecanizados y Perforaciones CNC Automáticas
     {
       id: 'mecanizados_cnc',
       category: 'mecanizados',
@@ -135,6 +304,8 @@ export class DocumentationModalComponent {
         { label: 'Exportación CNC', value: 'Capas DXF CNC + Fichas acotadas PDF' }
       ]
     },
+
+    // 7. Cinta Métrica y Acotado de Precisión CAD
     {
       id: 'cinta_metrica_cad',
       category: 'cinta_metrica',
@@ -164,6 +335,8 @@ export class DocumentationModalComponent {
         { label: 'Persistencia 3D', value: 'Permite órbita y rotación continua sin borrado' }
       ]
     },
+
+    // 8. Movimiento por Arrastre Directo 3D
     {
       id: 'movimiento_directo_3d',
       category: 'herramientas_3d',
@@ -192,6 +365,8 @@ export class DocumentationModalComponent {
         { label: 'Precisión CAD', value: 'Paso fino de 1 mm con soporte magnético' }
       ]
     },
+
+    // 9. Cinta Flotante de Acciones Rápidas
     {
       id: 'cinta_acciones_flotante',
       category: 'herramientas_3d',
@@ -201,7 +376,7 @@ export class DocumentationModalComponent {
       iconColor: 'text-emerald-600',
       badge: 'Barra Superior',
       steps: [
-        'Al seleccionar cualquier pieza o grupo en el visor 3D, se despliega automáticamente la cinta oscura de acciones en la esquina superior derecha (top-3 right-3), respetando estrictamente los márgenes visuales sin tapar tu diseño.',
+        'Al seleccionar cualquier pieza o grupo en el visor 3D, se despliega automáticamente la cinta oscura de acciones en la esquina superior derecha, respetando estrictamente los márgenes visuales sin tapar tu diseño.',
         'Si seleccionas un grupo o cajón modular, la cinta te permite:',
         '• "Duplicar": Crea una copia exacta de todo el módulo o cajón a un costado con sus herrajes y mecanizados.',
         '• "Mover": Activa el cursor de traslación rápida para arrastrar el bloque completo.',
@@ -210,10 +385,10 @@ export class DocumentationModalComponent {
         '• "Frente": Enfoca y selecciona de forma aislada la fachada frontal del cajón o puerta.',
         '• "Desagrupar": Separa el ensamble en piezas individuales independientes para editar sus partes por separado.',
         'Si seleccionas una pieza individual, dispones de: "Duplicar", "Mover", "90° (R)", "Orientación (Horizontal / Vertical)" y "Eliminar".',
-        'En la esquina opuesta (superior izquierda, top-3 left-16), se muestra la tarjeta informativa con el nombre de la pieza, sus medidas (L × A × E) o el recuento de piezas del grupo, ambas barras perfectamente alineadas y sin solaparse.'
+        'En la esquina superior izquierda se muestra la tarjeta informativa con el nombre de la pieza, sus medidas (L × A × E) o el recuento de piezas del grupo.'
       ],
       tips: [
-        'Ambas barras flotantes (info a la izquierda y acciones a la derecha) conservan un diseño minimalista que no obstruye la visibilidad del mueble 3D ni compite con los controles de cámara.',
+        'Ambas barras flotantes conservan un diseño minimalista que no obstruye la visibilidad del mueble 3D ni compite con los controles de cámara.',
         'Puedes presionar [ Q ] como atajo de teclado para la rotación rápida de 90° de la pieza seleccionada.'
       ],
       technicalDetails: [
@@ -223,6 +398,8 @@ export class DocumentationModalComponent {
         { label: 'Operaciones Pieza', value: 'Duplicar, Mover, 90° (R), Orientación H/V, Eliminar' }
       ]
     },
+
+    // 10. Dibujar Rectángulo 3D en el Lienzo CAD
     {
       id: 'dibujo_rectangulo_3d',
       category: 'herramientas_3d',
@@ -250,6 +427,8 @@ export class DocumentationModalComponent {
         { label: 'Espesor inicial', value: '15 mm o 18 mm según la configuración activa' }
       ]
     },
+
+    // 11. Empujar / Tirar (Push/Pull)
     {
       id: 'push_pull_tool',
       category: 'herramientas_3d',
@@ -276,6 +455,8 @@ export class DocumentationModalComponent {
         { label: 'Atajo rápido', value: 'Tecla [ P ]' }
       ]
     },
+
+    // 12. Luz Libre (Cálculo Automático de Holguras Útiles)
     {
       id: 'luz_libre_tool',
       category: 'herramientas_3d',
@@ -298,6 +479,8 @@ export class DocumentationModalComponent {
         { label: 'Tolerancia', value: 'Descuenta automáticamente los 15 mm o 18 mm de espesor de placas' }
       ]
     },
+
+    // 13. Catálogo de Plantillas de Muebles
     {
       id: 'plantillas_muebles',
       category: 'modulos_piezas',
@@ -323,57 +506,8 @@ export class DocumentationModalComponent {
         { label: 'Modos de Carga', value: 'Reemplazo total o Adición lateral en 3D' }
       ]
     },
-    {
-      id: 'optimizador_despiece',
-      category: 'optimizador',
-      title: 'Optimización de Corte 2D y Despiece Milimétrico',
-      shortDesc: 'Algoritmo guillotina de máximo rendimiento de placas con kerf de sierra, refilado y etiquetas imprimibles.',
-      icon: 'precision_manufacturing',
-      iconColor: 'text-purple-600',
-      badge: 'Ahorro de Material',
-      steps: [
-        'Ve a la pestaña "3. Optimizador 2D" en la barra superior.',
-        'Configura el tamaño del tablero comercial (ej. 2440 x 1830 mm) y el espesor de la hoja de sierra (Kerf = 4 mm estándar).',
-        'Establece el margen de refilado perimetral del tablero (ej. 10 mm) para limpiar bordes de fábrica.',
-        'El motor organizará automáticamente los cortes respetando la dirección de la veta longitudinal o transversal de la melamina y minimizando los retazos sobrantes.',
-        'Genera el reporte con el porcentaje de aprovechamiento, metros lineales de tapacanto y plano de corte con numeración de piezas.',
-        'Pulsa "Exportar Plano 2D Técnico" para descargar el PDF de taller listo para imprimir.'
-      ],
-      tips: [
-        'Puedes imprimir etiquetas adhesivas para cada pieza con su nombre de módulo, medidas exactas y esquema de bordes con tapacanto.'
-      ],
-      technicalDetails: [
-        { label: 'Algoritmo', value: 'Guillotine 2D con respeto estricto de veta (Largo/Ancho)' },
-        { label: 'Parámetros', value: 'Kerf de sierra (0-10 mm), Refilado (0-25 mm)' }
-      ]
-    },
-    {
-      id: 'atajos_teclado',
-      category: 'atajos',
-      title: 'Guía Rápida de Atajos de Teclado',
-      shortDesc: 'Trabaja con máxima agilidad usando atajos directos para medir, seleccionar, deshacer y transformar piezas.',
-      icon: 'keyboard',
-      iconColor: 'text-emerald-600',
-      badge: 'Productividad',
-      steps: [
-        '• [ Clic sostenido + Arrastre ]: Mover pieza individual o grupo completo directamente en el espacio 3D',
-        '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar piezas',
-        '• [ T ]: Cinta Métrica 3D con Imán Inteligente a vértices y aristas',
-        '• [ P ]: Empujar / Tirar (Push/Pull) para estirar o encoger caras en tiempo real',
-        '• [ R ]: Girar pieza/grupo seleccionado 90° o activar Dibujar Rectángulo 3D si no hay selección',
-        '• [ Q ]: Herramienta Rotar 90 grados en el plano horizontal',
-        '• [ H ] / [ Alt + H ]: Ocultar temporalmente la pieza/grupo seleccionado o mostrar todas las ocultas',
-        '• [ Supr / Delete / Backspace ]: Eliminar inmediatamente la pieza, grupo o equipo seleccionado (con restauración vía Ctrl+Z)',
-        '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer última acción',
-        '• [ Ctrl + Y ] / [ Cmd + Shift + Z ]: Rehacer acción deshecha',
-        '• [ Shift + Clic ]: Selección múltiple aditiva de piezas en el visor 3D para agrupar o mover en bloque',
-        '• [ Flechas Teclado ]: Mover pieza seleccionada en incrementos milimétricos (1 mm o 10 mm con Shift)',
-        '• [ Esc ]: Cancelar herramienta activa, limpiar selección o cerrar ventanas emergentes'
-      ],
-      tips: [
-        'La cinta contextual superior derecha te brinda acceso rápido con un solo clic a: Duplicar, Mover, Abrir/Cerrar, Editar Módulo, 90° (R), Frente y Desagrupar.'
-      ]
-    },
+
+    // 14. Creación y Gestión de Conjuntos (Grupos)
     {
       id: 'agrupacion_conjuntos',
       category: 'modulos_piezas',
@@ -401,6 +535,8 @@ export class DocumentationModalComponent {
         { label: 'Desagrupamiento', value: 'Retorno a piezas independientes con un solo clic' }
       ]
     },
+
+    // 15. Bisagras y Taladros Cazoleta Reversibles
     {
       id: 'bisagras_reversibles',
       category: 'mecanizados',
@@ -423,6 +559,63 @@ export class DocumentationModalComponent {
         { label: 'Estándar cazoleta', value: 'Ø 35 mm x 12.5 mm de profundidad' },
         { label: 'Distancia al borde K', value: '4 mm al canto / 22 mm al centro del taladro' },
         { label: 'Sincronización', value: 'Bisagra 3D + Tirador + Taladro cazoleta + Rotación animada' }
+      ]
+    },
+
+    // 16. Optimización de Corte 2D y Despiece Milimétrico
+    {
+      id: 'optimizador_despiece',
+      category: 'optimizador',
+      title: 'Optimización de Corte 2D y Despiece Milimétrico',
+      shortDesc: 'Algoritmo guillotina de máximo rendimiento de placas con kerf de sierra, refilado y etiquetas imprimibles.',
+      icon: 'precision_manufacturing',
+      iconColor: 'text-purple-600',
+      badge: 'Ahorro de Material',
+      steps: [
+        'Ve a la pestaña "3. Optimizador 2D" en la barra superior.',
+        'Configura el tamaño del tablero comercial (ej. 2440 x 1830 mm) y el espesor de la hoja de sierra (Kerf = 4 mm estándar).',
+        'Establece el margen de refilado perimetral del tablero (ej. 10 mm) para limpiar bordes de fábrica.',
+        'El motor organizará automáticamente los cortes respetando la dirección de la veta longitudinal o transversal de la melamina y minimizando los retazos sobrantes.',
+        'Genera el reporte con el porcentaje de aprovechamiento, metros lineales de tapacanto y plano de corte con numeración de piezas.',
+        'Pulsa "Exportar Plano 2D Técnico" para descargar el PDF de taller listo para imprimir.'
+      ],
+      tips: [
+        'Puedes imprimir etiquetas adhesivas para cada pieza con su nombre de módulo, medidas exactas y esquema de bordes con tapacanto.'
+      ],
+      technicalDetails: [
+        { label: 'Algoritmo', value: 'Guillotine 2D con respeto estricto de veta (Largo/Ancho)' },
+        { label: 'Parámetros', value: 'Kerf de sierra (0-10 mm), Refilado (0-25 mm)' }
+      ]
+    },
+
+    // 17. Guía Rápida de Atajos de Teclado
+    {
+      id: 'atajos_teclado',
+      category: 'atajos',
+      title: 'Guía Rápida de Atajos de Teclado',
+      shortDesc: 'Trabaja con máxima agilidad usando atajos directos para medir, seleccionar, deshacer, congelar y transformar piezas.',
+      icon: 'keyboard',
+      iconColor: 'text-emerald-600',
+      badge: 'Productividad',
+      steps: [
+        '• [ Clic sostenido + Arrastre ]: Mover pieza individual o grupo completo directamente en el espacio 3D',
+        '• [ Clic Derecho ]: Abrir Menú Contextual Inteligente (Cajón, Puerta, Estructura o Suelo)',
+        '• [ G ]: Alternar Guía de Escala Humana 1.72 m y Brújula Cardinal (+Z)',
+        '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar piezas',
+        '• [ T ]: Cinta Métrica 3D con Imán Inteligente a vértices y aristas',
+        '• [ P ]: Empujar / Tirar (Push/Pull) para estirar o encoger caras en tiempo real',
+        '• [ R ]: Girar pieza/grupo seleccionado 90° o activar Dibujar Rectángulo 3D si no hay selección',
+        '• [ Q ]: Herramienta Rotar 90 grados en el plano horizontal',
+        '• [ H ] / [ Alt + H ]: Ocultar temporalmente la pieza/grupo seleccionado o mostrar todas las ocultas',
+        '• [ Supr / Delete / Backspace ]: Eliminar inmediatamente la pieza, grupo o equipo seleccionado (con restauración vía Ctrl+Z)',
+        '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer última acción',
+        '• [ Ctrl + Y ] / [ Cmd + Shift + Z ]: Rehacer acción deshecha',
+        '• [ Shift + Clic ]: Selección múltiple aditiva de piezas en el visor 3D para agrupar o mover en bloque',
+        '• [ Flechas Teclado ]: Mover pieza seleccionada en incrementos milimétricos (1 mm o 10 mm con Shift)',
+        '• [ Esc ]: Cancelar herramienta activa, limpiar selección o cerrar ventanas emergentes'
+      ],
+      tips: [
+        'La cinta contextual superior derecha te brinda acceso rápido con un solo clic a: Duplicar, Mover, Abrir/Cerrar, Editar Módulo, 90° (R), Frente, Congelar y Desagrupar.'
       ]
     }
   ];
@@ -461,6 +654,47 @@ export class DocumentationModalComponent {
     const found = list.find(a => a.id === currentId);
     return found || list[0];
   });
+
+  /**
+   * Índice del artículo seleccionado dentro de la lista filtrada.
+   */
+  readonly currentArticleIndex = computed(() => {
+    const art = this.selectedArticle();
+    if (!art) return -1;
+    return this.filteredArticles().findIndex(a => a.id === art.id);
+  });
+
+  /**
+   * Artículo anterior en la lista de navegación secuencial.
+   */
+  readonly prevArticleItem = computed(() => {
+    const idx = this.currentArticleIndex();
+    const list = this.filteredArticles();
+    return idx > 0 ? list[idx - 1] : null;
+  });
+
+  /**
+   * Artículo siguiente en la lista de navegación secuencial.
+   */
+  readonly nextArticleItem = computed(() => {
+    const idx = this.currentArticleIndex();
+    const list = this.filteredArticles();
+    return (idx >= 0 && idx < list.length - 1) ? list[idx + 1] : null;
+  });
+
+  goToPrevArticle() {
+    const prev = this.prevArticleItem();
+    if (prev) {
+      this.selectedArticleId.set(prev.id);
+    }
+  }
+
+  goToNextArticle() {
+    const next = this.nextArticleItem();
+    if (next) {
+      this.selectedArticleId.set(next.id);
+    }
+  }
 
   onSearchInput(event: Event) {
     const target = event.target as HTMLInputElement | null;
@@ -505,6 +739,10 @@ export class DocumentationModalComponent {
    */
   getArticleIcon(iconName: string) {
     switch (iconName) {
+      case 'human': return this.icons.humanFigure;
+      case 'lock': return this.icons.lock;
+      case 'mouse': return this.icons.mouseContext;
+      case 'room': return this.icons.roomEnvironment;
       case 'adjust': return Settings01Icon;
       case 'straighten': return RulerIcon;
       case 'pan_tool': return Archive01Icon;
