@@ -70,6 +70,7 @@ export interface PartHardwareConfig {
   hingeType?: HingeType;
   openingDirection?: OpeningDirection;
   slideType?: SlideType;
+  slideLength?: number;
   isOpen?: boolean;
 }
 

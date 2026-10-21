@@ -1400,6 +1400,7 @@ export class CabinetGeneratorService {
           isMovable: true,
           movableType: 'drawer',
           slideType,
+          slideLength,
           handleType: hType,
           handleFinish: hFinish,
           handlePosition: 'horizontal',

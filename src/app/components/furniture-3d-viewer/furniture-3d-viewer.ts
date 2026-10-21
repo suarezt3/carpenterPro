@@ -2304,6 +2304,103 @@ private createHandleMesh(
 
     return group;
   }
+  /**
+   * Obtiene la longitud nominal comercial exacta de las correderas o caja de cajón
+   * evitando que sobresalgan por detrás del mueble al girar el módulo.
+   */
+  private getDrawerNominalSlideLength(
+    part: Part,
+    hw: PartHardwareConfig,
+    drawerFacing: 'front' | 'right' | 'back' | 'left' = 'front'
+  ): number {
+    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
+
+    // 1. Configuración explícita en el herraje
+    if (hw.slideLength && hw.slideLength >= 200) {
+      return hw.slideLength;
+    }
+
+    // 2. Definición en el grupo de cajón
+    if (part.groupId) {
+      const grp = this.partGroups().find(g => g.id === part.groupId);
+      if (grp?.slideLength && grp.slideLength >= 200) {
+        return grp.slideLength;
+      }
+    }
+
+    const allParts = this.parts();
+
+    // 3. A partir de los paneles laterales de la caja del cajón
+    const isDrawerLateral = (p: Part) =>
+      p.id !== part.id &&
+      p.componentRole !== 'side_left' &&
+      p.componentRole !== 'side_right' &&
+      (p.componentRole === 'drawer_box' ||
+       p.componentRole === 'drawer_lateral' ||
+       (p.name.toUpperCase().includes('LATERAL') && p.name.toUpperCase().includes('CAJ')));
+
+    let latPart: Part | undefined;
+    if (part.groupId) {
+      latPart = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p) && Math.abs((p.posY || 0) - (part.posY || 0)) < 150);
+      if (!latPart) {
+        latPart = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p));
+      }
+    }
+    if (!latPart) {
+      const prefix = part.id.includes('_frente') ? part.id.split('_frente')[0] : (part.id.includes('_front') ? part.id.split('_front')[0] : '');
+      if (prefix) {
+        latPart = allParts.find(p => p.id.startsWith(prefix) && isDrawerLateral(p));
+      }
+    }
+    if (!latPart) {
+      latPart = allParts.find(p =>
+        isDrawerLateral(p) && Math.abs((p.posY || 0) - (part.posY || 0)) < 150
+      );
+    }
+
+    if (latPart) {
+      const latDepth = Math.max(latPart.length || 0, latPart.width || 0);
+      if (latDepth >= 200) {
+        const matched = standardLengths.filter(l => l <= latDepth).pop();
+        return matched || latDepth;
+      }
+    }
+
+    // 4. Calcular según la profundidad real del casco/módulo (nunca part.width del frente)
+    const isFacingX = drawerFacing === 'right' || drawerFacing === 'left';
+    const contextParts = part.moduleId 
+      ? allParts.filter(p => p.moduleId === part.moduleId)
+      : (part.groupId ? allParts.filter(p => p.groupId === part.groupId) : allParts);
+
+    let carcassDepth = 500;
+    const sides = contextParts.filter(p => 
+      p.componentRole === 'side_left' || p.componentRole === 'side_right' ||
+      (p.name.toUpperCase().includes('LATERAL') && !p.name.toUpperCase().includes('CAJ'))
+    );
+    if (sides.length > 0) {
+      const sideBounds = this.joineryEngine.getPartBounds(sides[0]);
+      carcassDepth = isFacingX ? sideBounds.sx : sideBounds.sz;
+    } else {
+      let minVal = Infinity, maxVal = -Infinity;
+      for (const p of contextParts) {
+        const b = this.joineryEngine.getPartBounds(p);
+        if (isFacingX) {
+          if (b.minX < minVal) minVal = b.minX;
+          if (b.maxX > maxVal) maxVal = b.maxX;
+        } else {
+          if (b.minZ < minVal) minVal = b.minZ;
+          if (b.maxZ > maxVal) maxVal = b.maxZ;
+        }
+      }
+      if (Number.isFinite(minVal) && Number.isFinite(maxVal) && maxVal > minVal) {
+        carcassDepth = maxVal - minVal;
+      }
+    }
+
+    const availableDepth = Math.max(200, carcassDepth - 35);
+    return standardLengths.filter(l => l <= availableDepth).pop() || 350;
+  }
+
   private createDrawerBoxMesh(
     part: Part,
     sx: number,
@@ -2317,9 +2414,7 @@ private createHandleMesh(
     const frontWidth = isSideFacing ? sz : sx;
     const frontThickness = isSideFacing ? sx : sz;
     const frontHeight = sy;
-    const availableDepth = Math.max(250, (part.width || 450) - 25);
-    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
-    const boxDepth = standardLengths.filter(l => l <= availableDepth).pop() || 350;
+    const boxDepth = this.getDrawerNominalSlideLength(part, part.hardwareConfig || {}, drawerFacing);
     const boxHeight = Math.max(80, Math.min(Math.floor(frontHeight * 0.72), 220));
 
     // Standard clearances: 12.7mm (1/2") telescopic slide per side + 18mm carcass side panels
@@ -2429,11 +2524,7 @@ private createHandleMesh(
     if (hw.slideType === 'none') return group;
 
     const slideType = hw.slideType || 'telescopic';
-
-    // Commercial standard nominal lengths: 250, 300, 350, 400, 450, 500, 550, 600 mm
-    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
-    const availableDepth = Math.max(250, (part.width || 450) - 25);
-    const nominalLength = standardLengths.filter(l => l <= availableDepth).pop() || 350;
+    const nominalLength = this.getDrawerNominalSlideLength(part, hw, drawerFacing);
 
     // Standard dimensions per slide type
     let railHeight = 45; // mm standard heavy duty
@@ -2576,8 +2667,14 @@ private createHandleMesh(
        (p.name.toUpperCase().includes('LATERAL') && p.name.toUpperCase().includes('CAJ')));
 
     if (part.groupId) {
-      drawerLatIzq = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p) && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('IZQ')));
-      drawerLatDer = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p) && (p.id.includes('lat_der') || p.name.toUpperCase().includes('DER')));
+      drawerLatIzq = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p) && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('IZQ')) && Math.abs((p.posY || 0) - (part.posY || 0)) < 150);
+      if (!drawerLatIzq) {
+        drawerLatIzq = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p) && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('IZQ')));
+      }
+      drawerLatDer = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p) && (p.id.includes('lat_der') || p.name.toUpperCase().includes('DER')) && Math.abs((p.posY || 0) - (part.posY || 0)) < 150);
+      if (!drawerLatDer) {
+        drawerLatDer = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p) && (p.id.includes('lat_der') || p.name.toUpperCase().includes('DER')));
+      }
     }
 
     if (!drawerLatIzq || !drawerLatDer) {
