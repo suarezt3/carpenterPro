@@ -109,8 +109,8 @@ export interface ParametricCabinetConfig {
   id?: string;
   code: string; // ej. "MALT1PU001"
   name: string; // ej. "Módulo Alto 1 Puerta (MAL-1P)"
-  moduleType: 'wall_cabinet' | 'base_cabinet' | 'tall_cabinet' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
-  category?: 'kitchen_base' | 'kitchen_wall' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
+  moduleType: 'wall_cabinet' | 'base_cabinet' | 'tall_cabinet' | 'closet' | 'vanity' | 'bookshelf' | 'drawer_unit' | 'custom';
+  category?: 'kitchen_base' | 'kitchen_wall' | 'drawers' | 'cajones' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
   width: number; // Ancho exterior X (ej. 600 mm)
   height: number; // Altura exterior Y (ej. 800 mm)
   depth: number; // Profundidad exterior Z (ej. 320 mm)
@@ -134,6 +134,13 @@ export interface ParametricCabinetConfig {
   posX?: number;
   posY?: number; // Elevación sobre el piso
   posZ?: number;
+  // Propiedades paramétricas específicas de cajoneras
+  drawersCount?: number; // Número de gavetas (2, 3, 4, 5, 6)
+  drawerSlideType?: 'telescopic' | 'soft_close' | 'telescopic_35' | 'undermount';
+  drawerFrontType?: 'overlay' | 'inset';
+  hasPlinth?: boolean;
+  plinthHeight?: number;
+  hasTopCover?: boolean;
 }
 
 export interface Part {

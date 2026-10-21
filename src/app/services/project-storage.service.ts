@@ -964,18 +964,48 @@ export class ProjectStorageService {
       }
     }
 
-    const newParts = template.generateParts(mats, offsetX);
+    let newParts: Part[] = [];
+    let templateGroup: PartGroup | null = null;
+    let templateModule: FurnitureModule | null = null;
+
+    if (template.isParametric && template.parametricConfig) {
+      const cfg: ParametricCabinetConfig = {
+        ...template.parametricConfig as ParametricCabinetConfig,
+        posX: offsetX
+      };
+      const res = this.cabinetGen.generateParametricCabinet(cfg, mats);
+      newParts = res.parts;
+      templateGroup = res.group;
+      templateModule = res.module;
+    } else {
+      newParts = template.generateParts(mats, offsetX);
+      const groupId = 'group_' + template.id + '_' + crypto.randomUUID().slice(0, 6);
+      templateGroup = {
+        id: groupId,
+        name: template.name,
+        type: 'assembly',
+        colorHex: template.previewColor?.accent || '#6366f1'
+      };
+      newParts = newParts.map(p => ({
+        ...p,
+        groupId,
+        groupName: template.name
+      }));
+    }
 
     if (mode === 'replace') {
       this.updateProject(p => ({
         ...p,
         name: template.name,
-        modules: [],
+        modules: templateModule ? [templateModule] : [],
+        groups: templateGroup ? [templateGroup] : [],
         parts: newParts
       }));
     } else {
       this.updateProject(p => ({
         ...p,
+        modules: templateModule ? [...p.modules, templateModule] : p.modules,
+        groups: templateGroup ? [...(p.groups || []), templateGroup] : (p.groups || []),
         parts: [...p.parts, ...newParts]
       }));
     }

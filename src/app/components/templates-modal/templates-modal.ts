@@ -43,6 +43,7 @@ export type ModuleCategoryPreset =
   | 'closet'
   | 'vanity'
   | 'bookshelf'
+  | 'drawers'
   | 'custom';
 
 @Component({
@@ -226,6 +227,13 @@ export class TemplatesModalComponent {
   handleFinish = signal<HandleFinish>('brushed_steel');
   handlePosition = signal<'vertical' | 'horizontal' | 'centered'>('vertical');
 
+  // Parámetros reactivos específicos para Cajoneras (Gavetas)
+  drawersCount = signal<number>(3);
+  drawerSlideType = signal<'telescopic' | 'soft_close' | 'telescopic_35' | 'undermount'>('telescopic');
+  drawerFrontType = signal<'overlay' | 'inset'>('overlay');
+  hasPlinth = signal<boolean>(true);
+  plinthHeight = signal<number>(70);
+
   shelvesCount = signal<number>(1);
   shelfDistribution = signal<'uniform' | 'manual'>('uniform');
   shelfManualOffsets = signal<number[]>([380]);
@@ -262,6 +270,17 @@ export class TemplatesModalComponent {
     this.shelvesCount.set(safeShelvesCount);
     this.shelfDistribution.set(cfg.shelfDistribution || 'uniform');
 
+    if (cfg.category === 'drawers' || cfg.moduleType === 'drawer_unit') {
+      this.activePreset.set('drawers');
+    } else if (cfg.category) {
+      this.activePreset.set(cfg.category as ModuleCategoryPreset);
+    }
+    if (cfg.drawersCount) this.drawersCount.set(Math.max(2, Math.min(6, Math.floor(Number(cfg.drawersCount)))));
+    if (cfg.drawerSlideType) this.drawerSlideType.set(cfg.drawerSlideType);
+    if (cfg.drawerFrontType) this.drawerFrontType.set(cfg.drawerFrontType);
+    if (cfg.hasPlinth !== undefined) this.hasPlinth.set(cfg.hasPlinth);
+    if (cfg.plinthHeight) this.plinthHeight.set(Number(cfg.plinthHeight));
+
     const innerH = Math.max(50, safeHeight - (2 * safeStructT));
     if (cfg.shelfManualOffsets && Array.isArray(cfg.shelfManualOffsets) && cfg.shelfManualOffsets.length === safeShelvesCount) {
       this.shelfManualOffsets.set(cfg.shelfManualOffsets.map((val, idx) => {
@@ -278,12 +297,13 @@ export class TemplatesModalComponent {
       this.doorMaterialId.set(cfg.doorMaterialId);
       this.useSameMaterialForDoors.set(cfg.doorMaterialId === (cfg.structureMaterialId || this.structureMaterialId()));
     }
-    if (cfg.category) this.activePreset.set(cfg.category);
   }
 
   // Presets de dimensiones según categoría
   readonly widthPresets = computed(() => {
     switch (this.activePreset()) {
+      case 'drawers':
+        return [400, 450, 500, 600, 700, 800, 900];
       case 'kitchen_base':
       case 'kitchen_wall':
         return [300, 400, 450, 500, 600, 800, 900];
@@ -300,6 +320,8 @@ export class TemplatesModalComponent {
 
   readonly heightPresets = computed(() => {
     switch (this.activePreset()) {
+      case 'drawers':
+        return [600, 700, 750, 800, 850, 900, 1000];
       case 'kitchen_base':
         return [720, 800, 820, 850, 900];
       case 'kitchen_wall':
@@ -317,6 +339,8 @@ export class TemplatesModalComponent {
 
   readonly depthPresets = computed(() => {
     switch (this.activePreset()) {
+      case 'drawers':
+        return [400, 450, 500, 550, 600];
       case 'kitchen_base':
         return [500, 550, 580, 600];
       case 'kitchen_wall':
@@ -366,6 +390,50 @@ export class TemplatesModalComponent {
     return Math.max(50, Math.round(h - 3));
   });
 
+  // Dimensiones de corte de frente de cajón y blueprint
+  readonly drawerFrontWidth = computed(() => {
+    const w = Number(this.width()) || 600;
+    if (this.drawerFrontType() === 'inset') {
+      return Math.max(50, this.innerWidth() - 4);
+    }
+    return Math.max(50, w - 4);
+  });
+
+  readonly drawerFrontHeight = computed(() => {
+    const count = Math.max(1, Math.min(6, Math.floor(Number(this.drawersCount()) || 3)));
+    const totalH = Number(this.height()) || 750;
+    const plinthH = this.hasPlinth() ? (Number(this.plinthHeight()) || 70) : 0;
+    const topT = Number(this.structureThickness()) || 18;
+    const availH = Math.max(50, totalH - plinthH - topT);
+    const gap = 3;
+    const frontH = (availH - ((count - 1) * gap)) / count;
+    return Math.max(40, Math.round(frontH));
+  });
+
+  readonly recommendedSlideLength = computed(() => {
+    const d = Number(this.depth()) || 500;
+    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
+    return standardLengths.filter(l => l <= d - 35).pop() || 400;
+  });
+
+  readonly drawerBoxesBlueprint = computed(() => {
+    const count = Math.max(1, Math.min(6, Math.floor(Number(this.drawersCount()) || 3)));
+    const plinthSvgH = this.hasPlinth() ? 20 : 0;
+    const availSvgH = 190 - plinthSvgH;
+    const gapSvg = 2;
+    const boxSvgH = (availSvgH - ((count - 1) * gapSvg)) / count;
+
+    return Array.from({ length: count }, (_, idx) => {
+      const y = 25 + (idx * (boxSvgH + gapSvg));
+      return {
+        index: idx + 1,
+        y,
+        height: boxSvgH,
+        handleY: y + (boxSvgH / 2) - 2
+      };
+    });
+  });
+
   // Luz libre uniforme entre entrepaños
   readonly uniformShelfGap = computed(() => {
     const count = Math.max(0, Math.min(8, Math.floor(Number(this.shelvesCount()) || 0)));
@@ -405,6 +473,13 @@ export class TemplatesModalComponent {
 
   // Conteo total de piezas calculadas
   readonly totalPartsCount = computed(() => {
+    if (this.activePreset() === 'drawers') {
+      let count = 4; // 2 laterales + 1 tapa + 1 piso
+      if (this.hasPlinth()) count += 4; // 4 piezas de zócalo perimetral (frontal, trasero, 2 laterales)
+      if (this.hasBackPanel()) count += 1;
+      count += (this.drawersCount() * 6);
+      return count;
+    }
     let count = 4; // 2 laterales + 1 piso + 1 techo
     count += Math.max(0, Math.min(8, Math.floor(Number(this.shelvesCount()) || 0)));
     if (this.hasBackPanel()) count += 1;
@@ -500,6 +575,23 @@ export class TemplatesModalComponent {
   selectPreset(preset: ModuleCategoryPreset) {
     this.activePreset.set(preset);
     switch (preset) {
+      case 'drawers':
+        this.moduleName.set('Cajonera 3 Cajones');
+        this.width.set(600);
+        this.height.set(750);
+        this.depth.set(500);
+        this.drawersCount.set(3);
+        this.drawerSlideType.set('telescopic');
+        this.drawerFrontType.set('overlay');
+        this.hasPlinth.set(true);
+        this.plinthHeight.set(70);
+        this.doorOpening.set('none');
+        this.shelvesCount.set(0);
+        this.hasHandle.set(true);
+        this.handleType.set('bar_modern');
+        this.handlePosition.set('horizontal');
+        this.hasBackPanel.set(true);
+        break;
       case 'kitchen_base':
         this.moduleName.set('Módulo Cocina Bajo');
         this.width.set(600);
@@ -612,7 +704,9 @@ export class TemplatesModalComponent {
     const backMat = this.materials().find(m => m.thickness <= 6)?.id || structMat;
 
     let moduleType: ParametricCabinetConfig['moduleType'] = 'base_cabinet';
-    if (this.activePreset() === 'kitchen_wall') {
+    if (this.activePreset() === 'drawers') {
+      moduleType = 'drawer_unit';
+    } else if (this.activePreset() === 'kitchen_wall') {
       moduleType = 'wall_cabinet';
     } else if (this.activePreset() === 'closet') {
       moduleType = 'closet';
@@ -632,8 +726,10 @@ export class TemplatesModalComponent {
       elevationY = this.height() / 2;
     }
 
+    const isDrawers = this.activePreset() === 'drawers';
+
     const config: ParametricCabinetConfig = {
-      name: this.moduleName().trim() || 'Módulo Paramétrico',
+      name: this.moduleName().trim() || (isDrawers ? `Cajonera ${this.drawersCount()} Cajones` : 'Módulo Paramétrico'),
       code: 'MOD_' + Math.floor(100 + Math.random() * 900),
       moduleType,
       category: this.activePreset(),
@@ -645,14 +741,20 @@ export class TemplatesModalComponent {
       backThickness: this.backThickness(),
       backType: this.hasBackPanel() ? 'groove' : 'none',
       hasBackPanel: this.hasBackPanel(),
-      shelvesCount: this.shelvesCount(),
+      shelvesCount: isDrawers ? 0 : this.shelvesCount(),
       shelfDistribution: this.shelfDistribution(),
-      shelfManualOffsets: this.shelfDistribution() === 'manual' ? this.shelfManualOffsets() : undefined,
-      doorOpening: this.doorOpening(),
+      shelfManualOffsets: (!isDrawers && this.shelfDistribution() === 'manual') ? this.shelfManualOffsets() : undefined,
+      doorOpening: isDrawers ? 'none' : this.doorOpening(),
+      drawersCount: isDrawers ? this.drawersCount() : undefined,
+      drawerSlideType: isDrawers ? this.drawerSlideType() : undefined,
+      drawerFrontType: isDrawers ? this.drawerFrontType() : undefined,
+      hasPlinth: isDrawers ? this.hasPlinth() : undefined,
+      plinthHeight: isDrawers ? this.plinthHeight() : undefined,
+      hasTopCover: isDrawers ? true : undefined,
       hasHandle: this.hasHandle(),
       handleType: this.hasHandle() ? this.handleType() : 'none',
       handleFinish: this.handleFinish(),
-      handlePosition: this.handlePosition(),
+      handlePosition: isDrawers ? 'horizontal' : this.handlePosition(),
       structureMaterialId: structMat,
       doorMaterialId: doorMat,
       backMaterialId: backMat,

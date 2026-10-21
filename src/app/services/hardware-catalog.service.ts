@@ -170,16 +170,6 @@ export class HardwareCatalogService {
       icon: 'crop_square'
     },
     {
-      id: 'profile_gola',
-      name: 'Perfil Gola / J Embutido',
-      category: 'profile',
-      description: 'Tirador corrido de aluminio anodizado integrado en el canto superior o lateral.',
-      defaultLength: 0,
-      supportedFinishes: ['black', 'brushed_steel', 'gold', 'white'],
-      unitCost: 6.80,
-      icon: 'view_agenda'
-    },
-    {
       id: 'cup_vintage',
       name: 'Tirador Concha Vintage',
       category: 'cup',

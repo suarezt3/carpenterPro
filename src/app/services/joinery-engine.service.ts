@@ -43,24 +43,31 @@ export class JoineryEngineService {
 
     const orient = part.orientation || 'horizontal';
     if (orient === 'vertical_yz') {
+      const isPlinth =
+        part.componentRole === 'plinth' ||
+        part.name.toUpperCase().includes('ZOCALO') ||
+        part.name.toUpperCase().includes('ZÓCALO');
+
       const isCabinetSide =
-        part.componentRole === 'side_left' ||
-        part.componentRole === 'side_right' ||
-        part.componentRole === 'divider' ||
-        part.componentRole === 'door' ||
-        part.componentRole === 'back' ||
-        (part.name.toUpperCase().includes('LATERAL') &&
-          !part.name.toUpperCase().includes('CAJ') &&
-          part.componentRole !== 'drawer_box' &&
-          part.componentRole !== 'drawer_lateral');
+        !isPlinth &&
+        (part.componentRole === 'side_left' ||
+          part.componentRole === 'side_right' ||
+          part.componentRole === 'divider' ||
+          part.componentRole === 'door' ||
+          part.componentRole === 'back' ||
+          (part.name.toUpperCase().includes('LATERAL') &&
+            !part.name.toUpperCase().includes('CAJ') &&
+            part.componentRole !== 'drawer_box' &&
+            part.componentRole !== 'drawer_lateral'));
 
       const isDrawerBoxSide =
+        !isPlinth &&
         !isCabinetSide &&
         (part.componentRole === 'drawer_box' ||
           part.componentRole === 'drawer_lateral' ||
           (part.name.toUpperCase().includes('LATERAL') && part.name.toUpperCase().includes('CAJ')));
 
-      if (isDrawerBoxSide && L > W) {
+      if ((isPlinth || isDrawerBoxSide) && L > W) {
         sx = t;
         sy = W;
         sz = L;
@@ -158,7 +165,15 @@ export class JoineryEngineService {
               b1.part.componentRole &&
               ['side_left', 'side_right', 'top', 'bottom', 'shelf'].includes(b1.part.componentRole));
           const sameGroup = b1.part.groupId && b1.part.groupId === b2.part.groupId;
-          if (isBackJoint && sameGroup && (overlapX <= 12 || overlapY <= 12 || overlapZ <= 12)) {
+          if (isBackJoint && (sameGroup || !b1.part.groupId || !b2.part.groupId) && (overlapX <= 12 || overlapY <= 12 || overlapZ <= 12)) {
+            continue;
+          }
+
+          // Ranura de fondo de cajón MDF (encastre ranurado estándar de 4-8 mm)
+          const isDrawerBottomJoint =
+            ((b1.part.componentRole === 'drawer_box' && (b1.part.thickness || 0) <= 6) && b2.part.componentRole === 'drawer_box') ||
+            ((b2.part.componentRole === 'drawer_box' && (b2.part.thickness || 0) <= 6) && b1.part.componentRole === 'drawer_box');
+          if (isDrawerBottomJoint && (overlapX <= 12 || overlapZ <= 12) && overlapY <= 8) {
             continue;
           }
 

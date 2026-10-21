@@ -1034,16 +1034,28 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         (hw.movableType === 'door' || part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
         !part.name.toUpperCase().includes('CAJ');
 
+      const isCarcassStructure =
+        part.componentRole === 'side_left' ||
+        part.componentRole === 'side_right' ||
+        part.componentRole === 'top' ||
+        part.componentRole === 'bottom' ||
+        part.componentRole === 'plinth' ||
+        part.componentRole === 'back' ||
+        part.componentRole === 'shelf';
+
       const isInternalBoxPart =
-        part.componentRole === 'drawer_box' ||
-        part.name.toUpperCase().includes('LATERAL') ||
-        part.name.toUpperCase().includes('COSTADO') ||
-        part.name.toUpperCase().includes('TRASERA') ||
-        part.name.toUpperCase().includes('FONDO') ||
-        part.name.toUpperCase().includes('CONTRAFRENTE') ||
-        part.name.toUpperCase().includes('INTERIOR');
+        !isCarcassStructure &&
+        (part.componentRole === 'drawer_box' ||
+          (part.name.toUpperCase().includes('CAJ') &&
+            (part.name.toUpperCase().includes('LATERAL') ||
+              part.name.toUpperCase().includes('COSTADO') ||
+              part.name.toUpperCase().includes('TRASERA') ||
+              part.name.toUpperCase().includes('FONDO') ||
+              part.name.toUpperCase().includes('CONTRAFRENTE') ||
+              part.name.toUpperCase().includes('INTERIOR'))));
 
       const isDrawerFront =
+        !isCarcassStructure &&
         !isInternalBoxPart &&
         (part.componentRole === 'drawer_front' ||
           (hw.movableType === 'drawer' && !isInternalBoxPart) ||
@@ -1054,15 +1066,11 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
 
       const isPartInDrawerGroup = !!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer');
       const isDrawer =
+        !isCarcassStructure &&
         !isDoor &&
         (isPartInDrawerGroup ||
           isDrawerFront ||
-          (isInternalBoxPart &&
-            (part.name.toUpperCase().includes('CAJON') ||
-              part.name.toUpperCase().includes('CAJÓN') ||
-              part.name.toUpperCase().includes('GAVETA') ||
-              part.id.includes('caj_') ||
-              part.id.includes('gav_'))));
+          isInternalBoxPart);
 
       let doorPivot: THREE.Group | undefined;
       let hingeSide: 'left' | 'right' | 'top' | 'bottom' = hw.openingDirection || 'left';
@@ -1373,18 +1381,21 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
 
       group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
     } else if (orient === 'vertical_yz') {
-      const isCabinetSide = part.componentRole === 'side_left' || 
+      const isPlinth = part.componentRole === 'plinth' ||
+                            part.name.toUpperCase().includes('ZOCALO') ||
+                            part.name.toUpperCase().includes('ZÓCALO');
+      const isCabinetSide = !isPlinth && (part.componentRole === 'side_left' || 
                             part.componentRole === 'side_right' ||
                             (part.name.toUpperCase().includes('LATERAL') && 
                              !part.name.toUpperCase().includes('CAJ') && 
                              part.componentRole !== 'drawer_box' && 
-                             part.componentRole !== 'drawer_lateral');
+                             part.componentRole !== 'drawer_lateral'));
       const isDrawerLateral = !isCabinetSide && (
         part.componentRole === 'drawer_box' ||
         part.componentRole === 'drawer_lateral' ||
         (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
       );
-      if (isDrawerLateral && (part.length || 0) > (part.width || 0)) {
+      if ((isPlinth || isDrawerLateral) && (part.length || 0) > (part.width || 0)) {
         // En lateral de cajón: Length es profundidad en eje Z, Width es altura en eje Y
         const handleLPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0x2563eb, 'length', 1);
         const handleLMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0x2563eb, 'length', -1);
@@ -1881,18 +1892,21 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         const W = part.width;
         let sx = L; let sy = t; let sz = W;
         if (part.orientation === 'vertical_yz') {
-          const isCabinetSide = part.componentRole === 'side_left' || 
+          const isPlinth = part.componentRole === 'plinth' ||
+                                part.name.toUpperCase().includes('ZOCALO') ||
+                                part.name.toUpperCase().includes('ZÓCALO');
+          const isCabinetSide = !isPlinth && (part.componentRole === 'side_left' || 
                                 part.componentRole === 'side_right' ||
                                 (part.name.toUpperCase().includes('LATERAL') && 
                                  !part.name.toUpperCase().includes('CAJ') && 
                                  part.componentRole !== 'drawer_box' && 
-                                 part.componentRole !== 'drawer_lateral');
+                                 part.componentRole !== 'drawer_lateral'));
           const isDrawerLateral = !isCabinetSide && (
             part.componentRole === 'drawer_box' ||
             part.componentRole === 'drawer_lateral' ||
             (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
           );
-          if (isDrawerLateral && L > W) {
+          if ((isPlinth || isDrawerLateral) && L > W) {
             sx = t; sy = W; sz = L;
           } else {
             sx = t; sy = L; sz = W;
@@ -1954,7 +1968,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
   private getDrawerFacing(part: Part, parts: Part[]): 'front' | 'right' | 'back' | 'left' {
     // 1. Gather all parts that belong to the SAME drawer assembly:
     let drawerParts: Part[] = [];
-    if (part.groupId) {
+    if (part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer')) {
       drawerParts = parts.filter(p => p.groupId === part.groupId);
     } else {
       // Check for common drawer prefix in IDs (e.g., 'caj_ind_0_frente', 'caj_ind_0_lat_izq', etc.)
@@ -2104,13 +2118,8 @@ private createHandleMesh(
 
       group.add(stem, head);
     } else if (handleType === 'profile_gola') {
-      const widthSpan = isSideFacing ? sz : sx;
-      const width = isDoor ? Math.max(80, widthSpan - 12) : Math.max(100, widthSpan - 16);
-      const lipTop = new THREE.Mesh(new THREE.BoxGeometry(width, 6, 18), handleMat);
-      lipTop.position.set(0, 6, 0);
-      const lipFront = new THREE.Mesh(new THREE.BoxGeometry(width, 22, 4), handleMat);
-      lipFront.position.set(0, -2, 7);
-      group.add(lipTop, lipFront);
+      // Perfil Gola retirado por solicitud del usuario
+      return group;
     } else if (handleType === 'cup_vintage') {
       const cupBack = new THREE.Mesh(new THREE.BoxGeometry(96, 36, 4), handleMat);
       cupBack.position.set(0, 0, -10);
@@ -2124,21 +2133,7 @@ private createHandleMesh(
     }
 
     // Posicionar tirador en puerta o cajón según las 4 direcciones cardinales
-    if (handleType === 'profile_gola') {
-      if (drawerFacing === 'front') {
-        group.position.set(0, sy / 2 - 4, sz / 2 + 6);
-        group.rotation.set(0, 0, 0);
-      } else if (drawerFacing === 'back') {
-        group.position.set(0, sy / 2 - 4, -sz / 2 - 6);
-        group.rotation.set(0, Math.PI, 0);
-      } else if (drawerFacing === 'right') {
-        group.position.set(sx / 2 + 6, sy / 2 - 4, 0);
-        group.rotation.set(0, Math.PI / 2, 0);
-      } else {
-        group.position.set(-sx / 2 - 6, sy / 2 - 4, 0);
-        group.rotation.set(0, -Math.PI / 2, 0);
-      }
-    } else if (isDoor) {
+    if (isDoor) {
       const margin = 45;
       const isVerticalBar = handleType === 'bar_modern' || handleType === 'bar_black';
       if (drawerFacing === 'front') {
@@ -2572,16 +2567,24 @@ private createHandleMesh(
     let drawerLatIzq: Part | undefined;
     let drawerLatDer: Part | undefined;
 
+    const isDrawerLateral = (p: Part) =>
+      p.id !== part.id &&
+      p.componentRole !== 'side_left' &&
+      p.componentRole !== 'side_right' &&
+      (p.componentRole === 'drawer_box' ||
+       p.componentRole === 'drawer_lateral' ||
+       (p.name.toUpperCase().includes('LATERAL') && p.name.toUpperCase().includes('CAJ')));
+
     if (part.groupId) {
-      drawerLatIzq = allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ')));
-      drawerLatDer = allParts.find(p => p.groupId === part.groupId && (p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER')));
+      drawerLatIzq = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p) && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('IZQ')));
+      drawerLatDer = allParts.find(p => p.groupId === part.groupId && isDrawerLateral(p) && (p.id.includes('lat_der') || p.name.toUpperCase().includes('DER')));
     }
 
     if (!drawerLatIzq || !drawerLatDer) {
       const prefix = part.id.includes('_frente') ? part.id.split('_frente')[0] : (part.id.includes('_front') ? part.id.split('_front')[0] : '');
       if (prefix) {
-        if (!drawerLatIzq) drawerLatIzq = allParts.find(p => p.id.startsWith(prefix) && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('LATERAL IZQ')));
-        if (!drawerLatDer) drawerLatDer = allParts.find(p => p.id.startsWith(prefix) && (p.id.includes('lat_der') || p.name.toUpperCase().includes('LATERAL DER')));
+        if (!drawerLatIzq) drawerLatIzq = allParts.find(p => p.id.startsWith(prefix) && isDrawerLateral(p) && (p.id.includes('lat_izq') || p.name.toUpperCase().includes('IZQ')));
+        if (!drawerLatDer) drawerLatDer = allParts.find(p => p.id.startsWith(prefix) && isDrawerLateral(p) && (p.id.includes('lat_der') || p.name.toUpperCase().includes('DER')));
       }
     }
 
@@ -2603,9 +2606,17 @@ private createHandleMesh(
         const maxX = Math.max(x1, x2);
         const t1 = (x1 === minX ? drawerLatIzq : drawerLatDer).thickness || 15;
         const t2 = (x2 === maxX ? drawerLatDer : drawerLatIzq).thickness || 15;
-        // Mount strictly to outside faces of lateral panels
-        leftX = (minX - (t1 / 2) - px) - (railThickness / 2);
-        rightX = (maxX + (t2 / 2) - px) + (railThickness / 2);
+        
+        // Guard against matching exterior carcass walls: drawer box laterals must be inside front span
+        const maxExpectedSpan = (sx / 2);
+        if (Math.abs(minX - px) <= maxExpectedSpan && Math.abs(maxX - px) <= maxExpectedSpan) {
+          leftX = (minX - (t1 / 2) - px) - (railThickness / 2);
+          rightX = (maxX + (t2 / 2) - px) + (railThickness / 2);
+        } else {
+          const boxHalfWidth = Math.max(50, (sx / 2) - 13);
+          leftX = -boxHalfWidth - (railThickness / 2);
+          rightX = boxHalfWidth + (railThickness / 2);
+        }
       } else {
         const boxHalfWidth = Math.max(50, (sx / 2) - 13);
         leftX = -boxHalfWidth - (railThickness / 2);
@@ -2657,9 +2668,16 @@ private createHandleMesh(
         const maxZ = Math.max(z1, z2);
         const t1 = (z1 === minZ ? drawerLatIzq : drawerLatDer).thickness || 15;
         const t2 = (z2 === maxZ ? drawerLatDer : drawerLatIzq).thickness || 15;
-        // Mount strictly to outside faces of lateral panels
-        leftZ = (minZ - (t1 / 2) - pz) - (railThickness / 2);
-        rightZ = (maxZ + (t2 / 2) - pz) + (railThickness / 2);
+        // Guard against matching exterior carcass walls: drawer box laterals must be inside front span
+        const maxExpectedSpan = (sz / 2);
+        if (Math.abs(minZ - pz) <= maxExpectedSpan && Math.abs(maxZ - pz) <= maxExpectedSpan) {
+          leftZ = (minZ - (t1 / 2) - pz) - (railThickness / 2);
+          rightZ = (maxZ + (t2 / 2) - pz) + (railThickness / 2);
+        } else {
+          const boxHalfWidth = Math.max(50, (sz / 2) - 13);
+          leftZ = -boxHalfWidth - (railThickness / 2);
+          rightZ = boxHalfWidth + (railThickness / 2);
+        }
       } else {
         const boxHalfWidth = Math.max(50, (sz / 2) - 13);
         leftZ = -boxHalfWidth - (railThickness / 2);
@@ -6821,18 +6839,21 @@ nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
 
     const orient = part.orientation || 'horizontal';
     if (orient === 'vertical_yz') {
-      const isCabinetSide = part.componentRole === 'side_left' ||
+      const isPlinth = part.componentRole === 'plinth' ||
+                            part.name.toUpperCase().includes('ZOCALO') ||
+                            part.name.toUpperCase().includes('ZÓCALO');
+      const isCabinetSide = !isPlinth && (part.componentRole === 'side_left' ||
                             part.componentRole === 'side_right' ||
                             (part.name.toUpperCase().includes('LATERAL') &&
                              !part.name.toUpperCase().includes('CAJ') &&
                              part.componentRole !== 'drawer_box' &&
-                             part.componentRole !== 'drawer_lateral');
+                             part.componentRole !== 'drawer_lateral'));
       const isDrawerLateral = !isCabinetSide && (
         part.componentRole === 'drawer_box' ||
         part.componentRole === 'drawer_lateral' ||
         (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
       );
-      if (isDrawerLateral && L > W) {
+      if ((isPlinth || isDrawerLateral) && L > W) {
         sx = t;
         sy = W;
         sz = L;
@@ -8031,8 +8052,11 @@ private applyMagneticSnapToPosition(
 
     const targetPiece = this.pieceObjects.find(p => p.part.id === partId);
     if (targetPiece) {
-      // 1. If part belongs to a PartGroup (e.g. modular drawer), synchronize ALL parts in that group
-      if (targetPiece.part.groupId) {
+      // 1. If part belongs to an explicit modular drawer sub-group, synchronize parts in that drawer group only
+      const isDedicatedDrawerGroup = !!targetPiece.part.groupId &&
+        this.partGroups().some(g => g.id === targetPiece.part.groupId && g.type === 'drawer');
+
+      if (isDedicatedDrawerGroup) {
         const gId = targetPiece.part.groupId;
         for (const p of this.pieceObjects) {
           if (p.part.groupId === gId) {

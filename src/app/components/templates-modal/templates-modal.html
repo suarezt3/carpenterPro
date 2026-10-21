@@ -90,6 +90,15 @@
 
           <button
             type="button"
+            (click)="selectPreset('drawers')"
+            [class]="activePreset() === 'drawers' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
+            class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+            <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
+            <span>Cajonera (Gavetas)</span>
+          </button>
+
+          <button
+            type="button"
             (click)="selectPreset('kitchen_wall')"
             [class]="activePreset() === 'kitchen_wall' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
             class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
@@ -287,8 +296,147 @@
               </div>
             </div>
 
-            <!-- 3. Configuración de Puertas -->
-            <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+            @if (activePreset() === 'drawers') {
+              <!-- 3. Configuración de Cajones / Gavetas -->
+              <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                    <span>Configuración de Cajones</span>
+                  </span>
+                  <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    {{ drawersCount() }} Gavetas
+                  </span>
+                </div>
+
+                <!-- Selector de 2 a 6 cajones -->
+                <div>
+                  <span class="block text-[11px] font-bold text-slate-700 mb-1.5">Número de Gavetas:</span>
+                  <div class="grid grid-cols-5 gap-2">
+                    @for (cnt of [2, 3, 4, 5, 6]; track cnt) {
+                      <button
+                        type="button"
+                        (click)="drawersCount.set(cnt)"
+                        [class]="drawersCount() === cnt ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 font-medium'"
+                        class="py-2 rounded-xl text-center transition cursor-pointer flex flex-col items-center gap-0.5">
+                        <span class="text-sm font-bold">{{ cnt }}</span>
+                        <span class="text-[9px] uppercase tracking-wider opacity-80">{{ cnt === 1 ? 'Cajón' : 'Cajones' }}</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <!-- Opciones de Corredera y Tipo de Frente -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                  <div>
+                    <span class="block text-[11px] font-bold text-slate-700 mb-1">Tipo de Correderas:</span>
+                    <select
+                      [value]="drawerSlideType()"
+                      (change)="drawerSlideType.set($any($event.target).value)"
+                      class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                      <option value="telescopic">Telescópica Estándar (45kg)</option>
+                      <option value="soft_close">Telescópica Cierre Suave (Soft-Close)</option>
+                      <option value="telescopic_35">Telescópica Liviana (35mm)</option>
+                      <option value="undermount">Oculta / Extracción Bajo Fondo</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <span class="block text-[11px] font-bold text-slate-700 mb-1">Montaje de Frentes:</span>
+                    <select
+                      [value]="drawerFrontType()"
+                      (change)="drawerFrontType.set($any($event.target).value)"
+                      class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                      <option value="overlay">Sobrepuesto / Parche (Cubre costados)</option>
+                      <option value="inset">Embutido / Inset (Enrasado interno)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Zócalo Inferior -->
+                <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      [checked]="hasPlinth()"
+                      (change)="hasPlinth.set($any($event.target).checked)"
+                      class="rounded text-indigo-600 focus:ring-0" />
+                    <span>Incluir Zócalo Inferior</span>
+                  </label>
+
+                  @if (hasPlinth()) {
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[11px] text-slate-500">Altura:</span>
+                      @for (ph of [50, 70, 100, 120]; track ph) {
+                        <button
+                          type="button"
+                          (click)="plinthHeight.set(ph)"
+                          [class]="plinthHeight() === ph ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                          class="px-2 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
+                          {{ ph }}mm
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- 4. Tiradores de Cajón -->
+              <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.knob" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                    <span>Tiradores de Cajón</span>
+                  </span>
+
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      [checked]="hasHandle()"
+                      (change)="hasHandle.set($any($event.target).checked)"
+                      class="sr-only peer" />
+                    <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    <span class="ml-2 text-xs font-semibold text-slate-700">
+                      {{ hasHandle() ? 'Con Tirador' : 'Sin Tirador (Push)' }}
+                    </span>
+                  </label>
+                </div>
+
+                @if (hasHandle()) {
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <span class="block text-[11px] font-bold text-slate-700 mb-1">Modelo de Tirador:</span>
+                      <select
+                        [value]="handleType()"
+                        (change)="handleType.set($any($event.target).value)"
+                        class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                        <option value="bar_modern">Barra Tubular Centrada</option>
+                        <option value="bar_black">Perfil Negro Minimalista</option>
+                        <option value="knob_round">Tirador Botón Centrado</option>
+                        <option value="knob_square">Tirador Cuadrado</option>
+                        <option value="cup_vintage">Concha Clásica</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <span class="block text-[11px] font-bold text-slate-700 mb-1">Acabado / Material:</span>
+                      <select
+                        [value]="handleFinish()"
+                        (change)="handleFinish.set($any($event.target).value)"
+                        class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                        <option value="brushed_steel">Acero Inox Cepillado</option>
+                        <option value="black">Negro Mate</option>
+                        <option value="gold">Dorado / Oro Satinado</option>
+                        <option value="chrome">Cromo Brillante</option>
+                        <option value="white">Blanco Nieve</option>
+                      </select>
+                    </div>
+                  </div>
+                }
+              </div>
+            } @else {
+              <!-- 3. Configuración de Puertas -->
+              <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
               <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
                 <span>Configuración de Puertas</span>
@@ -412,7 +560,6 @@
                         <option value="bar_black">Perfil Negro Minimalista</option>
                         <option value="knob_round">Tirador Botón Redondo</option>
                         <option value="knob_square">Tirador Cuadrado</option>
-                        <option value="profile_gola">Perfil J / Gola Integrado</option>
                         <option value="cup_vintage">Concha Clásica</option>
                       </select>
                     </div>
@@ -542,6 +689,7 @@
                 }
               }
             </div>
+          }
 
             <!-- 6. Fondo Trasero MDF 3mm -->
             <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs flex items-center justify-between">
@@ -593,11 +741,13 @@
                 </div>
               </div>
 
-              <!-- Material Puerta -->
-              @if (doorOpening() !== 'none') {
+              <!-- Material Puerta / Frente -->
+              @if (activePreset() === 'drawers' || doorOpening() !== 'none') {
                 <div class="pt-2 border-t border-slate-100 space-y-2">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-700">Material de las Puertas:</span>
+                    <span class="text-xs font-bold text-slate-700">
+                      {{ activePreset() === 'drawers' ? 'Material de los Frentes de Cajón:' : 'Material de las Puertas:' }}
+                    </span>
                     <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
                       <input
                         type="checkbox"
@@ -661,61 +811,95 @@
                   <!-- Espesor interior de laterales y tapas -->
                   <rect x="30" y="25" width="140" height="190" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
 
-                  <!-- Entrepaños / Repisas calculadas -->
-                  @for (s of effectiveShelvesList(); track s.index) {
-                    @let shelfSvgY = 215 - (190 * (s.percentage / 100));
-                    <line x1="30" [attr.y1]="shelfSvgY" x2="170" [attr.y2]="shelfSvgY" stroke="#64748b" stroke-width="3" />
-                  }
+                  <!-- Fachada / Puertas O Cajones -->
+                  @if (activePreset() === 'drawers') {
+                    <!-- Frentes de Cajón Apilados -->
+                    @for (box of drawerBoxesBlueprint(); track box.index) {
+                      <rect
+                        x="27"
+                        [attr.y]="box.y"
+                        width="146"
+                        [attr.height]="box.height"
+                        fill="rgba(99, 102, 241, 0.08)"
+                        stroke="#4f46e5"
+                        stroke-width="1.8"
+                        rx="1" />
+                      <!-- Tirador Centrado Horizontal -->
+                      @if (hasHandle()) {
+                        <rect
+                          x="82"
+                          [attr.y]="box.handleY"
+                          width="36"
+                          height="4"
+                          fill="#1e293b"
+                          rx="1" />
+                      }
+                      <!-- Correderas Laterales Guía -->
+                      <line x1="28" [attr.y1]="box.y + (box.height / 2)" x2="33" [attr.y2]="box.y + (box.height / 2)" stroke="#0284c7" stroke-width="2" />
+                      <line x1="167" [attr.y1]="box.y + (box.height / 2)" x2="172" [attr.y2]="box.y + (box.height / 2)" stroke="#0284c7" stroke-width="2" />
+                    }
+                    <!-- Zócalo si está activo -->
+                    @if (hasPlinth()) {
+                      <rect x="30" y="195" width="140" height="20" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1" />
+                      <text x="100" y="209" font-size="8" font-family="monospace" font-weight="bold" fill="#64748b" text-anchor="middle">ZÓCALO {{ plinthHeight() }}mm</text>
+                    }
+                  } @else {
+                    <!-- Entrepaños / Repisas calculadas -->
+                    @for (s of effectiveShelvesList(); track s.index) {
+                      @let shelfSvgY = 215 - (190 * (s.percentage / 100));
+                      <line x1="30" [attr.y1]="shelfSvgY" x2="170" [attr.y2]="shelfSvgY" stroke="#64748b" stroke-width="3" />
+                    }
 
-                  <!-- Fachada / Puertas -->
-                  @if (doorOpening() === 'left') {
-                    <!-- 1 Puerta completa (Abre Izq) -->
-                    <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <!-- Líneas punteadas de abatimiento (Vértice en la derecha) -->
-                    <line x1="27" y1="22" x2="173" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <line x1="27" y1="218" x2="173" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <!-- Bisagras a la izquierda -->
-                    <rect x="23" y="38" width="4" height="14" fill="#0284c7" rx="1" />
-                    <rect x="23" y="188" width="4" height="14" fill="#0284c7" rx="1" />
-                    <!-- Manija a la derecha -->
-                    @if (hasHandle()) {
-                      <rect x="162" y="105" width="4" height="28" fill="#1e293b" rx="1" />
-                    }
-                  } @else if (doorOpening() === 'right') {
-                    <!-- 1 Puerta completa (Abre Der) -->
-                    <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <!-- Líneas punteadas de abatimiento (Vértice en la izquierda) -->
-                    <line x1="173" y1="22" x2="27" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <line x1="173" y1="218" x2="27" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <!-- Bisagras a la derecha -->
-                    <rect x="173" y="38" width="4" height="14" fill="#0284c7" rx="1" />
-                    <rect x="173" y="188" width="4" height="14" fill="#0284c7" rx="1" />
-                    <!-- Manija a la izquierda -->
-                    @if (hasHandle()) {
-                      <rect x="34" y="105" width="4" height="28" fill="#1e293b" rx="1" />
-                    }
-                  } @else if (doorOpening() === 'double') {
-                    <!-- 2 Puertas Dobles (Puerta Izquierda y Derecha) -->
-                    <rect x="27" y="22" width="71" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <rect x="102" y="22" width="71" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <!-- Abatimiento puerta izq -->
-                    <line x1="27" y1="22" x2="98" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                    <line x1="27" y1="218" x2="98" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                    <!-- Abatimiento puerta der -->
-                    <line x1="173" y1="22" x2="102" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                    <line x1="173" y1="218" x2="102" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                    <!-- Manijas en el centro -->
-                    @if (hasHandle()) {
-                      <rect x="91" y="105" width="3" height="26" fill="#1e293b" rx="1" />
-                      <rect x="106" y="105" width="3" height="26" fill="#1e293b" rx="1" />
-                    }
-                  } @else if (doorOpening() === 'top') {
-                    <!-- 1 Puerta Elevable Superior -->
-                    <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                    <line x1="27" y1="22" x2="100" y2="218" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    <line x1="173" y1="22" x2="100" y2="218" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                    @if (hasHandle()) {
-                      <rect x="85" y="206" width="30" height="4" fill="#1e293b" rx="1" />
+                    <!-- Fachada / Puertas -->
+                    @if (doorOpening() === 'left') {
+                      <!-- 1 Puerta completa (Abre Izq) -->
+                      <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <!-- Líneas punteadas de abatimiento (Vértice en la derecha) -->
+                      <line x1="27" y1="22" x2="173" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="27" y1="218" x2="173" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <!-- Bisagras a la izquierda -->
+                      <rect x="23" y="38" width="4" height="14" fill="#0284c7" rx="1" />
+                      <rect x="23" y="188" width="4" height="14" fill="#0284c7" rx="1" />
+                      <!-- Manija a la derecha -->
+                      @if (hasHandle()) {
+                        <rect x="162" y="105" width="4" height="28" fill="#1e293b" rx="1" />
+                      }
+                    } @else if (doorOpening() === 'right') {
+                      <!-- 1 Puerta completa (Abre Der) -->
+                      <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <!-- Líneas punteadas de abatimiento (Vértice en la izquierda) -->
+                      <line x1="173" y1="22" x2="27" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="173" y1="218" x2="27" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <!-- Bisagras a la derecha -->
+                      <rect x="173" y="38" width="4" height="14" fill="#0284c7" rx="1" />
+                      <rect x="173" y="188" width="4" height="14" fill="#0284c7" rx="1" />
+                      <!-- Manija a la izquierda -->
+                      @if (hasHandle()) {
+                        <rect x="34" y="105" width="4" height="28" fill="#1e293b" rx="1" />
+                      }
+                    } @else if (doorOpening() === 'double') {
+                      <!-- 2 Puertas Dobles (Puerta Izquierda y Derecha) -->
+                      <rect x="27" y="22" width="71" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <rect x="102" y="22" width="71" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <!-- Abatimiento puerta izq -->
+                      <line x1="27" y1="22" x2="98" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <line x1="27" y1="218" x2="98" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <!-- Abatimiento puerta der -->
+                      <line x1="173" y1="22" x2="102" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <line x1="173" y1="218" x2="102" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <!-- Manijas en el centro -->
+                      @if (hasHandle()) {
+                        <rect x="91" y="105" width="3" height="26" fill="#1e293b" rx="1" />
+                        <rect x="106" y="105" width="3" height="26" fill="#1e293b" rx="1" />
+                      }
+                    } @else if (doorOpening() === 'top') {
+                      <!-- 1 Puerta Elevable Superior -->
+                      <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <line x1="27" y1="22" x2="100" y2="218" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="173" y1="22" x2="100" y2="218" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      @if (hasHandle()) {
+                        <rect x="85" y="206" width="30" height="4" fill="#1e293b" rx="1" />
+                      }
                     }
                   }
 
@@ -736,8 +920,13 @@
                   <strong class="text-slate-800 font-bold">{{ innerWidth() }} × {{ innerHeight() }} × {{ innerDepth() }} mm</strong>
                 </div>
                 <div class="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                  <span class="text-slate-400 block font-sans text-[10px]">Corte Puerta(s):</span>
-                  @if (doorOpening() !== 'none') {
+                  @if (activePreset() === 'drawers') {
+                    <span class="text-slate-400 block font-sans text-[10px]">Frentes de Cajón:</span>
+                    <strong class="text-indigo-600 font-bold">
+                      {{ drawerFrontWidth() }} × {{ drawerFrontHeight() }} mm (×{{ drawersCount() }})
+                    </strong>
+                  } @else if (doorOpening() !== 'none') {
+                    <span class="text-slate-400 block font-sans text-[10px]">Corte Puerta(s):</span>
                     <strong class="text-indigo-600 font-bold">
                       {{ doorCutWidth() }} × {{ doorCutHeight() }} mm
                       @if (doorOpening() === 'double') {
@@ -745,10 +934,18 @@
                       }
                     </strong>
                   } @else {
+                    <span class="text-slate-400 block font-sans text-[10px]">Corte Puerta(s):</span>
                     <strong class="text-slate-400 font-bold">Sin puertas</strong>
                   }
                 </div>
               </div>
+
+              @if (activePreset() === 'drawers') {
+                <div class="w-full mt-2 p-2 rounded-lg bg-indigo-50/70 border border-indigo-100 flex items-center justify-between text-[11px] font-mono">
+                  <span class="text-indigo-700 font-sans text-[10px] font-bold">Correderas:</span>
+                  <strong class="text-indigo-900 font-bold">{{ recommendedSlideLength() }} mm ({{ drawerSlideType() === 'soft_close' ? 'Cierre Suave' : drawerSlideType() === 'undermount' ? 'Oculta' : 'Telescópica' }})</strong>
+                </div>
+              }
             </div>
 
             <!-- TARJETA INFORMATIVA DE EDICIÓN POSTERIOR -->

@@ -586,6 +586,10 @@ export class CabinetGeneratorService {
     config: ParametricCabinetConfig, 
     materials: Material[]
   ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
+    if (config.moduleType === 'drawer_unit' || config.category === 'drawers' || config.category === 'cajones' || (config.drawersCount && config.drawersCount > 0 && config.moduleType !== 'wall_cabinet')) {
+      return this.generateParametricDrawerUnit(config, materials);
+    }
+
     const moduleId = config.id || `module_cab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const groupId = `group_cab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const groupName = config.name || `Módulo Paramétrico (${config.code || 'MOD001'})`;
@@ -1059,6 +1063,505 @@ export class CabinetGeneratorService {
     return { module, parts, group };
   }
 
+  private generateParametricDrawerUnit(
+    config: ParametricCabinetConfig,
+    materials: Material[]
+  ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
+    const moduleId = config.id || `module_caj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const groupId = `group_caj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const groupName = config.name || `Cajonera (${config.code || 'CAJ001'})`;
+
+    const mainMat = materials.find(m => m.id === config.structureMaterialId) || materials[0];
+    const frontMat = materials.find(m => m.id === config.doorMaterialId) || mainMat;
+    const backMat = materials.find(m => m.id === config.backMaterialId) ||
+                    materials.find(m => m.thickness <= 6) ||
+                    materials.find(m => m.name.toLowerCase().includes('mdf')) ||
+                    { id: 'mat_mdf_3', name: 'MDF 3mm', thickness: 3 };
+
+    const t = Math.max(12, Number(config.structureThickness) || 18);
+    const doorT = Math.max(12, Number(config.doorThickness) || t);
+    const backT = Math.max(3, Number(config.backThickness) || 3);
+    const w = Math.max(300, Number(config.width) || 600);
+    const h = Math.max(400, Number(config.height) || 750);
+    const d = Math.max(300, Number(config.depth) || 500);
+    const gap = config.facadeGap ?? 3;
+
+    const drawersCount = Math.max(1, Math.min(6, Math.floor(Number(config.drawersCount) || 3)));
+    const hasPlinth = config.hasPlinth !== false;
+    const plinthH = hasPlinth ? (Number(config.plinthHeight) || 70) : 0;
+    const slideType = config.drawerSlideType || 'telescopic';
+    const isOverlay = config.drawerFrontType !== 'inset';
+    const includeBack = config.hasBackPanel !== false;
+    const hasHandle = config.hasHandle !== false;
+    const hType = hasHandle ? (config.handleType || 'bar_modern') : 'none';
+    const hFinish = config.handleFinish || 'brushed_steel';
+
+    // Coordenadas del centro
+    const posX = Number.isFinite(Number(config.posX)) ? Number(config.posX) : 0;
+    const posY = Number.isFinite(Number(config.posY)) ? Number(config.posY) : (h / 2);
+    const posZ = Number.isFinite(Number(config.posZ)) ? Number(config.posZ) : 0;
+
+    // Medidas del casco (carcass)
+    const carcassDepth = isOverlay ? Math.max(200, d - doorT) : d;
+    const carcassCenterZ = isOverlay ? (posZ - (doorT / 2)) : posZ;
+    const carcassFrontZ = carcassCenterZ + (carcassDepth / 2);
+    const carcassBackZ = carcassCenterZ - (carcassDepth / 2);
+
+    const innerWidth = Math.max(50, w - (2 * t));
+    const sideH = Math.max(100, h - t - plinthH);
+    const sideCenterY = posY - (h / 2) + plinthH + (sideH / 2);
+
+    const parts: Part[] = [];
+
+    // 1. Cubierta Superior / Tapa (cubre todo el ancho y fondo del mueble)
+    parts.push({
+      id: `${moduleId}_tapa_${Date.now()}`,
+      name: 'Cubierta Superior',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: w,
+      width: d,
+      thickness: t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+      posX,
+      posY: posY + (h / 2) - (t / 2),
+      posZ,
+      orientation: 'horizontal',
+      componentRole: 'top',
+      notes: 'Cubierta superior del mueble'
+    });
+
+    // 2. Lateral Izquierdo
+    parts.push({
+      id: `${moduleId}_lat_izq_${Date.now()}`,
+      name: 'Lateral Izquierdo',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: sideH,
+      width: carcassDepth,
+      thickness: t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+      posX: posX - (w / 2) + (t / 2),
+      posY: sideCenterY,
+      posZ: carcassCenterZ,
+      orientation: 'vertical_yz',
+      componentRole: 'side_left',
+      notes: 'Costado izquierdo de cajonera'
+    });
+
+    // 3. Lateral Derecho
+    parts.push({
+      id: `${moduleId}_lat_der_${Date.now()}`,
+      name: 'Lateral Derecho',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: sideH,
+      width: carcassDepth,
+      thickness: t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+      posX: posX + (w / 2) - (t / 2),
+      posY: sideCenterY,
+      posZ: carcassCenterZ,
+      orientation: 'vertical_yz',
+      componentRole: 'side_right',
+      notes: 'Costado derecho de cajonera'
+    });
+
+    // 4. Piso Inferior
+    parts.push({
+      id: `${moduleId}_piso_${Date.now()}`,
+      name: 'Piso Inferior',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: innerWidth,
+      width: carcassDepth,
+      thickness: t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX,
+      posY: posY - (h / 2) + plinthH + (t / 2),
+      posZ: carcassCenterZ,
+      orientation: 'horizontal',
+      componentRole: 'bottom',
+      notes: 'Base inferior estructural'
+    });
+
+    // 5. Base de Zócalo Perimetral Cerrada (4 lados: frontal, trasero y laterales con retranqueo uniforme)
+    if (hasPlinth && plinthH > 0) {
+      const recess = 25; // Retranqueo perimetral uniforme de 25mm en los 4 costados
+      const plinthOuterW = Math.max(50, w - (2 * recess));
+      const plinthOuterD = Math.max(50, carcassDepth - (2 * recess));
+      const plinthInnerD = Math.max(50, plinthOuterD - (2 * t));
+      const plinthCenterY = posY - (h / 2) + (plinthH / 2);
+
+      // 5.1 Zócalo Frontal (Cubre el ancho completo del marco de zócalo para vista frontal continua)
+      parts.push({
+        id: `${moduleId}_zocalo_frontal_${Date.now()}`,
+        name: 'Zócalo Frontal',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthOuterW,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: plinthCenterY,
+        posZ: carcassCenterZ + (carcassDepth / 2) - recess - (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo frontal perimetral'
+      });
+
+      // 5.2 Zócalo Trasero (Cierra el marco perimetral por detrás)
+      parts.push({
+        id: `${moduleId}_zocalo_trasero_${Date.now()}`,
+        name: 'Zócalo Trasero',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthOuterW,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: plinthCenterY,
+        posZ: carcassCenterZ - (carcassDepth / 2) + recess + (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo trasero perimetral'
+      });
+
+      // 5.3 Zócalo Lateral Izquierdo (Encaja limpiamente entre frontal y trasero)
+      parts.push({
+        id: `${moduleId}_zocalo_lat_izq_${Date.now()}`,
+        name: 'Zócalo Lateral Izquierdo',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthInnerD,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX - (w / 2) + recess + (t / 2),
+        posY: plinthCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'plinth',
+        notes: 'Zócalo lateral izquierdo perimetral'
+      });
+
+      // 5.4 Zócalo Lateral Derecho (Encaja limpiamente entre frontal y trasero)
+      parts.push({
+        id: `${moduleId}_zocalo_lat_der_${Date.now()}`,
+        name: 'Zócalo Lateral Derecho',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthInnerD,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX + (w / 2) - recess - (t / 2),
+        posY: plinthCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'plinth',
+        notes: 'Zócalo lateral derecho perimetral'
+      });
+    }
+
+    // 6. Fondo Trasera MDF
+    if (includeBack) {
+      const isGroove = config.backType !== 'overlay';
+      const backPosZ = isGroove ? (carcassBackZ + 15 + (backT / 2)) : (carcassBackZ - (backT / 2));
+      const backLength = isGroove ? Math.max(50, innerWidth - 2) : Math.max(50, w - 4);
+      const backHeight = isGroove ? Math.max(50, sideH - 2) : Math.max(50, sideH);
+
+      parts.push({
+        id: `${moduleId}_fondo_mdf_${Date.now()}`,
+        name: isGroove ? 'Fondo Trasero Ranurado' : 'Fondo Trasero Sobrepuesto',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: backLength,
+        width: backHeight,
+        thickness: backT,
+        quantity: 1,
+        materialId: backMat.id,
+        materialName: backMat.name,
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: sideCenterY,
+        posZ: backPosZ,
+        orientation: 'vertical_xy',
+        componentRole: 'back',
+        notes: `Fondo MDF ${backT}mm`
+      });
+    }
+
+    // 7. Generación de Gavetas / Cajones
+    const availableFrontH = isOverlay
+      ? (h - plinthH - t - (gap * (drawersCount + 1)))
+      : (sideH - t - (gap * (drawersCount + 1)));
+
+    const frontHeight = Math.max(60, Math.floor((availableFrontH / drawersCount) * 10) / 10);
+    const frontWidth = isOverlay ? Math.max(100, w - (gap * 2)) : Math.max(100, innerWidth - (gap * 2));
+    const frontCenterZ = isOverlay ? (posZ + (d / 2) - (doorT / 2)) : (carcassFrontZ - (doorT / 2));
+
+    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
+    const targetDepth = carcassDepth - 35;
+    const slideLength = standardLengths.filter(l => l <= targetDepth).pop() || 350;
+
+    const boxClearancePerSide = 12.7; // 1/2" por lado
+    const boxOuterWidth = innerWidth - (boxClearancePerSide * 2);
+    const boxInnerWidth = boxOuterWidth - (2 * t);
+    const boxHeight = Math.max(70, Math.min(Math.floor(frontHeight * 0.72), 220));
+    const boxFrontZ = frontCenterZ - (doorT / 2);
+
+    for (let i = 0; i < drawersCount; i++) {
+      const drawerIdx = i + 1; // 1 = Inferior, ..., N = Superior
+      const drawerUid = `${Date.now()}_${i}_${Math.random().toString(36).substring(2, 5)}`;
+      const drawerLabel = drawersCount === 3
+        ? (i === 0 ? 'Cajón Inferior' : (i === 1 ? 'Cajón Medio' : 'Cajón Superior'))
+        : `Cajón ${drawerIdx}`;
+
+      const frontBottomY = (posY - (h / 2) + plinthH) + gap + (i * (frontHeight + gap));
+      const frontCenterY = frontBottomY + (frontHeight / 2);
+      const boxCenterY = frontCenterY - ((frontHeight - boxHeight) * 0.12);
+
+      // Frente Decorativo Exterior
+      parts.push({
+        id: `${moduleId}_caj_${drawerIdx}_frente_${drawerUid}`,
+        name: `${drawerLabel} - Frente Vista`,
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: frontWidth,
+        width: frontHeight,
+        thickness: doorT,
+        quantity: 1,
+        materialId: frontMat.id,
+        materialName: frontMat.name,
+        grain: frontMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX,
+        posY: frontCenterY,
+        posZ: frontCenterZ,
+        orientation: 'vertical_xy',
+        componentRole: 'drawer_front',
+        hardwareConfig: {
+          isMovable: true,
+          movableType: 'drawer',
+          slideType,
+          handleType: hType,
+          handleFinish: hFinish,
+          handlePosition: 'horizontal',
+          isOpen: false
+        },
+        notes: `Frente exterior ${drawerLabel}`
+      });
+
+      // Lateral Izquierdo de Caja
+      parts.push({
+        id: `${moduleId}_caj_${drawerIdx}_lat_izq_${drawerUid}`,
+        name: `${drawerLabel} - Lateral Izquierdo`,
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: slideLength,
+        width: boxHeight,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX - (boxOuterWidth / 2) + (t / 2),
+        posY: boxCenterY,
+        posZ: boxFrontZ - (slideLength / 2),
+        orientation: 'vertical_yz',
+        componentRole: 'drawer_box',
+        notes: `Lateral cajón corredera ${slideLength}mm`
+      });
+
+      // Lateral Derecho de Caja
+      parts.push({
+        id: `${moduleId}_caj_${drawerIdx}_lat_der_${drawerUid}`,
+        name: `${drawerLabel} - Lateral Derecho`,
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: slideLength,
+        width: boxHeight,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX + (boxOuterWidth / 2) - (t / 2),
+        posY: boxCenterY,
+        posZ: boxFrontZ - (slideLength / 2),
+        orientation: 'vertical_yz',
+        componentRole: 'drawer_box',
+        notes: `Lateral cajón corredera ${slideLength}mm`
+      });
+
+      // Contrafrente Interior de Caja (entre laterales)
+      parts.push({
+        id: `${moduleId}_caj_${drawerIdx}_contrafrente_${drawerUid}`,
+        name: `${drawerLabel} - Contrafrente Interior`,
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: boxInnerWidth,
+        width: boxHeight,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: boxCenterY,
+        posZ: boxFrontZ - (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'drawer_box',
+        notes: 'Frente interior atornillado al frente vista'
+      });
+
+      // Trasera Interior de Caja (entre laterales)
+      parts.push({
+        id: `${moduleId}_caj_${drawerIdx}_trasera_${drawerUid}`,
+        name: `${drawerLabel} - Trasera Interior`,
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: boxInnerWidth,
+        width: boxHeight,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: boxCenterY,
+        posZ: boxFrontZ - slideLength + (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'drawer_box',
+        notes: 'Trasera de caja interior'
+      });
+
+      // Fondo MDF de Caja
+      parts.push({
+        id: `${moduleId}_caj_${drawerIdx}_fondo_${drawerUid}`,
+        name: `${drawerLabel} - Fondo MDF`,
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: boxInnerWidth,
+        width: slideLength - (2 * t),
+        thickness: backT,
+        quantity: 1,
+        materialId: backMat.id,
+        materialName: backMat.name,
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: boxCenterY - (boxHeight / 2) + (backT / 2) + 8,
+        posZ: boxFrontZ - (slideLength / 2),
+        orientation: 'horizontal',
+        componentRole: 'drawer_box',
+        notes: `Fondo de cajón MDF ${backT}mm`
+      });
+    }
+
+    const module: FurnitureModule = {
+      id: moduleId,
+      name: groupName,
+      type: 'base_cabinet',
+      width: w,
+      height: h,
+      depth: d,
+      boardThickness: t,
+      backThickness: backT,
+      backType: config.backType || 'groove',
+      shelvesCount: 0,
+      doorsCount: 0,
+      doorsType: 'overlay',
+      drawersCount,
+      hasPlinth,
+      plinthHeight: plinthH,
+      materialId: mainMat.id,
+      backMaterialId: backMat.id,
+      defaultThinEdge: true,
+      defaultThickDoors: true
+    };
+
+    const group: PartGroup = {
+      id: groupId,
+      name: groupName,
+      type: 'assembly',
+      isOpen: false,
+      parametricConfig: config
+    };
+
+    return { module, parts, group };
+  }
+
   /**
    * Reconstruye una configuración paramétrica a partir de las piezas existentes de un grupo
    */
@@ -1120,7 +1623,12 @@ export class CabinetGeneratorService {
         facadeGap: Number(raw.facadeGap) || 3,
         posX: Number.isFinite(Number(raw.posX)) ? Number(raw.posX) : 0,
         posY: Number.isFinite(Number(raw.posY)) ? Number(raw.posY) : undefined,
-        posZ: Number.isFinite(Number(raw.posZ)) ? Number(raw.posZ) : 0
+        posZ: Number.isFinite(Number(raw.posZ)) ? Number(raw.posZ) : 0,
+        drawersCount: Math.max(1, Math.min(6, Math.floor(Number(raw.drawersCount) || 3))),
+        drawerSlideType: raw.drawerSlideType || 'telescopic',
+        drawerFrontType: raw.drawerFrontType || 'overlay',
+        hasPlinth: raw.hasPlinth !== undefined ? Boolean(raw.hasPlinth) : true,
+        plinthHeight: Number(raw.plinthHeight) || 70
       };
     };
 
@@ -1131,6 +1639,7 @@ export class CabinetGeneratorService {
     const sidePart = parts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || parts[0];
     const topOrBottom = parts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
     const doorParts = parts.filter(p => p.componentRole === 'door');
+    const drawerFronts = parts.filter(p => p.componentRole === 'drawer_front');
     const shelfParts = parts.filter(p => p.componentRole === 'shelf');
     const backPart = parts.find(p => p.componentRole === 'back');
 
@@ -1140,8 +1649,51 @@ export class CabinetGeneratorService {
     const height = sidePart ? (rawSideLen > rawSideWid ? rawSideLen : rawSideWid) : 800;
     const innerWidth = Number(topOrBottom?.length) || 570;
     const width = innerWidth + (2 * t);
-    const doorT = doorParts.length > 0 ? (Number(doorParts[0]?.thickness) || 15) : t;
-    const depth = (sidePart ? (rawSideLen > rawSideWid ? rawSideWid : rawSideLen) : 300) + (doorParts.length > 0 ? doorT : 0);
+    const doorT = doorParts.length > 0
+      ? (Number(doorParts[0]?.thickness) || 15)
+      : (drawerFronts.length > 0 ? (Number(drawerFronts[0]?.thickness) || t) : t);
+    const depth = (sidePart ? (rawSideLen > rawSideWid ? rawSideWid : rawSideLen) : 300) + (doorParts.length > 0 || drawerFronts.length > 0 ? doorT : 0);
+
+    // Caso de módulo con cajones (Cajonera)
+    if (drawerFronts.length > 0 || parts.some(p => p.componentRole === 'drawer_box')) {
+      const drawersCount = drawerFronts.length || 3;
+      const frontPart = drawerFronts[0];
+      const hw = frontPart?.hardwareConfig;
+      const plinthPart = parts.find(p => p.componentRole === 'plinth');
+
+      return normalizeConfig({
+        name: group.name || 'Cajonera Paramétrica',
+        code: 'CAJ_' + group.id.slice(-4),
+        moduleType: 'drawer_unit',
+        category: 'drawers',
+        width,
+        height,
+        depth,
+        structureThickness: t,
+        doorThickness: doorT,
+        backThickness: Number(backPart?.thickness) || 3,
+        backType: backPart ? 'groove' : 'none',
+        hasBackPanel: !!backPart,
+        shelvesCount: 0,
+        doorOpening: 'none',
+        drawersCount,
+        drawerSlideType: (hw?.slideType && hw.slideType !== 'none') ? hw.slideType : 'telescopic',
+        drawerFrontType: 'overlay',
+        hasPlinth: !!plinthPart,
+        plinthHeight: plinthPart ? Number(plinthPart.width || 70) : 0,
+        hasHandle: hw?.handleType !== 'none',
+        handleType: hw?.handleType || 'bar_modern',
+        handleFinish: hw?.handleFinish || 'brushed_steel',
+        handlePosition: 'horizontal',
+        structureMaterialId: sidePart?.materialId || 'mat-1',
+        doorMaterialId: frontPart?.materialId || sidePart?.materialId || 'mat-1',
+        backMaterialId: backPart?.materialId || sidePart?.materialId || 'mat-1',
+        facadeGap: 3,
+        posX: Number(parts[0]?.posX) || 0,
+        posY: sidePart?.posY !== undefined ? Number(sidePart.posY) : undefined,
+        posZ: Number(parts[0]?.posZ) || 0
+      });
+    }
 
     let doorOpening: ParametricCabinetConfig['doorOpening'] = 'none';
     if (doorParts.length === 2) {
