@@ -43,6 +43,7 @@ import {
   Part,
   PartGroup,
   Material,
+  LayerVisibilityState,
   DrillHole,
   CollisionRecord,
   EdgeBandingType,
@@ -279,6 +280,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
   roomConfig = input<RoomConfiguration>(DEFAULT_ROOM_CONFIG);
   appliances = input<ApplianceItem[]>([]);
   selectedApplianceId = input<string | null>(null);
+  layerVisibility = input<LayerVisibilityState>({
+    showCountertops: true,
+    showFronts: true,
+    showHandles: true,
+    showPlinths: true,
+    showAppliances: true
+  });
 
   // Outputs
   partSelected = output<Part | null>();
@@ -688,6 +696,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.showHardware();
       this.activeTool();
       this.hiddenPartIds();
+      this.layerVisibility();
+      this.appliances();
 
       if (this.scene) {
         // Read activeSelectedIds untracked so selection changes don't destroy and rebuild the 3D scene!
@@ -733,10 +743,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     });
 
-    // 6. Update 3D Appliances when appliances or selectedApplianceId change
+    // 6. Update 3D Appliances when appliances, selectedApplianceId or layerVisibility change
     effect(() => {
       const appls = this.appliances();
       const selId = this.selectedApplianceId();
+      this.layerVisibility();
       if (this.scene) {
         this.updateAppliancesScene(appls, selId);
       }
@@ -1021,9 +1032,24 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
     }
 
     const selectedDataList: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number }[] = [];
+    const vis = this.layerVisibility();
+    const cutoutAppliances = (this.appliances() || []).filter(a => a.type === 'sink' || a.type === 'cooktop');
 
     for (const part of parts) {
       if (this.hiddenPartIds().has(part.id)) {
+        continue;
+      }
+
+      // Filtro de capas estilo Click-Cuisine 2
+      const role = part.componentRole || 'free';
+      const nameLow = (part.name || '').toLowerCase();
+      if (!vis.showCountertops && (role === 'countertop' || role === 'backsplash' || nameLow.includes('mesón') || nameLow.includes('meson') || nameLow.includes('salpicadero'))) {
+        continue;
+      }
+      if (!vis.showFronts && (role === 'door' || role === 'drawer_front' || role === 'front' || nameLow.includes('puerta') || (nameLow.includes('frente') && !nameLow.includes('contrafrente')))) {
+        continue;
+      }
+      if (!vis.showPlinths && (role === 'plinth' || nameLow.includes('zócalo') || nameLow.includes('zocalo'))) {
         continue;
       }
 
@@ -1043,27 +1069,111 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         selectedDataList.push({ part, px, py, pz, sx, sy, sz });
       }
 
-      // Geometry according to shapeType: circle, freehand or standard box
+      // Detectar si esta pieza horizontal es un mesón o cubierta que debe perforarse automáticamente
+      // para alojar un lavaplatos ('sink') o una estufa de empotrar ('cooktop')
+      const isHorizontalSurface = (part.orientation || 'horizontal') === 'horizontal';
+      const isCountertopOrCover =
+        isHorizontalSurface &&
+        (role === 'countertop' ||
+          role === 'top' ||
+          nameLow.includes('mesón') ||
+          nameLow.includes('meson') ||
+          nameLow.includes('encimera') ||
+          nameLow.includes('cubierta'));
+
+      const partTopY = py + sy / 2;
+      const overlappingCutouts: { localX: number; localZ: number; holeW: number; holeD: number }[] = [];
+
+      if (isCountertopOrCover && cutoutAppliances.length > 0) {
+        const rotYRad = THREE.MathUtils.degToRad(part.rotationY || 0);
+        const cosY = Math.cos(-rotYRad);
+        const sinY = Math.sin(-rotYRad);
+
+        for (const app of cutoutAppliances) {
+          // Verificar proximidad vertical entre el equipo y la superficie superior del mesón
+          if (Math.abs(app.position.y - partTopY) > 180) continue;
+
+          const dxWorld = app.position.x - px;
+          const dzWorld = app.position.z - pz;
+          const localX = dxWorld * cosY - dzWorld * sinY;
+          const localZ = dxWorld * sinY + dzWorld * cosY;
+
+          const appRot = ((app.rotation || 0) % 360 + 360) % 360;
+          const appSpanX = appRot === 90 || appRot === 270 ? app.depth : app.width;
+          const appSpanZ = appRot === 90 || appRot === 270 ? app.width : app.depth;
+
+          // Margen perimetral de apoyo (24mm por lado para que el labio del lavaplatos o vidrio apoye en el mesón)
+          const holeW = Math.max(80, appSpanX - 48);
+          const holeD = Math.max(80, appSpanZ - 48);
+
+          if (Math.abs(localX) < localDims.sx / 2 && Math.abs(localZ) < localDims.sz / 2) {
+            overlappingCutouts.push({ localX, localZ, holeW, holeD });
+          }
+        }
+      }
+
+      // Geometry according to shapeType: circle, freehand, countertop with cutout holes, or standard box
       let geometry: THREE.BufferGeometry;
       if (part.shapeType === 'circle') {
         const radius = part.radius || (part.diameter ? part.diameter / 2 : Math.max(10, (part.width || 600) / 2));
         const cylHeight = (part.length && part.length > part.thickness) ? part.length : (part.thickness || 15);
         geometry = new THREE.CylinderGeometry(radius, radius, cylHeight, 48);
-      } else if (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) {
+      } else if (
+        (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) ||
+        overlappingCutouts.length > 0
+      ) {
         const shape = new THREE.Shape();
-        const pts = part.contourPoints;
-        shape.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) {
-          shape.lineTo(pts[i].x, pts[i].y);
+        const halfSX = localDims.sx / 2;
+        const halfSZ = localDims.sz / 2;
+
+        if (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) {
+          const pts = part.contourPoints;
+          let minPtX = Infinity, maxPtX = -Infinity, minPtY = Infinity, maxPtY = -Infinity;
+          for (const pt of pts) {
+            if (pt.x < minPtX) minPtX = pt.x;
+            if (pt.x > maxPtX) maxPtX = pt.x;
+            if (pt.y < minPtY) minPtY = pt.y;
+            if (pt.y > maxPtY) maxPtY = pt.y;
+          }
+          const midX = (minPtX + maxPtX) / 2;
+          const midY = (minPtY + maxPtY) / 2;
+
+          shape.moveTo(pts[0].x - midX, pts[0].y - midY);
+          for (let i = 1; i < pts.length; i++) {
+            shape.lineTo(pts[i].x - midX, pts[i].y - midY);
+          }
+          shape.closePath();
+        } else {
+          shape.moveTo(-halfSX, -halfSZ);
+          shape.lineTo(halfSX, -halfSZ);
+          shape.lineTo(halfSX, halfSZ);
+          shape.lineTo(-halfSX, halfSZ);
+          shape.closePath();
         }
-        shape.closePath();
+
+        // Perforar huecos booleanos 2D (lavaplatos / estufas de empotrar)
+        for (const hole of overlappingCutouts) {
+          const hx0 = Math.max(-halfSX + 15, hole.localX - hole.holeW / 2);
+          const hx1 = Math.min(halfSX - 15, hole.localX + hole.holeW / 2);
+          const hz0 = Math.max(-halfSZ + 15, hole.localZ - hole.holeD / 2);
+          const hz1 = Math.min(halfSZ - 15, hole.localZ + hole.holeD / 2);
+          if (hx1 - hx0 > 40 && hz1 - hz0 > 40) {
+            const holePath = new THREE.Path();
+            holePath.moveTo(hx0, hz0);
+            holePath.lineTo(hx1, hz0);
+            holePath.lineTo(hx1, hz1);
+            holePath.lineTo(hx0, hz1);
+            holePath.closePath();
+            shape.holes.push(holePath);
+          }
+        }
 
         const extrudeGeom = new THREE.ExtrudeGeometry(shape, {
           depth: localDims.sy,
           bevelEnabled: false
         });
         extrudeGeom.rotateX(Math.PI / 2);
-        extrudeGeom.center();
+        extrudeGeom.translate(0, localDims.sy / 2, 0);
         geometry = extrudeGeom;
       } else {
         geometry = new THREE.BoxGeometry(localDims.sx, localDims.sy, localDims.sz);
@@ -1260,8 +1370,10 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         doorPivot.add(mesh);
 
         if (shouldRenderHardware) {
-          handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, true, hingeSide, doorFacing);
-          if (handleGroup) mesh.add(handleGroup);
+          if (vis.showHandles) {
+            handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, true, hingeSide, doorFacing);
+            if (handleGroup) mesh.add(handleGroup);
+          }
 
           hingeGroup = this.createHingesMesh(part, hw, sx, sy, sz, hingeSide, doorFacing);
           if (hingeGroup) mesh.add(hingeGroup);
@@ -1294,8 +1406,10 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         }
 
         if (isDrawerFront && shouldRenderHardware) {
-          handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, false, 'top', drawerFacing);
-          if (handleGroup) mesh.add(handleGroup);
+          if (vis.showHandles) {
+            handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, false, 'top', drawerFacing);
+            if (handleGroup) mesh.add(handleGroup);
+          }
 
           slideGroup = this.createDrawerSlidesMesh(part, hw, sx, sy, sz, drawerFacing);
           if (slideGroup) mesh.add(slideGroup);
@@ -5918,12 +6032,21 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
   readonly isContextMenuDrawerGroup = computed<boolean>(() => {
     const grp = this.contextMenuGroup();
     if (!grp) return false;
-    return grp.type === 'drawer' || grp.name.toUpperCase().includes('CAJ') || grp.name.toUpperCase().includes('GAVET');
+    return grp.type === 'drawer';
+  });
+
+  readonly isContextMenuCountertopGroup = computed<boolean>(() => {
+    const grp = this.contextMenuGroup();
+    if (!grp) return false;
+    const grpParts = this.getPartsForGroup(grp.id);
+    const hasCt = grpParts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
+    const hasSides = grpParts.some(p => p.componentRole === 'side_left' || p.componentRole === 'side_right');
+    return hasCt && !hasSides;
   });
 
   readonly isContextMenuCabinetModule = computed<boolean>(() => {
     const grp = this.contextMenuGroup();
-    return !!grp && !this.isContextMenuDrawerGroup();
+    return !!grp && !this.isContextMenuDrawerGroup() && !this.isContextMenuCountertopGroup();
   });
 
   readonly contextMenuCategory = computed<'drawer' | 'door' | 'structural'>(() => {
@@ -6843,7 +6966,9 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
   toggleGroupAnimation(groupId: string) {
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length > 0) {
-      const cur = this.openTargetMap.get(grpParts[0].id) || 0;
+      const movableObj = this.pieceObjects.find(po => po.part.groupId === groupId && (po.isDoor || po.isDrawer));
+      const refId = movableObj ? movableObj.part.id : grpParts[0].id;
+      const cur = this.openTargetMap.get(refId) || 0;
       const next = cur > 0.5 ? 0 : 1;
       for (const gp of grpParts) {
         this.openTargetMap.set(gp.id, next);
@@ -6859,7 +6984,9 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
   isGroupOpen(groupId: string): boolean {
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length === 0) return false;
-    const val = this.openTargetMap.get(grpParts[0].id) || 0;
+    const movableObj = this.pieceObjects.find(po => po.part.groupId === groupId && (po.isDoor || po.isDrawer));
+    const refId = movableObj ? movableObj.part.id : grpParts[0].id;
+    const val = this.openTargetMap.get(refId) || 0;
     return val > 0.5;
   }
 moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
@@ -9003,11 +9130,21 @@ private updateOpeningAnimations(delta = 0.016) {
       });
     }
     this.applianceHandleHitMeshes = [];
+    const showAppls = this.layerVisibility().showAppliances;
+    this.appliancesGroup.visible = showAppls;
+    this.applianceGizmoGroup.visible = showAppls;
+    if (!showAppls) return;
 
     // 3. Reconstruir cada electrodoméstico
     for (const app of appls) {
       const appGroup = this.appliance3dBuilder.buildApplianceGroup(app);
-      appGroup.position.set(app.position.x, app.position.y, app.position.z);
+      // Si es un lavaplatos ('sink') montado sobre mesón (y >= 500mm), empotrar la cubeta hacia abajo
+      // para que solo la pestaña perimetral (8mm) sobresalga sobre la cara superior del mesón
+      const visualBaseY =
+        app.type === 'sink' && app.position.y >= 500
+          ? app.position.y - app.height + 8
+          : app.position.y;
+      appGroup.position.set(app.position.x, visualBaseY, app.position.z);
       appGroup.rotation.y = THREE.MathUtils.degToRad(app.rotation || 0);
       this.appliancesGroup.add(appGroup);
 
@@ -9024,7 +9161,7 @@ private updateOpeningAnimations(delta = 0.016) {
           depthTest: false
         });
         const boxLines = new THREE.LineSegments(edgesGeo, lineMat);
-        boxLines.position.set(app.position.x, app.position.y + app.height / 2, app.position.z);
+        boxLines.position.set(app.position.x, visualBaseY + app.height / 2, app.position.z);
         boxLines.rotation.y = rotRad;
         this.applianceGizmoGroup.add(boxLines);
 

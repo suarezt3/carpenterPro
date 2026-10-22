@@ -10,7 +10,11 @@ import {
   Project,
   ProjectNoteItem,
   ProjectSettings,
-  ApplianceItem
+  ApplianceItem,
+  CountertopLayoutShape,
+  HandleFinish,
+  HandleType,
+  PartCornerCutConfig
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { JoineryEngineService } from './joinery-engine.service';
@@ -484,6 +488,66 @@ export class ProjectStorageService {
       textureType: 'solid'
     };
 
+    const matMesonCarrara: Material = {
+      id: 'mat_stone_carrara_30',
+      name: 'Piedra Mármol Carrara Pulido (Mesón)',
+      thickness: 30,
+      sheetLength: 3000,
+      sheetWidth: 1600,
+      sheetCost: 1450000,
+      hasGrain: false,
+      colorHex: '#f8fafc',
+      textureType: 'stone'
+    };
+
+    const matMesonCuarzoBlanco: Material = {
+      id: 'mat_stone_quartz_polar_20',
+      name: 'Cuarzo Blanco Polar Silestone (Mesón)',
+      thickness: 20,
+      sheetLength: 3000,
+      sheetWidth: 1600,
+      sheetCost: 1320000,
+      hasGrain: false,
+      colorHex: '#f1f5f9',
+      textureType: 'stone'
+    };
+
+    const matMesonGranitoNegro: Material = {
+      id: 'mat_stone_granite_black_30',
+      name: 'Granito Negro San Gabriel (Mesón)',
+      thickness: 30,
+      sheetLength: 2800,
+      sheetWidth: 1600,
+      sheetCost: 1180000,
+      hasGrain: false,
+      colorHex: '#1e293b',
+      textureType: 'stone'
+    };
+
+    const matMesonDektonGris: Material = {
+      id: 'mat_stone_dekton_gray_20',
+      name: 'Piedra Sinterizada Gris Dekton (Mesón)',
+      thickness: 20,
+      sheetLength: 3200,
+      sheetWidth: 1440,
+      sheetCost: 1680000,
+      hasGrain: false,
+      colorHex: '#64748b',
+      textureType: 'stone'
+    };
+
+    const matMesonMaderaRoble: Material = {
+      id: 'mat_wood_butcher_36',
+      name: 'Madera Roble Macizo Alistonado (Mesón)',
+      thickness: 36,
+      sheetLength: 2440,
+      sheetWidth: 1220,
+      sheetCost: 620000,
+      hasGrain: true,
+      colorHex: '#b47b48',
+      textureType: 'wood'
+    };
+
     const defaultMaterials = [
       matRoble,
       matNogal,
@@ -498,7 +562,12 @@ export class ProjectStorageService {
       matTerracota,
       matAntracita,
       matGris15,
-      matMdfFondo
+      matMdfFondo,
+      matMesonCarrara,
+      matMesonCuarzoBlanco,
+      matMesonGranitoNegro,
+      matMesonDektonGris,
+      matMesonMaderaRoble
     ];
 
     const initialParts: Part[] = [
@@ -1670,13 +1739,22 @@ export class ProjectStorageService {
         else if (prop === 'depth') targetProp = 'width';
       }
 
-      const nextCfg: ParametricCabinetConfig = {
-        ...group.parametricConfig,
-        [targetProp]: val,
-        posX: 0,
-        posY: 0,
-        posZ: 0
-      };
+      const nextCfg: ParametricCabinetConfig = prop === 'thickness'
+        ? {
+            ...group.parametricConfig,
+            structureThickness: Math.max(12, Math.min(22, val)),
+            doorThickness: Math.max(12, Math.min(22, val)),
+            posX: 0,
+            posY: 0,
+            posZ: 0
+          }
+        : {
+            ...group.parametricConfig,
+            [targetProp]: val,
+            posX: 0,
+            posY: 0,
+            posZ: 0
+          };
 
       const res = this.cabinetGen.generateParametricCabinet(nextCfg, currentProj.materials);
       const updatedParts = res.parts.map(p => ({
@@ -2268,5 +2346,468 @@ export class ProjectStorageService {
     a.download = `despiece_${this.currentProject().name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // =========================================================================
+  // ESTILO GLOBAL CLICK-CUISINE 2, MESONES INTELIGENTES Y CORTES ESPECIALES
+  // =========================================================================
+
+  /**
+   * Cambia en 1 clic el material de todas las piezas según su rol constructivo:
+   * - 'fronts': Puertas y frentes de cajón ('door', 'drawer_front', 'front')
+   * - 'carcass': Estructura / Casco ('side_left', 'side_right', 'top', 'bottom', 'shelf', 'divider', 'tie')
+   * - 'plinths': Zócalos inferiores ('plinth')
+   * - 'countertop': Mesones / Encimeras y salpicaderos ('countertop', 'backsplash')
+   */
+  applyGlobalMaterialByRole(
+    target: 'fronts' | 'carcass' | 'plinths' | 'countertop',
+    materialId: string
+  ): number {
+    const project = this.currentProject();
+    const mat = project.materials.find(m => m.id === materialId);
+    if (!mat) return 0;
+
+    let updatedCount = 0;
+    const isStone = mat.textureType === 'stone';
+
+    this.updateProject(p => ({
+      ...p,
+      parts: p.parts.map(part => {
+        const role = part.componentRole || 'free';
+        const nameLow = (part.name || '').toLowerCase();
+        let matches = false;
+
+        if (target === 'fronts') {
+          matches =
+            role === 'door' ||
+            role === 'drawer_front' ||
+            role === 'front' ||
+            nameLow.includes('puerta') ||
+            nameLow.includes('frente');
+        } else if (target === 'carcass') {
+          matches =
+            role === 'side_left' ||
+            role === 'side_right' ||
+            role === 'top' ||
+            role === 'bottom' ||
+            role === 'shelf' ||
+            role === 'divider' ||
+            role === 'tie' ||
+            role === 'drawer_box' ||
+            role === 'drawer_lateral';
+        } else if (target === 'plinths') {
+          matches = role === 'plinth' || nameLow.includes('zócalo') || nameLow.includes('zocalo');
+        } else if (target === 'countertop') {
+          matches =
+            role === 'countertop' ||
+            role === 'backsplash' ||
+            nameLow.includes('mesón') ||
+            nameLow.includes('meson') ||
+            nameLow.includes('encimera') ||
+            nameLow.includes('salpicadero');
+        }
+
+        if (!matches) return part;
+        updatedCount += part.quantity || 1;
+
+        return {
+          ...part,
+          materialId: mat.id,
+          materialName: mat.name,
+          colorHex: mat.colorHex,
+          thickness: target === 'countertop' && role === 'countertop' ? mat.thickness : part.thickness,
+          grain: mat.hasGrain ? (part.grain === 'none' ? 'length' : part.grain) : 'none',
+          excludeFromCutlist:
+            role === 'countertop' || role === 'backsplash' ? isStone : part.excludeFromCutlist
+        };
+      })
+    }));
+
+    return updatedCount;
+  }
+
+  /**
+   * Cambia en 1 clic el modelo y acabado de tiradores en todas las puertas y frentes de cajón del proyecto.
+   */
+  applyGlobalHandles(handleType: HandleType, handleFinish: HandleFinish): number {
+    let updatedCount = 0;
+    this.updateProject(p => ({
+      ...p,
+      parts: p.parts.map(part => {
+        const role = part.componentRole;
+        const hw = part.hardwareConfig;
+        const isFrontOrDoor =
+          role === 'door' ||
+          role === 'drawer_front' ||
+          hw?.movableType === 'door' ||
+          hw?.movableType === 'drawer';
+        if (!isFrontOrDoor) return part;
+
+        updatedCount += part.quantity || 1;
+        return {
+          ...part,
+          hardwareConfig: {
+            ...(hw || { isMovable: true, movableType: role === 'drawer_front' ? 'drawer' : 'door' }),
+            handleType,
+            handleFinish
+          }
+        };
+      })
+    }));
+    return updatedCount;
+  }
+
+  /**
+   * Aplica o limpia un corte especial paramétrico (chaflán, diagonal, destaje en L, esquinas redondeadas)
+   * sobre cualquier pieza o mesón, regenerando su polígono contourPoints.
+   */
+  applyCornerCutToPart(partId: string, config: PartCornerCutConfig) {
+    this.updateProject(p => ({
+      ...p,
+      parts: p.parts.map(part => {
+        if (part.id !== partId) return part;
+        if (!config || config.type === 'none') {
+          return {
+            ...part,
+            shapeType: 'rectangle',
+            contourPoints: undefined,
+            cornerCutConfig: { type: 'none', corner: 'front_right', cutX: 150, cutY: 150 }
+          };
+        }
+        const contourPoints = this.cabinetGen.buildCornerCutContour(part.length, part.width, config);
+        return {
+          ...part,
+          shapeType: 'freehand',
+          contourPoints,
+          cornerCutConfig: config
+        };
+      })
+    }));
+  }
+
+  /**
+   * Genera mesones inteligentes de cocina (Auto sobre muebles bajos, Recto, en L, en U o Isla con Cascada)
+   * con soporte dual Piedra/Melamina y zócalo/salpicadero trasero opcional.
+   */
+  generateSmartCountertop(options: {
+    shape: CountertopLayoutShape;
+    materialId: string;
+    thickness?: number;
+    includeBacksplash?: boolean;
+    backsplashHeight?: number;
+    length?: number;
+    depth?: number;
+    sideLength?: number;
+  }): Part[] {
+    const project = this.currentProject();
+    const mat =
+      project.materials.find(m => m.id === options.materialId) ||
+      project.materials.find(m => m.textureType === 'stone') ||
+      project.materials[0];
+
+    const isStone = mat.textureType === 'stone';
+    const thick = Number(options.thickness) || mat.thickness || 30;
+    const splashH = Number(options.backsplashHeight) || 75;
+    const splashT = Math.min(20, thick);
+    const includeSplash = options.includeBacksplash !== false;
+    const groupId = `group_meson_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const groupName = `Mesón Cocina (${mat.name})`;
+
+    // Determinar envolvente de los muebles bajos existentes para posicionar el mesón encima
+    const baseParts = project.parts.filter(p => {
+      if (p.componentRole === 'countertop' || p.componentRole === 'backsplash') return false;
+      const topY = (p.posY || 0) + (p.orientation === 'horizontal' ? (p.thickness || 18) / 2 : (p.length || 0) / 2);
+      return topY > 400 && topY <= 1050;
+    });
+
+    let minX = -900;
+    let maxX = 900;
+    let minZ = -300;
+    let maxZ = 300;
+    let maxBaseTopY = 860;
+
+    if (baseParts.length > 0) {
+      minX = Infinity;
+      maxX = -Infinity;
+      minZ = Infinity;
+      maxZ = -Infinity;
+      maxBaseTopY = 0;
+
+      for (const bp of baseParts) {
+        let halfX = (bp.length || 600) / 2;
+        let halfY = (bp.thickness || 18) / 2;
+        let halfZ = (bp.width || 580) / 2;
+        if (bp.orientation === 'vertical_yz') {
+          halfX = (bp.thickness || 18) / 2;
+          halfY = (bp.length || 750) / 2;
+          halfZ = (bp.width || 580) / 2;
+        } else if (bp.orientation === 'vertical_xy') {
+          halfX = (bp.length || 600) / 2;
+          halfY = (bp.width || 750) / 2;
+          halfZ = (bp.thickness || 18) / 2;
+        }
+        const px = bp.posX || 0;
+        const py = bp.posY || 0;
+        const pz = bp.posZ || 0;
+        if (px - halfX < minX) minX = px - halfX;
+        if (px + halfX > maxX) maxX = px + halfX;
+        if (pz - halfZ < minZ) minZ = pz - halfZ;
+        if (pz + halfZ > maxZ) maxZ = pz + halfZ;
+        if (py + halfY > maxBaseTopY) maxBaseTopY = py + halfY;
+      }
+    }
+
+    const overhangFront = 25;
+    const overhangSide = 15;
+    const newParts: Part[] = [];
+    const uid = () => `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    if (options.shape === 'auto_modules' || options.shape === 'straight') {
+      const length =
+        options.shape === 'auto_modules' && baseParts.length > 0
+          ? Math.max(600, Math.round(maxX - minX + overhangSide * 2))
+          : Math.max(600, Number(options.length) || 1800);
+      const depth =
+        options.shape === 'auto_modules' && baseParts.length > 0
+          ? Math.max(550, Math.round(maxZ - minZ + overhangFront))
+          : Math.max(500, Number(options.depth) || 620);
+
+      const centerX = options.shape === 'auto_modules' && baseParts.length > 0 ? Math.round((minX + maxX) / 2) : 0;
+      const centerZ =
+        options.shape === 'auto_modules' && baseParts.length > 0
+          ? Math.round((minZ + maxZ + overhangFront) / 2)
+          : 0;
+      const topPosY = Math.round(maxBaseTopY + thick / 2);
+
+      newParts.push({
+        id: `meson_recto_${uid()}`,
+        name: 'Mesón Principal de Cocina',
+        groupId,
+        groupName,
+        length,
+        width: depth,
+        thickness: thick,
+        quantity: 1,
+        materialId: mat.id,
+        materialName: mat.name,
+        colorHex: mat.colorHex,
+        grain: mat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: centerX,
+        posY: topPosY,
+        posZ: centerZ,
+        orientation: 'horizontal',
+        componentRole: 'countertop',
+        excludeFromCutlist: isStone,
+        notes: isStone
+          ? `Mesón de piedra/cuarzo cotizado por m² (${length}x${depth}mm)`
+          : `Mesón de tablero cortable (${length}x${depth}mm)`
+      });
+
+      if (includeSplash) {
+        newParts.push({
+          id: `salpicadero_recto_${uid()}`,
+          name: 'Zócalo / Salpicadero Posterior Mesón',
+          groupId,
+          groupName,
+          length,
+          width: splashH,
+          thickness: splashT,
+          quantity: 1,
+          materialId: mat.id,
+          materialName: mat.name,
+          colorHex: mat.colorHex,
+          grain: mat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'none', a1: 'thick', a2: 'thick' },
+          posX: centerX,
+          posY: Math.round(maxBaseTopY + thick + splashH / 2),
+          posZ: Math.round(centerZ - depth / 2 + splashT / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'backsplash',
+          excludeFromCutlist: isStone,
+          notes: 'Salpicadero trasero sobre encimera'
+        });
+      }
+    } else if (options.shape === 'l_shape') {
+      const mainLen = Math.max(1200, Number(options.length) || 2400);
+      const sideLen = Math.max(1000, Number(options.sideLength) || 1800);
+      const runDepth = Math.max(550, Number(options.depth) || 620);
+      const topPosY = Math.round(maxBaseTopY + thick / 2);
+
+      // Polígono monolítico en L (x: 0..mainLen, y: 0..sideLen donde y=sideLen es la pared del fondo -Z)
+      const contourL = [
+        { x: 0, y: sideLen - runDepth },
+        { x: mainLen - runDepth, y: sideLen - runDepth },
+        { x: mainLen - runDepth, y: 0 },
+        { x: mainLen, y: 0 },
+        { x: mainLen, y: sideLen },
+        { x: 0, y: sideLen }
+      ];
+
+      newParts.push({
+        id: `meson_en_l_${uid()}`,
+        name: 'Mesón en L Continuo',
+        groupId,
+        groupName,
+        length: mainLen,
+        width: sideLen,
+        thickness: thick,
+        quantity: 1,
+        materialId: mat.id,
+        materialName: mat.name,
+        colorHex: mat.colorHex,
+        grain: mat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: 0,
+        posY: topPosY,
+        posZ: Math.round(sideLen / 2 - runDepth / 2),
+        orientation: 'horizontal',
+        componentRole: 'countertop',
+        shapeType: 'freehand',
+        contourPoints: contourL,
+        excludeFromCutlist: isStone,
+        notes: `Mesón en L (${mainLen}x${sideLen}mm, fondo ${runDepth}mm)`
+      });
+
+      if (includeSplash) {
+        newParts.push({
+          id: `salpicadero_l_fondo_${uid()}`,
+          name: 'Salpicadero Tramo Principal (En L)',
+          groupId,
+          groupName,
+          length: mainLen,
+          width: splashH,
+          thickness: splashT,
+          quantity: 1,
+          materialId: mat.id,
+          materialName: mat.name,
+          colorHex: mat.colorHex,
+          grain: mat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'none', a1: 'thick', a2: 'thick' },
+          posX: 0,
+          posY: Math.round(maxBaseTopY + thick + splashH / 2),
+          posZ: Math.round(-runDepth / 2 + splashT / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'backsplash',
+          excludeFromCutlist: isStone
+        });
+      }
+    } else if (options.shape === 'u_shape') {
+      const mainLen = Math.max(1800, Number(options.length) || 2800);
+      const sideLen = Math.max(1200, Number(options.sideLength) || 2000);
+      const runDepth = Math.max(550, Number(options.depth) || 620);
+      const topPosY = Math.round(maxBaseTopY + thick / 2);
+
+      const contourU = [
+        { x: 0, y: 0 },
+        { x: runDepth, y: 0 },
+        { x: runDepth, y: sideLen - runDepth },
+        { x: mainLen - runDepth, y: sideLen - runDepth },
+        { x: mainLen - runDepth, y: 0 },
+        { x: mainLen, y: 0 },
+        { x: mainLen, y: sideLen },
+        { x: 0, y: sideLen }
+      ];
+
+      newParts.push({
+        id: `meson_en_u_${uid()}`,
+        name: 'Mesón en U Integral',
+        groupId,
+        groupName,
+        length: mainLen,
+        width: sideLen,
+        thickness: thick,
+        quantity: 1,
+        materialId: mat.id,
+        materialName: mat.name,
+        colorHex: mat.colorHex,
+        grain: mat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: 0,
+        posY: topPosY,
+        posZ: Math.round(sideLen / 2 - runDepth / 2),
+        orientation: 'horizontal',
+        componentRole: 'countertop',
+        shapeType: 'freehand',
+        contourPoints: contourU,
+        excludeFromCutlist: isStone,
+        notes: `Mesón en U (${mainLen}x${sideLen}mm, fondo ${runDepth}mm)`
+      });
+    } else if (options.shape === 'island_waterfall') {
+      const islandLen = Math.max(1200, Number(options.length) || 1800);
+      const islandDepth = Math.max(700, Number(options.depth) || 900);
+      const islandHeight = Math.round(maxBaseTopY + thick);
+      const islandZ = baseParts.length > 0 ? Math.round(maxZ + 1150) : 900;
+
+      // Cubierta superior de la isla
+      newParts.push({
+        id: `isla_cubierta_${uid()}`,
+        name: 'Cubierta Superior Isla con Cascada',
+        groupId,
+        groupName: `Isla Cascada (${mat.name})`,
+        length: islandLen,
+        width: islandDepth,
+        thickness: thick,
+        quantity: 1,
+        materialId: mat.id,
+        materialName: mat.name,
+        colorHex: mat.colorHex,
+        grain: mat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: 0,
+        posY: Math.round(islandHeight - thick / 2),
+        posZ: islandZ,
+        orientation: 'horizontal',
+        componentRole: 'countertop',
+        excludeFromCutlist: isStone,
+        notes: 'Cubierta principal de isla desayunadora'
+      });
+
+      // Costados en cascada (Waterfall Izquierdo y Derecho hasta el suelo)
+      const legH = islandHeight - thick;
+      for (const side of ['Izquierdo', 'Derecho'] as const) {
+        const sign = side === 'Izquierdo' ? -1 : 1;
+        newParts.push({
+          id: `isla_cascada_${side.toLowerCase()}_${uid()}`,
+          name: `Costado Cascada ${side} (Isla)`,
+          groupId,
+          groupName: `Isla Cascada (${mat.name})`,
+          length: legH,
+          width: islandDepth,
+          thickness: thick,
+          quantity: 1,
+          materialId: mat.id,
+          materialName: mat.name,
+          colorHex: mat.colorHex,
+          grain: mat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX: Math.round(sign * (islandLen / 2 - thick / 2)),
+          posY: Math.round(legH / 2),
+          posZ: islandZ,
+          orientation: 'vertical_yz',
+          componentRole: 'countertop',
+          excludeFromCutlist: isStone,
+          notes: `Faldón cascada vertical ${side.toLowerCase()} de isla`
+        });
+      }
+    }
+
+    if (newParts.length > 0) {
+      this.updateProject(p => ({
+        ...p,
+        parts: [...p.parts, ...newParts],
+        groups: [
+          ...(p.groups || []),
+          {
+            id: groupId,
+            name: newParts[0].groupName || groupName,
+            type: 'assembly',
+            isOpen: false
+          }
+        ]
+      }));
+    }
+
+    return newParts;
   }
 }

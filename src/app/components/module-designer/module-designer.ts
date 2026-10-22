@@ -60,7 +60,13 @@ import {
   ApplianceType,
   APPLIANCES_CATALOG_PRESETS,
   APPLIANCE_FINISH_OPTIONS,
-  ParametricCabinetConfig
+  ParametricCabinetConfig,
+  CountertopLayoutShape,
+  HandleFinish,
+  HandleType,
+  LayerVisibilityState,
+  PartCornerCutConfig,
+  SpecialCutPresetType
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -313,6 +319,31 @@ export class ModuleDesignerComponent {
       'M6 10V8A6 6 0 0 1 18 8V10',
       'M5 10H19A1 1 0 0 1 20 11V20A1 1 0 0 1 19 21H5A1 1 0 0 1 4 20V11A1 1 0 0 1 5 10Z',
       'M12 14V17'
+    ]),
+    chair: cadSvg([
+      'M7 4V12H17V4',
+      'M6 12H18V15H6V12Z',
+      'M7 15V20',
+      'M17 15V20'
+    ]),
+    lamp: cadSvg([
+      'M12 3V8',
+      'M6 14L9 8H15L18 14H6Z',
+      'M10 14A2 2 0 0 0 14 14'
+    ]),
+    windowFrame: cadSvg([
+      'M4 4H20V20H4V4Z',
+      'M12 4V20',
+      'M4 12H20'
+    ]),
+    countertopPro: cadSvg([
+      'M3 7H21V11H3V7Z',
+      'M5 11V19H19V11',
+      'M12 11V19'
+    ]),
+    chamferCut: cadSvg([
+      'M4 4H14L20 10V20H4V4Z',
+      'M14 4V10H20'
     ])
   };
 
@@ -339,7 +370,21 @@ export class ModuleDesignerComponent {
       case 'table_leg':
       case 'table_legs_set':
       case 'table_bar':
+      case 'dining_table':
+      case 'table_restaurant':
         return this.icons.tableBar;
+      case 'bar_stool':
+      case 'dining_chair':
+      case 'chair':
+        return this.icons.chair;
+      case 'pendant_lamp':
+      case 'light':
+        return this.icons.lamp;
+      case 'window_frame':
+      case 'door_frame':
+      case 'window':
+      case 'door_front':
+        return this.icons.windowFrame;
       case 'view_column':
         return this.icons.columns;
       case 'park':
@@ -751,7 +796,7 @@ export class ModuleDesignerComponent {
   readonly selectedAppliance = this.projectService.selectedAppliance;
   readonly appliancesCatalog = APPLIANCES_CATALOG_PRESETS;
   readonly applianceFinishOptions = APPLIANCE_FINISH_OPTIONS;
-  readonly activeApplianceCategory = signal<'all' | 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs'>('all');
+  readonly activeApplianceCategory = signal<'all' | 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs' | 'seating' | 'lighting' | 'architecture'>('all');
 
   readonly filteredAppliances = computed(() => {
     const cat = this.activeApplianceCategory();
@@ -848,8 +893,16 @@ export class ModuleDesignerComponent {
         posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
       }
     } else if (preset.defaultMountType === 'wall') {
-      posY = preset.type === 'hood' ? 1500 : 1200;
-      posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+      if (preset.type === 'pendant_lamp') {
+        posY = 1950;
+        posZ = 650;
+      } else if (preset.type === 'window_frame') {
+        posY = 1050;
+        posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+      } else {
+        posY = preset.type === 'hood' ? 1500 : 1200;
+        posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+      }
     } else if (preset.defaultMountType === 'built_in') {
       posY = 800;
       posZ = preset.defaultDepth / 2;
@@ -1028,6 +1081,19 @@ export class ModuleDesignerComponent {
     this.editingGroupConfig.set(null);
   }
 
+  isCountertopGroup(groupId: string | null | undefined): boolean {
+    if (!groupId) return false;
+    const parts = this.currentParts().filter(p => p.groupId === groupId);
+    if (parts.length === 0) return false;
+    const hasCountertopPart = parts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
+    const hasCarcassSide = parts.some(p => p.componentRole === 'side_left' || p.componentRole === 'side_right');
+    return hasCountertopPart && !hasCarcassSide;
+  }
+
+  readonly isSelectedGroupCountertop = computed<boolean>(() => {
+    return this.isCountertopGroup(this.activeSelectedGroupId());
+  });
+
   openEditSelectedGroup(event?: Event) {
     event?.stopPropagation();
     const gId = this.activeSelectedGroupId();
@@ -1038,7 +1104,7 @@ export class ModuleDesignerComponent {
 
   /**
    * Abre el asistente paramétrico cargando las dimensiones actuales del grupo seleccionado.
-   * Cancela previamente cualquier interacción activa en el visor 3D.
+   * Si el grupo es un Mesón / Encimera 3D, abre la pestaña Mesones 3D de Cocina Pro Studio.
    */
   openEditGroup(groupId: string, event?: Event) {
     event?.stopPropagation();
@@ -1049,6 +1115,30 @@ export class ModuleDesignerComponent {
       this.showToast('⚠️ No se encontraron piezas para editar en este módulo');
       return;
     }
+
+    if (this.isCountertopGroup(groupId)) {
+      this.showTemplatesDropdown.set(false);
+      this.showKitchenProPanel.set(true);
+      this.kitchenProTab.set('countertop');
+      const ctPart = parts.find(p => p.componentRole === 'countertop') || parts[0];
+      const bsPart = parts.find(p => p.componentRole === 'backsplash');
+      if (ctPart) {
+        this.countertopMaterialId.set(ctPart.materialId);
+        if (ctPart.thickness === 20 || ctPart.thickness === 30 || ctPart.thickness === 40) {
+          this.countertopThickness.set(ctPart.thickness);
+        }
+        this.countertopBacksplash.set(!!bsPart);
+        if (ctPart.length >= 400) {
+          this.countertopLength.set(Math.round(ctPart.length));
+        }
+        if (ctPart.width >= 300) {
+          this.countertopDepth.set(Math.round(ctPart.width));
+        }
+      }
+      this.showToast('🪨 Configura el mesón en Cocina Pro o ajusta sus medidas directamente en el panel derecho');
+      return;
+    }
+
     const group = this.groups().find(g => g.id === groupId) || {
       id: groupId,
       name: parts[0]?.groupName || parts[0]?.moduleName || 'Módulo Paramétrico',
@@ -1063,27 +1153,35 @@ export class ModuleDesignerComponent {
   }
 
   /**
-   * Actualiza un módulo paramétrico conservando su centro exacto (posX, posY, posZ) en el espacio 3D.
-   * Toma el centro X del techo/piso (o el punto medio entre ambos laterales) para evitar desplazamientos.
+   * Actualiza un módulo paramétrico conservando su centro horizontal (X, Z), su nivel de apoyo (minY)
+   * y su orientación de rotación en el espacio 3D.
    */
   onCabinetUpdated(event: { groupId: string; config: ParametricCabinetConfig }) {
     const groupParts = this.currentParts().filter(p => p.groupId === event.groupId);
-    const sidePart = groupParts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || groupParts[0];
-    const topOrBottom = groupParts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
-    const doorPart = groupParts.find(p => p.componentRole === 'door');
+    let oldMinX = Infinity, oldMaxX = -Infinity;
+    let oldMinY = Infinity;
+    let oldMinZ = Infinity, oldMaxZ = -Infinity;
 
-    const posX = topOrBottom?.posX ?? event.config.posX ?? 0;
-    const posY = sidePart?.posY ?? event.config.posY;
-    const doorOffsetZ = doorPart ? (Number(doorPart.thickness || event.config.doorThickness || 15) / 2) : 0;
-    const posZ = sidePart !== undefined && sidePart.posZ !== undefined
-      ? sidePart.posZ + doorOffsetZ
-      : (event.config.posZ ?? 0);
+    for (const p of groupParts) {
+      const b = this.joineryEngine.getPartBounds(p);
+      if (b.minX < oldMinX) oldMinX = b.minX;
+      if (b.maxX > oldMaxX) oldMaxX = b.maxX;
+      if (b.minY < oldMinY) oldMinY = b.minY;
+      if (b.minZ < oldMinZ) oldMinZ = b.minZ;
+      if (b.maxZ > oldMaxZ) oldMaxZ = b.maxZ;
+    }
+
+    const hasOldBounds = groupParts.length > 0 && Number.isFinite(oldMinX);
+    const oldCx = hasOldBounds ? (oldMinX + oldMaxX) / 2 : (event.config.posX ?? 0);
+    const oldCz = hasOldBounds ? (oldMinZ + oldMaxZ) / 2 : (event.config.posZ ?? 0);
+    const baseMinY = hasOldBounds ? oldMinY : 0;
+    const facing = this.projectService.getGroupFacingDirection(event.groupId);
 
     const finalConfig: ParametricCabinetConfig = {
       ...event.config,
-      posX,
-      posY,
-      posZ
+      posX: 0,
+      posY: (Number(event.config.height) || 800) / 2,
+      posZ: 0
     };
 
     const res = this.cabinetGen.generateParametricCabinet(finalConfig, this.materials());
@@ -1094,6 +1192,38 @@ export class ModuleDesignerComponent {
     }));
 
     this.projectService.updateParametricCabinet(event.groupId, updatedParts, finalConfig.name, finalConfig);
+
+    if (facing === 'right') {
+      this.projectService.rotateGroupRigidly(event.groupId, -90);
+    } else if (facing === 'left') {
+      this.projectService.rotateGroupRigidly(event.groupId, 90);
+    } else if (facing === 'back') {
+      this.projectService.rotateGroupRigidly(event.groupId, 180);
+    }
+
+    const afterParts = this.currentParts().filter(p => p.groupId === event.groupId);
+    if (afterParts.length > 0) {
+      let newMinX = Infinity, newMaxX = -Infinity;
+      let newMinY = Infinity;
+      let newMinZ = Infinity, newMaxZ = -Infinity;
+      for (const p of afterParts) {
+        const b = this.joineryEngine.getPartBounds(p);
+        if (b.minX < newMinX) newMinX = b.minX;
+        if (b.maxX > newMaxX) newMaxX = b.maxX;
+        if (b.minY < newMinY) newMinY = b.minY;
+        if (b.minZ < newMinZ) newMinZ = b.minZ;
+        if (b.maxZ > newMaxZ) newMaxZ = b.maxZ;
+      }
+      const newCx = (newMinX + newMaxX) / 2;
+      const newCz = (newMinZ + newMaxZ) / 2;
+      const dx = Math.round((oldCx - newCx) * 10) / 10;
+      const dy = Math.round((baseMinY - newMinY) * 10) / 10;
+      const dz = Math.round((oldCz - newCz) * 10) / 10;
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1 || Math.abs(dz) > 0.1) {
+        this.projectService.moveGroup(event.groupId, dx, dy, dz);
+      }
+    }
+
     this.showToast(`✨ Módulo "${finalConfig.name}" actualizado`);
     this.closeTemplatesModal();
 
@@ -2903,5 +3033,292 @@ hideActiveGroup() {
     this.selectAllParts();
     this.activateMoveToolOnViewer();
     this.showToast('🧲 Mueble completo listo: arrástralo libremente hacia las paredes con imán inteligente');
+  }
+
+  // =========================================================================
+  // PANEL MAESTRO "COCINA PRO / ESTILO GLOBAL" (CLICK-CUISINE 2) & CORTES CAD
+  // =========================================================================
+
+  readonly showKitchenProPanel = signal<boolean>(false);
+  readonly kitchenProTab = signal<'styles' | 'countertop' | 'modules'>('styles');
+
+  readonly layerVisibility = signal<LayerVisibilityState>({
+    showCountertops: true,
+    showFronts: true,
+    showHandles: true,
+    showPlinths: true,
+    showAppliances: true
+  });
+
+  readonly countertopShape = signal<CountertopLayoutShape>('auto_modules');
+  readonly countertopMaterialId = signal<string>('mat_stone_carrara_30');
+  readonly countertopThickness = signal<number>(30);
+  readonly countertopBacksplash = signal<boolean>(true);
+  readonly countertopLength = signal<number>(2100);
+  readonly countertopSideLength = signal<number>(1800);
+  readonly countertopDepth = signal<number>(620);
+
+  readonly globalHandleType = signal<HandleType>('bar_modern');
+  readonly globalHandleFinish = signal<HandleFinish>('brushed_steel');
+
+  readonly specialCutCorner = signal<PartCornerCutConfig['corner']>('front_right');
+  readonly specialCutX = signal<number>(150);
+  readonly specialCutY = signal<number>(150);
+
+  readonly selectedCountertopMaterial = computed(() => {
+    const id = this.countertopMaterialId();
+    return this.materials().find(m => m.id === id) || this.materials()[0] || null;
+  });
+
+  toggleKitchenProPanel() {
+    this.showKitchenProPanel.update(v => !v);
+  }
+
+  toggleLayerVisibility(key: keyof LayerVisibilityState) {
+    this.layerVisibility.update(cur => {
+      const nextVal = !cur[key];
+      const labels: Record<keyof LayerVisibilityState, string> = {
+        showCountertops: 'Mesones y Encimeras',
+        showFronts: 'Puertas y Frentes',
+        showHandles: 'Tiradores',
+        showPlinths: 'Zócalos',
+        showAppliances: 'Equipos y Mobiliario'
+      };
+      this.showToast(`${nextVal ? '👁️ Mostrando' : '🚫 Ocultando'}: ${labels[key]}`);
+      return { ...cur, [key]: nextVal };
+    });
+  }
+
+  applyGlobalRoleMaterial(
+    target: 'fronts' | 'carcass' | 'plinths' | 'countertop',
+    materialId: string
+  ) {
+    const count = this.projectService.applyGlobalMaterialByRole(target, materialId);
+    const mat = this.materials().find(m => m.id === materialId);
+    const targetNames: Record<typeof target, string> = {
+      fronts: 'Puertas y Frentes',
+      carcass: 'Estructura Interna',
+      plinths: 'Zócalos',
+      countertop: 'Mesones y Salpicaderos'
+    };
+    if (count > 0) {
+      this.showToast(`🎨 ${targetNames[target]} actualizados a "${mat?.name || 'Material'}" (${count} pzs)`);
+    } else {
+      this.showToast(`ℹ️ No se encontraron piezas de tipo ${targetNames[target]} en la escena`);
+    }
+  }
+
+  applyGlobalHandleStyle() {
+    const count = this.projectService.applyGlobalHandles(
+      this.globalHandleType(),
+      this.globalHandleFinish()
+    );
+    if (count > 0) {
+      this.showToast(`✨ Tiradores actualizados globalmente en ${count} puertas/frentes`);
+    } else {
+      this.showToast('ℹ️ No hay puertas o frentes de cajón en la escena');
+    }
+  }
+
+  generateKitchenCountertop() {
+    const created = this.projectService.generateSmartCountertop({
+      shape: this.countertopShape(),
+      materialId: this.countertopMaterialId(),
+      thickness: this.countertopThickness(),
+      includeBacksplash: this.countertopBacksplash(),
+      backsplashHeight: 75,
+      length: this.countertopLength(),
+      sideLength: this.countertopSideLength(),
+      depth: this.countertopDepth()
+    });
+
+    if (created.length > 0) {
+      const mat = this.selectedCountertopMaterial();
+      const isStone = mat?.textureType === 'stone';
+      this.selectedPartId.set(created[0].id);
+      this.selectedPartIds.set(created.map(p => p.id));
+      this.showToast(
+        isStone
+          ? `🪨 Mesón de piedra generado (${created.length} pzs) · Cotizado por m² en Presupuesto`
+          : `🪵 Mesón de madera/melamina generado (${created.length} pzs) · Incluido en Corte 2D`
+      );
+    }
+  }
+
+  insertSpecializedKitchenModule(templateId: string, withAutoAppliance = true) {
+    const tpl = this.templatesCatalog.getTemplateById(templateId);
+    if (!tpl) return;
+
+    const existingParts = this.currentParts();
+    const offsetX = this.templatesCatalog.calculateTemplateOffset(existingParts, tpl.dimensions.width);
+    const mats = this.materials();
+
+    if (tpl.isParametric && tpl.parametricConfig) {
+      const matBody = mats[0] || { id: 'mat_blanco_18', thickness: 18 };
+      const fullCfg: ParametricCabinetConfig = {
+        code: tpl.parametricConfig.code || 'KPRO',
+        name: tpl.name,
+        moduleType: tpl.parametricConfig.moduleType || 'base_cabinet',
+        category: tpl.parametricConfig.category || 'kitchen_base',
+        width: tpl.dimensions.width,
+        height: tpl.dimensions.height,
+        depth: tpl.dimensions.depth,
+        structureThickness: tpl.parametricConfig.structureThickness || matBody.thickness || 18,
+        doorThickness: tpl.parametricConfig.doorThickness || 18,
+        backThickness: tpl.parametricConfig.backThickness || 3,
+        backType: tpl.parametricConfig.backType || 'groove',
+        shelvesCount: tpl.parametricConfig.shelvesCount ?? 1,
+        doorOpening: tpl.parametricConfig.doorOpening || 'left',
+        structureMaterialId: matBody.id,
+        doorMaterialId: matBody.id,
+        backMaterialId: matBody.id,
+        facadeGap: 3,
+        hasPlinth: tpl.parametricConfig.hasPlinth !== false,
+        plinthHeight: tpl.parametricConfig.plinthHeight || 80,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel',
+        posX: offsetX,
+        posY: tpl.dimensions.height / 2,
+        posZ: 0
+      };
+
+      const generated = this.cabinetGen.generateParametricCabinet(fullCfg, mats);
+      this.projectService.addParametricCabinet(generated);
+      const partIds = generated.parts.map(p => p.id);
+      this.selectedPartIds.set(partIds);
+      this.selectedPartId.set(partIds[0] || null);
+
+      // Auto-encastre inteligente de electrodomésticos 3D sobre/dentro del módulo insertado
+      if (withAutoAppliance) {
+        if (tpl.parametricConfig.category === 'oven_base') {
+          const ovenPreset = this.appliancesCatalog.find(p => p.id === 'preset_oven_60cm');
+          const cooktopPreset = this.appliancesCatalog.find(p => p.id === 'preset_cooktop_induction_60cm');
+          if (ovenPreset) {
+            this.projectService.addAppliance({
+              id: `appliance_oven_${Date.now()}`,
+              type: 'oven',
+              name: ovenPreset.name,
+              brand: ovenPreset.brand,
+              modelCode: ovenPreset.modelCode,
+              width: 595,
+              depth: 560,
+              height: 595,
+              finish: 'black_matte',
+              position: { x: offsetX, y: 245, z: 10 },
+              rotation: 0,
+              mountType: 'built_in',
+              price: ovenPreset.defaultPrice,
+              includeInBudget: true
+            });
+          }
+          if (cooktopPreset) {
+            this.projectService.addAppliance({
+              id: `appliance_cooktop_${Date.now() + 1}`,
+              type: 'cooktop',
+              name: cooktopPreset.name,
+              brand: cooktopPreset.brand,
+              modelCode: cooktopPreset.modelCode,
+              width: 590,
+              depth: 520,
+              height: 60,
+              finish: 'black_matte',
+              position: { x: offsetX, y: tpl.dimensions.height, z: 0 },
+              rotation: 0,
+              mountType: 'countertop',
+              price: cooktopPreset.defaultPrice,
+              includeInBudget: true
+            });
+          }
+        } else if (tpl.parametricConfig.category === 'sink_base') {
+          const sinkPreset = this.appliancesCatalog.find(p => p.id === 'preset_sink_single_drainer');
+          if (sinkPreset) {
+            this.projectService.addAppliance({
+              id: `appliance_sink_${Date.now()}`,
+              type: 'sink',
+              name: sinkPreset.name,
+              brand: sinkPreset.brand,
+              modelCode: sinkPreset.modelCode,
+              width: 780,
+              depth: 480,
+              height: 210,
+              finish: 'stainless_steel',
+              position: { x: offsetX, y: tpl.dimensions.height, z: 0 },
+              rotation: 0,
+              mountType: 'countertop',
+              price: sinkPreset.defaultPrice,
+              includeInBudget: true
+            });
+          }
+        } else if (tpl.parametricConfig.category === 'oven_tower') {
+          const ovenPreset = this.appliancesCatalog.find(p => p.id === 'preset_oven_60cm');
+          const microPreset = this.appliancesCatalog.find(p => p.id === 'preset_micro_builtin_trim');
+          const plinthH = 80;
+          const sideH = tpl.dimensions.height - plinthH;
+          const lowerZoneH = Math.round(sideH * 0.32);
+          const ovenBaseY = plinthH + lowerZoneH + 18;
+          const microBaseY = ovenBaseY + 595 + 18;
+
+          if (ovenPreset) {
+            this.projectService.addAppliance({
+              id: `appliance_tower_oven_${Date.now()}`,
+              type: 'oven',
+              name: ovenPreset.name,
+              brand: ovenPreset.brand,
+              modelCode: ovenPreset.modelCode,
+              width: 595,
+              depth: 560,
+              height: 595,
+              finish: 'black_matte',
+              position: { x: offsetX, y: ovenBaseY, z: 10 },
+              rotation: 0,
+              mountType: 'built_in',
+              price: ovenPreset.defaultPrice,
+              includeInBudget: true
+            });
+          }
+          if (microPreset) {
+            this.projectService.addAppliance({
+              id: `appliance_tower_micro_${Date.now() + 1}`,
+              type: 'microwave',
+              name: microPreset.name,
+              brand: microPreset.brand,
+              modelCode: microPreset.modelCode,
+              width: 595,
+              depth: 390,
+              height: 388,
+              finish: 'black_matte',
+              position: { x: offsetX, y: microBaseY, z: 95 },
+              rotation: 0,
+              mountType: 'built_in',
+              price: microPreset.defaultPrice,
+              includeInBudget: true
+            });
+          }
+        }
+      }
+
+      this.showToast(`✨ "${tpl.name}" insertado en la cocina`);
+    }
+  }
+
+  applySpecialCutToSelectedPart(type: SpecialCutPresetType) {
+    const sel = this.selectedPart();
+    if (!sel) return;
+    const cfg: PartCornerCutConfig = {
+      type,
+      corner: this.specialCutCorner(),
+      cutX: Math.max(15, Number(this.specialCutX()) || 150),
+      cutY: Math.max(15, Number(this.specialCutY()) || 150)
+    };
+    this.projectService.applyCornerCutToPart(sel.id, cfg);
+    const labelMap: Record<SpecialCutPresetType, string> = {
+      none: 'Rectángulo Estándar restaurado',
+      chamfer_corner: `Chaflán (${cfg.cutX}×${cfg.cutY}mm) aplicado`,
+      diagonal_side: `Corte Diagonal (${cfg.cutX}mm) aplicado`,
+      notch_l: `Destaje en L (${cfg.cutX}×${cfg.cutY}mm) aplicado`,
+      rounded_corners: `Esquinas redondeadas (R=${cfg.cutX}mm) aplicadas`
+    };
+    this.showToast(`📐 ${labelMap[type]} en "${sel.name}"`);
   }
 }

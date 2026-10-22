@@ -141,6 +141,20 @@
             <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Personalizado</span>
           </button>
+
+          @if (activePreset() === 'oven_base' || activePreset() === 'sink_base' || activePreset() === 'corner_base' || activePreset() === 'oven_tower') {
+            <span class="px-3 py-1.5 rounded-lg text-xs bg-amber-600 text-white font-bold shadow-xs flex items-center gap-1.5 shrink-0">
+              <hugeicons-icon [icon]="icons.kitchen" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
+              <span>
+                @switch (activePreset()) {
+                  @case ('oven_base') { Cocina Pro: Horno Empotrado }
+                  @case ('sink_base') { Cocina Pro: Bajo Lavaplatos }
+                  @case ('corner_base') { Cocina Pro: Esquinero 45° }
+                  @case ('oven_tower') { Cocina Pro: Torre Hornos }
+                }
+              </span>
+            </span>
+          }
         </div>
 
         <!-- CUERPO PRINCIPAL DEL ASISTENTE (2 COLUMNAS) -->
@@ -316,7 +330,7 @@
                     @for (cnt of [2, 3, 4, 5, 6]; track cnt) {
                       <button
                         type="button"
-                        (click)="drawersCount.set(cnt)"
+                        (click)="setDrawersCount(cnt)"
                         [class]="drawersCount() === cnt ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 font-medium'"
                         class="py-2 rounded-xl text-center transition cursor-pointer flex flex-col items-center gap-0.5">
                         <span class="text-sm font-bold">{{ cnt }}</span>

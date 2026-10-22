@@ -170,6 +170,59 @@
         </div>
       </div>
 
+      <!-- 1.B MESONES Y SUPERFICIES DE PIEDRA / CUARZO / GRANITO / MÁRMOL (COTIZADOS POR M²) -->
+      @if (stoneCountertopsBreakdown().items.length > 0) {
+        <div [class]="themeService.isClassic() ? 'bg-white border border-indigo-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-indigo-500/30 rounded-2xl p-4 2xl:p-5 shadow-lg'">
+          <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+            <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
+              <hugeicons-icon [icon]="icons.board" [size]="17" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+              <span>Mesones de Piedra / Cuarzo / Mármol (Cotización por m² - Excluidos de Sierra Melamina)</span>
+            </h3>
+            <span [class]="themeService.isClassic() ? 'text-xs text-indigo-600 font-mono font-bold' : 'text-xs text-indigo-400 font-mono font-bold'">Subtotal: {{ format(stoneCountertopsBreakdown().totalStoneCost) }} ({{ stoneCountertopsBreakdown().totalAreaM2 }} m²)</span>
+          </div>
+
+          <div [class]="themeService.isClassic() ? 'overflow-x-auto scrollbar-thin border border-slate-200 rounded-xl' : 'overflow-x-auto scrollbar-thin border border-zinc-800 rounded-xl'">
+            <table class="w-full text-left text-xs">
+              <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold'">
+                <tr>
+                  <th class="py-2.5 px-3">Pieza / Superficie</th>
+                  <th class="py-2.5 px-3">Material Piedra</th>
+                  <th class="py-2.5 px-3 text-center">Medidas (mm)</th>
+                  <th class="py-2.5 px-3 text-center">Área / ML</th>
+                  <th class="py-2.5 px-3 text-right">Tarifa m²</th>
+                  <th class="py-2.5 px-3 text-right">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
+                @for (st of stoneCountertopsBreakdown().items; track st.part.id) {
+                  <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80' : 'hover:bg-zinc-800/40'">
+                    <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-semibold text-slate-800' : 'py-2.5 px-3 font-semibold text-white'">
+                      {{ st.part.name }}
+                    </td>
+                    <td class="py-2.5 px-3 flex items-center gap-2">
+                      <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-slate-400" [style.background-color]="st.colorHex"></span>
+                      <span>{{ st.materialName }}</span>
+                    </td>
+                    <td class="py-2.5 px-3 text-center font-mono">
+                      {{ st.part.length }} × {{ st.part.width }} × {{ st.part.thickness }}mm
+                    </td>
+                    <td class="py-2.5 px-3 text-center font-mono text-indigo-500 font-bold">
+                      {{ st.areaM2 }} m² ({{ st.linearMeters }} ml)
+                    </td>
+                    <td class="py-2.5 px-3 text-right font-mono">
+                      {{ format(st.costPerM2) }}/m²
+                    </td>
+                    <td [class]="themeService.isClassic() ? 'py-2.5 px-3 text-right font-bold font-mono text-slate-800' : 'py-2.5 px-3 text-right font-bold font-mono text-zinc-100'">
+                      {{ format(st.subtotal) }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
       <!-- 2. TAPACANTOS -->
       <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg'">
         <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">

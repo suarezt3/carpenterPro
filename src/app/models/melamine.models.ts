@@ -26,7 +26,33 @@ export type ComponentRole =
   | 'drawer_lateral'
   | 'plinth' 
   | 'tie'
+  | 'countertop'
+  | 'backsplash'
   | 'free';
+
+export type SpecialCutPresetType =
+  | 'none'
+  | 'chamfer_corner'
+  | 'diagonal_side'
+  | 'notch_l'
+  | 'rounded_corners';
+
+export interface PartCornerCutConfig {
+  type: SpecialCutPresetType;
+  corner: 'front_right' | 'front_left' | 'back_right' | 'back_left' | 'both_front' | 'all';
+  cutX: number;
+  cutY: number;
+}
+
+export interface LayerVisibilityState {
+  showCountertops: boolean;
+  showFronts: boolean;
+  showHandles: boolean;
+  showPlinths: boolean;
+  showAppliances: boolean;
+}
+
+export type CountertopLayoutShape = 'auto_modules' | 'straight' | 'l_shape' | 'u_shape' | 'island_waterfall';
 
 export type HandleType = 
   | 'bar_modern' 
@@ -111,7 +137,7 @@ export interface ParametricCabinetConfig {
   code: string; // ej. "MALT1PU001"
   name: string; // ej. "Módulo Alto 1 Puerta (MAL-1P)"
   moduleType: 'wall_cabinet' | 'base_cabinet' | 'tall_cabinet' | 'closet' | 'vanity' | 'bookshelf' | 'drawer_unit' | 'custom';
-  category?: 'kitchen_base' | 'kitchen_wall' | 'drawers' | 'cajones' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
+  category?: 'kitchen_base' | 'kitchen_wall' | 'oven_base' | 'sink_base' | 'corner_base' | 'oven_tower' | 'drawers' | 'cajones' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
   width: number; // Ancho exterior X (ej. 600 mm)
   height: number; // Altura exterior Y (ej. 800 mm)
   depth: number; // Profundidad exterior Z (ej. 320 mm)
@@ -177,6 +203,8 @@ export interface Part {
   radius?: number; // mm (para piezas circulares)
   diameter?: number; // mm (para piezas circulares)
   contourPoints?: { x: number; y: number }[]; // Puntos del polígono 2D en mm para piezas de forma libre
+  cornerCutConfig?: PartCornerCutConfig; // Configuración paramétrica de chaflanes, diagonales o destajes en L
+  excludeFromCutlist?: boolean; // Si es true (ej. mesones de piedra/cuarzo/mármol), se excluye del optimizador de melamina y se cotiza por m²
   isLocked?: boolean;
 }
 
@@ -715,7 +743,13 @@ export type ApplianceType =
   | 'microwave'
   | 'coffee_maker'
   | 'table_leg'
-  | 'table_legs_set';
+  | 'table_legs_set'
+  | 'bar_stool'
+  | 'dining_chair'
+  | 'dining_table'
+  | 'pendant_lamp'
+  | 'window_frame'
+  | 'door_frame';
 
 export type ApplianceFinish = 
   | 'stainless_steel' 
@@ -759,7 +793,7 @@ export interface AppliancePreset {
   id: string;
   type: ApplianceType;
   name: string;
-  category: 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs';
+  category: 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs' | 'seating' | 'lighting' | 'architecture';
   categoryLabel: string;
   brand: string;
   modelCode: string;
@@ -1429,5 +1463,206 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     icon: 'table_bar',
     description: 'Juego de 4 patas horquilla bajas de 40cm ideales para mesas ratonas de living, mesas de centro y muebles bajos de TV.',
     standardWidths: [600]
+  },
+
+  // 9. INTERIORISMO: SILLAS, BUTACOS DE BARRA Y MESAS
+  {
+    id: 'preset_stool_nordic_bar',
+    type: 'bar_stool',
+    name: 'Butaco Alto de Isla / Barra Nórdico 75cm',
+    category: 'seating',
+    categoryLabel: 'Sillas y Mesas',
+    brand: 'Nordic Living / BoConcept',
+    modelCode: 'BS-NRD-750',
+    defaultWidth: 440,
+    defaultDepth: 460,
+    defaultHeight: 920,
+    minWidth: 380,
+    maxWidth: 550,
+    minDepth: 380,
+    maxDepth: 550,
+    minHeight: 750,
+    maxHeight: 1080,
+    defaultMountType: 'floor',
+    defaultFinish: 'natural_wood',
+    defaultPrice: 320000,
+    icon: 'chair',
+    description: 'Taburete alto ergonómico para isla de cocina o barra desayunadora con patas inclinadas en madera de roble, aro reposapiés metálico y asiento con respaldo bajo.',
+    standardWidths: [420, 440, 480]
+  },
+  {
+    id: 'preset_stool_industrial_loft',
+    type: 'bar_stool',
+    name: 'Butaco de Barra Industrial Negro Mate 75cm',
+    category: 'seating',
+    categoryLabel: 'Sillas y Mesas',
+    brand: 'Loft Design Studio',
+    modelCode: 'BS-LOFT-75',
+    defaultWidth: 420,
+    defaultDepth: 420,
+    defaultHeight: 880,
+    minWidth: 360,
+    maxWidth: 520,
+    minDepth: 360,
+    maxDepth: 520,
+    minHeight: 720,
+    maxHeight: 1020,
+    defaultMountType: 'floor',
+    defaultFinish: 'black_matte',
+    defaultPrice: 280000,
+    icon: 'chair',
+    description: 'Taburete de barra estilo industrial con estructura tubular en acero negro mate, reposapiés perimetral y asiento contorneado.',
+    standardWidths: [400, 420]
+  },
+  {
+    id: 'preset_chair_dining_nordic',
+    type: 'dining_chair',
+    name: 'Silla de Comedor Moderna Eames / Nórdica',
+    category: 'seating',
+    categoryLabel: 'Sillas y Mesas',
+    brand: 'Design Interior Pro',
+    modelCode: 'CH-EAM-82',
+    defaultWidth: 480,
+    defaultDepth: 520,
+    defaultHeight: 820,
+    minWidth: 420,
+    maxWidth: 580,
+    minDepth: 450,
+    maxDepth: 600,
+    minHeight: 750,
+    maxHeight: 920,
+    defaultMountType: 'floor',
+    defaultFinish: 'natural_wood',
+    defaultPrice: 240000,
+    icon: 'chair',
+    description: 'Silla de comedor ergonómica con carcasa curva envolvente, cojín de asiento integrado y patas cónicas con tensores.',
+    standardWidths: [460, 480]
+  },
+  {
+    id: 'preset_table_dining_modern',
+    type: 'dining_table',
+    name: 'Mesa de Comedor Arquitectónica 6 Puestos 160cm',
+    category: 'seating',
+    categoryLabel: 'Sillas y Mesas',
+    brand: 'Piezo3D Interior',
+    modelCode: 'TB-DIN-160',
+    defaultWidth: 1600,
+    defaultDepth: 900,
+    defaultHeight: 760,
+    minWidth: 1100,
+    maxWidth: 2400,
+    minDepth: 750,
+    maxDepth: 1200,
+    minHeight: 720,
+    maxHeight: 780,
+    defaultMountType: 'floor',
+    defaultFinish: 'natural_wood',
+    defaultPrice: 1450000,
+    icon: 'table_restaurant',
+    description: 'Mesa de comedor principal con cubierta biselada y bastidor arquitectónico de patas inclinadas para integrar junto a la cocina.',
+    standardWidths: [1400, 1600, 1800, 2000]
+  },
+
+  // 10. ILUMINACIÓN ARQUITECTÓNICA Y LÁMPARAS COLGANTES
+  {
+    id: 'preset_lamp_pendant_trio',
+    type: 'pendant_lamp',
+    name: 'Luminaria Colgante Triple sobre Isla / Comedor (Luz 3D Real)',
+    category: 'lighting',
+    categoryLabel: 'Iluminación',
+    brand: 'Lumina Studio LED',
+    modelCode: 'LMP-TRIO-90',
+    defaultWidth: 900,
+    defaultDepth: 220,
+    defaultHeight: 750,
+    minWidth: 600,
+    maxWidth: 1400,
+    minDepth: 160,
+    maxDepth: 350,
+    minHeight: 450,
+    maxHeight: 1200,
+    defaultMountType: 'wall',
+    defaultFinish: 'black_matte',
+    defaultPrice: 480000,
+    icon: 'light',
+    description: 'Riel de techo con 3 pantallas colgantes cilíndricas/cónicas, detalles en latón dorado y emisión de luz cálida 3D sobre la isla o mesa.',
+    recommendedHeights: [1950, 2050, 2150],
+    standardWidths: [800, 900, 1100]
+  },
+  {
+    id: 'preset_lamp_pendant_dome',
+    type: 'pendant_lamp',
+    name: 'Campana Luminaria Nórdica Individual Ø38cm (Luz 3D)',
+    category: 'lighting',
+    categoryLabel: 'Iluminación',
+    brand: 'Lumina Studio LED',
+    modelCode: 'LMP-DOME-38',
+    defaultWidth: 380,
+    defaultDepth: 380,
+    defaultHeight: 700,
+    minWidth: 250,
+    maxWidth: 550,
+    minDepth: 250,
+    maxDepth: 550,
+    minHeight: 400,
+    maxHeight: 1100,
+    defaultMountType: 'wall',
+    defaultFinish: 'gold_brass',
+    defaultPrice: 260000,
+    icon: 'light',
+    description: 'Lámpara colgante de domo semiesférico con difusor interior cálido y fuente de iluminación puntual 3D.',
+    recommendedHeights: [1950, 2050],
+    standardWidths: [320, 380, 450]
+  },
+
+  // 11. ARQUITECTURA: VENTANAS Y PUERTAS DE PASO
+  {
+    id: 'preset_window_panoramic_120',
+    type: 'window_frame',
+    name: 'Ventana Panorámica sobre Mesón 120x100cm',
+    category: 'architecture',
+    categoryLabel: 'Ventanas y Puertas',
+    brand: 'Arquitectura 3D',
+    modelCode: 'WIN-PAN-120',
+    defaultWidth: 1200,
+    defaultDepth: 140,
+    defaultHeight: 1000,
+    minWidth: 600,
+    maxWidth: 2400,
+    minDepth: 100,
+    maxDepth: 220,
+    minHeight: 500,
+    maxHeight: 1600,
+    defaultMountType: 'wall',
+    defaultFinish: 'black_matte',
+    defaultPrice: 680000,
+    icon: 'window',
+    description: 'Ventana arquitectónica de aluminio con doble hoja de cristal templado translúcido, parteluz central y alféizar para ubicar sobre el lavaplatos.',
+    recommendedHeights: [1050, 1100],
+    standardWidths: [900, 1200, 1500, 1800]
+  },
+  {
+    id: 'preset_door_interior_90',
+    type: 'door_frame',
+    name: 'Puerta Arquitectónica de Paso con Marco 90x210cm',
+    category: 'architecture',
+    categoryLabel: 'Ventanas y Puertas',
+    brand: 'Arquitectura 3D',
+    modelCode: 'DR-ARC-90',
+    defaultWidth: 900,
+    defaultDepth: 140,
+    defaultHeight: 2100,
+    minWidth: 700,
+    maxWidth: 1200,
+    minDepth: 100,
+    maxDepth: 220,
+    minHeight: 2000,
+    maxHeight: 2400,
+    defaultMountType: 'floor',
+    defaultFinish: 'natural_wood',
+    defaultPrice: 820000,
+    icon: 'door_front',
+    description: 'Puerta de acceso a la cocina/comedor con marco perimetral, hoja entablerada moderna y manija de acero inoxidable.',
+    standardWidths: [800, 900, 1000]
   }
 ];

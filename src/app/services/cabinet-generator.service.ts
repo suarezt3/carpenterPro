@@ -1,5 +1,13 @@
 import { Injectable } from '@angular/core';
-import { FurnitureModule, HardwareItem, Material, Part, ParametricCabinetConfig, PartGroup } from '../models/melamine.models';
+import {
+  FurnitureModule,
+  HardwareItem,
+  Material,
+  Part,
+  ParametricCabinetConfig,
+  PartGroup,
+  PartCornerCutConfig
+} from '../models/melamine.models';
 
 @Injectable({
   providedIn: 'root'
@@ -586,6 +594,9 @@ export class CabinetGeneratorService {
     config: ParametricCabinetConfig, 
     materials: Material[]
   ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
+    if (config.category === 'oven_base' || config.category === 'sink_base' || config.category === 'corner_base' || config.category === 'oven_tower') {
+      return this.generateSpecializedKitchenModule(config, materials);
+    }
     if (config.moduleType === 'drawer_unit' || config.category === 'drawers' || config.category === 'cajones' || (config.drawersCount && config.drawersCount > 0 && config.moduleType !== 'wall_cabinet')) {
       return this.generateParametricDrawerUnit(config, materials);
     }
@@ -1071,15 +1082,19 @@ export class CabinetGeneratorService {
     const groupId = `group_caj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const groupName = config.name || `Cajonera (${config.code || 'CAJ001'})`;
 
-    const mainMat = materials.find(m => m.id === config.structureMaterialId) || materials[0];
-    const frontMat = materials.find(m => m.id === config.doorMaterialId) || mainMat;
+    const boardMats = materials.filter(m => m.textureType !== 'stone' && m.thickness >= 12 && m.thickness <= 25);
+    const defaultBoardMat = boardMats[0] || materials[0];
+    const rawMainMat = materials.find(m => m.id === config.structureMaterialId);
+    const mainMat = (rawMainMat && rawMainMat.textureType !== 'stone') ? rawMainMat : defaultBoardMat;
+    const rawFrontMat = materials.find(m => m.id === config.doorMaterialId);
+    const frontMat = (rawFrontMat && rawFrontMat.textureType !== 'stone') ? rawFrontMat : mainMat;
     const backMat = materials.find(m => m.id === config.backMaterialId) ||
                     materials.find(m => m.thickness <= 6) ||
                     materials.find(m => m.name.toLowerCase().includes('mdf')) ||
                     { id: 'mat_mdf_3', name: 'MDF 3mm', thickness: 3 };
 
-    const t = Math.max(12, Number(config.structureThickness) || 18);
-    const doorT = Math.max(12, Number(config.doorThickness) || t);
+    const t = Math.max(12, Math.min(22, Number(config.structureThickness) || 18));
+    const doorT = Math.max(12, Math.min(22, Number(config.doorThickness) || t));
     const backT = Math.max(3, Number(config.backThickness) || 3);
     const w = Math.max(300, Number(config.width) || 600);
     const h = Math.max(400, Number(config.height) || 750);
@@ -1346,6 +1361,10 @@ export class CabinetGeneratorService {
     }
 
     // 7. Generación de Gavetas / Cajones
+    const carcassFloorTopY = posY - (h / 2) + plinthH + t;
+    const carcassRoofBottomY = posY + (h / 2) - t;
+    const frontStartBaseY = isOverlay ? (posY - (h / 2) + plinthH) : carcassFloorTopY;
+
     const availableFrontH = isOverlay
       ? (h - plinthH - t - (gap * (drawersCount + 1)))
       : (sideH - t - (gap * (drawersCount + 1)));
@@ -1358,10 +1377,11 @@ export class CabinetGeneratorService {
     const targetDepth = carcassDepth - 35;
     const slideLength = standardLengths.filter(l => l <= targetDepth).pop() || 350;
 
-    const boxClearancePerSide = 12.7; // 1/2" por lado
+    const boxWallT = Math.min(t, 18);
+    const boxClearancePerSide = 12.7; // 1/2" por lado para corredera
     const boxOuterWidth = innerWidth - (boxClearancePerSide * 2);
-    const boxInnerWidth = boxOuterWidth - (2 * t);
-    const boxHeight = Math.max(70, Math.min(Math.floor(frontHeight * 0.72), 220));
+    const boxInnerWidth = boxOuterWidth - (2 * boxWallT);
+    const targetBoxHeight = Math.max(60, Math.min(Math.floor(frontHeight * 0.68), 200));
     const boxFrontZ = frontCenterZ - (doorT / 2);
 
     for (let i = 0; i < drawersCount; i++) {
@@ -1371,9 +1391,17 @@ export class CabinetGeneratorService {
         ? (i === 0 ? 'Cajón Inferior' : (i === 1 ? 'Cajón Medio' : 'Cajón Superior'))
         : `Cajón ${drawerIdx}`;
 
-      const frontBottomY = (posY - (h / 2) + plinthH) + gap + (i * (frontHeight + gap));
+      const frontBottomY = frontStartBaseY + gap + (i * (frontHeight + gap));
+      const frontTopY = frontBottomY + frontHeight;
       const frontCenterY = frontBottomY + (frontHeight / 2);
-      const boxCenterY = frontCenterY - ((frontHeight - boxHeight) * 0.12);
+
+      // Ventana vertical segura detrás del frente para evitar colisión con Piso Inferior (i=0) y Cubierta Superior
+      const minSafeBoxY = Math.max(frontBottomY + 6, carcassFloorTopY + 10);
+      const maxSafeBoxY = Math.min(frontTopY - 8, carcassRoofBottomY - 8);
+      const availBoxWindowH = Math.max(45, maxSafeBoxY - minSafeBoxY);
+      const drawerBoxH = Math.max(45, Math.min(targetBoxHeight, Math.floor(availBoxWindowH)));
+      const boxBottomY = minSafeBoxY + Math.min(6, Math.max(0, (availBoxWindowH - drawerBoxH) * 0.25));
+      const boxCenterY = boxBottomY + (drawerBoxH / 2);
 
       // Frente Decorativo Exterior
       parts.push({
@@ -1418,14 +1446,14 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: slideLength,
-        width: boxHeight,
-        thickness: t,
+        width: drawerBoxH,
+        thickness: boxWallT,
         quantity: 1,
         materialId: mainMat.id,
         materialName: mainMat.name,
         grain: mainMat.hasGrain ? 'length' : 'none',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: posX - (boxOuterWidth / 2) + (t / 2),
+        posX: posX - (boxOuterWidth / 2) + (boxWallT / 2),
         posY: boxCenterY,
         posZ: boxFrontZ - (slideLength / 2),
         orientation: 'vertical_yz',
@@ -1442,14 +1470,14 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: slideLength,
-        width: boxHeight,
-        thickness: t,
+        width: drawerBoxH,
+        thickness: boxWallT,
         quantity: 1,
         materialId: mainMat.id,
         materialName: mainMat.name,
         grain: mainMat.hasGrain ? 'length' : 'none',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: posX + (boxOuterWidth / 2) - (t / 2),
+        posX: posX + (boxOuterWidth / 2) - (boxWallT / 2),
         posY: boxCenterY,
         posZ: boxFrontZ - (slideLength / 2),
         orientation: 'vertical_yz',
@@ -1466,8 +1494,8 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: boxInnerWidth,
-        width: boxHeight,
-        thickness: t,
+        width: drawerBoxH,
+        thickness: boxWallT,
         quantity: 1,
         materialId: mainMat.id,
         materialName: mainMat.name,
@@ -1475,7 +1503,7 @@ export class CabinetGeneratorService {
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
         posX,
         posY: boxCenterY,
-        posZ: boxFrontZ - (t / 2),
+        posZ: boxFrontZ - (boxWallT / 2),
         orientation: 'vertical_xy',
         componentRole: 'drawer_box',
         notes: 'Frente interior atornillado al frente vista'
@@ -1490,8 +1518,8 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: boxInnerWidth,
-        width: boxHeight,
-        thickness: t,
+        width: drawerBoxH,
+        thickness: boxWallT,
         quantity: 1,
         materialId: mainMat.id,
         materialName: mainMat.name,
@@ -1499,7 +1527,7 @@ export class CabinetGeneratorService {
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
         posX,
         posY: boxCenterY,
-        posZ: boxFrontZ - slideLength + (t / 2),
+        posZ: boxFrontZ - slideLength + (boxWallT / 2),
         orientation: 'vertical_xy',
         componentRole: 'drawer_box',
         notes: 'Trasera de caja interior'
@@ -1514,7 +1542,7 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: boxInnerWidth,
-        width: slideLength - (2 * t),
+        width: slideLength - (2 * boxWallT),
         thickness: backT,
         quantity: 1,
         materialId: backMat.id,
@@ -1522,7 +1550,7 @@ export class CabinetGeneratorService {
         grain: 'none',
         edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
         posX,
-        posY: boxCenterY - (boxHeight / 2) + (backT / 2) + 8,
+        posY: boxCenterY - (drawerBoxH / 2) + (backT / 2) + 8,
         posZ: boxFrontZ - (slideLength / 2),
         orientation: 'horizontal',
         componentRole: 'drawer_box',
@@ -1571,8 +1599,8 @@ export class CabinetGeneratorService {
       const safeWidth = Math.max(200, Number(raw.width) || 600);
       const safeHeight = Math.max(200, Number(raw.height) || 800);
       const safeDepth = Math.max(150, Number(raw.depth) || 350);
-      const safeStructT = Math.max(9, Number(raw.structureThickness) || 15);
-      const safeDoorT = Math.max(9, Number(raw.doorThickness) || safeStructT);
+      const safeStructT = Math.max(9, Math.min(22, Number(raw.structureThickness) || 15));
+      const safeDoorT = Math.max(9, Math.min(22, Number(raw.doorThickness) || safeStructT));
       const safeBackT = Math.max(3, Number(raw.backThickness) || 3);
       const safeShelvesCount = Math.max(0, Math.min(8, Math.floor(Number(raw.shelvesCount) || 0)));
       const innerH = Math.max(100, safeHeight - (2 * safeStructT));
@@ -1750,6 +1778,1013 @@ export class CabinetGeneratorService {
     materials: Material[]
   ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
     return this.generateParametricCabinet(config, materials);
+  }
+
+  /**
+   * Genera módulos especializados de cocina real:
+   * - 'oven_base': Módulo bajo para horno empotrado con nicho de 595mm y gaveta/puerta inferior para latas.
+   * - 'sink_base': Módulo bajo lavaplatos sin tapa maciza (con amarres superiores) y libre paso hidráulico.
+   * - 'corner_base': Módulo bajo esquinero con chaflán diagonal a 45° para cocinas en L o en U.
+   * - 'oven_tower': Torre columna para Horno + Microondas con alacena superior y puerta inferior.
+   */
+  private generateSpecializedKitchenModule(
+    config: ParametricCabinetConfig,
+    materials: Material[]
+  ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
+    const moduleId = config.id || `module_kpro_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const groupId = `group_kpro_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const groupName = config.name || `Módulo Cocina (${config.code || 'KPRO'})`;
+
+    const mainMat = materials.find(m => m.id === config.structureMaterialId) || materials[0];
+    const doorMat = materials.find(m => m.id === config.doorMaterialId) || mainMat;
+    const backMat = materials.find(m => m.id === config.backMaterialId) ||
+                    materials.find(m => m.thickness <= 6) || mainMat;
+
+    const t = Math.max(12, Number(config.structureThickness) || 18);
+    const doorT = Math.max(12, Number(config.doorThickness) || t);
+    const backT = Math.max(3, Number(config.backThickness) || 3);
+    const w = Math.max(300, Number(config.width) || 600);
+    const h = Math.max(400, Number(config.height) || 860);
+    const d = Math.max(300, Number(config.depth) || 580);
+    const gap = config.facadeGap ?? 3;
+    const hasPlinth = config.hasPlinth !== false;
+    const plinthH = hasPlinth ? (Number(config.plinthHeight) || 80) : 0;
+    const hasHandle = config.hasHandle !== false;
+    const hType = hasHandle ? (config.handleType || 'bar_modern') : 'none';
+    const hFinish = config.handleFinish || 'brushed_steel';
+
+    const posX = Number.isFinite(Number(config.posX)) ? Number(config.posX) : 0;
+    const posY = Number.isFinite(Number(config.posY)) ? Number(config.posY) : (h / 2);
+    const posZ = Number.isFinite(Number(config.posZ)) ? Number(config.posZ) : 0;
+
+    const carcassDepth = Math.max(200, d - doorT);
+    const carcassCenterZ = posZ - (doorT / 2);
+    const carcassFrontZ = carcassCenterZ + (carcassDepth / 2);
+    const carcassBackZ = carcassCenterZ - (carcassDepth / 2);
+    const doorPosZ = carcassFrontZ + (doorT / 2);
+
+    const innerWidth = Math.max(80, w - (2 * t));
+    const sideH = Math.max(200, h - plinthH);
+    const bottomOfCarcassY = posY - (h / 2) + plinthH;
+    const sideCenterY = bottomOfCarcassY + (sideH / 2);
+
+    const parts: Part[] = [];
+
+    // 1. Zócalo perimetral común (4 lados)
+    if (hasPlinth && plinthH > 0) {
+      const recess = 25;
+      const plinthOuterW = Math.max(50, w - (2 * recess));
+      const plinthOuterD = Math.max(50, carcassDepth - (2 * recess));
+      const plinthInnerD = Math.max(50, plinthOuterD - (2 * t));
+      const plinthCenterY = posY - (h / 2) + (plinthH / 2);
+      parts.push({
+        id: `${moduleId}_zocalo_f_${Date.now()}`,
+        name: 'Zócalo Frontal',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthOuterW,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: plinthCenterY,
+        posZ: carcassFrontZ - recess - (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo inferior retranqueado 25mm'
+      });
+      parts.push({
+        id: `${moduleId}_zocalo_t_${Date.now()}`,
+        name: 'Zócalo Trasero',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthOuterW,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: plinthCenterY,
+        posZ: carcassBackZ + recess + (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo trasero estructural'
+      });
+      parts.push({
+        id: `${moduleId}_zocalo_li_${Date.now()}`,
+        name: 'Zócalo Lateral Izquierdo',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthInnerD,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX - (w / 2) + recess + (t / 2),
+        posY: plinthCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'plinth',
+        notes: 'Zócalo lateral izquierdo perimetral'
+      });
+      parts.push({
+        id: `${moduleId}_zocalo_ld_${Date.now()}`,
+        name: 'Zócalo Lateral Derecho',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthInnerD,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX + (w / 2) - recess - (t / 2),
+        posY: plinthCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'plinth',
+        notes: 'Zócalo lateral derecho perimetral'
+      });
+    }
+
+    if (config.category === 'corner_base') {
+      // MÓDULO ESQUINERO DIAGONAL 45° (900x900)
+      const cutX = Math.round(w * 0.38);
+      const cutY = Math.round(carcassDepth * 0.38);
+      const cornerConfig: PartCornerCutConfig = {
+        type: 'chamfer_corner',
+        corner: 'front_right',
+        cutX,
+        cutY
+      };
+      const contour = this.buildCornerCutContour(innerWidth, carcassDepth, cornerConfig);
+
+      // Laterales
+      parts.push({
+        id: `${moduleId}_lat_izq_${Date.now()}`,
+        name: 'Lateral Izquierdo Esquinero',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: sideH,
+        width: carcassDepth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+        posX: posX - (w / 2) + (t / 2),
+        posY: sideCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'side_left',
+        notes: 'Costado profundo esquinero'
+      });
+
+      const rightSideDepth = Math.max(250, carcassDepth - cutY);
+      parts.push({
+        id: `${moduleId}_lat_der_${Date.now()}`,
+        name: 'Lateral Derecho Corto (Encuentro 45°)',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: sideH,
+        width: rightSideDepth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+        posX: posX + (w / 2) - (t / 2),
+        posY: sideCenterY,
+        posZ: carcassBackZ + (rightSideDepth / 2),
+        orientation: 'vertical_yz',
+        componentRole: 'side_right',
+        notes: 'Costado lateral para encuentro a 45°'
+      });
+
+      // Piso, Techo y Entrepaño con chaflán diagonal 45°
+      const levels = [
+        { role: 'bottom' as const, name: 'Piso Esquinero Chaflanado 45°', y: bottomOfCarcassY + (t / 2) },
+        { role: 'shelf' as const, name: 'Entrepaño Interior Esquinero 45°', y: bottomOfCarcassY + (sideH / 2) },
+        { role: 'top' as const, name: 'Tapa Superior Esquinera 45°', y: bottomOfCarcassY + sideH - (t / 2) }
+      ];
+      for (const lv of levels) {
+        parts.push({
+          id: `${moduleId}_${lv.role}_45_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+          name: lv.name,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: innerWidth,
+          width: carcassDepth,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
+          posX,
+          posY: lv.y,
+          posZ: carcassCenterZ,
+          orientation: 'horizontal',
+          componentRole: lv.role,
+          shapeType: 'freehand',
+          contourPoints: contour,
+          cornerCutConfig: cornerConfig,
+          notes: `Corte diagonal 45° (${cutX}x${cutY} mm)`
+        });
+      }
+
+      // Puerta diagonal en chaflán
+      const diagDoorW = Math.max(240, Math.round(Math.hypot(cutX, cutY) - 8));
+      parts.push({
+        id: `${moduleId}_puerta_diag_${Date.now()}`,
+        name: 'Puerta Esquinera Diagonal 45°',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: diagDoorW,
+        width: sideH - gap,
+        thickness: doorT,
+        quantity: 1,
+        materialId: doorMat.id,
+        materialName: doorMat.name,
+        grain: doorMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: posX + (innerWidth / 2) - (cutX / 2),
+        posY: sideCenterY,
+        posZ: carcassFrontZ - (cutY / 2),
+        rotationY: 45,
+        orientation: 'vertical_xy',
+        componentRole: 'door',
+        hardwareConfig: {
+          isMovable: true,
+          movableType: 'door',
+          openingDirection: 'left',
+          hingeType: 'straight',
+          handleType: hType,
+          handleFinish: hFinish,
+          handlePosition: 'vertical',
+          isOpen: false
+        },
+        notes: 'Puerta esquinera con bisagra angular 45°'
+      });
+
+      // Fondo trasero esquinero MDF
+      if (config.hasBackPanel !== false) {
+        parts.push({
+          id: `${moduleId}_fondo_esq_${Date.now()}`,
+          name: 'Fondo Trasero Ranurado Esquinero',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: Math.max(50, innerWidth - 2),
+          width: Math.max(50, sideH - (2 * t)),
+          thickness: backT,
+          quantity: 1,
+          materialId: backMat.id,
+          materialName: backMat.name,
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX,
+          posY: sideCenterY,
+          posZ: carcassBackZ + 15 + (backT / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'back',
+          notes: `Fondo MDF ${backT}mm módulo esquinero`
+        });
+      }
+    } else {
+      // Laterales estándar para oven_base, sink_base y oven_tower
+      parts.push({
+        id: `${moduleId}_lat_izq_${Date.now()}`,
+        name: 'Lateral Izquierdo',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: sideH,
+        width: carcassDepth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+        posX: posX - (w / 2) + (t / 2),
+        posY: sideCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'side_left',
+        notes: 'Costado estructural izquierdo'
+      });
+
+      parts.push({
+        id: `${moduleId}_lat_der_${Date.now()}`,
+        name: 'Lateral Derecho',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: sideH,
+        width: carcassDepth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+        posX: posX + (w / 2) - (t / 2),
+        posY: sideCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'side_right',
+        notes: 'Costado estructural derecho'
+      });
+
+      // Piso inferior
+      parts.push({
+        id: `${moduleId}_piso_${Date.now()}`,
+        name: 'Piso Inferior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: carcassDepth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: bottomOfCarcassY + (t / 2),
+        posZ: carcassCenterZ,
+        orientation: 'horizontal',
+        componentRole: 'bottom',
+        notes: 'Base inferior estructural'
+      });
+
+      if (config.category === 'oven_base') {
+        // MÓDULO BAJO PARA HORNO EMPOTRADO (Nicho 595mm + Cajón/Puerta inferior para latas)
+        const tieWidth = 100;
+        const topTieY = bottomOfCarcassY + sideH - (t / 2);
+        // Amarres superiores (frontal y trasero) para dejar ventilación y paso de gas/inducción
+        parts.push({
+          id: `${moduleId}_amarre_sup_f_${Date.now()}`,
+          name: 'Amarre Superior Frontal',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: innerWidth,
+          width: tieWidth,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX,
+          posY: topTieY,
+          posZ: carcassFrontZ - (tieWidth / 2),
+          orientation: 'horizontal',
+          componentRole: 'tie',
+          notes: 'Faja superior frontal sobre horno'
+        });
+        parts.push({
+          id: `${moduleId}_amarre_sup_t_${Date.now()}`,
+          name: 'Amarre Superior Trasero',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: innerWidth,
+          width: tieWidth,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX,
+          posY: topTieY,
+          posZ: carcassBackZ + (tieWidth / 2),
+          orientation: 'horizontal',
+          componentRole: 'tie',
+          notes: 'Faja superior trasera sobre horno'
+        });
+
+        // Bandeja soporte de horno (deja nicho libre de 595mm bajo el amarre superior)
+        const ovenNicheH = 595;
+        const ovenShelfY = Math.max(bottomOfCarcassY + 130, bottomOfCarcassY + sideH - t - ovenNicheH - (t / 2));
+        parts.push({
+          id: `${moduleId}_bandeja_horno_${Date.now()}`,
+          name: 'Bandeja Soporte de Horno (Reforzada)',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: innerWidth,
+          width: carcassDepth - 25,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'none', a1: 'none', a2: 'none' },
+          posX,
+          posY: ovenShelfY,
+          posZ: carcassCenterZ + 12.5,
+          orientation: 'horizontal',
+          componentRole: 'shelf',
+          notes: 'Soporte estructural de horno empotrable (ventilación trasera 25mm)'
+        });
+
+        // Frente abatible/gaveta inferior para latas debajo del horno
+        const lowerFrontH = Math.max(80, Math.round((ovenShelfY - (t / 2)) - bottomOfCarcassY - (gap * 2)));
+        const lowerFrontCenterY = bottomOfCarcassY + gap + (lowerFrontH / 2);
+        parts.push({
+          id: `${moduleId}_frente_latas_${Date.now()}`,
+          name: 'Frente Gaveta / Puerta Inferior Portabandejas',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: w - (gap * 2),
+          width: lowerFrontH,
+          thickness: doorT,
+          quantity: 1,
+          materialId: doorMat.id,
+          materialName: doorMat.name,
+          grain: doorMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX,
+          posY: lowerFrontCenterY,
+          posZ: doorPosZ,
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_front',
+          hardwareConfig: {
+            isMovable: true,
+            movableType: 'door',
+            openingDirection: 'bottom',
+            hingeType: 'straight',
+            handleType: hType,
+            handleFinish: hFinish,
+            handlePosition: 'horizontal',
+            isOpen: false
+          },
+          notes: 'Compartimento inferior para bandejas de horno'
+        });
+
+        // Fondo trasero para módulo horno (cubre la estructura dejando cámara trasera de ventilación)
+        if (config.hasBackPanel !== false) {
+          parts.push({
+            id: `${moduleId}_fondo_horno_${Date.now()}`,
+            name: 'Fondo Trasero Ranurado (Ventilación Horno)',
+            moduleId,
+            moduleName: groupName,
+            groupId,
+            groupName,
+            length: Math.max(50, innerWidth - 2),
+            width: Math.max(50, sideH - (2 * t)),
+            thickness: backT,
+            quantity: 1,
+            materialId: backMat.id,
+            materialName: backMat.name,
+            grain: 'none',
+            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+            posX,
+            posY: sideCenterY,
+            posZ: carcassBackZ + 10 + (backT / 2),
+            orientation: 'vertical_xy',
+            componentRole: 'back',
+            notes: `Fondo MDF ${backT}mm con holgura de ventilación`
+          });
+        }
+      } else if (config.category === 'sink_base') {
+        // MÓDULO BAJO LAVAPLATOS (Sin tapa maciza superior, con fajas verticales/horizontales para paso de pozo y sifón)
+        const tieH = 95;
+        const topTieY = bottomOfCarcassY + sideH - (tieH / 2);
+        parts.push({
+          id: `${moduleId}_faja_frontal_lvp_${Date.now()}`,
+          name: 'Faja Frontal Falsa (Frente Pozo Lavaplatos)',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: innerWidth,
+          width: tieH,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'thin', a1: 'none', a2: 'none' },
+          posX,
+          posY: topTieY,
+          posZ: carcassFrontZ - (t / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'tie',
+          notes: 'Amarre vertical frontal para rigidez bajo el pozo del lavaplatos'
+        });
+        parts.push({
+          id: `${moduleId}_faja_trasera_lvp_${Date.now()}`,
+          name: 'Amarre Trasero Superior (Paso Grifería)',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: innerWidth,
+          width: tieH,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'thin', a1: 'none', a2: 'none' },
+          posX,
+          posY: topTieY,
+          posZ: carcassBackZ + (t / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'tie',
+          notes: 'Amarre trasero superior libre para desagüe y abastos'
+        });
+
+        // 2 Puertas batientes frontales
+        const doorW = Math.max(100, (w / 2) - (gap * 1.2));
+        const doorH = sideH - (gap * 2);
+        const leftDoorX = posX - (w / 4) + (gap / 4);
+        const rightDoorX = posX + (w / 4) - (gap / 4);
+
+        parts.push({
+          id: `${moduleId}_puerta_izq_lvp_${Date.now()}`,
+          name: 'Puerta Izquierda Bajo Lavaplatos',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: doorW,
+          width: doorH,
+          thickness: doorT,
+          quantity: 1,
+          materialId: doorMat.id,
+          materialName: doorMat.name,
+          grain: doorMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX: leftDoorX,
+          posY: sideCenterY,
+          posZ: doorPosZ,
+          orientation: 'vertical_xy',
+          componentRole: 'door',
+          hardwareConfig: {
+            isMovable: true,
+            movableType: 'door',
+            openingDirection: 'left',
+            hingeType: 'straight',
+            handleType: hType,
+            handleFinish: hFinish,
+            handlePosition: 'vertical',
+            isOpen: false
+          },
+          notes: 'Puerta izquierda módulo húmedo'
+        });
+
+        parts.push({
+          id: `${moduleId}_puerta_der_lvp_${Date.now()}`,
+          name: 'Puerta Derecha Bajo Lavaplatos',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: doorW,
+          width: doorH,
+          thickness: doorT,
+          quantity: 1,
+          materialId: doorMat.id,
+          materialName: doorMat.name,
+          grain: doorMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX: rightDoorX,
+          posY: sideCenterY,
+          posZ: doorPosZ,
+          orientation: 'vertical_xy',
+          componentRole: 'door',
+          hardwareConfig: {
+            isMovable: true,
+            movableType: 'door',
+            openingDirection: 'right',
+            hingeType: 'straight',
+            handleType: hType,
+            handleFinish: hFinish,
+            handlePosition: 'vertical',
+            isOpen: false
+          },
+          notes: 'Puerta derecha módulo húmedo'
+        });
+      } else if (config.category === 'oven_tower') {
+        // TORRE COLUMNA DE HORNO + MICROONDAS (Altura ~2150mm)
+        // Techo superior
+        parts.push({
+          id: `${moduleId}_techo_torre_${Date.now()}`,
+          name: 'Techo Superior Torre',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: innerWidth,
+          width: carcassDepth,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX,
+          posY: bottomOfCarcassY + sideH - (t / 2),
+          posZ: carcassCenterZ,
+          orientation: 'horizontal',
+          componentRole: 'top',
+          notes: 'Tapa superior columna de hornos'
+        });
+
+        const lowerZoneH = Math.max(480, Math.round(sideH * 0.32));
+        const ovenNicheH = 595;
+        const microNicheH = 388;
+
+        const ovenFloorY = bottomOfCarcassY + lowerZoneH + (t / 2);
+        const microFloorY = ovenFloorY + (t / 2) + ovenNicheH + (t / 2);
+        const upperFloorY = microFloorY + (t / 2) + microNicheH + (t / 2);
+
+        const fixedShelves = [
+          { name: 'Repisa Estructural Base Horno', y: ovenFloorY },
+          { name: 'Repisa Estructural Base Microondas', y: microFloorY },
+          { name: 'Repisa Estructural Techo Microondas', y: upperFloorY }
+        ];
+        for (const fs of fixedShelves) {
+          parts.push({
+            id: `${moduleId}_rep_fija_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+            name: fs.name,
+            moduleId,
+            moduleName: groupName,
+            groupId,
+            groupName,
+            length: innerWidth,
+            width: carcassDepth - 35,
+            thickness: t,
+            quantity: 1,
+            materialId: mainMat.id,
+            materialName: mainMat.name,
+            grain: mainMat.hasGrain ? 'length' : 'none',
+            edges: { l1: 'thick', l2: 'none', a1: 'none', a2: 'none' },
+            posX,
+            posY: fs.y,
+            posZ: carcassCenterZ + 17.5,
+            orientation: 'horizontal',
+            componentRole: 'shelf',
+            notes: 'Entrepaño fijo con cámara trasera de ventilación (35mm)'
+          });
+        }
+
+        // Puerta inferior de torre
+        const botDoorH = Math.max(200, lowerZoneH - (gap * 2));
+        parts.push({
+          id: `${moduleId}_puerta_inf_torre_${Date.now()}`,
+          name: 'Puerta Inferior Torre Despensa',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: w - (gap * 2),
+          width: botDoorH,
+          thickness: doorT,
+          quantity: 1,
+          materialId: doorMat.id,
+          materialName: doorMat.name,
+          grain: doorMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX,
+          posY: bottomOfCarcassY + gap + (botDoorH / 2),
+          posZ: doorPosZ,
+          orientation: 'vertical_xy',
+          componentRole: 'door',
+          hardwareConfig: {
+            isMovable: true,
+            movableType: 'door',
+            openingDirection: 'left',
+            hingeType: 'straight',
+            handleType: hType,
+            handleFinish: hFinish,
+            handlePosition: 'vertical',
+            isOpen: false
+          },
+          notes: 'Puerta inferior columna de hornos'
+        });
+
+        // Puerta superior elevable de torre
+        const topZoneBottomY = upperFloorY + (t / 2);
+        const topCabinetTopY = bottomOfCarcassY + sideH;
+        const topDoorH = Math.max(150, topCabinetTopY - topZoneBottomY - (gap * 2));
+        parts.push({
+          id: `${moduleId}_puerta_sup_torre_${Date.now()}`,
+          name: 'Puerta Superior Alacena Torre',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: w - (gap * 2),
+          width: topDoorH,
+          thickness: doorT,
+          quantity: 1,
+          materialId: doorMat.id,
+          materialName: doorMat.name,
+          grain: doorMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX,
+          posY: topZoneBottomY + gap + (topDoorH / 2),
+          posZ: doorPosZ,
+          orientation: 'vertical_xy',
+          componentRole: 'door',
+          hardwareConfig: {
+            isMovable: true,
+            movableType: 'door',
+            openingDirection: 'top',
+            hingeType: 'gas_piston',
+            handleType: hType,
+            handleFinish: hFinish,
+            handlePosition: 'horizontal',
+            isOpen: false
+          },
+          notes: 'Puerta superior sobre nicho de microondas'
+        });
+
+        // Fondo trasero en torre
+        parts.push({
+          id: `${moduleId}_fondo_torre_${Date.now()}`,
+          name: 'Fondo Trasero Ranurado Torre',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: innerWidth - 2,
+          width: sideH - (2 * t),
+          thickness: backT,
+          quantity: 1,
+          materialId: backMat.id,
+          materialName: backMat.name,
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX,
+          posY: sideCenterY,
+          posZ: carcassBackZ + 15 + (backT / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'back',
+          notes: 'Fondo MDF ranurado con rejilla de ventilación'
+        });
+      }
+    }
+
+    const module: FurnitureModule = {
+      id: moduleId,
+      name: groupName,
+      type: config.category === 'oven_tower' ? 'tall_cabinet' : 'base_cabinet',
+      width: w,
+      height: h,
+      depth: d,
+      boardThickness: t,
+      backThickness: backT,
+      backType: config.category === 'sink_base' ? 'none' : 'groove',
+      shelvesCount: config.shelvesCount || 1,
+      doorsCount: config.category === 'sink_base' ? 2 : 1,
+      doorsType: 'overlay',
+      drawersCount: 0,
+      hasPlinth,
+      plinthHeight: plinthH,
+      materialId: mainMat.id,
+      backMaterialId: backMat.id,
+      defaultThinEdge: true,
+      defaultThickDoors: true
+    };
+
+    const group: PartGroup = {
+      id: groupId,
+      name: groupName,
+      type: 'assembly',
+      isOpen: false,
+      parametricConfig: config
+    };
+
+    return { module, parts, group };
+  }
+
+  /**
+   * Construye el polígono 2D exacto (contourPoints en mm, origen inferior-izquierdo 0..length, 0..width)
+   * a partir de la configuración paramétrica de corte especial (Chaflán, Diagonal, Destaje en L o Esquinas Redondeadas).
+   */
+  buildCornerCutContour(
+    length: number,
+    width: number,
+    config: PartCornerCutConfig
+  ): { x: number; y: number }[] {
+    const L = Math.max(50, Number(length) || 600);
+    const W = Math.max(50, Number(width) || 600);
+    const cx = Math.max(15, Math.min(L * 0.75, Number(config.cutX) || 150));
+    const cy = Math.max(15, Math.min(W * 0.75, Number(config.cutY) || 150));
+    const corner = config.corner || 'front_right';
+
+    // Nota sobre sistema de coordenadas de contourPoints en Furniture3dViewer:
+    // x: 0 (izquierda) -> L (derecha)
+    // y: 0 (frente / +Z) -> W (fondo / -Z)
+    if (config.type === 'chamfer_corner') {
+      if (corner === 'front_right') {
+        return [
+          { x: 0, y: 0 },
+          { x: L - cx, y: 0 },
+          { x: L, y: cy },
+          { x: L, y: W },
+          { x: 0, y: W }
+        ];
+      }
+      if (corner === 'front_left') {
+        return [
+          { x: cx, y: 0 },
+          { x: L, y: 0 },
+          { x: L, y: W },
+          { x: 0, y: W },
+          { x: 0, y: cy }
+        ];
+      }
+      if (corner === 'back_right') {
+        return [
+          { x: 0, y: 0 },
+          { x: L, y: 0 },
+          { x: L, y: W - cy },
+          { x: L - cx, y: W },
+          { x: 0, y: W }
+        ];
+      }
+      if (corner === 'back_left') {
+        return [
+          { x: 0, y: 0 },
+          { x: L, y: 0 },
+          { x: L, y: W },
+          { x: cx, y: W },
+          { x: 0, y: W - cy }
+        ];
+      }
+      if (corner === 'both_front') {
+        return [
+          { x: cx, y: 0 },
+          { x: L - cx, y: 0 },
+          { x: L, y: cy },
+          { x: L, y: W },
+          { x: 0, y: W },
+          { x: 0, y: cy }
+        ];
+      }
+      // 'all'
+      return [
+        { x: cx, y: 0 },
+        { x: L - cx, y: 0 },
+        { x: L, y: cy },
+        { x: L, y: W - cy },
+        { x: L - cx, y: W },
+        { x: cx, y: W },
+        { x: 0, y: W - cy },
+        { x: 0, y: cy }
+      ];
+    }
+
+    if (config.type === 'diagonal_side') {
+      // Corte en trapecio: recorta cx en el frente derecho o izquierdo a lo largo de todo el fondo W
+      if (corner === 'front_left' || corner === 'back_left') {
+        return [
+          { x: cx, y: 0 },
+          { x: L, y: 0 },
+          { x: L, y: W },
+          { x: 0, y: W }
+        ];
+      }
+      return [
+        { x: 0, y: 0 },
+        { x: L - cx, y: 0 },
+        { x: L, y: W },
+        { x: 0, y: W }
+      ];
+    }
+
+    if (config.type === 'notch_l') {
+      // Destaje en esquina en L (salva-columna o ducto)
+      if (corner === 'front_right') {
+        return [
+          { x: 0, y: 0 },
+          { x: L - cx, y: 0 },
+          { x: L - cx, y: cy },
+          { x: L, y: cy },
+          { x: L, y: W },
+          { x: 0, y: W }
+        ];
+      }
+      if (corner === 'front_left') {
+        return [
+          { x: cx, y: 0 },
+          { x: L, y: 0 },
+          { x: L, y: W },
+          { x: 0, y: W },
+          { x: 0, y: cy },
+          { x: cx, y: cy }
+        ];
+      }
+      if (corner === 'back_left') {
+        return [
+          { x: 0, y: 0 },
+          { x: L, y: 0 },
+          { x: L, y: W },
+          { x: cx, y: W },
+          { x: cx, y: W - cy },
+          { x: 0, y: W - cy }
+        ];
+      }
+      // back_right (típico columna en esquina de pared)
+      return [
+        { x: 0, y: 0 },
+        { x: L, y: 0 },
+        { x: L, y: W - cy },
+        { x: L - cx, y: W - cy },
+        { x: L - cx, y: W },
+        { x: 0, y: W }
+      ];
+    }
+
+    if (config.type === 'rounded_corners') {
+      const r = Math.max(15, Math.min(L * 0.45, W * 0.45, cx));
+      const steps = 6;
+      const pts: { x: number; y: number }[] = [];
+      const addArc = (centerX: number, centerY: number, startAngle: number, endAngle: number) => {
+        for (let i = 0; i <= steps; i++) {
+          const a = startAngle + ((endAngle - startAngle) * i) / steps;
+          pts.push({
+            x: Math.round((centerX + Math.cos(a) * r) * 10) / 10,
+            y: Math.round((centerY + Math.sin(a) * r) * 10) / 10
+          });
+        }
+      };
+
+      const roundFL = corner === 'front_left' || corner === 'both_front' || corner === 'all';
+      const roundFR = corner === 'front_right' || corner === 'both_front' || corner === 'all';
+      const roundBR = corner === 'back_right' || corner === 'all';
+      const roundBL = corner === 'back_left' || corner === 'all';
+
+      if (roundFL) addArc(r, r, Math.PI, Math.PI * 1.5);
+      else pts.push({ x: 0, y: 0 });
+
+      if (roundFR) addArc(L - r, r, Math.PI * 1.5, Math.PI * 2);
+      else pts.push({ x: L, y: 0 });
+
+      if (roundBR) addArc(L - r, W - r, 0, Math.PI * 0.5);
+      else pts.push({ x: L, y: W });
+
+      if (roundBL) addArc(r, W - r, Math.PI * 0.5, Math.PI);
+      else pts.push({ x: 0, y: W });
+
+      return pts;
+    }
+
+    return [
+      { x: 0, y: 0 },
+      { x: L, y: 0 },
+      { x: L, y: W },
+      { x: 0, y: W }
+    ];
   }
 }
 

@@ -155,11 +155,51 @@ export class BudgetViewComponent {
   });
 
   /**
-   * Costo directo de materiales de carpintería (Tableros + Tapacantos + Herrajes).
+   * Desglose de mesones y salpicaderos de Piedra / Cuarzo / Granito / Mármol cotizados por m²
+   * (excluidos del optimizador de corte de melamina).
+   */
+  readonly stoneCountertopsBreakdown = computed(() => {
+    const parts = this.projectService.partsList();
+    const mats = this.materials();
+    const stoneParts = parts.filter(p => {
+      if (p.excludeFromCutlist) return true;
+      if (p.componentRole === 'countertop' || p.componentRole === 'backsplash') {
+        const m = mats.find(mat => mat.id === p.materialId);
+        return m?.textureType === 'stone';
+      }
+      return false;
+    });
+
+    const items = stoneParts.map(part => {
+      const mat = mats.find(m => m.id === part.materialId) || mats[0];
+      const sheetAreaM2 = Math.max(1, ((mat?.sheetLength || 3000) * (mat?.sheetWidth || 1600)) / 1_000_000);
+      const costPerM2 = Math.round((mat?.sheetCost || 1200000) / sheetAreaM2);
+      const areaM2 = Math.round(((part.length * part.width * (part.quantity || 1)) / 1_000_000) * 100) / 100;
+      const linearMeters = Math.round(((part.length * (part.quantity || 1)) / 1000) * 100) / 100;
+      const subtotal = Math.round(areaM2 * costPerM2);
+      return {
+        part,
+        materialName: mat?.name || part.materialName,
+        colorHex: mat?.colorHex || '#f1f5f9',
+        areaM2,
+        linearMeters,
+        costPerM2,
+        subtotal
+      };
+    });
+
+    const totalStoneCost = items.reduce((acc, it) => acc + it.subtotal, 0);
+    const totalAreaM2 = Math.round(items.reduce((acc, it) => acc + it.areaM2, 0) * 100) / 100;
+    return { items, totalStoneCost, totalAreaM2 };
+  });
+
+  /**
+   * Costo directo de materiales de carpintería y mesones (Tableros + Mesones Piedra m² + Tapacantos + Herrajes).
    */
   readonly totalMaterialsCost = computed(() => {
     return (
       this.sheetsCostBreakdown().totalSheetsCost +
+      this.stoneCountertopsBreakdown().totalStoneCost +
       this.edgesCostBreakdown().totalEdgeCost +
       this.hardwareCostTotal()
     );

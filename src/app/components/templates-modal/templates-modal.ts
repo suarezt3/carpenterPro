@@ -44,6 +44,10 @@ export type ModuleCategoryPreset =
   | 'vanity'
   | 'bookshelf'
   | 'drawers'
+  | 'oven_base'
+  | 'sink_base'
+  | 'corner_base'
+  | 'oven_tower'
   | 'custom';
 
 @Component({
@@ -218,8 +222,8 @@ export class TemplatesModalComponent {
   height = signal<number>(820);
   depth = signal<number>(580);
 
-  structureThickness = signal<number>(15);
-  doorThickness = signal<number>(15);
+  structureThickness = signal<number>(18);
+  doorThickness = signal<number>(18);
 
   doorOpening = signal<'none' | 'left' | 'right' | 'double' | 'top' | 'bottom'>('left');
   hasHandle = signal<boolean>(true);
@@ -253,8 +257,10 @@ export class TemplatesModalComponent {
     const safeWidth = Math.max(150, Number(cfg.width) || 600);
     const safeHeight = Math.max(200, Number(cfg.height) || 820);
     const safeDepth = Math.max(150, Number(cfg.depth) || 580);
-    const safeStructT = Number(cfg.structureThickness) || 15;
-    const safeDoorT = Number(cfg.doorThickness) || 15;
+    const rawStructT = Number(cfg.structureThickness) || 18;
+    const safeStructT = rawStructT === 15 ? 15 : 18;
+    const rawDoorT = Number(cfg.doorThickness) || safeStructT;
+    const safeDoorT = rawDoorT === 15 ? 15 : 18;
     const safeShelvesCount = Math.max(0, Math.min(8, Math.floor(Number(cfg.shelvesCount) || 0)));
 
     this.width.set(safeWidth);
@@ -292,10 +298,17 @@ export class TemplatesModalComponent {
     }
 
     this.hasBackPanel.set(cfg.hasBackPanel !== false && cfg.backType !== 'none');
-    if (cfg.structureMaterialId) this.structureMaterialId.set(cfg.structureMaterialId);
+    const boardMats = this.materials().filter(m => m.textureType !== 'stone');
+    const fallbackMatId = boardMats[0]?.id || this.materials()[0]?.id || '';
+    if (cfg.structureMaterialId) {
+      const found = this.materials().find(m => m.id === cfg.structureMaterialId);
+      this.structureMaterialId.set(found && found.textureType !== 'stone' ? found.id : fallbackMatId);
+    }
     if (cfg.doorMaterialId) {
-      this.doorMaterialId.set(cfg.doorMaterialId);
-      this.useSameMaterialForDoors.set(cfg.doorMaterialId === (cfg.structureMaterialId || this.structureMaterialId()));
+      const foundDoor = this.materials().find(m => m.id === cfg.doorMaterialId);
+      const validDoorId = foundDoor && foundDoor.textureType !== 'stone' ? foundDoor.id : this.structureMaterialId();
+      this.doorMaterialId.set(validDoorId);
+      this.useSameMaterialForDoors.set(validDoorId === this.structureMaterialId());
     }
   }
 
@@ -530,6 +543,8 @@ export class TemplatesModalComponent {
 
   categoriesNavRef = viewChild<ElementRef<HTMLDivElement>>('categoriesNav');
 
+  private wasEditingGroup = false;
+
   constructor() {
     // 1. Cargar configuración del módulo a editar: SOLO depende de isOpen(), editingGroupId() y editingConfig()
     effect(() => {
@@ -537,8 +552,18 @@ export class TemplatesModalComponent {
       const groupId = this.editingGroupId();
       const cfg = this.editingConfig();
       if (open && groupId && cfg) {
+        this.wasEditingGroup = true;
         untracked(() => {
           this.loadConfig(cfg);
+        });
+      } else if (open && !groupId) {
+        untracked(() => {
+          if (this.wasEditingGroup || (this.structureThickness() !== 15 && this.structureThickness() !== 18)) {
+            this.wasEditingGroup = false;
+            const p = this.activePreset();
+            const isSpec = p === 'oven_base' || p === 'sink_base' || p === 'corner_base' || p === 'oven_tower';
+            this.selectPreset(isSpec ? 'kitchen_base' : p);
+          }
         });
       }
     });
@@ -548,11 +573,12 @@ export class TemplatesModalComponent {
       const mats = this.materials();
       if (mats.length > 0) {
         untracked(() => {
+          const boardMat = mats.find(m => m.textureType !== 'stone') || mats[0];
           if (!this.structureMaterialId()) {
-            this.structureMaterialId.set(mats[0].id);
+            this.structureMaterialId.set(boardMat.id);
           }
           if (!this.doorMaterialId()) {
-            this.doorMaterialId.set(mats[0].id);
+            this.doorMaterialId.set(boardMat.id);
           }
         });
       }
@@ -571,16 +597,44 @@ export class TemplatesModalComponent {
     });
   }
 
+  setDrawersCount(cnt: number) {
+    const clamped = Math.max(2, Math.min(6, Math.floor(Number(cnt) || 3)));
+    this.drawersCount.set(clamped);
+    const currentName = this.moduleName().trim();
+    if (!currentName || /^Cajonera\s+\d+\s+(Cajones|Gavetas)$/i.test(currentName)) {
+      this.moduleName.set(`Cajonera ${clamped} Cajones`);
+    }
+  }
+
   // Selección de preset
   selectPreset(preset: ModuleCategoryPreset) {
     this.activePreset.set(preset);
+    if (this.structureThickness() !== 15 && this.structureThickness() !== 18) {
+      this.structureThickness.set(18);
+    }
+    if (this.doorThickness() !== 15 && this.doorThickness() !== 18) {
+      this.doorThickness.set(this.structureThickness());
+    }
+    const mats = this.materials();
+    if (mats.length > 0) {
+      const curStruct = mats.find(m => m.id === this.structureMaterialId());
+      if (!curStruct || curStruct.textureType === 'stone') {
+        const boardMat = mats.find(m => m.textureType !== 'stone') || mats[0];
+        this.structureMaterialId.set(boardMat.id);
+        if (this.useSameMaterialForDoors()) {
+          this.doorMaterialId.set(boardMat.id);
+        }
+      }
+    }
+
     switch (preset) {
       case 'drawers':
-        this.moduleName.set('Cajonera 3 Cajones');
+        this.moduleName.set(`Cajonera ${this.drawersCount()} Cajones`);
         this.width.set(600);
         this.height.set(750);
         this.depth.set(500);
-        this.drawersCount.set(3);
+        this.structureThickness.set(18);
+        this.doorThickness.set(18);
         this.drawerSlideType.set('telescopic');
         this.drawerFrontType.set('overlay');
         this.hasPlinth.set(true);
@@ -599,6 +653,62 @@ export class TemplatesModalComponent {
         this.depth.set(580);
         this.doorOpening.set('left');
         this.shelvesCount.set(1);
+        this.hasHandle.set(true);
+        this.hasBackPanel.set(true);
+        break;
+      case 'oven_base':
+        this.moduleName.set('Módulo Horno Empotrado');
+        this.width.set(600);
+        this.height.set(860);
+        this.depth.set(580);
+        this.structureThickness.set(18);
+        this.doorThickness.set(18);
+        this.hasPlinth.set(true);
+        this.plinthHeight.set(80);
+        this.doorOpening.set('bottom');
+        this.shelvesCount.set(1);
+        this.hasHandle.set(true);
+        this.hasBackPanel.set(true);
+        break;
+      case 'sink_base':
+        this.moduleName.set('Módulo Bajo Lavaplatos');
+        this.width.set(800);
+        this.height.set(860);
+        this.depth.set(580);
+        this.structureThickness.set(18);
+        this.doorThickness.set(18);
+        this.hasPlinth.set(true);
+        this.plinthHeight.set(80);
+        this.doorOpening.set('double');
+        this.shelvesCount.set(0);
+        this.hasHandle.set(true);
+        this.hasBackPanel.set(false);
+        break;
+      case 'corner_base':
+        this.moduleName.set('Esquinero Diagonal 45°');
+        this.width.set(900);
+        this.height.set(860);
+        this.depth.set(900);
+        this.structureThickness.set(18);
+        this.doorThickness.set(18);
+        this.hasPlinth.set(true);
+        this.plinthHeight.set(80);
+        this.doorOpening.set('left');
+        this.shelvesCount.set(1);
+        this.hasHandle.set(true);
+        this.hasBackPanel.set(true);
+        break;
+      case 'oven_tower':
+        this.moduleName.set('Torre Horno + Microondas');
+        this.width.set(600);
+        this.height.set(2150);
+        this.depth.set(580);
+        this.structureThickness.set(18);
+        this.doorThickness.set(18);
+        this.hasPlinth.set(true);
+        this.plinthHeight.set(80);
+        this.doorOpening.set('left');
+        this.shelvesCount.set(3);
         this.hasHandle.set(true);
         this.hasBackPanel.set(true);
         break;
@@ -703,16 +813,22 @@ export class TemplatesModalComponent {
     const doorMat = this.useSameMaterialForDoors() ? structMat : (this.doorMaterialId() || structMat);
     const backMat = this.materials().find(m => m.thickness <= 6)?.id || structMat;
 
+    const preset = this.activePreset();
+    const isDrawers = preset === 'drawers';
+    const isSpecKitchen = preset === 'oven_base' || preset === 'sink_base' || preset === 'corner_base' || preset === 'oven_tower';
+
     let moduleType: ParametricCabinetConfig['moduleType'] = 'base_cabinet';
-    if (this.activePreset() === 'drawers') {
+    if (isDrawers) {
       moduleType = 'drawer_unit';
-    } else if (this.activePreset() === 'kitchen_wall') {
+    } else if (preset === 'oven_tower') {
+      moduleType = 'tall_cabinet';
+    } else if (preset === 'kitchen_wall') {
       moduleType = 'wall_cabinet';
-    } else if (this.activePreset() === 'closet') {
+    } else if (preset === 'closet') {
       moduleType = 'closet';
-    } else if (this.activePreset() === 'vanity') {
+    } else if (preset === 'vanity') {
       moduleType = 'vanity';
-    } else if (this.activePreset() === 'bookshelf') {
+    } else if (preset === 'bookshelf') {
       moduleType = 'bookshelf';
     }
 
@@ -726,18 +842,19 @@ export class TemplatesModalComponent {
       elevationY = this.height() / 2;
     }
 
-    const isDrawers = this.activePreset() === 'drawers';
+    const safeStructT = this.structureThickness() === 15 ? 15 : 18;
+    const safeDoorT = this.doorThickness() === 15 ? 15 : safeStructT;
 
     const config: ParametricCabinetConfig = {
       name: this.moduleName().trim() || (isDrawers ? `Cajonera ${this.drawersCount()} Cajones` : 'Módulo Paramétrico'),
       code: 'MOD_' + Math.floor(100 + Math.random() * 900),
       moduleType,
-      category: this.activePreset(),
+      category: preset,
       width: this.width(),
       height: this.height(),
       depth: this.depth(),
-      structureThickness: this.structureThickness(),
-      doorThickness: this.doorThickness(),
+      structureThickness: safeStructT,
+      doorThickness: safeDoorT,
       backThickness: this.backThickness(),
       backType: this.hasBackPanel() ? 'groove' : 'none',
       hasBackPanel: this.hasBackPanel(),
@@ -748,8 +865,8 @@ export class TemplatesModalComponent {
       drawersCount: isDrawers ? this.drawersCount() : undefined,
       drawerSlideType: isDrawers ? this.drawerSlideType() : undefined,
       drawerFrontType: isDrawers ? this.drawerFrontType() : undefined,
-      hasPlinth: isDrawers ? this.hasPlinth() : undefined,
-      plinthHeight: isDrawers ? this.plinthHeight() : undefined,
+      hasPlinth: (isDrawers || isSpecKitchen) ? this.hasPlinth() : undefined,
+      plinthHeight: (isDrawers || isSpecKitchen) ? this.plinthHeight() : undefined,
       hasTopCover: isDrawers ? true : undefined,
       hasHandle: this.hasHandle(),
       handleType: this.hasHandle() ? this.handleType() : 'none',

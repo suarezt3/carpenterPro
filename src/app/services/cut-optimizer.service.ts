@@ -31,11 +31,22 @@ interface ExpandedPartItem {
 export class CutOptimizerService {
 
   optimizeProject(
-    parts: Part[],
+    rawParts: Part[],
     materials: Material[],
     settings: ProjectSettings
   ): OptimizationResult {
-    // 1. Calcular metros lineales de tapacantos en todas las piezas
+    // Excluir del optimizador de sierra los mesones/salpicaderos de piedra, cuarzo, granito o mármol
+    // (se cotizan por m² en el presupuesto pero no entran al corte de placas de melamina)
+    const parts = rawParts.filter(p => {
+      if (p.excludeFromCutlist) return false;
+      if (p.componentRole === 'countertop' || p.componentRole === 'backsplash') {
+        const mat = materials.find(m => m.id === p.materialId);
+        if (mat?.textureType === 'stone') return false;
+      }
+      return true;
+    });
+
+    // 1. Calcular metros lineales de tapacantos en todas las piezas cortables
     let totalThinEdgeMeters = 0;
     let totalThickEdgeMeters = 0;
 

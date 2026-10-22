@@ -72,6 +72,24 @@ export class Appliance3dBuilderService {
       case 'table_legs_set':
         this.buildTableLegsSet(group, appliance, w, h, d, bodyMat, accentMat, chromeMat);
         break;
+      case 'bar_stool':
+        this.buildBarStool(group, w, h, d, bodyMat, accentMat, chromeMat);
+        break;
+      case 'dining_chair':
+        this.buildDiningChair(group, w, h, d, bodyMat, accentMat, chromeMat);
+        break;
+      case 'dining_table':
+        this.buildDiningTable(group, w, h, d, bodyMat, accentMat);
+        break;
+      case 'pendant_lamp':
+        this.buildPendantLamp(group, appliance, w, h, d, bodyMat, accentMat, chromeMat);
+        break;
+      case 'window_frame':
+        this.buildWindowFrame(group, w, h, d, bodyMat, chromeMat);
+        break;
+      case 'door_frame':
+        this.buildDoorFrame(group, w, h, d, bodyMat, accentMat, chromeMat);
+        break;
       default:
         this.buildGenericBox(group, w, h, d, bodyMat);
     }
@@ -1314,6 +1332,388 @@ export class Appliance3dBuilderService {
     }
 
     group.add(legContainer);
+  }
+
+  // --- 9. INTERIORISMO: TABURETES DE BARRA, SILLAS, MESAS, LÁMPARAS, VENTANAS Y PUERTAS ---
+
+  private buildBarStool(
+    group: THREE.Group,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const seatHeight = Math.round(h * 0.78);
+    const backHeight = h - seatHeight;
+    const cushionMat = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      roughness: 0.75,
+      metalness: 0.05
+    });
+
+    // 4 Patas inclinadas desde la base del asiento hasta el suelo
+    const topSpreadX = w * 0.28;
+    const topSpreadZ = d * 0.28;
+    const botSpreadX = w * 0.42;
+    const botSpreadZ = d * 0.42;
+    const upAxis = new THREE.Vector3(0, 1, 0);
+
+    const legCoords = [
+      { tx: -topSpreadX, tz: topSpreadZ, bx: -botSpreadX, bz: botSpreadZ },
+      { tx: topSpreadX, tz: topSpreadZ, bx: botSpreadX, bz: botSpreadZ },
+      { tx: -topSpreadX, tz: -topSpreadZ, bx: -botSpreadX, bz: -botSpreadZ },
+      { tx: topSpreadX, tz: -topSpreadZ, bx: botSpreadX, bz: -botSpreadZ }
+    ];
+
+    for (const lc of legCoords) {
+      const topV = new THREE.Vector3(lc.tx, seatHeight - 15, lc.tz);
+      const botV = new THREE.Vector3(lc.bx, 0, lc.bz);
+      const delta = botV.clone().sub(topV);
+      const len = delta.length();
+      const mid = topV.clone().add(botV).multiplyScalar(0.5);
+
+      const legGeo = new THREE.CylinderGeometry(14, 10, len, 16);
+      const leg = new THREE.Mesh(legGeo, bodyMat);
+      leg.position.copy(mid);
+      leg.quaternion.setFromUnitVectors(upAxis, delta.clone().normalize());
+      group.add(leg);
+    }
+
+    // Aro reposapiés perimetral a ~280mm del suelo
+    const footrestY = Math.round(seatHeight * 0.36);
+    const ringRadius = Math.min(w, d) * 0.37;
+    const ringGeo = new THREE.TorusGeometry(ringRadius, 6, 12, 32);
+    const ring = new THREE.Mesh(ringGeo, chromeMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(0, footrestY, 0);
+    group.add(ring);
+
+    // Base del asiento y cojín ergonómico
+    const seatBaseGeo = new THREE.CylinderGeometry(w * 0.42, w * 0.38, 26, 28);
+    const seatBase = new THREE.Mesh(seatBaseGeo, bodyMat);
+    seatBase.position.set(0, seatHeight - 13, 0);
+    group.add(seatBase);
+
+    const padGeo = new THREE.CylinderGeometry(w * 0.40, w * 0.41, 22, 28);
+    const pad = new THREE.Mesh(padGeo, cushionMat);
+    pad.position.set(0, seatHeight + 8, 0);
+    group.add(pad);
+
+    // Respaldo bajo curvado
+    if (backHeight > 40) {
+      const backGeo = new THREE.BoxGeometry(w * 0.76, backHeight * 0.72, 24);
+      const back = new THREE.Mesh(backGeo, cushionMat);
+      back.position.set(0, seatHeight + backHeight * 0.55, -d * 0.36);
+      back.rotation.x = -0.12;
+      group.add(back);
+
+      // Soportes traseros del respaldo
+      for (const sx of [-w * 0.2, w * 0.2]) {
+        const postGeo = new THREE.BoxGeometry(16, backHeight * 0.6, 12);
+        const post = new THREE.Mesh(postGeo, accentMat);
+        post.position.set(sx, seatHeight + backHeight * 0.28, -d * 0.35);
+        post.rotation.x = -0.1;
+        group.add(post);
+      }
+    }
+  }
+
+  private buildDiningChair(
+    group: THREE.Group,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const seatH = Math.round(h * 0.54);
+    const backH = h - seatH;
+    const shellMat = new THREE.MeshStandardMaterial({
+      color: 0xf1f5f9,
+      roughness: 0.45,
+      metalness: 0.05
+    });
+    const padMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      roughness: 0.8
+    });
+
+    // 4 Patas cónicas nórdicas
+    const upAxis = new THREE.Vector3(0, 1, 0);
+    const corners = [
+      { tx: -w * 0.3, tz: d * 0.28, bx: -w * 0.42, bz: d * 0.4 },
+      { tx: w * 0.3, tz: d * 0.28, bx: w * 0.42, bz: d * 0.4 },
+      { tx: -w * 0.3, tz: -d * 0.28, bx: -w * 0.42, bz: -d * 0.42 },
+      { tx: w * 0.3, tz: -d * 0.28, bx: w * 0.42, bz: -d * 0.42 }
+    ];
+    for (const c of corners) {
+      const topV = new THREE.Vector3(c.tx, seatH - 12, c.tz);
+      const botV = new THREE.Vector3(c.bx, 0, c.bz);
+      const delta = botV.clone().sub(topV);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(14, 9, delta.length(), 16), bodyMat);
+      leg.position.copy(topV.clone().add(botV).multiplyScalar(0.5));
+      leg.quaternion.setFromUnitVectors(upAxis, delta.clone().normalize());
+      group.add(leg);
+    }
+
+    // Tensores metálicos tipo Eames
+    const crossGeo = new THREE.BoxGeometry(w * 0.62, 5, d * 0.58);
+    const cross = new THREE.Mesh(crossGeo, chromeMat);
+    cross.position.set(0, seatH * 0.68, 0);
+    group.add(cross);
+
+    // Asiento y respaldo envolvente
+    const seatMesh = new THREE.Mesh(new THREE.BoxGeometry(w * 0.88, 22, d * 0.84), shellMat);
+    seatMesh.position.set(0, seatH, 10);
+    group.add(seatMesh);
+
+    const cushionMesh = new THREE.Mesh(new THREE.BoxGeometry(w * 0.8, 14, d * 0.74), padMat);
+    cushionMesh.position.set(0, seatH + 14, 12);
+    group.add(cushionMesh);
+
+    const backMesh = new THREE.Mesh(new THREE.BoxGeometry(w * 0.84, backH * 0.92, 22), shellMat);
+    backMesh.position.set(0, seatH + backH * 0.46, -d * 0.36);
+    backMesh.rotation.x = -0.14;
+    group.add(backMesh);
+  }
+
+  private buildDiningTable(
+    group: THREE.Group,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material
+  ) {
+    const topThick = 34;
+    const apronH = 55;
+    const legH = h - topThick;
+
+    // Tablero principal de la mesa
+    const topGeo = new THREE.BoxGeometry(w, topThick, d);
+    const topMesh = new THREE.Mesh(topGeo, bodyMat);
+    topMesh.position.set(0, h - topThick / 2, 0);
+    group.add(topMesh);
+
+    // Bastidor inferior (faldón remetido)
+    const apronW = w - 180;
+    const apronD = d - 160;
+    const apronGeo = new THREE.BoxGeometry(apronW, apronH, apronD);
+    const apron = new THREE.Mesh(apronGeo, accentMat);
+    apron.position.set(0, h - topThick - apronH / 2, 0);
+    group.add(apron);
+
+    // 4 Patas arquitectónicas
+    const legSection = 55;
+    const legPositions = [
+      { x: -w / 2 + 75, z: d / 2 - 75 },
+      { x: w / 2 - 75, z: d / 2 - 75 },
+      { x: -w / 2 + 75, z: -d / 2 + 75 },
+      { x: w / 2 - 75, z: -d / 2 + 75 }
+    ];
+    for (const lp of legPositions) {
+      const legGeo = new THREE.BoxGeometry(legSection, legH, legSection);
+      const leg = new THREE.Mesh(legGeo, bodyMat);
+      leg.position.set(lp.x, legH / 2, lp.z);
+      group.add(leg);
+    }
+  }
+
+  private buildPendantLamp(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const isTrio = w >= 600 || appliance.id.includes('trio') || appliance.name.toLowerCase().includes('triple');
+    const warmBulbMat = new THREE.MeshStandardMaterial({
+      color: 0xfff7ed,
+      emissive: 0xffd27d,
+      emissiveIntensity: 1.6,
+      roughness: 0.2
+    });
+    const brassMat = new THREE.MeshStandardMaterial({
+      color: 0xd4af37,
+      metalness: 0.88,
+      roughness: 0.24
+    });
+
+    if (isTrio) {
+      // Florón rectangular de techo
+      const canopyH = 26;
+      const canopyGeo = new THREE.BoxGeometry(w * 0.82, canopyH, Math.min(110, d * 0.55));
+      const canopy = new THREE.Mesh(canopyGeo, bodyMat);
+      canopy.position.set(0, h - canopyH / 2, 0);
+      group.add(canopy);
+
+      const shadeH = Math.min(220, h * 0.32);
+      const shadeR = Math.min(95, d * 0.42);
+      const cordLen = Math.max(120, h - canopyH - shadeH);
+      const offsetsX = [-w * 0.32, 0, w * 0.32];
+
+      for (const ox of offsetsX) {
+        // Cable tensor
+        const cord = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, cordLen, 10), accentMat);
+        cord.position.set(ox, h - canopyH - cordLen / 2, 0);
+        group.add(cord);
+
+        // Casquillo superior de latón
+        const socket = new THREE.Mesh(new THREE.CylinderGeometry(16, 20, 36, 16), brassMat);
+        socket.position.set(ox, shadeH + 16, 0);
+        group.add(socket);
+
+        // Pantalla cónica/cilíndrica
+        const shade = new THREE.Mesh(new THREE.CylinderGeometry(shadeR * 0.65, shadeR, shadeH, 28), bodyMat);
+        shade.position.set(ox, shadeH / 2, 0);
+        group.add(shade);
+
+        // Difusor emisivo inferior
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(shadeR * 0.42, 16, 16), warmBulbMat);
+        bulb.position.set(ox, 18, 0);
+        group.add(bulb);
+      }
+    } else {
+      // Lámpara domo individual
+      const canopyH = 28;
+      const canopy = new THREE.Mesh(new THREE.CylinderGeometry(65, 65, canopyH, 24), bodyMat);
+      canopy.position.set(0, h - canopyH / 2, 0);
+      group.add(canopy);
+
+      const domeR = Math.min(w, d) * 0.48;
+      const cordLen = Math.max(120, h - canopyH - domeR);
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, cordLen, 10), accentMat);
+      cord.position.set(0, h - canopyH - cordLen / 2, 0);
+      group.add(cord);
+
+      const socket = new THREE.Mesh(new THREE.CylinderGeometry(18, 24, 42, 18), brassMat);
+      socket.position.set(0, domeR + 18, 0);
+      group.add(socket);
+
+      const domeGeo = new THREE.SphereGeometry(domeR, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.52);
+      const dome = new THREE.Mesh(domeGeo, bodyMat);
+      dome.position.set(0, 10, 0);
+      group.add(dome);
+
+      const diffuser = new THREE.Mesh(new THREE.CircleGeometry(domeR * 0.92, 28), warmBulbMat);
+      diffuser.rotation.x = Math.PI / 2;
+      diffuser.position.set(0, 12, 0);
+      group.add(diffuser);
+    }
+
+    // Luz 3D real cálida hacia el mesón/isla
+    const light = new THREE.PointLight(0xffdfa0, 0.85, 2600, 1.5);
+    light.position.set(0, -15, 0);
+    group.add(light);
+  }
+
+  private buildWindowFrame(
+    group: THREE.Group,
+    w: number,
+    h: number,
+    d: number,
+    frameMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const frameThick = 45;
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0xe0f2fe,
+      emissive: 0xbae6fd,
+      emissiveIntensity: 0.22,
+      roughness: 0.08,
+      metalness: 0.15,
+      transparent: true,
+      opacity: 0.52
+    });
+
+    // Marco perimetral exterior
+    const topBar = new THREE.Mesh(new THREE.BoxGeometry(w, frameThick, d), frameMat);
+    topBar.position.set(0, h - frameThick / 2, 0);
+    group.add(topBar);
+
+    const botSill = new THREE.Mesh(new THREE.BoxGeometry(w + 40, frameThick, d + 35), frameMat);
+    botSill.position.set(0, frameThick / 2, 12);
+    group.add(botSill);
+
+    const leftPost = new THREE.Mesh(new THREE.BoxGeometry(frameThick, h - frameThick * 2, d), frameMat);
+    leftPost.position.set(-w / 2 + frameThick / 2, h / 2, 0);
+    group.add(leftPost);
+
+    const rightPost = new THREE.Mesh(new THREE.BoxGeometry(frameThick, h - frameThick * 2, d), frameMat);
+    rightPost.position.set(w / 2 - frameThick / 2, h / 2, 0);
+    group.add(rightPost);
+
+    // Parteluz vertical central
+    const centerMullion = new THREE.Mesh(new THREE.BoxGeometry(frameThick * 0.75, h - frameThick * 2, d * 0.75), frameMat);
+    centerMullion.position.set(0, h / 2, 0);
+    group.add(centerMullion);
+
+    // Paneles de cristal translúcido luminoso
+    const paneW = (w - frameThick * 2.75) / 2;
+    const paneH = h - frameThick * 2;
+    for (const px of [-paneW / 2 - frameThick * 0.38, paneW / 2 + frameThick * 0.38]) {
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(paneW, paneH, 10), glassMat);
+      glass.position.set(px, h / 2, 0);
+      group.add(glass);
+    }
+
+    // Manilla central de cierre
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(14, 65, 22), chromeMat);
+    handle.position.set(12, h * 0.45, d * 0.38);
+    group.add(handle);
+  }
+
+  private buildDoorFrame(
+    group: THREE.Group,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const jambW = 55;
+    // Marco superior e izquierdo/derecho
+    const header = new THREE.Mesh(new THREE.BoxGeometry(w, jambW, d), accentMat);
+    header.position.set(0, h - jambW / 2, 0);
+    group.add(header);
+
+    const leftJamb = new THREE.Mesh(new THREE.BoxGeometry(jambW, h - jambW, d), accentMat);
+    leftJamb.position.set(-w / 2 + jambW / 2, (h - jambW) / 2, 0);
+    group.add(leftJamb);
+
+    const rightJamb = new THREE.Mesh(new THREE.BoxGeometry(jambW, h - jambW, d), accentMat);
+    rightJamb.position.set(w / 2 - jambW / 2, (h - jambW) / 2, 0);
+    group.add(rightJamb);
+
+    // Hoja de la puerta con entablerado arquitectónico
+    const leafW = w - jambW * 2 - 6;
+    const leafH = h - jambW - 8;
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(leafW, leafH, 44), bodyMat);
+    leaf.position.set(0, leafH / 2 + 4, 0);
+    group.add(leaf);
+
+    // Manija de roseta en acero inoxidable
+    const handleY = Math.min(1020, h * 0.48);
+    const handleX = leafW / 2 - 65;
+    const rosette = new THREE.Mesh(new THREE.CylinderGeometry(26, 26, 56, 20), chromeMat);
+    rosette.rotation.x = Math.PI / 2;
+    rosette.position.set(handleX, handleY, 0);
+    group.add(rosette);
+
+    const leverF = new THREE.Mesh(new THREE.BoxGeometry(115, 16, 18), chromeMat);
+    leverF.position.set(handleX - 45, handleY, 38);
+    group.add(leverF);
+
+    const leverB = new THREE.Mesh(new THREE.BoxGeometry(115, 16, 18), chromeMat);
+    leverB.position.set(handleX - 45, handleY, -38);
+    group.add(leverB);
   }
 }
 
