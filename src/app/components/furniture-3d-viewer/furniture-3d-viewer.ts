@@ -296,6 +296,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   drawerWizardRequested = output<void>();
   groupRotationRequested = output<{ groupId: string; deltaAngle: 90 | -90 | 180 }>();
   groupDuplicationRequested = output<string>();
+  groupResizeRequested = output<{ groupId: string; prop: 'width' | 'height' | 'depth' | 'thickness'; value: number }>();
   editModuleRequested = output<string>();
   hiddenPartsChanged = output<string[]>();
   roomConfigModified = output<Partial<RoomConfiguration>>();
@@ -438,11 +439,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return single ? [single] : [];
   });
 
-  // Current selected group (if active selection belongs to a group)
+  // Current selected group (active when the whole module/group is selected, NOT when inspecting a single piece of a multi-part group)
   readonly currentSelectedGroup = computed<PartGroup | null>(() => {
     const ids = this.activeSelectedIds();
     if (ids.length === 0) return null;
     const parts = this.parts();
+    const firstPart = parts.find(x => x.id === ids[0]);
+    if (ids.length === 1 && firstPart?.groupId) {
+      const groupPartsCount = parts.filter(p => p.groupId === firstPart.groupId).length;
+      if (groupPartsCount > 1) {
+        return null; // Modo inspección de pieza individual dentro del grupo
+      }
+    }
     for (const id of ids) {
       const p = parts.find(x => x.id === id);
       if (p?.groupId) {
@@ -451,6 +459,50 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
     return null;
+  });
+
+  // Grupo padre cuando se está inspeccionando una pieza individual perteneciente a un módulo/grupo
+  readonly selectedPartParentGroup = computed<PartGroup | null>(() => {
+    const sel = this.selectedPart();
+    if (!sel?.groupId) return null;
+    return this.partGroups().find(g => g.id === sel.groupId) || null;
+  });
+
+  // Dimensiones globales del módulo o grupo seleccionado
+  readonly currentSelectedGroupBounds = computed<{
+    width: number;
+    height: number;
+    depth: number;
+    thickness: number;
+    count: number;
+  } | null>(() => {
+    const grp = this.currentSelectedGroup();
+    if (!grp) return null;
+    const grpParts = this.parts().filter(p => p.groupId === grp.id);
+    if (grpParts.length === 0) return null;
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    let structuralThickness = 18;
+    for (const p of grpParts) {
+      const b = this.joineryEngine.getPartBounds(p);
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxY > maxY) maxY = b.maxY;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+      if ((p.thickness || 18) > 8 && p.componentRole !== 'back') {
+        structuralThickness = p.thickness || 18;
+      }
+    }
+    return {
+      width: Math.round(maxX - minX),
+      height: Math.round(maxY - minY),
+      depth: Math.round(maxZ - minZ),
+      thickness: structuralThickness,
+      count: grpParts.length
+    };
   });
 
   // Active Selected Parts list (ensures all parts of a selected group are included for rigid translation & movement)
@@ -506,7 +558,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   // Active Selected Part (primary)
   readonly selectedPart = computed(() => {
+    const explicitId = this.selectedPartId();
     const list = this.selectedParts();
+    if (explicitId) {
+      const found = list.find(p => p.id === explicitId);
+      if (found) return found;
+    }
     return list.length > 0 ? list[0] : null;
   });
 
@@ -518,6 +575,19 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.partModified.emit({
       part,
       updates: { [prop]: Math.round(val) }
+    });
+  }
+
+  onSelectedGroupDimensionChange(prop: 'width' | 'height' | 'depth' | 'thickness', event: Event) {
+    const grp = this.currentSelectedGroup();
+    const target = event.target as HTMLInputElement | null;
+    if (!grp || !target) return;
+    const val = Number(target.value);
+    if (isNaN(val) || val <= 0) return;
+    this.groupResizeRequested.emit({
+      groupId: grp.id,
+      prop,
+      value: Math.round(val)
     });
   }
 
@@ -958,6 +1028,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       }
 
       const baseBounds = this.joineryEngine.getPartBounds(part);
+      const localDims = this.joineryEngine.getPartLocalDimensions(part);
       const sx = baseBounds.sx;
       const sy = baseBounds.sy;
       const sz = baseBounds.sz;
@@ -988,14 +1059,14 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         shape.closePath();
 
         const extrudeGeom = new THREE.ExtrudeGeometry(shape, {
-          depth: sy,
+          depth: localDims.sy,
           bevelEnabled: false
         });
         extrudeGeom.rotateX(Math.PI / 2);
         extrudeGeom.center();
         geometry = extrudeGeom;
       } else {
-        geometry = new THREE.BoxGeometry(sx, sy, sz);
+        geometry = new THREE.BoxGeometry(localDims.sx, localDims.sy, localDims.sz);
       }
 
       const material = this.createPieceMaterial(part, isSelected, mats, xRay, isColliding);
@@ -2894,19 +2965,24 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       cylMesh.userData = { isDrillHole: true, part: targetPieceItem.part, parentPartId: hole.partId };
       ringMesh.userData = { isDrillHole: true, part: targetPieceItem.part, parentPartId: hole.partId };
 
-      // ATTACH HINGE BOREHOLES TO THE DOOR MESH SO THEY ROTATE IN SYNC!
-      if (targetPieceItem.doorPivot && hole.type === 'hinge_35') {
-        const localPos = new THREE.Vector3(
-          hole.posX - targetPieceItem.originalPos.x,
-          hole.posY - targetPieceItem.originalPos.y,
-          hole.posZ - targetPieceItem.originalPos.z
-        );
-        holeGroup.position.copy(localPos);
-        targetPieceItem.mesh.add(holeGroup);
-      } else {
-        holeGroup.position.set(hole.posX, hole.posY, hole.posZ);
-        this.drillGroup.add(holeGroup);
+      // Anclar todos los mecanizados (cazoletas, tornillos, tarugos, correderas Sistema 32)
+      // directamente al mesh de su pieza para que roten, se trasladen y se animen solidariamente con ella
+      const localPos = new THREE.Vector3(
+        hole.posX - targetPieceItem.originalPos.x,
+        hole.posY - targetPieceItem.originalPos.y,
+        hole.posZ - targetPieceItem.originalPos.z
+      );
+      const hasMeshRot =
+        Math.abs(targetPieceItem.mesh.rotation.x) > 1e-4 ||
+        Math.abs(targetPieceItem.mesh.rotation.y) > 1e-4 ||
+        Math.abs(targetPieceItem.mesh.rotation.z) > 1e-4;
+      if (hasMeshRot) {
+        const invQuat = targetPieceItem.mesh.quaternion.clone().invert();
+        localPos.applyQuaternion(invQuat);
+        holeGroup.quaternion.premultiply(invQuat);
       }
+      holeGroup.position.copy(localPos);
+      targetPieceItem.mesh.add(holeGroup);
     }
   }
 
@@ -3444,6 +3520,9 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     this.closeContextMenu();
   }
 
+  private lastPieceClickTime = 0;
+  private lastClickedPartId: string | null = null;
+
   // Pointer Down: Detect clicks on Gizmo controls vs Pieces vs Empty space vs Measurement picking
   private onPointerDown(e: PointerEvent) {
     const canvas = this.canvasRef()?.nativeElement;
@@ -3627,6 +3706,19 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             e.preventDefault();
             e.stopPropagation();
             return;
+          }
+          const curIds = this.activeSelectedIds();
+          const isSingleIsolated = curIds.length === 1 && curIds[0] === part.id;
+          if (part.groupId && !isSingleIsolated) {
+            const grpParts = this.parts().filter(p => p.groupId === part.groupId);
+            if (grpParts.length > 1) {
+              this.groupRotationRequested.emit({ groupId: part.groupId, deltaAngle: 90 });
+              this.partsSelected.emit(grpParts.map(p => p.id));
+              this.partSelected.emit(part);
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
           }
           this.rotatePart90(part, 'y');
           this.partsSelected.emit([part.id]);
@@ -4028,11 +4120,25 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             this.partSelected.emit(null);
           }
         } else {
+          const now = Date.now();
+          const isDoubleClickSamePart =
+            now - this.lastPieceClickTime < 350 && this.lastClickedPartId === part.id;
+          this.lastPieceClickTime = now;
+          this.lastClickedPartId = part.id;
+
           let partsToSelect: Part[] = [];
           const curIds = this.activeSelectedIds();
+          const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === part.id;
+
           if (part.groupId) {
             const groupParts = this.parts().filter(p => p.groupId === part.groupId);
-            partsToSelect = groupParts.length > 0 ? groupParts : [part];
+            if (isDoubleClickSamePart || isAlreadySingleIsolated) {
+              // Doble clic en una pieza del módulo (o arrastrar la pieza ya aislada): seleccionar solo esa pieza
+              partsToSelect = [part];
+            } else {
+              // Clic normal en cualquier pieza del módulo: seleccionar el módulo/grupo completo
+              partsToSelect = groupParts.length > 0 ? groupParts : [part];
+            }
             this.partsSelected.emit(partsToSelect.map(p => p.id));
             this.partSelected.emit(part);
           } else if (curIds.includes(part.id) && curIds.length > 1) {
@@ -5482,9 +5588,13 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
       this.freehandPoints = [];
       this.freehandStats.set(null);
     }
-    if (tool === 'rotate_90' && this.selectedPart()) {
-      // If a part is already selected and user activates rotate, rotate it 90 deg immediately
-      this.rotatePart90(this.selectedPart()!, 'y');
+    if (tool === 'rotate_90') {
+      const grp = this.currentSelectedGroup();
+      if (grp) {
+        this.groupRotationRequested.emit({ groupId: grp.id, deltaAngle: 90 });
+      } else if (this.selectedPart()) {
+        this.rotatePart90(this.selectedPart()!, 'y');
+      }
     }
     this.clearPushPullHighlight();
     this.hoveredFaceInfo.set(null);
@@ -5939,9 +6049,26 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
       if (part) {
         this.contextMenuPart.set(part);
         this.contextMenuPos.set({ x: posX, y: posY });
-        this.applyMaterialToWholeGroup.set(false);
-        this.partsSelected.emit([part.id]);
-        this.partSelected.emit(part);
+
+        const curIds = this.activeSelectedIds();
+        const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === part.id;
+        if (part.groupId && !isAlreadySingleIsolated) {
+          const grpParts = this.parts().filter(p => p.groupId === part!.groupId);
+          if (grpParts.length > 1) {
+            this.partsSelected.emit(grpParts.map(p => p.id));
+            this.partSelected.emit(part);
+            this.applyMaterialToWholeGroup.set(true);
+          } else {
+            this.partsSelected.emit([part.id]);
+            this.partSelected.emit(part);
+            this.applyMaterialToWholeGroup.set(false);
+          }
+        } else {
+          this.partsSelected.emit([part.id]);
+          this.partSelected.emit(part);
+          this.applyMaterialToWholeGroup.set(false);
+        }
+
         this.showQuickMaterialPicker.set(false);
         this.showRotateSubmenu.set(false);
         this.showMovableRoleSubmenu.set(false);
@@ -6150,6 +6277,54 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     }
   }
 
+  readonly isContextMenuGroupMode = computed<boolean>(() => {
+    const grp = this.contextMenuGroup();
+    return !!grp && this.activeSelectedIds().length > 1;
+  });
+
+  selectWholeGroupFromContext() {
+    const grp = this.contextMenuGroup();
+    const part = this.contextMenuPart();
+    if (!grp) return;
+    const grpIds = this.parts().filter(p => p.groupId === grp.id).map(p => p.id);
+    this.partsSelected.emit(grpIds);
+    if (part) this.partSelected.emit(part);
+    this.applyMaterialToWholeGroup.set(true);
+  }
+
+  selectSinglePartFromContext() {
+    const part = this.contextMenuPart();
+    if (!part) return;
+    this.partsSelected.emit([part.id]);
+    this.partSelected.emit(part);
+    this.applyMaterialToWholeGroup.set(false);
+  }
+
+  hideContextMenuGroup() {
+    const grp = this.contextMenuGroup();
+    if (!grp) return;
+    const grpIds = this.parts().filter(p => p.groupId === grp.id).map(p => p.id);
+    this.hidePartsByIds(grpIds);
+    this.closeContextMenu();
+  }
+
+  deleteContextMenuGroup() {
+    const grp = this.contextMenuGroup();
+    if (!grp) return;
+    const grpIds = this.parts().filter(p => p.groupId === grp.id).map(p => p.id);
+    for (const id of grpIds) {
+      this.partDeleted.emit(id);
+    }
+    this.closeContextMenu();
+  }
+
+  ungroupFromContext() {
+    const grp = this.contextMenuGroup();
+    if (!grp) return;
+    this.groupUngroupRequested.emit(grp.id);
+    this.closeContextMenu();
+  }
+
   duplicateContextMenuGroup() {
     const grp = this.contextMenuGroup();
     if (grp) {
@@ -6176,28 +6351,75 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
   }
 
   rotatePart90(part: Part, axis: 'x' | 'y' | 'z' = 'y') {
-    const updates: Partial<Part> = {};
-    if (axis === 'x') {
-      updates.rotationX = ((part.rotationX || 0) + 90) % 360;
+    const oldBounds = this.joineryEngine.getPartBounds(part);
+    const updates: Partial<Part> = {
+      rotationX: 0,
+      rotationY: 0,
+      rotationZ: 0
+    };
+    const currentOrient = part.orientation || 'horizontal';
+
+    if (axis === 'y') {
       if (part.shapeType !== 'circle') {
-        const currentOrient = part.orientation || 'horizontal';
+        if (currentOrient === 'horizontal') {
+          updates.orientation = 'horizontal';
+          updates.length = part.width;
+          updates.width = part.length;
+        } else if (currentOrient === 'vertical_xy') {
+          updates.orientation = 'vertical_yz';
+          const horizontalSpan = oldBounds.sx;
+          const verticalHeight = oldBounds.sy;
+
+          const isPlinth =
+            part.componentRole === 'plinth' ||
+            part.name.toUpperCase().includes('ZOCALO') ||
+            part.name.toUpperCase().includes('ZÓCALO');
+          const isCabinetSide =
+            !isPlinth &&
+            (part.componentRole === 'side_left' ||
+              part.componentRole === 'side_right' ||
+              part.componentRole === 'divider' ||
+              part.componentRole === 'door' ||
+              part.componentRole === 'back' ||
+              (part.name.toUpperCase().includes('LATERAL') &&
+                !ptIncludesDrawer(part)));
+          const isDrawerBoxSide =
+            !isPlinth &&
+            !isCabinetSide &&
+            ptIncludesDrawer(part);
+
+          if ((isPlinth || isDrawerBoxSide) && horizontalSpan > verticalHeight) {
+            updates.length = horizontalSpan;
+            updates.width = verticalHeight;
+          } else {
+            updates.length = verticalHeight;
+            updates.width = horizontalSpan;
+          }
+        } else if (currentOrient === 'vertical_yz') {
+          updates.orientation = 'vertical_xy';
+          updates.length = oldBounds.sz;
+          updates.width = oldBounds.sy;
+        }
+      }
+    } else if (axis === 'x') {
+      if (part.shapeType !== 'circle') {
         updates.orientation = currentOrient === 'horizontal' ? 'vertical_xy' : 'horizontal';
       }
-    } else if (axis === 'y') {
-      updates.rotationY = ((part.rotationY || 0) + 90) % 360;
-      if (part.shapeType !== 'circle') {
-        updates.length = part.width;
-        updates.width = part.length;
-      }
     } else if (axis === 'z') {
-      updates.rotationZ = ((part.rotationZ || 0) + 90) % 360;
       if (part.shapeType !== 'circle') {
-        const currentOrient = part.orientation || 'horizontal';
         updates.orientation = currentOrient === 'horizontal' ? 'vertical_yz' : 'horizontal';
       }
     }
     this.partModified.emit({ part, updates });
     this.closeContextMenu();
+
+    function ptIncludesDrawer(p: Part): boolean {
+      return (
+        p.componentRole === 'drawer_box' ||
+        p.componentRole === 'drawer_lateral' ||
+        (p.name.toUpperCase().includes('LATERAL') && p.name.toUpperCase().includes('CAJ'))
+      );
+    }
   }
 
   cancelActiveInteractions() {
@@ -6245,6 +6467,43 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
   alignContextMenuPart(type: 'floor' | 'centerX' | 'centerZ') {
     const part = this.contextMenuPart();
     if (!part) return;
+
+    // Si estamos en modo módulo/grupo completo, alinear todo el módulo en bloque
+    if (this.isContextMenuGroupMode() && part.groupId) {
+      const grpParts = this.parts().filter(p => p.groupId === part.groupId);
+      if (grpParts.length > 0) {
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
+        for (const p of grpParts) {
+          const b = this.joineryEngine.getPartBounds(p);
+          if (b.minX < minX) minX = b.minX;
+          if (b.maxX > maxX) maxX = b.maxX;
+          if (b.minY < minY) minY = b.minY;
+          if (b.minZ < minZ) minZ = b.minZ;
+          if (b.maxZ > maxZ) maxZ = b.maxZ;
+        }
+        const dx = type === 'centerX' ? -((minX + maxX) / 2) : 0;
+        const dy = type === 'floor' ? -minY : 0;
+        const dz = type === 'centerZ' ? -((minZ + maxZ) / 2) : 0;
+
+        const updatesList = grpParts.map(p => {
+          const b = this.joineryEngine.getPartBounds(p);
+          const upd: Partial<Part> = {};
+          if (type === 'centerX') upd.posX = Math.round(((p.posX ?? 0) + dx) * 10) / 10;
+          if (type === 'floor') upd.posY = Math.round(((p.posY ?? b.sy / 2) + dy) * 10) / 10;
+          if (type === 'centerZ') upd.posZ = Math.round(((p.posZ ?? 0) + dz) * 10) / 10;
+          return { part: p, updates: upd };
+        });
+        this.multiplePartsModified.emit({ updates: updatesList });
+        if (updatesList.length > 0) {
+          this.partModified.emit(updatesList[0]);
+        }
+        this.closeContextMenu();
+        return;
+      }
+    }
+
     const bounds = this.joineryEngine.getPartBounds(part);
     const sy = bounds.sy;
 
@@ -6802,11 +7061,7 @@ nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
       const sel = this.selectedPart();
       if (sel) {
         e.preventDefault();
-        if (sel.groupId) {
-          this.groupRotationRequested.emit({ groupId: sel.groupId, deltaAngle: 90 });
-        } else {
-          this.rotatePart90(sel, 'y');
-        }
+        this.rotatePart90(sel, 'y');
         return;
       }
       e.preventDefault();
@@ -6854,15 +7109,15 @@ nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
       }
       const sel = this.selectedPart();
       const selIds = this.selectedPartIds();
-      if (sel) {
-        e.preventDefault();
-        this.partDeleted.emit(sel.id);
-        return;
-      } else if (selIds.length > 0) {
+      if (selIds.length > 1) {
         e.preventDefault();
         for (const id of selIds) {
           this.partDeleted.emit(id);
         }
+        return;
+      } else if (sel) {
+        e.preventDefault();
+        this.partDeleted.emit(sel.id);
         return;
       }
     }

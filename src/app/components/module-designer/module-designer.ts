@@ -455,18 +455,90 @@ export class ModuleDesignerComponent {
   });
 
   /**
-   * Identifica el ID del grupo activo cuando la pieza o conjunto seleccionado pertenece a un módulo/cajón.
+   * Identifica el ID del grupo activo cuando el módulo/cajón completo está seleccionado.
+   * Si el usuario aisló una única pieza dentro de un grupo (selectedPartIds().length === 1),
+   * devuelve null para permitir inspeccionar y editar esa pieza individualmente.
    */
   readonly activeSelectedGroupId = computed<string | null>(() => {
-    const sel = this.selectedPart();
-    if (sel?.groupId) return sel.groupId;
     const ids = this.selectedPartIds();
-    if (ids.length > 0) {
+    if (ids.length === 1) {
+      const sel = this.currentParts().find(p => p.id === ids[0]);
+      if (sel?.groupId) {
+        const groupPartsCount = this.currentParts().filter(p => p.groupId === sel.groupId).length;
+        if (groupPartsCount > 1) {
+          return null;
+        }
+        return sel.groupId;
+      }
+      return null;
+    }
+    if (ids.length > 1) {
       const parts = this.currentParts().filter(p => ids.includes(p.id));
       const g = parts.find(p => p.groupId);
       if (g?.groupId) return g.groupId;
     }
     return null;
+  });
+
+  /**
+   * Devuelve el grupo padre de la pieza seleccionada (incluso cuando se inspecciona una sola pieza del grupo).
+   */
+  readonly selectedPartParentGroup = computed<PartGroup | null>(() => {
+    const sel = this.selectedPart();
+    if (!sel?.groupId) return null;
+    return this.groups().find(g => g.id === sel.groupId) || {
+      id: sel.groupId,
+      name: sel.groupName || sel.moduleName || 'Módulo',
+      type: 'assembly'
+    };
+  });
+
+  readonly selectedGroupParts = computed<Part[]>(() => {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return [];
+    return this.currentParts().filter(p => p.groupId === gId);
+  });
+
+  readonly selectedGroupStats = computed(() => {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return null;
+    const grpParts = this.currentParts().filter(p => p.groupId === gId);
+    if (grpParts.length === 0) return null;
+
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    let structuralThickness = 18;
+    let mainMaterialId = grpParts[0].materialId;
+
+    for (const p of grpParts) {
+      const b = this.joineryEngine.getPartBounds(p);
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxY > maxY) maxY = b.maxY;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+      if ((p.thickness || 18) > 8 && p.componentRole !== 'back') {
+        structuralThickness = p.thickness || 18;
+        mainMaterialId = p.materialId;
+      }
+    }
+
+    const mat = this.materials().find(m => m.id === mainMaterialId) || this.materials()[0] || null;
+
+    return {
+      width: Math.round(maxX - minX),
+      height: Math.round(maxY - minY),
+      depth: Math.round(maxZ - minZ),
+      thickness: structuralThickness,
+      centerX: Math.round((minX + maxX) / 2),
+      minY: Math.round(minY),
+      centerZ: Math.round((minZ + maxZ) / 2),
+      partsCount: grpParts.length,
+      materialId: mainMaterialId,
+      material: mat
+    };
   });
 
   readonly activeSelectedGroupName = computed(() => {
@@ -1050,6 +1122,17 @@ export class ModuleDesignerComponent {
     return this.joineryData().drillHolesByPart.get(sel.id) || [];
   });
 
+  readonly selectedGroupDrillHolesCount = computed<number>(() => {
+    const grpParts = this.selectedGroupParts();
+    if (grpParts.length === 0) return 0;
+    const map = this.joineryData().drillHolesByPart;
+    let total = 0;
+    for (const p of grpParts) {
+      total += (map.get(p.id) || []).length;
+    }
+    return total;
+  });
+
   readonly selectedPart = computed<Part | null>(() => {
     const id = this.selectedPartId();
     if (!id) return null;
@@ -1149,7 +1232,7 @@ export class ModuleDesignerComponent {
 
   onSelectPartFrom3D(part: Part | null) {
     if (part) {
-      if (this.selectedPartIds().length > 1 && this.selectedPartIds().includes(part.id)) {
+      if (this.selectedPartIds().includes(part.id)) {
         this.selectedPartId.set(part.id);
         this.activeDockTab.set('piece');
         return;
@@ -1202,6 +1285,13 @@ export class ModuleDesignerComponent {
     this.selectPartById(id, event);
   }
 
+  selectSinglePartById(id: string, event?: Event) {
+    event?.stopPropagation();
+    this.selectedPartId.set(id);
+    this.selectedPartIds.set([id]);
+    this.activeDockTab.set('piece');
+  }
+
   selectPartById(id: string, e?: MouseEvent) {
     if (e && e.shiftKey) {
       const cur = [...this.selectedPartIds()];
@@ -1211,14 +1301,8 @@ export class ModuleDesignerComponent {
       this.selectedPartIds.set(cur);
       this.selectedPartId.set(cur.length > 0 ? cur[0] : null);
     } else {
-      const part = this.currentParts().find(p => p.id === id);
       this.selectedPartId.set(id);
-      if (part?.groupId) {
-        const groupParts = this.currentParts().filter(p => p.groupId === part.groupId);
-        this.selectedPartIds.set(groupParts.map(p => p.id));
-      } else {
-        this.selectedPartIds.set([id]);
-      }
+      this.selectedPartIds.set([id]);
       this.activeDockTab.set('piece');
     }
   }
@@ -1261,14 +1345,14 @@ export class ModuleDesignerComponent {
 
   /**
    * Actualiza las propiedades de la pieza seleccionada. Si se modifican coordenadas espaciales
-   * (posX, posY, posZ) y la pieza pertenece a un grupo, desplaza todo el grupo en bloque
+   * (posX, posY, posZ) y el módulo/grupo completo está seleccionado, desplaza todo el grupo en bloque
    * impidiendo que cualquier pieza o módulo sobrepase el nivel del suelo (Y = 0).
    */
   updateSelectedPart(changes: Partial<Part>) {
     const current = this.selectedPart();
     if (!current) return;
 
-    if (current.groupId && (changes.posX !== undefined || changes.posY !== undefined || changes.posZ !== undefined)) {
+    if (this.isAnyGroupSelected() && current.groupId && (changes.posX !== undefined || changes.posY !== undefined || changes.posZ !== undefined)) {
       const dx = changes.posX !== undefined ? changes.posX - (current.posX ?? 0) : 0;
       let dy = changes.posY !== undefined ? changes.posY - (current.posY ?? 0) : 0;
       const dz = changes.posZ !== undefined ? changes.posZ - (current.posZ ?? 0) : 0;
@@ -1311,6 +1395,92 @@ export class ModuleDesignerComponent {
     }
 
     this.projectService.updatePart(updated);
+  }
+
+  /**
+   * Redimensiona el módulo/grupo activo en bloque (Ancho, Alto, Profundidad o Espesor Estructural)
+   * y sincroniza la selección de piezas para mantener el módulo activo tras regeneraciones paramétricas.
+   */
+  updateSelectedGroupDimension(
+    prop: 'width' | 'height' | 'depth' | 'thickness',
+    rawVal: number | string
+  ) {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return;
+    const val = Number(rawVal);
+    if (isNaN(val) || val <= 0) return;
+    this.projectService.resizeGroupStructure(gId, prop, val);
+    this.syncGroupSelectionAfterUpdate(gId);
+  }
+
+  adjustSelectedGroupDimension(
+    prop: 'width' | 'height' | 'depth' | 'thickness',
+    delta: number
+  ) {
+    const stats = this.selectedGroupStats();
+    if (!stats) return;
+    const current = stats[prop];
+    const minVal = prop === 'thickness' ? 3 : 120;
+    const nextVal = Math.max(minVal, current + delta);
+    this.updateSelectedGroupDimension(prop, nextVal);
+  }
+
+  onGroupResizeRequestedFromViewer(event: {
+    groupId: string;
+    prop: 'width' | 'height' | 'depth' | 'thickness';
+    value: number;
+  }) {
+    this.projectService.resizeGroupStructure(event.groupId, event.prop, event.value);
+    this.syncGroupSelectionAfterUpdate(event.groupId);
+  }
+
+  private syncGroupSelectionAfterUpdate(groupId: string) {
+    const updatedParts = this.currentParts().filter(p => p.groupId === groupId);
+    if (updatedParts.length > 0) {
+      this.selectedPartIds.set(updatedParts.map(p => p.id));
+      if (!this.selectedPartId() || !updatedParts.some(p => p.id === this.selectedPartId())) {
+        this.selectedPartId.set(updatedParts[0].id);
+      }
+    }
+  }
+
+  updateSelectedGroupPosition(axis: 'x' | 'y' | 'z', rawTargetVal: number | string) {
+    const gId = this.activeSelectedGroupId();
+    const stats = this.selectedGroupStats();
+    const targetVal = Number(rawTargetVal);
+    if (!gId || !stats || isNaN(targetVal)) return;
+
+    if (axis === 'x') {
+      const dx = Math.round(targetVal) - stats.centerX;
+      if (dx !== 0) this.projectService.moveGroup(gId, dx, 0, 0);
+    } else if (axis === 'y') {
+      const safeTargetY = Math.max(0, Math.round(targetVal));
+      const dy = safeTargetY - stats.minY;
+      if (dy !== 0) this.projectService.moveGroup(gId, 0, dy, 0);
+    } else if (axis === 'z') {
+      const dz = Math.round(targetVal) - stats.centerZ;
+      if (dz !== 0) this.projectService.moveGroup(gId, 0, 0, dz);
+    }
+  }
+
+  adjustSelectedGroupPosition(axis: 'x' | 'y' | 'z', delta: number) {
+    const stats = this.selectedGroupStats();
+    if (!stats) return;
+    const current = axis === 'x' ? stats.centerX : (axis === 'y' ? stats.minY : stats.centerZ);
+    this.updateSelectedGroupPosition(axis, current + delta);
+  }
+
+  alignSelectedGroup(preset: 'floor' | 'centerX' | 'centerZ') {
+    if (preset === 'floor') {
+      this.updateSelectedGroupPosition('y', 0);
+      this.showToast('📐 Módulo apoyado sobre el suelo (Y = 0)');
+    } else if (preset === 'centerX') {
+      this.updateSelectedGroupPosition('x', 0);
+      this.showToast('📐 Módulo centrado en X (X = 0)');
+    } else if (preset === 'centerZ') {
+      this.updateSelectedGroupPosition('z', 0);
+      this.showToast('📐 Módulo centrado en profundidad (Z = 0)');
+    }
   }
 
   testPieceAnimation(partId: string) {
@@ -1622,6 +1792,10 @@ export class ModuleDesignerComponent {
   }
 
   alignPart(preset: 'floor' | 'centerX' | 'centerZ' | 'top') {
+    if (this.isAnyGroupSelected() && preset !== 'top') {
+      this.alignSelectedGroup(preset);
+      return;
+    }
     const current = this.selectedPart();
     if (!current) return;
 
@@ -2191,6 +2365,14 @@ export class ModuleDesignerComponent {
     const ids = groupParts.map(p => p.id);
     this.selectedPartIds.set(ids);
     this.selectedPartId.set(ids[0] || null);
+    this.activeDockTab.set('piece');
+  }
+
+  updateActiveGroupName(rawName: string) {
+    const gId = this.activeSelectedGroupId();
+    const clean = rawName.trim();
+    if (!gId || !clean) return;
+    this.projectService.updateGroup(gId, { name: clean });
   }
 
   activateMoveToolOnViewer() {

@@ -1562,24 +1562,31 @@ export class ProjectStorageService {
             const horizontalSpan = oldBounds.sx;
             const verticalHeight = oldBounds.sy;
 
+            const isPlinth =
+              pt.componentRole === 'plinth' ||
+              pt.name.toUpperCase().includes('ZOCALO') ||
+              pt.name.toUpperCase().includes('ZÓCALO');
+
             const isCabinetSide =
-              pt.componentRole === 'side_left' ||
-              pt.componentRole === 'side_right' ||
-              pt.componentRole === 'divider' ||
-              pt.componentRole === 'door' ||
-              pt.componentRole === 'back' ||
-              (pt.name.toUpperCase().includes('LATERAL') &&
-                !pt.name.toUpperCase().includes('CAJ') &&
-                pt.componentRole !== 'drawer_box' &&
-                pt.componentRole !== 'drawer_lateral');
+              !isPlinth &&
+              (pt.componentRole === 'side_left' ||
+                pt.componentRole === 'side_right' ||
+                pt.componentRole === 'divider' ||
+                pt.componentRole === 'door' ||
+                pt.componentRole === 'back' ||
+                (pt.name.toUpperCase().includes('LATERAL') &&
+                  !pt.name.toUpperCase().includes('CAJ') &&
+                  pt.componentRole !== 'drawer_box' &&
+                  pt.componentRole !== 'drawer_lateral'));
 
             const isDrawerBoxSide =
+              !isPlinth &&
               !isCabinetSide &&
               (pt.componentRole === 'drawer_box' ||
                 pt.componentRole === 'drawer_lateral' ||
                 (pt.name.toUpperCase().includes('LATERAL') && pt.name.toUpperCase().includes('CAJ')));
 
-            if (isDrawerBoxSide && horizontalSpan > verticalHeight) {
+            if ((isPlinth || isDrawerBoxSide) && horizontalSpan > verticalHeight) {
               newLength = horizontalSpan;
               newWidth = verticalHeight;
             } else {
@@ -1611,6 +1618,255 @@ export class ProjectStorageService {
         parts: updatedParts
       };
     });
+  }
+
+  /**
+   * Redimensiona un módulo o grupo completo en bloque (Ancho, Alto, Profundidad o Espesor Estructural)
+   * preservando su orientación, su posición en la escena y las holguras internas sin colisiones.
+   */
+  resizeGroupStructure(
+    groupId: string,
+    prop: 'width' | 'height' | 'depth' | 'thickness',
+    rawValue: number
+  ) {
+    if (isNaN(rawValue)) return;
+    const currentProj = this.currentProject();
+    if (!currentProj) return;
+
+    const group = (currentProj.groups || []).find(g => g.id === groupId);
+    const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
+    if (groupParts.length === 0) return;
+
+    let oldMinX = Infinity, oldMaxX = -Infinity;
+    let oldMinY = Infinity, oldMaxY = -Infinity;
+    let oldMinZ = Infinity, oldMaxZ = -Infinity;
+    for (const pt of groupParts) {
+      const b = this.joineryEngine.getPartBounds(pt);
+      if (b.minX < oldMinX) oldMinX = b.minX;
+      if (b.maxX > oldMaxX) oldMaxX = b.maxX;
+      if (b.minY < oldMinY) oldMinY = b.minY;
+      if (b.maxY > oldMaxY) oldMaxY = b.maxY;
+      if (b.minZ < oldMinZ) oldMinZ = b.minZ;
+      if (b.maxZ > oldMaxZ) oldMaxZ = b.maxZ;
+    }
+
+    const oldCx = (oldMinX + oldMaxX) / 2;
+    const oldCz = (oldMinZ + oldMaxZ) / 2;
+    const facing = this.getGroupFacingDirection(groupId);
+    const isRotated90 = facing === 'left' || facing === 'right';
+
+    // 1. Si el grupo tiene configuración paramétrica (Módulo Paramétrico), regeneramos con precisión milimétrica
+    if (group?.parametricConfig) {
+      const val =
+        prop === 'thickness'
+          ? Math.max(3, Math.min(50, Math.round(rawValue)))
+          : Math.max(120, Math.round(rawValue));
+
+      // Si el módulo está rotado 90° en la escena, el eje X del mundo corresponde a la profundidad del mueble
+      // y el eje Z del mundo corresponde al ancho frontal del mueble.
+      let targetProp: 'width' | 'height' | 'depth' | 'thickness' = prop;
+      if (isRotated90) {
+        if (prop === 'width') targetProp = 'depth';
+        else if (prop === 'depth') targetProp = 'width';
+      }
+
+      const nextCfg: ParametricCabinetConfig = {
+        ...group.parametricConfig,
+        [targetProp]: val,
+        posX: 0,
+        posY: 0,
+        posZ: 0
+      };
+
+      const res = this.cabinetGen.generateParametricCabinet(nextCfg, currentProj.materials);
+      const updatedParts = res.parts.map(p => ({
+        ...p,
+        groupId,
+        groupName: group.name
+      }));
+      this.updateParametricCabinet(groupId, updatedParts, group.name, nextCfg);
+
+      if (facing === 'right') {
+        this.rotateGroupRigidly(groupId, -90);
+      } else if (facing === 'left') {
+        this.rotateGroupRigidly(groupId, 90);
+      } else if (facing === 'back') {
+        this.rotateGroupRigidly(groupId, 180);
+      }
+
+      // Restaurar el centro (oldCx, oldCz) y la base (oldMinY) originales del módulo
+      const afterParts = this.currentProject().parts.filter(pt => pt.groupId === groupId);
+      let newMinX = Infinity, newMaxX = -Infinity;
+      let newMinY = Infinity;
+      let newMinZ = Infinity, newMaxZ = -Infinity;
+      for (const pt of afterParts) {
+        const b = this.joineryEngine.getPartBounds(pt);
+        if (b.minX < newMinX) newMinX = b.minX;
+        if (b.maxX > newMaxX) newMaxX = b.maxX;
+        if (b.minY < newMinY) newMinY = b.minY;
+        if (b.minZ < newMinZ) newMinZ = b.minZ;
+        if (b.maxZ > newMaxZ) newMaxZ = b.maxZ;
+      }
+      const newCx = (newMinX + newMaxX) / 2;
+      const newCz = (newMinZ + newMaxZ) / 2;
+      const dx = Math.round((oldCx - newCx) * 10) / 10;
+      const dy = Math.round((oldMinY - newMinY) * 10) / 10;
+      const dz = Math.round((oldCz - newCz) * 10) / 10;
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1 || Math.abs(dz) > 0.1) {
+        this.moveGroup(groupId, dx, dy, dz);
+      }
+      return;
+    }
+
+    // 2. Si es un grupo no paramétrico (cajón independiente, plantilla o ensamble manual)
+    if (prop === 'thickness') {
+      const newT = Math.max(3, Math.min(50, Math.round(rawValue)));
+      this.updateProject(p => ({
+        ...p,
+        parts: p.parts.map(pt => {
+          if (pt.groupId !== groupId) return pt;
+          if ((pt.thickness || 18) <= 8 || pt.componentRole === 'back') return pt;
+          return { ...pt, thickness: newT };
+        })
+      }));
+      return;
+    }
+
+    const targetSpan = Math.max(80, Math.round(rawValue));
+    const oldSpanX = Math.max(1, oldMaxX - oldMinX);
+    const oldSpanY = Math.max(1, oldMaxY - oldMinY);
+    const oldSpanZ = Math.max(1, oldMaxZ - oldMinZ);
+
+    const deltaX = prop === 'width' ? targetSpan - oldSpanX : 0;
+    const deltaY = prop === 'height' ? targetSpan - oldSpanY : 0;
+    const deltaZ = prop === 'depth' ? targetSpan - oldSpanZ : 0;
+
+    if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5 && Math.abs(deltaZ) < 0.5) return;
+
+    this.updateProject(p => ({
+      ...p,
+      parts: p.parts.map(pt => {
+        if (pt.groupId !== groupId) return pt;
+        const b = this.joineryEngine.getPartBounds(pt);
+        let newSx = b.sx;
+        let newSy = b.sy;
+        let newSz = b.sz;
+        let newPx = b.px;
+        let newPy = b.py;
+        let newPz = b.pz;
+
+        if (Math.abs(deltaX) >= 0.5) {
+          if (b.sx <= 36 && (b.sy > 36 || b.sz > 36)) {
+            // El espesor de la pieza está en X: desplazar su posición X sin alterar su espesor
+            const norm = oldSpanX > b.sx ? (b.px - oldCx) / ((oldSpanX - b.sx) / 2) : 0;
+            newPx = Math.round((oldCx + norm * ((targetSpan - b.sx) / 2)) * 10) / 10;
+          } else {
+            // La pieza se extiende a lo largo de X
+            if (b.sx >= oldSpanX - 65) {
+              newSx = Math.max(40, Math.round((b.sx + deltaX) * 10) / 10);
+            } else {
+              const ratio = targetSpan / oldSpanX;
+              newSx = Math.max(40, Math.round(b.sx * ratio * 10) / 10);
+              newPx = Math.round((oldCx + (b.px - oldCx) * ratio) * 10) / 10;
+            }
+          }
+        }
+
+        if (Math.abs(deltaY) >= 0.5) {
+          if (b.sy <= 36 && (b.sx > 36 || b.sz > 36)) {
+            // Pieza horizontal (piso, techo, repisa): mantener espesor y escalar altura desde la base oldMinY
+            if (Math.abs(b.minY - oldMinY) <= 5) {
+              newPy = b.py;
+            } else if (Math.abs(b.maxY - oldMaxY) <= 5) {
+              newPy = Math.round((oldMinY + targetSpan - b.sy / 2) * 10) / 10;
+            } else {
+              const ratio = targetSpan / oldSpanY;
+              newPy = Math.round((oldMinY + (b.py - oldMinY) * ratio) * 10) / 10;
+            }
+          } else {
+            // Pieza vertical (costado, puerta, fondo, frente)
+            if (b.sy >= oldSpanY - 130) {
+              newSy = Math.max(40, Math.round((b.sy + deltaY) * 10) / 10);
+              newPy = Math.round((b.minY + newSy / 2) * 10) / 10;
+            } else {
+              const ratio = targetSpan / oldSpanY;
+              const relMinY = (b.minY - oldMinY) * ratio;
+              newSy = Math.max(40, Math.round(b.sy * ratio * 10) / 10);
+              newPy = Math.round((oldMinY + relMinY + newSy / 2) * 10) / 10;
+            }
+          }
+        }
+
+        if (Math.abs(deltaZ) >= 0.5) {
+          if (b.sz <= 36 && (b.sx > 36 || b.sy > 36)) {
+            // El espesor de la pieza está en Z: desplazar su posición Z sin alterar su espesor
+            const norm = oldSpanZ > b.sz ? (b.pz - oldCz) / ((oldSpanZ - b.sz) / 2) : 0;
+            newPz = Math.round((oldCz + norm * ((targetSpan - b.sz) / 2)) * 10) / 10;
+          } else {
+            // La pieza se extiende a lo largo de Z
+            if (b.sz >= oldSpanZ - 65) {
+              newSz = Math.max(40, Math.round((b.sz + deltaZ) * 10) / 10);
+            } else {
+              const ratio = targetSpan / oldSpanZ;
+              newSz = Math.max(40, Math.round(b.sz * ratio * 10) / 10);
+              newPz = Math.round((oldCz + (b.pz - oldCz) * ratio) * 10) / 10;
+            }
+          }
+        }
+
+        // Mapear (newSx, newSy, newSz) de vuelta a (length, width) según la orientación de la pieza
+        const orient = pt.orientation || 'horizontal';
+        let newLength = pt.length;
+        let newWidth = pt.width;
+
+        if (orient === 'horizontal') {
+          newLength = newSx;
+          newWidth = newSz;
+        } else if (orient === 'vertical_xy') {
+          newLength = newSx;
+          newWidth = newSy;
+        } else if (orient === 'vertical_yz') {
+          const isPlinth =
+            pt.componentRole === 'plinth' ||
+            pt.name.toUpperCase().includes('ZOCALO') ||
+            pt.name.toUpperCase().includes('ZÓCALO');
+          const isCabinetSide =
+            !isPlinth &&
+            (pt.componentRole === 'side_left' ||
+              pt.componentRole === 'side_right' ||
+              pt.componentRole === 'divider' ||
+              pt.componentRole === 'door' ||
+              pt.componentRole === 'back' ||
+              (pt.name.toUpperCase().includes('LATERAL') &&
+                !pt.name.toUpperCase().includes('CAJ') &&
+                pt.componentRole !== 'drawer_box' &&
+                pt.componentRole !== 'drawer_lateral'));
+          const isDrawerBoxSide =
+            !isPlinth &&
+            !isCabinetSide &&
+            (pt.componentRole === 'drawer_box' ||
+              pt.componentRole === 'drawer_lateral' ||
+              (pt.name.toUpperCase().includes('LATERAL') && pt.name.toUpperCase().includes('CAJ')));
+
+          if ((isPlinth || isDrawerBoxSide) && newSz > newSy) {
+            newLength = newSz;
+            newWidth = newSy;
+          } else {
+            newLength = newSy;
+            newWidth = newSz;
+          }
+        }
+
+        return {
+          ...pt,
+          length: newLength,
+          width: newWidth,
+          posX: newPx,
+          posY: newPy,
+          posZ: newPz
+        };
+      })
+    }));
   }
 
   /**

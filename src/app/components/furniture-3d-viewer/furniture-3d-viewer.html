@@ -680,43 +680,100 @@
       @if (contextMenuPart(); as part) {
         @let category = contextMenuCategory();
         @let grp = contextMenuGroup();
+        @let isGroupMode = isContextMenuGroupMode();
+        @let grpBounds = currentSelectedGroupBounds();
         @let frontRef = contextMenuEffectiveFrontPart() || part;
         @let isLocked = isPartOrGroupLocked(part);
 
+        <!-- SELECTOR DE MODO: MÓDULO COMPLETO vs SOLO ESTA PIEZA -->
+        @if (grp) {
+          <div class="p-1 bg-slate-100 rounded-xl flex items-center gap-1 mb-1 border border-slate-200/80">
+            <button
+              type="button"
+              (click)="selectWholeGroupFromContext()"
+              [class]="isGroupMode
+                ? 'bg-indigo-600 text-white font-bold shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'"
+              class="flex-1 py-1 px-2 rounded-lg text-[10px] flex items-center justify-center gap-1 transition cursor-pointer">
+              <hugeicons-icon [icon]="icons.inbox" [size]="11" [strokeWidth]="2.2"></hugeicons-icon>
+              <span class="truncate">{{ category === 'drawer' ? 'Cajón Completo' : 'Módulo Completo' }}</span>
+            </button>
+            <button
+              type="button"
+              (click)="selectSinglePartFromContext()"
+              [class]="!isGroupMode
+                ? 'bg-sky-600 text-white font-bold shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'"
+              class="flex-1 py-1 px-2 rounded-lg text-[10px] flex items-center justify-center gap-1 transition cursor-pointer">
+              <hugeicons-icon [icon]="icons.layers" [size]="11" [strokeWidth]="2.2"></hugeicons-icon>
+              <span class="truncate">Solo Esta Pieza</span>
+            </button>
+          </div>
+        }
+
         <!-- CABECERA DEL MENÚ CON ROL CLARO Y ESTADO CONGELADO -->
         <div class="px-2.5 py-1.5 border-b border-slate-100 flex flex-col gap-0.5">
-          <div class="flex items-center justify-between gap-1.5">
-            <div class="flex items-center gap-1.5 truncate">
-              <span
-                class="w-2 h-2 rounded-full shrink-0"
-                [class]="isLocked ? 'bg-amber-500' : (category === 'drawer' ? 'bg-indigo-500' : (category === 'door' ? 'bg-blue-500' : 'bg-sky-500'))">
-              </span>
-              <span class="font-bold text-slate-900 truncate">{{ part.name }}</span>
-            </div>
-            <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ part.length }}×{{ part.width }}</span>
-          </div>
-
-          <div class="flex items-center justify-between text-[10px] text-slate-400 pl-3.5">
-            <span class="truncate">{{ grp ? grp.name : (part.moduleName || 'Pieza individual') }}</span>
-            <div class="flex items-center gap-1 shrink-0">
-              @if (isLocked) {
-                <span class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px] bg-amber-100 text-amber-800 flex items-center gap-0.5">
-                  <hugeicons-icon [icon]="icons.lock" [size]="10" [strokeWidth]="2.2"></hugeicons-icon>
-                  <span>Congelado</span>
+          @if (isGroupMode && grp) {
+            <div class="flex items-center justify-between gap-1.5">
+              <div class="flex items-center gap-1.5 truncate">
+                <span
+                  class="w-2 h-2 rounded-full shrink-0"
+                  [class]="isLocked ? 'bg-amber-500' : 'bg-indigo-600'">
                 </span>
+                <span class="font-bold text-slate-900 truncate">{{ grp.name }}</span>
+              </div>
+              @if (grpBounds) {
+                <span class="text-[10px] font-mono text-indigo-600 font-bold shrink-0">{{ grpBounds.width }}×{{ grpBounds.height }}×{{ grpBounds.depth }}</span>
               }
-              <span
-                class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px]"
-                [class]="category === 'drawer' ? 'bg-indigo-50 text-indigo-700' : (category === 'door' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600')">
-                {{ category === 'drawer' ? 'Cajón' : (category === 'door' ? 'Puerta' : 'Estructura') }}
-              </span>
             </div>
-          </div>
+            <div class="flex items-center justify-between text-[10px] text-slate-400 pl-3.5">
+              <span class="truncate">Pieza bajo cursor: <strong class="text-slate-600">{{ part.name }}</strong></span>
+              <div class="flex items-center gap-1 shrink-0">
+                @if (isLocked) {
+                  <span class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px] bg-amber-100 text-amber-800 flex items-center gap-0.5">
+                    <hugeicons-icon [icon]="icons.lock" [size]="10" [strokeWidth]="2.2"></hugeicons-icon>
+                    <span>Congelado</span>
+                  </span>
+                }
+                <span class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px] bg-indigo-50 text-indigo-700">
+                  {{ category === 'drawer' ? 'Grupo Cajón' : 'Módulo' }}
+                </span>
+              </div>
+            </div>
+          } @else {
+            <div class="flex items-center justify-between gap-1.5">
+              <div class="flex items-center gap-1.5 truncate">
+                <span
+                  class="w-2 h-2 rounded-full shrink-0"
+                  [class]="isLocked ? 'bg-amber-500' : (category === 'drawer' ? 'bg-indigo-500' : (category === 'door' ? 'bg-blue-500' : 'bg-sky-500'))">
+                </span>
+                <span class="font-bold text-slate-900 truncate">{{ part.name }}</span>
+              </div>
+              <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ part.length }}×{{ part.width }}</span>
+            </div>
+
+            <div class="flex items-center justify-between text-[10px] text-slate-400 pl-3.5">
+              <span class="truncate">{{ grp ? grp.name : (part.moduleName || 'Pieza individual') }}</span>
+              <div class="flex items-center gap-1 shrink-0">
+                @if (isLocked) {
+                  <span class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px] bg-amber-100 text-amber-800 flex items-center gap-0.5">
+                    <hugeicons-icon [icon]="icons.lock" [size]="10" [strokeWidth]="2.2"></hugeicons-icon>
+                    <span>Congelado</span>
+                  </span>
+                }
+                <span
+                  class="px-1.5 py-0.2 rounded font-bold uppercase text-[9px]"
+                  [class]="category === 'drawer' ? 'bg-indigo-50 text-indigo-700' : (category === 'door' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600')">
+                  {{ category === 'drawer' ? 'Cajón' : (category === 'door' ? 'Puerta' : 'Estructura') }}
+                </span>
+              </div>
+            </div>
+          }
         </div>
 
-        <!-- BOTONES DE CONGELAR / DESCONGELAR POSICIÓN (ACCESO RÁPIDO ARRIBA) -->
+        <!-- BOTONES DE CONGELAR / DESCONGELAR POSICIÓN -->
         <div class="p-1 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col gap-1 my-0.5">
-          @if (grp) {
+          @if (isGroupMode && grp) {
             <button
               type="button"
               (click)="toggleGroupLockFromContext()"
@@ -732,20 +789,21 @@
               </div>
               <span class="text-[9px] font-mono uppercase opacity-80 shrink-0">{{ isLocked ? 'Fijo' : 'Bloquear' }}</span>
             </button>
+          } @else {
+            <button
+              type="button"
+              (click)="togglePartLockFromContext()"
+              [class]="part.isLocked
+                ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold border border-amber-300'
+                : 'bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200/80 font-semibold'"
+              class="w-full py-1.5 px-2.5 rounded-lg flex items-center justify-between text-xs transition cursor-pointer">
+              <div class="flex items-center gap-1.5 truncate">
+                <hugeicons-icon [icon]="icons.lock" [size]="13" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+                <span class="truncate">{{ part.isLocked ? 'Descongelar Solo Esta Pieza' : 'Congelar Solo Esta Pieza' }}</span>
+              </div>
+              <span class="text-[9px] font-mono uppercase opacity-80 shrink-0">{{ part.isLocked ? 'Fija' : 'Bloquear' }}</span>
+            </button>
           }
-
-          <button
-            type="button"
-            (click)="togglePartLockFromContext()"
-            [class]="part.isLocked
-              ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold border border-amber-300'
-              : 'hover:bg-white text-slate-600 hover:text-slate-900'"
-            class="w-full py-1 px-2 rounded-lg flex items-center justify-between text-[11px] transition cursor-pointer">
-            <div class="flex items-center gap-1.5 truncate">
-              <hugeicons-icon [icon]="icons.lock" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
-              <span class="truncate">{{ part.isLocked ? 'Descongelar Solo Esta Pieza' : 'Congelar Solo Esta Pieza' }}</span>
-            </div>
-          </button>
         </div>
 
         <!-- BOTÓN EDITAR MÓDULO COMPLETO (Solo para Módulos/Armarios, no para cajones sueltos) -->
@@ -1057,7 +1115,7 @@
         }
 
         <!-- ========================================================= -->
-        <!-- SECCIÓN UNIVERSAL: MATERIAL, CANTOS, GIRO Y VISIBILIDAD   -->
+        <!-- SECCIÓN CONTEXTUAL: MÓDULO COMPLETO vs PIEZA INDIVIDUAL   -->
         <!-- ========================================================= -->
 
         <!-- Submenú Cambiar Material -->
@@ -1068,7 +1126,7 @@
             class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
             <div class="flex items-center gap-2">
               <hugeicons-icon [icon]="icons.palette" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
-              <span>Cambiar Material</span>
+              <span>{{ isGroupMode ? 'Cambiar Material del ' + (category === 'drawer' ? 'Cajón' : 'Módulo') : 'Cambiar Material de la Pieza' }}</span>
             </div>
             <hugeicons-icon [icon]="showQuickMaterialPicker() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
           </button>
@@ -1107,8 +1165,8 @@
           }
         </div>
 
-        <!-- Fila Rápida de Tapacantos -->
-        @if ((part.thickness || 18) > 6) {
+        <!-- Fila Rápida de Tapacantos (Solo cuando está seleccionada una pieza individual) -->
+        @if (!isGroupMode && (part.thickness || 18) > 6) {
           <div class="px-2.5 py-1 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-1 my-0.5">
             <span class="text-[10px] font-bold text-slate-500 uppercase">Cantos:</span>
             <div class="flex items-center gap-1">
@@ -1122,8 +1180,8 @@
 
         <div class="h-px bg-slate-100 my-0.5"></div>
 
-        <!-- Duplicar y Rotar -->
-        @if (grp) {
+        @if (isGroupMode && grp) {
+          <!-- ACCIONES DE MÓDULO / GRUPO COMPLETO -->
           <button
             type="button"
             (click)="duplicateContextMenuGroup()"
@@ -1140,80 +1198,25 @@
               <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
               <span>Girar {{ category === 'drawer' ? 'Cajón' : 'Módulo' }} 90° (R)</span>
             </button>
+
+            <div class="grid grid-cols-2 gap-1 px-1 my-0.5">
+              <button
+                type="button"
+                (click)="alignContextMenuPart('floor')"
+                class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
+                Al Suelo (Y=0)
+              </button>
+              <button
+                type="button"
+                (click)="alignContextMenuPart('centerX')"
+                class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
+                Centrar en X
+              </button>
+            </div>
           }
-        }
 
-        <button
-          type="button"
-          (click)="duplicateContextMenuPart()"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
-          <hugeicons-icon [icon]="icons.copy" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
-          <span>Duplicar Solo Esta Pieza</span>
-        </button>
+          <div class="h-px bg-slate-100 my-0.5"></div>
 
-        @if (!isLocked) {
-          <!-- Submenú Rotación 3D Individual -->
-          <div class="relative">
-            <button
-              type="button"
-              (click)="toggleRotateSubmenu()"
-              class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
-              <div class="flex items-center gap-2">
-                <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
-                <span>Rotación de Pieza 3D</span>
-              </div>
-              <hugeicons-icon [icon]="showRotateSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
-            </button>
-
-            @if (showRotateSubmenu()) {
-              <div class="bg-slate-50 border border-slate-200 rounded-xl p-2 my-0.5 flex flex-col gap-1.5 text-xs shadow-xs">
-                <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <span>Giros Rápidos (90°):</span>
-                  <button type="button" (click)="resetPartRotation(part)" class="text-sky-600 hover:text-sky-800 font-bold transition cursor-pointer">Reset 0°</button>
-                </div>
-                <div class="flex items-center justify-between gap-1">
-                  <span class="font-bold text-rose-600 text-[11px] w-12">Eje X:</span>
-                  <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationX || 0 }}°</span>
-                  <button type="button" (click)="rotatePart3dAngle(part, 'x', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
-                  <button type="button" (click)="rotatePart3dAngle(part, 'x', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
-                </div>
-                <div class="flex items-center justify-between gap-1">
-                  <span class="font-bold text-emerald-600 text-[11px] w-12">Eje Y:</span>
-                  <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationY || 0 }}°</span>
-                  <button type="button" (click)="rotatePart3dAngle(part, 'y', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
-                  <button type="button" (click)="rotatePart3dAngle(part, 'y', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
-                </div>
-                <div class="flex items-center justify-between gap-1">
-                  <span class="font-bold text-sky-600 text-[11px] w-12">Eje Z:</span>
-                  <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationZ || 0 }}°</span>
-                  <button type="button" (click)="rotatePart3dAngle(part, 'z', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
-                  <button type="button" (click)="rotatePart3dAngle(part, 'z', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
-                </div>
-              </div>
-            }
-          </div>
-
-          <!-- Alineación Rápida -->
-          <div class="grid grid-cols-2 gap-1 px-1 my-0.5">
-            <button
-              type="button"
-              (click)="alignContextMenuPart('floor')"
-              class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
-              Al Suelo (Y=0)
-            </button>
-            <button
-              type="button"
-              (click)="alignContextMenuPart('centerX')"
-              class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
-              Centrar en X
-            </button>
-          </div>
-        }
-
-        <div class="h-px bg-slate-100 my-0.5"></div>
-
-        <!-- Aislar / Ocultar -->
-        @if (grp) {
           <button
             type="button"
             (click)="isolateContextMenuGroup()"
@@ -1221,34 +1224,129 @@
             <hugeicons-icon [icon]="icons.cameraFocus" [size]="14" [strokeWidth]="2" class="text-indigo-600"></hugeicons-icon>
             <span>Aislar {{ category === 'drawer' ? 'Cajón' : 'Módulo' }} (Ocultar demás)</span>
           </button>
+
+          <button
+            type="button"
+            (click)="hideContextMenuGroup()"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.eyeOff" [size]="14" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+            <span>Ocultar {{ category === 'drawer' ? 'Cajón' : 'Módulo' }} Temporalmente</span>
+          </button>
+
+          <button
+            type="button"
+            (click)="ungroupFromContext()"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.unlink" [size]="14" [strokeWidth]="2" class="text-amber-600"></hugeicons-icon>
+            <span>Desagrupar Piezas</span>
+          </button>
+
+          <div class="h-px bg-slate-100 my-0.5"></div>
+
+          <button
+            type="button"
+            (click)="deleteContextMenuGroup()"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 flex items-center gap-2 text-left transition font-semibold cursor-pointer">
+            <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="2" class="text-rose-500"></hugeicons-icon>
+            <span>Eliminar {{ category === 'drawer' ? 'Cajón Completo' : 'Módulo Completo' }}</span>
+          </button>
+        } @else {
+          <!-- ACCIONES DE PIEZA INDIVIDUAL -->
+          <button
+            type="button"
+            (click)="duplicateContextMenuPart()"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.copy" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
+            <span>Duplicar Solo Esta Pieza</span>
+          </button>
+
+          @if (!isLocked) {
+            <!-- Submenú Rotación 3D Individual -->
+            <div class="relative">
+              <button
+                type="button"
+                (click)="toggleRotateSubmenu()"
+                class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center justify-between transition cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+                  <span>Rotación de Pieza 3D</span>
+                </div>
+                <hugeicons-icon [icon]="showRotateSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+              </button>
+
+              @if (showRotateSubmenu()) {
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-2 my-0.5 flex flex-col gap-1.5 text-xs shadow-xs">
+                  <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <span>Giros Rápidos (90°):</span>
+                    <button type="button" (click)="resetPartRotation(part)" class="text-sky-600 hover:text-sky-800 font-bold transition cursor-pointer">Reset 0°</button>
+                  </div>
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="font-bold text-rose-600 text-[11px] w-12">Eje X:</span>
+                    <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationX || 0 }}°</span>
+                    <button type="button" (click)="rotatePart3dAngle(part, 'x', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
+                    <button type="button" (click)="rotatePart3dAngle(part, 'x', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
+                  </div>
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="font-bold text-emerald-600 text-[11px] w-12">Eje Y:</span>
+                    <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationY || 0 }}°</span>
+                    <button type="button" (click)="rotatePart90(part, 'y')" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">Girar 90°</button>
+                    <button type="button" (click)="rotatePart3dAngle(part, 'y', 45)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+45°</button>
+                  </div>
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="font-bold text-sky-600 text-[11px] w-12">Eje Z:</span>
+                    <span class="font-mono text-slate-800 font-bold text-[11px] w-10 text-center">{{ part.rotationZ || 0 }}°</span>
+                    <button type="button" (click)="rotatePart3dAngle(part, 'z', 90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">+90°</button>
+                    <button type="button" (click)="rotatePart3dAngle(part, 'z', -90)" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-[10px] font-bold transition cursor-pointer">-90°</button>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Alineación Rápida -->
+            <div class="grid grid-cols-2 gap-1 px-1 my-0.5">
+              <button
+                type="button"
+                (click)="alignContextMenuPart('floor')"
+                class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
+                Al Suelo (Y=0)
+              </button>
+              <button
+                type="button"
+                (click)="alignContextMenuPart('centerX')"
+                class="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold text-center transition cursor-pointer">
+                Centrar en X
+              </button>
+            </div>
+          }
+
+          <div class="h-px bg-slate-100 my-0.5"></div>
+
+          <button
+            type="button"
+            (click)="isolatePart(part)"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.cameraFocus" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
+            <span>Aislar Solo Esta Pieza</span>
+          </button>
+
+          <button
+            type="button"
+            (click)="hidePart(part)"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.eyeOff" [size]="14" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
+            <span>Ocultar Pieza Temporalmente</span>
+          </button>
+
+          <div class="h-px bg-slate-100 my-0.5"></div>
+
+          <button
+            type="button"
+            (click)="deleteContextMenuPart()"
+            class="px-2.5 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 flex items-center gap-2 text-left transition font-semibold cursor-pointer">
+            <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="2" class="text-rose-500"></hugeicons-icon>
+            <span>Eliminar Pieza</span>
+          </button>
         }
-
-        <button
-          type="button"
-          (click)="isolatePart(part)"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
-          <hugeicons-icon [icon]="icons.cameraFocus" [size]="14" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
-          <span>Aislar Solo Esta Pieza</span>
-        </button>
-
-        <button
-          type="button"
-          (click)="hidePart(part)"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 text-left transition cursor-pointer">
-          <hugeicons-icon [icon]="icons.eyeOff" [size]="14" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
-          <span>Ocultar Pieza Temporalmente</span>
-        </button>
-
-        <div class="h-px bg-slate-100 my-0.5"></div>
-
-        <!-- Eliminar -->
-        <button
-          type="button"
-          (click)="deleteContextMenuPart()"
-          class="px-2.5 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 flex items-center gap-2 text-left transition font-semibold cursor-pointer">
-          <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="2" class="text-rose-500"></hugeicons-icon>
-          <span>Eliminar Pieza</span>
-        </button>
 
       } @else {
         <!-- ========================================================= -->
@@ -1387,8 +1485,52 @@
         <strong class="text-sky-600">{{ fh.pointCount }} pts · Perím {{ fh.perimeter }} mm</strong>
       } @else if (measureDistance(); as dist) {
         <strong class="text-sky-600">{{ dist.total }} mm</strong>
+      } @else if (currentSelectedGroup(); as grp) {
+        @if (currentSelectedGroupBounds(); as gb) {
+          <div class="flex items-center gap-1">
+            <span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[9px] font-bold uppercase tracking-wider truncate max-w-[110px]" [title]="grp.name">
+              📦 {{ grp.name }}
+            </span>
+            <input
+              type="number"
+              min="80"
+              step="10"
+              [value]="gb.width"
+              (change)="onSelectedGroupDimensionChange('width', $event)"
+              class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-indigo-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-indigo-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+              title="Ancho total del módulo en X (mm)" />
+            <span class="text-slate-400 font-bold text-[11px]">×</span>
+            <input
+              type="number"
+              min="80"
+              step="10"
+              [value]="gb.height"
+              (change)="onSelectedGroupDimensionChange('height', $event)"
+              class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-indigo-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-indigo-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+              title="Alto total del módulo en Y (mm)" />
+            <span class="text-slate-400 font-bold text-[11px]">×</span>
+            <input
+              type="number"
+              min="80"
+              step="10"
+              [value]="gb.depth"
+              (change)="onSelectedGroupDimensionChange('depth', $event)"
+              class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-indigo-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-indigo-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+              title="Profundidad total del módulo en Z (mm)" />
+            <span class="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold">mm</span>
+          </div>
+        }
       } @else if (selectedPart(); as sel) {
         <div class="flex items-center gap-1">
+          @if (selectedPartParentGroup(); as parentGrp) {
+            <button
+              type="button"
+              (click)="selectGroupInViewer(parentGrp.id, false)"
+              class="px-1.5 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer"
+              title="Volver a seleccionar el módulo completo">
+              ← Módulo
+            </button>
+          }
           <input
             type="number"
             min="10"
@@ -1396,7 +1538,7 @@
             [value]="sel.length"
             (input)="onSelectedDimensionInput('length', $event)"
             class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
-            title="Alto / Largo (mm)" />
+            title="Alto / Largo de la pieza (mm)" />
           <span class="text-slate-400 font-bold text-[11px]">×</span>
           <input
             type="number"
@@ -1405,7 +1547,7 @@
             [value]="sel.width"
             (input)="onSelectedDimensionInput('width', $event)"
             class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
-            title="Ancho (mm)" />
+            title="Ancho de la pieza (mm)" />
           <span class="text-slate-400 font-bold text-[11px]">-</span>
           <input
             type="number"
@@ -1415,11 +1557,11 @@
             [value]="sel.thickness"
             (input)="onSelectedDimensionInput('thickness', $event)"
             class="w-11 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
-            title="Espesor / Grosor (mm)" />
+            title="Espesor / Grosor de la pieza (mm)" />
           <span class="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold">mm</span>
         </div>
       } @else {
-        <span class="text-slate-400 text-[11px] italic">Selecciona una pieza</span>
+        <span class="text-slate-400 text-[11px] italic">Selecciona una pieza o módulo</span>
       }
     </div>
   </div>

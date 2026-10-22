@@ -29,10 +29,10 @@ export interface JoineryAnalysis {
 export class JoineryEngineService {
 
   /**
-   * Calcula la caja envolvente 3D exacta (sx, sy, sz y límites min/max) de una pieza.
-   * Es la única fuente de verdad compartida entre el motor de uniones, el almacenamiento y el visor 3D.
+   * Calcula las dimensiones locales (sx, sy, sz) antes de aplicar rotaciones Euler (rotationX/Y/Z).
+   * Útil para construir el BoxGeometry(sx, sy, sz) en el visor 3D cuando el mesh aplica rotation.set(...) encima.
    */
-  getPartBounds(part: Part): Part3DBounds {
+  getPartLocalDimensions(part: Part): { sx: number; sy: number; sz: number } {
     const t = part.thickness || 18;
     const L = part.length;
     const W = part.width;
@@ -80,6 +80,46 @@ export class JoineryEngineService {
       sx = L;
       sy = W;
       sz = t;
+    }
+
+    return { sx, sy, sz };
+  }
+
+  /**
+   * Calcula la caja envolvente 3D exacta (sx, sy, sz y límites min/max) de una pieza en el espacio mundial,
+   * incluyendo cualquier rotación personalizada (rotationX, rotationY, rotationZ).
+   * Es la única fuente de verdad compartida entre el motor de uniones, el almacenamiento y el visor 3D.
+   */
+  getPartBounds(part: Part): Part3DBounds {
+    let { sx, sy, sz } = this.getPartLocalDimensions(part);
+
+    const rx = ((part.rotationX || 0) * Math.PI) / 180;
+    const ry = ((part.rotationY || 0) * Math.PI) / 180;
+    const rz = ((part.rotationZ || 0) * Math.PI) / 180;
+
+    if (Math.abs(rx) > 1e-4 || Math.abs(ry) > 1e-4 || Math.abs(rz) > 1e-4) {
+      const cx = Math.cos(rx), srx = Math.sin(rx);
+      const cy = Math.cos(ry), sry = Math.sin(ry);
+      const cz = Math.cos(rz), srz = Math.sin(rz);
+
+      // Matriz de rotación Euler 'XYZ' de Three.js
+      const m00 = cy * cz;
+      const m01 = -cy * srz;
+      const m02 = sry;
+      const m10 = srx * sry * cz + cx * srz;
+      const m11 = -srx * sry * srz + cx * cz;
+      const m12 = -srx * cy;
+      const m20 = -cx * sry * cz + srx * srz;
+      const m21 = cx * sry * srz + srx * cz;
+      const m22 = cx * cy;
+
+      const wsx = Math.abs(m00) * sx + Math.abs(m01) * sy + Math.abs(m02) * sz;
+      const wsy = Math.abs(m10) * sx + Math.abs(m11) * sy + Math.abs(m12) * sz;
+      const wsz = Math.abs(m20) * sx + Math.abs(m21) * sy + Math.abs(m22) * sz;
+
+      sx = Math.round(wsx * 100) / 100;
+      sy = Math.round(wsy * 100) / 100;
+      sz = Math.round(wsz * 100) / 100;
     }
 
     const px = part.posX ?? 0;
@@ -132,6 +172,14 @@ export class JoineryEngineService {
     const cz = (minZ + maxZ) / 2;
     const dx = (part.posX ?? 0) - cx;
     const dz = (part.posZ ?? 0) - cz;
+
+    const bPart = this.getPartBounds(part);
+    if (bPart.sx <= 36 && bPart.sz > bPart.sx) {
+      return dx >= 0 ? 'right' : 'left';
+    }
+    if (bPart.sz <= 36 && bPart.sx > bPart.sz) {
+      return dz >= 0 ? 'front' : 'back';
+    }
 
     if (part.orientation === 'vertical_yz') {
       return dx >= 0 ? 'right' : 'left';
@@ -253,7 +301,7 @@ export class JoineryEngineService {
             !isInternalBox));
 
       if (isDrawerFront) {
-        const slideHoles = this.generateSlideSystem32Holes(b, boundsList);
+        const slideHoles = this.generateSlideSystem32Holes(b, boundsList, parts);
         for (const h of slideHoles) {
           drillHolesByPart.get(h.partId)?.push(h);
           allDrillHoles.push(h);
@@ -278,65 +326,146 @@ export class JoineryEngineService {
     };
   }
 
-  private generateSlideSystem32Holes(drawer: Part3DBounds, allBounds: Part3DBounds[]): DrillHole[] {
+  private generateSlideSystem32Holes(drawer: Part3DBounds, allBounds: Part3DBounds[], allParts: Part[]): DrillHole[] {
     const holes: DrillHole[] = [];
     const slideY = drawer.py - drawer.sy * 0.15;
+    const facing = this.getPartFacingDirection(drawer.part, allParts);
 
-    const verticalSides = allBounds.filter(
-      b =>
-        b.part.id !== drawer.part.id &&
-        b.sx <= 32 &&
-        b.sy >= 150 &&
-        drawer.py >= b.minY - 20 &&
-        drawer.py <= b.maxY + 20
-    );
+    // Filtrar solo costados/divisores estructurales reales del módulo (excluir puertas, frentes, fondos, cajones internos)
+    const candidateSides = allBounds.filter(b => {
+      if (b.part.id === drawer.part.id) return false;
+      if (drawer.part.groupId && b.part.groupId && b.part.groupId !== drawer.part.groupId) return false;
+      const role = b.part.componentRole;
+      if (
+        role === 'door' ||
+        role === 'drawer_front' ||
+        role === 'drawer_box' ||
+        role === 'drawer_lateral' ||
+        role === 'back' ||
+        role === 'plinth' ||
+        (b.part.thickness || 18) <= 8
+      ) {
+        return false;
+      }
+      const upper = b.part.name.toUpperCase();
+      if (
+        upper.includes('FRENTE') ||
+        upper.includes('PUERTA') ||
+        upper.includes('FONDO') ||
+        upper.includes('TRASERA') ||
+        upper.includes('CONTRA') ||
+        upper.includes('ZOCALO') ||
+        upper.includes('ZÓCALO') ||
+        ((upper.includes('CAJ') || upper.includes('GAVET')) && !upper.includes('LATERAL CAJONERA'))
+      ) {
+        return false;
+      }
+      return b.sy >= 150 && drawer.py >= b.minY - 20 && drawer.py <= b.maxY + 20;
+    });
 
-    const leftFlank = verticalSides
-      .filter(b => b.maxX <= drawer.minX + 30 && b.maxX >= drawer.minX - 50)
-      .sort((a, b) => b.maxX - a.maxX)[0];
+    const spacings = [37, 69, 101, 165, 229, 293];
 
-    const rightFlank = verticalSides
-      .filter(b => b.minX >= drawer.maxX - 30 && b.minX <= drawer.maxX + 50)
-      .sort((a, b) => a.minX - b.minX)[0];
+    if (facing === 'front' || facing === 'back') {
+      // Cajón se desliza en Z; los laterales del gabinete tienen espesor en X (b.sx <= 36)
+      const verticalSides = candidateSides.filter(b => b.sx <= 36 && b.sz >= 150);
 
-    const flanks = [
-      { side: leftFlank, isLeft: true },
-      { side: rightFlank, isLeft: false }
-    ];
+      const leftFlank = verticalSides
+        .filter(b => b.maxX <= drawer.minX + 30 && b.maxX >= drawer.minX - 50)
+        .sort((a, b) => b.maxX - a.maxX)[0];
 
-    for (const { side, isLeft } of flanks) {
-      if (!side) continue;
+      const rightFlank = verticalSides
+        .filter(b => b.minX >= drawer.maxX - 30 && b.minX <= drawer.maxX + 50)
+        .sort((a, b) => a.minX - b.minX)[0];
 
-      const frontEdgeZ = side.maxZ;
-      const holePosX = isLeft ? side.maxX : side.minX;
-      const normalAxis = 'x' as const;
-      const direction = (isLeft ? -1 : 1) as 1 | -1;
+      const flanks = [
+        { side: leftFlank, isMinSide: true },
+        { side: rightFlank, isMinSide: false }
+      ];
 
-      const spacings = [37, 69, 101, 165, 229, 293];
-      const maxReachableDepth = side.sz - 40;
+      for (const { side, isMinSide } of flanks) {
+        if (!side) continue;
 
-      for (let i = 0; i < spacings.length; i++) {
-        const dist = spacings[i];
-        if (dist > maxReachableDepth) break;
+        const frontEdgeZ = facing === 'front' ? side.maxZ : side.minZ;
+        const stepSign = facing === 'front' ? -1 : 1;
+        const holePosX = isMinSide ? side.maxX : side.minX;
+        const normalAxis = 'x' as const;
+        const direction = (isMinSide ? -1 : 1) as 1 | -1;
+        const maxReachableDepth = side.sz - 40;
 
-        const holeZ = frontEdgeZ - dist;
-        holes.push({
-          id: `slide_sys32_${side.part.id}_${drawer.part.id}_${i}`,
-          type: 'slide_system32',
-          diameter: 5,
-          depth: 11.5,
-          posX: holePosX,
-          posY: slideY,
-          posZ: holeZ,
-          normalAxis,
-          direction,
-          surfaceType: 'face',
-          partId: side.part.id,
-          partName: side.part.name,
-          targetPartId: drawer.part.id,
-          targetPartName: drawer.part.name,
-          description: `Perforación técnica corredera Sistema 32 Ø5x11.5mm (${dist}mm del borde frontal)`
-        });
+        for (let i = 0; i < spacings.length; i++) {
+          const dist = spacings[i];
+          if (dist > maxReachableDepth) break;
+
+          const holeZ = frontEdgeZ + stepSign * dist;
+          holes.push({
+            id: `slide_sys32_${side.part.id}_${drawer.part.id}_${i}`,
+            type: 'slide_system32',
+            diameter: 5,
+            depth: 11.5,
+            posX: holePosX,
+            posY: slideY,
+            posZ: holeZ,
+            normalAxis,
+            direction,
+            surfaceType: 'face',
+            partId: side.part.id,
+            partName: side.part.name,
+            targetPartId: drawer.part.id,
+            targetPartName: drawer.part.name,
+            description: `Perforación técnica corredera Sistema 32 Ø5x11.5mm (${dist}mm del borde frontal)`
+          });
+        }
+      }
+    } else {
+      // Módulo rotado 90° ('left' o 'right'): el cajón se desliza en X; los laterales tienen espesor en Z (b.sz <= 36)
+      const verticalSides = candidateSides.filter(b => b.sz <= 36 && b.sx >= 150);
+
+      const minZFlank = verticalSides
+        .filter(b => b.maxZ <= drawer.minZ + 30 && b.maxZ >= drawer.minZ - 50)
+        .sort((a, b) => b.maxZ - a.maxZ)[0];
+
+      const maxZFlank = verticalSides
+        .filter(b => b.minZ >= drawer.maxZ - 30 && b.minZ <= drawer.maxZ + 50)
+        .sort((a, b) => a.minZ - b.minZ)[0];
+
+      const flanks = [
+        { side: minZFlank, isMinSide: true },
+        { side: maxZFlank, isMinSide: false }
+      ];
+
+      for (const { side, isMinSide } of flanks) {
+        if (!side) continue;
+
+        const frontEdgeX = facing === 'right' ? side.maxX : side.minX;
+        const stepSign = facing === 'right' ? -1 : 1;
+        const holePosZ = isMinSide ? side.maxZ : side.minZ;
+        const normalAxis = 'z' as const;
+        const direction = (isMinSide ? -1 : 1) as 1 | -1;
+        const maxReachableDepth = side.sx - 40;
+
+        for (let i = 0; i < spacings.length; i++) {
+          const dist = spacings[i];
+          if (dist > maxReachableDepth) break;
+
+          const holeX = frontEdgeX + stepSign * dist;
+          holes.push({
+            id: `slide_sys32_${side.part.id}_${drawer.part.id}_${i}`,
+            type: 'slide_system32',
+            diameter: 5,
+            depth: 11.5,
+            posX: holeX,
+            posY: slideY,
+            posZ: holePosZ,
+            normalAxis,
+            direction,
+            surfaceType: 'face',
+            partId: side.part.id,
+            partName: side.part.name,
+            targetPartId: drawer.part.id,
+            targetPartName: drawer.part.name,
+            description: `Perforación técnica corredera Sistema 32 Ø5x11.5mm (${dist}mm del borde frontal)`
+          });
+        }
       }
     }
 
@@ -360,17 +489,6 @@ export class JoineryEngineService {
       }
     }
 
-    const marginY = Math.min(100, height * 0.15);
-    let hingeYs = [b.minY + marginY, b.maxY - marginY];
-
-    if (hingeSide === 'top') {
-      hingeYs = [b.maxY - 22];
-    } else if (hingeSide === 'bottom') {
-      hingeYs = [b.minY + 22];
-    } else if (height >= 950) {
-      hingeYs.push(b.py);
-    }
-
     const sideText =
       hingeSide === 'right'
         ? 'derecho'
@@ -379,6 +497,46 @@ export class JoineryEngineService {
           : hingeSide === 'bottom'
             ? 'inferior'
             : 'izquierdo';
+
+    if (hingeSide === 'top' || hingeSide === 'bottom') {
+      const y = hingeSide === 'top' ? b.maxY - 22 : b.minY + 22;
+      const span = facing === 'front' || facing === 'back' ? b.sx : b.sz;
+      const marginH = Math.min(100, span * 0.2);
+      const offsets =
+        facing === 'front' || facing === 'back'
+          ? [b.minX + marginH, b.maxX - marginH]
+          : [b.minZ + marginH, b.maxZ - marginH];
+
+      offsets.forEach((coord, i) => {
+        const posX = facing === 'front' || facing === 'back' ? coord : facing === 'right' ? b.maxX : b.minX;
+        const posZ = facing === 'front' ? b.maxZ : facing === 'back' ? b.minZ : coord;
+        const normalAxis: 'x' | 'z' = facing === 'front' || facing === 'back' ? 'z' : 'x';
+        const direction: 1 | -1 = facing === 'front' || facing === 'right' ? 1 : -1;
+
+        holes.push({
+          id: `hinge_${b.part.id}_${i}`,
+          type: 'hinge_35',
+          diameter: 35,
+          depth: 12.5,
+          posX,
+          posY: y,
+          posZ,
+          normalAxis,
+          direction,
+          surfaceType: 'face',
+          partId: b.part.id,
+          partName: b.part.name,
+          description: `Cazoleta bisagra Ø35mm x 12.5mm (borde ${sideText})`
+        });
+      });
+      return holes;
+    }
+
+    const marginY = Math.min(100, height * 0.15);
+    const hingeYs = [b.minY + marginY, b.maxY - marginY];
+    if (height >= 950) {
+      hingeYs.push(b.py);
+    }
 
     for (let i = 0; i < hingeYs.length; i++) {
       const y = hingeYs[i];
@@ -458,73 +616,139 @@ export class JoineryEngineService {
       b2.part.name.toUpperCase().includes('FRENTE');
     if (isMovable1 || isMovable2) return;
 
+    // Ignorar fondos delgados (MDF 3-6mm) para tornillos/tarugos estructurales
+    if ((b1.part.thickness || 18) <= 8 || (b2.part.thickness || 18) <= 8) return;
+    if (b1.part.componentRole === 'back' || b2.part.componentRole === 'back') return;
+
     const contactTolerance = 3.0;
     const overlapX = Math.min(b1.maxX, b2.maxX) - Math.max(b1.minX, b2.minX);
+    const overlapY = Math.min(b1.maxY, b2.maxY) - Math.max(b1.minY, b2.minY);
     const overlapZ = Math.min(b1.maxZ, b2.maxZ) - Math.max(b1.minZ, b2.minZ);
 
-    if (overlapZ < 60) return;
+    const isSideYZ1 = b1.sx <= 36 && b1.sy >= 60 && b1.sz >= 60;
+    const isSideYZ2 = b2.sx <= 36 && b2.sy >= 60 && b2.sz >= 60;
+    const isSideXY1 = b1.sz <= 36 && b1.sy >= 60 && b1.sx >= 60;
+    const isSideXY2 = b2.sz <= 36 && b2.sy >= 60 && b2.sx >= 60;
+    const isShelf1 = b1.sy <= 36 && b1.sx >= 60 && b1.sz >= 60;
+    const isShelf2 = b2.sy <= 36 && b2.sx >= 60 && b2.sz >= 60;
 
-    const isSide1 = b1.sx <= 32 && b1.sy >= 60;
-    const isSide2 = b2.sx <= 32 && b2.sy >= 60;
-    const isShelf1 = b1.sy <= 32 && b1.sx >= 60;
-    const isShelf2 = b2.sy <= 32 && b2.sx >= 60;
+    // CASO A: Uniones con línea de contacto a lo largo del eje Z (módulo mirando a Frente/Atrás)
+    if (overlapZ >= 60) {
+      if ((isSideYZ1 && isShelf2) || (isSideYZ2 && isShelf1)) {
+        const side = isSideYZ1 ? b1 : b2;
+        const shelf = isSideYZ1 ? b2 : b1;
+        const touchesLeft = Math.abs(shelf.minX - side.maxX) <= contactTolerance;
+        const touchesRight = Math.abs(shelf.maxX - side.minX) <= contactTolerance;
 
-    if (isSide1 && isShelf2) {
-      const side = b1;
-      const shelf = b2;
-      const touchesLeft = Math.abs(shelf.minX - side.maxX) <= contactTolerance;
-      const touchesRight = Math.abs(shelf.maxX - side.minX) <= contactTolerance;
+        if ((touchesLeft || touchesRight) && overlapY >= 8) {
+          const contactX = touchesLeft ? side.maxX : side.minX;
+          const contactY = Math.max(shelf.minY + 4, Math.min(shelf.maxY - 4, shelf.py));
+          const minZ = Math.max(side.minZ, shelf.minZ);
+          const maxZ = Math.min(side.maxZ, shelf.maxZ);
 
-      if (touchesLeft || touchesRight) {
-        const contactX = touchesLeft ? side.maxX : side.minX;
-        const contactY = Math.max(shelf.minY + 4, Math.min(shelf.maxY - 4, shelf.py));
-        const minZ = Math.max(side.minZ, shelf.minZ);
-        const maxZ = Math.min(side.maxZ, shelf.maxZ);
-
-        this.distributeScrewAndDowelHoles(side, shelf, 'x', contactX, contactY, minZ, maxZ, drillMap, allDrills);
-        return;
+          this.distributeScrewAndDowelHoles(
+            side,
+            shelf,
+            'x',
+            'z',
+            contactX,
+            contactY,
+            minZ,
+            maxZ,
+            drillMap,
+            allDrills
+          );
+          return;
+        }
       }
-    } else if (isSide2 && isShelf1) {
-      const side = b2;
-      const shelf = b1;
-      const touchesLeft = Math.abs(shelf.minX - side.maxX) <= contactTolerance;
-      const touchesRight = Math.abs(shelf.maxX - side.minX) <= contactTolerance;
 
-      if (touchesLeft || touchesRight) {
-        const contactX = touchesLeft ? side.maxX : side.minX;
-        const contactY = Math.max(shelf.minY + 4, Math.min(shelf.maxY - 4, shelf.py));
-        const minZ = Math.max(side.minZ, shelf.minZ);
-        const maxZ = Math.min(side.maxZ, shelf.maxZ);
+      if ((isShelf1 && isSideYZ2) || (isShelf2 && isSideYZ1)) {
+        const horizontal = isShelf1 ? b1 : b2;
+        const vertical = isShelf1 ? b2 : b1;
 
-        this.distributeScrewAndDowelHoles(side, shelf, 'x', contactX, contactY, minZ, maxZ, drillMap, allDrills);
-        return;
+        const touchesTop = Math.abs(vertical.minY - horizontal.maxY) <= contactTolerance;
+        const touchesBottom = Math.abs(vertical.maxY - horizontal.minY) <= contactTolerance;
+
+        if ((touchesTop || touchesBottom) && overlapX >= 8) {
+          const contactY = touchesTop ? horizontal.maxY : horizontal.minY;
+          const contactX = Math.max(vertical.minX + 4, Math.min(vertical.maxX - 4, vertical.px));
+          const minZ = Math.max(horizontal.minZ, vertical.minZ);
+          const maxZ = Math.min(horizontal.maxZ, vertical.maxZ);
+
+          this.distributeScrewAndDowelHoles(
+            horizontal,
+            vertical,
+            'y',
+            'z',
+            contactY,
+            contactX,
+            minZ,
+            maxZ,
+            drillMap,
+            allDrills
+          );
+          return;
+        }
       }
     }
 
-    if ((isShelf1 && isSide2) || (isShelf2 && isSide1)) {
-      const horizontal = isShelf1 ? b1 : b2;
-      const vertical = isShelf1 ? b2 : b1;
+    // CASO B: Uniones con línea de contacto a lo largo del eje X (módulo rotado 90° mirando a Izq/Der)
+    if (overlapX >= 60) {
+      if ((isSideXY1 && isShelf2) || (isSideXY2 && isShelf1)) {
+        const side = isSideXY1 ? b1 : b2;
+        const shelf = isSideXY1 ? b2 : b1;
+        const touchesBack = Math.abs(shelf.minZ - side.maxZ) <= contactTolerance;
+        const touchesFront = Math.abs(shelf.maxZ - side.minZ) <= contactTolerance;
 
-      const touchesTop = Math.abs(vertical.minY - horizontal.maxY) <= contactTolerance;
-      const touchesBottom = Math.abs(vertical.maxY - horizontal.minY) <= contactTolerance;
+        if ((touchesBack || touchesFront) && overlapY >= 8) {
+          const contactZ = touchesBack ? side.maxZ : side.minZ;
+          const contactY = Math.max(shelf.minY + 4, Math.min(shelf.maxY - 4, shelf.py));
+          const minX = Math.max(side.minX, shelf.minX);
+          const maxX = Math.min(side.maxX, shelf.maxX);
 
-      if ((touchesTop || touchesBottom) && overlapX >= 60) {
-        const contactY = touchesTop ? horizontal.maxY : horizontal.minY;
-        const contactX = Math.max(vertical.minX + 4, Math.min(vertical.maxX - 4, vertical.px));
-        const minZ = Math.max(horizontal.minZ, vertical.minZ);
-        const maxZ = Math.min(horizontal.maxZ, vertical.maxZ);
+          this.distributeScrewAndDowelHoles(
+            side,
+            shelf,
+            'z',
+            'x',
+            contactZ,
+            contactY,
+            minX,
+            maxX,
+            drillMap,
+            allDrills
+          );
+          return;
+        }
+      }
 
-        this.distributeScrewAndDowelHoles(
-          horizontal,
-          vertical,
-          'y',
-          contactY,
-          contactX,
-          minZ,
-          maxZ,
-          drillMap,
-          allDrills
-        );
+      if ((isShelf1 && isSideXY2) || (isShelf2 && isSideXY1)) {
+        const horizontal = isShelf1 ? b1 : b2;
+        const vertical = isShelf1 ? b2 : b1;
+
+        const touchesTop = Math.abs(vertical.minY - horizontal.maxY) <= contactTolerance;
+        const touchesBottom = Math.abs(vertical.maxY - horizontal.minY) <= contactTolerance;
+
+        if ((touchesTop || touchesBottom) && overlapZ >= 8) {
+          const contactY = touchesTop ? horizontal.maxY : horizontal.minY;
+          const contactZ = Math.max(vertical.minZ + 4, Math.min(vertical.maxZ - 4, vertical.pz));
+          const minX = Math.max(horizontal.minX, vertical.minX);
+          const maxX = Math.min(horizontal.maxX, vertical.maxX);
+
+          this.distributeScrewAndDowelHoles(
+            horizontal,
+            vertical,
+            'y',
+            'x',
+            contactY,
+            contactZ,
+            minX,
+            maxX,
+            drillMap,
+            allDrills
+          );
+          return;
+        }
       }
     }
   }
@@ -532,35 +756,48 @@ export class JoineryEngineService {
   private distributeScrewAndDowelHoles(
     passing: Part3DBounds,
     butt: Part3DBounds,
-    axis: 'x' | 'y',
-    contactAxisPos: number,
+    normalAxis: 'x' | 'y' | 'z',
+    lineAxis: 'z' | 'x',
+    contactNormalPos: number,
     contactCrossPos: number,
-    minZ: number,
-    maxZ: number,
+    minLine: number,
+    maxLine: number,
     drillMap: Map<string, DrillHole[]>,
     allDrills: DrillHole[]
   ) {
-    const contactLen = maxZ - minZ;
+    const contactLen = maxLine - minLine;
     if (contactLen < 70) return;
 
-    const startZ = minZ + Math.min(50, contactLen * 0.18);
-    const endZ = maxZ - Math.min(50, contactLen * 0.18);
+    const startLine = minLine + Math.min(50, contactLen * 0.18);
+    const endLine = maxLine - Math.min(50, contactLen * 0.18);
 
-    const screwZs: number[] = [startZ, endZ];
-    const dowelZs: number[] = [];
+    const screwCoords: number[] = [startLine, endLine];
+    const dowelCoords: number[] = [];
 
     if (contactLen >= 320) {
-      const midZ = (startZ + endZ) / 2;
-      screwZs.push(midZ);
-      dowelZs.push((startZ + midZ) / 2);
-      dowelZs.push((midZ + endZ) / 2);
+      const midLine = (startLine + endLine) / 2;
+      screwCoords.push(midLine);
+      dowelCoords.push((startLine + midLine) / 2);
+      dowelCoords.push((midLine + endLine) / 2);
     } else {
-      dowelZs.push((startZ + endZ) / 2);
+      dowelCoords.push((startLine + endLine) / 2);
     }
 
-    screwZs.forEach((z, idx) => {
-      const posX = axis === 'x' ? contactAxisPos : contactCrossPos;
-      const posY = axis === 'x' ? contactCrossPos : contactAxisPos;
+    const resolveXYZ = (lineCoord: number): { posX: number; posY: number; posZ: number } => {
+      if (lineAxis === 'z') {
+        const posX = normalAxis === 'x' ? contactNormalPos : contactCrossPos;
+        const posY = normalAxis === 'x' ? contactCrossPos : contactNormalPos;
+        return { posX, posY, posZ: lineCoord };
+      } else {
+        // lineAxis === 'x'
+        const posZ = normalAxis === 'z' ? contactNormalPos : contactCrossPos;
+        const posY = normalAxis === 'z' ? contactCrossPos : contactNormalPos;
+        return { posX: lineCoord, posY, posZ };
+      }
+    };
+
+    screwCoords.forEach((lineCoord, idx) => {
+      const { posX, posY, posZ } = resolveXYZ(lineCoord);
 
       const passHole: DrillHole = {
         id: `screw_pass_${passing.part.id}_${butt.part.id}_${idx}`,
@@ -569,8 +806,8 @@ export class JoineryEngineService {
         depth: passing.part.thickness || 18,
         posX,
         posY,
-        posZ: z,
-        normalAxis: axis,
+        posZ,
+        normalAxis,
         direction: 1,
         surfaceType: 'face',
         partId: passing.part.id,
@@ -589,8 +826,8 @@ export class JoineryEngineService {
         depth: 40,
         posX,
         posY,
-        posZ: z,
-        normalAxis: axis,
+        posZ,
+        normalAxis,
         direction: -1,
         surfaceType: 'edge',
         partId: butt.part.id,
@@ -603,9 +840,8 @@ export class JoineryEngineService {
       allDrills.push(guideHole);
     });
 
-    dowelZs.forEach((z, idx) => {
-      const posX = axis === 'x' ? contactAxisPos : contactCrossPos;
-      const posY = axis === 'x' ? contactCrossPos : contactAxisPos;
+    dowelCoords.forEach((lineCoord, idx) => {
+      const { posX, posY, posZ } = resolveXYZ(lineCoord);
 
       const dowelPassing: DrillHole = {
         id: `dowel_pass_${passing.part.id}_${butt.part.id}_${idx}`,
@@ -614,8 +850,8 @@ export class JoineryEngineService {
         depth: 12.0,
         posX,
         posY,
-        posZ: z,
-        normalAxis: axis,
+        posZ,
+        normalAxis,
         direction: 1,
         surfaceType: 'face',
         partId: passing.part.id,
@@ -634,8 +870,8 @@ export class JoineryEngineService {
         depth: 20.0,
         posX,
         posY,
-        posZ: z,
-        normalAxis: axis,
+        posZ,
+        normalAxis,
         direction: -1,
         surfaceType: 'edge',
         partId: butt.part.id,
