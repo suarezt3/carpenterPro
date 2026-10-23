@@ -7164,21 +7164,43 @@ nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
       return;
     }
 
+    // P: Empujar / Tirar (Push/Pull)
     if (e.key === 'p' || e.key === 'P') {
       e.preventDefault();
       this.setActiveTool('push_pull');
       return;
     }
-    if (e.key === 'v' || e.key === 'V') {
+    // V o Barra Espaciadora: Herramienta Seleccionar
+    if (e.key === 'v' || e.key === 'V' || e.key === ' ' || e.code === 'Space') {
       e.preventDefault();
       this.setActiveTool('select');
       return;
     }
+    // M: Mover (Gizmo 3D)
     if (e.key === 'm' || e.key === 'M') {
       e.preventDefault();
       this.setActiveTool('move');
       return;
     }
+    // D: Dibujar Rectángulo 3D
+    if (e.key === 'd' || e.key === 'D') {
+      e.preventDefault();
+      this.setActiveTool('draw_rect');
+      return;
+    }
+    // C: Dibujar Círculo 3D
+    if (e.key === 'c' || e.key === 'C') {
+      e.preventDefault();
+      this.setActiveTool('draw_circle');
+      return;
+    }
+    // F: Dibujo Libre a Mano Alzada (Freehand)
+    if (e.key === 'f' || e.key === 'F') {
+      e.preventDefault();
+      this.setActiveTool('draw_freehand');
+      return;
+    }
+    // R: Rotar 90° pieza, cajón o módulo seleccionado (o activar herramienta rotar 90°)
     if (e.key === 'r' || e.key === 'R') {
       const grp = this.currentSelectedGroup();
       if (grp) {
@@ -7193,17 +7215,25 @@ nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
         return;
       }
       e.preventDefault();
-      this.setActiveTool('draw_rect');
+      this.setActiveTool('rotate_90');
       return;
     }
+    // Q: Herramienta Rotar 90° con transportador
     if (e.key === 'q' || e.key === 'Q') {
       e.preventDefault();
       this.setActiveTool('rotate_90');
       return;
     }
+    // T: Cinta Métrica 3D
     if (e.key === 't' || e.key === 'T') {
       e.preventDefault();
       this.setActiveTool('measure');
+      return;
+    }
+    // Z: Centrar y reiniciar cámara (sin Ctrl/Meta/Alt para no colisionar con Deshacer)
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      this.resetCamera();
       return;
     }
     if (e.key === 'Escape') {

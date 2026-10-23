@@ -140,7 +140,7 @@ export class DocumentationModalComponent {
       steps: [
         'En el visor 3D observarás el maniquí arquitectónico estilizado a escala humana real (1720 mm / 1.72 m de estatura) ubicado sobre el suelo del taller.',
         'La figura incluye una regla milimétrica vertical que marca alturas antropométricas clave: zócalo (100 mm), mesada de cocina (900 mm), antepecho (1450 mm) y alcance visual (1600-1720 mm).',
-        'En el suelo, la Brújula Cardinal proyecta indicadores en los 4 extremos: destacando en azul cian "▼ FRENTE (+Z) · VISTA FRONTAL", y en gris "▲ ATRÁS / FONDO (-Z)", "IZQUIERDA (-X)" y "DERECHA (+X)".',
+        'En el suelo, el marco perimetral del taller delimita los 5000 × 5000 mm con indicadores de alta visibilidad en sus bordes exteriores: destacando en azul "▲ FRENTE (+Z) · VISTA PRINCIPAL", y en gris "▼ ATRÁS (-Z)", "► IZQUIERDA (-X)" y "◄ DERECHA (+X)".',
         'Para mover el maniquí de lugar: haz clic sobre su base circular o cuerpo en el 3D y arrástralo suavemente con el ratón hacia donde quieras comparar proporciones ergonómicas con tu mueble.',
         'Para ocultar o mostrar la guía humana y la brújula en cualquier momento, pulsa el botón del icono de figura humana en la barra de herramientas o el atajo de teclado [ G ].'
       ],
@@ -408,9 +408,9 @@ export class DocumentationModalComponent {
       shortDesc: 'Traza placas y paneles rectangulares directamente en el suelo 3D o sobre caras de muebles con previsualización milimétrica dinámica.',
       icon: 'crop_square',
       iconColor: 'text-sky-600',
-      badge: 'Atajo [ R ]',
+      badge: 'Atajo [ D ]',
       steps: [
-        'Activa la herramienta de dibujo presionando la tecla [ R ] en tu teclado o haciendo clic en el icono de rectángulo de la paleta izquierda.',
+        'Activa la herramienta de dibujo presionando la tecla [ D ] en tu teclado o haciendo clic en el icono de rectángulo de la paleta izquierda.',
         'Haz clic en el punto de inicio deseado (sobre el piso o sobre la superficie de una pieza existente).',
         'Arrastra el ratón: verás una retícula traslúcida cian proyectada en 3D que indica en tiempo real las dimensiones del rectángulo (Largo × Ancho en milímetros) con snap por defecto de 10 mm.',
         'Al soltar el clic, se creará instantáneamente una nueva pieza de melamina real con el espesor estándar del proyecto (15 mm o 18 mm).',
@@ -422,7 +422,7 @@ export class DocumentationModalComponent {
         'El sistema previene la creación de micro-piezas accidentales exigiendo una dimensión mínima de 60 × 60 mm.'
       ],
       technicalDetails: [
-        { label: 'Atajo rápido', value: 'Tecla [ R ]' },
+        { label: 'Atajo rápido', value: 'Tecla [ D ]' },
         { label: 'Snap de dibujo', value: 'Incrementos de 10 mm durante el trazado' },
         { label: 'Dimensión mínima', value: '60 mm x 60 mm (evita clics accidentales)' },
         { label: 'Espesor inicial', value: '15 mm o 18 mm según la configuración activa' }
@@ -594,29 +594,42 @@ export class DocumentationModalComponent {
       id: 'atajos_teclado',
       category: 'atajos',
       title: 'Guía Rápida de Atajos de Teclado',
-      shortDesc: 'Trabaja con máxima agilidad usando atajos directos para medir, seleccionar, deshacer, congelar y transformar piezas.',
+      shortDesc: 'Trabaja con máxima agilidad usando atajos directos sin colisiones para modelar, rotar, medir, deshacer y transformar piezas.',
       icon: 'keyboard',
       iconColor: 'text-emerald-600',
       badge: 'Productividad',
       steps: [
-        '• [ Clic sostenido + Arrastre ]: Mover pieza individual o grupo completo directamente en el espacio 3D',
-        '• [ Clic Derecho ]: Abrir Menú Contextual Inteligente (Cajón, Puerta, Estructura o Suelo)',
-        '• [ G ]: Alternar Guía de Escala Humana 1.72 m y Brújula Cardinal (+Z)',
-        '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar piezas',
-        '• [ T ]: Cinta Métrica 3D con Imán Inteligente a vértices y aristas',
-        '• [ P ]: Empujar / Tirar (Push/Pull) para estirar o encoger caras en tiempo real',
-        '• [ R ]: Girar pieza/grupo seleccionado 90° o activar Dibujar Rectángulo 3D si no hay selección',
-        '• [ Q ]: Herramienta Rotar 90 grados en el plano horizontal',
-        '• [ H ] / [ Alt + H ]: Ocultar temporalmente la pieza/grupo seleccionado o mostrar todas las ocultas',
-        '• [ Supr / Delete / Backspace ]: Eliminar inmediatamente la pieza, grupo o equipo seleccionado (con restauración vía Ctrl+Z)',
-        '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer última acción',
-        '• [ Ctrl + Y ] / [ Cmd + Shift + Z ]: Rehacer acción deshecha',
-        '• [ Shift + Clic ]: Selección múltiple aditiva de piezas en el visor 3D para agrupar o mover en bloque',
-        '• [ Flechas Teclado ]: Mover pieza seleccionada en incrementos milimétricos (1 mm o 10 mm con Shift)',
-        '• [ Esc ]: Cancelar herramienta activa, limpiar selección o cerrar ventanas emergentes'
+        '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar piezas (Shift + Clic para selección múltiple)',
+        '• [ P ]: Herramienta Empujar / Tirar (Push/Pull) para estirar o encoger caras en tiempo real',
+        '• [ M ]: Herramienta Mover (Gizmo 3D de flechas para posicionar en X, Y, Z)',
+        '• [ D ]: Herramienta Dibujar Rectángulo 3D (traza nuevas placas de melamina en el piso o caras)',
+        '• [ C ]: Herramienta Dibujar Círculo 3D (traza tapas circulares o mesas redondas)',
+        '• [ F ]: Herramienta Dibujo Libre a Mano Alzada (Freehand con auto-extrusión)',
+        '• [ T ]: Cinta Métrica 3D con snapping magnético a vértices y aristas',
+        '• [ Q ]: Herramienta Transportador / Rotar 90° interactiva con el ratón',
+        '• [ R ]: Rotar 90° pieza, cajón o módulo seleccionado en bloque (sentido horario)',
+        '• [ Z ]: Centrar y reiniciar vista de cámara en el taller 3D',
+        '• [ W ] / [ S ]: Elevar o descender la pieza seleccionada en el eje vertical (Y)',
+        '• [ Flechas Teclado ]: Desplazamiento milimétrico de pieza (1 mm o 10 mm con Shift)',
+        '• [ G ]: Mostrar u ocultar Guías Espaciales perimetrales y el Maniquí de Escala Humana',
+        '• [ H ] / [ Alt + H ]: Ocultar temporalmente pieza/módulo seleccionado o mostrar todas las ocultas',
+        '• [ Supr / Delete / Backspace ]: Eliminar inmediatamente la pieza, grupo o equipo seleccionado',
+        '• [ Ctrl + Z ] / [ Cmd + Z ]: Deshacer última acción (Undo)',
+        '• [ Ctrl + Y ] / [ Cmd + Shift + Z ]: Rehacer acción deshecha (Redo)',
+        '• [ Esc ]: Cancelar herramienta activa, limpiar selección actual o cerrar ventanas emergentes'
       ],
       tips: [
-        'La cinta contextual superior derecha te brinda acceso rápido con un solo clic a: Duplicar, Mover, Abrir/Cerrar, Editar Módulo, 90° (R), Frente, Congelar y Desagrupar.'
+        'Atajo [ R ] dedicado exclusivamente a ROTAR: al pulsar R con un cajón, módulo o pieza seleccionada, girará 90° de inmediato sin alterar la herramienta activa.',
+        'Atajos de Dibujo 3D: pulsa [ D ] para trazar Rectángulos, [ C ] para Círculos y [ F ] para Dibujo Libre a Mano Alzada.',
+        'La barra espaciadora o la tecla [ V ] te regresan al instante a la herramienta de selección estándar.'
+      ],
+      technicalDetails: [
+        { label: 'Rotación 90°', value: 'Tecla [ R ] (módulo o pieza activa)' },
+        { label: 'Rectángulo 3D', value: 'Tecla [ D ] (nueva pieza rectangular)' },
+        { label: 'Círculo 3D', value: 'Tecla [ C ] (pieza circular)' },
+        { label: 'Mano Alzada', value: 'Tecla [ F ] (trazo libre)' },
+        { label: 'Seleccionar', value: 'Teclas [ V ] o [ Espacio ]' },
+        { label: 'Empujar / Tirar', value: 'Tecla [ P ]' }
       ]
     }
   ];

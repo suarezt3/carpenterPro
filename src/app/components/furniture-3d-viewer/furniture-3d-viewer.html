@@ -56,7 +56,7 @@
       (click)="setActiveTool('draw_rect')"
       [class]="activeTool() === 'draw_rect' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
       class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
-      title="Dibujar Rectángulo 3D (R): Dibuja un rectángulo en el plano horizontal para crear una pieza rectangular">
+      title="Dibujar Rectángulo 3D (D): Dibuja un rectángulo en el plano horizontal para crear una pieza rectangular">
       <hugeicons-icon [icon]="icons.squareShape" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
@@ -1450,7 +1450,7 @@
         }
       } @else if (activeTool() === 'draw_rect') {
         <hugeicons-icon [icon]="icons.squareShape" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span class="truncate"><strong>Dibujar Rectángulo 3D (R):</strong> Haz clic y arrastra en el suelo para definir el largo y ancho de una nueva pieza.</span>
+        <span class="truncate"><strong>Dibujar Rectángulo 3D (D):</strong> Haz clic y arrastra en el suelo para definir el largo y ancho de una nueva pieza.</span>
       } @else if (activeTool() === 'draw_circle') {
         <hugeicons-icon [icon]="icons.circleShape" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
         <span class="truncate"><strong>Dibujar Círculo 3D (C):</strong> Haz clic en el centro y arrastra para definir el radio/diámetro de la pieza circular.</span>
@@ -1462,7 +1462,7 @@
         <span class="truncate"><strong>Rotar 90° (Q):</strong> Haz clic sobre cualquier pieza para girarla 90° en el plano horizontal.</span>
       } @else if (activeTool() === 'select') {
         <hugeicons-icon [icon]="icons.cursorSelect" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span class="truncate"><strong>Seleccionar:</strong> Clic en pieza · <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Clic Derecho</kbd> Menú Contextual · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> Empujar · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">R</kbd> Rectángulo</span>
+        <span class="truncate"><strong>Seleccionar (V / Espacio):</strong> Clic en pieza · <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Clic Derecho</kbd> Menú · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> Empujar · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">R</kbd> Rotar 90° · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">D</kbd> Rectángulo</span>
       } @else if (activeTool() === 'move') {
         <hugeicons-icon [icon]="icons.moveAxes" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
         <span class="truncate"><strong>Mover (M):</strong> Arrastra las flechas 3D para posicionar la pieza en X, Y o Z.</span>
