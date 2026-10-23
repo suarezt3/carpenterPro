@@ -1573,30 +1573,30 @@ export class ProjectStorageService {
   }
 
   /**
-   * Rota rígidamente un módulo, cajón o grupo de piezas en el plano horizontal (90°, -90° o 180°)
-   * alrededor de su centro geométrico real (cx, cz), preservando intacta la altura vertical (sy)
-   * de cada pieza y evitando pérdida de precisión decimal (.5 mm).
+   * Rota rígidamente múltiples piezas o módulos seleccionados en el plano horizontal (90°, -90° o 180°)
+   * alrededor de su centroide geométrico común (cx, cz), preservando la coherencia entre módulos.
    */
-  rotateGroupRigidly(groupId: string, angleDelta: 90 | -90 | 180) {
+  rotateMultiplePartsRigidly(partIds: string[], angleDelta: 90 | -90 | 180) {
+    if (partIds.length === 0) return;
     this.updateProject(p => {
-      const groupParts = p.parts.filter(pt => pt.groupId === groupId);
-      if (groupParts.length === 0) return p;
+      const targetParts = p.parts.filter(pt => partIds.includes(pt.id));
+      if (targetParts.length === 0) return p;
 
-      let grpMinX = Infinity, grpMaxX = -Infinity;
-      let grpMinZ = Infinity, grpMaxZ = -Infinity;
-      for (const pt of groupParts) {
+      let minX = Infinity, maxX = -Infinity;
+      let minZ = Infinity, maxZ = -Infinity;
+      for (const pt of targetParts) {
         const b = this.joineryEngine.getPartBounds(pt);
-        if (b.minX < grpMinX) grpMinX = b.minX;
-        if (b.maxX > grpMaxX) grpMaxX = b.maxX;
-        if (b.minZ < grpMinZ) grpMinZ = b.minZ;
-        if (b.maxZ > grpMaxZ) grpMaxZ = b.maxZ;
+        if (b.minX < minX) minX = b.minX;
+        if (b.maxX > maxX) maxX = b.maxX;
+        if (b.minZ < minZ) minZ = b.minZ;
+        if (b.maxZ > maxZ) maxZ = b.maxZ;
       }
 
-      const cx = (grpMinX + grpMaxX) / 2;
-      const cz = (grpMinZ + grpMaxZ) / 2;
+      const cx = (minX + maxX) / 2;
+      const cz = (minZ + maxZ) / 2;
 
       const updatedParts = p.parts.map(pt => {
-        if (pt.groupId !== groupId) return pt;
+        if (!partIds.includes(pt.id)) return pt;
 
         const oldBounds = this.joineryEngine.getPartBounds(pt);
         const dx = oldBounds.px - cx;
@@ -1668,7 +1668,6 @@ export class ProjectStorageService {
             newOrientation = 'vertical_xy';
             const horizontalSpan = oldBounds.sz;
             const verticalHeight = oldBounds.sy;
-            // En vertical_xy todas las piezas mapean sx = length y sy = width
             newLength = horizontalSpan;
             newWidth = verticalHeight;
           }
@@ -1689,6 +1688,38 @@ export class ProjectStorageService {
         parts: updatedParts
       };
     });
+  }
+
+  /**
+   * Cambia el material de melamina a múltiples piezas a la vez (para varios módulos seleccionados).
+   */
+  changeMultiplePartsMaterial(partIds: string[], materialId: string) {
+    const mat = this.materialsList().find(m => m.id === materialId);
+    if (!mat) return;
+    this.updateProject(p => ({
+      ...p,
+      parts: p.parts.map(part => {
+        if (partIds.includes(part.id)) {
+          return {
+            ...part,
+            materialId: mat.id,
+            materialName: mat.name
+          };
+        }
+        return part;
+      })
+    }));
+  }
+
+  /**
+   * Rota rígidamente un módulo, cajón o grupo de piezas en el plano horizontal (90°, -90° o 180°)
+   * alrededor de su centro geométrico real (cx, cz), preservando intacta la altura vertical (sy)
+   * de cada pieza y evitando pérdida de precisión decimal (.5 mm).
+   */
+  rotateGroupRigidly(groupId: string, angleDelta: 90 | -90 | 180) {
+    const groupParts = this.currentProject().parts.filter(pt => pt.groupId === groupId);
+    if (groupParts.length === 0) return;
+    this.rotateMultiplePartsRigidly(groupParts.map(p => p.id), angleDelta);
   }
 
   /**

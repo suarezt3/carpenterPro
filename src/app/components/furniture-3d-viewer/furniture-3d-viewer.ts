@@ -447,24 +447,45 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return single ? [single] : [];
   });
 
-  // Current selected group (active when the whole module/group is selected, NOT when inspecting a single piece of a multi-part group)
+  // Ventana de selección múltiple por arrastre (Marquee Box Selection con Shift)
+  readonly marqueeBox = signal<{ left: number; top: number; width: number; height: number } | null>(null);
+  private isMarqueeSelecting = false;
+  private marqueeStart = { x: 0, y: 0, clientX: 0, clientY: 0 };
+
+  // Current selected group (activo cuando un ÚNICO módulo/grupo está seleccionado en su totalidad)
   readonly currentSelectedGroup = computed<PartGroup | null>(() => {
     const ids = this.activeSelectedIds();
     if (ids.length === 0) return null;
     const parts = this.parts();
-    const firstPart = parts.find(x => x.id === ids[0]);
-    if (ids.length === 1 && firstPart?.groupId) {
-      const groupPartsCount = parts.filter(p => p.groupId === firstPart.groupId).length;
-      if (groupPartsCount > 1) {
-        return null; // Modo inspección de pieza individual dentro del grupo
+    const selectedParts = parts.filter(p => ids.includes(p.id));
+    const uniqueGroupIds = Array.from(new Set(selectedParts.map(p => p.groupId).filter(Boolean))) as string[];
+
+    // Si hay más de un grupo seleccionado, NO es un único grupo (modo multiselección)
+    if (uniqueGroupIds.length > 1) return null;
+
+    if (uniqueGroupIds.length === 1) {
+      const gId = uniqueGroupIds[0];
+      const groupParts = parts.filter(p => p.groupId === gId);
+      // Si el grupo tiene varias piezas y solo se seleccionó 1, es modo inspección de pieza individual
+      if (ids.length === 1 && groupParts.length > 1) {
+        return null;
       }
+      return this.partGroups().find(group => group.id === gId) || null;
     }
-    for (const id of ids) {
-      const p = parts.find(x => x.id === id);
-      if (p?.groupId) {
-        const g = this.partGroups().find(group => group.id === p.groupId);
-        if (g) return g;
-      }
+    return null;
+  });
+
+  // Información reactiva cuando se seleccionan 2 o más módulos a la vez
+  readonly selectedMultiGroupsInfo = computed<{ groupCount: number; partCount: number } | null>(() => {
+    const ids = this.activeSelectedIds();
+    if (ids.length <= 1) return null;
+    const parts = this.parts().filter(p => ids.includes(p.id));
+    const uniqueGroupIds = new Set(parts.map(p => p.groupId).filter(Boolean));
+    if (uniqueGroupIds.size > 1) {
+      return {
+        groupCount: uniqueGroupIds.size,
+        partCount: ids.length
+      };
     }
     return null;
   });
@@ -3656,6 +3677,22 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       return;
     }
 
+    // 0. Selección múltiple por ventana (Marquee Box Selection con tecla Shift presionada)
+    // Desactiva OrbitControls para que la cámara no se mueva durante el arrastre de selección (estilo SketchUp)
+    if (e.button === 0 && e.shiftKey) {
+      const canvasBounds = canvas.getBoundingClientRect();
+      this.isMarqueeSelecting = true;
+      this.marqueeStart = {
+        x: e.clientX - canvasBounds.left,
+        y: e.clientY - canvasBounds.top,
+        clientX: e.clientX,
+        clientY: e.clientY
+      };
+      this.marqueeBox.set(null);
+      this.controls.enabled = false;
+      return;
+    }
+
     const rect = canvas.getBoundingClientRect();
     this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -4324,6 +4361,24 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
   private onPointerMove(e: PointerEvent) {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas || !this.camera) return;
+
+    // Si estamos en modo de selección múltiple por ventana (Shift + arrastre)
+    if (this.isMarqueeSelecting) {
+      const canvasBounds = canvas.getBoundingClientRect();
+      const curX = e.clientX - canvasBounds.left;
+      const curY = e.clientY - canvasBounds.top;
+      const dist = Math.hypot(e.clientX - this.marqueeStart.clientX, e.clientY - this.marqueeStart.clientY);
+      if (dist > 5) {
+        this.marqueeBox.set({
+          left: Math.min(this.marqueeStart.x, curX),
+          top: Math.min(this.marqueeStart.y, curY),
+          width: Math.abs(curX - this.marqueeStart.x),
+          height: Math.abs(curY - this.marqueeStart.y)
+        });
+        canvas.style.cursor = 'crosshair';
+      }
+      return;
+    }
 
     // Track right pointer drag to distinguish panning from stationary context menu click
     if (this.rightPointerDownPos) {
@@ -5434,6 +5489,28 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
 
   // Pointer Up: Release Dragging
   private onPointerUp(e?: PointerEvent) {
+    // Si estábamos en modo de Selección por Ventana (Marquee Box Selection con Shift)
+    if (this.isMarqueeSelecting) {
+      this.isMarqueeSelecting = false;
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+
+      const currentBox = this.marqueeBox();
+      this.marqueeBox.set(null);
+
+      const clientX = e ? e.clientX : this.marqueeStart.clientX;
+      const clientY = e ? e.clientY : this.marqueeStart.clientY;
+      const dragDist = Math.hypot(clientX - this.marqueeStart.clientX, clientY - this.marqueeStart.clientY);
+
+      if (dragDist >= 6 && currentBox) {
+        this.performMarqueeSelection(currentBox);
+      } else if (e) {
+        this.handleShiftClickSelection(e);
+      }
+      return;
+    }
+
     if (this.isDrawingRect() && this.rectStartPoint && this.rectCurrentPoint) {
       const L = Math.round(Math.abs(this.rectCurrentPoint.x - this.rectStartPoint.x));
       const W = Math.round(Math.abs(this.rectCurrentPoint.z - this.rectStartPoint.z));
@@ -6546,6 +6623,240 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     }
   }
 
+  /**
+   * Rota en bloque 90° todas las piezas o módulos actualmente seleccionados alrededor de su centroide común.
+   */
+  rotateMultipleParts90(partsList: Part[], angleDelta: 90 | -90 | 180 = 90) {
+    if (partsList.length === 0) return;
+    if (partsList.some(p => this.isPartOrGroupLocked(p))) return;
+
+    let minX = Infinity, maxX = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    for (const pt of partsList) {
+      const b = this.joineryEngine.getPartBounds(pt);
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+    }
+
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+
+    const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+
+    for (const pt of partsList) {
+      const oldBounds = this.joineryEngine.getPartBounds(pt);
+      const dx = oldBounds.px - cx;
+      const dz = oldBounds.pz - cz;
+      let newDx = dx;
+      let newDz = dz;
+
+      if (angleDelta === 90) {
+        newDx = dz;
+        newDz = -dx;
+      } else if (angleDelta === -90) {
+        newDx = -dz;
+        newDz = dx;
+      } else if (angleDelta === 180) {
+        newDx = -dx;
+        newDz = -dz;
+      }
+
+      const newPosX = Math.round((cx + newDx) * 10) / 10;
+      const newPosZ = Math.round((cz + newDz) * 10) / 10;
+
+      const currentOrient = pt.orientation || 'horizontal';
+      let newOrientation = currentOrient;
+      let newLength = pt.length;
+      let newWidth = pt.width;
+
+      if (Math.abs(angleDelta) === 90) {
+        if (currentOrient === 'horizontal') {
+          newLength = pt.width;
+          newWidth = pt.length;
+        } else if (currentOrient === 'vertical_xy') {
+          newOrientation = 'vertical_yz';
+          newLength = pt.length;
+          newWidth = pt.width;
+        } else if (currentOrient === 'vertical_yz') {
+          newOrientation = 'vertical_xy';
+          newLength = pt.length;
+          newWidth = pt.width;
+        }
+      }
+
+      updatesList.push({
+        part: pt,
+        updates: {
+          posX: newPosX,
+          posZ: newPosZ,
+          length: newLength,
+          width: newWidth,
+          orientation: newOrientation
+        }
+      });
+    }
+
+    this.multiplePartsModified.emit({ updates: updatesList });
+  }
+
+  /**
+   * Ejecuta la selección múltiple por ventana (Marquee Box Selection con Shift)
+   * Proyecta en pantalla todas las piezas y selecciona los módulos completos alcanzados.
+   */
+  private performMarqueeSelection(box: { left: number; top: number; width: number; height: number }) {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas || !this.camera) return;
+    const canvasBounds = canvas.getBoundingClientRect();
+    const w = canvasBounds.width;
+    const h = canvasBounds.height;
+
+    const boxMinX = box.left;
+    const boxMaxX = box.left + box.width;
+    const boxMinY = box.top;
+    const boxMaxY = box.top + box.height;
+
+    const matchedPartIds = new Set<string>();
+
+    for (const item of this.pieceObjects) {
+      const mesh = item.mesh;
+      const part = mesh.userData?.['part'] as Part | undefined;
+      if (!part) continue;
+
+      const bbox = new THREE.Box3().setFromObject(mesh);
+      if (bbox.isEmpty()) continue;
+
+      const pts = [
+        new THREE.Vector3(bbox.min.x, bbox.min.y, bbox.min.z),
+        new THREE.Vector3(bbox.min.x, bbox.min.y, bbox.max.z),
+        new THREE.Vector3(bbox.min.x, bbox.max.y, bbox.min.z),
+        new THREE.Vector3(bbox.min.x, bbox.max.y, bbox.max.z),
+        new THREE.Vector3(bbox.max.x, bbox.min.y, bbox.min.z),
+        new THREE.Vector3(bbox.max.x, bbox.min.y, bbox.max.z),
+        new THREE.Vector3(bbox.max.x, bbox.max.y, bbox.min.z),
+        new THREE.Vector3(bbox.max.x, bbox.max.y, bbox.max.z)
+      ];
+
+      let minSx = Infinity, maxSx = -Infinity;
+      let minSy = Infinity, maxSy = -Infinity;
+      let anyInFront = false;
+
+      for (const pt of pts) {
+        const pProj = pt.clone().project(this.camera);
+        if (pProj.z < 1) {
+          anyInFront = true;
+          const sx = ((pProj.x + 1) / 2) * w;
+          const sy = ((-pProj.y + 1) / 2) * h;
+          if (sx < minSx) minSx = sx;
+          if (sx > maxSx) maxSx = sx;
+          if (sy < minSy) minSy = sy;
+          if (sy > maxSy) maxSy = sy;
+        }
+      }
+
+      if (anyInFront) {
+        const overlaps = !(
+          maxSx < boxMinX ||
+          minSx > boxMaxX ||
+          maxSy < boxMinY ||
+          minSy > boxMaxY
+        );
+        if (overlaps) {
+          matchedPartIds.add(part.id);
+        }
+      }
+
+      const center = bbox.getCenter(new THREE.Vector3());
+      const cProj = center.project(this.camera);
+      if (cProj.z < 1) {
+        const csx = ((cProj.x + 1) / 2) * w;
+        const csy = ((-cProj.y + 1) / 2) * h;
+        if (csx >= boxMinX && csx <= boxMaxX && csy >= boxMinY && csy <= boxMaxY) {
+          matchedPartIds.add(part.id);
+        }
+      }
+    }
+
+    if (matchedPartIds.size === 0) {
+      return;
+    }
+
+    // Incorporar todos los módulos completos alcanzados para garantizar integridad constructiva
+    const allParts = this.parts();
+    const finalSelectedIds = new Set<string>();
+
+    for (const partId of matchedPartIds) {
+      const p = allParts.find(x => x.id === partId);
+      if (p?.groupId) {
+        const grpParts = allParts.filter(x => x.groupId === p.groupId);
+        for (const gp of grpParts) {
+          finalSelectedIds.add(gp.id);
+        }
+      } else {
+        finalSelectedIds.add(partId);
+      }
+    }
+
+    const idsArray = Array.from(finalSelectedIds);
+    this.partsSelected.emit(idsArray);
+    const firstPart = allParts.find(x => idsArray.includes(x.id));
+    if (firstPart) {
+      this.partSelected.emit(firstPart);
+    }
+  }
+
+  /**
+   * Gestiona el clic simple con Shift (Shift-Click) para alternar módulos completos en la selección.
+   */
+  private handleShiftClickSelection(e: PointerEvent) {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas || !this.camera) return;
+    const rect = canvas.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    const targets: THREE.Object3D[] = this.pieceObjects.map(p => p.mesh);
+    const intersects = this.raycaster.intersectObjects(targets, true);
+
+    if (intersects.length > 0) {
+      let currObj: THREE.Object3D | null = intersects[0].object;
+      let part: Part | undefined;
+      while (currObj && !part && currObj !== this.furnitureGroup) {
+        if (currObj.userData?.['part']) {
+          part = currObj.userData['part'];
+          break;
+        }
+        currObj = currObj.parent;
+      }
+
+      if (part) {
+        const curIds = new Set(this.activeSelectedIds());
+        // Si la pieza pertenece a un módulo, alternamos el módulo completo
+        const partsToToggle = part.groupId
+          ? this.parts().filter(p => p.groupId === part.groupId)
+          : [part];
+
+        const allInCur = partsToToggle.every(p => curIds.has(p.id));
+        if (allInCur) {
+          for (const p of partsToToggle) curIds.delete(p.id);
+        } else {
+          for (const p of partsToToggle) curIds.add(p.id);
+        }
+
+        const updatedIds = Array.from(curIds);
+        this.partsSelected.emit(updatedIds);
+        if (updatedIds.length > 0) {
+          const nextFirst = this.parts().find(p => updatedIds.includes(p.id));
+          this.partSelected.emit(nextFirst || null);
+        } else {
+          this.partSelected.emit(null);
+        }
+      }
+    }
+  }
+
   cancelActiveInteractions() {
     this.isDragging = false;
     this.activeGizmoHit = null;
@@ -7202,6 +7513,12 @@ nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
     }
     // R: Rotar 90° pieza, cajón o módulo seleccionado (o activar herramienta rotar 90°)
     if (e.key === 'r' || e.key === 'R') {
+      const selParts = this.selectedParts();
+      if (selParts.length > 1) {
+        e.preventDefault();
+        this.rotateMultipleParts90(selParts, 90);
+        return;
+      }
       const grp = this.currentSelectedGroup();
       if (grp) {
         e.preventDefault();

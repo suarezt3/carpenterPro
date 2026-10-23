@@ -6,6 +6,21 @@
   <!-- Lienzo 3D WebGL -->
   <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
 
+  <!-- MARQUEE BOX SELECTION OVERLAY (Shift + Arrastre estilo SketchUp) -->
+  @if (marqueeBox(); as mb) {
+    <div
+      class="absolute border-2 border-dashed border-indigo-500 bg-indigo-500/15 backdrop-blur-2xs rounded-xs pointer-events-none z-40 shadow-sm"
+      [style.left.px]="mb.left"
+      [style.top.px]="mb.top"
+      [style.width.px]="mb.width"
+      [style.height.px]="mb.height">
+      <span class="absolute -top-5 left-0 px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[9px] font-bold shadow-xs flex items-center gap-1 select-none whitespace-nowrap">
+        <hugeicons-icon [icon]="icons.layers" [size]="10" [strokeWidth]="2"></hugeicons-icon>
+        <span>Selección múltiple (Shift)</span>
+      </span>
+    </div>
+  }
+
   <!-- PALETA VERTICAL IZQUIERDA DE HERRAMIENTAS CAD (ADAPTATIVA HD / FHD / 2K) -->
   <div class="cad-toolbar absolute top-2.5 left-2.5 z-30 flex flex-col items-center bg-white/95 text-slate-700 backdrop-blur-md rounded-xl border border-slate-200/90 shadow-lg pointer-events-auto transition-colors duration-200 max-h-[calc(100%-2.25rem)] overflow-y-auto scrollbar-none">
 
@@ -1485,6 +1500,12 @@
         <strong class="text-sky-600">{{ fh.pointCount }} pts · Perím {{ fh.perimeter }} mm</strong>
       } @else if (measureDistance(); as dist) {
         <strong class="text-sky-600">{{ dist.total }} mm</strong>
+      } @else if (selectedMultiGroupsInfo(); as mg) {
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-[11px] font-bold text-indigo-700 dark:text-indigo-300">
+          <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+          <span>{{ mg.groupCount }} módulos seleccionados ({{ mg.partCount }} piezas)</span>
+          <span class="text-slate-400 dark:text-zinc-400 font-normal text-[10px]">· Arrastra o usa flechas para mover</span>
+        </div>
       } @else if (currentSelectedGroup(); as grp) {
         @if (currentSelectedGroupBounds(); as gb) {
           <div class="flex items-center gap-1">

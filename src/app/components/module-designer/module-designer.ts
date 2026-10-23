@@ -500,23 +500,90 @@ export class ModuleDesignerComponent {
   });
 
   /**
-   * Identifica el ID del grupo activo cuando el módulo/cajón completo está seleccionado.
-   * Si el usuario aisló una única pieza dentro de un grupo (selectedPartIds().length === 1),
-   * devuelve null para permitir inspeccionar y editar esa pieza individualmente.
+   * Obtiene los IDs únicos de todos los módulos/grupos involucrados en la selección actual.
+   */
+  readonly selectedGroupIds = computed<string[]>(() => {
+    const ids = this.selectedPartIds();
+    if (ids.length === 0) return [];
+    const parts = this.currentParts().filter(p => ids.includes(p.id));
+    const gIds = new Set<string>();
+    for (const p of parts) {
+      if (p.groupId) gIds.add(p.groupId);
+    }
+    return Array.from(gIds);
+  });
+
+  /**
+   * Indica si hay 2 o más módulos seleccionados simultáneamente (Multi-Selección de Módulos).
+   */
+  readonly isMultiGroupSelected = computed<boolean>(() => {
+    return this.selectedGroupIds().length > 1;
+  });
+
+  /**
+   * Colección de los módulos actualmente seleccionados.
+   */
+  readonly selectedGroups = computed<PartGroup[]>(() => {
+    const gIds = this.selectedGroupIds();
+    if (gIds.length === 0) return [];
+    return gIds.map(id => {
+      const found = this.groups().find(g => g.id === id);
+      if (found) return found;
+      const part = this.currentParts().find(p => p.groupId === id);
+      return {
+        id,
+        name: part?.groupName || part?.moduleName || 'Módulo',
+        type: 'assembly'
+      } as PartGroup;
+    });
+  });
+
+  /**
+   * Módulos seleccionados con detalle de piezas para el panel inspector de multiselección.
+   */
+  readonly selectedGroupsWithCount = computed(() => {
+    const gIds = this.selectedGroupIds();
+    if (gIds.length === 0) return [];
+    const parts = this.currentParts();
+    return gIds.map(id => {
+      const found = this.groups().find(g => g.id === id);
+      const groupParts = parts.filter(p => p.groupId === id);
+      const name = found?.name || groupParts[0]?.groupName || groupParts[0]?.moduleName || 'Módulo';
+      return {
+        id,
+        name,
+        partsCount: groupParts.length,
+        type: found?.type || 'assembly'
+      };
+    });
+  });
+
+  /**
+   * Identifica el ID del grupo activo cuando un ÚNICO módulo/cajón completo está seleccionado.
+   * Si hay múltiples módulos seleccionados o si se aisló una sola pieza, devuelve null
+   * para evitar mostrar funciones o cotas que no aplican a conjuntos dispares.
    */
   readonly activeSelectedGroupId = computed<string | null>(() => {
     const ids = this.selectedPartIds();
+    if (ids.length === 0) return null;
+
+    // Si hay más de un módulo en la selección, no hay un único grupo activo
+    if (this.selectedGroupIds().length > 1) {
+      return null;
+    }
+
     if (ids.length === 1) {
       const sel = this.currentParts().find(p => p.id === ids[0]);
       if (sel?.groupId) {
         const groupPartsCount = this.currentParts().filter(p => p.groupId === sel.groupId).length;
         if (groupPartsCount > 1) {
-          return null;
+          return null; // Aislamiento de pieza individual dentro del módulo
         }
         return sel.groupId;
       }
       return null;
     }
+
     if (ids.length > 1) {
       const parts = this.currentParts().filter(p => ids.includes(p.id));
       const g = parts.find(p => p.groupId);
@@ -1858,6 +1925,23 @@ export class ModuleDesignerComponent {
   }
 
   duplicateSelectedGroup() {
+    if (this.isMultiGroupSelected()) {
+      const gIds = this.selectedGroupIds();
+      const allNewIds: string[] = [];
+      for (const gid of gIds) {
+        const res = this.projectService.duplicateGroup(gid);
+        if (res) allNewIds.push(...res.newPartIds);
+      }
+      if (allNewIds.length > 0) {
+        this.selectedPartIds.set(allNewIds);
+        if (allNewIds.length > 0) {
+          this.selectedPartId.set(allNewIds[0]);
+        }
+        this.activeDockTab.set('piece');
+        this.showToast(`📋 Se duplicaron ${gIds.length} módulos seleccionados`);
+      }
+      return;
+    }
     const groupId = this.activeSelectedGroupId();
     if (!groupId) return;
     const result = this.projectService.duplicateGroup(groupId);
@@ -1872,10 +1956,34 @@ export class ModuleDesignerComponent {
   }
 
   rotateSelectedGroup(deltaAngle: 90 | -90 | 180 = 90) {
+    if (this.isMultiGroupSelected() || this.selectedPartIds().length > 1) {
+      const ids = this.selectedPartIds();
+      this.projectService.rotateMultiplePartsRigidly(ids, deltaAngle);
+      const gCount = this.selectedGroupIds().length;
+      this.showToast(`🔄 ${gCount > 1 ? gCount + ' módulos girados' : ids.length + ' piezas giradas'} ${deltaAngle > 0 ? '+' : ''}${deltaAngle}° en bloque`);
+      return;
+    }
     const groupId = this.activeSelectedGroupId();
     if (!groupId) return;
     this.projectService.rotateGroupRigidly(groupId, deltaAngle);
-    this.showToast(`🔄 Cajón girado ${deltaAngle > 0 ? '+' : ''}${deltaAngle}° en bloque`);
+    this.showToast(`🔄 Módulo girado ${deltaAngle > 0 ? '+' : ''}${deltaAngle}° en bloque`);
+  }
+
+  /**
+   * Aplica un material de melamina a todas las piezas o módulos actualmente seleccionados en 1 solo clic.
+   */
+  applyMaterialToSelection(materialId: string) {
+    const ids = this.selectedPartIds();
+    if (ids.length === 0) return;
+    const mat = this.projectService.materialsList().find(m => m.id === materialId);
+    if (!mat) return;
+    this.projectService.changeMultiplePartsMaterial(ids, materialId);
+    const gCount = this.selectedGroupIds().length;
+    if (gCount > 1) {
+      this.showToast(`🎨 "${mat.name}" aplicado a los ${gCount} módulos seleccionados (${ids.length} piezas)`);
+    } else {
+      this.showToast(`🎨 "${mat.name}" aplicado a ${ids.length} piezas seleccionadas`);
+    }
   }
 
   rotateSelectedGroup90() {
@@ -1966,16 +2074,56 @@ export class ModuleDesignerComponent {
   }
 
   /**
+   * Alterna la inclusión o exclusión de un módulo completo dentro de la multi-selección activa.
+   */
+  toggleGroupInSelection(groupId: string) {
+    const currentSel = new Set(this.selectedPartIds());
+    const groupPartIds = this.currentParts().filter(p => p.groupId === groupId).map(p => p.id);
+    const hasGroup = groupPartIds.some(id => currentSel.has(id));
+
+    if (hasGroup) {
+      for (const id of groupPartIds) currentSel.delete(id);
+    } else {
+      for (const id of groupPartIds) currentSel.add(id);
+    }
+
+    const nextIds = Array.from(currentSel);
+    this.selectedPartIds.set(nextIds);
+    this.selectedPartId.set(nextIds.length > 0 ? nextIds[0] : null);
+    if (nextIds.length === 0) {
+      this.activeDockTab.set('catalog');
+    }
+  }
+
+  /**
+   * Aísla y selecciona exclusivamente el módulo especificado, pasando al modo inspector individual.
+   */
+  selectOnlyGroup(groupId: string) {
+    const groupPartIds = this.currentParts().filter(p => p.groupId === groupId).map(p => p.id);
+    this.selectedPartIds.set(groupPartIds);
+    this.selectedPartId.set(groupPartIds.length > 0 ? groupPartIds[0] : null);
+    this.activeDockTab.set('piece');
+  }
+
+  /**
    * Elimina la pieza o conjunto de piezas seleccionadas en una única transacción de historial.
    */
   async deleteSelectedPart() {
     const selIds = this.selectedPartIds();
     const selId = this.selectedPartId();
     if (selIds.length > 1) {
+      const isMulti = this.isMultiGroupSelected();
+      const gCount = this.selectedGroupIds().length;
+      const title = isMulti
+        ? `¿Eliminar ${gCount} módulos seleccionados (${selIds.length} piezas)?`
+        : `¿Eliminar ${selIds.length} piezas seleccionadas?`;
+      const message = isMulti
+        ? `Se eliminarán del modelo 3D los ${gCount} módulos y sus ${selIds.length} piezas. Puedes deshacer esta acción con Ctrl+Z o el botón Deshacer.`
+        : 'Se eliminarán del modelo 3D todas las piezas seleccionadas actualmente en grupo. Puedes deshacer esta acción con el botón Deshacer o Ctrl+Z.';
       const confirmed = await this.confirmService.ask({
-        title: `¿Eliminar ${selIds.length} piezas seleccionadas?`,
-        message: 'Se eliminarán del modelo 3D todas las piezas seleccionadas actualmente en grupo. Puedes deshacer esta acción con el botón Deshacer o Ctrl+Z.',
-        confirmText: `Eliminar ${selIds.length} piezas`,
+        title,
+        message,
+        confirmText: isMulti ? `Eliminar ${gCount} módulos` : `Eliminar ${selIds.length} piezas`,
         cancelText: 'Cancelar',
         severity: 'danger'
       });
@@ -2725,7 +2873,18 @@ export class ModuleDesignerComponent {
     this.showToast(`👁️ "${partName}" oculta temporalmente (Alt+H para mostrar)`);
   }
 
-hideActiveGroup() {
+  hideActiveGroup() {
+    if (this.isMultiGroupSelected() || this.selectedPartIds().length > 1) {
+      const ids = this.selectedPartIds();
+      const next = new Set(this.hiddenPartIds());
+      for (const id of ids) next.add(id);
+      this.hiddenPartIds.set(next);
+      this.viewer3d()?.hidePartsByIds(ids);
+      const gCount = this.selectedGroupIds().length;
+      this.deselectAll();
+      this.showToast(`👁️ ${gCount > 1 ? gCount + ' módulos ocultos' : ids.length + ' piezas ocultas'}. Alt+H para mostrar`);
+      return;
+    }
     const gId = this.activeSelectedGroupId();
     if (!gId) return;
     const group = this.groups().find(g => g.id === gId);
