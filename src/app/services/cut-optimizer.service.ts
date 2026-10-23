@@ -3,6 +3,7 @@ import {
   CutLine,
   LeftoverScrap,
   Material,
+  MaterialSheetSpec,
   OptimizationResult,
   Part,
   PlacedPart,
@@ -30,14 +31,65 @@ interface ExpandedPartItem {
 })
 export class CutOptimizerService {
 
-  optimizeProject(
-    rawParts: Part[],
-    materials: Material[],
-    settings: ProjectSettings
-  ): OptimizationResult {
-    // Excluir del optimizador de sierra los mesones/salpicaderos de piedra, cuarzo, granito o mármol
-    // (se cotizan por m² en el presupuesto pero no entran al corte de placas de melamina)
-    const parts = rawParts.filter(p => {
+  /** Normaliza un espesor de pieza a una clave estable (0.1 mm de precisión). */
+  static thicknessKey(t: number | undefined | null): string {
+    const n = Number(t);
+    if (!Number.isFinite(n) || n <= 0) return '18';
+    return String(Math.round(n * 10) / 10);
+  }
+
+  /**
+   * Devuelve el "tablero real" que corresponde a un material del catálogo en un espesor concreto.
+   * Si la pieza usa el mismo espesor del catálogo se devuelve el material tal cual; si usa otro espesor
+   * (ej. Roble Nebraska de catálogo 18 mm pero la pieza es de 15 mm) se genera una variante con su propio
+   * id, espesor, medidas y precio (configurables en `thicknessSpecs`).
+   */
+  resolveSheetMaterial(base: Material, thickness: number | undefined | null): Material {
+    const key = CutOptimizerService.thicknessKey(thickness ?? base.thickness);
+    const baseKey = CutOptimizerService.thicknessKey(base.thickness);
+    if (key === baseKey) {
+      return base;
+    }
+    const spec = base.thicknessSpecs?.[key];
+    return {
+      ...base,
+      id: `${base.id}__${key}mm`,
+      baseMaterialId: base.id,
+      thickness: Number(key),
+      sheetLength: spec?.sheetLength || base.sheetLength,
+      sheetWidth: spec?.sheetWidth || base.sheetWidth,
+      sheetCost: spec?.sheetCost ?? base.sheetCost
+    };
+  }
+
+  /**
+   * Aplica nuevas medidas / precio de tablero a un material del catálogo para un espesor dado
+   * y devuelve el material base actualizado (listo para `updateMaterial`).
+   */
+  applySheetSpec(base: Material, thickness: number, patch: MaterialSheetSpec): Material {
+    const key = CutOptimizerService.thicknessKey(thickness);
+    const baseKey = CutOptimizerService.thicknessKey(base.thickness);
+    const clean: MaterialSheetSpec = {};
+    if (patch.sheetLength !== undefined) clean.sheetLength = Math.max(300, Math.min(6000, Math.round(Number(patch.sheetLength) || 0)));
+    if (patch.sheetWidth !== undefined) clean.sheetWidth = Math.max(300, Math.min(3000, Math.round(Number(patch.sheetWidth) || 0)));
+    if (patch.sheetCost !== undefined) clean.sheetCost = Math.max(0, Number(patch.sheetCost) || 0);
+
+    if (key === baseKey) {
+      return { ...base, ...clean };
+    }
+    const prev = base.thicknessSpecs?.[key] || {};
+    return {
+      ...base,
+      thicknessSpecs: {
+        ...(base.thicknessSpecs || {}),
+        [key]: { ...prev, ...clean }
+      }
+    };
+  }
+
+  /** Piezas que realmente pasan por la sierra (excluye mesones de piedra y piezas marcadas). */
+  getCuttableParts(rawParts: Part[], materials: Material[]): Part[] {
+    return rawParts.filter(p => {
       if (p.excludeFromCutlist) return false;
       if (p.componentRole === 'countertop' || p.componentRole === 'backsplash') {
         const mat = materials.find(m => m.id === p.materialId);
@@ -45,6 +97,51 @@ export class CutOptimizerService {
       }
       return true;
     });
+  }
+
+  /**
+   * Lista de tipos de tablero (material + espesor real) que necesita el proyecto,
+   * con la cantidad de piezas de cada uno. Se usa para configurar medidas de placa.
+   */
+  listSheetTypes(rawParts: Part[], materials: Material[]): { material: Material; base: Material; partsCount: number }[] {
+    const parts = this.getCuttableParts(rawParts, materials);
+    const map = new Map<string, { material: Material; base: Material; partsCount: number }>();
+    for (const p of parts) {
+      const base = materials.find(m => m.id === p.materialId) || this.fallbackMaterial(p.materialId);
+      const mat = this.resolveSheetMaterial(base, p.thickness);
+      const existing = map.get(mat.id);
+      if (existing) {
+        existing.partsCount += p.quantity || 1;
+      } else {
+        map.set(mat.id, { material: mat, base, partsCount: p.quantity || 1 });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.base.name.localeCompare(b.base.name) || b.material.thickness - a.material.thickness
+    );
+  }
+
+  private fallbackMaterial(matId: string): Material {
+    return {
+      id: matId,
+      name: 'Melamina Estándar',
+      thickness: 18,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 45,
+      hasGrain: false,
+      colorHex: '#d4a373'
+    };
+  }
+
+  optimizeProject(
+    rawParts: Part[],
+    materials: Material[],
+    settings: ProjectSettings
+  ): OptimizationResult {
+    // Excluir del optimizador de sierra los mesones/salpicaderos de piedra, cuarzo, granito o mármol
+    // (se cotizan por m² en el presupuesto pero no entran al corte de placas de melamina)
+    const parts = this.getCuttableParts(rawParts, materials);
 
     // 1. Calcular metros lineales de tapacantos en todas las piezas cortables
     let totalThinEdgeMeters = 0;
@@ -75,22 +172,21 @@ export class CutOptimizerService {
     let totalPartsPlaced = 0;
     let totalPartsCount = 0;
 
-    // Obtener lista única de materiales usados en las piezas
-    const usedMaterialIds = new Set(parts.map(p => p.materialId));
+    // Agrupar por "tablero real": material del catálogo + espesor real de la pieza.
+    // Así una pieza de Roble Nebraska de 15 mm nunca se coloca en un tablero de Roble Nebraska de 18 mm.
+    const sheetGroups = new Map<string, { material: Material; parts: Part[] }>();
+    for (const p of parts) {
+      const base = materials.find(m => m.id === p.materialId) || this.fallbackMaterial(p.materialId);
+      const sheetMat = this.resolveSheetMaterial(base, p.thickness);
+      const grp = sheetGroups.get(sheetMat.id);
+      if (grp) {
+        grp.parts.push(p);
+      } else {
+        sheetGroups.set(sheetMat.id, { material: sheetMat, parts: [p] });
+      }
+    }
 
-    for (const matId of usedMaterialIds) {
-      const material = materials.find(m => m.id === matId) || {
-        id: matId,
-        name: 'Melamina Estándar',
-        thickness: 18,
-        sheetLength: 2440,
-        sheetWidth: 1830,
-        sheetCost: 45,
-        hasGrain: false,
-        colorHex: '#d4a373'
-      };
-
-      const matParts = parts.filter(p => p.materialId === matId);
+    for (const { material, parts: matParts } of sheetGroups.values()) {
       const itemsToPlace: ExpandedPartItem[] = [];
 
       for (const part of matParts) {
@@ -117,9 +213,10 @@ export class CutOptimizerService {
 
       // Optimizar colocación en tableros sucesivos hasta terminar
       let currentItems = [...itemsToPlace];
-      let sheetNum = 1;
 
       while (currentItems.length > 0) {
+        // Numeración global y única de tableros (#1, #2, #3...) entre todos los materiales/espesores
+        const sheetNum = placedSheets.length + 1;
         const sheetResult = this.packSingleSheet(
           sheetNum,
           material,
@@ -144,7 +241,6 @@ export class CutOptimizerService {
         // Remover piezas colocadas
         const placedIds = new Set(sheetResult.placedParts.map(p => `${p.part.id}_${p.copyIndex}`));
         currentItems = currentItems.filter(item => !placedIds.has(`${item.part.id}_${item.copyIndex}`));
-        sheetNum++;
       }
     }
 

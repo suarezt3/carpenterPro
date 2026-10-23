@@ -144,6 +144,7 @@
                   <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-semibold text-slate-800 flex items-center gap-2' : 'py-2.5 px-3 font-semibold text-white flex items-center gap-2'">
                     <span class="w-2.5 h-2.5 rounded-full shrink-0" [style.background-color]="item.material.colorHex"></span>
                     <span>{{ item.material.name }}</span>
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-500/25">{{ item.material.thickness }}mm</span>
                   </td>
                   <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-mono text-slate-500 whitespace-nowrap' : 'py-2.5 px-3 font-mono text-zinc-400 whitespace-nowrap'">
                     {{ item.material.sheetLength }} × {{ item.material.sheetWidth }} × {{ item.material.thickness }}mm
@@ -578,7 +579,7 @@
               <div>
                 <span class="font-bold text-zinc-900">{{ mod.name }}</span>
                 <span class="text-zinc-600 text-[11px] block">
-                  Medidas: {{ mod.width }}mm (Ancho) × {{ mod.height }}mm (Alto) × {{ mod.depth }}mm (Profundidad) - Melamina {{ mod.boardThickness }}mm
+                  Medidas: {{ mod.width }}mm (Ancho) × {{ mod.height }}mm (Alto) × {{ mod.depth }}mm (Profundidad) - Melamina {{ getModuleBoardThicknessLabel(mod.id, mod.boardThickness) }}
                 </span>
               </div>
               <span class="font-bold text-zinc-800">1 Unidad</span>

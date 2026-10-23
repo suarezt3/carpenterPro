@@ -328,10 +328,25 @@ export class BudgetViewComponent {
   }
 
   updateMaterialCost(material: Material, newCost: number) {
-    this.projectService.updateMaterial({
-      ...material,
-      sheetCost: Number(newCost)
-    });
+    // Funciona tanto para el material base como para variantes de espesor (ej. Roble 15 mm)
+    this.projectService.updateMaterialSheetSpec(material, { sheetCost: Number(newCost) });
+  }
+
+  /**
+   * Espesor(es) reales de melamina usados por las piezas de un módulo (ej. "15mm" o "15 / 18mm"),
+   * para que la cotización formal muestre lo mismo que el modelador y el optimizador.
+   */
+  getModuleBoardThicknessLabel(moduleId: string, fallback: number): string {
+    const parts = this.projectService.partsList().filter(p =>
+      p.moduleId === moduleId &&
+      (p.thickness || 0) > 8 &&
+      p.componentRole !== 'back' &&
+      p.componentRole !== 'countertop' &&
+      p.componentRole !== 'backsplash'
+    );
+    if (parts.length === 0) return `${fallback}mm`;
+    const set = Array.from(new Set(parts.map(p => Math.round((p.thickness || 0) * 10) / 10))).sort((a, b) => a - b);
+    return `${set.join(' / ')}mm`;
   }
 
   updateHardwareQty(item: HardwareItem, qty: number) {

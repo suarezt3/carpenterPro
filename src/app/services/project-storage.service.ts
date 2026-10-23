@@ -18,6 +18,7 @@ import {
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { JoineryEngineService } from './joinery-engine.service';
+import { CutOptimizerService } from './cut-optimizer.service';
 import { SupabaseService, CloudProjectRecord } from './supabase.service';
 import { FurnitureTemplate } from './templates-catalog.service';
 
@@ -80,6 +81,7 @@ export function cleanMaterialName(name: string): string {
 export class ProjectStorageService {
   private cabinetGen = inject(CabinetGeneratorService);
   private joineryEngine = inject(JoineryEngineService);
+  private cutOptimizer = inject(CutOptimizerService);
   readonly supabase = inject(SupabaseService);
   private autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -2231,6 +2233,21 @@ export class ProjectStorageService {
       ...p,
       materials: p.materials.map(m => m.id === material.id ? material : m)
     }));
+  }
+
+  /**
+   * Actualiza medidas y/o precio del tablero de un material del catálogo para un espesor concreto.
+   * Acepta tanto el material base como una variante generada por el optimizador (ej. "mat_roble__15mm").
+   */
+  updateMaterialSheetSpec(
+    materialOrVariant: Material,
+    patch: { sheetLength?: number; sheetWidth?: number; sheetCost?: number }
+  ) {
+    const baseId = materialOrVariant.baseMaterialId || materialOrVariant.id;
+    const base = this.currentProject().materials.find(m => m.id === baseId);
+    if (!base) return;
+    const updated = this.cutOptimizer.applySheetSpec(base, materialOrVariant.thickness, patch);
+    this.updateMaterial(updated);
   }
 
   deleteMaterial(materialId: string) {

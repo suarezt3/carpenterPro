@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   Add01Icon,
+  Alert02Icon,
+  ArrowDataTransferHorizontalIcon,
   ArrowDown01Icon,
   CheckListIcon,
   Clock01Icon,
@@ -10,12 +12,13 @@ import {
   Layers01Icon,
   Note01Icon,
   PrinterIcon,
+  Settings01Icon,
   ViewIcon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { ThemeService } from '../../services/theme.service';
-import { OptimizationResult, PlacedPart, PlacedSheet } from '../../models/melamine.models';
+import { Material, OptimizationResult, PlacedPart, PlacedSheet } from '../../models/melamine.models';
 
 /**
  * Vista interactiva del Optimizador de Corte 2D por Guillotina.
@@ -46,7 +49,10 @@ export class CutOptimizerViewComponent {
     board: Layers01Icon,
     zoomIn: Add01Icon,
     zoomOut: ArrowDown01Icon,
-    list: CheckListIcon
+    list: CheckListIcon,
+    settings: Settings01Icon,
+    swap: ArrowDataTransferHorizontalIcon,
+    alert: Alert02Icon
   };
 
   // Signals sincronizados con el estado global del proyecto
@@ -88,6 +94,80 @@ export class CutOptimizerViewComponent {
   selectSheet(index: number) {
     this.selectedSheetIndex.set(index);
     this.hoveredPart.set(null);
+  }
+
+  // --- CONFIGURACIÓN DE MEDIDAS DE TABLERO (por material + espesor real) ---
+
+  readonly showSheetConfig = signal<boolean>(false);
+
+  /** Formatos comerciales habituales de tablero (largo × ancho en mm). */
+  readonly sheetSizePresets: { length: number; width: number; label: string }[] = [
+    { length: 2440, width: 1830, label: '2440 × 1830' },
+    { length: 2440, width: 2150, label: '2440 × 2150' },
+    { length: 2500, width: 1830, label: '2500 × 1830' },
+    { length: 2600, width: 1830, label: '2600 × 1830' },
+    { length: 2750, width: 1830, label: '2750 × 1830' },
+    { length: 2800, width: 2070, label: '2800 × 2070' },
+    { length: 2440, width: 1220, label: '2440 × 1220' }
+  ];
+
+  /** Tipos de tablero que necesita el proyecto (material + espesor real de las piezas). */
+  readonly sheetTypes = computed(() => this.optimizer.listSheetTypes(this.parts(), this.materials()));
+
+  /** Cantidad de placas usadas por cada tipo de tablero en el resultado actual. */
+  readonly sheetsCountByType = computed(() => {
+    const map = new Map<string, number>();
+    for (const s of this.optimizationResult().sheets) {
+      map.set(s.material.id, (map.get(s.material.id) || 0) + 1);
+    }
+    return map;
+  });
+
+  /** Piezas que no caben en el tablero configurado (más grandes que la placa). */
+  readonly unplacedPartsSummary = computed(() => {
+    const res = this.optimizationResult();
+    const seen = new Map<string, { name: string; length: number; width: number; thickness: number; count: number }>();
+    for (const p of res.unplacedParts) {
+      const prev = seen.get(p.id);
+      if (prev) prev.count++;
+      else seen.set(p.id, { name: p.name, length: p.length, width: p.width, thickness: p.thickness, count: 1 });
+    }
+    return Array.from(seen.values());
+  });
+
+  toggleSheetConfig() {
+    this.showSheetConfig.update(v => !v);
+  }
+
+  onSheetDimensionChange(material: Material, prop: 'sheetLength' | 'sheetWidth', event: Event) {
+    const target = event.target as HTMLInputElement | null;
+    const val = Math.round(Number(target?.value) || 0);
+    if (val < 300) {
+      if (target) target.value = String(material[prop]);
+      return;
+    }
+    this.projectService.updateMaterialSheetSpec(material, { [prop]: val });
+    this.selectedSheetIndex.set(0);
+  }
+
+  applySheetPreset(material: Material, length: number, width: number) {
+    this.projectService.updateMaterialSheetSpec(material, { sheetLength: length, sheetWidth: width });
+    this.selectedSheetIndex.set(0);
+  }
+
+  swapSheetDimensions(material: Material) {
+    this.projectService.updateMaterialSheetSpec(material, {
+      sheetLength: material.sheetWidth,
+      sheetWidth: material.sheetLength
+    });
+    this.selectedSheetIndex.set(0);
+  }
+
+  applySizeToAllSheets(length: number, width: number) {
+    for (const st of this.sheetTypes()) {
+      this.projectService.updateMaterialSheetSpec(st.material, { sheetLength: length, sheetWidth: width });
+    }
+    this.selectedSheetIndex.set(0);
   }
 
   zoomIn() {

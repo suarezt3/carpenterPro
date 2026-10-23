@@ -132,6 +132,131 @@
     </div>
   </div>
 
+  <!-- CONFIGURACIÓN DE MEDIDAS DE TABLERO (por material + espesor real de las piezas) -->
+  @if (sheetTypes().length > 0) {
+    <div class="print:hidden" [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl shadow-lg'">
+      <button
+        type="button"
+        (click)="toggleSheetConfig()"
+        class="w-full flex items-center justify-between gap-3 px-3.5 sm:px-4 py-2.5 cursor-pointer text-left">
+        <div class="flex items-center gap-2 min-w-0">
+          <hugeicons-icon [icon]="icons.settings" [size]="17" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+          <span [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800' : 'text-xs xl:text-sm font-bold text-white'">Medidas de Tableros</span>
+          <span [class]="themeService.isClassic() ? 'text-[11px] text-slate-500 truncate' : 'text-[11px] text-zinc-400 truncate'">
+            · {{ sheetTypes().length }} {{ sheetTypes().length === 1 ? 'tipo de placa' : 'tipos de placa' }} (material + espesor). Edita el formato si tu proveedor maneja otra medida.
+          </span>
+        </div>
+        <span [class]="themeService.isClassic() ? 'text-[11px] font-semibold text-amber-600 shrink-0' : 'text-[11px] font-semibold text-amber-400 shrink-0'">
+          {{ showSheetConfig() ? 'Ocultar' : 'Configurar' }}
+        </span>
+      </button>
+
+      @if (showSheetConfig()) {
+        <div [class]="themeService.isClassic() ? 'px-3.5 sm:px-4 pb-3.5 pt-1 border-t border-slate-100 space-y-3' : 'px-3.5 sm:px-4 pb-3.5 pt-1 border-t border-zinc-800 space-y-3'">
+
+          <!-- Aplicar formato a todos -->
+          <div class="flex flex-wrap items-center gap-1.5 pt-2">
+            <span [class]="themeService.isClassic() ? 'text-[11px] font-semibold text-slate-600 mr-1' : 'text-[11px] font-semibold text-zinc-300 mr-1'">Aplicar a todos:</span>
+            @for (ps of sheetSizePresets; track ps.label) {
+              <button
+                type="button"
+                (click)="applySizeToAllSheets(ps.length, ps.width)"
+                [class]="themeService.isClassic() ? 'px-2 py-0.5 rounded-md bg-slate-100 hover:bg-amber-100 text-slate-700 border border-slate-200 text-[10px] font-mono transition cursor-pointer' : 'px-2 py-0.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-[10px] font-mono transition cursor-pointer'">
+                {{ ps.label }}
+              </button>
+            }
+          </div>
+
+          <!-- Lista de tipos de tablero -->
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-2.5">
+            @for (st of sheetTypes(); track st.material.id) {
+              <div [class]="themeService.isClassic() ? 'p-3 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2' : 'p-3 rounded-xl border border-zinc-800 bg-zinc-950/60 space-y-2'">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-3 h-3 rounded-full shrink-0 border border-black/10" [style.background-color]="st.material.colorHex"></span>
+                    <span [class]="themeService.isClassic() ? 'text-xs font-bold text-slate-800 truncate' : 'text-xs font-bold text-white truncate'">{{ st.material.name }}</span>
+                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 border border-amber-500/30 shrink-0">{{ st.material.thickness }} mm</span>
+                  </div>
+                  <span [class]="themeService.isClassic() ? 'text-[10px] text-slate-500 shrink-0' : 'text-[10px] text-zinc-400 shrink-0'">
+                    {{ st.partsCount }} pzs · {{ sheetsCountByType().get(st.material.id) || 0 }} placa(s)
+                  </span>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <label class="flex items-center gap-1 text-[11px]">
+                    <span [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'">Largo</span>
+                    <input
+                      type="number"
+                      min="300"
+                      max="6000"
+                      step="10"
+                      [value]="st.material.sheetLength"
+                      (change)="onSheetDimensionChange(st.material, 'sheetLength', $event)"
+                      aria-label="Largo del tablero en mm"
+                      [class]="themeService.isClassic() ? 'w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 text-right focus:outline-hidden focus:border-amber-500' : 'w-20 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs font-mono font-bold text-white text-right focus:outline-hidden focus:border-amber-500'" />
+                  </label>
+                  <button
+                    type="button"
+                    (click)="swapSheetDimensions(st.material)"
+                    title="Intercambiar largo y ancho"
+                    [class]="themeService.isClassic() ? 'p-1 rounded-md hover:bg-slate-200 text-slate-500 cursor-pointer' : 'p-1 rounded-md hover:bg-zinc-800 text-zinc-400 cursor-pointer'">
+                    <hugeicons-icon [icon]="icons.swap" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                  </button>
+                  <label class="flex items-center gap-1 text-[11px]">
+                    <span [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'">Ancho</span>
+                    <input
+                      type="number"
+                      min="300"
+                      max="3000"
+                      step="10"
+                      [value]="st.material.sheetWidth"
+                      (change)="onSheetDimensionChange(st.material, 'sheetWidth', $event)"
+                      aria-label="Ancho del tablero en mm"
+                      [class]="themeService.isClassic() ? 'w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-800 text-right focus:outline-hidden focus:border-amber-500' : 'w-20 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs font-mono font-bold text-white text-right focus:outline-hidden focus:border-amber-500'" />
+                  </label>
+                  <span [class]="themeService.isClassic() ? 'text-[10px] text-slate-400' : 'text-[10px] text-zinc-500'">mm</span>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-1">
+                  @for (ps of sheetSizePresets; track ps.label) {
+                    <button
+                      type="button"
+                      (click)="applySheetPreset(st.material, ps.length, ps.width)"
+                      [class]="st.material.sheetLength === ps.length && st.material.sheetWidth === ps.width
+                        ? 'px-1.5 py-0.5 rounded bg-amber-500 text-zinc-950 font-bold text-[10px] font-mono cursor-pointer'
+                        : (themeService.isClassic() ? 'px-1.5 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-mono cursor-pointer' : 'px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 text-[10px] font-mono cursor-pointer')">
+                      {{ ps.label }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          <p [class]="themeService.isClassic() ? 'text-[10px] text-slate-400' : 'text-[10px] text-zinc-500'">
+            El espesor de cada placa se toma del espesor real de las piezas. Si un mismo acabado se usa en 15 mm y 18 mm, se optimizan y cotizan como placas distintas.
+          </p>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Aviso de piezas que no caben en el tablero configurado -->
+  @if (unplacedPartsSummary().length > 0) {
+    <div class="print:hidden p-3 rounded-2xl border border-rose-300 bg-rose-50 text-rose-800 text-xs flex items-start gap-2">
+      <hugeicons-icon [icon]="icons.alert" [size]="17" [strokeWidth]="2" class="shrink-0 mt-0.5 text-rose-600"></hugeicons-icon>
+      <div>
+        <p class="font-bold">{{ unplacedPartsSummary().length }} pieza(s) no caben en el tablero configurado:</p>
+        <p class="mt-0.5">
+          @for (up of unplacedPartsSummary(); track up.name + up.length + up.width; let last = $last) {
+            <span class="font-mono">{{ up.name }} ({{ up.length }} × {{ up.width }} × {{ up.thickness }} mm){{ up.count > 1 ? ' ×' + up.count : '' }}</span>{{ last ? '' : ' · ' }}
+          }
+        </p>
+        <p class="mt-0.5 text-rose-700/80">Aumenta la medida del tablero en "Medidas de Tableros" o divide la pieza.</p>
+      </div>
+    </div>
+  }
+
   @if (optimizationResult().sheets.length > 0) {
     <!-- SELECTOR DE PESTAÑAS DE TABLEROS (Oculto al imprimir) -->
     <div class="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none print:hidden">

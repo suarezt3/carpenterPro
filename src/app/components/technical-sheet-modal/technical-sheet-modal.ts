@@ -103,6 +103,33 @@ export class TechnicalSheetModalComponent {
   });
 
   /**
+   * Material estructural predominante REAL del proyecto (por área de piezas), con su espesor real
+   * tomado de las piezas (no del catálogo), para que coincida con el modelador, optimizador y presupuesto.
+   */
+  readonly mainBoardInfo = computed<{ name: string; thickness: number }>(() => {
+    const proj = this.project();
+    const areaByKey = new Map<string, { matId: string; thickness: number; area: number }>();
+    for (const p of proj.parts) {
+      const t = Math.round((Number(p.thickness) || 0) * 10) / 10;
+      if (t <= 8 || p.componentRole === 'countertop' || p.componentRole === 'backsplash') continue;
+      const key = `${p.materialId}__${t}`;
+      const area = (p.length * p.width * (p.quantity || 1));
+      const prev = areaByKey.get(key);
+      if (prev) prev.area += area;
+      else areaByKey.set(key, { matId: p.materialId, thickness: t, area });
+    }
+    let best: { matId: string; thickness: number; area: number } | null = null;
+    for (const v of areaByKey.values()) {
+      if (!best || v.area > best.area) best = v;
+    }
+    if (!best) {
+      return { name: proj.materials[0]?.name || 'Melamina', thickness: proj.materials[0]?.thickness || 18 };
+    }
+    const mat = proj.materials.find(m => m.id === best!.matId);
+    return { name: mat?.name || 'Melamina', thickness: best.thickness };
+  });
+
+  /**
    * Calcula la caja envolvente total (Bounding Box 3D) del mueble completo en milímetros.
    */
   readonly bounds = computed(() => {

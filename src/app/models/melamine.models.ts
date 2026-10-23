@@ -237,6 +237,12 @@ export interface FurnitureModule {
   defaultThickDoors: boolean;
 }
 
+export interface MaterialSheetSpec {
+  sheetLength?: number; // mm
+  sheetWidth?: number;  // mm
+  sheetCost?: number;   // Precio por tablero entero en este espesor
+}
+
 export interface Material {
   id: string;
   name: string;
@@ -247,6 +253,10 @@ export interface Material {
   hasGrain: boolean;   // Si tiene textura de veta
   colorHex: string;
   textureType?: 'wood' | 'solid' | 'metal' | 'stone';
+  /** Medidas y precio del tablero cuando el mismo acabado se usa en otro espesor (clave = espesor en mm). */
+  thicknessSpecs?: Record<string, MaterialSheetSpec>;
+  /** Solo en variantes generadas por el optimizador: id del material base del catálogo. */
+  baseMaterialId?: string;
 }
 
 export interface HardwareItem {

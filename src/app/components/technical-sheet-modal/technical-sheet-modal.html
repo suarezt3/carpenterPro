@@ -308,8 +308,8 @@
 
           <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
             <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">MATERIAL PRINCIPAL:</span>
-            <p class="font-bold truncate mt-0.5">{{ project().materials[0]?.name || 'Melamina 18mm' }}</p>
-            <span class="text-[10px] text-zinc-400">Espesor: {{ project().materials[0]?.thickness || 18 }} mm</span>
+            <p class="font-bold truncate mt-0.5">{{ mainBoardInfo().name }}</p>
+            <span class="text-[10px] text-zinc-400">Espesor: {{ mainBoardInfo().thickness }} mm</span>
           </div>
 
           <div class="flex flex-col justify-between">

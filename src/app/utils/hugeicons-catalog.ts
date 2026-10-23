@@ -25,6 +25,12 @@ export const Archive01Icon = defIcon([
 
 export const ArrowDown01Icon = defIcon(['M6 9L12 15L18 9']);
 
+export const ArrowDataTransferHorizontalIcon = defIcon([
+  'M7 16L3 12L7 8',
+  'M3 12H21',
+  'M17 8L21 12L17 16'
+]);
+
 export const ArrowLeft01Icon = defIcon(['M15 6L9 12L15 18']);
 
 export const ArrowRight01Icon = defIcon(['M9 6L15 12L9 18']);
