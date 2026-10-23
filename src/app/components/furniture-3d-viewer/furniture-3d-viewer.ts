@@ -871,9 +871,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const isWhite = this.isWhiteTheme();
 
     if (isWhite) {
-      // Clean pure studio white with soft contrast
+      // Clean pure studio white with soft contrast - zero fog for crisp visibility at any distance
       this.scene.background = new THREE.Color(0xfcfcfd);
-      this.scene.fog = new THREE.FogExp2(0xfcfcfd, 0.00012);
+      this.scene.fog = null;
       if (this.floorMesh) {
         (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.09;
       }
@@ -884,9 +884,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.scene.add(this.gridHelper);
       }
     } else {
-      // Dark CAD Mode
+      // Dark CAD Mode - zero fog for crisp visibility at any distance
       this.scene.background = new THREE.Color(0x0e0e11);
-      this.scene.fog = new THREE.FogExp2(0x0e0e11, 0.00035);
+      this.scene.fog = null;
       if (this.floorMesh) {
         (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.35;
       }
@@ -902,6 +902,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   toggleTheme() {
     this.isWhiteTheme.update(v => !v);
     this.applyThemeColors();
+    this.updateReferenceGuideScene();
   }
 
   private setupLighting() {

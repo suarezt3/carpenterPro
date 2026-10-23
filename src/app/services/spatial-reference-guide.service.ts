@@ -36,39 +36,170 @@ export class SpatialReferenceGuideService {
   private buildFloorCardinalMarkers(isWhiteTheme: boolean): THREE.Group {
     const group = new THREE.Group();
 
-    // Línea frontal indicadora en el borde delantero (+Z)
-    const frontBarGeo = new THREE.PlaneGeometry(1800, 10);
+    // 1. Marco perimetral completo del taller (5000 x 5000 mm)
+    const borderPoints = [
+      new THREE.Vector3(-2500, 1.2, 2500),
+      new THREE.Vector3(2500, 1.2, 2500),
+      new THREE.Vector3(2500, 1.2, -2500),
+      new THREE.Vector3(-2500, 1.2, -2500),
+      new THREE.Vector3(-2500, 1.2, 2500)
+    ];
+    const borderGeo = new THREE.BufferGeometry().setFromPoints(borderPoints);
+    const borderMat = new THREE.LineBasicMaterial({
+      color: isWhiteTheme ? 0x94a3b8 : 0x475569,
+      transparent: true,
+      opacity: isWhiteTheme ? 0.65 : 0.8
+    });
+    const borderLine = new THREE.Line(borderGeo, borderMat);
+    group.add(borderLine);
+
+    // 2. Cantoneras arquitectónicas CAD en las 4 esquinas del taller
+    const cornerLen = 220;
+    const cornerMat = new THREE.LineBasicMaterial({
+      color: isWhiteTheme ? 0x0284c7 : 0x38bdf8,
+      transparent: true,
+      opacity: isWhiteTheme ? 0.8 : 0.9
+    });
+    const corners = [
+      // Delantera Izquierda (-2500, 2500)
+      [
+        new THREE.Vector3(-2500 + cornerLen, 1.5, 2500),
+        new THREE.Vector3(-2500, 1.5, 2500),
+        new THREE.Vector3(-2500, 1.5, 2500 - cornerLen)
+      ],
+      // Delantera Derecha (2500, 2500)
+      [
+        new THREE.Vector3(2500 - cornerLen, 1.5, 2500),
+        new THREE.Vector3(2500, 1.5, 2500),
+        new THREE.Vector3(2500, 1.5, 2500 - cornerLen)
+      ],
+      // Trasera Derecha (2500, -2500)
+      [
+        new THREE.Vector3(2500 - cornerLen, 1.5, -2500),
+        new THREE.Vector3(2500, 1.5, -2500),
+        new THREE.Vector3(2500, 1.5, -2500 + cornerLen)
+      ],
+      // Trasera Izquierda (-2500, -2500)
+      [
+        new THREE.Vector3(-2500 + cornerLen, 1.5, -2500),
+        new THREE.Vector3(-2500, 1.5, -2500),
+        new THREE.Vector3(-2500, 1.5, -2500 + cornerLen)
+      ]
+    ];
+    for (const pts of corners) {
+      const cGeo = new THREE.BufferGeometry().setFromPoints(pts);
+      const cLine = new THREE.Line(cGeo, cornerMat);
+      group.add(cLine);
+    }
+
+    // 3. Cinta frontal azul distintiva en todo el borde delantero (+Z = 2500)
+    const frontBarGeo = new THREE.PlaneGeometry(2800, 24);
     const frontBarMat = new THREE.MeshBasicMaterial({
       color: 0x0284c7,
       transparent: true,
-      opacity: isWhiteTheme ? 0.45 : 0.6,
+      opacity: isWhiteTheme ? 0.75 : 0.9,
       side: THREE.DoubleSide,
       depthWrite: false
     });
     const frontBar = new THREE.Mesh(frontBarGeo, frontBarMat);
     frontBar.rotation.x = -Math.PI / 2;
-    frontBar.position.set(0, 1.5, 1380);
+    frontBar.position.set(0, 1.6, 2500);
     group.add(frontBar);
 
-    // Badges cardinales en los 4 lados del escenario
-    const frontSprite = this.createCardinalBadge('▼ FRENTE (+Z) · VISTA FRONTAL', '#0284c7', '#ffffff', 420, 68);
-    frontSprite.position.set(0, 18, 1480);
-    frontSprite.scale.set(360, 58, 1);
+    // 4. Chevrons direccionales en el piso apuntando al interior del taller
+    const createInwardChevron = (x: number, z: number, rotY: number, color: number) => {
+      const shape = new THREE.Shape();
+      shape.moveTo(0, 90);
+      shape.lineTo(-75, -40);
+      shape.lineTo(-32, -40);
+      shape.lineTo(0, 15);
+      shape.lineTo(32, -40);
+      shape.lineTo(75, -40);
+      shape.closePath();
+
+      const geo = new THREE.ShapeGeometry(shape);
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: isWhiteTheme ? 0.7 : 0.85,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.rotation.z = rotY;
+      mesh.position.set(x, 2, z);
+      return mesh;
+    };
+
+    // Frontal (+Z): flecha apuntando hacia el centro (-Z)
+    group.add(createInwardChevron(0, 2420, Math.PI, 0x0284c7));
+    // Trasero (-Z): flecha apuntando hacia el centro (+Z)
+    group.add(createInwardChevron(0, -2420, 0, 0x64748b));
+    // Izquierdo (-X): flecha apuntando hacia el centro (+X)
+    group.add(createInwardChevron(-2420, 0, -Math.PI / 2, 0x64748b));
+    // Derecho (+X): flecha apuntando hacia el centro (-X)
+    group.add(createInwardChevron(2420, 0, Math.PI / 2, 0x64748b));
+
+    // 5. Badges cardinales perimetrales de alta visibilidad en los 4 bordes exteriores
+    // FRENTE (+Z)
+    const frontSprite = this.createPerimeterBadge({
+      title: 'FRENTE (+Z)',
+      subtitle: 'VISTA PRINCIPAL',
+      icon: '▲',
+      borderColor: '#0284c7',
+      accentColor: '#0284c7',
+      titleColor: '#ffffff',
+      subtitleColor: '#38bdf8',
+      isFront: true
+    });
+    frontSprite.position.set(0, 65, 2680);
+    frontSprite.scale.set(820, 155, 1);
     group.add(frontSprite);
 
-    const backSprite = this.createCardinalBadge('▲ ATRÁS / FONDO (-Z)', '#475569', '#f8fafc', 360, 64);
-    backSprite.position.set(0, 18, -1480);
-    backSprite.scale.set(290, 52, 1);
+    // ATRÁS (-Z)
+    const backSprite = this.createPerimeterBadge({
+      title: 'ATRÁS (-Z)',
+      subtitle: 'VISTA POSTERIOR',
+      icon: '▼',
+      borderColor: '#475569',
+      accentColor: '#334155',
+      titleColor: '#f8fafc',
+      subtitleColor: '#94a3b8',
+      isFront: false
+    });
+    backSprite.position.set(0, 65, -2680);
+    backSprite.scale.set(780, 148, 1);
     group.add(backSprite);
 
-    const leftSprite = this.createCardinalBadge('◄ IZQUIERDA (-X)', '#64748b', '#f8fafc', 340, 64);
-    leftSprite.position.set(-1650, 18, 0);
-    leftSprite.scale.set(270, 50, 1);
+    // IZQUIERDA (-X)
+    const leftSprite = this.createPerimeterBadge({
+      title: 'IZQUIERDA (-X)',
+      subtitle: 'LATERAL IZQUIERDO',
+      icon: '►',
+      borderColor: '#475569',
+      accentColor: '#334155',
+      titleColor: '#f8fafc',
+      subtitleColor: '#94a3b8',
+      isFront: false
+    });
+    leftSprite.position.set(-2680, 65, 0);
+    leftSprite.scale.set(780, 148, 1);
     group.add(leftSprite);
 
-    const rightSprite = this.createCardinalBadge('DERECHA (+X) ►', '#64748b', '#f8fafc', 340, 64);
-    rightSprite.position.set(1650, 18, 0);
-    rightSprite.scale.set(270, 50, 1);
+    // DERECHA (+X)
+    const rightSprite = this.createPerimeterBadge({
+      title: 'DERECHA (+X)',
+      subtitle: 'LATERAL DERECHO',
+      icon: '◄',
+      borderColor: '#475569',
+      accentColor: '#334155',
+      titleColor: '#f8fafc',
+      subtitleColor: '#94a3b8',
+      isFront: false
+    });
+    rightSprite.position.set(2680, 65, 0);
+    rightSprite.scale.set(780, 148, 1);
     group.add(rightSprite);
 
     return group;
@@ -253,17 +384,19 @@ export class SpatialReferenceGuideService {
     counterBadge.scale.set(175, 35, 1);
     figureGroup.add(counterBadge);
 
-    // Etiqueta de dirección en la flecha de los pies
-    const frontFootBadge = this.createCardinalBadge(
-      isSelected ? '▼ FRENTE (+Z) · Arrastra o pulsa Supr' : '▼ FRENTE (+Z)',
-      isSelected ? '#f59e0b' : '#0284c7',
-      '#ffffff',
-      isSelected ? 440 : 260,
-      58
-    );
-    frontFootBadge.position.set(0, 35, 370);
-    frontFootBadge.scale.set(isSelected ? 310 : 185, 42, 1);
-    figureGroup.add(frontFootBadge);
+    // Etiqueta flotante informativa cuando el maniquí está seleccionado
+    if (isSelected) {
+      const selectedBadge = this.createCardinalBadge(
+        'Escala Humana (1.72 m) · Arrastra libremente',
+        '#f59e0b',
+        '#ffffff',
+        440,
+        58
+      );
+      selectedBadge.position.set(0, 35, 370);
+      selectedBadge.scale.set(310, 42, 1);
+      figureGroup.add(selectedBadge);
+    }
 
     // Marcar todos los elementos del maniquí para poder seleccionarlo y arrastrarlo con el ratón
     figureGroup.traverse(obj => {
@@ -274,6 +407,94 @@ export class SpatialReferenceGuideService {
     });
 
     return figureGroup;
+  }
+
+  /**
+   * Crea un badge perimetral de alta resolución (1600x300 px), gran escala y máxima legibilidad
+   * con icono direccional, título principal destacado y subtítulo técnico descriptivo.
+   */
+  private createPerimeterBadge(options: {
+    title: string;
+    subtitle: string;
+    icon: string;
+    borderColor: string;
+    accentColor: string;
+    titleColor: string;
+    subtitleColor: string;
+    isFront: boolean;
+  }): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    const w = 1600;
+    const h = 300;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      ctx.clearRect(0, 0, w, h);
+
+      // Sombra suave proyectada para despegar visualmente la tarjeta del fondo
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetY = 10;
+
+      // Tarjeta principal con bordes redondeados
+      ctx.fillStyle = options.isFront ? 'rgba(10, 16, 30, 0.96)' : 'rgba(15, 23, 42, 0.94)';
+      ctx.beginPath();
+      ctx.roundRect(16, 16, w - 32, h - 32, 44);
+      ctx.fill();
+
+      // Desactivar sombra para contornos y tipografía
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+
+      // Borde del badge
+      ctx.strokeStyle = options.borderColor;
+      ctx.lineWidth = options.isFront ? 7 : 5;
+      ctx.stroke();
+
+      // Pastilla de icono a la izquierda
+      const iconBoxX = 48;
+      const iconBoxY = 48;
+      const iconBoxSize = 204;
+      ctx.fillStyle = options.accentColor;
+      ctx.beginPath();
+      ctx.roundRect(iconBoxX, iconBoxY, iconBoxSize, iconBoxSize, 36);
+      ctx.fill();
+
+      // Icono direccional (flecha) dentro de la pastilla
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 105px "Inter", -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(options.icon, iconBoxX + iconBoxSize / 2, iconBoxY + iconBoxSize / 2 + 4);
+
+      // Título principal en mayúsculas negrita
+      const textStartX = iconBoxX + iconBoxSize + 48;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = options.titleColor;
+      ctx.font = '800 84px "Inter", -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillText(options.title, textStartX, 138);
+
+      // Subtítulo técnico
+      ctx.fillStyle = options.subtitleColor;
+      ctx.font = '700 40px "Inter", -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillText(options.subtitle, textStartX, 218);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.generateMipmaps = true;
+
+    const mat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false
+    });
+    return new THREE.Sprite(mat);
   }
 
   private createCardinalBadge(
@@ -299,7 +520,7 @@ export class SpatialReferenceGuideService {
       ctx.stroke();
 
       ctx.fillStyle = textColor;
-      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+      ctx.font = 'bold 20px "Inter", system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, canvasW / 2, canvasH / 2);
