@@ -110,6 +110,7 @@ export class DocumentationModalComponent {
   // Estado de apertura del modal y evento de cierre
   readonly isOpen = input<boolean>(false);
   readonly modalClose = output<void>();
+  readonly openChangelog = output<void>();
 
   // Signals reactivos para el buscador, categoría activa y artículo seleccionado
   readonly searchQuery = signal<string>('');

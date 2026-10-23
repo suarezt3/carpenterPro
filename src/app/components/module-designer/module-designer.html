@@ -47,11 +47,10 @@
       <button
         type="button"
         (click)="openTemplatesModal()"
-        class="h-7 xl:h-7.5 px-2.5 xl:px-3 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+        class="h-6.5 xl:h-7 px-2 xl:px-2.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
         title="Catálogo de Plantillas: Cocinas, Closets, Baños y Cajoneras">
         <hugeicons-icon [icon]="icons.templatesGrid" [size]="14" [strokeWidth]="1.9" class="text-indigo-600 shrink-0"></hugeicons-icon>
         <span>Plantillas</span>
-        <span class="hidden xl:inline text-[9px] px-1.5 py-0.2 rounded bg-indigo-200/70 text-indigo-900 font-mono font-bold">Catálogo</span>
       </button>
 
       <!-- BOTÓN PANEL MAESTRO COCINA PRO / ESTILO GLOBAL (CLICK-CUISINE 2) -->
@@ -61,11 +60,10 @@
         [class]="showKitchenProPanel()
           ? 'bg-amber-500 text-white border-amber-600 shadow-sm ring-2 ring-amber-400/40'
           : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'"
-        class="h-7 xl:h-7.5 px-2.5 xl:px-3 text-xs font-bold border rounded-lg flex items-center gap-1.5 transition cursor-pointer"
-        title="Panel Maestro Cocina Pro: Materiales globales en 1 clic, Mesones Inteligentes con hueco de lavaplatos y Capas">
+        class="h-6.5 xl:h-7 px-2 xl:px-2.5 text-xs font-bold border rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+        title="Panel Maestro Cocina Pro: Materiales globales en 1 clic, Mesones Inteligentes y Capas">
         <hugeicons-icon [icon]="icons.countertopPro" [size]="14" [strokeWidth]="2" [class]="showKitchenProPanel() ? 'text-white shrink-0' : 'text-amber-600 shrink-0'"></hugeicons-icon>
         <span>Cocina Pro</span>
-        <span [class]="showKitchenProPanel() ? 'bg-amber-700 text-amber-100' : 'bg-amber-200/80 text-amber-950'" class="hidden xl:inline text-[9px] px-1.5 py-0.2 rounded font-mono font-bold">Mesones & Estilo</span>
       </button>
 
       <!-- Botón Configurar Entorno (Visible en Modo Habitación) -->
@@ -73,10 +71,10 @@
         <button
           type="button"
           (click)="openRoomSettings()"
-          class="h-7 px-2 xl:px-2.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer animate-in fade-in"
+          class="h-6.5 xl:h-7 px-2 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer animate-in fade-in"
           title="Configurar medidas de paredes, piso y catálogo de texturas">
           <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="1.9" class="text-sky-600 shrink-0"></hugeicons-icon>
-          <span class="hidden md:inline">Configurar Entorno</span>
+          <span class="hidden md:inline">Entorno</span>
         </button>
       }
 
@@ -84,10 +82,10 @@
       <button
         type="button"
         (click)="startBlank()"
-        class="h-7 xl:h-7.5 px-2 xl:px-2.5 text-xs font-medium text-stone-700 bg-white hover:bg-stone-100 rounded-lg border border-stone-300 flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+        class="h-6.5 xl:h-7 px-2 text-xs font-medium text-stone-700 bg-white hover:bg-stone-100 rounded-lg border border-stone-300 flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
         title="Limpiar el lienzo 3D e iniciar un nuevo mueble desde cero">
         <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="1.9" class="text-stone-400 shrink-0"></hugeicons-icon>
-        <span class="hidden lg:inline">Lienzo en Blanco</span>
+        <span class="hidden xl:inline">Lienzo en Blanco</span>
       </button>
 
       <!-- Botón Mostrar/Ocultar Bandeja Lateral -->
@@ -95,10 +93,10 @@
         type="button"
         (click)="toggleSidebar()"
         [class]="isSidebarCollapsed() ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'"
-        class="h-7 px-2 xl:px-2.5 text-xs font-semibold rounded-lg border flex items-center gap-1.5 transition cursor-pointer"
+        class="h-6.5 xl:h-7 px-2 text-xs font-semibold rounded-lg border flex items-center gap-1 transition cursor-pointer"
         [title]="isSidebarCollapsed() ? 'Mostrar bandeja de propiedades' : 'Ocultar bandeja para lienzo 3D al 100% de pantalla'">
         <hugeicons-icon [icon]="icons.sidebarToggle" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-        <span class="hidden xl:inline">{{ isSidebarCollapsed() ? 'Mostrar Bandeja' : 'Ocultar Bandeja' }}</span>
+        <span class="hidden 2xl:inline text-[11px]">{{ isSidebarCollapsed() ? 'Mostrar' : 'Ocultar' }}</span>
       </button>
 
     </div>
@@ -552,44 +550,15 @@
           </div>
         }
 
-        <!-- HUD SUPERIOR IZQUIERDO (Visible en monitores amplios 2K para no solapar la barra de acciones en HD/FHD) -->
-        @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
-          <div class="hidden min-[1800px]:flex absolute top-2.5 left-13 z-30 items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1 rounded-xl border border-slate-200 shadow-md text-xs pointer-events-auto">
-            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-            <span class="font-bold uppercase tracking-wider text-slate-700">GRUPO ({{ selectedPartIds().length }}):</span>
-            <span class="font-semibold text-amber-600">Arrastre sincronizado</span>
-            <button
-              type="button"
-              (click)="deselectAll()"
-              class="text-xs text-slate-400 hover:text-slate-800 underline ml-1 cursor-pointer">
-              Deseleccionar
-            </button>
-          </div>
-        } @else if (selectedPart(); as sel) {
-          <div class="hidden min-[1800px]:flex absolute top-2.5 left-13 z-30 items-center gap-2 bg-white/95 text-slate-800 backdrop-blur-md px-3 py-1 rounded-xl border border-slate-200 shadow-md text-xs pointer-events-auto">
-            <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-            <span class="font-bold text-slate-800 truncate max-w-40">{{ sel.name }}:</span>
-            <span class="font-mono font-bold text-sky-600">{{ sel.length }} × {{ sel.width }} mm</span>
-            <span class="font-mono text-slate-400 text-[11px]">({{ sel.thickness }}mm)</span>
-            <button
-              type="button"
-              (click)="deselectAll()"
-              class="text-slate-400 hover:text-slate-800 ml-1 cursor-pointer flex items-center justify-center"
-              title="Deseleccionar">
-              <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
-            </button>
-          </div>
-        }
-
 <!-- BARRA FLOTANTE DE ACCIONES SUPERIOR (Grupo, Multiselección o Pieza Individual) -->
         @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
           <div
             [class]="isSidebarCollapsed() ? 'right-26' : 'right-2.5'"
-            class="absolute top-2.5 z-30 flex items-center gap-1 bg-slate-950/92 text-white backdrop-blur-md px-2 py-1 rounded-xl shadow-xl border border-slate-800/90 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-3.75rem)] min-[1800px]:max-w-[calc(100%-330px)] overflow-x-auto no-scrollbar whitespace-nowrap">
+            class="absolute top-2.5 z-30 flex items-center gap-1 bg-slate-950/92 text-white backdrop-blur-md px-1.5 py-0.5 rounded-xl shadow-xl border border-slate-800/90 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-3.75rem)] min-[1800px]:max-w-[calc(100%-330px)] overflow-x-auto no-scrollbar whitespace-nowrap">
             <!-- Badge de Grupo / Edición en Línea -->
             @if (activeSelectedGroupName()) {
               @if (renamingGroupId() === activeSelectedGroupId()) {
-                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-950/80 border border-indigo-400/50 h-6.5 shrink-0 text-[11px]">
+                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-950/80 border border-indigo-400/50 h-6 shrink-0 text-[11px]">
                   <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="2" class="text-indigo-400 shrink-0"></hugeicons-icon>
                   <input
                     type="text"
@@ -598,8 +567,8 @@
                     (click)="$event.stopPropagation()"
                     (keydown.enter)="saveRenameActiveGroup()"
                     (keydown.escape)="cancelRenameGroup()"
-                    class="text-[11px] font-bold px-1.5 py-0.5 bg-slate-900 border border-indigo-400/80 rounded text-white w-28 focus:outline-hidden focus:ring-1 focus:ring-indigo-400"
-                    placeholder="Nombre del cajón" />
+                    class="text-[11px] font-bold px-1.5 py-0.5 bg-slate-900 border border-indigo-400/80 rounded text-white w-24 focus:outline-hidden focus:ring-1 focus:ring-indigo-400"
+                    placeholder="Nombre módulo" />
                   <button
                     type="button"
                     (click)="saveRenameActiveGroup()"
@@ -616,86 +585,82 @@
                   </button>
                 </div>
               } @else {
-                <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 h-6.5 shrink-0 text-[11px]">
+                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 h-6 shrink-0 text-[11px]">
                   <span class="w-1.5 h-1.5 rounded-full" [class]="isActiveSelectionLocked() ? 'bg-amber-400' : 'bg-indigo-400 animate-pulse'"></span>
                   <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="1.9" class="text-indigo-400 shrink-0"></hugeicons-icon>
-                  <span class="text-[11px] font-bold text-white truncate max-w-28 xl:max-w-36">{{ activeSelectedGroupName() }}</span>
+                  <span class="text-[11px] font-bold text-white truncate max-w-24 xl:max-w-32">{{ activeSelectedGroupName() }}</span>
                   <span class="text-[10px] text-slate-400 font-mono">({{ selectedPartIds().length }})</span>
                   <button
                     type="button"
                     (click)="startRenameActiveGroup($event)"
                     class="ml-0.5 text-slate-400 hover:text-white hover:bg-white/15 p-0.5 rounded transition cursor-pointer flex items-center justify-center"
-                    title="Renombrar este cajón o módulo">
-                    <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
+                    title="Renombrar módulo">
+                    <hugeicons-icon [icon]="icons.edit" [size]="11" [strokeWidth]="1.9"></hugeicons-icon>
                   </button>
                 </div>
               }
             } @else {
-              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 h-6.5 shrink-0 text-[11px]">
+              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 h-6 shrink-0 text-[11px]">
                 <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
                 <span class="text-[11px] font-medium text-white">
-                  {{ selectedPartIds().length }} seleccionadas
+                  {{ selectedPartIds().length }} piezas
                 </span>
               </div>
             }
 
-            <div class="h-3.5 w-px bg-slate-800 shrink-0 mx-0.5"></div>
+            <div class="h-3 w-px bg-slate-800 shrink-0 mx-0.5"></div>
 
-            <!-- Botón Congelar / Descongelar Módulo o Selección -->
+            <!-- Botón Congelar / Descongelar Módulo o Selección (Icono) -->
             <button
               type="button"
               (click)="toggleActiveGroupLock($event)"
               [class]="isActiveSelectionLocked()
                 ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-xs'
                 : 'bg-white/10 hover:bg-amber-500/20 hover:text-amber-300 text-slate-200 font-medium'"
-              class="h-6.5 px-2 xl:px-2.5 rounded-md text-[11px] flex items-center gap-1 transition shrink-0 cursor-pointer"
-              [title]="isActiveSelectionLocked() ? 'Módulo congelado (fijo). Clic para descongelar y permitir moverlo' : 'Congelar módulo para evitar moverlo por accidente'">
-              <hugeicons-icon [icon]="icons.lock" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-              <span>{{ isActiveSelectionLocked() ? 'Congelado' : 'Congelar' }}</span>
+              class="h-6 w-6 rounded-md flex items-center justify-center transition shrink-0 cursor-pointer"
+              [title]="isActiveSelectionLocked() ? 'Módulo congelado (fijo). Clic para descongelar' : 'Congelar módulo para no moverlo por accidente'">
+              <hugeicons-icon [icon]="icons.lock" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             </button>
 
             @if (!activeSelectedGroupName()) {
               <button
                 type="button"
                 (click)="openGroupNamingModal()"
-                class="h-6.5 px-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1.5 shadow-xs transition shrink-0 cursor-pointer"
+                class="h-6 px-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 shadow-xs transition shrink-0 cursor-pointer"
                 title="Agrupar las piezas seleccionadas como un cajón o módulo">
                 <hugeicons-icon [icon]="icons.link" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                 <span>Agrupar</span>
               </button>
             } @else {
-              <!-- Duplicar Cajón -->
+              <!-- Duplicar Cajón (Icono) -->
               <button
                 type="button"
                 (click)="duplicateSelectedGroup()"
-                class="h-6.5 px-2 xl:px-2.5 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
-                title="Duplicar módulo completo (crea una copia apilada arriba)">
-                <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-                <span>Duplicar</span>
+                class="h-6 w-6 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-md flex items-center justify-center transition shrink-0 shadow-xs cursor-pointer"
+                title="Duplicar módulo completo (crea copia)">
+                <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
               </button>
 
               @if (!isActiveSelectionLocked()) {
-                <!-- Mover en Bloque -->
+                <!-- Mover en Bloque (Icono) -->
                 <button
                   type="button"
                   (click)="activateMoveToolOnViewer()"
-                  class="h-6.5 px-2 xl:px-2.5 bg-sky-600/85 hover:bg-sky-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+                  class="h-6 w-6 bg-sky-600/85 hover:bg-sky-500 active:scale-95 text-white rounded-md flex items-center justify-center transition shrink-0 shadow-xs cursor-pointer"
                   title="Mover módulo completo con flechas 3D">
-                  <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-                  <span>Mover</span>
+                  <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
                 </button>
               }
 
               @if (!isSelectedGroupCountertop()) {
-                <!-- Abrir / Cerrar -->
+                <!-- Abrir / Cerrar (Icono) -->
                 <button
                   type="button"
                   (click)="toggleSelectedGroupOpen()"
-                  [class]="isGroupOpen() ? 'bg-amber-500 hover:bg-amber-400 text-white shadow-xs' : 'bg-white/10 hover:bg-white/20 text-white'"
-                  class="h-6.5 px-2 xl:px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 cursor-pointer"
-                  title="Abrir o cerrar módulo completo en 3D">
-                  <hugeicons-icon [icon]="isGroupOpen() ? icons.doorOpen : icons.doorClosed" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-                  <span>{{ isGroupOpen() ? 'Cerrar' : 'Abrir' }}</span>
+                  [class]="isGroupOpen() ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-xs' : 'bg-white/10 hover:bg-white/20 text-white'"
+                  class="h-6 w-6 rounded-md flex items-center justify-center transition shrink-0 cursor-pointer"
+                  [title]="isGroupOpen() ? 'Cerrar puertas y gavetas en 3D' : 'Abrir puertas y gavetas en 3D'">
+                  <hugeicons-icon [icon]="isGroupOpen() ? icons.doorOpen : icons.doorClosed" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
                 </button>
               }
 
@@ -704,116 +669,112 @@
                 type="button"
                 (click)="$event.stopPropagation(); openEditSelectedGroup($event)"
                 [class]="isSelectedGroupCountertop() ? 'bg-amber-600/90 hover:bg-amber-500' : 'bg-indigo-600/90 hover:bg-indigo-500'"
-                class="h-6.5 px-2 xl:px-2.5 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+                class="h-6 px-2 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
                 [title]="isSelectedGroupCountertop() ? 'Abrir Cocina Pro para configurar material, espesor o salpicadero del mesón' : 'Editar dimensiones, puertas, entrepaños y parámetros de este módulo'">
                 <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-                <span>{{ isSelectedGroupCountertop() ? 'Mesón 3D' : 'Editar Módulo' }}</span>
+                <span>{{ isSelectedGroupCountertop() ? 'Mesón' : 'Editar' }}</span>
               </button>
 
               @if (!isActiveSelectionLocked()) {
-                <div class="h-3.5 w-px bg-slate-800 shrink-0 mx-0.5"></div>
+                <div class="h-3 w-px bg-slate-800 shrink-0 mx-0.5"></div>
 
-                <!-- Giro 90° -->
-                <div class="flex items-center bg-white/5 rounded-md p-0.5 border border-white/10 h-6.5 shrink-0">
+                <!-- Giro 90° (Iconos compactos) -->
+                <div class="flex items-center bg-white/5 rounded-md p-0.5 border border-white/10 h-6 shrink-0">
                   <button
                     type="button"
                     (click)="rotateSelectedGroup(-90)"
-                    class="h-5.5 w-5.5 flex items-center justify-center hover:bg-white/20 text-slate-300 hover:text-white rounded transition cursor-pointer"
-                    title="Girar módulo 90° Antihorario (Izquierda)">
-                    <hugeicons-icon [icon]="icons.rotateLeft" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
+                    class="h-5 w-5 flex items-center justify-center hover:bg-white/20 text-slate-300 hover:text-white rounded transition cursor-pointer"
+                    title="Girar módulo 90° Izquierda">
+                    <hugeicons-icon [icon]="icons.rotateLeft" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
                   </button>
                   <button
                     type="button"
                     (click)="rotateSelectedGroup(90)"
-                    class="h-5.5 px-1.5 hover:bg-white/20 text-white rounded text-[11px] font-medium flex items-center gap-1 transition cursor-pointer"
-                    title="Girar módulo 90° Horario (Derecha) - Atajo: tecla R">
-                    <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
-                    <span>90° (R)</span>
+                    class="h-5 w-5 flex items-center justify-center hover:bg-white/20 text-white rounded transition cursor-pointer"
+                    title="Girar módulo 90° Derecha (Atajo: R)">
+                    <hugeicons-icon [icon]="icons.rotateRight" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
                   </button>
                 </div>
 
-                <!-- Selector de Cara/Frente del Módulo -->
-                <div class="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5 border border-white/10 h-6.5 shrink-0 text-[11px]">
-                  <span class="text-[10px] text-slate-400 font-medium px-1 flex items-center gap-1">
+                <!-- Selector de Cara/Frente del Módulo (Pastillas compactas F | D | A | I) -->
+                <div class="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5 border border-white/10 h-6 shrink-0 text-[10px]">
+                  <span class="text-slate-400 px-0.5 flex items-center" title="Orientación del frente">
                     <hugeicons-icon [icon]="icons.compass" [size]="12" [strokeWidth]="1.9" class="text-indigo-400 shrink-0"></hugeicons-icon>
-                    <span class="hidden 2xl:inline">Frente:</span>
                   </span>
                   <button
                     type="button"
                     (click)="setGroupFaceDirection('front')"
                     [class]="currentGroupFacing() === 'front' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                    class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
+                    class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
                     title="Cara frontal hacia el frente (0°)">
-                    Frente
+                    F
                   </button>
                   <button
                     type="button"
                     (click)="setGroupFaceDirection('right')"
                     [class]="currentGroupFacing() === 'right' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                    class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
+                    class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
                     title="Cara frontal hacia la derecha (90°)">
-                    Der
+                    D
                   </button>
                   <button
                     type="button"
                     (click)="setGroupFaceDirection('back')"
                     [class]="currentGroupFacing() === 'back' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                    class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
-                    title="Cara frontal hacia el fondo (180°)">
-                    Atrás
+                    class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
+                    title="Cara frontal hacia atrás (180°)">
+                    A
                   </button>
                   <button
                     type="button"
                     (click)="setGroupFaceDirection('left')"
                     [class]="currentGroupFacing() === 'left' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                    class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
+                    class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
                     title="Cara frontal hacia la izquierda (270°)">
-                    Izq
+                    I
                   </button>
                 </div>
               }
 
-              <div class="h-3.5 w-px bg-slate-800 shrink-0 mx-0.5"></div>
+              <div class="h-3 w-px bg-slate-800 shrink-0 mx-0.5"></div>
 
-              <!-- Ocultar Grupo Modular -->
+              <!-- Ocultar Grupo Modular (Icono) -->
               <button
                 type="button"
                 (click)="hideActiveGroup()"
-                class="h-6.5 px-2 bg-white/10 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 cursor-pointer"
+                class="h-6 w-6 bg-white/10 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md flex items-center justify-center transition shrink-0 cursor-pointer"
                 title="Ocultar temporalmente este módulo (Tecla H)">
-                <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-                <span class="hidden xl:inline">Ocultar</span>
+                <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
               </button>
 
-              <!-- Desagrupar -->
+              <!-- Desagrupar (Icono) -->
               <button
                 type="button"
                 (click)="ungroupSelected()"
-                class="h-6.5 px-2 bg-white/10 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 cursor-pointer"
+                class="h-6 w-6 bg-white/10 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 rounded-md flex items-center justify-center transition shrink-0 cursor-pointer"
                 title="Desagrupar piezas para editarlas individualmente">
-                <hugeicons-icon [icon]="icons.unlink" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-                <span class="hidden xl:inline">Desagrupar</span>
+                <hugeicons-icon [icon]="icons.unlink" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
               </button>
             }
 
             <!-- Botón Cerrar / Deseleccionar -->
-            <div class="h-4 w-px bg-white/15 shrink-0 mx-0.5"></div>
+            <div class="h-3 w-px bg-white/15 shrink-0 mx-0.5"></div>
             <button
               type="button"
               (click)="deselectAll()"
-              class="h-6.5 w-6.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0 cursor-pointer"
+              class="h-6 w-6 rounded-md text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0 cursor-pointer"
               title="Deseleccionar piezas (Esc)">
-              <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+              <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             </button>
           </div>
         } @else if (selectedPart(); as selPart) {
           <!-- BARRA FLOTANTE PARA PIEZA INDIVIDUAL -->
           <div
             [class]="isSidebarCollapsed() ? 'right-26' : 'right-2.5'"
-            class="absolute top-2.5 z-30 flex items-center gap-1 bg-slate-950/92 text-white backdrop-blur-md px-2 py-1 rounded-xl shadow-xl border border-slate-800/90 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-3.75rem)] min-[1800px]:max-w-[calc(100%-330px)] overflow-x-auto no-scrollbar whitespace-nowrap">
+            class="absolute top-2.5 z-30 flex items-center gap-1 bg-slate-950/92 text-white backdrop-blur-md px-1.5 py-0.5 rounded-xl shadow-xl border border-slate-800/90 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-3.75rem)] min-[1800px]:max-w-[calc(100%-330px)] overflow-x-auto no-scrollbar whitespace-nowrap">
             <!-- Badge de Pieza Individual / Edición en Línea -->
             @if (renamingPartId() === selPart.id) {
-              <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-950/80 border border-sky-400/50 h-6.5 shrink-0">
+              <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-950/80 border border-sky-400/50 h-6 shrink-0">
                 <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="2" class="text-sky-400 shrink-0"></hugeicons-icon>
                 <input
                   type="text"
@@ -822,7 +783,7 @@
                   (click)="$event.stopPropagation()"
                   (keydown.enter)="saveRenameSelectedPart()"
                   (keydown.escape)="cancelRenamePart()"
-                  class="text-[11px] font-bold px-1.5 py-0.5 bg-slate-900 border border-sky-400/80 rounded text-white w-32 focus:outline-hidden focus:ring-1 focus:ring-sky-400"
+                  class="text-[11px] font-bold px-1.5 py-0.5 bg-slate-900 border border-sky-400/80 rounded text-white w-28 focus:outline-hidden focus:ring-1 focus:ring-sky-400"
                   placeholder="Nombre de pieza" />
                 <button
                   type="button"
@@ -840,17 +801,17 @@
                 </button>
               </div>
             } @else {
-              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 h-6.5 shrink-0">
+              <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 h-6 shrink-0">
                 <span class="w-1.5 h-1.5 rounded-full" [class]="isPartLocked(selPart.id) ? 'bg-amber-400' : 'bg-sky-400 animate-pulse'"></span>
                 <hugeicons-icon [icon]="icons.squareShape" [size]="13" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
-                <span class="text-[11px] font-bold text-white truncate max-w-28 xl:max-w-36">{{ selPart.name }}</span>
+                <span class="text-[11px] font-bold text-white truncate max-w-24 xl:max-w-32">{{ selPart.name }}</span>
                 <span class="text-[10px] text-slate-400 font-mono">({{ selPart.length }}×{{ selPart.width }}×{{ selPart.thickness }})</span>
                 <button
                   type="button"
                   (click)="startRenameSelectedPart($event)"
                   class="ml-0.5 text-slate-400 hover:text-white hover:bg-white/15 p-0.5 rounded transition cursor-pointer flex items-center justify-center"
                   title="Renombrar esta pieza">
-                  <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.edit" [size]="11" [strokeWidth]="1.9"></hugeicons-icon>
                 </button>
               </div>
             }
@@ -859,127 +820,120 @@
               <button
                 type="button"
                 (click)="selectEntireGroup(parentGrp.id)"
-                class="h-6.5 px-2 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-md text-[11px] font-bold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
-                title="Volver a seleccionar el módulo completo ({{ parentGrp.name }})">
+                class="h-6 px-1.5 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-md text-[11px] font-bold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+                [title]="'Volver a seleccionar el módulo completo: ' + parentGrp.name">
                 <hugeicons-icon [icon]="icons.inbox" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                <span>← Módulo ({{ parentGrp.name }})</span>
+                <span>Módulo</span>
               </button>
             }
 
-            <!-- Botón Congelar / Descongelar Pieza Individual -->
+            <!-- Botón Congelar / Descongelar Pieza Individual (Icono) -->
             <button
               type="button"
               (click)="toggleSelectedPartLock($event)"
               [class]="isPartLocked(selPart.id)
                 ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-xs'
                 : 'bg-white/10 hover:bg-amber-500/20 hover:text-amber-300 text-slate-200 font-medium'"
-              class="h-6.5 px-2 xl:px-2.5 rounded-md text-[11px] flex items-center gap-1 transition shrink-0 cursor-pointer"
+              class="h-6 w-6 rounded-md flex items-center justify-center transition shrink-0 cursor-pointer"
               [title]="isPartLocked(selPart.id) ? 'Pieza congelada (fija). Clic para descongelar' : 'Congelar pieza para no moverla por accidente'">
-              <hugeicons-icon [icon]="icons.lock" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-              <span>{{ isPartLocked(selPart.id) ? 'Congelada' : 'Congelar' }}</span>
+              <hugeicons-icon [icon]="icons.lock" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             </button>
 
-            <!-- Duplicar Pieza -->
+            <!-- Duplicar Pieza (Icono) -->
             <button
               type="button"
               (click)="duplicateSelectedPart()"
-              class="h-6.5 px-2 xl:px-2.5 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+              class="h-6 w-6 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-md flex items-center justify-center transition shrink-0 shadow-xs cursor-pointer"
               title="Duplicar pieza individual">
-              <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-              <span>Duplicar</span>
+              <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
             </button>
 
             @if (!isPartLocked(selPart.id)) {
-              <!-- Mover en 3D -->
+              <!-- Mover en 3D (Icono) -->
               <button
                 type="button"
                 (click)="activateMoveToolOnViewer()"
-                class="h-6.5 px-2 xl:px-2.5 bg-sky-600/85 hover:bg-sky-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+                class="h-6 w-6 bg-sky-600/85 hover:bg-sky-500 active:scale-95 text-white rounded-md flex items-center justify-center transition shrink-0 shadow-xs cursor-pointer"
                 title="Mover pieza con flechas 3D">
-                <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-                <span>Mover</span>
+                <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
               </button>
 
-              <!-- Girar 90° -->
-              <div class="flex items-center bg-white/5 rounded-md p-0.5 border border-white/10 h-6.5 shrink-0">
+              <!-- Girar 90° (Iconos compactos) -->
+              <div class="flex items-center bg-white/5 rounded-md p-0.5 border border-white/10 h-6 shrink-0">
                 <button
                   type="button"
                   (click)="rotateSelectedPart90('z')"
-                  class="h-5.5 w-5.5 flex items-center justify-center hover:bg-white/20 text-slate-300 hover:text-white rounded transition cursor-pointer"
-                  title="Voltear / Girar en plano">
-                  <hugeicons-icon [icon]="icons.rotateLeft" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
+                  class="h-5 w-5 flex items-center justify-center hover:bg-white/20 text-slate-300 hover:text-white rounded transition cursor-pointer"
+                  title="Voltear / Girar en plano Z">
+                  <hugeicons-icon [icon]="icons.rotateLeft" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
                 </button>
                 <button
                   type="button"
                   (click)="rotateSelectedPart90('y')"
-                  class="h-5.5 px-1.5 hover:bg-white/20 text-white rounded text-[11px] font-medium flex items-center gap-1 transition cursor-pointer"
+                  class="h-5 w-5 flex items-center justify-center hover:bg-white/20 text-white rounded transition cursor-pointer"
                   title="Girar pieza 90° (intercambia largo y ancho) - Atajo: tecla R">
-                  <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
-                  <span>90° (R)</span>
+                  <hugeicons-icon [icon]="icons.rotateRight" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
                 </button>
               </div>
 
-              <!-- Selector de Orientación de la Pieza -->
-              <div class="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5 border border-white/10 h-6.5 shrink-0 text-[11px]">
-                <span class="text-[10px] text-slate-400 font-medium px-1 flex items-center gap-1">
+              <!-- Selector de Orientación de la Pieza (Pastillas compactas H | L | F) -->
+              <div class="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5 border border-white/10 h-6 shrink-0 text-[10px]">
+                <span class="text-slate-400 px-0.5 flex items-center" title="Orientación de la pieza">
                   <hugeicons-icon [icon]="icons.compass" [size]="12" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
-                  <span class="hidden 2xl:inline">Orientación:</span>
                 </span>
                 <button
                   type="button"
                   (click)="setPartOrientation('horizontal')"
                   [class]="(selPart.orientation || 'horizontal') === 'horizontal' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                  class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
-                  title="Orientación Horizontal (plano XZ, ej. estante, base, tapa)">
-                  Horizontal
+                  class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
+                  title="Horizontal (plano XZ, ej. repisa, base, tapa)">
+                  H
                 </button>
                 <button
                   type="button"
                   (click)="setPartOrientation('vertical_yz')"
                   [class]="selPart.orientation === 'vertical_yz' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                  class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
-                  title="Orientación Lateral (plano YZ, ej. lateral izquierdo o derecho)">
-                  Lateral (YZ)
+                  class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
+                  title="Lateral YZ (ej. lateral izquierdo o derecho)">
+                  L
                 </button>
                 <button
                   type="button"
                   (click)="setPartOrientation('vertical_xy')"
                   [class]="selPart.orientation === 'vertical_xy' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-slate-300 hover:bg-white/15'"
-                  class="h-5 px-1.5 rounded text-[10px] font-medium transition cursor-pointer"
-                  title="Orientación Frontal (plano XY, ej. frente, trasera o fondo)">
-                  Frontal (XY)
+                  class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
+                  title="Frontal XY (ej. frente, trasera o fondo)">
+                  F
                 </button>
               </div>
             }
 
-            <!-- Ocultar Pieza -->
+            <!-- Ocultar Pieza (Icono) -->
             <button
               type="button"
               (click)="hideSelectedPart()"
-              class="h-6.5 px-2 bg-white/10 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 cursor-pointer"
+              class="h-6 w-6 bg-white/10 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md flex items-center justify-center transition shrink-0 cursor-pointer"
               title="Ocultar temporalmente esta pieza (Tecla H)">
-              <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-              <span class="hidden xl:inline">Ocultar</span>
+              <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
             </button>
 
-            <!-- Eliminar Pieza -->
+            <!-- Eliminar Pieza (Icono) -->
             <button
               type="button"
               (click)="deleteSelectedPart()"
-              class="h-6.5 px-2 bg-rose-600/85 hover:bg-rose-600 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+              class="h-6 w-6 bg-rose-600/85 hover:bg-rose-600 active:scale-95 text-white rounded-md flex items-center justify-center transition shrink-0 shadow-xs cursor-pointer"
               title="Eliminar pieza seleccionada (Supr)">
-              <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-              <span class="hidden xl:inline">Eliminar</span>
+              <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
             </button>
 
             <!-- Botón Cerrar / Deseleccionar -->
-            <div class="h-4 w-px bg-white/15 shrink-0 mx-0.5"></div>
+            <div class="h-3 w-px bg-white/15 shrink-0 mx-0.5"></div>
             <button
               type="button"
               (click)="deselectAll()"
-              class="h-6.5 w-6.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0 cursor-pointer"
+              class="h-6 w-6 rounded-md text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0 cursor-pointer"
               title="Deseleccionar pieza (Esc)">
-              <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+              <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             </button>
           </div>
         }

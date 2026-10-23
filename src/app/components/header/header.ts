@@ -32,7 +32,9 @@ import {
   Settings01Icon,
   Sun01Icon,
   Tag01Icon,
-  Tick02Icon
+  Tick02Icon,
+  Megaphone01Icon,
+  Rocket01Icon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
@@ -42,6 +44,8 @@ import { ThemeService } from '../../services/theme.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
 import { DocumentationModalComponent } from '../documentation-modal/documentation-modal';
 import { ProjectNotesModalComponent } from '../project-notes-modal/project-notes-modal';
+import { ChangelogModalComponent } from '../changelog-modal/changelog-modal';
+import { APP_CURRENT_VERSION } from '../../data/changelog.data';
 import { ProjectSettings } from '../../models/melamine.models';
 
 /**
@@ -58,7 +62,8 @@ import { ProjectSettings } from '../../models/melamine.models';
     HugeiconsIconComponent,
     TechnicalSheetModalComponent,
     DocumentationModalComponent,
-    ProjectNotesModalComponent
+    ProjectNotesModalComponent,
+    ChangelogModalComponent
   ],
   host: {
     '(window:keydown)': 'handleGlobalKeyDown($event)',
@@ -99,8 +104,13 @@ export class HeaderComponent {
     loading: Clock01Icon,
     info: InformationCircleIcon,
     settings: Settings01Icon,
-    delete: Delete02Icon
+    delete: Delete02Icon,
+    megaphone: Megaphone01Icon,
+    rocket: Rocket01Icon
   };
+
+  // Versión actual de la aplicación
+  readonly appVersion = APP_CURRENT_VERSION;
 
   // Pestaña activa y evento de navegación hacia App
   readonly activeTab = input<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>('modules');
@@ -116,6 +126,7 @@ export class HeaderComponent {
   readonly showTechnicalSheetModal = signal(false);
   readonly showDocumentationModal = signal(false);
   readonly showNotesModal = signal(false);
+  readonly showChangelogModal = signal(false);
 
   readonly projectsTab = signal<'cloud' | 'local'>('cloud');
   readonly sqlCopied = signal(false);
@@ -463,6 +474,15 @@ export class HeaderComponent {
 
   closeDocumentationModal() {
     this.showDocumentationModal.set(false);
+  }
+
+  openChangelogModal() {
+    this.closeDropdowns();
+    this.showChangelogModal.set(true);
+  }
+
+  closeChangelogModal() {
+    this.showChangelogModal.set(false);
   }
 
   exportDxf() {

@@ -29,9 +29,14 @@
               <h2 class="text-base sm:text-lg font-extrabold tracking-tight truncate" [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'">
                 Centro de Ayuda y Manual Interactivo
               </h2>
-              <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                Actualizado
-              </span>
+              <button
+                type="button"
+                (click)="openChangelog.emit()"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold transition hover:scale-105 cursor-pointer shadow-xs"
+                title="Ver historial de novedades de versiones y roadmap en desarrollo">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
+                <span>Novedades & Roadmap</span>
+              </button>
             </div>
             <p class="text-xs truncate" [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'">
               Guía práctica de herramientas 3D, escala humana, bloqueo de piezas, menú contextual, mecanizados CNC y corte.

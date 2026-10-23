@@ -264,11 +264,11 @@ export class CutOptimizerViewComponent {
       ctx.fillRect(0, 0, totalCanvasWidth, totalCanvasHeight);
 
       ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 36px "Plus Jakarta Sans", sans-serif';
+      ctx.font = 'bold 36px "Inter", sans-serif';
       ctx.fillText(`PLANO DE CORTE OPTIMIZADO - TABLERO #${sheet.sheetIndex}`, margin, margin + 40);
 
       ctx.fillStyle = '#475569';
-      ctx.font = '22px "Plus Jakarta Sans", sans-serif';
+      ctx.font = '22px "Inter", sans-serif';
       const projName = this.project().name || 'Proyecto Cocina';
       ctx.fillText(`Proyecto: ${projName}  |  Material: ${sheet.material.name} (${sheet.material.thickness} mm)`, margin, margin + 76);
 
@@ -291,7 +291,7 @@ export class CutOptimizerViewComponent {
       ctx.strokeRect(margin, margin + headerHeight, exportWidth, exportHeight);
 
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '16px "Plus Jakarta Sans", sans-serif';
+      ctx.font = '16px "Inter", sans-serif';
       const dateStr = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
       ctx.fillText(`Generado con Piezo3D Studio • ${dateStr} • Patrón Guillotina (Escuadradora)`, margin, totalCanvasHeight - margin + 15);
 
