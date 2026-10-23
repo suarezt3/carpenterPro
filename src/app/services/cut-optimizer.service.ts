@@ -125,7 +125,7 @@ export class CutOptimizerService {
     return {
       id: matId,
       name: 'Melamina Estándar',
-      thickness: 18,
+      thickness: 15,
       sheetLength: 2440,
       sheetWidth: 1830,
       sheetCost: 45,

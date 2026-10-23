@@ -610,8 +610,8 @@ export class CabinetGeneratorService {
     const backMat = materials.find(m => m.id === config.backMaterialId) || 
                     materials.find(m => m.thickness <= 6) || mainMat;
 
-    const t = config.structureThickness || 15;
-    const doorT = config.doorThickness || 15;
+    const t = Number(config.structureThickness) || mainMat.thickness || 15;
+    const doorT = Number(config.doorThickness) || doorMat.thickness || t;
     const backT = config.backThickness || 3;
     const w = config.width || 600;
     const h = config.height || 800;
@@ -1093,7 +1093,7 @@ export class CabinetGeneratorService {
                     materials.find(m => m.name.toLowerCase().includes('mdf')) ||
                     { id: 'mat_mdf_3', name: 'MDF 3mm', thickness: 3 };
 
-    const t = Math.max(12, Math.min(22, Number(config.structureThickness) || 18));
+    const t = Math.max(12, Math.min(22, Number(config.structureThickness) || 15));
     const doorT = Math.max(12, Math.min(22, Number(config.doorThickness) || t));
     const backT = Math.max(3, Number(config.backThickness) || 3);
     const w = Math.max(300, Number(config.width) || 600);
@@ -1679,7 +1679,7 @@ export class CabinetGeneratorService {
     const innerWidth = Number(topOrBottom?.length) || 570;
     const width = innerWidth + (2 * t);
     const doorT = doorParts.length > 0
-      ? (Number(doorParts[0]?.thickness) || 15)
+      ? (Number(doorParts[0]?.thickness) || t)
       : (drawerFronts.length > 0 ? (Number(drawerFronts[0]?.thickness) || t) : t);
     const depth = (sidePart ? (rawSideLen > rawSideWid ? rawSideWid : rawSideLen) : 300) + (doorParts.length > 0 || drawerFronts.length > 0 ? doorT : 0);
 
@@ -1800,7 +1800,7 @@ export class CabinetGeneratorService {
     const backMat = materials.find(m => m.id === config.backMaterialId) ||
                     materials.find(m => m.thickness <= 6) || mainMat;
 
-    const t = Math.max(12, Number(config.structureThickness) || 18);
+    const t = Math.max(12, Number(config.structureThickness) || 15);
     const doorT = Math.max(12, Number(config.doorThickness) || t);
     const backT = Math.max(3, Number(config.backThickness) || 3);
     const w = Math.max(300, Number(config.width) || 600);
@@ -2155,58 +2155,59 @@ export class CabinetGeneratorService {
       });
 
       if (config.category === 'oven_base') {
-        // MÓDULO BAJO PARA HORNO EMPOTRADO (Nicho 595mm + Cajón/Puerta inferior para latas)
-        const tieWidth = 100;
-        const topTieY = bottomOfCarcassY + sideH - (t / 2);
-        // Amarres superiores (frontal y trasero) para dejar ventilación y paso de gas/inducción
+        // MÓDULO BAJO PARA HORNO EMPOTRADO Y ESTUFA (Nicho 595mm + Cajón inferior para latas)
+        // Los amarres superiores van verticales de canto (orientation: 'vertical_xy') para dejar la cavidad superior
+        // completamente abierta y libre, permitiendo el encastre preciso de la estufa / parrilla sin colisiones.
+        const tieH = 65;
+        const topTieCenterY = bottomOfCarcassY + sideH - (tieH / 2);
         parts.push({
           id: `${moduleId}_amarre_sup_f_${Date.now()}`,
-          name: 'Amarre Superior Frontal',
+          name: 'Faja Superior Frontal (Bajo Estufa)',
           moduleId,
           moduleName: groupName,
           groupId,
           groupName,
           length: innerWidth,
-          width: tieWidth,
+          width: tieH,
           thickness: t,
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
           grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          edges: { l1: 'thin', l2: 'thin', a1: 'none', a2: 'none' },
           posX,
-          posY: topTieY,
-          posZ: carcassFrontZ - (tieWidth / 2),
-          orientation: 'horizontal',
+          posY: topTieCenterY,
+          posZ: carcassFrontZ - (t / 2),
+          orientation: 'vertical_xy',
           componentRole: 'tie',
-          notes: 'Faja superior frontal sobre horno'
+          notes: 'Amarre vertical de canto frontal (cubierta estética entre horno y estufa)'
         });
         parts.push({
           id: `${moduleId}_amarre_sup_t_${Date.now()}`,
-          name: 'Amarre Superior Trasero',
+          name: 'Amarre Superior Trasero (Anclaje)',
           moduleId,
           moduleName: groupName,
           groupId,
           groupName,
           length: innerWidth,
-          width: tieWidth,
+          width: tieH,
           thickness: t,
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
           grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          edges: { l1: 'thin', l2: 'thin', a1: 'none', a2: 'none' },
           posX,
-          posY: topTieY,
-          posZ: carcassBackZ + (tieWidth / 2),
-          orientation: 'horizontal',
+          posY: topTieCenterY,
+          posZ: carcassBackZ + (t / 2),
+          orientation: 'vertical_xy',
           componentRole: 'tie',
-          notes: 'Faja superior trasera sobre horno'
+          notes: 'Amarre vertical de canto trasero para anclaje a pared sin obstruir paso de encastre'
         });
 
-        // Bandeja soporte de horno (deja nicho libre de 595mm bajo el amarre superior)
+        // Bandeja soporte de horno (deja nicho libre de 595mm bajo la faja superior)
         const ovenNicheH = 595;
-        const ovenShelfY = Math.max(bottomOfCarcassY + 130, bottomOfCarcassY + sideH - t - ovenNicheH - (t / 2));
+        const ovenShelfY = Math.max(bottomOfCarcassY + 110, bottomOfCarcassY + sideH - tieH - ovenNicheH - (t / 2));
         parts.push({
           id: `${moduleId}_bandeja_horno_${Date.now()}`,
           name: 'Bandeja Soporte de Horno (Reforzada)',
@@ -2266,17 +2267,24 @@ export class CabinetGeneratorService {
           notes: 'Compartimento inferior para bandejas de horno'
         });
 
-        // Fondo trasero para módulo horno (cubre la estructura dejando cámara trasera de ventilación)
-        if (config.hasBackPanel !== false) {
+        // En módulo bajo horno empotrado, el nicho del horno debe permanecer completamente abierto por detrás
+        // para ventilación de calor según norma técnica y libre paso de conexiones eléctricas/gas (backType: 'none').
+        // Solo si el usuario solicita explícitamente fondo trasero (hasBackPanel === true && backType !== 'none'),
+        // este se coloca EXCLUSIVAMENTE en el compartimento inferior de bandejas/cajón (debajo del estante del horno),
+        // NUNCA en el nicho del horno ni solapándose con el amarre superior trasero.
+        const wantsBackPanel = config.hasBackPanel === true && config.backType !== 'none';
+        if (wantsBackPanel) {
+          const lowerBackH = Math.max(40, Math.round((ovenShelfY - (t / 2)) - (bottomOfCarcassY + t)));
+          const lowerBackCenterY = bottomOfCarcassY + t + (lowerBackH / 2);
           parts.push({
-            id: `${moduleId}_fondo_horno_${Date.now()}`,
-            name: 'Fondo Trasero Ranurado (Ventilación Horno)',
+            id: `${moduleId}_fondo_inferior_${Date.now()}`,
+            name: 'Fondo Trasero Compartimento Inferior',
             moduleId,
             moduleName: groupName,
             groupId,
             groupName,
             length: Math.max(50, innerWidth - 2),
-            width: Math.max(50, sideH - (2 * t)),
+            width: lowerBackH,
             thickness: backT,
             quantity: 1,
             materialId: backMat.id,
@@ -2284,11 +2292,11 @@ export class CabinetGeneratorService {
             grain: 'none',
             edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
             posX,
-            posY: sideCenterY,
+            posY: lowerBackCenterY,
             posZ: carcassBackZ + 10 + (backT / 2),
             orientation: 'vertical_xy',
             componentRole: 'back',
-            notes: `Fondo MDF ${backT}mm con holgura de ventilación`
+            notes: `Fondo MDF ${backT}mm para gaveta inferior (nicho de horno libre)`
           });
         }
       } else if (config.category === 'sink_base') {
@@ -2582,7 +2590,7 @@ export class CabinetGeneratorService {
       depth: d,
       boardThickness: t,
       backThickness: backT,
-      backType: config.category === 'sink_base' ? 'none' : 'groove',
+      backType: (config.category === 'sink_base' || config.category === 'oven_base' || config.backType === 'none') ? 'none' : (config.backType || 'groove'),
       shelvesCount: config.shelvesCount || 1,
       doorsCount: config.category === 'sink_base' ? 2 : 1,
       doorsType: 'overlay',

@@ -29,7 +29,7 @@ export class TemplatesCatalogService {
     if (found) {
       return { id: found.id, name: found.name, thickness: found.thickness };
     }
-    const def = materials[0] || { id: 'mat_default', name: 'Melamina Blanco Frost Mate', thickness: 18 };
+    const def = materials[0] || { id: 'mat_default', name: 'Melamina Blanco Frost Mate', thickness: 15 };
     return { id: def.id, name: def.name, thickness: def.thickness };
   }
 
@@ -239,8 +239,8 @@ export class TemplatesCatalogService {
         width: 600,
         height: 750,
         depth: 500,
-        structureThickness: 18,
-        doorThickness: 18,
+        structureThickness: 15,
+        doorThickness: 15,
         drawersCount: 3,
         drawerSlideType: 'telescopic',
         drawerFrontType: 'overlay',
@@ -264,8 +264,8 @@ export class TemplatesCatalogService {
           width: 600,
           height: 750,
           depth: 500,
-          structureThickness: matBody.thickness || 18,
-          doorThickness: 18,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
           backThickness: 3,
           backType: 'groove',
           shelvesCount: 0,
@@ -313,8 +313,8 @@ export class TemplatesCatalogService {
         width: 600,
         height: 850,
         depth: 600,
-        structureThickness: 18,
-        doorThickness: 18,
+        structureThickness: 15,
+        doorThickness: 15,
         doorOpening: 'left',
         shelvesCount: 1,
         hasHandle: true,
@@ -327,7 +327,7 @@ export class TemplatesCatalogService {
         const matBody = this.getMaterial(mats, 'blanco');
         const matDoor = this.getMaterial(mats, 'blanco');
         const matBottom = this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_6', name: 'MDF 6mm', thickness: 6 };
-        const t = matBody.thickness || 18;
+        const t = matBody.thickness || 15;
         const width = 600;
         const height = 850;
         const depth = 600;
@@ -532,8 +532,8 @@ export class TemplatesCatalogService {
         width: 600,
         height: 800,
         depth: 320,
-        structureThickness: 18,
-        doorThickness: 18,
+        structureThickness: 15,
+        doorThickness: 15,
         backThickness: 3,
         shelvesCount: 1,
         doorOpening: 'left',
@@ -543,11 +543,11 @@ export class TemplatesCatalogService {
         const matBody = this.getMaterial(mats, 'blanco');
         const matDoor = this.getMaterial(mats, 'roble') || matBody;
         const matBottom = this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_3', name: 'MDF 3mm', thickness: 3 };
-        const t = matBody.thickness || 18;
+        const t = matBody.thickness || 15;
         const w = 600;
         const h = 800;
         const d = 320;
-        const doorT = 18;
+        const doorT = 15;
         const carcassDepth = d - doorT;
         const innerW = w - (2 * t);
         const posY = 1450 + (h / 2);
@@ -702,7 +702,7 @@ export class TemplatesCatalogService {
         const matBody = this.getMaterial(mats, 'blanco');
         const matDoor = this.getMaterial(mats, 'roble') || matBody;
         const matBottom = this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_3', name: 'MDF 3mm', thickness: 3 };
-        const t = matBody.thickness || 18;
+        const t = matBody.thickness || 15;
         const w = 500;
         const h = 1900;
         const d = 550;
@@ -859,7 +859,7 @@ export class TemplatesCatalogService {
       generateParts: (mats, offsetX = 0) => {
         const matBody = this.getMaterial(mats, 'blanco');
         const matDoor = this.getMaterial(mats, 'blanco');
-        const t = matBody.thickness || 18;
+        const t = matBody.thickness || 15;
         const w = 500;
         const h = 500;
         const d = 400;
@@ -987,8 +987,8 @@ export class TemplatesCatalogService {
         width: 600,
         height: 860,
         depth: 580,
-        structureThickness: 18,
-        doorThickness: 18,
+        structureThickness: 15,
+        doorThickness: 15,
         backThickness: 3,
         backType: 'none',
         shelvesCount: 1,
@@ -1010,8 +1010,8 @@ export class TemplatesCatalogService {
           width: 600,
           height: 860,
           depth: 580,
-          structureThickness: matBody.thickness || 18,
-          doorThickness: 18,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
           backThickness: 3,
           backType: 'none',
           shelvesCount: 1,
@@ -1053,8 +1053,8 @@ export class TemplatesCatalogService {
         width: 800,
         height: 860,
         depth: 580,
-        structureThickness: 18,
-        doorThickness: 18,
+        structureThickness: 15,
+        doorThickness: 15,
         backThickness: 3,
         backType: 'none',
         shelvesCount: 0,
@@ -1076,8 +1076,8 @@ export class TemplatesCatalogService {
           width: 800,
           height: 860,
           depth: 580,
-          structureThickness: matBody.thickness || 18,
-          doorThickness: 18,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
           backThickness: 3,
           backType: 'none',
           shelvesCount: 0,
@@ -1119,8 +1119,8 @@ export class TemplatesCatalogService {
         width: 900,
         height: 860,
         depth: 900,
-        structureThickness: 18,
-        doorThickness: 18,
+        structureThickness: 15,
+        doorThickness: 15,
         backThickness: 3,
         backType: 'none',
         shelvesCount: 1,
@@ -1142,8 +1142,8 @@ export class TemplatesCatalogService {
           width: 900,
           height: 860,
           depth: 900,
-          structureThickness: matBody.thickness || 18,
-          doorThickness: 18,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
           backThickness: 3,
           backType: 'none',
           shelvesCount: 1,
@@ -1185,8 +1185,8 @@ export class TemplatesCatalogService {
         width: 600,
         height: 2150,
         depth: 580,
-        structureThickness: 18,
-        doorThickness: 18,
+        structureThickness: 15,
+        doorThickness: 15,
         backThickness: 3,
         backType: 'groove',
         shelvesCount: 3,
@@ -1208,8 +1208,8 @@ export class TemplatesCatalogService {
           width: 600,
           height: 2150,
           depth: 580,
-          structureThickness: matBody.thickness || 18,
-          doorThickness: 18,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
           backThickness: 3,
           backType: 'groove',
           shelvesCount: 3,
@@ -1255,7 +1255,7 @@ export class TemplatesCatalogService {
       if (part.orientation === 'horizontal' || part.orientation === 'vertical_xy') {
         halfW = (part.length || 0) / 2;
       } else {
-        halfW = (part.thickness || 18) / 2;
+        halfW = (part.thickness || 15) / 2;
       }
       const rightEdge = (part.posX || 0) + halfW;
       if (rightEdge > maxX) maxX = rightEdge;

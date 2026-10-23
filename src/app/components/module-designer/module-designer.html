@@ -121,6 +121,8 @@
           [roomConfig]="roomConfig()"
           [appliances]="appliances()"
           [selectedApplianceId]="selectedApplianceId()"
+          [selectedApplianceIds]="selectedApplianceIds()"
+          [defaultBoardThickness]="defaultBoardThickness()"
           [layerVisibility]="layerVisibility()"
           (partSelected)="onSelectPartFrom3D($event)"
           (partsSelected)="onPartsSelectedFrom3D($event)"
@@ -141,8 +143,12 @@
           (roomConfigModified)="updateRoomConfig($event)"
           (wallSelected)="onWallSelected($event)"
           (applianceSelected)="onApplianceSelectedFrom3D($event)"
+          (appliancesSelected)="onAppliancesSelectedFrom3D($event)"
           (applianceModified)="onApplianceModifiedFromViewer($event)"
-          (applianceDeleted)="onApplianceDeletedFromViewer($event)">
+          (multipleAppliancesModified)="onMultipleAppliancesModifiedFromViewer($event)"
+          (applianceDeleted)="onApplianceDeletedFromViewer($event)"
+          (applianceDuplicated)="onApplianceDuplicatedFromViewer($event)"
+          (showAllRequested)="showAllParts()">
         </app-furniture-3d-viewer>
 
         <!-- PANEL FLOTANTE MAESTRO "COCINA PRO / CLICK-CUISINE 2" -->
@@ -551,17 +557,28 @@
         }
 
 <!-- BARRA FLOTANTE DE ACCIONES SUPERIOR (Grupo, Multiselección o Pieza Individual) -->
-        @if (selectedPartIds().length >= 2 || isAnyGroupSelected()) {
+        @if (isMultiSelection() || selectedPartIds().length >= 2 || isAnyGroupSelected() || selectedApplianceIds().length >= 2) {
           <div
             [class]="isSidebarCollapsed() ? 'right-26' : 'right-2.5'"
             class="absolute top-2.5 z-30 flex items-center gap-1 bg-slate-950/92 text-white backdrop-blur-md px-1.5 py-0.5 rounded-xl shadow-xl border border-slate-800/90 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-3.75rem)] min-[1800px]:max-w-[calc(100%-330px)] overflow-x-auto no-scrollbar whitespace-nowrap">
-            @if (isMultiGroupSelected()) {
-              <!-- Badge de Multi-Selección de Módulos (Estilo SketchUp) -->
+            @if (isMultiSelection() || isMultiGroupSelected()) {
+              <!-- Badge de Multi-Selección de Módulos y Equipos (Estilo SketchUp) -->
               <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-950/80 border border-indigo-400/50 h-6 shrink-0 text-[11px]">
                 <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
                 <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-indigo-400 shrink-0"></hugeicons-icon>
-                <span class="text-[11px] font-bold text-white">{{ selectedGroupIds().length }} módulos</span>
-                <span class="text-[10px] text-slate-400 font-mono">({{ selectedPartIds().length }} pzs)</span>
+                <span class="text-[11px] font-bold text-white">
+                  @if (selectedGroupIds().length > 0) {
+                    {{ selectedGroupIds().length }} {{ selectedGroupIds().length === 1 ? 'módulo' : 'módulos' }}
+                  } @else if (selectedPartIds().length > 0) {
+                    {{ selectedPartIds().length }} pzs
+                  }
+                  @if (selectedApplianceIds().length > 0) {
+                    {{ selectedPartIds().length > 0 ? ' · ' : '' }}{{ selectedApplianceIds().length }} {{ selectedApplianceIds().length === 1 ? 'equipo' : 'equipos' }}
+                  }
+                </span>
+                @if (selectedGroupIds().length > 0 && selectedPartIds().length > 0) {
+                  <span class="text-[10px] text-slate-400 font-mono">({{ selectedPartIds().length }} pzs)</span>
+                }
               </div>
 
               <div class="h-3 w-px bg-slate-800 shrink-0 mx-0.5"></div>
@@ -743,16 +760,25 @@
                   </button>
                 }
 
-                <!-- Editar Configuración del Módulo -->
-                <button
-                  type="button"
-                  (click)="$event.stopPropagation(); openEditSelectedGroup($event)"
-                  [class]="isSelectedGroupCountertop() ? 'bg-amber-600/90 hover:bg-amber-500' : 'bg-indigo-600/90 hover:bg-indigo-500'"
-                  class="h-6 px-2 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
-                  [title]="isSelectedGroupCountertop() ? 'Abrir Cocina Pro para configurar material, espesor o salpicadero del mesón' : 'Editar dimensiones, puertas, entrepaños y parámetros de este módulo'">
-                  <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
-                  <span>{{ isSelectedGroupCountertop() ? 'Mesón' : 'Editar' }}</span>
-                </button>
+                <!-- Editar Configuración del Módulo (Protegido si es Módulo Pro con electrodomésticos) -->
+                @if (activeModuleAppliances().length === 0) {
+                  <button
+                    type="button"
+                    (click)="$event.stopPropagation(); openEditSelectedGroup($event)"
+                    [class]="isSelectedGroupCountertop() ? 'bg-amber-600/90 hover:bg-amber-500' : 'bg-indigo-600/90 hover:bg-indigo-500'"
+                    class="h-6 px-2 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+                    [title]="isSelectedGroupCountertop() ? 'Abrir Cocina Pro para configurar material, espesor o salpicadero del mesón' : 'Editar dimensiones, puertas, entrepaños y parámetros de este módulo'">
+                    <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
+                    <span>{{ isSelectedGroupCountertop() ? 'Mesón' : 'Editar' }}</span>
+                  </button>
+                } @else {
+                  <div
+                    class="h-6 px-2 bg-amber-500/20 border border-amber-400/30 text-amber-300 rounded-md text-[11px] font-semibold flex items-center gap-1 shrink-0"
+                    title="Módulo Pro con electrodomésticos integrados. Para medidas, usa el inspector derecho.">
+                    <hugeicons-icon [icon]="icons.appliance" [size]="12" [strokeWidth]="2" class="text-amber-400"></hugeicons-icon>
+                    <span>Módulo Pro</span>
+                  </div>
+                }
 
                 @if (!isActiveSelectionLocked()) {
                   <div class="h-3 w-px bg-slate-800 shrink-0 mx-0.5"></div>
@@ -1016,6 +1042,121 @@
               <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             </button>
           </div>
+        } @else if (selectedAppliance(); as selApp) {
+          <!-- BARRA FLOTANTE PARA ELECTRODOMÉSTICO INDIVIDUAL -->
+          <div
+            [class]="isSidebarCollapsed() ? 'right-26' : 'right-2.5'"
+            class="absolute top-2.5 z-30 flex items-center gap-1 bg-slate-950/92 text-white backdrop-blur-md px-1.5 py-0.5 rounded-xl shadow-xl border border-slate-800/90 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-3.75rem)] min-[1800px]:max-w-[calc(100%-330px)] overflow-x-auto no-scrollbar whitespace-nowrap">
+            <!-- Badge de Electrodoméstico -->
+            <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-950/80 border border-amber-400/50 h-6 shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <hugeicons-icon [icon]="icons.appliance" [size]="13" [strokeWidth]="1.9" class="text-amber-400 shrink-0"></hugeicons-icon>
+              <span class="text-[11px] font-bold text-white truncate max-w-28 xl:max-w-36">{{ selApp.name }}</span>
+            </div>
+
+            <!-- Dimensiones X × Z × Y directas en mm -->
+            <div class="flex items-center gap-1 bg-white/5 rounded-md px-1.5 py-0.5 border border-white/10 h-6 shrink-0 text-[10px]">
+              <span class="text-slate-400 font-bold uppercase text-[9px]">X</span>
+              <input
+                type="number"
+                [value]="selApp.width"
+                (change)="onApplianceDirectDimChange(selApp.id, 'width', $any($event.target).value)"
+                class="w-12 text-[11px] font-mono font-bold bg-slate-900 border border-white/15 rounded px-1 py-0.2 text-white text-center focus:outline-hidden focus:border-amber-400"
+                title="Ancho (mm)"
+                min="50"
+                step="10" />
+
+              <span class="text-slate-400 font-bold uppercase text-[9px]">Z</span>
+              <input
+                type="number"
+                [value]="selApp.depth"
+                (change)="onApplianceDirectDimChange(selApp.id, 'depth', $any($event.target).value)"
+                class="w-12 text-[11px] font-mono font-bold bg-slate-900 border border-white/15 rounded px-1 py-0.2 text-white text-center focus:outline-hidden focus:border-amber-400"
+                title="Profundidad (mm)"
+                min="50"
+                step="10" />
+
+              <span class="text-slate-400 font-bold uppercase text-[9px]">Y</span>
+              <input
+                type="number"
+                [value]="selApp.height"
+                (change)="onApplianceDirectDimChange(selApp.id, 'height', $any($event.target).value)"
+                class="w-12 text-[11px] font-mono font-bold bg-slate-900 border border-white/15 rounded px-1 py-0.2 text-white text-center focus:outline-hidden focus:border-amber-400"
+                title="Alto (mm)"
+                min="50"
+                step="10" />
+            </div>
+
+            <!-- Giro 90° -->
+            <button
+              type="button"
+              (click)="rotateAppliance(90)"
+              class="h-6 w-6 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-md flex items-center justify-center transition shrink-0 cursor-pointer"
+              title="Girar 90° (Tecla R)">
+              <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
+            </button>
+
+            <!-- Duplicar -->
+            <button
+              type="button"
+              (click)="duplicateSelectedAppliance()"
+              class="h-6 w-6 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white rounded-md flex items-center justify-center transition shrink-0 shadow-xs cursor-pointer"
+              title="Duplicar electrodoméstico">
+              <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
+            </button>
+
+            <!-- Inmovilizar / Congelar Equipo (Candado) -->
+            <button
+              type="button"
+              (click)="toggleSelectedApplianceLock()"
+              [class]="selApp.isLocked
+                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-xs'
+                : 'bg-white/10 hover:bg-amber-500/20 hover:text-amber-300 text-slate-200 font-medium'"
+              class="h-6 w-6 rounded-md flex items-center justify-center transition shrink-0 cursor-pointer"
+              [title]="selApp.isLocked ? 'Equipo inmovilizado (fijo). Clic para descongelar' : 'Inmovilizar equipo (evita moverlo por accidente)'">
+              <hugeicons-icon [icon]="icons.lock" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+            </button>
+
+            <!-- Ocultar Temporalmente Equipo (Tecla H) -->
+            <button
+              type="button"
+              (click)="hideSelectedAppliance()"
+              class="h-6 w-6 bg-white/10 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md flex items-center justify-center transition shrink-0 cursor-pointer"
+              title="Ocultar temporalmente este equipo (Tecla H)">
+              <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
+            </button>
+
+            <!-- Vínculo con Módulo -->
+            @if (selApp.groupId) {
+              <button
+                type="button"
+                (click)="toggleApplianceModuleLink(selApp.id, null)"
+                class="h-6 px-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-md text-[10px] font-semibold flex items-center gap-1 transition shrink-0 cursor-pointer"
+                title="Desvincular del módulo para mover independientemente">
+                <hugeicons-icon [icon]="icons.unlink" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
+                <span>Desvincular</span>
+              </button>
+            }
+
+            <!-- Eliminar -->
+            <button
+              type="button"
+              (click)="deleteSelectedAppliance()"
+              class="h-6 w-6 bg-rose-600/90 hover:bg-rose-500 active:scale-95 text-white rounded-md flex items-center justify-center transition shrink-0 shadow-xs cursor-pointer"
+              title="Eliminar electrodoméstico (Supr)">
+              <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
+            </button>
+
+            <!-- Botón Cerrar / Deseleccionar -->
+            <div class="h-3 w-px bg-white/15 shrink-0 mx-0.5"></div>
+            <button
+              type="button"
+              (click)="deselectAll()"
+              class="h-6 w-6 rounded-md text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition shrink-0 cursor-pointer"
+              title="Deseleccionar equipo (Esc)">
+              <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+            </button>
+          </div>
         }
 
         <!-- CINTA DE CONFIGURAR ENTORNO / AJUSTAR HABITACIÓN 3D -->
@@ -1148,17 +1289,33 @@
           class="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-thin py-0.5 scroll-smooth">
           @if (groups().length > 0) {
             @for (grp of groups(); track grp.id) {
-              <button
-                type="button"
-                (click)="selectEntireGroup(grp.id)"
+              <div
                 [class]="isGroupHidden(grp.id)
-                  ? 'bg-amber-50/70 border-dashed border-amber-300 text-slate-400 opacity-60'
+                  ? 'bg-amber-50/80 border-dashed border-amber-300 text-slate-500'
                   : (activeSelectedGroupId() === grp.id ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200')"
-                class="px-2.5 py-0.5 xl:py-1 rounded-lg text-xs flex items-center gap-1.5 shrink-0 transition cursor-pointer"
-                [title]="'Seleccionar módulo completo: ' + grp.name">
-                <hugeicons-icon [icon]="icons.inbox" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                <span class="truncate max-w-32">{{ grp.name }}</span>
-              </button>
+                class="px-2 py-0.5 xl:py-1 rounded-lg text-xs flex items-center gap-1.5 shrink-0 transition border">
+                <button
+                  type="button"
+                  (click)="selectEntireGroup(grp.id)"
+                  class="flex items-center gap-1.5 cursor-pointer min-w-0"
+                  [title]="'Seleccionar módulo: ' + grp.name">
+                  @if (isGroupHidden(grp.id)) {
+                    <hugeicons-icon [icon]="icons.eyeOff" [size]="12" [strokeWidth]="1.9" class="text-amber-500 shrink-0"></hugeicons-icon>
+                  } @else {
+                    <hugeicons-icon [icon]="icons.inbox" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  }
+                  <span class="truncate max-w-32">{{ grp.name }}</span>
+                </button>
+                @if (isGroupHidden(grp.id)) {
+                  <button
+                    type="button"
+                    (click)="toggleGroupVisibility(grp.id, $event)"
+                    class="p-0.5 hover:bg-amber-200/60 rounded text-amber-700 cursor-pointer transition"
+                    title="Mostrar este módulo">
+                    <hugeicons-icon [icon]="icons.eye" [size]="11" [strokeWidth]="2"></hugeicons-icon>
+                  </button>
+                }
+              </div>
             }
             <div class="h-4 w-px bg-slate-200 shrink-0 mx-0.5"></div>
           }
@@ -1256,11 +1413,43 @@
           </button>
         </div>
 
+        <!-- BANNER DE ELEMENTOS OCULTOS EN EL PANEL LATERAL -->
+        @if (totalHiddenCount() > 0) {
+          <div class="mx-3 mt-2 p-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex items-center justify-between gap-2 shadow-2xs shrink-0 animate-in fade-in">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0"></span>
+              <hugeicons-icon [icon]="icons.eyeOff" [size]="14" [strokeWidth]="2.2" class="text-amber-600 shrink-0"></hugeicons-icon>
+              <div class="text-[11px] font-bold truncate">
+                <span>{{ totalHiddenCount() }} elemento(s) oculto(s)</span>
+                <span class="text-[9px] font-normal text-amber-800 block truncate">
+                  @if (hiddenModulesCount() > 0) {
+                    {{ hiddenModulesCount() }} mód.
+                  }
+                  @if (hiddenPiecesOnlyCount() > 0) {
+                    {{ hiddenModulesCount() > 0 ? ' · ' : '' }}{{ hiddenPiecesOnlyCount() }} pzs
+                  }
+                  @if (hiddenAppliancesCount() > 0) {
+                    {{ (hiddenModulesCount() > 0 || hiddenPiecesOnlyCount() > 0) ? ' · ' : '' }}{{ hiddenAppliancesCount() }} eq.
+                  }
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              (click)="showAllParts()"
+              class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 active:scale-95 text-white text-[10px] font-bold shadow-2xs flex items-center gap-1 shrink-0 transition cursor-pointer"
+              title="Restaurar la visibilidad de todas las piezas, módulos y equipos (Alt+H)">
+              <hugeicons-icon [icon]="icons.eye" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+              <span>Mostrar Todo</span>
+            </button>
+          </div>
+        }
+
 <!-- PESTAÑA 1: PROPIEDADES DEL MÓDULO / GRUPO O PIEZA SELECCIONADA -->
         @if (activeDockTab() === 'piece') {
           <div class="p-3 space-y-3 overflow-y-auto scrollbar-thin flex-1 min-h-0">
 
-            @if (isMultiGroupSelected() || (selectedPartIds().length > 1 && !isAnyGroupSelected())) {
+            @if (isMultiSelection()) {
 
               <!-- MODO MULTI-SELECCIÓN: BATCH INSPECTOR PARA MÚLTIPLES MÓDULOS O PIEZAS -->
               <div class="space-y-3">
@@ -1272,8 +1461,14 @@
                       <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0"></span>
                       <hugeicons-icon [icon]="icons.layers" [size]="14" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
                       <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-200 truncate">
-                        @if (isMultiGroupSelected()) {
+                        @if (selectedGroupIds().length > 1 && selectedApplianceIds().length > 0) {
+                          Multi-Selección: Módulos y Equipos
+                        } @else if (selectedGroupIds().length > 1) {
                           Multi-Selección de Módulos
+                        } @else if (selectedApplianceIds().length > 0 && selectedPartIds().length > 0) {
+                          Conjunto Módulo + Equipos
+                        } @else if (selectedApplianceIds().length > 1) {
+                          Multi-Selección de Equipos
                         } @else {
                           Multi-Selección de Piezas
                         }
@@ -1289,40 +1484,35 @@
                   </div>
 
                   <div class="flex items-center justify-between pt-0.5">
-                    @if (isMultiGroupSelected()) {
-                      <span class="text-xs font-black text-slate-800 dark:text-zinc-100">
-                        {{ selectedGroupIds().length }} muebles seleccionados
-                      </span>
-                      <span class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-indigo-100/80 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800">
-                        {{ selectedPartIds().length }} piezas en total
-                      </span>
-                    } @else {
-                      <span class="text-xs font-black text-slate-800 dark:text-zinc-100">
+                    <span class="text-xs font-black text-slate-800 dark:text-zinc-100">
+                      @if (selectedGroupIds().length > 0) {
+                        {{ selectedGroupIds().length }} {{ selectedGroupIds().length === 1 ? 'mueble' : 'muebles' }}
+                      }
+                      @if (selectedApplianceIds().length > 0) {
+                        {{ selectedGroupIds().length > 0 ? ' · ' : '' }}{{ selectedApplianceIds().length }} {{ selectedApplianceIds().length === 1 ? 'equipo' : 'equipos' }}
+                      }
+                      @if (selectedGroupIds().length === 0 && selectedApplianceIds().length === 0) {
                         {{ selectedPartIds().length }} piezas seleccionadas
-                      </span>
-                      <button
-                        type="button"
-                        (click)="openGroupNamingModal()"
-                        class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1 cursor-pointer transition shadow-2xs">
-                        <hugeicons-icon [icon]="icons.link" [size]="11" [strokeWidth]="2"></hugeicons-icon>
-                        <span>Crear Módulo</span>
-                      </button>
-                    }
+                      }
+                    </span>
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-indigo-100/80 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800">
+                      {{ selectedPartIds().length }} piezas · {{ selectedApplianceIds().length }} equipos
+                    </span>
                   </div>
                 </div>
 
-                <!-- 2. LISTADO DE MÓDULOS INCLUIDOS EN LA MULTI-SELECCIÓN (CHIPS INTERACTIVOS) -->
-                @if (isMultiGroupSelected() && selectedGroupsWithCount().length > 0) {
+                <!-- 2. LISTADO DE MÓDULOS Y EQUIPOS EN LA MULTI-SELECCIÓN (CHIPS INTERACTIVOS) -->
+                @if (selectedGroupsWithCount().length > 0 || selectedAppliances().length > 0) {
                   <div class="bg-white dark:bg-zinc-900/80 p-2.5 rounded-xl border border-slate-200/90 dark:border-zinc-800 space-y-2 shadow-2xs">
                     <div class="flex items-center justify-between">
                       <span class="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
                         <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
-                        <span>Módulos en el conjunto</span>
+                        <span>Módulos y Equipos en el conjunto</span>
                       </span>
                       <span class="text-[9px] text-slate-400 font-medium">Clic para aislar</span>
                     </div>
 
-                    <div class="space-y-1.5 max-h-36 overflow-y-auto scrollbar-thin">
+                    <div class="space-y-1.5 max-h-48 overflow-y-auto scrollbar-thin">
                       @for (grp of selectedGroupsWithCount(); track grp.id) {
                         <div class="flex items-center justify-between gap-1.5 p-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/70 dark:border-zinc-700/60 hover:border-indigo-300 transition group">
                           <button
@@ -1339,6 +1529,27 @@
                             (click)="toggleGroupInSelection(grp.id)"
                             class="w-5 h-5 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition cursor-pointer shrink-0"
                             title="Quitar este módulo de la selección">
+                            <hugeicons-icon [icon]="icons.close" [size]="11" [strokeWidth]="2"></hugeicons-icon>
+                          </button>
+                        </div>
+                      }
+
+                      @for (app of selectedAppliances(); track app.id) {
+                        <div class="flex items-center justify-between gap-1.5 p-1.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/50 hover:border-amber-400 transition group">
+                          <button
+                            type="button"
+                            (click)="selectOnlyAppliance(app.id)"
+                            class="flex items-center gap-1.5 min-w-0 flex-1 text-left cursor-pointer"
+                            title="Aislar y ajustar medidas de este electrodoméstico">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                            <span class="text-[11px] font-semibold text-amber-950 dark:text-amber-200 truncate group-hover:text-amber-600 transition">{{ app.name }}</span>
+                            <span class="text-[9px] text-amber-700 dark:text-amber-400 font-mono shrink-0">({{ app.width }}×{{ app.height }})</span>
+                          </button>
+                          <button
+                            type="button"
+                            (click)="toggleApplianceInSelection(app.id)"
+                            class="w-5 h-5 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition cursor-pointer shrink-0"
+                            title="Quitar este equipo de la selección">
                             <hugeicons-icon [icon]="icons.close" [size]="11" [strokeWidth]="2"></hugeicons-icon>
                           </button>
                         </div>
@@ -1454,17 +1665,26 @@
                       </button>
                     }
                   </div>
+
+                  @if (selectedAppliances().length > 0) {
+                    <div class="mt-2 px-2 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/50 text-[9.5px] text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.info" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+                      <span>Aplica solo a melaminas. Los electrodomésticos conservan su acabado de catálogo intacto.</span>
+                    </div>
+                  }
                 </div>
 
                 <!-- 5. CALLOUT DE COHERENCIA CAD / SKETCHUP -->
-                <div class="p-2.5 bg-slate-50 dark:bg-zinc-800/50 border border-slate-200/90 dark:border-zinc-700 rounded-xl flex items-start gap-2 shadow-2xs">
-                  <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-indigo-600 shrink-0 mt-0.5"></hugeicons-icon>
-                  <div class="text-[10.5px] leading-relaxed text-slate-600 dark:text-zinc-300 space-y-1">
-                    <p>
-                      <strong>Movimiento conjunto:</strong> Arrastra en el lienzo 3D o usa las flechas del teclado (← → ↑ ↓ / Alt+↑↓) para mover todos los módulos a la vez.
+                <div class="p-3 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl flex items-start gap-2.5 shadow-2xs">
+                  <hugeicons-icon [icon]="icons.info" [size]="15" [strokeWidth]="2.2" class="text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5"></hugeicons-icon>
+                  <div class="text-[11px] leading-relaxed space-y-1.5">
+                    <p class="text-slate-900 dark:text-slate-100 font-medium">
+                      <strong class="font-bold text-slate-950 dark:text-white">Movimiento conjunto:</strong>
+                      Arrastra en el lienzo 3D o usa las flechas del teclado (<kbd class="px-1 py-0.2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-[10px] font-mono text-slate-800 dark:text-slate-200">← → ↑ ↓</kbd> / <kbd class="px-1 py-0.2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-[10px] font-mono text-slate-800 dark:text-slate-200">Alt+↑↓</kbd>) para mover todos los módulos y equipos a la vez.
                     </p>
-                    <p class="text-[9.5px] text-slate-500 dark:text-zinc-400">
-                      <em>Nota de diseño:</em> Las cotas individuales (ancho, alto y fondo) están ocultas deliberadamente para preservar la integridad dimensional de cada módulo. Para ajustar medidas, haz clic en un solo módulo.
+                    <p class="text-[10px] text-slate-700 dark:text-slate-300">
+                      <strong class="font-semibold text-slate-800 dark:text-slate-200">Nota de diseño:</strong>
+                      Las cotas individuales (ancho, alto y fondo) están ocultas deliberadamente para preservar la integridad dimensional de cada módulo. Para ajustar medidas, haz clic en un solo módulo o equipo.
                     </p>
                   </div>
                 </div>
@@ -1504,15 +1724,24 @@
 
                 <!-- Botones de Acción Principal del Módulo -->
                 <div [class]="isSelectedGroupCountertop() ? 'grid grid-cols-2 gap-1.5 pt-0.5' : 'grid grid-cols-3 gap-1.5 pt-0.5'">
-                  <button
-                    type="button"
-                    (click)="openEditSelectedGroup($event)"
-                    [class]="isSelectedGroupCountertop() ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white'"
-                    class="py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 shadow-2xs transition cursor-pointer"
-                    [title]="isSelectedGroupCountertop() ? 'Abrir panel Mesones 3D en Cocina Pro Studio' : 'Abrir asistente paramétrico de este módulo'">
-                    <hugeicons-icon [icon]="icons.tune" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                    <span class="truncate">{{ isSelectedGroupCountertop() ? 'Mesón 3D' : 'Configurar' }}</span>
-                  </button>
+                  @if (activeModuleAppliances().length === 0) {
+                    <button
+                      type="button"
+                      (click)="openEditSelectedGroup($event)"
+                      [class]="isSelectedGroupCountertop() ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white'"
+                      class="py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 shadow-2xs transition cursor-pointer"
+                      [title]="isSelectedGroupCountertop() ? 'Abrir panel Mesones 3D en Cocina Pro Studio' : 'Abrir asistente paramétrico de este módulo'">
+                      <hugeicons-icon [icon]="icons.tune" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                      <span class="truncate">{{ isSelectedGroupCountertop() ? 'Mesón 3D' : 'Configurar' }}</span>
+                    </button>
+                  } @else {
+                    <div
+                      class="py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 bg-amber-500/15 border border-amber-300 text-amber-800 shadow-2xs"
+                      title="Módulo Pro Protegido. Sus medidas se ajustan en la sección Dimensiones o en Equipos integrados.">
+                      <hugeicons-icon [icon]="icons.appliance" [size]="12" [strokeWidth]="2" class="text-amber-700 shrink-0"></hugeicons-icon>
+                      <span class="truncate">Módulo Pro</span>
+                    </div>
+                  }
 
                   @if (!isSelectedGroupCountertop()) {
                     <button
@@ -1923,6 +2152,76 @@
                 </div>
               </div>
 
+              <!-- Electrodomésticos vinculados al módulo -->
+              @if (activeModuleAppliances().length > 0) {
+                <div class="p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2 shadow-2xs">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.appliance" [size]="13" [strokeWidth]="2" class="text-amber-700 shrink-0"></hugeicons-icon>
+                      <span>Equipos integrados ({{ activeModuleAppliances().length }})</span>
+                    </span>
+                    <span class="text-[9px] text-amber-700 font-semibold">Sincronizados</span>
+                  </div>
+                  <div class="space-y-2">
+                    @for (app of activeModuleAppliances(); track app.id) {
+                      <div class="p-2 rounded-lg bg-white border border-amber-200/80 space-y-1.5 shadow-2xs">
+                        <div class="flex items-center justify-between gap-1">
+                          <button
+                            type="button"
+                            (click)="selectOnlyAppliance(app.id)"
+                            class="flex items-center gap-1.5 min-w-0 flex-1 text-left cursor-pointer"
+                            title="Seleccionar y ver detalles completos de este electrodoméstico">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                            <span class="text-[11px] font-bold text-slate-800 truncate hover:text-amber-600 transition">{{ app.name }}</span>
+                          </button>
+                          <button
+                            type="button"
+                            (click)="toggleApplianceModuleLink(app.id, null)"
+                            class="px-1.5 py-0.5 text-[9px] font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 rounded transition cursor-pointer shrink-0"
+                            title="Desvincular del módulo para moverlo de forma independiente">
+                            Desvincular
+                          </button>
+                        </div>
+
+                        <!-- Ajuste directo de medidas del equipo (Ancho X, Prof Z, Alto Y) -->
+                        <div class="grid grid-cols-3 gap-1 pt-1 border-t border-slate-100">
+                          <div>
+                            <span class="text-[8px] font-bold text-slate-400 block uppercase">Ancho (X)</span>
+                            <input
+                              type="number"
+                              [value]="app.width"
+                              (change)="onApplianceDirectDimChange(app.id, 'width', $any($event.target).value)"
+                              class="w-full text-[10px] font-bold font-mono px-1 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-800 text-center focus:outline-hidden focus:border-amber-500"
+                              min="50"
+                              step="10" />
+                          </div>
+                          <div>
+                            <span class="text-[8px] font-bold text-slate-400 block uppercase">Prof. (Z)</span>
+                            <input
+                              type="number"
+                              [value]="app.depth"
+                              (change)="onApplianceDirectDimChange(app.id, 'depth', $any($event.target).value)"
+                              class="w-full text-[10px] font-bold font-mono px-1 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-800 text-center focus:outline-hidden focus:border-amber-500"
+                              min="50"
+                              step="10" />
+                          </div>
+                          <div>
+                            <span class="text-[8px] font-bold text-slate-400 block uppercase">Alto (Y)</span>
+                            <input
+                              type="number"
+                              [value]="app.height"
+                              (change)="onApplianceDirectDimChange(app.id, 'height', $any($event.target).value)"
+                              class="w-full text-[10px] font-bold font-mono px-1 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-800 text-center focus:outline-hidden focus:border-amber-500"
+                              min="50"
+                              step="10" />
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+
               <!-- 8. ACCIONES FINALES DEL MÓDULO -->
               <div class="pt-1 grid grid-cols-2 gap-1.5">
                 <button
@@ -2196,7 +2495,7 @@
                       [class]="sel.thickness === 15 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
                       class="py-1 text-[10px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
                       <span>15 mm</span>
-                      <span class="text-[8px] opacity-75">Ligero</span>
+                      <span class="text-[8px] opacity-75">Estándar</span>
                     </button>
                     <button
                       type="button"
@@ -2204,7 +2503,7 @@
                       [class]="sel.thickness === 18 ? 'bg-sky-500 text-white font-bold shadow-2xs border-sky-600' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
                       class="py-1 text-[10px] font-mono rounded-lg transition border text-center flex flex-col items-center cursor-pointer">
                       <span>18 mm</span>
-                      <span class="text-[8px] opacity-75">Estándar</span>
+                      <span class="text-[8px] opacity-75">Robusto</span>
                     </button>
                     <button
                       type="button"
@@ -3461,6 +3760,46 @@
                   </div>
                 </div>
 
+                <!-- Vínculo con Módulo / Mueble -->
+                <div class="p-2 bg-white rounded-xl border border-emerald-100 space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                      <hugeicons-icon [icon]="icons.link" [size]="12" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+                      <span>Vínculo con Módulo</span>
+                    </span>
+                    @if (selApp.groupId) {
+                      <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800">Vinculado</span>
+                    } @else {
+                      <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">Independiente</span>
+                    }
+                  </div>
+
+                  @if (selApp.groupId) {
+                    <div class="flex items-center justify-between gap-1 pt-0.5">
+                      <span class="text-[11px] font-semibold text-slate-800 truncate">
+                        {{ getGroupName(selApp.groupId) }}
+                      </span>
+                      <button
+                        type="button"
+                        (click)="toggleApplianceModuleLink(selApp.id, null)"
+                        class="px-2 py-0.5 text-[9px] font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-md transition cursor-pointer shrink-0">
+                        Desvincular
+                      </button>
+                    </div>
+                  } @else {
+                    <div class="flex items-center gap-1.5 pt-0.5">
+                      <select
+                        (change)="toggleApplianceModuleLink(selApp.id, $any($event.target).value)"
+                        class="w-full text-[10px] font-semibold bg-slate-50 border border-slate-200 rounded px-1.5 py-1 text-slate-700 focus:outline-hidden focus:border-indigo-500">
+                        <option value="">-- Vincular a un módulo... --</option>
+                        @for (grp of groups(); track grp.id) {
+                          <option [value]="grp.id">{{ grp.name }}</option>
+                        }
+                      </select>
+                    </div>
+                  }
+                </div>
+
                 <!-- Presupuesto e Integración Financiera -->
                 <div class="p-2 bg-white rounded-xl border border-emerald-100 space-y-1">
                   <div class="flex items-center justify-between">
@@ -3499,19 +3838,32 @@
                     <hugeicons-icon [icon]="icons.inbox" [size]="12" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
                     <span>En Escena ({{ appliances().length }})</span>
                   </span>
-                  <span class="text-[9px] text-slate-400">Clic para editar</span>
+                  @if (hiddenAppliancesCount() > 0) {
+                    <button
+                      type="button"
+                      (click)="projectService.unhideAllAppliances()"
+                      class="text-[9px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded transition cursor-pointer flex items-center gap-1"
+                      title="Restaurar visibilidad de todos los equipos">
+                      <hugeicons-icon [icon]="icons.eye" [size]="10" [strokeWidth]="2"></hugeicons-icon>
+                      <span>Mostrar {{ hiddenAppliancesCount() }} oculto(s)</span>
+                    </button>
+                  } @else {
+                    <span class="text-[9px] text-slate-400">Clic para editar</span>
+                  }
                 </div>
 
-                <div class="space-y-1 max-h-36 overflow-y-auto scrollbar-thin pr-0.5">
+                <div class="space-y-1 max-h-48 overflow-y-auto scrollbar-thin pr-0.5">
                   @for (app of appliances(); track app.id) {
                     <div
                       (click)="selectAppliance(app.id)"
                       (keydown.enter)="selectAppliance(app.id)"
                       tabindex="0"
                       role="button"
-                      [class]="selectedApplianceId() === app.id
-                        ? 'border-emerald-500 bg-emerald-50/80 shadow-2xs font-bold'
-                        : 'border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-white font-normal'"
+                      [class]="app.isHidden
+                        ? 'border-amber-300 border-dashed bg-amber-50/70 opacity-70'
+                        : (selectedApplianceId() === app.id
+                          ? 'border-emerald-500 bg-emerald-50/80 shadow-2xs font-bold'
+                          : 'border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-white font-normal')"
                       class="p-1.5 rounded-xl border flex items-center justify-between gap-2 transition cursor-pointer text-xs">
 
                       <div class="flex items-center gap-2 min-w-0">
@@ -3520,20 +3872,53 @@
                           [size]="14"
                           [strokeWidth]="1.9"
                           class="shrink-0"
-                          [class.text-emerald-600]="selectedApplianceId() === app.id">
+                          [class.text-amber-500]="app.isHidden"
+                          [class.text-emerald-600]="!app.isHidden && selectedApplianceId() === app.id">
                         </hugeicons-icon>
                         <div class="truncate">
-                          <p class="truncate text-[11px] leading-tight text-slate-800">{{ app.name }}</p>
+                          <div class="flex items-center gap-1 truncate">
+                            <p class="truncate text-[11px] leading-tight text-slate-800">{{ app.name }}</p>
+                            @if (app.isHidden) {
+                              <span class="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-200/80 text-amber-900 shrink-0">Oculto</span>
+                            }
+                            @if (app.isLocked) {
+                              <span class="inline-flex items-center px-1 py-0.2 bg-amber-100 text-amber-800 rounded text-[9px] font-bold shrink-0" title="Equipo inmovilizado (fijo)">
+                                <hugeicons-icon [icon]="icons.lock" [size]="9" [strokeWidth]="2.2"></hugeicons-icon>
+                              </span>
+                            }
+                          </div>
                           <p class="text-[9px] font-mono text-slate-400">
                             {{ app.width }}×{{ app.depth }}×{{ app.height }} mm
                           </p>
                         </div>
                       </div>
 
-                      <div class="flex items-center gap-1 shrink-0">
-                        <span class="text-[10px] font-mono font-semibold" [class.text-emerald-700]="app.includeInBudget" [class.text-slate-400]="!app.includeInBudget">
+                      <div class="flex items-center gap-0.5 shrink-0">
+                        <span class="text-[10px] font-mono font-semibold mr-1" [class.text-emerald-700]="app.includeInBudget" [class.text-slate-400]="!app.includeInBudget">
                           {{ app.includeInBudget ? projectService.formatCurrency(app.price) : 'Excluido' }}
                         </span>
+
+                        <!-- Botón Inmovilizar / Desbloquear Equipo -->
+                        <button
+                          type="button"
+                          (click)="toggleApplianceLockById(app.id, $event)"
+                          [class]="app.isLocked ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : 'text-slate-400 hover:text-amber-600'"
+                          class="p-1 rounded-lg transition cursor-pointer flex items-center justify-center"
+                          [title]="app.isLocked ? 'Equipo inmovilizado. Clic para desbloquear' : 'Inmovilizar este equipo en el 3D'">
+                          <hugeicons-icon [icon]="icons.lock" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
+                        </button>
+
+                        <!-- Botón Ocultar / Mostrar Equipo -->
+                        <button
+                          type="button"
+                          (click)="toggleApplianceVisibility(app.id, $event)"
+                          [class]="app.isHidden ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : 'text-slate-400 hover:text-slate-700'"
+                          class="p-1 rounded-lg transition cursor-pointer flex items-center justify-center"
+                          [title]="app.isHidden ? 'Mostrar equipo en el 3D' : 'Ocultar equipo temporalmente (H)'">
+                          <hugeicons-icon [icon]="app.isHidden ? icons.eyeOff : icons.eye" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
+                        </button>
+
+                        <!-- Botón Eliminar Equipo -->
                         <button
                           type="button"
                           (click)="projectService.removeAppliance(app.id); $event.stopPropagation()"

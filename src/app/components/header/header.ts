@@ -97,6 +97,7 @@ export class HeaderComponent {
     undo: ArrowLeft01Icon,
     redo: ArrowRight01Icon,
     project: Layers01Icon,
+    layers: Layers01Icon,
     chevronDown: ArrowDown01Icon,
     add: Add01Icon,
     cloud: CloudIcon,
@@ -166,6 +167,8 @@ export class HeaderComponent {
   readonly settingsForm: FormGroup = this.fb.group({
     sawKerf: [4, [Validators.required, Validators.min(0)]],
     trimMargin: [10, [Validators.required, Validators.min(0)]],
+    defaultBoardThickness: [15, [Validators.required, Validators.min(10), Validators.max(35)]],
+    applyThicknessToAllParts: [false],
     thinEdgeThickness: [0.45, [Validators.required, Validators.min(0)]],
     thickEdgeThickness: [2.0, [Validators.required, Validators.min(0)]],
     thinEdgeCostPerMeter: [1800, [Validators.required, Validators.min(0)]],
@@ -202,6 +205,8 @@ export class HeaderComponent {
     this.settingsForm.patchValue({
       sawKerf: s.sawKerf,
       trimMargin: s.trimMargin,
+      defaultBoardThickness: s.defaultBoardThickness || 15,
+      applyThicknessToAllParts: false,
       thinEdgeThickness: s.thinEdgeThickness,
       thickEdgeThickness: s.thickEdgeThickness,
       thinEdgeCostPerMeter: s.thinEdgeCostPerMeter,
@@ -214,9 +219,25 @@ export class HeaderComponent {
 
   saveSettings() {
     if (this.settingsForm.valid) {
-      const val = this.settingsForm.value as ProjectSettings;
-      this.projectService.updateSettings(val);
+      const raw = this.settingsForm.value;
+      const applyToAll = !!raw.applyThicknessToAllParts;
+      const val: ProjectSettings = {
+        sawKerf: Number(raw.sawKerf),
+        trimMargin: Number(raw.trimMargin),
+        defaultBoardThickness: Number(raw.defaultBoardThickness) || 15,
+        thinEdgeThickness: Number(raw.thinEdgeThickness),
+        thickEdgeThickness: Number(raw.thickEdgeThickness),
+        thinEdgeCostPerMeter: Number(raw.thinEdgeCostPerMeter),
+        thickEdgeCostPerMeter: Number(raw.thickEdgeCostPerMeter),
+        currency: raw.currency,
+        optimizationPreference: raw.optimizationPreference
+      };
+      this.projectService.updateSettings(val, applyToAll);
       this.showSettingsModal.set(false);
+      this.showToast(applyToAll
+        ? `Configuración guardada. Espesor base ${val.defaultBoardThickness} mm aplicado a las piezas.`
+        : `Configuración guardada. Espesor base predeterminado: ${val.defaultBoardThickness} mm.`
+      );
     }
   }
 

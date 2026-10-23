@@ -139,7 +139,7 @@ export class PartsListComponent {
     materialId: ['', Validators.required],
     length: [600, [Validators.required, Validators.min(10)]],
     width: [400, [Validators.required, Validators.min(10)]],
-    thickness: [18, [Validators.required, Validators.min(1)]],
+    thickness: [this.projectService.currentProject().settings.defaultBoardThickness || 15, [Validators.required, Validators.min(1)]],
     quantity: [1, [Validators.required, Validators.min(1)]],
     grain: ['length' as GrainDirection, Validators.required],
     l1: ['none' as EdgeBandingType],
@@ -245,7 +245,7 @@ export class PartsListComponent {
       materialId: mats[0]?.id || '',
       length: 600,
       width: 400,
-      thickness: 18,
+      thickness: this.projectService.currentProject().settings.defaultBoardThickness || 15,
       quantity: 1,
       grain: 'length',
       l1: 'thin',
@@ -290,7 +290,7 @@ export class PartsListComponent {
     const selMod = mods.find(m => m.id === val.moduleId);
 
     const existing = this.editingPart();
-    const thickness = Number(val.thickness) || 18;
+    const thickness = Number(val.thickness) || this.projectService.currentProject().settings.defaultBoardThickness || 15;
 
     const partData: Part = {
       ...(existing ?? {

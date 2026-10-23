@@ -33,7 +33,7 @@ export class JoineryEngineService {
    * Útil para construir el BoxGeometry(sx, sy, sz) en el visor 3D cuando el mesh aplica rotation.set(...) encima.
    */
   getPartLocalDimensions(part: Part): { sx: number; sy: number; sz: number } {
-    const t = part.thickness || 18;
+    const t = part.thickness || 15;
     const L = part.length;
     const W = part.width;
 
@@ -208,10 +208,10 @@ export class JoineryEngineService {
           const isBackJoint =
             (b1.part.componentRole === 'back' &&
               b2.part.componentRole &&
-              ['side_left', 'side_right', 'top', 'bottom', 'shelf'].includes(b2.part.componentRole)) ||
+              ['side_left', 'side_right', 'top', 'bottom', 'shelf', 'tie'].includes(b2.part.componentRole)) ||
             (b2.part.componentRole === 'back' &&
               b1.part.componentRole &&
-              ['side_left', 'side_right', 'top', 'bottom', 'shelf'].includes(b1.part.componentRole));
+              ['side_left', 'side_right', 'top', 'bottom', 'shelf', 'tie'].includes(b1.part.componentRole));
           const sameGroup = b1.part.groupId && b1.part.groupId === b2.part.groupId;
           if (isBackJoint && (sameGroup || !b1.part.groupId || !b2.part.groupId) && (overlapX <= 12 || overlapY <= 12 || overlapZ <= 12)) {
             continue;
@@ -343,7 +343,7 @@ export class JoineryEngineService {
         role === 'drawer_lateral' ||
         role === 'back' ||
         role === 'plinth' ||
-        (b.part.thickness || 18) <= 8
+        (b.part.thickness || 15) <= 8
       ) {
         return false;
       }
@@ -617,7 +617,7 @@ export class JoineryEngineService {
     if (isMovable1 || isMovable2) return;
 
     // Ignorar fondos delgados (MDF 3-6mm) para tornillos/tarugos estructurales
-    if ((b1.part.thickness || 18) <= 8 || (b2.part.thickness || 18) <= 8) return;
+    if ((b1.part.thickness || 15) <= 8 || (b2.part.thickness || 15) <= 8) return;
     if (b1.part.componentRole === 'back' || b2.part.componentRole === 'back') return;
 
     const contactTolerance = 3.0;
@@ -803,7 +803,7 @@ export class JoineryEngineService {
         id: `screw_pass_${passing.part.id}_${butt.part.id}_${idx}`,
         type: 'screw_4x50',
         diameter: 4.5,
-        depth: passing.part.thickness || 18,
+        depth: passing.part.thickness || 15,
         posX,
         posY,
         posZ,

@@ -405,6 +405,7 @@ export class ModuleDesignerComponent {
   readonly project = this.projectService.currentProject;
   readonly materials = this.projectService.materialsList;
   readonly currentParts = this.projectService.partsList;
+  readonly defaultBoardThickness = computed(() => this.project().settings?.defaultBoardThickness || 15);
 
   // Estado del Modal de Opciones de Componente Paramétrico
   readonly selectedParametricConfig = signal<ParametricCabinetConfig | null>(null);
@@ -521,6 +522,22 @@ export class ModuleDesignerComponent {
   });
 
   /**
+   * Indica si hay una selección múltiple activa (múltiples módulos, piezas y/o electrodomésticos).
+   */
+  readonly isMultiSelection = computed<boolean>(() => {
+    const partCount = this.selectedPartIds().length;
+    const appCount = this.selectedApplianceIds().length;
+    const total = partCount + appCount;
+    if (total <= 1) return false;
+    const gIds = this.selectedGroupIds();
+    if (gIds.length > 1) return true;
+    if (appCount > 0 && partCount > 0) return true;
+    if (appCount > 1) return true;
+    if (partCount > 1 && !this.isAnyGroupSelected()) return true;
+    return false;
+  });
+
+  /**
    * Colección de los módulos actualmente seleccionados.
    */
   readonly selectedGroups = computed<PartGroup[]>(() => {
@@ -620,7 +637,7 @@ export class ModuleDesignerComponent {
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
     let minZ = Infinity, maxZ = -Infinity;
-    let structuralThickness = 18;
+    let structuralThickness = 15;
     let mainMaterialId = grpParts[0].materialId;
 
     for (const p of grpParts) {
@@ -631,8 +648,8 @@ export class ModuleDesignerComponent {
       if (b.maxY > maxY) maxY = b.maxY;
       if (b.minZ < minZ) minZ = b.minZ;
       if (b.maxZ > maxZ) maxZ = b.maxZ;
-      if ((p.thickness || 18) > 8 && p.componentRole !== 'back') {
-        structuralThickness = p.thickness || 18;
+      if ((p.thickness || 15) > 8 && p.componentRole !== 'back') {
+        structuralThickness = p.thickness || 15;
         mainMaterialId = p.materialId;
       }
     }
@@ -718,9 +735,18 @@ export class ModuleDesignerComponent {
     return this.getNextUniqueGroupName('Cajón');
   });
 
-  // Control de visibilidad (Ocultar / Mostrar piezas y grupos con tecla H / Alt+H)
+  // Control de visibilidad (Ocultar / Mostrar piezas, módulos y electrodomésticos con tecla H / Alt+H)
   readonly hiddenPartIds = signal<Set<string>>(new Set());
   readonly hiddenPartsCount = computed(() => this.hiddenPartIds().size);
+  readonly hiddenAppliancesCount = computed(() => this.appliances().filter(a => a.isHidden).length);
+  readonly hiddenModulesCount = computed(() => this.groups().filter(g => this.isGroupHidden(g.id)).length);
+  readonly hiddenPiecesOnlyCount = computed(() => {
+    const hiddenPIds = this.hiddenPartIds();
+    const groupsHidden = this.groups().filter(g => this.isGroupHidden(g.id));
+    const hiddenGroupPartIds = new Set(this.currentParts().filter(p => p.groupId && groupsHidden.some(g => g.id === p.groupId)).map(p => p.id));
+    return Array.from(hiddenPIds).filter(id => !hiddenGroupPartIds.has(id)).length;
+  });
+  readonly totalHiddenCount = computed(() => this.hiddenPartIds().size + this.hiddenAppliancesCount());
 
   // Configuración del Modo Habitación 3D y Catálogos de Acabados Arquitectónicos
   readonly workspaceMode = signal<WorkspaceMode>('module');
@@ -836,9 +862,13 @@ export class ModuleDesignerComponent {
     }
 
     if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'h' || e.key === 'H')) {
-      if (this.isAnyGroupSelected()) {
+      if (this.isAnyGroupSelected() || this.isMultiSelection()) {
         e.preventDefault();
         this.hideActiveGroup();
+        return;
+      } else if (this.selectedApplianceId()) {
+        e.preventDefault();
+        this.hideSelectedAppliance();
         return;
       } else if (this.selectedPartId()) {
         e.preventDefault();
@@ -860,7 +890,17 @@ export class ModuleDesignerComponent {
   // Electrodomésticos y Accesorios 3D
   readonly appliances = this.projectService.appliancesList;
   readonly selectedApplianceId = this.projectService.selectedApplianceId;
+  readonly selectedApplianceIds = this.projectService.selectedApplianceIds;
   readonly selectedAppliance = this.projectService.selectedAppliance;
+  readonly selectedAppliances = computed(() => {
+    const ids = this.selectedApplianceIds();
+    return this.appliances().filter(a => ids.includes(a.id));
+  });
+  readonly activeModuleAppliances = computed(() => {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return [];
+    return this.appliances().filter(a => a.groupId === gId);
+  });
   readonly appliancesCatalog = APPLIANCES_CATALOG_PRESETS;
   readonly applianceFinishOptions = APPLIANCE_FINISH_OPTIONS;
   readonly activeApplianceCategory = signal<'all' | 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs' | 'seating' | 'lighting' | 'architecture'>('all');
@@ -1083,6 +1123,24 @@ export class ModuleDesignerComponent {
     this.showToast(`🗑️ "${name}" retirado`);
   }
 
+  toggleSelectedApplianceLock() {
+    const sel = this.selectedAppliance();
+    if (!sel) return;
+    const next = !sel.isLocked;
+    this.projectService.updateAppliance(sel.id, { isLocked: next });
+    this.showToast(next ? `🔒 "${sel.name}" inmovilizado (fijo)` : `🔓 "${sel.name}" desbloqueado para mover`);
+  }
+
+  hideSelectedAppliance() {
+    const sel = this.selectedAppliance();
+    if (!sel) return;
+    this.projectService.updateAppliance(sel.id, { isHidden: true });
+    this.selectedApplianceId.set(null);
+    this.selectedApplianceIds.set([]);
+    this.activeDockTab.set('catalog');
+    this.showToast(`👁️ "${sel.name}" oculto temporalmente (Alt+H para restaurar)`);
+  }
+
   toggleApplianceBudgetInclusion() {
     const sel = this.selectedAppliance();
     if (!sel) return;
@@ -1105,11 +1163,52 @@ export class ModuleDesignerComponent {
   onApplianceSelectedFrom3D(app: ApplianceItem | null) {
     if (app) {
       this.projectService.selectAppliance(app.id);
+      this.projectService.selectAppliances([app.id]);
       this.selectedPartId.set(null);
       this.selectedPartIds.set([]);
       this.activeDockTab.set('appliances');
     } else {
       this.projectService.selectAppliance(null);
+      this.projectService.selectAppliances([]);
+    }
+  }
+
+  onAppliancesSelectedFrom3D(appIds: string[]) {
+    this.projectService.selectAppliances(appIds);
+    if (appIds.length > 0) {
+      if (appIds.length === 1 && this.selectedPartIds().length === 0) {
+        this.projectService.selectAppliance(appIds[0]);
+        this.activeDockTab.set('appliances');
+      } else {
+        this.activeDockTab.set('piece');
+      }
+    }
+  }
+
+  onMultipleAppliancesModifiedFromViewer(evt: { updates: { id: string; updates: Partial<ApplianceItem> }[] }) {
+    this.projectService.updateMultipleAppliances(evt.updates);
+  }
+
+  selectOnlyAppliance(appId: string) {
+    this.selectedPartIds.set([]);
+    this.selectedPartId.set(null);
+    this.projectService.selectAppliance(appId);
+    this.projectService.selectAppliances([appId]);
+    this.activeDockTab.set('appliances');
+  }
+
+  toggleApplianceInSelection(appId: string) {
+    this.projectService.toggleApplianceSelection(appId);
+  }
+
+  toggleApplianceModuleLink(applianceId: string, groupId: string | null) {
+    this.projectService.linkApplianceToGroup(applianceId, groupId);
+    const app = this.appliances().find(a => a.id === applianceId);
+    const group = groupId ? this.groups().find(g => g.id === groupId) : null;
+    if (groupId && group) {
+      this.showToast(`🔗 "${app?.name || 'Equipo'}" vinculado al módulo "${group.name}"`);
+    } else {
+      this.showToast(`🔓 "${app?.name || 'Equipo'}" desvinculado (ahora es independiente)`);
     }
   }
 
@@ -1122,6 +1221,18 @@ export class ModuleDesignerComponent {
     const name = app ? app.name : 'Equipo';
     this.projectService.removeAppliance(id);
     this.showToast(`🗑️ "${name}" eliminado (Delete)`);
+  }
+
+  onApplianceDuplicatedFromViewer(id: string) {
+    this.projectService.duplicateAppliance(id);
+    this.showToast('📋 Electrodoméstico duplicado');
+  }
+
+  onApplianceDirectDimChange(appId: string, prop: 'width' | 'depth' | 'height', val: number | string) {
+    const num = Number(val);
+    if (!isNaN(num) && num > 0) {
+      this.projectService.updateAppliance(appId, { [prop]: Math.round(num) });
+    }
   }
 
   // Control de colapso de la bandeja lateral y modal de plantillas/edición de módulos
@@ -1180,6 +1291,11 @@ export class ModuleDesignerComponent {
     const parts = this.currentParts().filter(p => p.groupId === groupId);
     if (parts.length === 0) {
       this.showToast('⚠️ No se encontraron piezas para editar en este módulo');
+      return;
+    }
+
+    if (this.appliances().some(a => a.groupId === groupId)) {
+      this.showToast('ℹ️ Módulo Pro protegido con equipos integrados. Para cambiar dimensiones usa el inspector derecho.');
       return;
     }
 
@@ -1471,6 +1587,8 @@ export class ModuleDesignerComponent {
   deselectAll() {
     this.selectedPartId.set(null);
     this.selectedPartIds.set([]);
+    this.projectService.selectAppliances([]);
+    this.projectService.selectAppliance(null);
     this.activeDockTab.set('catalog');
   }
 
@@ -1504,10 +1622,10 @@ export class ModuleDesignerComponent {
     }
   }
 
-  getGroupName(groupId?: string): string | null {
-    if (!groupId) return null;
+  getGroupName(groupId?: string): string {
+    if (!groupId) return 'Módulo';
     const grp = this.groups().find(g => g.id === groupId);
-    return grp ? grp.name : null;
+    return grp ? grp.name : 'Módulo';
   }
 
   deselectPart() {
@@ -1750,19 +1868,21 @@ export class ModuleDesignerComponent {
 
   onPartCreatedFromViewer(partData: Partial<Part>) {
     const defaultMat = this.materials()[0];
+    const defaultT = this.projectService.currentProject().settings.defaultBoardThickness || 15;
+    const resolvedT = partData.thickness || defaultT;
     const newPart: Part = {
       id: crypto.randomUUID(),
       name: partData.name || `Pieza ${this.currentParts().length + 1}`,
       length: partData.length || 600,
       width: partData.width || 400,
-      thickness: partData.thickness || 15,
+      thickness: resolvedT,
       quantity: 1,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
       materialName: defaultMat ? defaultMat.name : 'Melamina Blanco Frost Mate',
       grain: 'length',
       edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
       posX: partData.posX ?? 0,
-      posY: partData.posY ?? 7.5,
+      posY: partData.posY ?? (resolvedT / 2),
       posZ: partData.posZ ?? 0,
       orientation: partData.orientation || 'horizontal',
       componentRole: 'free',
@@ -1956,11 +2076,22 @@ export class ModuleDesignerComponent {
   }
 
   rotateSelectedGroup(deltaAngle: 90 | -90 | 180 = 90) {
-    if (this.isMultiGroupSelected() || this.selectedPartIds().length > 1) {
-      const ids = this.selectedPartIds();
-      this.projectService.rotateMultiplePartsRigidly(ids, deltaAngle);
+    const partIds = this.selectedPartIds();
+    const appIds = this.selectedApplianceIds();
+    if (this.isMultiSelection() || partIds.length > 1 || (partIds.length > 0 && appIds.length > 0) || appIds.length > 1) {
+      this.projectService.rotateMultiplePartsRigidly(partIds, deltaAngle, appIds);
       const gCount = this.selectedGroupIds().length;
-      this.showToast(`🔄 ${gCount > 1 ? gCount + ' módulos girados' : ids.length + ' piezas giradas'} ${deltaAngle > 0 ? '+' : ''}${deltaAngle}° en bloque`);
+      const totalCount = (gCount > 0 ? gCount : partIds.length) + appIds.length;
+      this.showToast(`🔄 ${totalCount} elementos girados ${deltaAngle > 0 ? '+' : ''}${deltaAngle}° en bloque`);
+      return;
+    }
+    if (appIds.length === 1 && partIds.length === 0) {
+      const app = this.selectedAppliance();
+      if (app) {
+        const nextRot = (((app.rotation || 0) + deltaAngle) % 360 + 360) % 360;
+        this.projectService.updateAppliance(app.id, { rotation: nextRot });
+        this.showToast(`🔄 ${app.name} girado ${deltaAngle > 0 ? '+' : ''}${deltaAngle}°`);
+      }
       return;
     }
     const groupId = this.activeSelectedGroupId();
@@ -2106,31 +2237,56 @@ export class ModuleDesignerComponent {
   }
 
   /**
-   * Elimina la pieza o conjunto de piezas seleccionadas en una única transacción de historial.
+   * Elimina la pieza, electrodoméstico o conjunto seleccionado en una única transacción de historial.
    */
   async deleteSelectedPart() {
     const selIds = this.selectedPartIds();
     const selId = this.selectedPartId();
-    if (selIds.length > 1) {
-      const isMulti = this.isMultiGroupSelected();
+    const selAppIds = this.selectedApplianceIds();
+
+    if (selIds.length > 1 || (selIds.length > 0 && selAppIds.length > 0) || selAppIds.length > 1) {
+      const isMulti = this.isMultiSelection();
       const gCount = this.selectedGroupIds().length;
-      const title = isMulti
-        ? `¿Eliminar ${gCount} módulos seleccionados (${selIds.length} piezas)?`
-        : `¿Eliminar ${selIds.length} piezas seleccionadas?`;
-      const message = isMulti
-        ? `Se eliminarán del modelo 3D los ${gCount} módulos y sus ${selIds.length} piezas. Puedes deshacer esta acción con Ctrl+Z o el botón Deshacer.`
-        : 'Se eliminarán del modelo 3D todas las piezas seleccionadas actualmente en grupo. Puedes deshacer esta acción con el botón Deshacer o Ctrl+Z.';
+      const appCount = selAppIds.length;
+      const partCount = selIds.length;
+
+      let labelDesc = '';
+      if (gCount > 0) labelDesc += `${gCount} módulo(s) (${partCount} pzs)`;
+      else if (partCount > 0) labelDesc += `${partCount} pieza(s)`;
+      if (appCount > 0) labelDesc += `${labelDesc ? ' y ' : ''}${appCount} equipo(s)`;
+
       const confirmed = await this.confirmService.ask({
-        title,
-        message,
-        confirmText: isMulti ? `Eliminar ${gCount} módulos` : `Eliminar ${selIds.length} piezas`,
+        title: `¿Eliminar selección (${labelDesc})?`,
+        message: `Se eliminarán del modelo 3D los elementos seleccionados. Puedes deshacer esta acción con el botón Deshacer o Ctrl+Z.`,
+        confirmText: 'Eliminar selección',
         cancelText: 'Cancelar',
         severity: 'danger'
       });
       if (!confirmed) return;
-      this.projectService.deleteMultipleParts(selIds);
+
+      this.projectService.deleteMultiplePartsAndAppliances(selIds, selAppIds);
       this.selectedPartIds.set([]);
       this.selectedPartId.set(null);
+      this.projectService.selectAppliances([]);
+      this.projectService.selectAppliance(null);
+      this.activeDockTab.set('catalog');
+      return;
+    }
+
+    if (selAppIds.length === 1 && selIds.length === 0) {
+      const app = this.appliances().find(a => a.id === selAppIds[0]);
+      const appName = app ? `"${app.name}"` : 'el equipo';
+      const confirmed = await this.confirmService.ask({
+        title: '¿Eliminar equipo de la escena?',
+        message: `Se eliminará ${appName} del modelo 3D.`,
+        confirmText: 'Eliminar Equipo',
+        cancelText: 'Cancelar',
+        severity: 'danger'
+      });
+      if (!confirmed) return;
+      this.projectService.removeAppliance(selAppIds[0]);
+      this.projectService.selectAppliances([]);
+      this.projectService.selectAppliance(null);
       this.activeDockTab.set('catalog');
       return;
     }
@@ -2187,7 +2343,7 @@ export class ModuleDesignerComponent {
     const whiteMat = mats.find(m => !m.hasGrain && m.thickness >= 15) || mats[0];
     const mdfMat = mats.find(m => m.thickness <= 6) || mats[0];
 
-    const defaultT = 15;
+    const defaultT = this.projectService.currentProject().settings.defaultBoardThickness || 15;
     let newPart: Part;
 
     const currentParts = this.currentParts();
@@ -2874,18 +3030,29 @@ export class ModuleDesignerComponent {
   }
 
   hideActiveGroup() {
-    if (this.isMultiGroupSelected() || this.selectedPartIds().length > 1) {
+    const selAppIds = this.selectedApplianceIds();
+    if (selAppIds.length > 0) {
+      const appUpdates = selAppIds.map(id => ({ id, updates: { isHidden: true } }));
+      this.projectService.updateMultipleAppliances(appUpdates);
+    }
+
+    if (this.isMultiSelection() || this.isMultiGroupSelected() || this.selectedPartIds().length > 1) {
       const ids = this.selectedPartIds();
-      const next = new Set(this.hiddenPartIds());
-      for (const id of ids) next.add(id);
-      this.hiddenPartIds.set(next);
-      this.viewer3d()?.hidePartsByIds(ids);
-      const gCount = this.selectedGroupIds().length;
+      if (ids.length > 0) {
+        const next = new Set(this.hiddenPartIds());
+        for (const id of ids) next.add(id);
+        this.hiddenPartIds.set(next);
+        this.viewer3d()?.hidePartsByIds(ids);
+      }
       this.deselectAll();
-      this.showToast(`👁️ ${gCount > 1 ? gCount + ' módulos ocultos' : ids.length + ' piezas ocultas'}. Alt+H para mostrar`);
+      this.showToast('👁️ Selección oculta temporalmente. Alt+H para mostrar');
       return;
     }
     const gId = this.activeSelectedGroupId();
+    if (!gId && selAppIds.length > 0) {
+      this.deselectAll();
+      return;
+    }
     if (!gId) return;
     const group = this.groups().find(g => g.id === gId);
     const groupName = group ? group.name : 'Grupo';
@@ -2925,6 +3092,10 @@ export class ModuleDesignerComponent {
   }
 
   isActiveSelectionLocked(): boolean {
+    const selAppIds = this.selectedApplianceIds();
+    const selApps = this.appliances().filter(a => selAppIds.includes(a.id));
+    if (selApps.some(a => !!a.isLocked)) return true;
+
     const gId = this.activeSelectedGroupId();
     if (gId) {
       return this.isGroupLocked(gId);
@@ -2936,7 +3107,9 @@ export class ModuleDesignerComponent {
         .some(p => !!p.isLocked);
     }
     const sel = this.selectedPart();
-    return sel ? this.isPartLocked(sel.id) : false;
+    if (sel) return this.isPartLocked(sel.id);
+    const selApp = this.selectedAppliance();
+    return selApp ? !!selApp.isLocked : false;
   }
 
   toggleSelectedPartLock(event?: Event) {
@@ -2961,28 +3134,33 @@ export class ModuleDesignerComponent {
 
   toggleActiveGroupLock(event?: Event) {
     event?.stopPropagation();
+    const selAppIds = this.selectedApplianceIds();
+    const selPartIds = this.selectedPartIds();
     const gId = this.activeSelectedGroupId();
+
+    const currentlyLocked = this.isActiveSelectionLocked();
+    const nextLocked = !currentlyLocked;
+
+    if (selAppIds.length > 0) {
+      const appUpdates = selAppIds.map(id => ({ id, updates: { isLocked: nextLocked } }));
+      this.projectService.updateMultipleAppliances(appUpdates);
+    }
+
     if (gId) {
       this.toggleGroupLockById(gId, event);
       return;
     }
 
-    const selIds = this.selectedPartIds();
-    if (selIds.length > 1) {
-      const selParts = this.currentParts().filter(p => selIds.includes(p.id));
-      const anyLocked = selParts.some(p => !!p.isLocked);
-      const nextLocked = !anyLocked;
+    if (selPartIds.length > 0) {
+      const selParts = this.currentParts().filter(p => selPartIds.includes(p.id));
       const updatesList = selParts.map(p => ({
         partId: p.id,
         updates: { isLocked: nextLocked }
       }));
       this.projectService.updateMultipleParts(updatesList);
-      this.showToast(
-        nextLocked
-          ? `🔒 ${selParts.length} piezas congeladas`
-          : `🔓 ${selParts.length} piezas descongeladas`
-      );
     }
+
+    this.showToast(nextLocked ? '🔒 Elementos inmovilizados' : '🔓 Elementos desbloqueados');
   }
 
   toggleGroupLockById(groupId: string, event?: Event) {
@@ -3038,15 +3216,21 @@ export class ModuleDesignerComponent {
     const group = this.groups().find(g => g.id === groupId);
     const groupName = group ? group.name : 'Grupo';
     const groupParts = this.currentParts().filter(p => p.groupId === groupId);
-    if (groupParts.length === 0) return;
+    const groupApps = this.appliances().filter(a => a.groupId === groupId);
+    if (groupParts.length === 0 && groupApps.length === 0) return;
 
     const partIds = groupParts.map(p => p.id);
-    const allHidden = partIds.every(id => this.hiddenPartIds().has(id));
+    const allHidden = partIds.length > 0
+      ? partIds.every(id => this.hiddenPartIds().has(id))
+      : groupApps.every(a => a.isHidden);
 
     const next = new Set(this.hiddenPartIds());
     if (allHidden) {
       for (const id of partIds) {
         next.delete(id);
+      }
+      if (groupApps.length > 0) {
+        this.projectService.updateMultipleAppliances(groupApps.map(a => ({ id: a.id, updates: { isHidden: false } })));
       }
       this.hiddenPartIds.set(next);
       this.viewer3d()?.showPartsByIds(partIds);
@@ -3054,6 +3238,9 @@ export class ModuleDesignerComponent {
     } else {
       for (const id of partIds) {
         next.add(id);
+      }
+      if (groupApps.length > 0) {
+        this.projectService.updateMultipleAppliances(groupApps.map(a => ({ id: a.id, updates: { isHidden: true } })));
       }
       this.hiddenPartIds.set(next);
       this.viewer3d()?.hidePartsByIds(partIds);
@@ -3064,15 +3251,36 @@ export class ModuleDesignerComponent {
     }
   }
 
+  toggleApplianceVisibility(appId: string, event?: Event) {
+    event?.stopPropagation();
+    const app = this.appliances().find(a => a.id === appId);
+    if (!app) return;
+    const nextHidden = !app.isHidden;
+    this.projectService.updateAppliance(appId, { isHidden: nextHidden });
+    this.showToast(nextHidden ? `👁️ "${app.name}" oculto (Alt+H para restaurar)` : `👁️ "${app.name}" visible`);
+  }
+
+  toggleApplianceLockById(appId: string, event?: Event) {
+    event?.stopPropagation();
+    const app = this.appliances().find(a => a.id === appId);
+    if (!app) return;
+    const nextLocked = !app.isLocked;
+    this.projectService.updateAppliance(appId, { isLocked: nextLocked });
+    this.showToast(nextLocked ? `🔒 "${app.name}" inmovilizado` : `🔓 "${app.name}" desbloqueado`);
+  }
+
   showAllParts() {
-    const prevCount = this.hiddenPartIds().size;
-    if (prevCount === 0) {
-      this.showToast('Todas las piezas ya son visibles');
+    const prevParts = this.hiddenPartIds().size;
+    const prevApps = this.appliances().filter(a => a.isHidden).length;
+    const total = prevParts + prevApps;
+    if (total === 0) {
+      this.showToast('Todas las piezas y equipos ya son visibles');
       return;
     }
     this.hiddenPartIds.set(new Set());
+    this.projectService.unhideAllAppliances();
     this.viewer3d()?.showAllParts();
-    this.showToast(`👁️ Se restauraron ${prevCount} pieza(s) ocultas`);
+    this.showToast(`👁️ Se restauraron ${total} elemento(s) ocultos`);
   }
 
   onHiddenPartsChangedFromViewer(hiddenIds: string[]) {
@@ -3313,7 +3521,15 @@ export class ModuleDesignerComponent {
     const mats = this.materials();
 
     if (tpl.isParametric && tpl.parametricConfig) {
-      const matBody = mats[0] || { id: 'mat_blanco_18', thickness: 18 };
+      const defaultT = this.projectService.currentProject().settings.defaultBoardThickness || 15;
+      const matBody = mats[0] || { id: 'mat_blanco_15', thickness: defaultT };
+      const isOvenOrSink = tpl.parametricConfig.category === 'oven_base' || tpl.parametricConfig.category === 'sink_base';
+      const defaultBackType = isOvenOrSink ? 'none' : 'groove';
+      const resolvedBackType = tpl.parametricConfig.backType || defaultBackType;
+      const resolvedHasBack = tpl.parametricConfig.hasBackPanel !== undefined
+        ? tpl.parametricConfig.hasBackPanel
+        : (resolvedBackType !== 'none');
+
       const fullCfg: ParametricCabinetConfig = {
         code: tpl.parametricConfig.code || 'KPRO',
         name: tpl.name,
@@ -3322,10 +3538,11 @@ export class ModuleDesignerComponent {
         width: tpl.dimensions.width,
         height: tpl.dimensions.height,
         depth: tpl.dimensions.depth,
-        structureThickness: tpl.parametricConfig.structureThickness || matBody.thickness || 18,
-        doorThickness: tpl.parametricConfig.doorThickness || 18,
+        structureThickness: tpl.parametricConfig.structureThickness || matBody.thickness || defaultT,
+        doorThickness: tpl.parametricConfig.doorThickness || defaultT,
         backThickness: tpl.parametricConfig.backThickness || 3,
-        backType: tpl.parametricConfig.backType || 'groove',
+        backType: resolvedBackType,
+        hasBackPanel: resolvedHasBack,
         shelvesCount: tpl.parametricConfig.shelvesCount ?? 1,
         doorOpening: tpl.parametricConfig.doorOpening || 'left',
         structureMaterialId: matBody.id,
@@ -3350,6 +3567,7 @@ export class ModuleDesignerComponent {
 
       // Auto-encastre inteligente de electrodomésticos 3D sobre/dentro del módulo insertado
       if (withAutoAppliance) {
+        const modGroupId = generated.group?.id;
         if (tpl.parametricConfig.category === 'oven_base') {
           const ovenPreset = this.appliancesCatalog.find(p => p.id === 'preset_oven_60cm');
           const cooktopPreset = this.appliancesCatalog.find(p => p.id === 'preset_cooktop_induction_60cm');
@@ -3364,11 +3582,12 @@ export class ModuleDesignerComponent {
               depth: 560,
               height: 595,
               finish: 'black_matte',
-              position: { x: offsetX, y: 245, z: 10 },
+              position: { x: offsetX, y: 200, z: 10 },
               rotation: 0,
               mountType: 'built_in',
               price: ovenPreset.defaultPrice,
-              includeInBudget: true
+              includeInBudget: true,
+              groupId: modGroupId
             });
           }
           if (cooktopPreset) {
@@ -3386,7 +3605,8 @@ export class ModuleDesignerComponent {
               rotation: 0,
               mountType: 'countertop',
               price: cooktopPreset.defaultPrice,
-              includeInBudget: true
+              includeInBudget: true,
+              groupId: modGroupId
             });
           }
         } else if (tpl.parametricConfig.category === 'sink_base') {
@@ -3406,7 +3626,8 @@ export class ModuleDesignerComponent {
               rotation: 0,
               mountType: 'countertop',
               price: sinkPreset.defaultPrice,
-              includeInBudget: true
+              includeInBudget: true,
+              groupId: modGroupId
             });
           }
         } else if (tpl.parametricConfig.category === 'oven_tower') {
@@ -3433,7 +3654,8 @@ export class ModuleDesignerComponent {
               rotation: 0,
               mountType: 'built_in',
               price: ovenPreset.defaultPrice,
-              includeInBudget: true
+              includeInBudget: true,
+              groupId: modGroupId
             });
           }
           if (microPreset) {
@@ -3451,7 +3673,8 @@ export class ModuleDesignerComponent {
               rotation: 0,
               mountType: 'built_in',
               price: microPreset.defaultPrice,
-              includeInBudget: true
+              includeInBudget: true,
+              groupId: modGroupId
             });
           }
         }

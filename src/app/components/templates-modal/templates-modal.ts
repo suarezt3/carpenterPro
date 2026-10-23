@@ -31,6 +31,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { ThemeService } from '../../services/theme.service';
 import { TemplatesCatalogService, FurnitureTemplate } from '../../services/templates-catalog.service';
+import { ProjectStorageService } from '../../services/project-storage.service';
 import { Material, ParametricCabinetConfig, HandleType, HandleFinish } from '../../models/melamine.models';
 
 type HugeIconDef = typeof Compass01Icon;
@@ -60,6 +61,7 @@ export type ModuleCategoryPreset =
 export class TemplatesModalComponent {
   readonly themeService = inject(ThemeService);
   readonly catalogService = inject(TemplatesCatalogService);
+  readonly projectService = inject(ProjectStorageService);
 
   // Registro local de iconos vectoriales de Hugeicons y trazos CAD
   readonly icons = {
@@ -222,8 +224,8 @@ export class TemplatesModalComponent {
   height = signal<number>(820);
   depth = signal<number>(580);
 
-  structureThickness = signal<number>(18);
-  doorThickness = signal<number>(18);
+  structureThickness = signal<number>(15);
+  doorThickness = signal<number>(15);
 
   doorOpening = signal<'none' | 'left' | 'right' | 'double' | 'top' | 'bottom'>('left');
   hasHandle = signal<boolean>(true);
@@ -609,8 +611,9 @@ export class TemplatesModalComponent {
   // Selección de preset
   selectPreset(preset: ModuleCategoryPreset) {
     this.activePreset.set(preset);
+    const defaultT = this.projectService.currentProject().settings.defaultBoardThickness || 15;
     if (this.structureThickness() !== 15 && this.structureThickness() !== 18) {
-      this.structureThickness.set(18);
+      this.structureThickness.set(defaultT);
     }
     if (this.doorThickness() !== 15 && this.doorThickness() !== 18) {
       this.doorThickness.set(this.structureThickness());
@@ -633,8 +636,8 @@ export class TemplatesModalComponent {
         this.width.set(600);
         this.height.set(750);
         this.depth.set(500);
-        this.structureThickness.set(18);
-        this.doorThickness.set(18);
+        this.structureThickness.set(defaultT);
+        this.doorThickness.set(defaultT);
         this.drawerSlideType.set('telescopic');
         this.drawerFrontType.set('overlay');
         this.hasPlinth.set(true);
@@ -651,6 +654,8 @@ export class TemplatesModalComponent {
         this.width.set(600);
         this.height.set(820);
         this.depth.set(580);
+        this.structureThickness.set(defaultT);
+        this.doorThickness.set(defaultT);
         this.doorOpening.set('left');
         this.shelvesCount.set(1);
         this.hasHandle.set(true);
@@ -661,22 +666,22 @@ export class TemplatesModalComponent {
         this.width.set(600);
         this.height.set(860);
         this.depth.set(580);
-        this.structureThickness.set(18);
-        this.doorThickness.set(18);
+        this.structureThickness.set(defaultT);
+        this.doorThickness.set(defaultT);
         this.hasPlinth.set(true);
         this.plinthHeight.set(80);
         this.doorOpening.set('bottom');
         this.shelvesCount.set(1);
         this.hasHandle.set(true);
-        this.hasBackPanel.set(true);
+        this.hasBackPanel.set(false); // Nicho de horno libre de fondo para ventilación
         break;
       case 'sink_base':
         this.moduleName.set('Módulo Bajo Lavaplatos');
         this.width.set(800);
         this.height.set(860);
         this.depth.set(580);
-        this.structureThickness.set(18);
-        this.doorThickness.set(18);
+        this.structureThickness.set(defaultT);
+        this.doorThickness.set(defaultT);
         this.hasPlinth.set(true);
         this.plinthHeight.set(80);
         this.doorOpening.set('double');
@@ -689,8 +694,8 @@ export class TemplatesModalComponent {
         this.width.set(900);
         this.height.set(860);
         this.depth.set(900);
-        this.structureThickness.set(18);
-        this.doorThickness.set(18);
+        this.structureThickness.set(defaultT);
+        this.doorThickness.set(defaultT);
         this.hasPlinth.set(true);
         this.plinthHeight.set(80);
         this.doorOpening.set('left');
@@ -703,8 +708,8 @@ export class TemplatesModalComponent {
         this.width.set(600);
         this.height.set(2150);
         this.depth.set(580);
-        this.structureThickness.set(18);
-        this.doorThickness.set(18);
+        this.structureThickness.set(defaultT);
+        this.doorThickness.set(defaultT);
         this.hasPlinth.set(true);
         this.plinthHeight.set(80);
         this.doorOpening.set('left');
@@ -842,8 +847,9 @@ export class TemplatesModalComponent {
       elevationY = this.height() / 2;
     }
 
-    const safeStructT = this.structureThickness() === 15 ? 15 : 18;
-    const safeDoorT = this.doorThickness() === 15 ? 15 : safeStructT;
+    const defaultT = this.projectService.currentProject().settings.defaultBoardThickness || 15;
+    const safeStructT = Number(this.structureThickness()) || defaultT;
+    const safeDoorT = Number(this.doorThickness()) || safeStructT;
 
     const config: ParametricCabinetConfig = {
       name: this.moduleName().trim() || (isDrawers ? `Cajonera ${this.drawersCount()} Cajones` : 'Módulo Paramétrico'),

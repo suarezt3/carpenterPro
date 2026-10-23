@@ -272,6 +272,7 @@ export interface HardwareItem {
 export interface ProjectSettings {
   sawKerf: number;            // Espesor de disco / ancho de corte (ej. 4mm)
   trimMargin: number;         // Refilado perimetral del tablero (ej. 10mm)
+  defaultBoardThickness?: number; // Espesor de melamina predeterminado para el proyecto (15 mm estándar, o 18 mm)
   thinEdgeThickness: number;  // Espesor tapacanto delgado (ej. 0.45mm)
   thickEdgeThickness: number; // Espesor tapacanto grueso (ej. 2.0mm)
   thinEdgeCostPerMeter: number;
@@ -797,6 +798,9 @@ export interface ApplianceItem {
   price: number;       // Costo para presupuesto
   includeInBudget: boolean;
   notes?: string;
+  groupId?: string;    // ID del módulo/mueble padre al que está vinculado (opcional)
+  isLocked?: boolean;  // Inmovilizado / congelado (no arrastrar ni mover accidentalmente)
+  isHidden?: boolean;  // Oculto temporalmente en la vista 3D
 }
 
 export interface AppliancePreset {

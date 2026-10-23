@@ -120,6 +120,7 @@ export class ProjectStorageService {
   readonly hardwareList = computed(() => this.currentProject().hardware);
   readonly appliancesList = computed<ApplianceItem[]>(() => this.currentProject().appliances || []);
   readonly selectedApplianceId = signal<string | null>(null);
+  readonly selectedApplianceIds = signal<string[]>([]);
   readonly selectedAppliance = computed<ApplianceItem | null>(() => {
     const id = this.selectedApplianceId();
     if (!id) return null;
@@ -225,6 +226,59 @@ export class ProjectStorageService {
 
   selectAppliance(id: string | null) {
     this.selectedApplianceId.set(id);
+    this.selectedApplianceIds.set(id ? [id] : []);
+  }
+
+  selectAppliances(ids: string[]) {
+    this.selectedApplianceIds.set(ids);
+    this.selectedApplianceId.set(ids.length > 0 ? ids[0] : null);
+  }
+
+  toggleApplianceSelection(id: string) {
+    const set = new Set(this.selectedApplianceIds());
+    if (set.has(id)) {
+      set.delete(id);
+    } else {
+      set.add(id);
+    }
+    const arr = Array.from(set);
+    this.selectedApplianceIds.set(arr);
+    this.selectedApplianceId.set(arr.length > 0 ? arr[0] : null);
+  }
+
+  updateMultipleAppliances(updatesList: { id: string; updates: Partial<ApplianceItem> }[]) {
+    if (updatesList.length === 0) return;
+    const updatesMap = new Map(updatesList.map(u => [u.id, u.updates]));
+    this.updateProject(p => ({
+      ...p,
+      appliances: (p.appliances || []).map(a => {
+        const upd = updatesMap.get(a.id);
+        return upd ? { ...a, ...upd } : a;
+      })
+    }));
+  }
+
+  removeMultipleAppliances(ids: string[]) {
+    const idsSet = new Set(ids);
+    if (this.selectedApplianceId() && idsSet.has(this.selectedApplianceId()!)) {
+      this.selectedApplianceId.set(null);
+    }
+    this.selectedApplianceIds.set(this.selectedApplianceIds().filter(id => !idsSet.has(id)));
+    this.updateProject(p => ({
+      ...p,
+      appliances: (p.appliances || []).filter(a => !idsSet.has(a.id))
+    }));
+  }
+
+  linkApplianceToGroup(applianceId: string, groupId: string | null) {
+    this.updateAppliance(applianceId, { groupId: groupId || undefined });
+  }
+
+  unhideAllAppliances() {
+    this.updateProject(p => ({
+      ...p,
+      appliances: (p.appliances || []).map(a => a.isHidden ? { ...a, isHidden: false } : a)
+    }));
   }
 
   formatCurrency(amount: number): string {
@@ -302,6 +356,11 @@ export class ProjectStorageService {
                 materialName: cleanMaterialName(p.materialName)
               }));
             }
+            if (!parsed.settings) {
+              parsed.settings = demo.settings;
+            } else if (!parsed.settings.defaultBoardThickness) {
+              parsed.settings.defaultBoardThickness = 15;
+            }
             if (!parsed.groups || !Array.isArray(parsed.groups)) {
               parsed.groups = [];
             }
@@ -325,10 +384,10 @@ export class ProjectStorageService {
     const matRoble: Material = {
       id: 'mat_roble_18',
       name: 'Melamina Roble Nebraska',
-      thickness: 18,
+      thickness: 15,
       sheetLength: 2440,
       sheetWidth: 1830,
-      sheetCost: 195000,
+      sheetCost: 175000,
       hasGrain: true,
       colorHex: '#b48a60',
       textureType: 'wood'
@@ -409,10 +468,10 @@ export class ProjectStorageService {
     const matBlanco: Material = {
       id: 'mat_blanco_18',
       name: 'Melamina Blanco Frost Mate',
-      thickness: 18,
+      thickness: 15,
       sheetLength: 2440,
       sheetWidth: 1830,
-      sheetCost: 145000,
+      sheetCost: 135000,
       hasGrain: false,
       colorHex: '#f8fafc',
       textureType: 'solid'
@@ -578,14 +637,14 @@ export class ProjectStorageService {
         name: 'TECHO',
         length: 1800,
         width: 600,
-        thickness: 18,
+        thickness: 15,
         quantity: 1,
         materialId: matRoble.id,
         materialName: matRoble.name,
         grain: 'length',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
         posX: 0,
-        posY: 991,
+        posY: 992.5,
         posZ: 0,
         orientation: 'horizontal',
         componentRole: 'top',
@@ -596,13 +655,13 @@ export class ProjectStorageService {
         name: 'LATERAL IZQUIERDO',
         length: 1000,
         width: 600,
-        thickness: 18,
+        thickness: 15,
         quantity: 1,
         materialId: matRoble.id,
         materialName: matRoble.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
-        posX: -891,
+        posX: -892.5,
         posY: 500,
         posZ: 0,
         orientation: 'vertical_yz',
@@ -614,7 +673,7 @@ export class ProjectStorageService {
         name: 'DIVISIÓN CENTRAL',
         length: 900,
         width: 600,
-        thickness: 18,
+        thickness: 15,
         quantity: 1,
         materialId: matRoble.id,
         materialName: matRoble.name,
@@ -632,13 +691,13 @@ export class ProjectStorageService {
         name: 'LATERAL DERECHO',
         length: 1000,
         width: 600,
-        thickness: 18,
+        thickness: 15,
         quantity: 1,
         materialId: matRoble.id,
         materialName: matRoble.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
-        posX: 891,
+        posX: 892.5,
         posY: 500,
         posZ: 0,
         orientation: 'vertical_yz',
@@ -648,16 +707,16 @@ export class ProjectStorageService {
       {
         id: 'desk_bottom',
         name: 'PISO INFERIOR',
-        length: 573,
+        length: 577.5,
         width: 600,
-        thickness: 18,
+        thickness: 15,
         quantity: 1,
         materialId: matRoble.id,
         materialName: matRoble.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: 595.5,
-        posY: 90,
+        posX: 596.25,
+        posY: 87.5,
         posZ: 0,
         orientation: 'horizontal',
         componentRole: 'bottom',
@@ -666,15 +725,15 @@ export class ProjectStorageService {
       {
         id: 'desk_plinth',
         name: 'ZÓCALO',
-        length: 573,
+        length: 577.5,
         width: 80,
-        thickness: 18,
+        thickness: 15,
         quantity: 1,
         materialId: matRoble.id,
         materialName: matRoble.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: 595.5,
+        posX: 596.25,
         posY: 40,
         posZ: 260,
         orientation: 'vertical_xy',
@@ -705,6 +764,7 @@ export class ProjectStorageService {
     const settings: ProjectSettings = {
       sawKerf: 4,
       trimMargin: 10,
+      defaultBoardThickness: 15, // Espesor predeterminado 15 mm en todo el software
       thinEdgeThickness: 0.45,
       thickEdgeThickness: 2.0,
       thinEdgeCostPerMeter: 1800,
@@ -1085,6 +1145,7 @@ export class ProjectStorageService {
   loadDeskBarFurniture() {
     const mats = this.currentProject().materials;
     const woodMat = mats.find(m => m.hasGrain) || mats[0];
+    const defaultT = this.currentProject().settings.defaultBoardThickness || 15;
 
     const deskParts: Part[] = [
       {
@@ -1092,14 +1153,14 @@ export class ProjectStorageService {
         name: 'TECHO',
         length: 1800,
         width: 600,
-        thickness: 18,
+        thickness: defaultT,
         quantity: 1,
         materialId: woodMat.id,
         materialName: woodMat.name,
         grain: 'length',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
         posX: 0,
-        posY: 991,
+        posY: 1000 - defaultT / 2,
         posZ: 0,
         orientation: 'horizontal',
         componentRole: 'top',
@@ -1110,13 +1171,13 @@ export class ProjectStorageService {
         name: 'LATERAL IZQUIERDO',
         length: 1000,
         width: 600,
-        thickness: 18,
+        thickness: defaultT,
         quantity: 1,
         materialId: woodMat.id,
         materialName: woodMat.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
-        posX: -891,
+        posX: -900 + defaultT / 2,
         posY: 500,
         posZ: 0,
         orientation: 'vertical_yz',
@@ -1128,7 +1189,7 @@ export class ProjectStorageService {
         name: 'DIVISIÓN CENTRAL',
         length: 900,
         width: 600,
-        thickness: 18,
+        thickness: defaultT,
         quantity: 1,
         materialId: woodMat.id,
         materialName: woodMat.name,
@@ -1146,13 +1207,13 @@ export class ProjectStorageService {
         name: 'LATERAL DERECHO',
         length: 1000,
         width: 600,
-        thickness: 18,
+        thickness: defaultT,
         quantity: 1,
         materialId: woodMat.id,
         materialName: woodMat.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
-        posX: 891,
+        posX: 900 - defaultT / 2,
         posY: 500,
         posZ: 0,
         orientation: 'vertical_yz',
@@ -1164,14 +1225,14 @@ export class ProjectStorageService {
         name: 'PISO INFERIOR',
         length: 573,
         width: 600,
-        thickness: 18,
+        thickness: defaultT,
         quantity: 1,
         materialId: woodMat.id,
         materialName: woodMat.name,
         grain: 'length',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
         posX: 595.5,
-        posY: 90,
+        posY: 80 + defaultT / 2,
         posZ: 0,
         orientation: 'horizontal',
         componentRole: 'bottom',
@@ -1182,7 +1243,7 @@ export class ProjectStorageService {
         name: 'ZÓCALO',
         length: 573,
         width: 80,
-        thickness: 18,
+        thickness: defaultT,
         quantity: 1,
         materialId: woodMat.id,
         materialName: woodMat.name,
@@ -1284,6 +1345,23 @@ export class ProjectStorageService {
         ...p,
         parts: remainingParts,
         groups: filteredGroups
+      };
+    });
+  }
+
+  deleteMultiplePartsAndAppliances(partIds: string[], applianceIds: string[]) {
+    const partIdsSet = new Set(partIds);
+    const appIdsSet = new Set(applianceIds);
+    this.updateProject(p => {
+      const remainingParts = p.parts.filter(pt => !partIdsSet.has(pt.id));
+      const usedGroupIds = new Set(remainingParts.map(pt => pt.groupId).filter(Boolean));
+      const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
+      const remainingAppliances = (p.appliances || []).filter(a => !appIdsSet.has(a.id));
+      return {
+        ...p,
+        parts: remainingParts,
+        groups: filteredGroups,
+        appliances: remainingAppliances
       };
     });
   }
@@ -1404,8 +1482,10 @@ export class ProjectStorageService {
     this.updateProject(p => {
       const currentGroups = (p.groups || []).filter(g => g.id !== groupId);
       let updatedParts = p.parts;
+      let updatedAppliances = p.appliances || [];
       if (deleteParts) {
         updatedParts = p.parts.filter(pt => pt.groupId !== groupId);
+        updatedAppliances = updatedAppliances.filter(a => a.groupId !== groupId);
       } else {
         updatedParts = p.parts.map(pt => {
           if (pt.groupId === groupId) {
@@ -1416,11 +1496,20 @@ export class ProjectStorageService {
           }
           return pt;
         });
+        updatedAppliances = updatedAppliances.map(a => {
+          if (a.groupId === groupId) {
+            const copy = { ...a };
+            delete copy.groupId;
+            return copy;
+          }
+          return a;
+        });
       }
       return {
         ...p,
         groups: currentGroups,
-        parts: updatedParts
+        parts: updatedParts,
+        appliances: updatedAppliances
       };
     });
   }
@@ -1561,11 +1650,26 @@ export class ProjectStorageService {
       };
     });
 
+    const groupAppliances = (currentProj.appliances || []).filter(a => a.groupId === groupId);
+    const newAppliances: ApplianceItem[] = groupAppliances.map(app => {
+      const newAppId = 'appliance_' + crypto.randomUUID().slice(0, 8);
+      return {
+        ...app,
+        id: newAppId,
+        groupId: newGroupId,
+        position: {
+          ...app.position,
+          y: Math.round(((app.position.y ?? 0) + deltaY) * 10) / 10
+        }
+      };
+    });
+
     this.updateProject(p => {
       return {
         ...p,
         groups: [...(p.groups || []), newGroup],
-        parts: [...p.parts, ...newParts]
+        parts: [...p.parts, ...newParts],
+        appliances: [...(p.appliances || []), ...newAppliances]
       };
     });
 
@@ -1573,14 +1677,18 @@ export class ProjectStorageService {
   }
 
   /**
-   * Rota rígidamente múltiples piezas o módulos seleccionados en el plano horizontal (90°, -90° o 180°)
-   * alrededor de su centroide geométrico común (cx, cz), preservando la coherencia entre módulos.
+   * Rota rígidamente múltiples piezas, módulos y electrodomésticos seleccionados en el plano horizontal (90°, -90° o 180°)
+   * alrededor de su centroide geométrico común (cx, cz), preservando la coherencia entre módulos y equipos.
    */
-  rotateMultiplePartsRigidly(partIds: string[], angleDelta: 90 | -90 | 180) {
-    if (partIds.length === 0) return;
+  rotateMultiplePartsRigidly(partIds: string[], angleDelta: 90 | -90 | 180, applianceIds: string[] = []) {
+    if (partIds.length === 0 && applianceIds.length === 0) return;
     this.updateProject(p => {
       const targetParts = p.parts.filter(pt => partIds.includes(pt.id));
-      if (targetParts.length === 0) return p;
+      const groupIdsFromParts = new Set(targetParts.map(pt => pt.groupId).filter(Boolean));
+      const targetAppliances = (p.appliances || []).filter(
+        a => applianceIds.includes(a.id) || (a.groupId && groupIdsFromParts.has(a.groupId))
+      );
+      if (targetParts.length === 0 && targetAppliances.length === 0) return p;
 
       let minX = Infinity, maxX = -Infinity;
       let minZ = Infinity, maxZ = -Infinity;
@@ -1590,6 +1698,19 @@ export class ProjectStorageService {
         if (b.maxX > maxX) maxX = b.maxX;
         if (b.minZ < minZ) minZ = b.minZ;
         if (b.maxZ > maxZ) maxZ = b.maxZ;
+      }
+
+      for (const app of targetAppliances) {
+        const halfW = (app.width || 600) / 2;
+        const halfD = (app.depth || 600) / 2;
+        const appMinX = app.position.x - halfW;
+        const appMaxX = app.position.x + halfW;
+        const appMinZ = app.position.z - halfD;
+        const appMaxZ = app.position.z + halfD;
+        if (appMinX < minX) minX = appMinX;
+        if (appMaxX > maxX) maxX = appMaxX;
+        if (appMinZ < minZ) minZ = appMinZ;
+        if (appMaxZ > maxZ) maxZ = appMaxZ;
       }
 
       const cx = (minX + maxX) / 2;
@@ -1683,9 +1804,45 @@ export class ProjectStorageService {
         };
       });
 
+      const targetAppIds = new Set(targetAppliances.map(a => a.id));
+      const updatedAppliances = (p.appliances || []).map(a => {
+        if (!targetAppIds.has(a.id)) return a;
+
+        const dx = a.position.x - cx;
+        const dz = a.position.z - cz;
+        let newDx = dx;
+        let newDz = dz;
+
+        if (angleDelta === 90) {
+          newDx = dz;
+          newDz = -dx;
+        } else if (angleDelta === -90) {
+          newDx = -dz;
+          newDz = dx;
+        } else if (angleDelta === 180) {
+          newDx = -dx;
+          newDz = -dz;
+        }
+
+        const newPosX = Math.round((cx + newDx) * 10) / 10;
+        const newPosZ = Math.round((cz + newDz) * 10) / 10;
+        const newRot = (((a.rotation || 0) + angleDelta) % 360 + 360) % 360;
+
+        return {
+          ...a,
+          position: {
+            ...a.position,
+            x: newPosX,
+            z: newPosZ
+          },
+          rotation: newRot
+        };
+      });
+
       return {
         ...p,
-        parts: updatedParts
+        parts: updatedParts,
+        appliances: updatedAppliances
       };
     });
   }
@@ -1836,7 +1993,7 @@ export class ProjectStorageService {
         ...p,
         parts: p.parts.map(pt => {
           if (pt.groupId !== groupId) return pt;
-          if ((pt.thickness || 18) <= 8 || pt.componentRole === 'back') return pt;
+          if ((pt.thickness || 15) <= 8 || pt.componentRole === 'back') return pt;
           return { ...pt, thickness: newT };
         })
       }));
@@ -2309,11 +2466,33 @@ export class ProjectStorageService {
     }));
   }
 
-  updateSettings(settings: ProjectSettings) {
-    this.updateProject(p => ({
-      ...p,
-      settings
-    }));
+  updateSettings(settings: ProjectSettings, applyToExistingParts = false) {
+    this.updateProject(p => {
+      let parts = p.parts;
+      let materials = p.materials;
+      if (applyToExistingParts && settings.defaultBoardThickness) {
+        const newT = settings.defaultBoardThickness;
+        parts = parts.map(part => {
+          // Actualizar piezas de melamina estándar (15 o 18 mm), conservando fondos MDF (3-6mm) y mesones (>25mm)
+          if (part.thickness === 15 || part.thickness === 18) {
+            return { ...part, thickness: newT };
+          }
+          return part;
+        });
+        materials = materials.map(m => {
+          if ((m.thickness === 15 || m.thickness === 18) && m.textureType !== 'stone') {
+            return { ...m, thickness: newT };
+          }
+          return m;
+        });
+      }
+      return {
+        ...p,
+        settings,
+        materials,
+        parts
+      };
+    });
   }
 
   // ==========================================
@@ -2564,7 +2743,7 @@ export class ProjectStorageService {
     // Determinar envolvente de los muebles bajos existentes para posicionar el mesón encima
     const baseParts = project.parts.filter(p => {
       if (p.componentRole === 'countertop' || p.componentRole === 'backsplash') return false;
-      const topY = (p.posY || 0) + (p.orientation === 'horizontal' ? (p.thickness || 18) / 2 : (p.length || 0) / 2);
+      const topY = (p.posY || 0) + (p.orientation === 'horizontal' ? (p.thickness || 15) / 2 : (p.length || 0) / 2);
       return topY > 400 && topY <= 1050;
     });
 
@@ -2583,16 +2762,16 @@ export class ProjectStorageService {
 
       for (const bp of baseParts) {
         let halfX = (bp.length || 600) / 2;
-        let halfY = (bp.thickness || 18) / 2;
+        let halfY = (bp.thickness || 15) / 2;
         let halfZ = (bp.width || 580) / 2;
         if (bp.orientation === 'vertical_yz') {
-          halfX = (bp.thickness || 18) / 2;
+          halfX = (bp.thickness || 15) / 2;
           halfY = (bp.length || 750) / 2;
           halfZ = (bp.width || 580) / 2;
         } else if (bp.orientation === 'vertical_xy') {
           halfX = (bp.length || 600) / 2;
           halfY = (bp.width || 750) / 2;
-          halfZ = (bp.thickness || 18) / 2;
+          halfZ = (bp.thickness || 15) / 2;
         }
         const px = bp.posX || 0;
         const py = bp.posY || 0;
