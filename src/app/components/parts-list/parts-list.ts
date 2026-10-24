@@ -8,7 +8,6 @@ import {
   CheckmarkCircle02Icon,
   Compass01Icon,
   Delete02Icon,
-  Edit02Icon,
   RulerIcon,
   Search01Icon,
   Tag01Icon
@@ -96,7 +95,6 @@ export class PartsListComponent {
       'M20 15H4',
       'M7.5 11.5L4 15L7.5 18.5'
     ]),
-    edit: Edit02Icon,
     delete: Delete02Icon,
     verified: CheckmarkCircle02Icon,
     sawCut: cadSvg([
@@ -129,9 +127,8 @@ export class PartsListComponent {
   readonly filterMaterialId = signal<string>('all');
   readonly searchQuery = signal<string>('');
 
-  // Control del modal de agregar/editar pieza manual
+  // Control del modal de agregar pieza manual
   readonly showAddPartModal = signal<boolean>(false);
-  readonly editingPart = signal<Part | null>(null);
 
   readonly partForm: FormGroup = this.fb.group({
     name: ['', Validators.required],
@@ -234,10 +231,9 @@ export class PartsListComponent {
     this.filterMaterialId.set(target?.value ?? 'all');
   }
 
-  // --- CREACIÓN Y EDICIÓN DE PIEZAS ---
+  // --- CREACIÓN DE PIEZA MANUAL ---
 
   openAddModal() {
-    this.editingPart.set(null);
     const mats = this.materials();
     this.partForm.reset({
       name: 'Pieza Personalizada',
@@ -257,29 +253,8 @@ export class PartsListComponent {
     this.showAddPartModal.set(true);
   }
 
-  editPart(part: Part) {
-    this.editingPart.set(part);
-    this.partForm.patchValue({
-      name: part.name,
-      moduleId: part.moduleId || '',
-      materialId: part.materialId,
-      length: part.length,
-      width: part.width,
-      thickness: part.thickness,
-      quantity: part.quantity,
-      grain: part.grain,
-      l1: part.edges.l1,
-      l2: part.edges.l2,
-      a1: part.edges.a1,
-      a2: part.edges.a2,
-      notes: part.notes || ''
-    });
-    this.showAddPartModal.set(true);
-  }
-
   /**
-   * Guarda una pieza nueva o actualiza una existente preservando sus coordenadas 3D
-   * (`posX`, `posY`, `posZ`), su orientación, grupo (`groupId`) y herrajes (`hardwareConfig`).
+   * Agrega una pieza manual auxiliar a la lista técnica y al proyecto.
    */
   savePart() {
     if (this.partForm.invalid) return;
@@ -289,21 +264,18 @@ export class PartsListComponent {
     const mods = this.modules();
     const selMod = mods.find(m => m.id === val.moduleId);
 
-    const existing = this.editingPart();
     const thickness = Number(val.thickness) || this.projectService.currentProject().settings.defaultBoardThickness || 15;
 
     const partData: Part = {
-      ...(existing ?? {
-        posX: 0,
-        posY: Math.round(thickness / 2),
-        posZ: 0,
-        orientation: 'horizontal',
-        componentRole: 'free'
-      }),
-      id: existing ? existing.id : 'part_' + crypto.randomUUID().slice(0, 8),
+      posX: 0,
+      posY: Math.round(thickness / 2),
+      posZ: 0,
+      orientation: 'horizontal',
+      componentRole: 'free',
+      id: 'part_' + crypto.randomUUID().slice(0, 8),
       name: String(val.name || 'Pieza').trim(),
-      moduleId: val.moduleId || existing?.moduleId || undefined,
-      moduleName: selMod ? selMod.name : existing?.moduleName,
+      moduleId: val.moduleId || undefined,
+      moduleName: selMod ? selMod.name : undefined,
       materialId: selMat.id,
       materialName: selMat.name,
       length: Number(val.length),
@@ -320,14 +292,8 @@ export class PartsListComponent {
       notes: val.notes
     };
 
-    if (existing) {
-      this.projectService.updatePart(partData);
-    } else {
-      this.projectService.addPart(partData);
-    }
-
+    this.projectService.addPart(partData);
     this.showAddPartModal.set(false);
-    this.editingPart.set(null);
   }
 
   /**
