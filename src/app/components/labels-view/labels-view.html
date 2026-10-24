@@ -1,15 +1,15 @@
 <div class="w-full px-3 sm:px-6 py-4 space-y-5">
 
   <!-- Barra de Herramientas Superior (Oculta durante la impresión) -->
-  <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden'">
+  <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200 rounded-lg p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden' : 'bg-zinc-900 border border-zinc-800 rounded-lg p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden'">
     <div>
       <div class="flex items-center gap-2">
-        <hugeicons-icon [icon]="icons.qrCode" [size]="22" [strokeWidth]="1.8" class="text-amber-500 shrink-0"></hugeicons-icon>
-        <h2 [class]="themeService.isClassic() ? 'text-xl font-bold text-slate-900' : 'text-xl font-bold text-white'">
+        <hugeicons-icon [icon]="icons.qrCode" [size]="20" [strokeWidth]="1.8" class="text-zinc-700 shrink-0"></hugeicons-icon>
+        <h2 [class]="themeService.isClassic() ? 'text-xl font-bold text-zinc-900' : 'text-xl font-bold text-white'">
           Generador de Etiquetas para Taller
         </h2>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-xs text-slate-500 mt-1' : 'text-xs text-zinc-400 mt-1'">
+      <p [class]="themeService.isClassic() ? 'text-xs text-zinc-500 mt-1' : 'text-xs text-zinc-400 mt-1'">
         Imprime etiquetas adhesivas individuales para pegar en cada pieza cortada. Incluye cotas exactas, módulo de destino, flecha de veta y diagrama de cantos L1/L2/A1/A2.
       </p>
     </div>
@@ -20,7 +20,7 @@
         [value]="selectedModuleFilter()"
         (change)="onModuleFilterChange($event)"
         aria-label="Filtrar etiquetas por módulo"
-        [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-hidden focus:border-amber-500 cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-hidden focus:border-amber-500 cursor-pointer'">
+        [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-700 focus:outline-hidden focus:border-zinc-900 cursor-pointer font-medium' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-zinc-200 focus:outline-hidden focus:border-zinc-500 cursor-pointer font-medium'">
         <option value="all">Todos los Módulos</option>
         @for (m of modules(); track m.id) {
           <option [value]="m.id">{{ m.name }}</option>
@@ -32,7 +32,7 @@
         [value]="selectedMaterialFilter()"
         (change)="onMaterialFilterChange($event)"
         aria-label="Filtrar etiquetas por material"
-        [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-hidden focus:border-amber-500 cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-hidden focus:border-amber-500 cursor-pointer'">
+        [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-700 focus:outline-hidden focus:border-zinc-900 cursor-pointer font-medium' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-zinc-200 focus:outline-hidden focus:border-zinc-500 cursor-pointer font-medium'">
         <option value="all">Todos los Materiales</option>
         @for (mat of materials(); track mat.id) {
           <option [value]="mat.id">{{ mat.name }}</option>
@@ -43,7 +43,7 @@
       <button
         type="button"
         (click)="printLabels()"
-        class="px-4 py-2 bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-2 shadow-md shadow-amber-900/20 transition cursor-pointer">
+        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md flex items-center gap-2 shadow-xs transition cursor-pointer">
         <hugeicons-icon [icon]="icons.print" [size]="16" [strokeWidth]="2"></hugeicons-icon>
         <span>Imprimir Etiquetas ({{ flatLabels().length }})</span>
       </button>
@@ -51,25 +51,25 @@
   </div>
 
   <!-- Leyenda de Convención de Cantos (Oculta al imprimir) -->
-  <div [class]="themeService.isClassic() ? 'bg-slate-50 border border-slate-200 p-3 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 print:hidden' : 'bg-zinc-950/70 border border-zinc-800 p-3 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400 print:hidden'">
+  <div [class]="themeService.isClassic() ? 'bg-zinc-50 border border-zinc-200 p-3 rounded-md flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-600 print:hidden' : 'bg-zinc-950/70 border border-zinc-800 p-3 rounded-md flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400 print:hidden'">
     <div class="flex flex-wrap items-center gap-4">
-      <span [class]="themeService.isClassic() ? 'font-semibold text-slate-700' : 'font-semibold text-zinc-300'">
+      <span [class]="themeService.isClassic() ? 'font-semibold text-zinc-800' : 'font-semibold text-zinc-200'">
         Convención de Cantos en Etiqueta:
       </span>
-      <span class="inline-flex items-center gap-1">
+      <span class="inline-flex items-center gap-1 font-medium">
         <span class="w-3 h-1 bg-zinc-300 inline-block"></span>
         <span>Sin Canto</span>
       </span>
-      <span class="inline-flex items-center gap-1">
-        <span class="w-3 h-1 bg-cyan-600 inline-block"></span>
-        <span class="text-cyan-600 dark:text-cyan-400 font-bold">Canto Delgado (0.45mm)</span>
+      <span class="inline-flex items-center gap-1 font-medium">
+        <span class="w-3 h-1 bg-zinc-500 inline-block"></span>
+        <span class="text-zinc-700 dark:text-zinc-300 font-semibold">Canto Delgado (0.45mm)</span>
       </span>
-      <span class="inline-flex items-center gap-1">
-        <span class="w-3 h-1.5 bg-amber-600 inline-block"></span>
-        <span class="text-amber-600 dark:text-amber-400 font-bold">Canto Grueso (2.0mm)</span>
+      <span class="inline-flex items-center gap-1 font-medium">
+        <span class="w-3 h-1.5 bg-amber-500 inline-block"></span>
+        <span class="text-amber-700 dark:text-amber-400 font-semibold">Canto Grueso (2.0mm)</span>
       </span>
     </div>
-    <div [class]="themeService.isClassic() ? 'text-[11px] text-slate-400' : 'text-[11px] text-zinc-500'">
+    <div [class]="themeService.isClassic() ? 'text-[11px] text-zinc-400 font-medium' : 'text-[11px] text-zinc-500 font-medium'">
       Optimizado para hojas de etiquetas adhesivas A4 / Carta
     </div>
   </div>

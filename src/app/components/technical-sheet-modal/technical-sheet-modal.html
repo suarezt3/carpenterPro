@@ -1,19 +1,19 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-xs select-none overflow-y-auto">
   <div
-    [class]="isBlueprintDark() ? 'bg-zinc-950 text-zinc-100 border-zinc-800' : 'bg-slate-50 text-slate-900 border-slate-300'"
-    class="relative w-full max-w-6xl max-h-[96vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+    [class]="isBlueprintDark() ? 'bg-zinc-950 text-zinc-100 border-zinc-800' : 'bg-zinc-50 text-zinc-900 border-zinc-200'"
+    class="relative w-full max-w-6xl max-h-[96vh] rounded-lg border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
 
     <!-- BARRA DE HERRAMIENTAS SUPERIOR (Oculta al imprimir) -->
     <div class="print:hidden px-5 py-3.5 border-b flex flex-wrap items-center justify-between gap-3 shrink-0"
-      [class]="isBlueprintDark() ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-slate-200 shadow-xs'">
+      [class]="isBlueprintDark() ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200 shadow-xs'">
 
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-500 flex items-center justify-center shadow-xs">
-          <hugeicons-icon [icon]="icons.blueprint" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
+        <div class="w-8 h-8 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center shadow-xs">
+          <hugeicons-icon [icon]="icons.blueprint" [size]="18" [strokeWidth]="1.8"></hugeicons-icon>
         </div>
         <div>
           <h3 class="text-sm sm:text-base font-bold tracking-tight">Plano Técnico 2D de Fabricación (Taller)</h3>
-          <p class="text-xs opacity-70">Vistas ortográficas acotadas con cuadro de rotulación de ingeniería</p>
+          <p class="text-xs text-zinc-500">Vistas ortográficas acotadas con cuadro de rotulación de ingeniería</p>
         </div>
       </div>
 
@@ -24,8 +24,8 @@
         <button
           type="button"
           (click)="toggleTheme()"
-          [class]="isBlueprintDark() ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-slate-200 text-slate-800 hover:bg-slate-300'"
-          class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+          [class]="isBlueprintDark() ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 border border-zinc-200'"
+          class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition cursor-pointer">
           <hugeicons-icon [icon]="isBlueprintDark() ? icons.sun : icons.moon" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           <span>{{ isBlueprintDark() ? 'Papel Blanco' : 'CAD Oscuro' }}</span>
         </button>
@@ -34,7 +34,7 @@
         <button
           type="button"
           (click)="downloadDxf()"
-          class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer">
+          class="px-3 py-1.5 bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 rounded-md text-xs font-medium flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
           <hugeicons-icon [icon]="icons.download" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           <span>Exportar DXF CNC</span>
         </button>
@@ -43,7 +43,7 @@
         <button
           type="button"
           (click)="printSheet()"
-          class="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold rounded-lg text-xs flex items-center gap-1.5 transition shadow-md cursor-pointer">
+          class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer">
           <hugeicons-icon [icon]="icons.print" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           <span>Imprimir / Guardar PDF</span>
         </button>
@@ -52,7 +52,7 @@
         <button
           type="button"
           (click)="modalClose.emit()"
-          class="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition cursor-pointer"
+          class="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-md transition cursor-pointer"
           title="Cerrar plano">
           <hugeicons-icon [icon]="icons.close" [size]="18" [strokeWidth]="2"></hugeicons-icon>
         </button>
@@ -64,31 +64,31 @@
 
       <div
         id="printableDrawing"
-        [class]="isBlueprintDark() ? 'bg-zinc-900 border-zinc-800 shadow-xl' : 'bg-white border-slate-300 shadow-lg text-slate-900'"
-        class="border rounded-2xl p-6 sm:p-8 space-y-8 max-w-5xl mx-auto print:border-none print:shadow-none print:p-4 print:w-full">
+        [class]="isBlueprintDark() ? 'bg-zinc-900 border-zinc-800 shadow-xl' : 'bg-white border-zinc-200 shadow-sm text-zinc-900'"
+        class="border rounded-md p-6 sm:p-8 space-y-8 max-w-5xl mx-auto print:border-none print:shadow-none print:p-4 print:w-full">
 
         <!-- CABECERA DEL PLANO -->
         <div class="border-b pb-4 flex items-start justify-between gap-4"
-          [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-300'">
+          [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-zinc-200'">
           <div>
-            <span class="text-[10px] font-mono uppercase tracking-widest text-indigo-500 font-bold block mb-0.5">
+            <span class="text-[10px] font-mono tabular-nums uppercase tracking-widest text-zinc-500 font-medium block mb-0.5">
               PIEZO3D STUDIO • ESPECIFICACIÓN TÉCNICA DE CARPINTERÍA
             </span>
-            <h2 class="text-xl sm:text-2xl font-black tracking-tight">
+            <h2 class="text-xl sm:text-2xl font-bold tracking-tight">
               {{ project().name }}
             </h2>
-            <p class="text-xs opacity-75 mt-0.5">
-              Cliente: <strong>{{ project().clientName || 'General' }}</strong> • Fecha: <strong>{{ project().date }}</strong> • Medidas en Milímetros (mm)
+            <p class="text-xs text-zinc-500 mt-0.5">
+              Cliente: <strong class="text-zinc-800">{{ project().clientName || 'General' }}</strong> • Fecha: <strong class="text-zinc-800">{{ project().date }}</strong> • Medidas en Milímetros (mm)
             </p>
           </div>
 
           <!-- Resumen de Dimensiones Generales -->
           <div class="text-right shrink-0">
-            <span class="text-[10px] font-mono text-zinc-400 block">VOLUMEN EXTERIOR (L x A x P):</span>
-            <span class="text-base sm:text-lg font-black font-mono text-cyan-500">
+            <span class="text-[10px] font-mono text-zinc-500 block">VOLUMEN EXTERIOR (L x A x P):</span>
+            <span class="text-base sm:text-lg font-bold font-mono tabular-nums text-zinc-900">
               {{ bounds().width }} × {{ bounds().height }} × {{ bounds().depth }} mm
             </span>
-            <p class="text-[11px] opacity-75 mt-0.5">
+            <p class="text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums">
               {{ project().parts.length }} piezas • {{ drillHoles().length }} perforaciones de taller
             </p>
           </div>
@@ -100,19 +100,19 @@
           <!-- VISTA 1: ALZADA FRONTAL (Eje X vs Eje Y) -->
           <div class="col-span-12 md:col-span-8 space-y-2">
             <div class="flex items-center justify-between border-b pb-1"
-              [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
-              <span class="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.view" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+              [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-zinc-200'">
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                <hugeicons-icon [icon]="icons.view" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
                 <span>01. Vista Frontal (Alzada)</span>
               </span>
-              <span class="text-[11px] font-mono text-zinc-400">
+              <span class="text-[11px] font-mono tabular-nums text-zinc-500">
                 Ancho: {{ bounds().width }} mm | Alto: {{ bounds().height }} mm
               </span>
             </div>
 
             <!-- Lienzo SVG de Proyección Frontal -->
-            <div class="w-full flex items-center justify-center p-3 rounded-xl border overflow-x-auto"
-              [class]="isBlueprintDark() ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'">
+            <div class="w-full flex items-center justify-center p-3 rounded-md border overflow-x-auto"
+              [class]="isBlueprintDark() ? 'bg-zinc-950 border-zinc-800' : 'bg-zinc-50 border-zinc-200'">
               <svg
                 [attr.viewBox]="'-80 -60 ' + (bounds().width + 160) + ' ' + (bounds().height + 110)"
                 class="w-full max-h-95 overflow-visible">
@@ -231,19 +231,19 @@
           <!-- VISTA 2: PERFIL LATERAL (Eje Z vs Eje Y) -->
           <div class="col-span-12 md:col-span-4 space-y-2">
             <div class="flex items-center justify-between border-b pb-1"
-              [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
-              <span class="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.ruler" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+              [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-zinc-200'">
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                <hugeicons-icon [icon]="icons.ruler" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
                 <span>02. Vista Lateral (Perfil)</span>
               </span>
-              <span class="text-[11px] font-mono text-zinc-400">
+              <span class="text-[11px] font-mono tabular-nums text-zinc-500">
                 Prof: {{ bounds().depth }} mm
               </span>
             </div>
 
             <!-- Lienzo SVG de Proyección Lateral -->
-            <div class="w-full flex items-center justify-center p-3 rounded-xl border overflow-x-auto"
-              [class]="isBlueprintDark() ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'">
+            <div class="w-full flex items-center justify-center p-3 rounded-md border overflow-x-auto"
+              [class]="isBlueprintDark() ? 'bg-zinc-950 border-zinc-800' : 'bg-zinc-50 border-zinc-200'">
               <svg
                 [attr.viewBox]="'-60 -60 ' + (bounds().depth + 110) + ' ' + (bounds().height + 110)"
                 class="w-full max-h-95 overflow-visible">
@@ -285,37 +285,37 @@
         </div>
 
         <!-- CUADRO DE ROTULACIÓN DE INGENIERÍA -->
-        <div class="border-2 rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-mono"
-          [class]="isBlueprintDark() ? 'border-zinc-700 bg-zinc-950/80' : 'border-slate-400 bg-slate-100/90'">
+        <div class="border rounded-md p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-mono tabular-nums"
+          [class]="isBlueprintDark() ? 'border-zinc-700 bg-zinc-950/80' : 'border-zinc-300 bg-zinc-50'">
 
           <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
-            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">PROYECTO:</span>
-            <p class="font-bold truncate text-sm mt-0.5">{{ project().name }}</p>
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">PROYECTO:</span>
+            <p class="font-bold truncate text-sm mt-0.5 text-zinc-900">{{ project().name }}</p>
             <span class="text-[10px] text-zinc-400">Piezo3D Studio</span>
           </div>
 
           <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
-            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">CLIENTE / TALLER:</span>
-            <p class="font-bold truncate text-sm mt-0.5">{{ project().clientName || 'General' }}</p>
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">CLIENTE / TALLER:</span>
+            <p class="font-bold truncate text-sm mt-0.5 text-zinc-900">{{ project().clientName || 'General' }}</p>
             <span class="text-[10px] text-zinc-400">Fecha: {{ project().date }}</span>
           </div>
 
           <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
-            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">ENSAMBLE & TORNILLERÍA:</span>
-            <p class="font-bold text-amber-500 mt-0.5">Soberbio 4x50 mm</p>
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">ENSAMBLE & TORNILLERÍA:</span>
+            <p class="font-semibold text-zinc-900 mt-0.5">Soberbio 4x50 mm</p>
             <span class="text-[10px] text-zinc-400">+ Tarugos madera 8x30</span>
           </div>
 
           <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
-            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">MATERIAL PRINCIPAL:</span>
-            <p class="font-bold truncate mt-0.5">{{ mainBoardInfo().name }}</p>
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">MATERIAL PRINCIPAL:</span>
+            <p class="font-bold truncate mt-0.5 text-zinc-900">{{ mainBoardInfo().name }}</p>
             <span class="text-[10px] text-zinc-400">Espesor: {{ mainBoardInfo().thickness }} mm</span>
           </div>
 
           <div class="flex flex-col justify-between">
             <div>
-              <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-bold">APROBACIÓN DE CORTE:</span>
-              <div class="h-6 border-b border-dashed border-zinc-400 mt-2"></div>
+              <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">APROBACIÓN DE CORTE:</span>
+              <div class="h-6 border-b border-dashed border-zinc-300 mt-2"></div>
             </div>
             <span class="text-[9px] text-zinc-500 text-right">Firma / Sello de Taller</span>
           </div>
@@ -324,20 +324,20 @@
         <!-- TABLA RESUMEN DE DESPIECE Y PERFORACIONES DE TALLER -->
         <div class="space-y-2">
           <div class="flex items-center justify-between border-b pb-1"
-            [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
-            <span class="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-              <hugeicons-icon [icon]="icons.list" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-zinc-200'">
+            <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+              <hugeicons-icon [icon]="icons.list" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
               <span>03. Listado de Piezas y Mecanizados para Armado</span>
             </span>
-            <span class="text-xs font-mono font-bold text-cyan-500">
+            <span class="text-xs font-mono tabular-nums font-semibold text-zinc-800">
               Total: {{ project().parts.length }} piezas | {{ drillHoles().length }} taladros
             </span>
           </div>
 
-          <div class="overflow-x-auto rounded-xl border"
-            [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-slate-200'">
-            <table class="w-full text-left text-xs font-mono">
-              <thead [class]="isBlueprintDark() ? 'bg-zinc-800/80 text-zinc-300' : 'bg-slate-100 text-slate-700'">
+          <div class="overflow-x-auto rounded-md border"
+            [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-zinc-200'">
+            <table class="w-full text-left text-xs font-mono tabular-nums">
+              <thead [class]="isBlueprintDark() ? 'bg-zinc-800/80 text-zinc-300' : 'bg-zinc-100 text-zinc-700'">
                 <tr>
                   <th class="p-2.5">Pieza</th>
                   <th class="p-2.5">Cant.</th>
@@ -349,20 +349,20 @@
                 </tr>
               </thead>
               <tbody class="divide-y"
-                [class]="isBlueprintDark() ? 'divide-zinc-800 text-zinc-300' : 'divide-slate-200 text-slate-800'">
+                [class]="isBlueprintDark() ? 'divide-zinc-800 text-zinc-300' : 'divide-zinc-200 text-zinc-800'">
                 @for (part of project().parts; track part.id) {
-                  <tr class="hover:bg-amber-500/5 transition">
-                    <td class="p-2.5 font-bold">
+                  <tr class="hover:bg-zinc-50 transition">
+                    <td class="p-2.5 font-medium">
                       <div>{{ part.name }}</div>
                       @if (part.shapeType === 'circle') {
-                        <div class="text-[10px] text-cyan-600 font-bold">Cilindro Ø{{ part.diameter || part.width }}mm (Longitud {{ part.length }}mm)</div>
+                        <div class="text-[10px] text-zinc-600 font-medium">Cilindro Ø{{ part.diameter || part.width }}mm (Longitud {{ part.length }}mm)</div>
                       }
                       @if (part.rotationX || part.rotationY || part.rotationZ) {
-                        <div class="text-[10px] text-amber-500 font-normal">Ángulos 3D: X {{ part.rotationX || 0 }}° | Y {{ part.rotationY || 0 }}° | Z {{ part.rotationZ || 0 }}°</div>
+                        <div class="text-[10px] text-zinc-500 font-normal">Ángulos 3D: X {{ part.rotationX || 0 }}° | Y {{ part.rotationY || 0 }}° | Z {{ part.rotationZ || 0 }}°</div>
                       }
                     </td>
                     <td class="p-2.5">{{ part.quantity }}x</td>
-                    <td class="p-2.5 font-bold text-cyan-600">{{ part.length }} × {{ part.width }} mm</td>
+                    <td class="p-2.5 font-semibold text-zinc-900">{{ part.length }} × {{ part.width }} mm</td>
                     <td class="p-2.5">{{ part.thickness }} mm</td>
                     <td class="p-2.5 truncate max-w-35">{{ part.materialName }}</td>
                     <td class="p-2.5 text-[11px]">
@@ -371,7 +371,7 @@
                         <span class="text-zinc-400">Sin canto</span>
                       }
                     </td>
-                    <td class="p-2.5 text-[11px] text-amber-500 font-semibold">
+                    <td class="p-2.5 text-[11px] text-zinc-700 font-medium">
                       @let partDrills = joineryData().drillHolesByPart.get(part.id);
                       @if (partDrills && partDrills.length > 0) {
                         <span>{{ partDrills.length }} taladros (4x50 / 8x30)</span>

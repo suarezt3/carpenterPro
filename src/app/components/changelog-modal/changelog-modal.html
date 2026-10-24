@@ -1,42 +1,42 @@
 @if (isOpen()) {
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-150"
+    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-zinc-950/75 backdrop-blur-md animate-in fade-in duration-150"
     (click)="handleBackdropClick($event)">
 
     <div
       [class]="themeService.isClassic()
-        ? 'bg-white border-slate-300 text-slate-800'
+        ? 'bg-white border-zinc-200/90 text-zinc-800'
         : 'bg-zinc-900 border-zinc-700/80 text-zinc-100'"
-      class="border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden animate-in zoom-in-95 duration-150">
+      class="border rounded-lg w-full max-w-4xl shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden animate-in zoom-in-95 duration-150">
 
       <!-- ================= CABECERA DEL MODAL ================= -->
       <div
         [class]="themeService.isClassic()
-          ? 'bg-slate-50 border-b border-slate-200'
+          ? 'bg-zinc-50 border-b border-zinc-200'
           : 'bg-zinc-950 border-b border-zinc-800'"
         class="px-5 py-3.5 sm:px-6 sm:py-4 flex items-center justify-between gap-3 shrink-0">
 
         <div class="flex items-center gap-3 min-w-0">
-          <div class="w-9 h-9 rounded-lg bg-linear-to-br from-indigo-600 to-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+          <div class="w-8 h-8 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0">
             @if (activeTab() === 'changelog') {
-              <hugeicons-icon [icon]="icons.megaphone" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+              <hugeicons-icon [icon]="icons.megaphone" [size]="17" [strokeWidth]="2"></hugeicons-icon>
             } @else {
-              <hugeicons-icon [icon]="icons.rocket" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+              <hugeicons-icon [icon]="icons.rocket" [size]="17" [strokeWidth]="2"></hugeicons-icon>
             }
           </div>
 
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <h2 [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'" class="text-base sm:text-lg font-bold tracking-tight">
+              <h2 [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'" class="text-base sm:text-lg font-bold tracking-tight">
                 Novedades & Hoja de Ruta
               </h2>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-700 text-white text-[11px] font-extrabold shadow-2xs">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-200 border border-zinc-700 text-[11px] font-mono font-medium shadow-2xs">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>{{ currentVersion }} Actual</span>
               </span>
             </div>
-            <p [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'" class="text-xs truncate">
-              Historial oficial de mejoras continuas y plan de desarrollo para Piezo3D Studio
+            <p [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-xs truncate">
+              Historial oficial de mejoras continuas y plan de desarrollo para Pieza3D Studio
             </p>
           </div>
         </div>
@@ -45,9 +45,9 @@
           type="button"
           (click)="close()"
           [class]="themeService.isClassic()
-            ? 'text-slate-400 hover:text-slate-800 hover:bg-slate-200/70 border border-slate-200'
+            ? 'text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 border border-zinc-200'
             : 'text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-700'"
-          class="h-8 w-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+          class="h-8 w-8 rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
           title="Cerrar modal (Esc)">
           <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
         </button>
@@ -56,29 +56,29 @@
       <!-- ================= BARRA DE PESTAÑAS Y BUSCADOR ================= -->
       <div
         [class]="themeService.isClassic()
-          ? 'bg-slate-100/70 border-b border-slate-200'
+          ? 'bg-zinc-100/70 border-b border-zinc-200'
           : 'bg-zinc-900/95 border-b border-zinc-800'"
         class="px-5 py-2.5 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
 
         <!-- Conmutador de Pestañas -->
         <div
-          [class]="themeService.isClassic() ? 'bg-slate-200/90 border-slate-300' : 'bg-zinc-800 border-zinc-700'"
-          class="inline-flex items-center p-1 rounded-lg border self-start shrink-0">
+          [class]="themeService.isClassic() ? 'bg-zinc-200/90 border-zinc-300' : 'bg-zinc-800 border-zinc-700'"
+          class="inline-flex items-center p-0.5 rounded-md border self-start shrink-0">
 
           <button
             type="button"
             (click)="activeTab.set('changelog')"
             [class]="activeTab() === 'changelog'
-              ? (themeService.isClassic() ? 'bg-white text-indigo-700 shadow-xs font-bold' : 'bg-zinc-700 text-white shadow-xs font-bold')
-              : (themeService.isClassic() ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-zinc-200')"
-            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer font-medium">
+              ? 'bg-zinc-900 text-white shadow-xs font-medium'
+              : (themeService.isClassic() ? 'text-zinc-600 hover:text-zinc-900 font-medium' : 'text-zinc-400 hover:text-zinc-200 font-medium')"
+            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer">
             <hugeicons-icon [icon]="icons.megaphone" [size]="14" [strokeWidth]="2"></hugeicons-icon>
             <span>Historial de Novedades</span>
             <span
               [class]="activeTab() === 'changelog'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-slate-300 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'"
-              class="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold">
+                ? 'bg-zinc-700 text-zinc-100'
+                : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'"
+              class="text-[10px] px-1.5 py-0.2 rounded font-mono font-medium">
               {{ releases.length }}
             </span>
           </button>
@@ -87,44 +87,44 @@
             type="button"
             (click)="activeTab.set('roadmap')"
             [class]="activeTab() === 'roadmap'
-              ? (themeService.isClassic() ? 'bg-white text-indigo-700 shadow-xs font-bold' : 'bg-zinc-700 text-white shadow-xs font-bold')
-              : (themeService.isClassic() ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-zinc-200')"
-            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer font-medium">
+              ? 'bg-zinc-900 text-white shadow-xs font-medium'
+              : (themeService.isClassic() ? 'text-zinc-600 hover:text-zinc-900 font-medium' : 'text-zinc-400 hover:text-zinc-200 font-medium')"
+            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer">
             <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2"></hugeicons-icon>
             <span>Próximamente</span>
             <span
               [class]="activeTab() === 'roadmap'
-                ? 'bg-amber-600 text-white'
-                : 'bg-slate-300 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'"
-              class="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold">
+                ? 'bg-zinc-700 text-zinc-100'
+                : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'"
+              class="text-[10px] px-1.5 py-0.2 rounded font-mono font-medium">
               Roadmap
             </span>
           </button>
         </div>
 
-        <!-- Buscador Limpio en Contenedor Flex (Sin superposición de lupa) -->
+        <!-- Buscador Limpio en Contenedor Flex -->
         <div
           [class]="themeService.isClassic()
-            ? 'bg-white border-slate-300 text-slate-900 focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600 shadow-2xs'
-            : 'bg-zinc-800/90 border-zinc-700 text-white focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400'"
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg border w-full sm:w-64 transition shrink-0">
+            ? 'bg-white border-zinc-200 text-zinc-900 focus-within:border-zinc-900 shadow-2xs'
+            : 'bg-zinc-800/90 border-zinc-700 text-white focus-within:border-zinc-400'"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-md border w-full sm:w-64 transition shrink-0">
           <hugeicons-icon
             [icon]="icons.search"
             [size]="15"
             [strokeWidth]="2"
-            class="text-slate-400 dark:text-zinc-400 shrink-0">
+            class="text-zinc-400 dark:text-zinc-400 shrink-0">
           </hugeicons-icon>
           <input
             type="text"
             [ngModel]="searchQuery()"
             (ngModelChange)="searchQuery.set($event)"
             [placeholder]="activeTab() === 'changelog' ? 'Buscar en versiones...' : 'Buscar en roadmap...'"
-            class="w-full bg-transparent text-xs placeholder:text-slate-400 dark:placeholder:text-zinc-500 outline-none p-0 border-none leading-none" />
+            class="w-full bg-transparent text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none p-0 border-none leading-none font-medium" />
           @if (searchQuery()) {
             <button
               type="button"
               (click)="searchQuery.set('')"
-              class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5 rounded cursor-pointer shrink-0"
+              class="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-0.5 rounded cursor-pointer shrink-0"
               title="Borrar búsqueda">
               <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             </button>
@@ -138,9 +138,9 @@
         <!-- ================= PESTAÑA 1: HISTORIAL DE VERSIONES ================= -->
         @if (activeTab() === 'changelog') {
 
-          <!-- Filtros por Tipo de Cambio (100% Hugeicons, sin emojis) -->
+          <!-- Filtros por Tipo de Cambio -->
           <div class="flex items-center gap-1.5 flex-wrap">
-            <span [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'" class="text-xs font-semibold mr-1">
+            <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-xs font-semibold mr-1">
               Filtrar por:
             </span>
 
@@ -148,9 +148,9 @@
               type="button"
               (click)="activeChangeFilter.set('all')"
               [class]="activeChangeFilter() === 'all'
-                ? 'bg-indigo-600 text-white font-bold shadow-xs'
-                : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300')"
-              class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1">
+                ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
+              class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1 border">
               <span>Todas</span>
             </button>
 
@@ -158,10 +158,10 @@
               type="button"
               (click)="activeChangeFilter.set('feature')"
               [class]="activeChangeFilter() === 'feature'
-                ? 'bg-emerald-700 text-white font-bold shadow-xs'
-                : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700')"
-              class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5">
-              <hugeicons-icon [icon]="icons.check" [size]="13" [strokeWidth]="2.5" class="text-emerald-500"></hugeicons-icon>
+                ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
+              class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5 border">
+              <hugeicons-icon [icon]="icons.check" [size]="13" [strokeWidth]="2.5" class="text-zinc-400"></hugeicons-icon>
               <span>Nuevas Funciones</span>
             </button>
 
@@ -169,10 +169,10 @@
               type="button"
               (click)="activeChangeFilter.set('improvement')"
               [class]="activeChangeFilter() === 'improvement'
-                ? 'bg-sky-700 text-white font-bold shadow-xs'
-                : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700')"
-              class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5">
-              <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
+                ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
+              class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5 border">
+              <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-zinc-400"></hugeicons-icon>
               <span>Mejoras</span>
             </button>
 
@@ -180,15 +180,15 @@
               type="button"
               (click)="activeChangeFilter.set('fix')"
               [class]="activeChangeFilter() === 'fix'
-                ? 'bg-amber-600 text-white font-bold shadow-xs'
-                : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700')"
-              class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5">
-              <hugeicons-icon [icon]="icons.settings" [size]="13" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+                ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
+              class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5 border">
+              <hugeicons-icon [icon]="icons.settings" [size]="13" [strokeWidth]="2" class="text-zinc-400"></hugeicons-icon>
               <span>Correcciones</span>
             </button>
           </div>
 
-          <!-- Feed Limpio y Corporativo de Versiones (Sin líneas flotantes) -->
+          <!-- Feed Limpio y Corporativo de Versiones -->
           @if (filteredReleases().length > 0) {
             <div class="space-y-4">
 
@@ -197,40 +197,40 @@
                 <div
                   [class]="release.isCurrent
                     ? (themeService.isClassic()
-                        ? 'bg-white border-emerald-500/80 shadow-sm ring-1 ring-emerald-200'
-                        : 'bg-zinc-800/60 border-emerald-500/60 shadow-sm ring-1 ring-emerald-500/20')
+                        ? 'bg-white border-zinc-400 shadow-sm ring-1 ring-zinc-300'
+                        : 'bg-zinc-850 border-zinc-500 shadow-sm ring-1 ring-zinc-600')
                     : (themeService.isClassic()
-                        ? 'bg-white border-slate-200 shadow-2xs hover:border-slate-300'
-                        : 'bg-zinc-800/40 border-zinc-700/60 shadow-2xs hover:border-zinc-600')"
-                  class="border rounded-lg p-4 sm:p-5 transition">
+                        ? 'bg-white border-zinc-200 shadow-2xs hover:border-zinc-300'
+                        : 'bg-zinc-850/60 border-zinc-700/80 shadow-2xs hover:border-zinc-600')"
+                  class="border rounded-md p-4 sm:p-5 transition">
 
                   <!-- Cabecera de la Versión -->
-                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/80 dark:border-zinc-700/80">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-200/80 dark:border-zinc-700/80">
                     <div class="flex items-center gap-2 flex-wrap">
-                      <span class="px-2.5 py-0.5 rounded-md bg-slate-900 text-white text-xs font-mono font-bold shadow-2xs">
+                      <span class="px-2.5 py-0.5 rounded-md bg-zinc-900 text-white text-xs font-mono tabular-nums font-medium shadow-2xs">
                         {{ release.version }}
                       </span>
 
-                      <h3 [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'" class="text-sm sm:text-base font-bold">
+                      <h3 [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'" class="text-sm sm:text-base font-bold">
                         {{ release.name }}
                       </h3>
 
-                      <!-- Pastilla de Alto Contraste para Versión Actual -->
+                      <!-- Pastilla para Versión Actual -->
                       @if (release.isCurrent) {
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-700 text-white text-[10px] font-extrabold uppercase tracking-wide shadow-2xs">
-                          <hugeicons-icon [icon]="icons.verified" [size]="12" [strokeWidth]="2.5" class="text-white"></hugeicons-icon>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-200 border border-zinc-700 text-[10px] font-mono font-medium uppercase tracking-wide shadow-2xs">
+                          <hugeicons-icon [icon]="icons.verified" [size]="12" [strokeWidth]="2" class="text-zinc-300"></hugeicons-icon>
                           <span>Versión Actual en Uso</span>
                         </span>
                       }
                     </div>
 
-                    <span [class]="themeService.isClassic() ? 'text-slate-400' : 'text-zinc-500'" class="text-xs font-medium shrink-0">
+                    <span [class]="themeService.isClassic() ? 'text-zinc-400' : 'text-zinc-500'" class="text-xs font-mono shrink-0">
                       {{ release.releaseDate }}
                     </span>
                   </div>
 
                   <!-- Resumen Ejecutivo de la Versión -->
-                  <p [class]="themeService.isClassic() ? 'text-slate-600' : 'text-zinc-300'" class="text-xs mt-3 leading-relaxed">
+                  <p [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-300'" class="text-xs mt-3 leading-relaxed">
                     {{ release.summary }}
                   </p>
 
@@ -238,15 +238,15 @@
                   @if (release.highlights.length > 0) {
                     <div
                       [class]="themeService.isClassic()
-                        ? 'bg-slate-50 border-slate-200 text-slate-700'
+                        ? 'bg-zinc-50 border-zinc-200 text-zinc-700'
                         : 'bg-zinc-900/60 border-zinc-800 text-zinc-300'"
-                      class="mt-3 p-3 rounded-lg border text-xs space-y-1.5">
-                      <span [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'" class="text-[10px] font-bold uppercase tracking-wider block">
+                      class="mt-3 p-3 rounded-md border text-xs space-y-1.5">
+                      <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-[10px] font-semibold uppercase tracking-wider block">
                         Puntos Clave:
                       </span>
                       @for (highlight of release.highlights; track highlight) {
                         <div class="flex items-start gap-2">
-                          <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.5" class="text-emerald-500 shrink-0 mt-0.5"></hugeicons-icon>
+                          <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.5" class="text-zinc-500 shrink-0 mt-0.5"></hugeicons-icon>
                           <span>{{ highlight }}</span>
                         </div>
                       }
@@ -258,9 +258,9 @@
                     @for (change of release.changes; track change.title) {
                       <div
                         [class]="themeService.isClassic()
-                          ? 'bg-slate-50/70 border-slate-200/80 hover:bg-slate-100/60'
+                          ? 'bg-zinc-50/70 border-zinc-200/80 hover:bg-zinc-100/60'
                           : 'bg-zinc-900/40 border-zinc-800/80 hover:bg-zinc-900/80'"
-                        class="p-2.5 sm:p-3 rounded-lg border transition flex flex-col gap-1">
+                        class="p-2.5 sm:p-3 rounded-md border transition flex flex-col gap-1">
 
                         <div class="flex items-center gap-2 flex-wrap">
                           <span [class]="getBadgeClass(change.type)" class="text-[10px] font-bold px-2 py-0.5 rounded font-mono shadow-2xs">
@@ -268,17 +268,17 @@
                           </span>
 
                           @if (change.tag) {
-                            <span [class]="themeService.isClassic() ? 'bg-slate-200 text-slate-700 font-semibold' : 'bg-zinc-800 text-zinc-300 font-medium'" class="text-[10px] px-1.5 py-0.5 rounded">
+                            <span [class]="themeService.isClassic() ? 'bg-zinc-200 text-zinc-700 font-medium' : 'bg-zinc-800 text-zinc-300 font-medium'" class="text-[10px] px-1.5 py-0.5 rounded font-mono">
                               {{ change.tag }}
                             </span>
                           }
 
-                          <h4 [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'" class="text-xs font-bold">
+                          <h4 [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'" class="text-xs font-semibold">
                             {{ change.title }}
                           </h4>
                         </div>
 
-                        <p [class]="themeService.isClassic() ? 'text-slate-600' : 'text-zinc-400'" class="text-xs leading-relaxed pl-0.5">
+                        <p [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-400'" class="text-xs leading-relaxed pl-0.5">
                           {{ change.description }}
                         </p>
                       </div>
@@ -291,17 +291,17 @@
           } @else {
             <!-- Estado sin resultados -->
             <div class="py-12 text-center flex flex-col items-center justify-center gap-2">
-              <hugeicons-icon [icon]="icons.search" [size]="32" [strokeWidth]="1.5" class="text-slate-400"></hugeicons-icon>
-              <h4 [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-200'" class="text-sm font-bold">
+              <hugeicons-icon [icon]="icons.search" [size]="32" [strokeWidth]="1.5" class="text-zinc-400"></hugeicons-icon>
+              <h4 [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-200'" class="text-sm font-bold">
                 No se encontraron novedades para "{{ searchQuery() }}"
               </h4>
-              <p [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'" class="text-xs">
+              <p [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-xs">
                 Intenta buscar por otro término o limpia los filtros activos.
               </p>
               <button
                 type="button"
                 (click)="searchQuery.set(''); activeChangeFilter.set('all')"
-                class="mt-2 px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition cursor-pointer">
+                class="mt-2 px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white rounded-md hover:bg-zinc-800 transition cursor-pointer">
                 Restablecer Filtros
               </button>
             </div>
@@ -309,18 +309,18 @@
 
         } @else {
 
-          <!-- ================= PESTAÑA 2: PRÓXIMAMENTE (ROADMAP LIMPIO Y PROFESIONAL) ================= -->
+          <!-- ================= PESTAÑA 2: PRÓXIMAMENTE (ROADMAP) ================= -->
           <div class="space-y-4">
 
             <!-- Subcabecera Técnica del Roadmap -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200 dark:border-zinc-800">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-800">
               <div>
-                <h3 [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'" class="text-sm sm:text-base font-bold flex items-center gap-2">
-                  <hugeicons-icon [icon]="icons.rocket" [size]="16" [strokeWidth]="2" class="text-indigo-500"></hugeicons-icon>
+                <h3 [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'" class="text-sm sm:text-base font-bold flex items-center gap-2">
+                  <hugeicons-icon [icon]="icons.rocket" [size]="16" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
                   <span>Hoja de Ruta de Próximas Funciones</span>
                 </h3>
-                <p [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'" class="text-xs">
-                  Desarrollo activo planificado para las siguientes entregas de Piezo3D Studio
+                <p [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-xs">
+                  Desarrollo activo planificado para las siguientes entregas de Pieza3D Studio
                 </p>
               </div>
 
@@ -330,9 +330,9 @@
                   type="button"
                   (click)="activeRoadmapStatus.set('all')"
                   [class]="activeRoadmapStatus() === 'all'
-                    ? 'bg-indigo-600 text-white font-bold shadow-xs'
-                    : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300')"
-                  class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer">
+                    ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                    : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
+                  class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer border">
                   Todas ({{ roadmapItems.length }})
                 </button>
 
@@ -340,10 +340,10 @@
                   type="button"
                   (click)="activeRoadmapStatus.set('in_progress')"
                   [class]="activeRoadmapStatus() === 'in_progress'
-                    ? 'bg-emerald-700 text-white font-bold shadow-xs'
-                    : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300')"
-                  class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                    : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
+                  class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5 border">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   <span>En Desarrollo ({{ inProgressCount() }})</span>
                 </button>
 
@@ -351,9 +351,9 @@
                   type="button"
                   (click)="activeRoadmapStatus.set('planned')"
                   [class]="activeRoadmapStatus() === 'planned'
-                    ? 'bg-blue-700 text-white font-bold shadow-xs'
-                    : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300')"
-                  class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer">
+                    ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                    : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
+                  class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer border">
                   Planificadas ({{ plannedCount() }})
                 </button>
 
@@ -361,70 +361,70 @@
                   type="button"
                   (click)="activeRoadmapStatus.set('evaluating')"
                   [class]="activeRoadmapStatus() === 'evaluating'
-                    ? 'bg-purple-700 text-white font-bold shadow-xs'
-                    : (themeService.isClassic() ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300')"
-                  class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer">
+                    ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                    : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
+                  class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer border">
                   En Estudio ({{ evaluatingCount() }})
                 </button>
               </div>
             </div>
 
-            <!-- Lista de Tarjetas del Roadmap (Bordes limpios rounded-lg) -->
+            <!-- Lista de Tarjetas del Roadmap -->
             @if (filteredRoadmap().length > 0) {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 @for (item of filteredRoadmap(); track item.id) {
                   <div
                     [class]="themeService.isClassic()
-                      ? 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+                      ? 'bg-white border-zinc-200 hover:border-zinc-300 shadow-2xs'
                       : 'bg-zinc-800/40 border-zinc-700/70 hover:border-zinc-600 shadow-2xs'"
                     [ngClass]="{
                       'border-l-4 border-l-emerald-600': item.status === 'in_progress',
                       'border-l-4 border-l-blue-600': item.status === 'planned',
-                      'border-l-4 border-l-purple-600': item.status === 'evaluating'
+                      'border-l-4 border-l-zinc-500': item.status === 'evaluating'
                     }"
-                    class="p-4 rounded-lg border transition flex flex-col justify-between gap-3">
+                    class="p-4 rounded-md border transition flex flex-col justify-between gap-3">
 
                     <div class="space-y-2">
                       <!-- Badges Superiores con Alto Contraste -->
                       <div class="flex items-center justify-between gap-2">
-                        <span [class]="themeService.isClassic() ? 'bg-slate-100 text-slate-700 font-semibold' : 'bg-zinc-700 text-zinc-200 font-medium'" class="text-[10px] px-2 py-0.5 rounded">
+                        <span [class]="themeService.isClassic() ? 'bg-zinc-100 text-zinc-700 font-medium' : 'bg-zinc-700 text-zinc-200 font-medium'" class="text-[10px] px-2 py-0.5 rounded font-mono">
                           {{ item.category }}
                         </span>
 
-                        <span [class]="getStatusBadgeClass(item.status)" class="text-[10px] font-bold px-2 py-0.5 rounded shadow-2xs">
+                        <span [class]="getStatusBadgeClass(item.status)" class="text-[10px] font-medium px-2 py-0.5 rounded shadow-2xs font-mono">
                           {{ item.badge || getStatusLabel(item.status) }}
                         </span>
                       </div>
 
                       <!-- Título y Descripción -->
-                      <h4 [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'" class="text-sm font-bold leading-snug">
+                      <h4 [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'" class="text-sm font-semibold leading-snug">
                         {{ item.title }}
                       </h4>
 
-                      <p [class]="themeService.isClassic() ? 'text-slate-600' : 'text-zinc-400'" class="text-xs leading-relaxed">
+                      <p [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-400'" class="text-xs leading-relaxed">
                         {{ item.description }}
                       </p>
                     </div>
 
                     <!-- Pie de la Tarjeta con Timeline y Progreso -->
-                    <div class="pt-2 border-t border-slate-100 dark:border-zinc-700/50 flex flex-col gap-1.5">
+                    <div class="pt-2 border-t border-zinc-100 dark:border-zinc-700/50 flex flex-col gap-1.5">
                       <div class="flex items-center justify-between text-[11px]">
-                        <span [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'" class="flex items-center gap-1 font-medium">
+                        <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="flex items-center gap-1 font-medium">
                           <hugeicons-icon [icon]="icons.clock" [size]="12" [strokeWidth]="2"></hugeicons-icon>
                           <span>{{ item.targetTimeline || 'Fecha por definir' }}</span>
                         </span>
 
                         @if (item.progressPercent !== undefined) {
-                          <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          <span class="font-mono tabular-nums font-bold text-zinc-900 dark:text-zinc-100">
                             {{ item.progressPercent }}%
                           </span>
                         }
                       </div>
 
                       @if (item.progressPercent !== undefined) {
-                        <div class="w-full bg-slate-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden">
+                        <div class="w-full bg-zinc-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden">
                           <div
-                            class="bg-linear-to-r from-emerald-500 to-indigo-500 h-full rounded-full transition-all duration-500"
+                            class="bg-blue-600 h-full rounded-full transition-all duration-500"
                             [style.width.%]="item.progressPercent">
                           </div>
                         </div>
@@ -437,14 +437,14 @@
             } @else {
               <!-- Estado sin resultados -->
               <div class="py-12 text-center flex flex-col items-center justify-center gap-2">
-                <hugeicons-icon [icon]="icons.search" [size]="32" [strokeWidth]="1.5" class="text-slate-400"></hugeicons-icon>
-                <h4 [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-200'" class="text-sm font-bold">
+                <hugeicons-icon [icon]="icons.search" [size]="32" [strokeWidth]="1.5" class="text-zinc-400"></hugeicons-icon>
+                <h4 [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-200'" class="text-sm font-bold">
                   No se encontraron elementos para "{{ searchQuery() }}"
                 </h4>
                 <button
                   type="button"
                   (click)="searchQuery.set(''); activeRoadmapStatus.set('all')"
-                  class="mt-2 px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition cursor-pointer">
+                  class="mt-2 px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white rounded-md hover:bg-zinc-800 transition cursor-pointer">
                   Restablecer Búsqueda
                 </button>
               </div>
@@ -453,24 +453,24 @@
             <!-- Llamado a la Acción Empresarial -->
             <div
               [class]="themeService.isClassic()
-                ? 'bg-slate-50 border-slate-200 text-slate-700'
+                ? 'bg-zinc-50 border-zinc-200 text-zinc-700'
                 : 'bg-zinc-900/80 border-zinc-800 text-zinc-300'"
-              class="p-3.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
+              class="p-3.5 rounded-md border flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
               <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                <div class="w-8 h-8 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0">
                   <hugeicons-icon [icon]="icons.info" [size]="16" [strokeWidth]="2"></hugeicons-icon>
                 </div>
                 <div>
-                  <h5 [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'" class="text-xs font-bold">
+                  <h5 [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'" class="text-xs font-bold">
                     ¿Requieres una función específica para tu taller?
                   </h5>
-                  <p [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'" class="text-[11px]">
-                    El desarrollo continuo de Piezo3D Studio se prioriza en base a las solicitudes de los carpinteros y diseñadores.
+                  <p [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-[11px]">
+                    El desarrollo continuo de Pieza3D Studio se prioriza en base a las solicitudes de los carpinteros y diseñadores.
                   </p>
                 </div>
               </div>
 
-              <span class="px-2.5 py-1 rounded-md bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-[11px] font-bold text-center shrink-0">
+              <span class="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium text-center shrink-0 font-mono">
                 Tu opinión construye el software
               </span>
             </div>
@@ -484,12 +484,12 @@
       <!-- ================= PIE DEL MODAL ================= -->
       <div
         [class]="themeService.isClassic()
-          ? 'bg-slate-50 border-t border-slate-200 text-slate-600'
+          ? 'bg-zinc-50 border-t border-zinc-200 text-zinc-600'
           : 'bg-zinc-950 border-t border-zinc-800 text-zinc-400'"
         class="px-5 py-3 sm:px-6 flex items-center justify-between text-xs shrink-0">
 
         <div class="flex items-center gap-2">
-          <span class="font-bold">Piezo3D Studio</span>
+          <span class="font-bold">Pieza3D Studio</span>
           <span>·</span>
           <span>Despiece & Diseño Modular 3D</span>
         </div>
@@ -497,7 +497,7 @@
         <button
           type="button"
           (click)="close()"
-          class="px-4 py-1.5 rounded-lg font-bold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition cursor-pointer shadow-xs flex items-center gap-1.5">
+          class="px-4 py-2 rounded-md font-medium text-white bg-blue-600 hover:bg-blue-700 transition cursor-pointer shadow-xs flex items-center gap-1.5">
           <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
           <span>Entendido</span>
         </button>

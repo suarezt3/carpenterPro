@@ -1,7 +1,7 @@
 <div #container3d
-  [class]="isWhiteTheme() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950 border-zinc-800'"
+  [class]="isWhiteTheme() ? 'bg-[#EAE8E1] border-zinc-300' : 'bg-zinc-950 border-zinc-800'"
   (contextmenu)="onContextMenu($event)"
-  class="relative w-full h-full min-h-0 rounded-2xl border overflow-hidden shadow-xl select-none group transition-colors duration-200">
+  class="relative w-full h-full min-h-0 rounded-lg border overflow-hidden shadow-xs select-none group transition-colors duration-200">
 
   <!-- Lienzo 3D WebGL -->
   <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
@@ -9,12 +9,12 @@
   <!-- MARQUEE BOX SELECTION OVERLAY (Shift + Arrastre estilo SketchUp) -->
   @if (marqueeBox(); as mb) {
     <div
-      class="absolute border-2 border-dashed border-indigo-500 bg-indigo-500/15 backdrop-blur-2xs rounded-xs pointer-events-none z-40 shadow-sm"
+      class="absolute border-2 border-dashed border-zinc-700 bg-zinc-900/20 backdrop-blur-2xs rounded-xs pointer-events-none z-40 shadow-sm"
       [style.left.px]="mb.left"
       [style.top.px]="mb.top"
       [style.width.px]="mb.width"
       [style.height.px]="mb.height">
-      <span class="absolute -top-5 left-0 px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[9px] font-bold shadow-xs flex items-center gap-1 select-none whitespace-nowrap">
+      <span class="absolute -top-5 left-0 px-1.5 py-0.5 rounded bg-zinc-900 text-white text-[9px] font-medium shadow-xs flex items-center gap-1 select-none whitespace-nowrap">
         <hugeicons-icon [icon]="icons.layers" [size]="10" [strokeWidth]="2"></hugeicons-icon>
         <span>Selección múltiple (Shift)</span>
       </span>
@@ -22,14 +22,14 @@
   }
 
   <!-- PALETA VERTICAL IZQUIERDA DE HERRAMIENTAS CAD (ADAPTATIVA HD / FHD / 2K) -->
-  <div class="cad-toolbar absolute top-2.5 left-2.5 z-30 flex flex-col items-center bg-white/95 text-slate-700 backdrop-blur-md rounded-xl border border-slate-200/90 shadow-lg pointer-events-auto transition-colors duration-200 max-h-[calc(100%-2.25rem)] overflow-y-auto scrollbar-none">
+  <div class="cad-toolbar absolute top-2.5 left-2.5 z-30 flex flex-col items-center bg-white/95 text-zinc-700 backdrop-blur-md rounded-md border border-zinc-200/90 shadow-md pointer-events-auto transition-colors duration-200 max-h-[calc(100%-2.25rem)] overflow-y-auto scrollbar-none">
 
     <!-- 1. HERRAMIENTA SELECCIONAR -->
     <button
       type="button"
       (click)="setActiveTool('select')"
-      [class]="activeTool() === 'select' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="activeTool() === 'select' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Seleccionar (V o Espacio): Haz clic para seleccionar piezas o Shift+Clic para multi-selección">
       <hugeicons-icon [icon]="icons.cursorSelect" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -38,8 +38,8 @@
     <button
       type="button"
       (click)="setActiveTool('push_pull')"
-      [class]="activeTool() === 'push_pull' ? 'bg-amber-500 text-white shadow-xs shadow-amber-500/30 ring-1 ring-amber-400/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition relative cursor-pointer shrink-0"
+      [class]="activeTool() === 'push_pull' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition relative cursor-pointer shrink-0"
       title="Empujar / Tirar (P): Haz clic en cualquier cara de la pieza y arrastra para estirar o encoger sus dimensiones en tiempo real">
       <hugeicons-icon [icon]="icons.pushPull" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400"></span>
@@ -49,8 +49,8 @@
     <button
       type="button"
       (click)="setActiveTool('move')"
-      [class]="activeTool() === 'move' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="activeTool() === 'move' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Mover (M): Muestra las flechas 3D para posicionar y trasladar piezas en los ejes X, Y, Z">
       <hugeicons-icon [icon]="icons.moveAxes" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -59,8 +59,8 @@
     <button
       type="button"
       (click)="setActiveTool('rotate_90')"
-      [class]="activeTool() === 'rotate_90' ? 'bg-amber-500 text-white shadow-xs shadow-amber-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="activeTool() === 'rotate_90' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Rotar 90° (Q): Haz clic en cualquier pieza para girarla 90 grados con transportador">
       <hugeicons-icon [icon]="icons.rotate90" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -69,8 +69,8 @@
     <button
       type="button"
       (click)="setActiveTool('draw_rect')"
-      [class]="activeTool() === 'draw_rect' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="activeTool() === 'draw_rect' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Dibujar Rectángulo 3D (D): Dibuja un rectángulo en el plano horizontal para crear una pieza rectangular">
       <hugeicons-icon [icon]="icons.squareShape" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -79,8 +79,8 @@
     <button
       type="button"
       (click)="setActiveTool('draw_circle')"
-      [class]="activeTool() === 'draw_circle' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="activeTool() === 'draw_circle' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Dibujar Círculo 3D (C): Arrastra desde el centro para definir el radio y crear una pieza o mesa redonda">
       <hugeicons-icon [icon]="icons.circleShape" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -89,8 +89,8 @@
     <button
       type="button"
       (click)="setActiveTool('draw_freehand')"
-      [class]="activeTool() === 'draw_freehand' ? 'bg-sky-500 text-white shadow-xs shadow-sky-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="activeTool() === 'draw_freehand' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Dibujo Libre a Mano Alzada (F): Trazo continuo que se suaviza y extruye en un polígono tridimensional">
       <hugeicons-icon [icon]="icons.freehandWave" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -99,24 +99,24 @@
     <button
       type="button"
       (click)="setActiveTool('measure')"
-      [class]="activeTool() === 'measure' ? 'bg-amber-500 text-white shadow-xs shadow-amber-500/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="activeTool() === 'measure' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Cinta Métrica 3D (T): Mide distancias reales y luces entre aristas o caras">
       <hugeicons-icon [icon]="icons.ruler" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
-    <div class="cad-toolbar-divider w-5 h-px bg-slate-200/90 shrink-0"></div>
+    <div class="cad-toolbar-divider w-5 h-px bg-zinc-200/90 shrink-0"></div>
 
     <!-- 8. MECANIZADOS CNC (PERFORACIONES) -->
     <button
       type="button"
       (click)="toggleDrillHoles()"
-      [class]="showDrillHoles() ? 'text-sky-600 bg-sky-50 ring-1 ring-sky-300/80' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition relative cursor-pointer shrink-0"
+      [class]="showDrillHoles() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition relative cursor-pointer shrink-0"
       title="Mecanizados CNC: Perforaciones calculadas (Cazoletas de bisagra Ø35mm moradas, tornillos 4x50 cyan y clavijas 8x30 ámbar)">
       <hugeicons-icon [icon]="icons.cncTarget" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       @if (showDrillHoles() && allDrillHoles().length > 0) {
-        <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-sky-500 text-white flex items-center justify-center leading-none shadow-2xs">
+        <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
           {{ allDrillHoles().length }}
         </span>
       }
@@ -126,8 +126,8 @@
     <button
       type="button"
       (click)="toggleDimensions()"
-      [class]="show3dDimensions() ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="show3dDimensions() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Cotas 3D: Mostrar u ocultar líneas de acotado milimétrico sobre el mueble">
       <hugeicons-icon [icon]="icons.dimensions3d" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -136,8 +136,8 @@
     <button
       type="button"
       (click)="toggleClearances()"
-      [class]="showClearances() ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="showClearances() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Luz Libre: Cotas dinámicas de huecos interiores útiles entre baldas y laterales">
       <hugeicons-icon [icon]="icons.clearanceVert" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -146,8 +146,8 @@
     <button
       type="button"
       (click)="toggleXRay()"
-      [class]="isXRay() ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="isXRay() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       title="Rayos X: Transparencia técnica para inspeccionar ensambles interiores">
       <hugeicons-icon [icon]="icons.eye" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -158,11 +158,11 @@
       [disabled]="!hasHardwareSelected()"
       (click)="toggleHardware()"
       [class]="!hasHardwareSelected()
-        ? 'opacity-35 cursor-not-allowed text-slate-300'
+        ? 'opacity-35 cursor-not-allowed text-zinc-300'
         : (isSelectedHardwareVisible()
-            ? 'text-blue-600 bg-blue-50 ring-1 ring-blue-300/80 cursor-pointer'
-            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer')"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition shrink-0"
+            ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300 cursor-pointer'
+            : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 cursor-pointer')"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition shrink-0"
       [title]="!hasHardwareSelected()
         ? 'Herrajes 3D: Selecciona un cajón o puerta para gestionar sus herrajes'
         : (isSelectedHardwareVisible() ? 'Ocultar herrajes 3D del cajón seleccionado' : 'Mostrar herrajes 3D del cajón seleccionado')">
@@ -173,12 +173,12 @@
     <button
       type="button"
       (click)="toggleAllDoorsAndDrawers()"
-      [class]="isAllOpen() ? 'text-blue-700 bg-blue-50 ring-1 ring-blue-400 font-bold' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition relative cursor-pointer shrink-0"
+      [class]="isAllOpen() ? 'text-zinc-900 bg-zinc-100 ring-1 ring-zinc-300 font-bold' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition relative cursor-pointer shrink-0"
       [title]="isAllOpen() ? 'Cerrar todas las puertas y cajones (Animación fluida)' : 'Abrir todas las puertas y cajones en 3D (Animación fluida)'">
       <hugeicons-icon [icon]="isAllOpen() ? icons.doorOpen : icons.doorClosed" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       @if (isAllOpen()) {
-        <span class="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-blue-500 border border-white"></span>
+        <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zinc-900 border border-white"></span>
       }
     </button>
 
@@ -187,36 +187,35 @@
       <button
         type="button"
         (click)="toggleGroupsFlyout()"
-        [class]="showGroupsFlyout() ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-500/30 ring-1 ring-indigo-400' : (activePartGroups().length > 0 ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 ring-1 ring-indigo-300/80' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100')"
-        class="cad-tool-btn rounded-lg flex items-center justify-center transition relative cursor-pointer"
+        [class]="showGroupsFlyout() ? 'bg-zinc-900 text-white shadow-xs' : (activePartGroups().length > 0 ? 'text-zinc-900 bg-zinc-100 hover:bg-zinc-200 ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100')"
+        class="cad-tool-btn rounded-md flex items-center justify-center transition relative cursor-pointer"
         title="Cajones y Grupos Guardados: Administrar y seleccionar cajones completos para moverlos o animarlos">
         <hugeicons-icon [icon]="icons.inbox" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
         @if (activePartGroups().length > 0) {
-          <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-indigo-600 text-white flex items-center justify-center leading-none shadow-2xs">
+          <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
             {{ activePartGroups().length }}
           </span>
         }
       </button>
     </div>
 
-    <div class="cad-toolbar-divider w-5 h-px bg-slate-200/90 shrink-0"></div>
+    <div class="cad-toolbar-divider w-5 h-px bg-zinc-200/90 shrink-0"></div>
 
     <!-- 14. TEMA DE ESTUDIO (CLARO / OSCURO) -->
     <button
       type="button"
       (click)="toggleTheme()"
-      class="cad-tool-btn rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer shrink-0"
+      class="cad-tool-btn rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer shrink-0"
       [title]="isWhiteTheme() ? 'Cambiar a modo CAD oscuro' : 'Cambiar a modo estudio claro'">
       <hugeicons-icon [icon]="isWhiteTheme() ? icons.sun : icons.moon" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
-    <!-- 15. REINICIAR CÁMARA -->
-   <!-- 14.5. GUÍA DE FRENTE Y ESCALA HUMANA 3D -->
+    <!-- 14.5. GUÍA DE FRENTE Y ESCALA HUMANA 3D -->
     <button
       type="button"
       (click)="toggleReferenceGuide()"
-      [class]="showReferenceGuide() ? 'text-sky-600 bg-sky-50 ring-1 ring-sky-300/80' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'"
-      class="cad-tool-btn rounded-lg flex items-center justify-center transition cursor-pointer shrink-0"
+      [class]="showReferenceGuide() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       [title]="showReferenceGuide() ? 'Ocultar Guía de Frente y Escala Humana 1.72m (Tecla G o Supr al seleccionarla)' : 'Mostrar Guía de Frente y Escala Humana 1.72m (Tecla G)'">
       <hugeicons-icon [icon]="icons.humanGuide" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -225,7 +224,7 @@
     <button
       type="button"
       (click)="resetCamera()"
-      class="cad-tool-btn rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer shrink-0"
+      class="cad-tool-btn rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer shrink-0"
       title="Centrar y reiniciar cámara (Z)">
       <hugeicons-icon [icon]="icons.cameraFocus" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
@@ -580,27 +579,27 @@
   <!-- HUD FLOTANTE DE MICRO-AJUSTE EN ZOOM -->
   @if (selectedPart(); as sel) {
     <div class="absolute bottom-8.5 left-13 z-20 pointer-events-auto flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
-      <div class="cad-nudge-card bg-white/95 text-slate-800 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200/90 shadow-xl flex flex-col gap-1.5 max-w-76">
-        <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-1">
+      <div class="cad-nudge-card bg-white/95 text-zinc-800 backdrop-blur-md px-3 py-2 rounded-md border border-zinc-200/90 shadow-lg flex flex-col gap-1.5 max-w-76">
+        <div class="flex items-center justify-between gap-2 border-b border-zinc-100 pb-1">
           <div class="flex items-center gap-1.5">
-            <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-sky-500"></hugeicons-icon>
-            <span class="text-[11px] font-bold text-slate-800">Micro-Ajuste en Zoom</span>
+            <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-zinc-600"></hugeicons-icon>
+            <span class="text-[11px] font-semibold text-zinc-900">Micro-Ajuste en Zoom</span>
           </div>
 
           <div class="flex items-center gap-1">
             <button
               type="button"
               (click)="setNudgeStep(1)"
-              [class]="nudgeStep() === 1 ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-              class="px-1.5 py-0.5 text-[10px] rounded transition cursor-pointer"
+              [class]="nudgeStep() === 1 ? 'bg-zinc-900 text-white font-medium shadow-xs' : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900'"
+              class="px-1.5 py-0.5 text-[10px] rounded-md transition cursor-pointer font-mono tabular-nums"
               title="Paso de 1 milímetro">
               1 mm
             </button>
             <button
               type="button"
               (click)="setNudgeStep(10)"
-              [class]="nudgeStep() === 10 ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-              class="px-1.5 py-0.5 text-[10px] rounded transition cursor-pointer"
+              [class]="nudgeStep() === 10 ? 'bg-zinc-900 text-white font-medium shadow-xs' : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900'"
+              class="px-1.5 py-0.5 text-[10px] rounded-md transition cursor-pointer font-mono tabular-nums"
               title="Paso de 10 milímetros">
               10 mm
             </button>
@@ -608,10 +607,10 @@
             <button
               type="button"
               (click)="toggleMagneticSnap()"
-              [class]="isMagneticSnap() ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-slate-100 text-slate-400 border-slate-200'"
-              class="px-1.5 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-1 transition ml-0.5 cursor-pointer"
+              [class]="isMagneticSnap() ? 'bg-amber-50 text-amber-900 border-amber-400 font-medium' : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'"
+              class="px-1.5 py-0.5 text-[10px] rounded-md border flex items-center gap-1 transition ml-0.5 cursor-pointer"
               [title]="isMagneticSnap() ? 'Imán de caras activo. Une piezas a 0mm de contacto perfecto.' : 'Imán desactivado.'">
-              <hugeicons-icon [icon]="icons.magnet" [size]="11" [strokeWidth]="2"></hugeicons-icon>
+              <hugeicons-icon [icon]="icons.magnet" [size]="11" [strokeWidth]="2" [class]="isMagneticSnap() ? 'text-amber-600' : 'text-zinc-400'"></hugeicons-icon>
               <span>{{ isMagneticSnap() ? 'Imán ON' : 'OFF' }}</span>
             </button>
           </div>
@@ -619,69 +618,69 @@
 
         <div class="grid grid-cols-3 gap-1 text-center">
           <!-- Eje X -->
-          <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
-            <span class="text-[10px] font-bold text-red-500">X Lateral</span>
+          <div class="bg-zinc-50 rounded-md p-1 border border-zinc-200/80 flex flex-col items-center">
+            <span class="text-[10px] font-bold text-rose-600 font-mono">X Lateral</span>
             <div class="flex items-center gap-1 w-full justify-center my-0.5">
               <button
                 type="button"
                 (click)="nudgePart('x', -nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
+                class="w-5 h-5 rounded-md bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-bold flex items-center justify-center border border-zinc-200 shadow-2xs active:scale-95 transition cursor-pointer"
                 title="Mover a la izquierda">
                 -
               </button>
               <button
                 type="button"
                 (click)="nudgePart('x', nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
+                class="w-5 h-5 rounded-md bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-bold flex items-center justify-center border border-zinc-200 shadow-2xs active:scale-95 transition cursor-pointer"
                 title="Mover a la derecha">
                 +
               </button>
             </div>
-            <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posX) }} mm</span>
+            <span class="text-[9px] font-mono tabular-nums text-zinc-500">{{ formatCoord(sel.posX) }} mm</span>
           </div>
 
           <!-- Eje Y -->
-          <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
-            <span class="text-[10px] font-bold text-emerald-600">Y Altura</span>
+          <div class="bg-zinc-50 rounded-md p-1 border border-zinc-200/80 flex flex-col items-center">
+            <span class="text-[10px] font-bold text-emerald-600 font-mono">Y Altura</span>
             <div class="flex items-center gap-1 w-full justify-center my-0.5">
               <button
                 type="button"
                 (click)="nudgePart('y', -nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
+                class="w-5 h-5 rounded-md bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-bold flex items-center justify-center border border-zinc-200 shadow-2xs active:scale-95 transition cursor-pointer"
                 title="Bajar pieza">
                 -
               </button>
               <button
                 type="button"
                 (click)="nudgePart('y', nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
+                class="w-5 h-5 rounded-md bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-bold flex items-center justify-center border border-zinc-200 shadow-2xs active:scale-95 transition cursor-pointer"
                 title="Subir pieza">
                 +
               </button>
             </div>
-            <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posY) }} mm</span>
+            <span class="text-[9px] font-mono tabular-nums text-zinc-500">{{ formatCoord(sel.posY) }} mm</span>
           </div>
 
           <!-- Eje Z -->
-          <div class="bg-slate-50 rounded-xl p-1 border border-slate-100 flex flex-col items-center">
-            <span class="text-[10px] font-bold text-sky-600">Z Fondo</span>
+          <div class="bg-zinc-50 rounded-md p-1 border border-zinc-200/80 flex flex-col items-center">
+            <span class="text-[10px] font-bold text-sky-600 font-mono">Z Fondo</span>
             <div class="flex items-center gap-1 w-full justify-center my-0.5">
               <button
                 type="button"
                 (click)="nudgePart('z', -nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
+                class="w-5 h-5 rounded-md bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-bold flex items-center justify-center border border-zinc-200 shadow-2xs active:scale-95 transition cursor-pointer"
                 title="Mover al fondo">
                 -
               </button>
               <button
                 type="button"
                 (click)="nudgePart('z', nudgeStep())"
-                class="w-5 h-5 rounded bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center border border-slate-200 shadow-xs active:scale-95 transition cursor-pointer"
+                class="w-5 h-5 rounded-md bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-bold flex items-center justify-center border border-zinc-200 shadow-2xs active:scale-95 transition cursor-pointer"
                 title="Mover al frente">
                 +
               </button>
             </div>
-            <span class="text-[9px] font-mono text-slate-500">{{ formatCoord(sel.posZ) }} mm</span>
+            <span class="text-[9px] font-mono tabular-nums text-zinc-500">{{ formatCoord(sel.posZ) }} mm</span>
           </div>
         </div>
       </div>
@@ -1673,58 +1672,58 @@
     </div>
   }
   <!-- BARRA DE ESTADO INFERIOR CAD Y CUADRO DE MEDIDAS -->
-  <div class="absolute bottom-0 left-0 right-0 h-7 2xl:h-8 bg-white/95 text-slate-600 backdrop-blur-md border-t border-slate-200/90 px-3 flex items-center justify-between text-xs z-20 pointer-events-auto">
+  <div class="absolute bottom-0 left-0 right-0 h-7 2xl:h-8 bg-zinc-900/95 text-zinc-200 backdrop-blur-md border-t border-zinc-800 px-3 flex items-center justify-between text-xs z-20 pointer-events-auto font-mono tabular-nums">
     <!-- Izquierda: Guía contextual de la herramienta activa -->
     <div class="flex items-center gap-2 truncate pr-2 min-w-0">
       @if (activeTool() === 'push_pull') {
-        <hugeicons-icon [icon]="icons.pushPull" [size]="14" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+        <hugeicons-icon [icon]="icons.pushPull" [size]="14" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
         @if (hoveredFaceInfo(); as hf) {
-          <span class="font-medium text-slate-800 truncate">
-            Posa y arrastra la <strong>{{ hf.faceLabel }}</strong> de <strong>{{ hf.partName }}</strong> ({{ hf.dimLabel }})
+          <span class="font-medium text-zinc-200 truncate">
+            Posa y arrastra la <strong class="text-white">{{ hf.faceLabel }}</strong> de <strong class="text-white">{{ hf.partName }}</strong> ({{ hf.dimLabel }})
           </span>
         } @else {
-          <span class="truncate"><strong>Empujar / Tirar (P):</strong> Posa el cursor sobre una cara de la pieza y arrastra para estirar o encoger.</span>
+          <span class="truncate text-zinc-300"><strong class="text-white">Empujar / Tirar (P):</strong> Posa el cursor sobre una cara de la pieza y arrastra para estirar o encoger.</span>
         }
       } @else if (activeTool() === 'draw_rect') {
-        <hugeicons-icon [icon]="icons.squareShape" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span class="truncate"><strong>Dibujar Rectángulo 3D (D):</strong> Haz clic y arrastra en el suelo para definir el largo y ancho de una nueva pieza.</span>
+        <hugeicons-icon [icon]="icons.squareShape" [size]="14" [strokeWidth]="2" class="text-zinc-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Dibujar Rectángulo 3D (D):</strong> Haz clic y arrastra en el suelo para definir el largo y ancho de una nueva pieza.</span>
       } @else if (activeTool() === 'draw_circle') {
-        <hugeicons-icon [icon]="icons.circleShape" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span class="truncate"><strong>Dibujar Círculo 3D (C):</strong> Haz clic en el centro y arrastra para definir el radio/diámetro de la pieza circular.</span>
+        <hugeicons-icon [icon]="icons.circleShape" [size]="14" [strokeWidth]="2" class="text-zinc-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Dibujar Círculo 3D (C):</strong> Haz clic en el centro y arrastra para definir el radio/diámetro de la pieza circular.</span>
       } @else if (activeTool() === 'draw_freehand') {
-        <hugeicons-icon [icon]="icons.freehandWave" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span class="truncate"><strong>Dibujo Libre a Mano Alzada (F):</strong> Mantén presionado y traza la forma deseada en el suelo; al soltar se cerrará y extruirá.</span>
+        <hugeicons-icon [icon]="icons.freehandWave" [size]="14" [strokeWidth]="2" class="text-zinc-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Dibujo Libre a Mano Alzada (F):</strong> Mantén presionado y traza la forma deseada en el suelo; al soltar se cerrará y extruirá.</span>
       } @else if (activeTool() === 'rotate_90') {
-        <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-        <span class="truncate"><strong>Rotar 90° (Q):</strong> Haz clic sobre cualquier pieza para girarla 90° en el plano horizontal.</span>
+        <hugeicons-icon [icon]="icons.rotate90" [size]="14" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Rotar 90° (Q):</strong> Haz clic sobre cualquier pieza para girarla 90° en el plano horizontal.</span>
       } @else if (activeTool() === 'select') {
-        <hugeicons-icon [icon]="icons.cursorSelect" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span class="truncate"><strong>Seleccionar (V / Espacio):</strong> Clic en pieza · <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">Clic Derecho</kbd> Menú · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">P</kbd> Empujar · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">R</kbd> Rotar 90° · Tecla <kbd class="px-1 bg-slate-100 rounded border border-slate-300 font-mono text-[10px]">D</kbd> Rectángulo</span>
+        <hugeicons-icon [icon]="icons.cursorSelect" [size]="14" [strokeWidth]="2" class="text-zinc-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Seleccionar (V / Espacio):</strong> Clic en pieza · <kbd class="px-1 bg-zinc-800 rounded border border-zinc-700 font-mono text-[10px] text-zinc-300">Clic Derecho</kbd> Menú · Tecla <kbd class="px-1 bg-zinc-800 rounded border border-zinc-700 font-mono text-[10px] text-zinc-300">P</kbd> Empujar · Tecla <kbd class="px-1 bg-zinc-800 rounded border border-zinc-700 font-mono text-[10px] text-zinc-300">R</kbd> Rotar 90° · Tecla <kbd class="px-1 bg-zinc-800 rounded border border-zinc-700 font-mono text-[10px] text-zinc-300">D</kbd> Rectángulo</span>
       } @else if (activeTool() === 'move') {
-        <hugeicons-icon [icon]="icons.moveAxes" [size]="14" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-        <span class="truncate"><strong>Mover (M):</strong> Arrastra las flechas 3D para posicionar la pieza en X, Y o Z.</span>
+        <hugeicons-icon [icon]="icons.moveAxes" [size]="14" [strokeWidth]="2" class="text-zinc-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Mover (M):</strong> Arrastra las flechas 3D para posicionar la pieza en X, Y o Z.</span>
       } @else if (activeTool() === 'measure') {
-        <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-        <span class="truncate"><strong>Cinta Métrica (T):</strong> Clic en dos puntos para medir la distancia real en milímetros.</span>
+        <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Cinta Métrica (T):</strong> Clic en dos puntos para medir la distancia real en milímetros.</span>
       }
     </div>
 
     <!-- Derecha: Cuadro de Medidas CAD (Largo x Ancho - Espesor mm) -->
-    <div class="flex items-center gap-1.5 shrink-0 bg-slate-100 dark:bg-zinc-800 px-2.5 py-0.5 rounded border border-slate-300 dark:border-zinc-700 font-mono text-xs">
-      <span class="text-[10px] uppercase font-bold text-slate-500 dark:text-zinc-400">Medidas:</span>
+    <div class="flex items-center gap-1.5 shrink-0 bg-zinc-800 text-zinc-100 px-2.5 py-0.5 rounded-md border border-zinc-700 font-mono text-xs tabular-nums">
+      <span class="text-[10px] uppercase font-bold text-zinc-400">Medidas:</span>
       @if (pushPullDelta(); as pp) {
-        <strong class="text-amber-600">{{ pp.axisName }} {{ pp.currentVal }} mm</strong>
+        <strong class="text-amber-400 font-mono tabular-nums">{{ pp.axisName }} {{ pp.currentVal }} mm</strong>
       } @else if (rectDrawDims(); as rd) {
-        <strong class="text-sky-600">{{ rd.length }} × {{ rd.width }} mm</strong>
+        <strong class="text-zinc-100 font-mono tabular-nums">{{ rd.length }} × {{ rd.width }} mm</strong>
       } @else if (circleDrawDims(); as cd) {
-        <strong class="text-sky-600">Ø {{ cd.diameter }} mm (R {{ cd.radius }})</strong>
+        <strong class="text-zinc-100 font-mono tabular-nums">Ø {{ cd.diameter }} mm (R {{ cd.radius }})</strong>
       } @else if (freehandStats(); as fh) {
-        <strong class="text-sky-600">{{ fh.pointCount }} pts · Perím {{ fh.perimeter }} mm</strong>
+        <strong class="text-zinc-100 font-mono tabular-nums">{{ fh.pointCount }} pts · Perím {{ fh.perimeter }} mm</strong>
       } @else if (measureDistance(); as dist) {
-        <strong class="text-sky-600">{{ dist.total }} mm</strong>
+        <strong class="text-zinc-100 font-mono tabular-nums">{{ dist.total }} mm</strong>
       } @else if (selectedMultiGroupsInfo(); as mg) {
-        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-[11px] font-bold text-indigo-700 dark:text-indigo-300">
-          <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-700/80 border border-zinc-600 text-[11px] font-medium text-zinc-100 font-mono tabular-nums">
+          <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-zinc-300 shrink-0"></hugeicons-icon>
           <span>
             @if (mg.groupCount > 0) {
               {{ mg.groupCount }} {{ mg.groupCount === 1 ? 'módulo' : 'módulos' }} ({{ mg.partCount }} pzs)
@@ -1735,12 +1734,12 @@
               {{ mg.partCount > 0 ? ' · ' : '' }}{{ mg.applianceCount }} {{ mg.applianceCount === 1 ? 'equipo' : 'equipos' }}
             }
           </span>
-          <span class="text-slate-400 dark:text-zinc-400 font-normal text-[10px]">· Arrastra o usa flechas para mover</span>
+          <span class="text-zinc-400 font-normal text-[10px]">· Arrastra o usa flechas para mover</span>
         </div>
       } @else if (currentSelectedGroup(); as grp) {
         @if (currentSelectedGroupBounds(); as gb) {
           <div class="flex items-center gap-1">
-            <span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[9px] font-bold uppercase tracking-wider truncate max-w-[110px]" [title]="grp.name">
+            <span class="px-1.5 py-0.5 rounded-md bg-zinc-700 text-zinc-200 border border-zinc-600 text-[9px] font-semibold uppercase tracking-wider truncate max-w-[110px]" [title]="grp.name">
               📦 {{ grp.name }}
             </span>
             <input
@@ -1749,27 +1748,27 @@
               step="10"
               [value]="gb.width"
               (change)="onSelectedGroupDimensionChange('width', $event)"
-              class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-indigo-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-indigo-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+              class="w-14 px-1 py-0.5 bg-zinc-900 border border-zinc-700 rounded-md text-center text-xs font-semibold text-zinc-100 font-mono tabular-nums focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
               title="Ancho total del módulo en X (mm)" />
-            <span class="text-slate-400 font-bold text-[11px]">×</span>
+            <span class="text-zinc-400 font-bold text-[11px]">×</span>
             <input
               type="number"
               min="80"
               step="10"
               [value]="gb.height"
               (change)="onSelectedGroupDimensionChange('height', $event)"
-              class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-indigo-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-indigo-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+              class="w-14 px-1 py-0.5 bg-zinc-900 border border-zinc-700 rounded-md text-center text-xs font-semibold text-zinc-100 font-mono tabular-nums focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
               title="Alto total del módulo en Y (mm)" />
-            <span class="text-slate-400 font-bold text-[11px]">×</span>
+            <span class="text-zinc-400 font-bold text-[11px]">×</span>
             <input
               type="number"
               min="80"
               step="10"
               [value]="gb.depth"
               (change)="onSelectedGroupDimensionChange('depth', $event)"
-              class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-indigo-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-indigo-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+              class="w-14 px-1 py-0.5 bg-zinc-900 border border-zinc-700 rounded-md text-center text-xs font-semibold text-zinc-100 font-mono tabular-nums focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
               title="Profundidad total del módulo en Z (mm)" />
-            <span class="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold">mm</span>
+            <span class="text-[10px] text-zinc-400 font-semibold">mm</span>
           </div>
         }
       } @else if (selectedPart(); as sel) {
@@ -1778,7 +1777,7 @@
             <button
               type="button"
               (click)="selectGroupInViewer(parentGrp.id, false)"
-              class="px-1.5 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer"
+              class="px-1.5 py-0.5 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 border border-zinc-600 text-[9px] font-semibold uppercase tracking-wider transition cursor-pointer"
               title="Volver a seleccionar el módulo completo">
               ← Módulo
             </button>
@@ -1789,18 +1788,18 @@
             step="1"
             [value]="sel.length"
             (input)="onSelectedDimensionInput('length', $event)"
-            class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
+            class="w-14 px-1 py-0.5 bg-zinc-900 border border-zinc-700 rounded-md text-center text-xs font-semibold text-zinc-100 font-mono tabular-nums focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
             title="Alto / Largo de la pieza (mm)" />
-          <span class="text-slate-400 font-bold text-[11px]">×</span>
+          <span class="text-zinc-400 font-bold text-[11px]">×</span>
           <input
             type="number"
             min="10"
             step="1"
             [value]="sel.width"
             (input)="onSelectedDimensionInput('width', $event)"
-            class="w-14 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
+            class="w-14 px-1 py-0.5 bg-zinc-900 border border-zinc-700 rounded-md text-center text-xs font-semibold text-zinc-100 font-mono tabular-nums focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
             title="Ancho de la pieza (mm)" />
-          <span class="text-slate-400 font-bold text-[11px]">-</span>
+          <span class="text-zinc-400 font-bold text-[11px]">-</span>
           <input
             type="number"
             min="3"
@@ -1808,12 +1807,12 @@
             step="1"
             [value]="sel.thickness"
             (input)="onSelectedDimensionInput('thickness', $event)"
-            class="w-11 px-1 py-0.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded text-center text-xs font-bold text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
+            class="w-11 px-1 py-0.5 bg-zinc-900 border border-zinc-700 rounded-md text-center text-xs font-semibold text-zinc-100 font-mono tabular-nums focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
             title="Espesor / Grosor de la pieza (mm)" />
-          <span class="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold">mm</span>
+          <span class="text-[10px] text-zinc-400 font-semibold">mm</span>
         </div>
       } @else {
-        <span class="text-slate-400 text-[11px] italic">Selecciona una pieza o módulo</span>
+        <span class="text-zinc-400 text-[11px] italic font-sans">Selecciona una pieza o módulo</span>
       }
     </div>
   </div>

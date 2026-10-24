@@ -1,28 +1,28 @@
 <div class="w-full px-3 sm:px-5 2xl:px-6 py-3 xl:py-4 space-y-3.5 xl:space-y-4">
 
   <!-- Barra Superior: Título y Selector Rápido de Moneda -->
-  <div [class]="themeService.isClassic() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 shadow-xs print:hidden' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-sm print:hidden'">
+  <div [class]="themeService.isClassic() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs print:hidden' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs print:hidden'">
     <div class="flex items-center gap-3">
-      <div [class]="themeService.isClassic() ? 'w-9 h-9 xl:w-10 xl:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 shrink-0' : 'w-9 h-9 xl:w-10 xl:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0'">
-        <hugeicons-icon [icon]="icons.budget" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'w-9 h-9 rounded-md bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-700 shrink-0' : 'w-9 h-9 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 shrink-0'">
+        <hugeicons-icon [icon]="icons.budget" [size]="18" [strokeWidth]="1.9"></hugeicons-icon>
       </div>
       <div>
-        <h2 [class]="themeService.isClassic() ? 'text-base xl:text-lg font-bold text-slate-800 tracking-tight' : 'text-base xl:text-lg font-bold text-white tracking-tight'">Presupuesto y Costos de Fabricación</h2>
-        <p [class]="themeService.isClassic() ? 'text-xs text-slate-500' : 'text-xs text-zinc-400'">Cálculo exacto de placas, tapacantos, herrajes y mano de obra con margen de utilidad</p>
+        <h2 [class]="themeService.isClassic() ? 'text-base font-semibold text-zinc-900 tracking-tight' : 'text-base font-semibold text-white tracking-tight'">Presupuesto y Costos de Fabricación</h2>
+        <p [class]="themeService.isClassic() ? 'text-xs text-zinc-500' : 'text-xs text-zinc-400'">Cálculo exacto de placas, tapacantos, herrajes y mano de obra con margen de utilidad</p>
       </div>
     </div>
 
     <!-- Selector de Moneda del Proyecto -->
-    <div [class]="themeService.isClassic() ? 'flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-inner shrink-0' : 'flex items-center gap-2 bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-1.5 shadow-inner shrink-0'">
-      <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-slate-600 flex items-center gap-1.5' : 'text-xs font-semibold text-zinc-400 flex items-center gap-1.5'">
-        <hugeicons-icon [icon]="icons.currency" [size]="15" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-md px-3 py-1.5 shrink-0' : 'flex items-center gap-2 bg-zinc-950/80 border border-zinc-800 rounded-md px-3 py-1.5 shrink-0'">
+      <span [class]="themeService.isClassic() ? 'text-xs font-medium text-zinc-600 flex items-center gap-1.5' : 'text-xs font-medium text-zinc-400 flex items-center gap-1.5'">
+        <hugeicons-icon [icon]="icons.currency" [size]="14" [strokeWidth]="2" class="text-zinc-600"></hugeicons-icon>
         <span>Moneda:</span>
       </span>
       <select
         [value]="settings().currency"
         (change)="setCurrency($event)"
         aria-label="Seleccionar moneda del proyecto"
-        [class]="themeService.isClassic() ? 'bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-hidden focus:border-amber-500 cursor-pointer shadow-xs' : 'bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs font-bold text-white focus:outline-hidden focus:border-amber-500 cursor-pointer'">
+        [class]="themeService.isClassic() ? 'bg-white border border-zinc-200 rounded-md px-2.5 py-1 text-xs font-semibold text-zinc-900 focus:outline-hidden focus:border-zinc-900 cursor-pointer shadow-2xs font-mono' : 'bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1 text-xs font-semibold text-white focus:outline-hidden focus:border-zinc-400 cursor-pointer font-mono'">
         <option value="COP">COP ($) - Pesos Colombianos</option>
         <option value="USD">USD ($) - Dólares Americanos</option>
         <option value="EUR">EUR (€) - Euros</option>
@@ -38,75 +38,75 @@
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2.5 xl:gap-3.5 print:hidden">
 
     <!-- Tableros -->
-    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
-        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Tableros Melamina</span>
-        <hugeicons-icon [icon]="icons.board" [size]="16" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-zinc-200/90 rounded-md shadow-2xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-md shadow-xs min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-zinc-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-medium uppercase tracking-wider truncate text-[11px]">Tableros Melamina</span>
+        <hugeicons-icon [icon]="icons.board" [size]="15" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(sheetsCostBreakdown().totalSheetsCost)">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-zinc-900 font-mono tabular-nums truncate' : 'text-lg xl:text-xl font-bold text-white font-mono tabular-nums truncate'" [title]="format(sheetsCostBreakdown().totalSheetsCost)">
         {{ format(sheetsCostBreakdown().totalSheetsCost) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">{{ optResult().totalSheetsUsed }} tableros requeridos</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums' : 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums'">{{ optResult().totalSheetsUsed }} tableros requeridos</p>
     </div>
 
     <!-- Tapacantos -->
-    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
-        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Tapacantos</span>
-        <hugeicons-icon [icon]="icons.edges" [size]="16" [strokeWidth]="2" class="text-cyan-500 shrink-0"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-zinc-200/90 rounded-md shadow-2xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-md shadow-xs min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-zinc-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-medium uppercase tracking-wider truncate text-[11px]">Tapacantos</span>
+        <hugeicons-icon [icon]="icons.edges" [size]="15" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(edgesCostBreakdown().totalEdgeCost)">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-zinc-900 font-mono tabular-nums truncate' : 'text-lg xl:text-xl font-bold text-white font-mono tabular-nums truncate'" [title]="format(edgesCostBreakdown().totalEdgeCost)">
         {{ format(edgesCostBreakdown().totalEdgeCost) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">{{ (optResult().thinEdgeMeters + optResult().thickEdgeMeters).toFixed(1) }} ml totales</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums' : 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums'">{{ (optResult().thinEdgeMeters + optResult().thickEdgeMeters).toFixed(1) }} ml totales</p>
     </div>
 
     <!-- Herrajes -->
-    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
-        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Herrajes & Tornillos</span>
-        <hugeicons-icon [icon]="icons.hardware" [size]="16" [strokeWidth]="2" class="text-purple-500 shrink-0"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-zinc-200/90 rounded-md shadow-2xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-md shadow-xs min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-zinc-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-medium uppercase tracking-wider truncate text-[11px]">Herrajes & Tornillos</span>
+        <hugeicons-icon [icon]="icons.hardware" [size]="15" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(hardwareCostTotal())">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-zinc-900 font-mono tabular-nums truncate' : 'text-lg xl:text-xl font-bold text-white font-mono tabular-nums truncate'" [title]="format(hardwareCostTotal())">
         {{ format(hardwareCostTotal()) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">{{ hardware().length }} ítems listados</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums' : 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums'">{{ hardware().length }} ítems listados</p>
     </div>
 
     <!-- Electrodomésticos y Equipamiento 3D -->
-    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
-        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Electrodomésticos</span>
-        <hugeicons-icon [icon]="icons.appliance" [size]="16" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-zinc-200/90 rounded-md shadow-2xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-md shadow-xs min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-zinc-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-medium uppercase tracking-wider truncate text-[11px]">Electrodomésticos</span>
+        <hugeicons-icon [icon]="icons.appliance" [size]="15" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(appliancesCostTotal())">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-zinc-900 font-mono tabular-nums truncate' : 'text-lg xl:text-xl font-bold text-white font-mono tabular-nums truncate'" [title]="format(appliancesCostTotal())">
         {{ format(appliancesCostTotal()) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">{{ appliancesBudgetList().length }} equipos cotizados</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums' : 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums'">{{ appliancesBudgetList().length }} equipos cotizados</p>
     </div>
 
     <!-- Mano de Obra -->
-    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-w-0'">
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-slate-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
-        <span class="font-semibold uppercase tracking-wider truncate text-[11px]">Mano de Obra</span>
-        <hugeicons-icon [icon]="icons.labor" [size]="16" [strokeWidth]="2" class="text-emerald-500 shrink-0"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-white border border-zinc-200/90 rounded-md shadow-2xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 border border-zinc-800 rounded-md shadow-xs min-w-0'">
+      <div [class]="themeService.isClassic() ? 'flex items-center justify-between text-zinc-500 text-xs mb-1 gap-1' : 'flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1'">
+        <span class="font-medium uppercase tracking-wider truncate text-[11px]">Mano de Obra</span>
+        <hugeicons-icon [icon]="icons.labor" [size]="15" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-slate-800 font-mono truncate' : 'text-lg xl:text-xl font-bold text-white font-mono truncate'" [title]="format(laborTotal())">
+      <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-zinc-900 font-mono tabular-nums truncate' : 'text-lg xl:text-xl font-bold text-white font-mono tabular-nums truncate'" [title]="format(laborTotal())">
         {{ format(laborTotal()) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">Armado e instalación</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">Armado e instalación</p>
     </div>
 
     <!-- PRECIO TOTAL SUGERIDO -->
-    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-linear-to-br from-amber-500/10 via-white to-amber-500/5 border-2 border-amber-500/40 rounded-2xl shadow-sm min-w-0' : 'p-3.5 xl:p-4 bg-linear-to-br from-amber-500/20 via-zinc-900 to-zinc-900 border-2 border-amber-500/50 rounded-2xl shadow-xl min-w-0'">
-      <div class="flex items-center justify-between text-amber-500 text-xs mb-1 gap-1">
-        <span class="font-bold uppercase tracking-wider truncate text-[11px]">Precio Sugerido Venta</span>
-        <hugeicons-icon [icon]="icons.star" [size]="16" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+    <div [class]="themeService.isClassic() ? 'p-3.5 xl:p-4 bg-zinc-900 text-white border border-zinc-800 rounded-md shadow-xs min-w-0' : 'p-3.5 xl:p-4 bg-zinc-900 text-white border border-zinc-800 rounded-md shadow-xs min-w-0'">
+      <div class="flex items-center justify-between text-zinc-400 text-xs mb-1 gap-1">
+        <span class="font-medium uppercase tracking-wider truncate text-[11px]">Precio Sugerido Venta</span>
+        <hugeicons-icon [icon]="icons.star" [size]="15" [strokeWidth]="2" class="text-emerald-400 shrink-0"></hugeicons-icon>
       </div>
-      <p class="text-xl xl:text-2xl font-black text-amber-600 font-mono truncate" [title]="format(finalClientPrice())">
+      <p class="text-xl xl:text-2xl font-bold text-emerald-400 font-mono tabular-nums truncate" [title]="format(finalClientPrice())">
         {{ format(finalClientPrice()) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[10px] text-slate-500 mt-0.5' : 'text-[10px] text-zinc-400 mt-0.5'">Con {{ project().profitMarginPercent }}% margen utilidad</p>
+      <p class="text-[10px] text-zinc-400 mt-0.5 font-mono tabular-nums">Con {{ project().profitMarginPercent }}% margen utilidad</p>
     </div>
 
   </div>
@@ -115,21 +115,21 @@
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 2xl:gap-6 items-start print:hidden">
 
     <!-- COLUMNA IZQUIERDA: Materiales, Tapacantos, Herrajes y Equipos (8 cols) -->
-    <div class="lg:col-span-8 space-y-4 2xl:space-y-5 min-w-0">
+    <div class="lg:col-span-8 space-y-3.5 min-w-0">
 
       <!-- 1. TABLEROS DE MELAMINA REQUERIDOS -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg'">
-        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
-          <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
-            <hugeicons-icon [icon]="icons.board" [size]="17" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs' : 'bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs'">
+        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-zinc-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+          <h3 [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-900 flex items-center gap-2 uppercase tracking-wider' : 'text-xs font-semibold text-white flex items-center gap-2 uppercase tracking-wider'">
+            <hugeicons-icon [icon]="icons.board" [size]="16" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
             <span>1. Tableros Enteros (Calculados por Optimizador)</span>
           </h3>
-          <span [class]="themeService.isClassic() ? 'text-xs text-slate-500 font-mono font-semibold' : 'text-xs text-zinc-400 font-mono'">Subtotal: {{ format(sheetsCostBreakdown().totalSheetsCost) }}</span>
+          <span [class]="themeService.isClassic() ? 'text-xs text-zinc-700 font-mono tabular-nums font-semibold' : 'text-xs text-zinc-300 font-mono tabular-nums'">Subtotal: {{ format(sheetsCostBreakdown().totalSheetsCost) }}</span>
         </div>
 
-        <div [class]="themeService.isClassic() ? 'overflow-x-auto scrollbar-thin border border-slate-200 rounded-xl' : 'overflow-x-auto scrollbar-thin border border-zinc-800 rounded-xl'">
+        <div [class]="themeService.isClassic() ? 'overflow-x-auto scrollbar-thin border border-zinc-200/90 rounded-md shadow-2xs' : 'overflow-x-auto scrollbar-thin border border-zinc-800 rounded-md'">
           <table class="w-full text-left text-xs">
-            <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold'">
+            <thead [class]="themeService.isClassic() ? 'bg-zinc-50 text-zinc-500 uppercase text-[10px] font-mono border-b border-zinc-200/90' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-mono border-b border-zinc-800'">
               <tr>
                 <th class="py-2.5 px-3">Material</th>
                 <th class="py-2.5 px-3">Medidas Tablero</th>
@@ -138,18 +138,18 @@
                 <th class="py-2.5 px-3 text-right">Subtotal</th>
               </tr>
             </thead>
-            <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
+            <tbody [class]="themeService.isClassic() ? 'divide-y divide-zinc-100 text-zinc-700' : 'divide-y divide-zinc-800 text-zinc-200'">
               @for (item of sheetsCostBreakdown().items; track item.material.id) {
-                <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80' : 'hover:bg-zinc-800/40'">
-                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-semibold text-slate-800 flex items-center gap-2' : 'py-2.5 px-3 font-semibold text-white flex items-center gap-2'">
+                <tr [class]="themeService.isClassic() ? 'hover:bg-zinc-50/80' : 'hover:bg-zinc-800/40'">
+                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-medium text-zinc-900 flex items-center gap-2' : 'py-2.5 px-3 font-medium text-white flex items-center gap-2'">
                     <span class="w-2.5 h-2.5 rounded-full shrink-0" [style.background-color]="item.material.colorHex"></span>
                     <span>{{ item.material.name }}</span>
-                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-500/25">{{ item.material.thickness }}mm</span>
+                    <span class="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 border border-zinc-200">{{ item.material.thickness }}mm</span>
                   </td>
-                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-mono text-slate-500 whitespace-nowrap' : 'py-2.5 px-3 font-mono text-zinc-400 whitespace-nowrap'">
+                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-mono tabular-nums text-zinc-500 whitespace-nowrap' : 'py-2.5 px-3 font-mono tabular-nums text-zinc-400 whitespace-nowrap'">
                     {{ item.material.sheetLength }} × {{ item.material.sheetWidth }} × {{ item.material.thickness }}mm
                   </td>
-                  <td class="py-2.5 px-3 text-center font-bold text-amber-500">
+                  <td class="py-2.5 px-3 text-center font-mono tabular-nums font-bold text-zinc-900">
                     {{ item.count }}
                   </td>
                   <td class="py-2.5 px-3 text-right">
@@ -159,9 +159,9 @@
                       [value]="item.material.sheetCost"
                       (change)="onMaterialCostChange(item.material, $event)"
                       aria-label="Costo por tablero"
-                      [class]="themeService.isClassic() ? 'w-28 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-28 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
+                      [class]="themeService.isClassic() ? 'w-28 px-2 py-1 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 text-right font-mono tabular-nums focus:border-zinc-900' : 'w-28 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-right font-mono tabular-nums focus:border-zinc-400'" />
                   </td>
-                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 text-right font-bold font-mono text-slate-800 whitespace-nowrap' : 'py-2.5 px-3 text-right font-bold font-mono text-zinc-100 whitespace-nowrap'">
+                  <td [class]="themeService.isClassic() ? 'py-2.5 px-3 text-right font-bold font-mono tabular-nums text-zinc-900 whitespace-nowrap' : 'py-2.5 px-3 text-right font-bold font-mono tabular-nums text-zinc-100 whitespace-nowrap'">
                     {{ format(item.subtotal) }}
                   </td>
                 </tr>
@@ -173,18 +173,18 @@
 
       <!-- 1.B MESONES Y SUPERFICIES DE PIEDRA / CUARZO / GRANITO / MÁRMOL (COTIZADOS POR M²) -->
       @if (stoneCountertopsBreakdown().items.length > 0) {
-        <div [class]="themeService.isClassic() ? 'bg-white border border-indigo-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-indigo-500/30 rounded-2xl p-4 2xl:p-5 shadow-lg'">
-          <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
-            <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
-              <hugeicons-icon [icon]="icons.board" [size]="17" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+        <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs' : 'bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs'">
+          <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-zinc-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+            <h3 [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-900 flex items-center gap-2 uppercase tracking-wider' : 'text-xs font-semibold text-white flex items-center gap-2 uppercase tracking-wider'">
+              <hugeicons-icon [icon]="icons.board" [size]="16" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
               <span>Mesones de Piedra / Cuarzo / Mármol (Cotización por m² - Excluidos de Sierra Melamina)</span>
             </h3>
-            <span [class]="themeService.isClassic() ? 'text-xs text-indigo-600 font-mono font-bold' : 'text-xs text-indigo-400 font-mono font-bold'">Subtotal: {{ format(stoneCountertopsBreakdown().totalStoneCost) }} ({{ stoneCountertopsBreakdown().totalAreaM2 }} m²)</span>
+            <span [class]="themeService.isClassic() ? 'text-xs text-zinc-800 font-mono tabular-nums font-semibold' : 'text-xs text-zinc-200 font-mono tabular-nums font-semibold'">Subtotal: {{ format(stoneCountertopsBreakdown().totalStoneCost) }} ({{ stoneCountertopsBreakdown().totalAreaM2 }} m²)</span>
           </div>
 
-          <div [class]="themeService.isClassic() ? 'overflow-x-auto scrollbar-thin border border-slate-200 rounded-xl' : 'overflow-x-auto scrollbar-thin border border-zinc-800 rounded-xl'">
+          <div [class]="themeService.isClassic() ? 'overflow-x-auto scrollbar-thin border border-zinc-200/90 rounded-md shadow-2xs' : 'overflow-x-auto scrollbar-thin border border-zinc-800 rounded-md'">
             <table class="w-full text-left text-xs">
-              <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold'">
+              <thead [class]="themeService.isClassic() ? 'bg-zinc-50 text-zinc-500 uppercase text-[10px] font-mono border-b border-zinc-200/90' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-mono border-b border-zinc-800'">
                 <tr>
                   <th class="py-2.5 px-3">Pieza / Superficie</th>
                   <th class="py-2.5 px-3">Material Piedra</th>
@@ -194,26 +194,26 @@
                   <th class="py-2.5 px-3 text-right">Subtotal</th>
                 </tr>
               </thead>
-              <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
+              <tbody [class]="themeService.isClassic() ? 'divide-y divide-zinc-100 text-zinc-700' : 'divide-y divide-zinc-800 text-zinc-200'">
                 @for (st of stoneCountertopsBreakdown().items; track st.part.id) {
-                  <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80' : 'hover:bg-zinc-800/40'">
-                    <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-semibold text-slate-800' : 'py-2.5 px-3 font-semibold text-white'">
+                  <tr [class]="themeService.isClassic() ? 'hover:bg-zinc-50/80' : 'hover:bg-zinc-800/40'">
+                    <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-medium text-zinc-900' : 'py-2.5 px-3 font-medium text-white'">
                       {{ st.part.name }}
                     </td>
                     <td class="py-2.5 px-3 flex items-center gap-2">
-                      <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-slate-400" [style.background-color]="st.colorHex"></span>
+                      <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-black/10" [style.background-color]="st.colorHex"></span>
                       <span>{{ st.materialName }}</span>
                     </td>
-                    <td class="py-2.5 px-3 text-center font-mono">
+                    <td class="py-2.5 px-3 text-center font-mono tabular-nums">
                       {{ st.part.length }} × {{ st.part.width }} × {{ st.part.thickness }}mm
                     </td>
-                    <td class="py-2.5 px-3 text-center font-mono text-indigo-500 font-bold">
+                    <td class="py-2.5 px-3 text-center font-mono tabular-nums text-zinc-800 font-semibold">
                       {{ st.areaM2 }} m² ({{ st.linearMeters }} ml)
                     </td>
-                    <td class="py-2.5 px-3 text-right font-mono">
+                    <td class="py-2.5 px-3 text-right font-mono tabular-nums">
                       {{ format(st.costPerM2) }}/m²
                     </td>
-                    <td [class]="themeService.isClassic() ? 'py-2.5 px-3 text-right font-bold font-mono text-slate-800' : 'py-2.5 px-3 text-right font-bold font-mono text-zinc-100'">
+                    <td [class]="themeService.isClassic() ? 'py-2.5 px-3 text-right font-bold font-mono tabular-nums text-zinc-900' : 'py-2.5 px-3 text-right font-bold font-mono tabular-nums text-zinc-100'">
                       {{ format(st.subtotal) }}
                     </td>
                   </tr>
@@ -225,64 +225,64 @@
       }
 
       <!-- 2. TAPACANTOS -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg'">
-        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
-          <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
-            <hugeicons-icon [icon]="icons.edges" [size]="17" [strokeWidth]="2" class="text-cyan-500 shrink-0"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs' : 'bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs'">
+        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-zinc-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+          <h3 [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-900 flex items-center gap-2 uppercase tracking-wider' : 'text-xs font-semibold text-white flex items-center gap-2 uppercase tracking-wider'">
+            <hugeicons-icon [icon]="icons.edges" [size]="16" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
             <span>2. Tapacantos / Cubrecantos (Metros Lineales)</span>
           </h3>
-          <span [class]="themeService.isClassic() ? 'text-xs text-slate-500 font-mono font-semibold' : 'text-xs text-zinc-400 font-mono'">Subtotal: {{ format(edgesCostBreakdown().totalEdgeCost) }}</span>
+          <span [class]="themeService.isClassic() ? 'text-xs text-zinc-700 font-mono tabular-nums font-semibold' : 'text-xs text-zinc-300 font-mono tabular-nums font-semibold'">Subtotal: {{ format(edgesCostBreakdown().totalEdgeCost) }}</span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <!-- Delgado 0.45mm -->
-          <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl flex items-center justify-between gap-2'">
+          <div [class]="themeService.isClassic() ? 'p-3 bg-zinc-50/80 border border-zinc-200 rounded-md flex items-center justify-between gap-2' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-md flex items-center justify-between gap-2'">
             <div>
-              <span class="text-xs font-bold text-cyan-600 block">Canto Delgado (0.45mm)</span>
-              <span [class]="themeService.isClassic() ? 'text-[11px] text-slate-500' : 'text-[11px] text-zinc-400'">{{ edgesCostBreakdown().thinMeters }} metros lineales consumidos</span>
+              <span class="text-xs font-semibold text-zinc-800 block">Canto Delgado (0.45mm)</span>
+              <span [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 font-mono tabular-nums' : 'text-[11px] text-zinc-400 font-mono tabular-nums'">{{ edgesCostBreakdown().thinMeters }} metros lineales consumidos</span>
             </div>
             <div class="text-right shrink-0">
-              <span [class]="themeService.isClassic() ? 'text-xs font-mono font-bold text-slate-800' : 'text-xs font-mono font-bold text-zinc-100'">{{ format(edgesCostBreakdown().thinCost) }}</span>
-              <span [class]="themeService.isClassic() ? 'text-[10px] text-slate-400 block' : 'text-[10px] text-zinc-500 block'">@ {{ format(edgesCostBreakdown().thinRate) }}/ml</span>
+              <span [class]="themeService.isClassic() ? 'text-xs font-mono tabular-nums font-bold text-zinc-900' : 'text-xs font-mono tabular-nums font-bold text-zinc-100'">{{ format(edgesCostBreakdown().thinCost) }}</span>
+              <span [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 block font-mono tabular-nums' : 'text-[10px] text-zinc-500 block font-mono tabular-nums'">@ {{ format(edgesCostBreakdown().thinRate) }}/ml</span>
             </div>
           </div>
 
           <!-- Grueso 2.0mm -->
-          <div [class]="themeService.isClassic() ? 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl flex items-center justify-between gap-2'">
+          <div [class]="themeService.isClassic() ? 'p-3 bg-zinc-50/80 border border-zinc-200 rounded-md flex items-center justify-between gap-2' : 'p-3 bg-zinc-950/70 border border-zinc-800 rounded-md flex items-center justify-between gap-2'">
             <div>
-              <span class="text-xs font-bold text-orange-600 block">Canto Grueso (2.0mm)</span>
-              <span [class]="themeService.isClassic() ? 'text-[11px] text-slate-500' : 'text-[11px] text-zinc-400'">{{ edgesCostBreakdown().thickMeters }} metros lineales consumidos</span>
+              <span class="text-xs font-semibold text-zinc-800 block">Canto Grueso (2.0mm)</span>
+              <span [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 font-mono tabular-nums' : 'text-[11px] text-zinc-400 font-mono tabular-nums'">{{ edgesCostBreakdown().thickMeters }} metros lineales consumidos</span>
             </div>
             <div class="text-right shrink-0">
-              <span [class]="themeService.isClassic() ? 'text-xs font-mono font-bold text-slate-800' : 'text-xs font-mono font-bold text-zinc-100'">{{ format(edgesCostBreakdown().thickCost) }}</span>
-              <span [class]="themeService.isClassic() ? 'text-[10px] text-slate-400 block' : 'text-[10px] text-zinc-500 block'">@ {{ format(edgesCostBreakdown().thickRate) }}/ml</span>
+              <span [class]="themeService.isClassic() ? 'text-xs font-mono tabular-nums font-bold text-zinc-900' : 'text-xs font-mono tabular-nums font-bold text-zinc-100'">{{ format(edgesCostBreakdown().thickCost) }}</span>
+              <span [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 block font-mono tabular-nums' : 'text-[10px] text-zinc-500 block font-mono tabular-nums'">@ {{ format(edgesCostBreakdown().thickRate) }}/ml</span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 3. HERRAJES Y ACCESORIOS -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg'">
-        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
-          <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
-            <hugeicons-icon [icon]="icons.hardware" [size]="17" [strokeWidth]="2" class="text-purple-500 shrink-0"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs' : 'bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs'">
+        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-zinc-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+          <h3 [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-900 flex items-center gap-2 uppercase tracking-wider' : 'text-xs font-semibold text-white flex items-center gap-2 uppercase tracking-wider'">
+            <hugeicons-icon [icon]="icons.hardware" [size]="16" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
             <span>3. Herrajes, Correderas y Tornillería</span>
           </h3>
           <div class="flex items-center gap-2">
-            <span [class]="themeService.isClassic() ? 'text-xs text-slate-500 font-mono font-semibold' : 'text-xs text-zinc-400 font-mono'">Subtotal: {{ format(hardwareCostTotal()) }}</span>
+            <span [class]="themeService.isClassic() ? 'text-xs text-zinc-700 font-mono tabular-nums font-semibold' : 'text-xs text-zinc-300 font-mono tabular-nums'">Subtotal: {{ format(hardwareCostTotal()) }}</span>
             <button
               type="button"
               (click)="openAddHardware()"
-              [class]="themeService.isClassic() ? 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-medium flex items-center gap-1 transition cursor-pointer' : 'px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg text-xs font-medium flex items-center gap-1 transition cursor-pointer'">
-              <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2.2" class="text-amber-500"></hugeicons-icon>
+              [class]="themeService.isClassic() ? 'px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-white rounded-md text-xs font-medium flex items-center gap-1 transition shadow-xs cursor-pointer' : 'px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-md text-xs font-medium flex items-center gap-1 transition cursor-pointer'">
+              <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
               <span>Agregar</span>
             </button>
           </div>
         </div>
 
-        <div [class]="themeService.isClassic() ? 'overflow-x-auto overflow-y-auto scrollbar-thin border border-slate-200 rounded-xl max-h-64 2xl:max-h-80' : 'overflow-x-auto overflow-y-auto scrollbar-thin border border-zinc-800 rounded-xl max-h-64 2xl:max-h-80'">
+        <div [class]="themeService.isClassic() ? 'overflow-x-auto overflow-y-auto scrollbar-thin border border-zinc-200/90 rounded-md shadow-2xs max-h-64 2xl:max-h-80' : 'overflow-x-auto overflow-y-auto scrollbar-thin border border-zinc-800 rounded-md max-h-64 2xl:max-h-80'">
           <table class="w-full text-left text-xs">
-            <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold sticky top-0 border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold sticky top-0'">
+            <thead [class]="themeService.isClassic() ? 'bg-zinc-50 text-zinc-500 uppercase text-[10px] font-mono sticky top-0 border-b border-zinc-200/90' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-mono sticky top-0'">
               <tr>
                 <th class="py-2.5 px-3">Herraje / Accesorio</th>
                 <th class="py-2.5 px-2">Unidad</th>
@@ -292,11 +292,11 @@
                 <th class="py-2.5 px-2 text-right"></th>
               </tr>
             </thead>
-            <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
+            <tbody [class]="themeService.isClassic() ? 'divide-y divide-zinc-100 text-zinc-700' : 'divide-y divide-zinc-800 text-zinc-200'">
               @for (h of hardware(); track h.id) {
-                <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80' : 'hover:bg-zinc-800/40'">
-                  <td [class]="themeService.isClassic() ? 'py-2 px-3 font-medium text-slate-800' : 'py-2 px-3 font-medium text-white'">{{ h.name }}</td>
-                  <td [class]="themeService.isClassic() ? 'py-2 px-2 text-slate-500 text-[11px]' : 'py-2 px-2 text-zinc-400 text-[11px]'">{{ h.unit }}</td>
+                <tr [class]="themeService.isClassic() ? 'hover:bg-zinc-50/80' : 'hover:bg-zinc-800/40'">
+                  <td [class]="themeService.isClassic() ? 'py-2 px-3 font-medium text-zinc-900' : 'py-2 px-3 font-medium text-white'">{{ h.name }}</td>
+                  <td [class]="themeService.isClassic() ? 'py-2 px-2 text-zinc-500 text-[11px]' : 'py-2 px-2 text-zinc-400 text-[11px]'">{{ h.unit }}</td>
                   <td class="py-2 px-2 text-center">
                     <input
                       type="number"
@@ -304,7 +304,7 @@
                       [value]="h.quantity"
                       (change)="onHardwareQtyChange(h, $event)"
                       aria-label="Cantidad de herraje"
-                      [class]="themeService.isClassic() ? 'w-16 px-1.5 py-0.5 bg-slate-50 border border-slate-300 rounded text-xs text-center font-bold text-amber-600' : 'w-16 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-center font-bold text-amber-400'" />
+                      [class]="themeService.isClassic() ? 'w-16 px-1.5 py-0.5 bg-white border border-zinc-200 rounded-md text-xs text-center font-mono tabular-nums font-bold text-zinc-900 focus:border-zinc-900' : 'w-16 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-center font-mono tabular-nums font-bold text-white focus:border-zinc-400'" />
                   </td>
                   <td class="py-2 px-3 text-right">
                     <input
@@ -313,9 +313,9 @@
                       [value]="h.unitCost"
                       (change)="onHardwareCostChange(h, $event)"
                       aria-label="Costo unitario de herraje"
-                      [class]="themeService.isClassic() ? 'w-24 px-1.5 py-0.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-24 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
+                      [class]="themeService.isClassic() ? 'w-24 px-1.5 py-0.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 text-right font-mono tabular-nums focus:border-zinc-900' : 'w-24 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-right font-mono tabular-nums focus:border-zinc-400'" />
                   </td>
-                  <td [class]="themeService.isClassic() ? 'py-2 px-3 text-right font-mono font-semibold text-slate-800 whitespace-nowrap' : 'py-2 px-3 text-right font-mono font-semibold text-zinc-100 whitespace-nowrap'">
+                  <td [class]="themeService.isClassic() ? 'py-2 px-3 text-right font-mono tabular-nums font-semibold text-zinc-900 whitespace-nowrap' : 'py-2 px-3 text-right font-mono tabular-nums font-semibold text-zinc-100 whitespace-nowrap'">
                     {{ format(h.quantity * h.unitCost) }}
                   </td>
                   <td class="py-2 px-2 text-right">
@@ -323,7 +323,7 @@
                       type="button"
                       (click)="deleteHardwareItem(h.id)"
                       title="Eliminar herraje"
-                      [class]="themeService.isClassic() ? 'text-slate-400 hover:text-rose-500 p-0.5 transition cursor-pointer' : 'text-zinc-500 hover:text-rose-400 p-0.5 transition cursor-pointer'">
+                      [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-rose-600 p-0.5 transition cursor-pointer' : 'text-zinc-500 hover:text-rose-400 p-0.5 transition cursor-pointer'">
                       <hugeicons-icon [icon]="icons.close" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                     </button>
                   </td>
@@ -335,27 +335,27 @@
       </div>
 
       <!-- 4. ELECTRODOMÉSTICOS Y EQUIPAMIENTO 3D -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg'">
-        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
-          <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider' : 'text-xs xl:text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider'">
-            <hugeicons-icon [icon]="icons.appliance" [size]="17" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs' : 'bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs'">
+        <div [class]="themeService.isClassic() ? 'flex items-center justify-between mb-3 border-b border-zinc-100 pb-2.5' : 'flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5'">
+          <h3 [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-900 flex items-center gap-2 uppercase tracking-wider' : 'text-xs font-semibold text-white flex items-center gap-2 uppercase tracking-wider'">
+            <hugeicons-icon [icon]="icons.appliance" [size]="16" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
             <span>4. Electrodomésticos & Equipamiento 3D</span>
           </h3>
-          <span [class]="themeService.isClassic() ? 'text-xs text-slate-500 font-mono font-semibold' : 'text-xs text-zinc-400 font-mono'">
+          <span [class]="themeService.isClassic() ? 'text-xs text-zinc-700 font-mono tabular-nums font-semibold' : 'text-xs text-zinc-300 font-mono tabular-nums'">
             Subtotal: {{ format(appliancesCostTotal()) }}
           </span>
         </div>
 
         @if (appliances().length === 0) {
-          <div [class]="themeService.isClassic() ? 'text-center py-5 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex flex-col items-center' : 'text-center py-5 px-4 bg-zinc-950 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center'">
-            <hugeicons-icon [icon]="icons.appliance" [size]="28" [strokeWidth]="1.6" class="text-slate-400"></hugeicons-icon>
-            <p [class]="themeService.isClassic() ? 'text-xs text-slate-500 mt-1' : 'text-xs text-zinc-400 mt-1'">No hay electrodomésticos colocados en el diseño 3D.</p>
-            <p [class]="themeService.isClassic() ? 'text-[11px] text-slate-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">Puedes añadirlos desde la pestaña "Equipos" en el Modelador 3D.</p>
+          <div [class]="themeService.isClassic() ? 'text-center py-5 px-4 bg-zinc-50 rounded-md border border-dashed border-zinc-200 flex flex-col items-center' : 'text-center py-5 px-4 bg-zinc-950 rounded-md border border-dashed border-zinc-800 flex flex-col items-center'">
+            <hugeicons-icon [icon]="icons.appliance" [size]="26" [strokeWidth]="1.6" class="text-zinc-400"></hugeicons-icon>
+            <p [class]="themeService.isClassic() ? 'text-xs text-zinc-600 mt-1' : 'text-xs text-zinc-400 mt-1'">No hay electrodomésticos colocados en el diseño 3D.</p>
+            <p [class]="themeService.isClassic() ? 'text-[11px] text-zinc-400 mt-0.5' : 'text-[11px] text-zinc-500 mt-0.5'">Puedes añadirlos desde la pestaña "Equipos" en el Modelador 3D.</p>
           </div>
         } @else {
-          <div [class]="themeService.isClassic() ? 'overflow-x-auto scrollbar-thin border border-slate-200 rounded-xl' : 'overflow-x-auto scrollbar-thin border border-zinc-800 rounded-xl'">
+          <div [class]="themeService.isClassic() ? 'overflow-x-auto scrollbar-thin border border-zinc-200/90 rounded-md shadow-2xs' : 'overflow-x-auto scrollbar-thin border border-zinc-800 rounded-md'">
             <table class="w-full text-left text-xs">
-              <thead [class]="themeService.isClassic() ? 'bg-slate-50 text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-bold'">
+              <thead [class]="themeService.isClassic() ? 'bg-zinc-50 text-zinc-500 uppercase text-[10px] font-mono border-b border-zinc-200/90' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-mono'">
                 <tr>
                   <th class="py-2.5 px-3">Equipo / Modelo</th>
                   <th class="py-2.5 px-2">Dimensiones</th>
@@ -365,23 +365,23 @@
                   <th class="py-2.5 px-3 text-right">Subtotal</th>
                 </tr>
               </thead>
-              <tbody [class]="themeService.isClassic() ? 'divide-y divide-slate-100 text-slate-700' : 'divide-y divide-zinc-800 text-zinc-200'">
+              <tbody [class]="themeService.isClassic() ? 'divide-y divide-zinc-100 text-zinc-700' : 'divide-y divide-zinc-800 text-zinc-200'">
                 @for (app of appliances(); track app.id) {
-                  <tr [class]="themeService.isClassic() ? 'hover:bg-slate-50/80' : 'hover:bg-zinc-800/40'">
+                  <tr [class]="themeService.isClassic() ? 'hover:bg-zinc-50/80' : 'hover:bg-zinc-800/40'">
                     <td class="py-2.5 px-3">
                       <div class="flex items-center gap-2">
-                        <hugeicons-icon [icon]="icons.appliance" [size]="16" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                        <hugeicons-icon [icon]="icons.appliance" [size]="15" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
                         <div>
-                          <p [class]="themeService.isClassic() ? 'font-bold text-slate-800 text-xs' : 'font-bold text-white text-xs'">{{ app.name }}</p>
-                          <p [class]="themeService.isClassic() ? 'text-[10px] text-slate-400' : 'text-[10px] text-zinc-400'">{{ app.brand || 'Estándar' }} · {{ app.modelCode || app.type }}</p>
+                          <p [class]="themeService.isClassic() ? 'font-medium text-zinc-900 text-xs' : 'font-medium text-white text-xs'">{{ app.name }}</p>
+                          <p [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400' : 'text-[10px] text-zinc-400'">{{ app.brand || 'Estándar' }} · {{ app.modelCode || app.type }}</p>
                         </div>
                       </div>
                     </td>
-                    <td [class]="themeService.isClassic() ? 'py-2.5 px-2 font-mono text-[11px] text-slate-600 whitespace-nowrap' : 'py-2.5 px-2 font-mono text-[11px] text-zinc-300 whitespace-nowrap'">
+                    <td [class]="themeService.isClassic() ? 'py-2.5 px-2 font-mono tabular-nums text-[11px] text-zinc-600 whitespace-nowrap' : 'py-2.5 px-2 font-mono tabular-nums text-[11px] text-zinc-300 whitespace-nowrap'">
                       {{ app.width }}×{{ app.depth }}×{{ app.height }} mm
                     </td>
                     <td class="py-2.5 px-2 text-[11px]">
-                      <span [class]="themeService.isClassic() ? 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700 whitespace-nowrap' : 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-800 text-zinc-300 whitespace-nowrap'">
+                      <span [class]="themeService.isClassic() ? 'px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-100 text-zinc-700 border border-zinc-200 whitespace-nowrap' : 'px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800 text-zinc-300 border border-zinc-700 whitespace-nowrap'">
                         {{ app.finish === 'stainless_steel' ? 'Acero Inox' : (app.finish === 'black_matte' ? 'Negro Mate' : (app.finish === 'white_gloss' ? 'Blanco Cristal' : (app.finish === 'gold_brass' ? 'Latón Dorado' : (app.finish === 'natural_wood' ? 'Madera Roble' : (app.finish === 'retro_red' ? 'Rojo Barista' : app.finish))))) }}
                       </span>
                     </td>
@@ -390,7 +390,7 @@
                         type="checkbox"
                         [checked]="app.includeInBudget"
                         (change)="onApplianceIncludeChange(app.id, $event)"
-                        class="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                        class="w-3.5 h-3.5 accent-zinc-900 rounded cursor-pointer"
                         title="Incluir este electrodoméstico en el presupuesto" />
                     </td>
                     <td class="py-2.5 px-3 text-right">
@@ -400,9 +400,9 @@
                         [value]="app.price"
                         (change)="onAppliancePriceChange(app.id, $event)"
                         aria-label="Precio unitario de electrodoméstico"
-                        [class]="themeService.isClassic() ? 'w-28 px-1.5 py-0.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-right font-mono' : 'w-28 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-right font-mono'" />
+                        [class]="themeService.isClassic() ? 'w-28 px-1.5 py-0.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 text-right font-mono tabular-nums focus:border-zinc-900' : 'w-28 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-right font-mono tabular-nums focus:border-zinc-400'" />
                     </td>
-                    <td class="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap" [class.text-emerald-700]="app.includeInBudget" [class.text-slate-400]="!app.includeInBudget">
+                    <td class="py-2.5 px-3 text-right font-mono tabular-nums font-bold whitespace-nowrap" [class.text-zinc-900]="app.includeInBudget" [class.text-zinc-400]="!app.includeInBudget">
                       {{ app.includeInBudget ? format(app.price) : 'Excluido' }}
                     </td>
                   </tr>
@@ -416,20 +416,20 @@
     </div>
 
     <!-- COLUMNA DERECHA FIJA (Sticky): Cálculo de Precio Final y Exportación de Cotización (4 cols) -->
-    <div class="lg:col-span-4 lg:sticky lg:top-4 space-y-4 min-w-0">
+    <div class="lg:col-span-4 lg:sticky lg:top-4 space-y-3.5 min-w-0">
 
       <!-- Tarjeta de Configuración de Márgenes y Estructura de Precios -->
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl p-4 2xl:p-5 shadow-xs space-y-3.5' : 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4 2xl:p-5 shadow-lg space-y-3.5'">
-        <h3 [class]="themeService.isClassic() ? 'text-xs xl:text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2' : 'text-xs xl:text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2'">
-          <hugeicons-icon [icon]="icons.calculate" [size]="17" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-4 shadow-2xs space-y-3.5' : 'bg-zinc-900 border border-zinc-800 rounded-md p-4 shadow-xs space-y-3.5'">
+        <h3 [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-900 uppercase tracking-wider flex items-center gap-2' : 'text-xs font-semibold text-white uppercase tracking-wider flex items-center gap-2'">
+          <hugeicons-icon [icon]="icons.calculate" [size]="16" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
           <span>Estructura de Precios</span>
         </h3>
 
         <!-- Mano de obra -->
         <div>
           <div class="flex items-center justify-between text-xs mb-1">
-            <span [class]="themeService.isClassic() ? 'text-slate-600 font-medium' : 'text-zinc-300 font-medium'">Mano de Obra (Armado / Taller)</span>
-            <span class="text-emerald-600 font-mono font-bold">{{ format(laborTotal()) }}</span>
+            <span [class]="themeService.isClassic() ? 'text-zinc-600 font-medium' : 'text-zinc-300 font-medium'">Mano de Obra (Armado / Taller)</span>
+            <span class="text-zinc-900 font-mono tabular-nums font-bold">{{ format(laborTotal()) }}</span>
           </div>
           <div class="flex items-center gap-2">
             <input
@@ -437,13 +437,13 @@
               [value]="project().laborCost"
               (change)="onLaborCostChange($event)"
               aria-label="Costo de mano de obra"
-              [class]="themeService.isClassic() ? 'w-28 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 font-mono' : 'w-28 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white font-mono'" />
+              [class]="themeService.isClassic() ? 'w-28 px-2 py-1 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 font-mono tabular-nums focus:border-zinc-900' : 'w-28 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white font-mono tabular-nums focus:border-zinc-400'" />
 
             <select
               [value]="project().laborType"
               (change)="onLaborTypeChange($event)"
               aria-label="Tipo de cálculo de mano de obra"
-              [class]="themeService.isClassic() ? 'flex-1 min-w-0 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800' : 'flex-1 min-w-0 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white'">
+              [class]="themeService.isClassic() ? 'flex-1 min-w-0 px-2 py-1 bg-white border border-zinc-200 rounded-md text-xs text-zinc-800 focus:border-zinc-900' : 'flex-1 min-w-0 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white'">
               <option value="fixed">Monto Fijo ({{ settings().currency }})</option>
               <option value="percent">% sobre Materiales</option>
             </select>
@@ -451,10 +451,10 @@
         </div>
 
         <!-- Margen de Ganancia -->
-        <div [class]="themeService.isClassic() ? 'pt-2 border-t border-slate-100' : 'pt-2 border-t border-zinc-800'">
+        <div [class]="themeService.isClassic() ? 'pt-2 border-t border-zinc-100' : 'pt-2 border-t border-zinc-800'">
           <div class="flex items-center justify-between text-xs mb-1">
-            <span [class]="themeService.isClassic() ? 'text-slate-600 font-medium' : 'text-zinc-300 font-medium'">Margen de Utilidad del Taller</span>
-            <span class="text-amber-600 font-mono font-bold">{{ project().profitMarginPercent }}% ({{ format(profitAmount()) }})</span>
+            <span [class]="themeService.isClassic() ? 'text-zinc-600 font-medium' : 'text-zinc-300 font-medium'">Margen de Utilidad del Taller</span>
+            <span class="text-zinc-900 font-mono tabular-nums font-bold">{{ project().profitMarginPercent }}% ({{ format(profitAmount()) }})</span>
           </div>
           <input
             type="range"
@@ -464,14 +464,14 @@
             [value]="project().profitMarginPercent"
             (input)="onProfitMarginInput($event)"
             aria-label="Porcentaje de margen de utilidad"
-            class="w-full accent-amber-500 cursor-pointer" />
+            class="w-full accent-zinc-900 cursor-pointer" />
         </div>
 
         <!-- Impuestos / IVA -->
-        <div [class]="themeService.isClassic() ? 'pt-2 border-t border-slate-100' : 'pt-2 border-t border-zinc-800'">
+        <div [class]="themeService.isClassic() ? 'pt-2 border-t border-zinc-100' : 'pt-2 border-t border-zinc-800'">
           <div class="flex items-center justify-between text-xs mb-1">
-            <span [class]="themeService.isClassic() ? 'text-slate-600 font-medium' : 'text-zinc-300 font-medium'">Impuesto / IVA</span>
-            <span [class]="themeService.isClassic() ? 'text-slate-500 font-mono' : 'text-zinc-400 font-mono'">{{ project().taxPercent }}%</span>
+            <span [class]="themeService.isClassic() ? 'text-zinc-600 font-medium' : 'text-zinc-300 font-medium'">Impuesto / IVA</span>
+            <span [class]="themeService.isClassic() ? 'text-zinc-500 font-mono tabular-nums' : 'text-zinc-400 font-mono tabular-nums'">{{ project().taxPercent }}%</span>
           </div>
           <div class="flex items-center gap-2">
             <input
@@ -481,39 +481,39 @@
               [value]="project().taxPercent"
               (change)="onTaxChange($event)"
               aria-label="Porcentaje de impuesto o IVA"
-              [class]="themeService.isClassic() ? 'w-20 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 text-center font-mono' : 'w-20 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-white text-center font-mono'" />
-            <span [class]="themeService.isClassic() ? 'text-xs text-slate-400' : 'text-xs text-zinc-500'">% sobre subtotal</span>
+              [class]="themeService.isClassic() ? 'w-20 px-2 py-1 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 text-center font-mono tabular-nums focus:border-zinc-900' : 'w-20 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-center font-mono tabular-nums focus:border-zinc-400'" />
+            <span [class]="themeService.isClassic() ? 'text-xs text-zinc-500' : 'text-xs text-zinc-500'">% sobre subtotal</span>
           </div>
         </div>
 
         <!-- RESUMEN TOTAL FINAL -->
-        <div [class]="themeService.isClassic() ? 'pt-3.5 border-t border-slate-100 space-y-2 text-xs' : 'pt-3.5 border-t border-zinc-800 space-y-2 text-xs'">
-          <div [class]="themeService.isClassic() ? 'flex justify-between text-slate-500' : 'flex justify-between text-zinc-400'">
-            <span>Costo Total Materiales:</span>
-            <span class="font-mono">{{ format(totalMaterialsCost()) }}</span>
+        <div [class]="themeService.isClassic() ? 'pt-3.5 border-t border-zinc-100 space-y-2 text-xs font-mono tabular-nums' : 'pt-3.5 border-t border-zinc-800 space-y-2 text-xs font-mono tabular-nums'">
+          <div [class]="themeService.isClassic() ? 'flex justify-between text-zinc-500' : 'flex justify-between text-zinc-400'">
+            <span class="font-sans">Costo Total Materiales:</span>
+            <span>{{ format(totalMaterialsCost()) }}</span>
           </div>
-          <div [class]="themeService.isClassic() ? 'flex justify-between text-slate-500' : 'flex justify-between text-zinc-400'">
-            <span>Mano de Obra Taller:</span>
-            <span class="font-mono">{{ format(laborTotal()) }}</span>
+          <div [class]="themeService.isClassic() ? 'flex justify-between text-zinc-500' : 'flex justify-between text-zinc-400'">
+            <span class="font-sans">Mano de Obra Taller:</span>
+            <span>{{ format(laborTotal()) }}</span>
           </div>
-          <div [class]="themeService.isClassic() ? 'flex justify-between text-slate-800 font-semibold' : 'flex justify-between text-zinc-300 font-semibold'">
-            <span>Costo Total Producción:</span>
-            <span class="font-mono">{{ format(productionCost()) }}</span>
+          <div [class]="themeService.isClassic() ? 'flex justify-between text-zinc-800 font-semibold' : 'flex justify-between text-zinc-300 font-semibold'">
+            <span class="font-sans">Costo Total Producción:</span>
+            <span>{{ format(productionCost()) }}</span>
           </div>
-          <div class="flex justify-between text-amber-600 font-semibold">
-            <span>Utilidad Bruta ({{ project().profitMarginPercent }}%):</span>
-            <span class="font-mono">+{{ format(profitAmount()) }}</span>
+          <div class="flex justify-between text-zinc-700 font-semibold">
+            <span class="font-sans">Utilidad Bruta ({{ project().profitMarginPercent }}%):</span>
+            <span>+{{ format(profitAmount()) }}</span>
           </div>
           @if (project().taxPercent > 0) {
-            <div [class]="themeService.isClassic() ? 'flex justify-between text-slate-500' : 'flex justify-between text-zinc-400'">
-              <span>Impuesto ({{ project().taxPercent }}%):</span>
-              <span class="font-mono">+{{ format(taxAmount()) }}</span>
+            <div [class]="themeService.isClassic() ? 'flex justify-between text-zinc-500' : 'flex justify-between text-zinc-400'">
+              <span class="font-sans">Impuesto ({{ project().taxPercent }}%):</span>
+              <span>+{{ format(taxAmount()) }}</span>
             </div>
           }
 
-          <div [class]="themeService.isClassic() ? 'pt-3 border-t-2 border-amber-500/30 flex justify-between items-center text-sm font-bold text-slate-900 gap-2' : 'pt-3 border-t-2 border-amber-500/30 flex justify-between items-center text-sm font-bold text-white gap-2'">
-            <span>PRECIO AL CLIENTE:</span>
-            <span class="text-lg xl:text-xl font-black text-amber-600 font-mono truncate">{{ format(finalClientPrice()) }}</span>
+          <div [class]="themeService.isClassic() ? 'pt-3 border-t border-zinc-900 flex justify-between items-center text-sm font-bold text-zinc-900 gap-2' : 'pt-3 border-t border-zinc-700 flex justify-between items-center text-sm font-bold text-white gap-2'">
+            <span class="font-sans uppercase">PRECIO AL CLIENTE:</span>
+            <span class="text-lg xl:text-xl font-bold text-zinc-900 dark:text-emerald-400 font-mono tabular-nums truncate">{{ format(finalClientPrice()) }}</span>
           </div>
         </div>
 
@@ -522,15 +522,15 @@
           <button
             type="button"
             (click)="showClientQuotation.set(!showClientQuotation())"
-            [class]="themeService.isClassic() ? 'w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer' : 'w-full py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer'">
-            <hugeicons-icon [icon]="icons.receipt" [size]="15" [strokeWidth]="2" class="text-cyan-500"></hugeicons-icon>
+            [class]="themeService.isClassic() ? 'w-full py-2 px-3 rounded-md bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 text-xs font-medium flex items-center justify-center gap-2 transition shadow-2xs cursor-pointer' : 'w-full py-2 px-3 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-medium flex items-center justify-center gap-2 transition cursor-pointer'">
+            <hugeicons-icon [icon]="icons.receipt" [size]="15" [strokeWidth]="2" class="text-zinc-600"></hugeicons-icon>
             <span>{{ showClientQuotation() ? 'Ocultar Presupuesto Formal' : 'Ver Presupuesto Formal Cliente' }}</span>
           </button>
 
           <button
             type="button"
             (click)="printQuote()"
-            class="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer">
+            class="w-full py-2 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer">
             <hugeicons-icon [icon]="icons.print" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             <span>Imprimir Cotización PDF</span>
           </button>
@@ -543,14 +543,14 @@
 
   <!-- HOJA DE COTIZACIÓN FORMAL PARA EL CLIENTE (CENTRADA EN MONITORES 2K Y LISTA PARA IMPRIMIR) -->
   @if (showClientQuotation()) {
-    <div class="w-full max-w-5xl mx-auto print:max-w-none bg-white text-zinc-900 rounded-2xl p-6 sm:p-8 shadow-xl border border-slate-200 print:border-none print:shadow-none print:m-0 print:p-0">
+    <div class="w-full max-w-5xl mx-auto print:max-w-none bg-white text-zinc-900 rounded-lg p-6 sm:p-8 shadow-xl border border-zinc-200/90 print:border-none print:shadow-none print:m-0 print:p-0">
       <!-- Cabecera de Cotización -->
       <div class="flex items-center justify-between pb-6 border-b-2 border-zinc-900">
         <div>
-          <h2 class="text-xl sm:text-2xl font-black tracking-tight text-zinc-950">PRESUPUESTO DE CARPINTERÍA</h2>
+          <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-zinc-950">PRESUPUESTO DE CARPINTERÍA</h2>
           <p class="text-xs sm:text-sm font-medium text-zinc-600 mt-1">Muebles a Medida en Melamina de Alta Densidad · Piezo3D Studio</p>
         </div>
-        <div class="text-right text-xs">
+        <div class="text-right text-xs font-mono tabular-nums">
           <p class="font-bold text-zinc-800">Fecha: {{ project().date }}</p>
           <p class="text-zinc-600">Presupuesto N°: {{ project().id.toUpperCase() }}</p>
         </div>
@@ -559,30 +559,30 @@
       <!-- Datos del Cliente y Proyecto -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4 border-b border-zinc-200 text-xs">
         <div>
-          <p class="font-bold text-zinc-700 uppercase">Cliente:</p>
-          <p class="text-base font-bold text-zinc-900">{{ project().clientName || 'Cliente Particular' }}</p>
+          <p class="font-medium text-zinc-500 uppercase tracking-wider text-[11px]">Cliente:</p>
+          <p class="text-base font-semibold text-zinc-900">{{ project().clientName || 'Cliente Particular' }}</p>
           <p class="text-zinc-600 mt-1">Proyecto: <strong class="text-zinc-800">{{ project().name }}</strong></p>
         </div>
         <div class="sm:text-right">
-          <p class="font-bold text-zinc-700 uppercase">Resumen Técnico:</p>
-          <p class="text-zinc-800">{{ project().modules.length }} módulos incluidos ({{ project().parts.length }} piezas)</p>
+          <p class="font-medium text-zinc-500 uppercase tracking-wider text-[11px]">Resumen Técnico:</p>
+          <p class="text-zinc-800 font-mono tabular-nums">{{ project().modules.length }} módulos incluidos ({{ project().parts.length }} piezas)</p>
           <p class="text-zinc-600">Correderas telescópicas y bisagras de cierre suave</p>
         </div>
       </div>
 
       <!-- Descripción de Módulos Incluidos -->
       <div class="py-4 border-b border-zinc-200">
-        <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-700 mb-3">Detalle de Muebles a Fabricar:</h4>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-3">Detalle de Muebles a Fabricar:</h4>
         <div class="space-y-2">
           @for (mod of project().modules; track mod.id) {
-            <div class="p-3 bg-zinc-50 rounded-lg flex items-center justify-between text-xs">
+            <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-md flex items-center justify-between text-xs">
               <div>
-                <span class="font-bold text-zinc-900">{{ mod.name }}</span>
-                <span class="text-zinc-600 text-[11px] block">
+                <span class="font-semibold text-zinc-900">{{ mod.name }}</span>
+                <span class="text-zinc-600 text-[11px] font-mono tabular-nums block mt-0.5">
                   Medidas: {{ mod.width }}mm (Ancho) × {{ mod.height }}mm (Alto) × {{ mod.depth }}mm (Profundidad) - Melamina {{ getModuleBoardThicknessLabel(mod.id, mod.boardThickness) }}
                 </span>
               </div>
-              <span class="font-bold text-zinc-800">1 Unidad</span>
+              <span class="font-semibold text-zinc-800 font-mono tabular-nums">1 Unidad</span>
             </div>
           }
         </div>
@@ -591,20 +591,20 @@
       <!-- Electrodomésticos y Equipamiento Suministrado -->
       @if (appliancesBudgetList().length > 0) {
         <div class="py-4 border-b border-zinc-200">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-700 mb-3 flex items-center gap-1.5">
-            <hugeicons-icon [icon]="icons.appliance" [size]="15" [strokeWidth]="2" class="text-emerald-600"></hugeicons-icon>
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-3 flex items-center gap-1.5">
+            <hugeicons-icon [icon]="icons.appliance" [size]="15" [strokeWidth]="2" class="text-zinc-700"></hugeicons-icon>
             <span>Electrodomésticos y Equipamiento Incluido:</span>
           </h4>
           <div class="space-y-1.5">
             @for (app of appliancesBudgetList(); track app.id) {
-              <div class="p-2.5 bg-zinc-50 rounded-lg flex items-center justify-between text-xs">
+              <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-md flex items-center justify-between text-xs">
                 <div>
-                  <span class="font-bold text-zinc-900">{{ app.name }}</span>
-                  <span class="text-zinc-500 text-[11px] block">
+                  <span class="font-semibold text-zinc-900">{{ app.name }}</span>
+                  <span class="text-zinc-500 text-[11px] font-mono tabular-nums block">
                     {{ app.brand || 'Línea de Empotrar' }} · {{ app.width }}×{{ app.depth }}×{{ app.height }} mm · Acabado: {{ app.finish === 'stainless_steel' ? 'Acero Inox' : (app.finish === 'black_matte' ? 'Negro Mate' : 'Blanco Cristal') }}
                   </span>
                 </div>
-                <span class="font-mono font-bold text-zinc-800">{{ format(app.price) }}</span>
+                <span class="font-mono tabular-nums font-semibold text-zinc-800">{{ format(app.price) }}</span>
               </div>
             }
           </div>
@@ -613,20 +613,20 @@
 
       <!-- Precio Total de la Cotización -->
       <div class="py-6 flex justify-end">
-        <div class="w-72 space-y-2 text-xs">
+        <div class="w-72 space-y-2 text-xs font-mono tabular-nums">
           <div class="flex justify-between text-zinc-600">
-            <span>Materiales y Fabricación:</span>
-            <span class="font-mono font-medium">{{ format(subtotalBeforeTax()) }}</span>
+            <span class="font-sans">Materiales y Fabricación:</span>
+            <span class="font-medium">{{ format(subtotalBeforeTax()) }}</span>
           </div>
           @if (project().taxPercent > 0) {
             <div class="flex justify-between text-zinc-600">
-              <span>Impuestos ({{ project().taxPercent }}%):</span>
-              <span class="font-mono font-medium">{{ format(taxAmount()) }}</span>
+              <span class="font-sans">Impuestos ({{ project().taxPercent }}%):</span>
+              <span class="font-medium">{{ format(taxAmount()) }}</span>
             </div>
           }
-          <div class="pt-3 border-t-2 border-zinc-900 flex justify-between items-center text-base font-black text-zinc-950">
-            <span>TOTAL PRESUPUESTO:</span>
-            <span class="text-2xl font-black text-zinc-950 font-mono">{{ format(finalClientPrice()) }}</span>
+          <div class="pt-3 border-t-2 border-zinc-900 flex justify-between items-center text-base font-bold text-zinc-950">
+            <span class="font-sans uppercase">TOTAL PRESUPUESTO:</span>
+            <span class="text-2xl font-bold text-zinc-950 font-mono tabular-nums">{{ format(finalClientPrice()) }}</span>
           </div>
         </div>
       </div>
@@ -634,7 +634,7 @@
       <!-- Condiciones Comerciales y Firma -->
       <div class="pt-8 border-t border-zinc-200 grid grid-cols-1 sm:grid-cols-2 gap-8 text-[11px] text-zinc-600">
         <div>
-          <p class="font-bold text-zinc-800 mb-1">Condiciones Comerciales:</p>
+          <p class="font-semibold text-zinc-800 mb-1">Condiciones Comerciales:</p>
           <ul class="list-disc list-inside space-y-0.5">
             <li>50% de anticipo al confirmar el diseño para compra de materiales.</li>
             <li>50% contra entrega e instalación conforme.</li>
@@ -644,7 +644,7 @@
         </div>
         <div class="flex flex-col items-center justify-end">
           <div class="w-48 border-b border-zinc-400 mb-1"></div>
-          <span class="text-zinc-700 font-semibold">Firma del Taller / Carpintero</span>
+          <span class="text-zinc-700 font-medium">Firma del Taller / Carpintero</span>
         </div>
       </div>
     </div>
@@ -653,35 +653,35 @@
   <!-- MODAL: AGREGAR HERRAJE -->
   @if (showAddHardwareModal()) {
     <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
-      <div [class]="themeService.isClassic() ? 'bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl p-5 sm:p-6 text-slate-800 max-h-[88dvh] overflow-y-auto scrollbar-thin' : 'bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl p-5 sm:p-6 text-zinc-100 max-h-[88dvh] overflow-y-auto scrollbar-thin'">
-        <div [class]="themeService.isClassic() ? 'flex items-center justify-between pb-3 border-b border-slate-100' : 'flex items-center justify-between pb-3 border-b border-zinc-800'">
-          <h3 class="text-base font-bold flex items-center gap-2">
-            <hugeicons-icon [icon]="icons.hardware" [size]="19" [strokeWidth]="2" class="text-purple-500"></hugeicons-icon>
+      <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-lg w-full max-w-md shadow-xl p-5 text-zinc-900 max-h-[88dvh] overflow-y-auto scrollbar-thin' : 'bg-zinc-900 border border-zinc-700 rounded-lg w-full max-w-md shadow-xl p-5 text-zinc-100 max-h-[88dvh] overflow-y-auto scrollbar-thin'">
+        <div [class]="themeService.isClassic() ? 'flex items-center justify-between pb-3 border-b border-zinc-200' : 'flex items-center justify-between pb-3 border-b border-zinc-800'">
+          <h3 class="text-sm font-semibold flex items-center gap-2">
+            <hugeicons-icon [icon]="icons.hardware" [size]="16" [strokeWidth]="2" class="text-zinc-700"></hugeicons-icon>
             <span>Agregar Herraje al Presupuesto</span>
           </h3>
           <button
             type="button"
             (click)="showAddHardwareModal.set(false)"
             aria-label="Cerrar modal"
-            [class]="themeService.isClassic() ? 'text-slate-400 hover:text-slate-700 cursor-pointer' : 'text-zinc-400 hover:text-white cursor-pointer'">
-            <hugeicons-icon [icon]="icons.close" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+            [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-700 cursor-pointer' : 'text-zinc-400 hover:text-white cursor-pointer'">
+            <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
           </button>
         </div>
 
-        <form [formGroup]="hardwareForm" (ngSubmit)="saveHardware()" class="mt-4 space-y-4">
+        <form [formGroup]="hardwareForm" (ngSubmit)="saveHardware()" class="mt-4 space-y-3.5">
           <div>
-            <span [class]="themeService.isClassic() ? 'block text-xs font-medium text-slate-600 mb-1' : 'block text-xs font-medium text-zinc-300 mb-1'">Nombre del Herraje *</span>
+            <span [class]="themeService.isClassic() ? 'block text-xs font-medium text-zinc-700 mb-1' : 'block text-xs font-medium text-zinc-300 mb-1'">Nombre del Herraje *</span>
             <input
               type="text"
               formControlName="name"
               placeholder="ej. Pistón a gas 80N, Patas niveladoras, Canto PVC"
-              [class]="themeService.isClassic() ? 'w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-hidden focus:border-amber-500 focus:bg-white' : 'w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-hidden focus:border-amber-500'" />
+              [class]="themeService.isClassic() ? 'w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs text-zinc-900 focus:outline-hidden focus:border-zinc-900 focus:bg-white' : 'w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white focus:outline-hidden focus:border-zinc-400'" />
           </div>
 
           <div class="grid grid-cols-3 gap-2">
             <div>
-              <span [class]="themeService.isClassic() ? 'block text-[11px] text-slate-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Categoría</span>
-              <select formControlName="category" [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-800' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-white'">
+              <span [class]="themeService.isClassic() ? 'block text-[11px] text-zinc-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Categoría</span>
+              <select formControlName="category" [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs text-zinc-800 focus:border-zinc-900' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white'">
                 <option value="slide">Corredera</option>
                 <option value="hinge">Bisagra</option>
                 <option value="handle">Tirador</option>
@@ -691,8 +691,8 @@
               </select>
             </div>
             <div>
-              <span [class]="themeService.isClassic() ? 'block text-[11px] text-slate-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Unidad</span>
-              <select formControlName="unit" [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-800' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-white'">
+              <span [class]="themeService.isClassic() ? 'block text-[11px] text-zinc-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Unidad</span>
+              <select formControlName="unit" [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs text-zinc-800 focus:border-zinc-900' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white'">
                 <option value="und">und</option>
                 <option value="par">par</option>
                 <option value="juego">juego</option>
@@ -701,35 +701,35 @@
               </select>
             </div>
             <div>
-              <span [class]="themeService.isClassic() ? 'block text-[11px] text-slate-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Cantidad</span>
+              <span [class]="themeService.isClassic() ? 'block text-[11px] text-zinc-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">Cantidad</span>
               <input
                 type="number"
                 min="1"
                 formControlName="quantity"
-                [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs text-amber-600 text-center font-bold' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-amber-400 text-center font-bold'" />
+                [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs text-zinc-900 text-center font-mono tabular-nums font-bold focus:border-zinc-900' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-center font-mono tabular-nums font-bold focus:border-zinc-400'" />
             </div>
           </div>
 
           <div>
-            <span [class]="themeService.isClassic() ? 'block text-xs font-medium text-slate-600 mb-1' : 'block text-xs font-medium text-zinc-300 mb-1'">Precio Unitario ({{ settings().currency }})</span>
+            <span [class]="themeService.isClassic() ? 'block text-xs font-medium text-zinc-700 mb-1' : 'block text-xs font-medium text-zinc-300 mb-1'">Precio Unitario ({{ settings().currency }})</span>
             <input
               type="number"
               step="0.1"
               formControlName="unitCost"
-              [class]="themeService.isClassic() ? 'w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800' : 'w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white'" />
+              [class]="themeService.isClassic() ? 'w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs text-zinc-900 font-mono tabular-nums focus:border-zinc-900' : 'w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white font-mono tabular-nums focus:border-zinc-400'" />
           </div>
 
-          <div class="pt-3 flex justify-end gap-2">
+          <div class="pt-3 flex justify-end gap-2 border-t border-zinc-200 dark:border-zinc-800">
             <button
               type="button"
               (click)="showAddHardwareModal.set(false)"
-              [class]="themeService.isClassic() ? 'px-4 py-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 cursor-pointer' : 'px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 cursor-pointer'">
+              [class]="themeService.isClassic() ? 'px-3.5 py-1.5 text-xs font-medium bg-white hover:bg-zinc-50 border border-zinc-200 rounded-md text-zinc-700 cursor-pointer shadow-2xs' : 'px-3.5 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 rounded-md text-zinc-300 cursor-pointer'">
               Cancelar
             </button>
             <button
               type="submit"
               [disabled]="hardwareForm.invalid"
-              class="px-4 py-2 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition shadow-xs cursor-pointer">
+              class="px-3.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition shadow-xs cursor-pointer disabled:opacity-50">
               Agregar
             </button>
           </div>

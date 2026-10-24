@@ -1,6 +1,6 @@
 @if (isOpen()) {
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-900/45 backdrop-blur-xs animate-in fade-in duration-150"
+    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -9,30 +9,30 @@
 
     <!-- Modal Window: Modern Clean Architectural Light Theme -->
     <div
-      class="relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-slate-200 bg-white text-slate-800 transition-all"
+      class="relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-lg shadow-2xl overflow-hidden border border-zinc-200 bg-white text-zinc-800 transition-all"
       role="document"
       tabindex="0"
       (keydown)="$event.stopPropagation()"
       (click)="$event.stopPropagation()">
 
-      <!-- HEADER MODAL: Pure White, Soft Slate Borders & Indigo/Sky Modern Accents -->
-      <div class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-slate-200 bg-white shrink-0">
+      <!-- HEADER MODAL: Pure White, Soft Zinc Borders & CAD Technical Accents -->
+      <div class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-zinc-200 bg-white shrink-0">
 
         <div class="flex items-center gap-3 min-w-0">
-          <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-200/80 shadow-xs shrink-0">
-            <hugeicons-icon [icon]="icons.tune" [size]="20" [strokeWidth]="1.9"></hugeicons-icon>
+          <div class="w-8 h-8 rounded-md flex items-center justify-center bg-zinc-100 text-zinc-700 border border-zinc-200 shadow-xs shrink-0">
+            <hugeicons-icon [icon]="icons.tune" [size]="18" [strokeWidth]="1.9"></hugeicons-icon>
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-2">
-              <h2 class="text-base font-bold tracking-tight text-slate-900">
+              <h2 class="text-base font-bold tracking-tight text-zinc-900">
                 {{ editingGroupId() ? 'Editar Módulo Paramétrico' : 'Plantillas & Asistente Modular' }}
               </h2>
-              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                [class]="editingGroupId() ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'">
+              <span class="text-[10px] font-mono font-medium uppercase tracking-wider px-2 py-0.5 rounded-md"
+                [class]="editingGroupId() ? 'bg-amber-50 text-amber-800 border border-amber-300' : 'bg-zinc-100 text-zinc-700 border border-zinc-200'">
                 {{ editingGroupId() ? 'Modo Edición' : 'Módulos Paramétricos' }}
               </span>
             </div>
-            <p class="text-xs text-slate-500 font-normal truncate">
+            <p class="text-xs text-zinc-500 font-normal truncate">
               {{ editingGroupId() ? ('Modifica medidas, puertas o entrepaños de: ' + moduleName()) : 'Crea muebles a medida con despiece milimétrico, puertas, manijas y entrepaños.' }}
             </p>
           </div>
@@ -40,11 +40,11 @@
 
         <div class="flex items-center gap-2 shrink-0">
           <!-- Conmutador de Vistas: Asistente vs Catálogo -->
-          <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs font-semibold">
+          <div class="flex items-center p-0.5 bg-zinc-100 rounded-md border border-zinc-200 text-xs font-medium">
             <button
               type="button"
               (click)="activeView.set('assistant')"
-              [class]="activeView() === 'assistant' ? 'bg-white text-indigo-700 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'"
+              [class]="activeView() === 'assistant' ? 'bg-zinc-900 text-white shadow-xs font-medium' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
               class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5 cursor-pointer">
               <hugeicons-icon [icon]="icons.magicWand" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Asistente</span>
@@ -52,7 +52,7 @@
             <button
               type="button"
               (click)="activeView.set('catalog')"
-              [class]="activeView() === 'catalog' ? 'bg-white text-indigo-700 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'"
+              [class]="activeView() === 'catalog' ? 'bg-zinc-900 text-white shadow-xs font-medium' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
               class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5 cursor-pointer">
               <hugeicons-icon [icon]="icons.book" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>Catálogo ({{ catalogService.templates.length }})</span>
@@ -63,9 +63,9 @@
           <button
             type="button"
             (click)="close()"
-            class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 transition cursor-pointer"
+            class="w-8 h-8 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 border border-zinc-200 transition cursor-pointer"
             title="Cerrar (Esc)">
-            <hugeicons-icon [icon]="icons.close" [size]="17" [strokeWidth]="2"></hugeicons-icon>
+            <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
           </button>
         </div>
       </div>
@@ -76,14 +76,14 @@
       @if (activeView() === 'assistant') {
 
         <!-- BARRA DE CATEGORÍAS PRESETS (Cocina, Closet, Baño, etc.) -->
-        <div class="px-5 sm:px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
-          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Tipo:</span>
+        <div class="px-5 sm:px-6 py-2.5 border-b border-zinc-200 bg-zinc-50 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
+          <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mr-1 shrink-0">Tipo:</span>
 
           <button
             type="button"
             (click)="selectPreset('kitchen_base')"
-            [class]="activePreset() === 'kitchen_base' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+            [class]="activePreset() === 'kitchen_base' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
+            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
             <hugeicons-icon [icon]="icons.countertop" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Cocina Bajo (Base)</span>
           </button>
@@ -91,8 +91,8 @@
           <button
             type="button"
             (click)="selectPreset('drawers')"
-            [class]="activePreset() === 'drawers' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+            [class]="activePreset() === 'drawers' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
+            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
             <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Cajonera (Gavetas)</span>
           </button>
@@ -100,8 +100,8 @@
           <button
             type="button"
             (click)="selectPreset('kitchen_wall')"
-            [class]="activePreset() === 'kitchen_wall' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+            [class]="activePreset() === 'kitchen_wall' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
+            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
             <hugeicons-icon [icon]="icons.kitchen" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Cocina Alto (Alacena)</span>
           </button>
@@ -109,8 +109,8 @@
           <button
             type="button"
             (click)="selectPreset('closet')"
-            [class]="activePreset() === 'closet' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+            [class]="activePreset() === 'closet' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
+            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
             <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Closet / Armario</span>
           </button>
@@ -118,8 +118,8 @@
           <button
             type="button"
             (click)="selectPreset('vanity')"
-            [class]="activePreset() === 'vanity' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+            [class]="activePreset() === 'vanity' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
+            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
             <hugeicons-icon [icon]="icons.vanity" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Baño / Vanitorio</span>
           </button>
@@ -127,8 +127,8 @@
           <button
             type="button"
             (click)="selectPreset('bookshelf')"
-            [class]="activePreset() === 'bookshelf' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+            [class]="activePreset() === 'bookshelf' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
+            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
             <hugeicons-icon [icon]="icons.shelves" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Estantería / Abierto</span>
           </button>
@@ -136,14 +136,14 @@
           <button
             type="button"
             (click)="selectPreset('custom')"
-            [class]="activePreset() === 'custom' ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+            [class]="activePreset() === 'custom' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
+            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
             <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Personalizado</span>
           </button>
 
           @if (activePreset() === 'oven_base' || activePreset() === 'sink_base' || activePreset() === 'corner_base' || activePreset() === 'oven_tower') {
-            <span class="px-3 py-1.5 rounded-lg text-xs bg-amber-600 text-white font-bold shadow-xs flex items-center gap-1.5 shrink-0">
+            <span class="px-3 py-1.5 rounded-md text-xs bg-zinc-800 text-zinc-100 font-medium shadow-xs flex items-center gap-1.5 shrink-0 border border-zinc-700">
               <hugeicons-icon [icon]="icons.kitchen" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>
                 @switch (activePreset()) {
@@ -158,14 +158,14 @@
         </div>
 
         <!-- CUERPO PRINCIPAL DEL ASISTENTE (2 COLUMNAS) -->
-        <div class="flex-1 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 bg-slate-50/50">
+        <div class="flex-1 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 bg-zinc-50/50">
 
           <!-- COLUMNA 1: FORMULARIO PARAMÉTRICO DE ENTRADA (7 cols) -->
           <div class="lg:col-span-7 space-y-4">
 
             <!-- 1. Nombre del Módulo -->
-            <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <label for="module-name-input" class="block text-xs font-bold text-slate-700 mb-1">
+            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs">
+              <label for="module-name-input" class="block text-xs font-semibold text-zinc-700 mb-1">
                 Nombre del Módulo
               </label>
               <input
@@ -173,18 +173,18 @@
                 type="text"
                 [value]="moduleName()"
                 (input)="moduleName.set($any($event.target).value)"
-                class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden transition"
+                class="w-full px-3 py-1.5 text-xs font-medium bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden transition"
                 placeholder="ej. Módulo Cocina Bajo 1, Alacena 2P" />
             </div>
 
             <!-- 2. Dimensiones Exteriores (Ancho, Alto, Fondo) -->
-            <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                   <span>Dimensiones Exteriores (mm)</span>
                 </span>
-                <span class="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                <span class="text-[11px] font-mono tabular-nums font-medium text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200">
                   {{ width() }} × {{ height() }} × {{ depth() }} mm
                 </span>
               </div>
@@ -192,7 +192,7 @@
               <!-- Ancho exterior (X) -->
               <div>
                 <div class="flex items-center justify-between mb-1 text-xs">
-                  <label for="width-input-param" class="font-bold text-slate-700 flex items-center gap-1">
+                  <label for="width-input-param" class="font-semibold text-zinc-700 flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-rose-500"></span>
                     <span>Ancho exterior: (X)</span>
                   </label>
@@ -201,8 +201,8 @@
                       <button
                         type="button"
                         (click)="width.set(pw)"
-                        [class]="width() === pw ? 'bg-rose-500 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
-                        class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
+                        [class]="width() === pw ? 'bg-zinc-900 text-white font-medium' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums transition cursor-pointer">
                         {{ pw }}
                       </button>
                     }
@@ -217,15 +217,15 @@
                     min="150"
                     max="2400"
                     step="10"
-                    class="w-full px-3 py-1.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:border-rose-500 focus:outline-hidden transition" />
-                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">mm</span>
+                    class="w-full px-3 py-1.5 text-xs font-mono tabular-nums font-bold bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden transition" />
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-mono">mm</span>
                 </div>
               </div>
 
               <!-- Altura exterior (Z) -->
               <div>
                 <div class="flex items-center justify-between mb-1 text-xs">
-                  <label for="height-input-param" class="font-bold text-slate-700 flex items-center gap-1">
+                  <label for="height-input-param" class="font-semibold text-zinc-700 flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-sky-500"></span>
                     <span>Altura exterior: (Z)</span>
                   </label>
@@ -234,8 +234,8 @@
                       <button
                         type="button"
                         (click)="height.set(ph)"
-                        [class]="height() === ph ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
-                        class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
+                        [class]="height() === ph ? 'bg-zinc-900 text-white font-medium' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums transition cursor-pointer">
                         {{ ph }}
                       </button>
                     }
@@ -250,15 +250,15 @@
                     min="200"
                     max="2600"
                     step="10"
-                    class="w-full px-3 py-1.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-hidden transition" />
-                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">mm</span>
+                    class="w-full px-3 py-1.5 text-xs font-mono tabular-nums font-bold bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden transition" />
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-mono">mm</span>
                 </div>
               </div>
 
               <!-- Profundidad exterior (Y) -->
               <div>
                 <div class="flex items-center justify-between mb-1 text-xs">
-                  <label for="depth-input-param" class="font-bold text-slate-700 flex items-center gap-1">
+                  <label for="depth-input-param" class="font-semibold text-zinc-700 flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                     <span>Profundidad / Fondo: (Y)</span>
                   </label>
@@ -267,8 +267,8 @@
                       <button
                         type="button"
                         (click)="depth.set(pd)"
-                        [class]="depth() === pd ? 'bg-emerald-500 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'"
-                        class="px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
+                        [class]="depth() === pd ? 'bg-zinc-900 text-white font-medium' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums transition cursor-pointer">
                         {{ pd }}
                       </button>
                     }
@@ -283,27 +283,27 @@
                     min="150"
                     max="1000"
                     step="10"
-                    class="w-full px-3 py-1.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:border-emerald-500 focus:outline-hidden transition" />
-                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">mm</span>
+                    class="w-full px-3 py-1.5 text-xs font-mono tabular-nums font-bold bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden transition" />
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-mono">mm</span>
                 </div>
               </div>
 
               <!-- Espesor de la melamina estructura -->
-              <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span class="font-bold text-slate-700">Espesor Melamina Estructura:</span>
+              <div class="pt-2 border-t border-zinc-100 flex items-center justify-between text-xs">
+                <span class="font-semibold text-zinc-700">Espesor Melamina Estructura:</span>
                 <div class="flex items-center gap-1.5">
                   <button
                     type="button"
                     (click)="structureThickness.set(15)"
-                    [class]="structureThickness() === 15 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                    class="px-3 py-1 rounded-md font-mono text-xs transition cursor-pointer">
+                    [class]="structureThickness() === 15 ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                    class="px-3 py-1 rounded-md font-mono tabular-nums text-xs transition cursor-pointer border">
                     15 mm
                   </button>
                   <button
                     type="button"
                     (click)="structureThickness.set(18)"
-                    [class]="structureThickness() === 18 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                    class="px-3 py-1 rounded-md font-mono text-xs transition cursor-pointer">
+                    [class]="structureThickness() === 18 ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                    class="px-3 py-1 rounded-md font-mono tabular-nums text-xs transition cursor-pointer border">
                     18 mm
                   </button>
                 </div>
@@ -312,28 +312,28 @@
 
             @if (activePreset() === 'drawers') {
               <!-- 3. Configuración de Cajones / Gavetas -->
-              <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+              <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                  <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                     <span>Configuración de Cajones</span>
                   </span>
-                  <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                  <span class="text-xs font-mono tabular-nums font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200">
                     {{ drawersCount() }} Gavetas
                   </span>
                 </div>
 
                 <!-- Selector de 2 a 6 cajones -->
                 <div>
-                  <span class="block text-[11px] font-bold text-slate-700 mb-1.5">Número de Gavetas:</span>
+                  <span class="block text-[11px] font-semibold text-zinc-700 mb-1.5">Número de Gavetas:</span>
                   <div class="grid grid-cols-5 gap-2">
                     @for (cnt of [2, 3, 4, 5, 6]; track cnt) {
                       <button
                         type="button"
                         (click)="setDrawersCount(cnt)"
-                        [class]="drawersCount() === cnt ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 font-medium'"
-                        class="py-2 rounded-xl text-center transition cursor-pointer flex flex-col items-center gap-0.5">
-                        <span class="text-sm font-bold">{{ cnt }}</span>
+                        [class]="drawersCount() === cnt ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
+                        class="py-2 rounded-md text-center transition cursor-pointer flex flex-col items-center gap-0.5 border">
+                        <span class="text-sm font-bold font-mono tabular-nums">{{ cnt }}</span>
                         <span class="text-[9px] uppercase tracking-wider opacity-80">{{ cnt === 1 ? 'Cajón' : 'Cajones' }}</span>
                       </button>
                     }
@@ -341,13 +341,13 @@
                 </div>
 
                 <!-- Opciones de Corredera y Tipo de Frente -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-zinc-100">
                   <div>
-                    <span class="block text-[11px] font-bold text-slate-700 mb-1">Tipo de Correderas:</span>
+                    <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Tipo de Correderas:</span>
                     <select
                       [value]="drawerSlideType()"
                       (change)="drawerSlideType.set($any($event.target).value)"
-                      class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                      class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-800 focus:border-zinc-900 focus:outline-hidden">
                       <option value="telescopic">Telescópica Estándar (45kg)</option>
                       <option value="soft_close">Telescópica Cierre Suave (Soft-Close)</option>
                       <option value="telescopic_35">Telescópica Liviana (35mm)</option>
@@ -356,11 +356,11 @@
                   </div>
 
                   <div>
-                    <span class="block text-[11px] font-bold text-slate-700 mb-1">Montaje de Frentes:</span>
+                    <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Montaje de Frentes:</span>
                     <select
                       [value]="drawerFrontType()"
                       (change)="drawerFrontType.set($any($event.target).value)"
-                      class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                      class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-800 focus:border-zinc-900 focus:outline-hidden">
                       <option value="overlay">Sobrepuesto / Parche (Cubre costados)</option>
                       <option value="inset">Embutido / Inset (Enrasado interno)</option>
                     </select>
@@ -368,25 +368,25 @@
                 </div>
 
                 <!-- Zócalo Inferior -->
-                <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                <div class="pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <label class="flex items-center gap-2 cursor-pointer font-semibold text-zinc-700">
                     <input
                       type="checkbox"
                       [checked]="hasPlinth()"
                       (change)="hasPlinth.set($any($event.target).checked)"
-                      class="rounded text-indigo-600 focus:ring-0" />
+                      class="rounded text-zinc-900 accent-zinc-900" />
                     <span>Incluir Zócalo Inferior</span>
                   </label>
 
                   @if (hasPlinth()) {
                     <div class="flex items-center gap-1.5">
-                      <span class="text-[11px] text-slate-500">Altura:</span>
+                      <span class="text-[11px] text-zinc-500">Altura:</span>
                       @for (ph of [50, 70, 100, 120]; track ph) {
                         <button
                           type="button"
                           (click)="plinthHeight.set(ph)"
-                          [class]="plinthHeight() === ph ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                          class="px-2 py-0.5 rounded text-[10px] font-mono transition cursor-pointer">
+                          [class]="plinthHeight() === ph ? 'bg-zinc-900 text-white font-medium' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'"
+                          class="px-2 py-0.5 rounded text-[10px] font-mono tabular-nums transition cursor-pointer">
                           {{ ph }}mm
                         </button>
                       }
@@ -396,10 +396,10 @@
               </div>
 
               <!-- 4. Tiradores de Cajón -->
-              <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+              <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.knob" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                  <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.knob" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                     <span>Tiradores de Cajón</span>
                   </span>
 
@@ -409,8 +409,8 @@
                       [checked]="hasHandle()"
                       (change)="hasHandle.set($any($event.target).checked)"
                       class="sr-only peer" />
-                    <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                    <span class="ml-2 text-xs font-semibold text-slate-700">
+                    <div class="w-9 h-5 bg-zinc-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900"></div>
+                    <span class="ml-2 text-xs font-semibold text-zinc-700">
                       {{ hasHandle() ? 'Con Tirador' : 'Sin Tirador (Push)' }}
                     </span>
                   </label>
@@ -419,11 +419,11 @@
                 @if (hasHandle()) {
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <div>
-                      <span class="block text-[11px] font-bold text-slate-700 mb-1">Modelo de Tirador:</span>
+                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Modelo de Tirador:</span>
                       <select
                         [value]="handleType()"
                         (change)="handleType.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-800 focus:border-zinc-900 focus:outline-hidden">
                         <option value="bar_modern">Barra Tubular Centrada</option>
                         <option value="bar_black">Perfil Negro Minimalista</option>
                         <option value="knob_round">Tirador Botón Centrado</option>
@@ -433,11 +433,11 @@
                     </div>
 
                     <div>
-                      <span class="block text-[11px] font-bold text-slate-700 mb-1">Acabado / Material:</span>
+                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Acabado / Material:</span>
                       <select
                         [value]="handleFinish()"
                         (change)="handleFinish.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-800 focus:border-zinc-900 focus:outline-hidden">
                         <option value="brushed_steel">Acero Inox Cepillado</option>
                         <option value="black">Negro Mate</option>
                         <option value="gold">Dorado / Oro Satinado</option>
@@ -450,9 +450,9 @@
               </div>
             } @else {
               <!-- 3. Configuración de Puertas -->
-              <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+              <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                 <span>Configuración de Puertas</span>
               </span>
 
@@ -462,74 +462,74 @@
                 <button
                   type="button"
                   (click)="doorOpening.set('none')"
-                  [class]="doorOpening() === 'none' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.squareShape" [size]="17" [strokeWidth]="1.9" [class.text-indigo-600]="doorOpening() === 'none'"></hugeicons-icon>
+                  [class]="doorOpening() === 'none' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
+                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer">
+                  <hugeicons-icon [icon]="icons.squareShape" [size]="17" [strokeWidth]="1.9" [class.text-white]="doorOpening() === 'none'" [class.text-zinc-500]="doorOpening() !== 'none'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">Sin Puerta</span>
-                  <span class="text-[9px] text-slate-400">Abierto</span>
+                  <span class="text-[9px] opacity-70">Abierto</span>
                 </button>
 
                 <!-- Abre Izquierda -->
                 <button
                   type="button"
                   (click)="doorOpening.set('left')"
-                  [class]="doorOpening() === 'left' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.arrowLeft" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'left'"></hugeicons-icon>
+                  [class]="doorOpening() === 'left' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
+                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer">
+                  <hugeicons-icon [icon]="icons.arrowLeft" [size]="17" [strokeWidth]="2" [class.text-white]="doorOpening() === 'left'" [class.text-zinc-500]="doorOpening() !== 'left'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">1 Puerta</span>
-                  <span class="text-[9px] text-slate-400">Abre Izq</span>
+                  <span class="text-[9px] opacity-70">Abre Izq</span>
                 </button>
 
                 <!-- Abre Derecha -->
                 <button
                   type="button"
                   (click)="doorOpening.set('right')"
-                  [class]="doorOpening() === 'right' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.arrowRight" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'right'"></hugeicons-icon>
+                  [class]="doorOpening() === 'right' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
+                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer">
+                  <hugeicons-icon [icon]="icons.arrowRight" [size]="17" [strokeWidth]="2" [class.text-white]="doorOpening() === 'right'" [class.text-zinc-500]="doorOpening() !== 'right'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">1 Puerta</span>
-                  <span class="text-[9px] text-slate-400">Abre Der</span>
+                  <span class="text-[9px] opacity-70">Abre Der</span>
                 </button>
 
                 <!-- Doble Puerta -->
                 <button
                   type="button"
                   (click)="doorOpening.set('double')"
-                  [class]="doorOpening() === 'double' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.doubleArrows" [size]="17" [strokeWidth]="1.9" [class.text-indigo-600]="doorOpening() === 'double'"></hugeicons-icon>
+                  [class]="doorOpening() === 'double' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
+                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer">
+                  <hugeicons-icon [icon]="icons.doubleArrows" [size]="17" [strokeWidth]="1.9" [class.text-white]="doorOpening() === 'double'" [class.text-zinc-500]="doorOpening() !== 'double'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">2 Puertas</span>
-                  <span class="text-[9px] text-slate-400">Dobles</span>
+                  <span class="text-[9px] opacity-70">Dobles</span>
                 </button>
 
                 <!-- Elevable Gas -->
                 <button
                   type="button"
                   (click)="doorOpening.set('top')"
-                  [class]="doorOpening() === 'top' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 cursor-pointer col-span-2 sm:col-span-1">
-                  <hugeicons-icon [icon]="icons.arrowUp" [size]="17" [strokeWidth]="2" [class.text-indigo-600]="doorOpening() === 'top'"></hugeicons-icon>
+                  [class]="doorOpening() === 'top' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
+                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer col-span-2 sm:col-span-1">
+                  <hugeicons-icon [icon]="icons.arrowUp" [size]="17" [strokeWidth]="2" [class.text-white]="doorOpening() === 'top'" [class.text-zinc-500]="doorOpening() !== 'top'"></hugeicons-icon>
                   <span class="text-[11px] font-bold">Elevable</span>
-                  <span class="text-[9px] text-slate-400">Pistón Gas</span>
+                  <span class="text-[9px] opacity-70">Pistón Gas</span>
                 </button>
               </div>
 
               @if (doorOpening() !== 'none') {
-                <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span class="font-bold text-slate-700">Espesor Puerta(s):</span>
+                <div class="pt-2 border-t border-zinc-100 flex items-center justify-between text-xs">
+                  <span class="font-semibold text-zinc-700">Espesor Puerta(s):</span>
                   <div class="flex items-center gap-1.5">
                     <button
                       type="button"
                       (click)="doorThickness.set(15)"
-                      [class]="doorThickness() === 15 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                      class="px-2.5 py-1 rounded-md font-mono text-xs transition cursor-pointer">
+                      [class]="doorThickness() === 15 ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                      class="px-2.5 py-1 rounded-md font-mono tabular-nums text-xs transition cursor-pointer border">
                       15 mm
                     </button>
                     <button
                       type="button"
                       (click)="doorThickness.set(18)"
-                      [class]="doorThickness() === 18 ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                      class="px-2.5 py-1 rounded-md font-mono text-xs transition cursor-pointer">
+                      [class]="doorThickness() === 18 ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                      class="px-2.5 py-1 rounded-md font-mono tabular-nums text-xs transition cursor-pointer border">
                       18 mm
                     </button>
                   </div>
@@ -539,10 +539,10 @@
 
             <!-- 4. Manijas y Tiradores (visible si tiene puerta) -->
             @if (doorOpening() !== 'none') {
-              <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+              <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.knob" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                  <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.knob" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                     <span>Manijas y Tiradores</span>
                   </span>
 
@@ -553,8 +553,8 @@
                       [checked]="hasHandle()"
                       (change)="hasHandle.set($any($event.target).checked)"
                       class="sr-only peer" />
-                    <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                    <span class="ml-2 text-xs font-semibold text-slate-700">
+                    <div class="w-9 h-5 bg-zinc-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900"></div>
+                    <span class="ml-2 text-xs font-semibold text-zinc-700">
                       {{ hasHandle() ? 'Con Manija' : 'Sin Manija (Push)' }}
                     </span>
                   </label>
@@ -565,11 +565,11 @@
 
                     <!-- Tipo de Manija -->
                     <div>
-                      <span class="block text-[11px] font-bold text-slate-700 mb-1">Modelo de Manija:</span>
+                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Modelo de Manija:</span>
                       <select
                         [value]="handleType()"
                         (change)="handleType.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden">
                         <option value="bar_modern">Barra Tubular Moderna</option>
                         <option value="bar_black">Perfil Negro Minimalista</option>
                         <option value="knob_round">Tirador Botón Redondo</option>
@@ -580,11 +580,11 @@
 
                     <!-- Acabado / Color Manija -->
                     <div>
-                      <span class="block text-[11px] font-bold text-slate-700 mb-1">Acabado:</span>
+                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Acabado:</span>
                       <select
                         [value]="handleFinish()"
                         (change)="handleFinish.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden">
                         <option value="brushed_steel">Acero Inox Cepillado</option>
                         <option value="black">Negro Mate</option>
                         <option value="gold">Dorado / Oro Satinado</option>
@@ -595,11 +595,11 @@
 
                     <!-- Posición -->
                     <div>
-                      <span class="block text-[11px] font-bold text-slate-700 mb-1">Orientación:</span>
+                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Orientación:</span>
                       <select
                         [value]="handlePosition()"
                         (change)="handlePosition.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden">
+                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden">
                         <option value="vertical">Vertical</option>
                         <option value="horizontal">Horizontal</option>
                         <option value="centered">Centrado</option>
@@ -611,30 +611,30 @@
             }
 
             <!-- 5. Entrepaños y Repisas (Uniforme vs Manual) -->
-            <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
+            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.tableRows" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.tableRows" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                   <span>Entrepaños / Repisas</span>
                 </span>
 
                 <!-- Stepper de cantidad -->
-                <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-1.5 bg-zinc-100 p-0.5 rounded-md border border-zinc-200">
                   <button
                     type="button"
                     (click)="setShelvesCount(shelvesCount() - 1)"
                     [disabled]="shelvesCount() <= 0"
-                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
+                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-zinc-200 text-zinc-700 disabled:opacity-40 transition cursor-pointer font-bold border border-zinc-200">
                     -
                   </button>
-                  <span class="text-xs font-mono font-bold px-2 text-slate-900">
+                  <span class="text-xs font-mono tabular-nums font-semibold px-2 text-zinc-900">
                     {{ shelvesCount() }} {{ shelvesCount() === 1 ? 'entrepaño' : 'entrepaños' }}
                   </span>
                   <button
                     type="button"
                     (click)="setShelvesCount(shelvesCount() + 1)"
                     [disabled]="shelvesCount() >= 8"
-                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-slate-200 text-slate-700 disabled:opacity-40 transition cursor-pointer font-bold">
+                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-zinc-200 text-zinc-700 disabled:opacity-40 transition cursor-pointer font-bold border border-zinc-200">
                     +
                   </button>
                 </div>
@@ -643,12 +643,12 @@
               @if (shelvesCount() > 0) {
                 <!-- Selector Distribución: Uniforme vs Manual -->
                 <div class="flex items-center gap-2 pt-1">
-                  <span class="text-xs text-slate-500 font-medium">Distribución:</span>
-                  <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs">
+                  <span class="text-xs text-zinc-500 font-medium">Distribución:</span>
+                  <div class="flex items-center p-0.5 bg-zinc-100 rounded-md border border-zinc-200 text-xs">
                     <button
                       type="button"
                       (click)="setShelfDistribution('uniform')"
-                      [class]="shelfDistribution() === 'uniform' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                      [class]="shelfDistribution() === 'uniform' ? 'bg-zinc-900 text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
                       class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
                       <hugeicons-icon [icon]="icons.equalizer" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                       <span>Uniforme Automática</span>
@@ -656,7 +656,7 @@
                     <button
                       type="button"
                       (click)="setShelfDistribution('manual')"
-                      [class]="shelfDistribution() === 'manual' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                      [class]="shelfDistribution() === 'manual' ? 'bg-zinc-900 text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
                       class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
                       <hugeicons-icon [icon]="icons.editAttributes" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                       <span>Ajuste Manual</span>
@@ -666,25 +666,25 @@
 
                 <!-- Detalle de distribución -->
                 @if (shelfDistribution() === 'uniform') {
-                  <div class="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 text-[11px] text-indigo-900 flex items-center justify-between">
+                  <div class="p-2.5 rounded-md bg-zinc-50 border border-zinc-200 text-[11px] text-zinc-800 flex items-center justify-between">
                     <div class="flex items-center gap-1.5 font-medium">
-                      <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+                      <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                       <span>Luz libre uniforme entre cada nivel:</span>
                     </div>
-                    <strong class="font-mono text-indigo-700 font-bold text-xs">
+                    <strong class="font-mono tabular-nums text-zinc-900 font-bold text-xs">
                       {{ uniformShelfGap() }} mm
                     </strong>
                   </div>
                 } @else {
                   <!-- Modo Manual: Inputs de cota por cada entrepaño -->
-                  <div class="space-y-2 pt-1 border-t border-slate-100">
-                    <span class="text-[11px] text-slate-500 font-medium block">
+                  <div class="space-y-2 pt-1 border-t border-zinc-100">
+                    <span class="text-[11px] text-zinc-500 font-medium block">
                       Indica la cota exacta (altura en mm desde la base interior del mueble):
                     </span>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       @for (s of effectiveShelvesList(); track s.index) {
-                        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
-                          <span class="text-xs font-bold text-slate-700">Entrepaño {{ s.index }}:</span>
+                        <div class="flex items-center justify-between p-2 rounded-md bg-zinc-50 border border-zinc-200">
+                          <span class="text-xs font-semibold text-zinc-700">Entrepaño {{ s.index }}:</span>
                           <div class="relative w-24">
                             <input
                               type="number"
@@ -693,8 +693,8 @@
                               min="30"
                               [max]="innerHeight() - 30"
                               step="5"
-                              class="w-full pr-6 pl-2 py-1 text-xs font-mono font-bold bg-white border border-slate-200 rounded text-right focus:border-indigo-500 focus:outline-hidden" />
-                            <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">mm</span>
+                              class="w-full pr-6 pl-2 py-1 text-xs font-mono tabular-nums font-bold bg-white border border-zinc-200 rounded text-right focus:border-zinc-900 focus:outline-hidden" />
+                            <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400 font-mono">mm</span>
                           </div>
                         </div>
                       }
@@ -706,10 +706,10 @@
           }
 
             <!-- 6. Fondo Trasero MDF 3mm -->
-            <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs flex items-center justify-between">
+            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs flex items-center justify-between">
               <div>
-                <span class="text-xs font-bold text-slate-800 block">Fondo Trasero (MDF 3mm)</span>
-                <span class="text-[11px] text-slate-500">Panel posterior para cuadratura y rigidez</span>
+                <span class="text-xs font-semibold text-zinc-800 block">Fondo Trasero (MDF 3mm)</span>
+                <span class="text-[11px] text-zinc-500">Panel posterior para cuadratura y rigidez</span>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input
@@ -717,23 +717,23 @@
                   [checked]="hasBackPanel()"
                   (change)="hasBackPanel.set($any($event.target).checked)"
                   class="sr-only peer" />
-                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                <span class="ml-2 text-xs font-semibold text-slate-700">
+                <div class="w-9 h-5 bg-zinc-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900"></div>
+                <span class="ml-2 text-xs font-semibold text-zinc-700">
                   {{ hasBackPanel() ? 'Con Fondo' : 'Sin Fondo' }}
                 </span>
               </label>
             </div>
 
             <!-- 7. Materiales & Acabados Iniciales -->
-            <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.palette" [size]="14" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                <hugeicons-icon [icon]="icons.palette" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                 <span>Material / Color Inicial</span>
               </span>
 
               <!-- Selector Material Estructura -->
               <div>
-                <span class="block text-[11px] font-bold text-slate-700 mb-1.5">
+                <span class="block text-[11px] font-semibold text-zinc-700 mb-1.5">
                   Material de la Estructura (Laterales, Piso, Techo, Repisas):
                 </span>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -741,14 +741,14 @@
                     <button
                       type="button"
                       (click)="structureMaterialId.set(mat.id)"
-                      [class]="selectedStructureMat()?.id === mat.id ? 'bg-indigo-50 border-indigo-500 text-indigo-950 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                      class="p-2 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer min-w-0">
+                      [class]="selectedStructureMat()?.id === mat.id ? 'bg-white border-zinc-900 text-zinc-950 ring-1 ring-zinc-900/20 shadow-xs' : 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-white'"
+                      class="p-2 rounded-md border text-left flex items-center gap-2 transition cursor-pointer min-w-0">
                       <span
-                        class="w-5 h-5 rounded-md border border-black/10 shrink-0 shadow-2xs"
+                        class="w-5 h-5 rounded border border-black/10 shrink-0 shadow-2xs"
                         [style.background-color]="mat.colorHex || '#f1f5f9'"></span>
                       <div class="min-w-0">
-                        <span class="text-xs font-bold block truncate">{{ mat.name }}</span>
-                        <span class="text-[10px] text-slate-400 font-mono">{{ mat.thickness }} mm</span>
+                        <span class="text-xs font-semibold block truncate">{{ mat.name }}</span>
+                        <span class="text-[10px] text-zinc-400 font-mono tabular-nums">{{ mat.thickness }} mm</span>
                       </div>
                     </button>
                   }
@@ -757,17 +757,17 @@
 
               <!-- Material Puerta / Frente -->
               @if (activePreset() === 'drawers' || doorOpening() !== 'none') {
-                <div class="pt-2 border-t border-slate-100 space-y-2">
+                <div class="pt-2 border-t border-zinc-100 space-y-2">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-700">
+                    <span class="text-xs font-semibold text-zinc-700">
                       {{ activePreset() === 'drawers' ? 'Material de los Frentes de Cajón:' : 'Material de las Puertas:' }}
                     </span>
-                    <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
+                    <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-600">
                       <input
                         type="checkbox"
                         [checked]="useSameMaterialForDoors()"
                         (change)="useSameMaterialForDoors.set($any($event.target).checked)"
-                        class="rounded text-indigo-600 focus:ring-0" />
+                        class="rounded text-zinc-900 accent-zinc-900 focus:ring-0" />
                       <span>Mismo que estructura</span>
                     </label>
                   </div>
@@ -778,14 +778,14 @@
                         <button
                           type="button"
                           (click)="doorMaterialId.set(mat.id)"
-                          [class]="selectedDoorMat()?.id === mat.id ? 'bg-indigo-50 border-indigo-500 text-indigo-950 ring-2 ring-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                          class="p-2 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer min-w-0">
+                          [class]="selectedDoorMat()?.id === mat.id ? 'bg-white border-zinc-900 text-zinc-950 ring-1 ring-zinc-900/20 shadow-xs' : 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-white'"
+                          class="p-2 rounded-md border text-left flex items-center gap-2 transition cursor-pointer min-w-0">
                           <span
-                            class="w-5 h-5 rounded-md border border-black/10 shrink-0 shadow-2xs"
+                            class="w-5 h-5 rounded border border-black/10 shrink-0 shadow-2xs"
                             [style.background-color]="mat.colorHex || '#f1f5f9'"></span>
                           <div class="min-w-0">
-                            <span class="text-xs font-bold block truncate">{{ mat.name }}</span>
-                            <span class="text-[10px] text-slate-400 font-mono">{{ mat.thickness }} mm</span>
+                            <span class="text-xs font-semibold block truncate">{{ mat.name }}</span>
+                            <span class="text-[10px] text-zinc-400 font-mono tabular-nums">{{ mat.thickness }} mm</span>
                           </div>
                         </button>
                       }
@@ -800,20 +800,20 @@
           <div class="lg:col-span-5 flex flex-col gap-4">
 
             <!-- TARJETA BLUEPRINT SVG TÉCNICO INTERACTIVO -->
-            <div class="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs flex flex-col items-center">
+            <div class="p-4 rounded-md border border-zinc-200/90 bg-white shadow-2xs flex flex-col items-center">
 
               <div class="w-full flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.compass" [size]="13" [strokeWidth]="2" class="text-indigo-500 shrink-0"></hugeicons-icon>
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                  <hugeicons-icon [icon]="icons.compass" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                   <span>Alzado Técnico de Fachada</span>
                 </span>
-                <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <span class="text-[10px] font-mono tabular-nums font-medium px-1.5 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
                   Escala Dinámica
                 </span>
               </div>
 
               <!-- Canvas Blueprint Técnico SVG -->
-              <div class="w-full h-64 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-center p-3 relative overflow-hidden shadow-inner">
+              <div class="w-full h-64 bg-zinc-50 rounded-md border border-zinc-200 flex items-center justify-center p-3 relative overflow-hidden shadow-inner">
                 <svg
                   viewBox="0 0 200 240"
                   class="w-full h-full max-h-60 drop-shadow-xs"
@@ -834,8 +834,8 @@
                         [attr.y]="box.y"
                         width="146"
                         [attr.height]="box.height"
-                        fill="rgba(99, 102, 241, 0.08)"
-                        stroke="#4f46e5"
+                        fill="rgba(24, 24, 27, 0.04)"
+                        stroke="#18181b"
                         stroke-width="1.8"
                         rx="1" />
                       <!-- Tirador Centrado Horizontal -->
@@ -845,12 +845,12 @@
                           [attr.y]="box.handleY"
                           width="36"
                           height="4"
-                          fill="#1e293b"
+                          fill="#18181b"
                           rx="1" />
                       }
                       <!-- Correderas Laterales Guía -->
-                      <line x1="28" [attr.y1]="box.y + (box.height / 2)" x2="33" [attr.y2]="box.y + (box.height / 2)" stroke="#0284c7" stroke-width="2" />
-                      <line x1="167" [attr.y1]="box.y + (box.height / 2)" x2="172" [attr.y2]="box.y + (box.height / 2)" stroke="#0284c7" stroke-width="2" />
+                      <line x1="28" [attr.y1]="box.y + (box.height / 2)" x2="33" [attr.y2]="box.y + (box.height / 2)" stroke="#52525b" stroke-width="2" />
+                      <line x1="167" [attr.y1]="box.y + (box.height / 2)" x2="172" [attr.y2]="box.y + (box.height / 2)" stroke="#52525b" stroke-width="2" />
                     }
                     <!-- Zócalo si está activo -->
                     @if (hasPlinth()) {
@@ -867,119 +867,119 @@
                     <!-- Fachada / Puertas -->
                     @if (doorOpening() === 'left') {
                       <!-- 1 Puerta completa (Abre Izq) -->
-                      <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <rect x="27" y="22" width="146" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
                       <!-- Líneas punteadas de abatimiento (Vértice en la derecha) -->
-                      <line x1="27" y1="22" x2="173" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                      <line x1="27" y1="218" x2="173" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="27" y1="22" x2="173" y2="120" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="27" y1="218" x2="173" y2="120" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
                       <!-- Bisagras a la izquierda -->
-                      <rect x="23" y="38" width="4" height="14" fill="#0284c7" rx="1" />
-                      <rect x="23" y="188" width="4" height="14" fill="#0284c7" rx="1" />
+                      <rect x="23" y="38" width="4" height="14" fill="#52525b" rx="1" />
+                      <rect x="23" y="188" width="4" height="14" fill="#52525b" rx="1" />
                       <!-- Manija a la derecha -->
                       @if (hasHandle()) {
-                        <rect x="162" y="105" width="4" height="28" fill="#1e293b" rx="1" />
+                        <rect x="162" y="105" width="4" height="28" fill="#18181b" rx="1" />
                       }
                     } @else if (doorOpening() === 'right') {
                       <!-- 1 Puerta completa (Abre Der) -->
-                      <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <rect x="27" y="22" width="146" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
                       <!-- Líneas punteadas de abatimiento (Vértice en la izquierda) -->
-                      <line x1="173" y1="22" x2="27" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                      <line x1="173" y1="218" x2="27" y2="120" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="173" y1="22" x2="27" y2="120" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="173" y1="218" x2="27" y2="120" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
                       <!-- Bisagras a la derecha -->
-                      <rect x="173" y="38" width="4" height="14" fill="#0284c7" rx="1" />
-                      <rect x="173" y="188" width="4" height="14" fill="#0284c7" rx="1" />
+                      <rect x="173" y="38" width="4" height="14" fill="#52525b" rx="1" />
+                      <rect x="173" y="188" width="4" height="14" fill="#52525b" rx="1" />
                       <!-- Manija a la izquierda -->
                       @if (hasHandle()) {
-                        <rect x="34" y="105" width="4" height="28" fill="#1e293b" rx="1" />
+                        <rect x="34" y="105" width="4" height="28" fill="#18181b" rx="1" />
                       }
                     } @else if (doorOpening() === 'double') {
                       <!-- 2 Puertas Dobles (Puerta Izquierda y Derecha) -->
-                      <rect x="27" y="22" width="71" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                      <rect x="102" y="22" width="71" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
+                      <rect x="27" y="22" width="71" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
+                      <rect x="102" y="22" width="71" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
                       <!-- Abatimiento puerta izq -->
-                      <line x1="27" y1="22" x2="98" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                      <line x1="27" y1="218" x2="98" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <line x1="27" y1="22" x2="98" y2="120" stroke="#18181b" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <line x1="27" y1="218" x2="98" y2="120" stroke="#18181b" stroke-dasharray="3 2" stroke-width="1.2" />
                       <!-- Abatimiento puerta der -->
-                      <line x1="173" y1="22" x2="102" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
-                      <line x1="173" y1="218" x2="102" y2="120" stroke="#4f46e5" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <line x1="173" y1="22" x2="102" y2="120" stroke="#18181b" stroke-dasharray="3 2" stroke-width="1.2" />
+                      <line x1="173" y1="218" x2="102" y2="120" stroke="#18181b" stroke-dasharray="3 2" stroke-width="1.2" />
                       <!-- Manijas en el centro -->
                       @if (hasHandle()) {
-                        <rect x="91" y="105" width="3" height="26" fill="#1e293b" rx="1" />
-                        <rect x="106" y="105" width="3" height="26" fill="#1e293b" rx="1" />
+                        <rect x="91" y="105" width="3" height="26" fill="#18181b" rx="1" />
+                        <rect x="106" y="105" width="3" height="26" fill="#18181b" rx="1" />
                       }
                     } @else if (doorOpening() === 'top') {
                       <!-- 1 Puerta Elevable Superior -->
-                      <rect x="27" y="22" width="146" height="196" fill="rgba(99, 102, 241, 0.08)" stroke="#4f46e5" stroke-width="1.8" rx="1" />
-                      <line x1="27" y1="22" x2="100" y2="218" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
-                      <line x1="173" y1="22" x2="100" y2="218" stroke="#4f46e5" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <rect x="27" y="22" width="146" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
+                      <line x1="27" y1="22" x2="100" y2="218" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
+                      <line x1="173" y1="22" x2="100" y2="218" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
                       @if (hasHandle()) {
-                        <rect x="85" y="206" width="30" height="4" fill="#1e293b" rx="1" />
+                        <rect x="85" y="206" width="30" height="4" fill="#18181b" rx="1" />
                       }
                     }
                   }
 
                   <!-- Cotas Técnicas (X y Z) -->
-                  <text x="100" y="13" font-size="9" font-family="monospace" font-weight="bold" fill="#e11d48" text-anchor="middle">
+                  <text x="100" y="13" font-size="9" font-family="monospace" font-weight="bold" fill="#18181b" text-anchor="middle">
                     {{ width() }} mm
                   </text>
-                  <text x="12" y="120" font-size="9" font-family="monospace" font-weight="bold" fill="#0284c7" text-anchor="middle" transform="rotate(-90 12 120)">
+                  <text x="12" y="120" font-size="9" font-family="monospace" font-weight="bold" fill="#52525b" text-anchor="middle" transform="rotate(-90 12 120)">
                     {{ height() }} mm
                   </text>
                 </svg>
               </div>
 
               <!-- Resumen constructivo milimétrico -->
-              <div class="w-full mt-3 grid grid-cols-2 gap-2 text-[11px] font-mono">
-                <div class="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                  <span class="text-slate-400 block font-sans text-[10px]">Luz Interior:</span>
-                  <strong class="text-slate-800 font-bold">{{ innerWidth() }} × {{ innerHeight() }} × {{ innerDepth() }} mm</strong>
+              <div class="w-full mt-3 grid grid-cols-2 gap-2 text-[11px] font-mono tabular-nums">
+                <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200">
+                  <span class="text-zinc-500 block font-sans text-[10px]">Luz Interior:</span>
+                  <strong class="text-zinc-800 font-semibold">{{ innerWidth() }} × {{ innerHeight() }} × {{ innerDepth() }} mm</strong>
                 </div>
-                <div class="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200">
                   @if (activePreset() === 'drawers') {
-                    <span class="text-slate-400 block font-sans text-[10px]">Frentes de Cajón:</span>
-                    <strong class="text-indigo-600 font-bold">
+                    <span class="text-zinc-500 block font-sans text-[10px]">Frentes de Cajón:</span>
+                    <strong class="text-zinc-900 font-semibold">
                       {{ drawerFrontWidth() }} × {{ drawerFrontHeight() }} mm (×{{ drawersCount() }})
                     </strong>
                   } @else if (doorOpening() !== 'none') {
-                    <span class="text-slate-400 block font-sans text-[10px]">Corte Puerta(s):</span>
-                    <strong class="text-indigo-600 font-bold">
+                    <span class="text-zinc-500 block font-sans text-[10px]">Corte Puerta(s):</span>
+                    <strong class="text-zinc-900 font-semibold">
                       {{ doorCutWidth() }} × {{ doorCutHeight() }} mm
                       @if (doorOpening() === 'double') {
                         <span>(×2)</span>
                       }
                     </strong>
                   } @else {
-                    <span class="text-slate-400 block font-sans text-[10px]">Corte Puerta(s):</span>
-                    <strong class="text-slate-400 font-bold">Sin puertas</strong>
+                    <span class="text-zinc-400 block font-sans text-[10px]">Corte Puerta(s):</span>
+                    <strong class="text-zinc-400 font-normal">Sin puertas</strong>
                   }
                 </div>
               </div>
 
               @if (activePreset() === 'drawers') {
-                <div class="w-full mt-2 p-2 rounded-lg bg-indigo-50/70 border border-indigo-100 flex items-center justify-between text-[11px] font-mono">
-                  <span class="text-indigo-700 font-sans text-[10px] font-bold">Correderas:</span>
-                  <strong class="text-indigo-900 font-bold">{{ recommendedSlideLength() }} mm ({{ drawerSlideType() === 'soft_close' ? 'Cierre Suave' : drawerSlideType() === 'undermount' ? 'Oculta' : 'Telescópica' }})</strong>
+                <div class="w-full mt-2 p-2 rounded-md bg-zinc-50 border border-zinc-200 flex items-center justify-between text-[11px] font-mono tabular-nums">
+                  <span class="text-zinc-600 font-sans text-[10px] font-semibold">Correderas:</span>
+                  <strong class="text-zinc-900 font-semibold">{{ recommendedSlideLength() }} mm ({{ drawerSlideType() === 'soft_close' ? 'Cierre Suave' : drawerSlideType() === 'undermount' ? 'Oculta' : 'Telescópica' }})</strong>
                 </div>
               }
             </div>
 
             <!-- TARJETA INFORMATIVA DE EDICIÓN POSTERIOR -->
-            <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 flex items-start gap-2.5">
+            <div class="p-3.5 rounded-md bg-amber-50/70 border border-amber-300/80 text-xs text-amber-950 flex items-start gap-2.5">
               <hugeicons-icon [icon]="icons.lightbulb" [size]="16" [strokeWidth]="2" class="text-amber-600 shrink-0 mt-0.5"></hugeicons-icon>
               <div>
                 <strong class="font-bold text-amber-950 block">Edición post-creación:</strong>
-                <p class="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
+                <p class="text-zinc-600 text-[11px] mt-0.5 leading-relaxed">
                   Al pulsar "Crear Módulo", todas las piezas se insertarán en 3D ensambladas y agrupadas. Podrás cambiar el material o color del mueble completo o de piezas individuales en cualquier momento desde el inspector.
                 </p>
               </div>
             </div>
 
             <!-- Resumen de piezas generadas -->
-            <div class="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-xs font-semibold text-slate-700">
+            <div class="p-3 rounded-md border border-zinc-200 bg-white flex items-center justify-between text-xs font-semibold text-zinc-700">
               <div class="flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.cube3d" [size]="15" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.cube3d" [size]="15" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                 <span>Piezas listas para despiece:</span>
               </div>
-              <span class="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+              <span class="font-mono tabular-nums font-semibold text-zinc-800 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md">
                 {{ totalPartsCount() }} piezas ensambladas
               </span>
             </div>
@@ -987,31 +987,31 @@
         </div>
 
         <!-- PIE DE MODAL (ACCIONES CLARAS) -->
-        <div class="px-5 sm:px-6 py-3.5 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+        <div class="px-5 sm:px-6 py-3.5 border-t border-zinc-200 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
 
           <!-- Selector de Modo o Indicador de Edición -->
           @if (!editingGroupId()) {
             <div class="flex items-center gap-2 text-xs">
-              <span class="text-slate-500 font-medium">Modo de inserción:</span>
-              <div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+              <span class="text-zinc-500 font-medium">Modo de inserción:</span>
+              <div class="flex items-center p-0.5 bg-zinc-100 rounded-md border border-zinc-200">
                 <button
                   type="button"
                   (click)="creationMode.set('append')"
-                  [class]="creationMode() === 'append' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                  [class]="creationMode() === 'append' ? 'bg-zinc-900 text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
                   class="px-2.5 py-1 rounded-md transition cursor-pointer">
                   Añadir al taller
                 </button>
                 <button
                   type="button"
                   (click)="creationMode.set('replace')"
-                  [class]="creationMode() === 'replace' ? 'bg-white text-rose-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                  [class]="creationMode() === 'replace' ? 'bg-zinc-900 text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
                   class="px-2.5 py-1 rounded-md transition cursor-pointer">
                   Reemplazar actual
                 </button>
               </div>
             </div>
           } @else {
-            <div class="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
+            <div class="flex items-center gap-1.5 text-xs text-amber-800 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-300">
               <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
               <span>Actualizando módulo en su posición 3D actual.</span>
             </div>
@@ -1022,13 +1022,13 @@
             <button
               type="button"
               (click)="close()"
-              class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+              class="px-4 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-100 border border-zinc-200 rounded-md transition cursor-pointer">
               Cancelar
             </button>
             <button
               type="button"
               (click)="onSubmitAssistant()"
-              class="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl shadow-md shadow-indigo-600/20 flex items-center gap-2 transition cursor-pointer">
+              class="px-5 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-md shadow-xs flex items-center gap-2 transition cursor-pointer">
               <hugeicons-icon [icon]="editingGroupId() ? icons.checkCircle : icons.cube3d" [size]="15" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
               <span>{{ editingGroupId() ? 'Guardar Cambios del Módulo' : 'Crear Módulo en 3D' }}</span>
             </button>
@@ -1039,14 +1039,14 @@
         <!-- ========================================== -->
         <!-- VISTA 2: CATÁLOGO DE PLANTILLAS PREDISEÑADAS -->
         <!-- ========================================== -->
-        <div class="px-5 sm:px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shrink-0">
+        <div class="px-5 sm:px-6 py-2.5 border-b border-zinc-200 bg-zinc-50 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shrink-0">
 
           <!-- Categorías Tabs con Botones de Navegación Compactos -->
           <div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
             <button
               type="button"
               (click)="scrollCategories('left')"
-              class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 bg-white hover:bg-slate-200 border border-slate-200 transition shrink-0 cursor-pointer"
+              class="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-zinc-900 bg-white hover:bg-zinc-100 border border-zinc-200 transition shrink-0 cursor-pointer"
               title="Desplazar a la izquierda">
               <hugeicons-icon [icon]="icons.chevronLeft" [size]="14" [strokeWidth]="2"></hugeicons-icon>
             </button>
@@ -1060,13 +1060,13 @@
                   type="button"
                   (click)="selectCategory(cat.id)"
                   [class]="activeCategory() === cat.id
-                    ? 'bg-indigo-600 text-white font-bold shadow-xs'
-                    : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-medium'"
-                  class="px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer">
+                    ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                    : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                  class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border">
                   <hugeicons-icon [icon]="getCatalogIcon(cat.icon)" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                   <span>{{ cat.label }}</span>
-                  <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold"
-                    [class]="activeCategory() === cat.id ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-600'">
+                  <span class="text-[10px] px-1.5 py-0.2 rounded font-mono tabular-nums font-medium"
+                    [class]="activeCategory() === cat.id ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600'">
                     {{ cat.count }}
                   </span>
                 </button>
@@ -1076,7 +1076,7 @@
             <button
               type="button"
               (click)="scrollCategories('right')"
-              class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 bg-white hover:bg-slate-200 border border-slate-200 transition shrink-0 cursor-pointer"
+              class="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-zinc-900 bg-white hover:bg-zinc-100 border border-zinc-200 transition shrink-0 cursor-pointer"
               title="Desplazar a la derecha">
               <hugeicons-icon [icon]="icons.chevronRight" [size]="14" [strokeWidth]="2"></hugeicons-icon>
             </button>
@@ -1084,19 +1084,19 @@
 
           <!-- Buscador Limpio -->
           <div class="relative w-full md:w-60 shrink-0">
-            <hugeicons-icon [icon]="icons.search" [size]="15" [strokeWidth]="2" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></hugeicons-icon>
+            <hugeicons-icon [icon]="icons.search" [size]="15" [strokeWidth]="2" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"></hugeicons-icon>
             <input
               type="text"
               [value]="searchQuery()"
               (input)="searchQuery.set($any($event.target).value)"
               placeholder="Filtrar plantilla..."
               autocomplete="off"
-              class="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-lg outline-hidden text-slate-900 font-medium placeholder:text-slate-400 transition" />
+              class="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-zinc-200 focus:border-zinc-900 rounded-md outline-hidden text-zinc-900 font-medium placeholder:text-zinc-400 transition" />
             @if (searchQuery()) {
               <button
                 type="button"
                 (click)="searchQuery.set('')"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition cursor-pointer flex items-center justify-center"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition cursor-pointer flex items-center justify-center"
                 title="Borrar búsqueda">
                 <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
               </button>
@@ -1105,78 +1105,78 @@
         </div>
 
         <!-- GRID DE PLANTILLAS -->
-        <div class="flex-1 overflow-y-auto p-5 sm:p-6 min-h-0 bg-slate-50/50 scrollbar-thin">
+        <div class="flex-1 overflow-y-auto p-5 sm:p-6 min-h-0 bg-zinc-50/50 scrollbar-thin">
           @if (filteredTemplates().length === 0) {
-            <div class="p-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-              <hugeicons-icon [icon]="icons.search" [size]="34" [strokeWidth]="1.6" class="text-slate-400"></hugeicons-icon>
-              <span class="font-bold text-slate-800 text-sm">No se encontraron plantillas</span>
-              <span class="text-slate-500">Prueba cambiando el término de búsqueda o selecciona otra categoría.</span>
+            <div class="p-12 text-center text-xs text-zinc-500 flex flex-col items-center gap-2">
+              <hugeicons-icon [icon]="icons.search" [size]="34" [strokeWidth]="1.6" class="text-zinc-400"></hugeicons-icon>
+              <span class="font-bold text-zinc-800 text-sm">No se encontraron plantillas</span>
+              <span class="text-zinc-500">Prueba cambiando el término de búsqueda o selecciona otra categoría.</span>
               <button
                 type="button"
                 (click)="searchQuery.set(''); activeCategory.set('all')"
-                class="mt-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs transition cursor-pointer">
+                class="mt-2 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-md text-xs transition cursor-pointer">
                 Ver todas las plantillas
               </button>
             </div>
           } @else {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               @for (tpl of filteredTemplates(); track tpl.id) {
-                <div class="rounded-xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md flex flex-col justify-between transition-all duration-150 overflow-hidden group">
+                <div class="rounded-md border border-zinc-200 bg-white hover:border-zinc-400 hover:shadow-md flex flex-col justify-between transition-all duration-150 overflow-hidden group">
 
                   <div class="p-4 flex flex-col flex-1">
                     <div class="flex items-start justify-between gap-3 mb-2">
                       <div class="flex items-center gap-2.5 min-w-0">
-                        <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-slate-200 bg-slate-50 text-indigo-600 transition-transform group-hover:scale-105">
-                          <hugeicons-icon [icon]="getCatalogIcon(tpl.icon || 'kitchen')" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
+                        <div class="w-9 h-9 rounded-md flex items-center justify-center shrink-0 border border-zinc-200 bg-zinc-50 text-zinc-700 transition-transform group-hover:scale-105">
+                          <hugeicons-icon [icon]="getCatalogIcon(tpl.icon || 'kitchen')" [size]="18" [strokeWidth]="1.8"></hugeicons-icon>
                         </div>
                         <div class="min-w-0">
-                          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                          <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">
                             {{ tpl.categoryLabel }}
                           </span>
-                          <h3 class="text-sm font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors leading-tight truncate">
+                          <h3 class="text-sm font-bold tracking-tight text-zinc-900 group-hover:text-zinc-950 transition-colors leading-tight truncate">
                             {{ tpl.name }}
                           </h3>
                         </div>
                       </div>
-                      <span class="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full shrink-0">
+                      <span class="text-[11px] font-mono tabular-nums font-medium text-zinc-700 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shrink-0">
                         {{ tpl.partsCount }} piezas
                       </span>
                     </div>
 
-                    <p class="text-xs leading-relaxed text-slate-500 font-normal mt-1 mb-3">
+                    <p class="text-xs leading-relaxed text-zinc-500 font-normal mt-1 mb-3">
                       {{ tpl.description }}
                     </p>
 
                     <!-- Dimensiones -->
-                    <div class="mt-auto flex items-center justify-between text-xs font-mono px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700">
-                      <span class="font-sans text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                        <hugeicons-icon [icon]="icons.ruler" [size]="12" [strokeWidth]="2" class="text-slate-500 shrink-0"></hugeicons-icon>
+                    <div class="mt-auto flex items-center justify-between text-xs font-mono tabular-nums px-2.5 py-1.5 rounded-md border border-zinc-200 bg-zinc-50 text-zinc-700">
+                      <span class="font-sans text-[11px] font-medium text-zinc-400 flex items-center gap-1">
+                        <hugeicons-icon [icon]="icons.ruler" [size]="12" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                         <span>Medidas:</span>
                       </span>
-                      <div class="flex items-center gap-1 font-bold text-slate-900">
+                      <div class="flex items-center gap-1 font-bold text-zinc-900">
                         <span>{{ tpl.dimensions.width }}</span>
-                        <span class="text-slate-400 text-[10px]">×</span>
+                        <span class="text-zinc-400 text-[10px]">×</span>
                         <span>{{ tpl.dimensions.height }}</span>
-                        <span class="text-slate-400 text-[10px]">×</span>
+                        <span class="text-zinc-400 text-[10px]">×</span>
                         <span>{{ tpl.dimensions.depth }}</span>
-                        <span class="text-[10px] text-slate-400 font-normal">mm</span>
+                        <span class="text-[10px] text-zinc-400 font-normal">mm</span>
                       </div>
                     </div>
                   </div>
 
                   <!-- Acciones de tarjeta -->
-                  <div class="px-4 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-2">
+                  <div class="px-4 py-3 border-t border-zinc-100 bg-zinc-50/60 flex items-center justify-end gap-2">
                     <button
                       type="button"
                       (click)="onSelectTemplate(tpl, 'append')"
-                      class="py-1.5 px-3 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg flex items-center gap-1.5 transition cursor-pointer">
+                      class="py-1.5 px-3 text-xs font-medium bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-md flex items-center gap-1.5 transition cursor-pointer">
                       <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.2" class="shrink-0"></hugeicons-icon>
                       <span>Añadir</span>
                     </button>
                     <button
                       type="button"
                       (click)="onSelectTemplate(tpl, 'replace')"
-                      class="py-1.5 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
+                      class="py-1.5 px-3 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
                       <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                       <span>Cargar en 3D</span>
                     </button>
@@ -1188,18 +1188,18 @@
         </div>
 
         <!-- PIE DE CATÁLOGO -->
-        <div class="px-5 sm:px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-between shrink-0">
+        <div class="px-5 sm:px-6 py-3 border-t border-zinc-200 bg-white flex items-center justify-between shrink-0">
           <button
             type="button"
             (click)="onStartBlank()"
-            class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg flex items-center gap-1.5 transition cursor-pointer">
-            <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="1.9" class="text-slate-400 shrink-0"></hugeicons-icon>
+            class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-md flex items-center gap-1.5 transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="1.9" class="text-zinc-400 shrink-0"></hugeicons-icon>
             <span>Lienzo en Blanco</span>
           </button>
           <button
             type="button"
             (click)="activeView.set('assistant')"
-            class="px-4 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition cursor-pointer flex items-center gap-1.5">
+            class="px-4 py-1.5 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition cursor-pointer flex items-center gap-1.5 shadow-xs">
             <hugeicons-icon [icon]="icons.magicWand" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
             <span>Volver al Asistente Paramétrico</span>
           </button>

@@ -1,6 +1,6 @@
 @if (isOpen()) {
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in-50"
+    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-50"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -15,28 +15,25 @@
 
     <!-- Contenedor principal de la ventana modal -->
     <div
-      class="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border font-sans transition-all animate-in zoom-in-95"
-      [class]="themeService.isClassic() ? 'bg-white border-slate-200 text-slate-800' : 'bg-zinc-900 border-zinc-800 text-zinc-100'">
+      class="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-lg shadow-2xl overflow-hidden border border-zinc-200/90 bg-white text-zinc-900 font-sans transition-all animate-in zoom-in-95">
 
       <!-- CABECERA DEL MODAL -->
-      <div
-        class="flex items-center justify-between px-5 py-3.5 border-b shrink-0"
-        [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200' : 'bg-zinc-950/80 border-zinc-800'">
+      <div class="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200 bg-[#F4F4F6] shrink-0">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0 shadow-2xs">
-            <hugeicons-icon [icon]="icons.note" [size]="22" [strokeWidth]="1.9"></hugeicons-icon>
+          <div class="w-9 h-9 rounded-md bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-700 shrink-0 shadow-2xs">
+            <hugeicons-icon [icon]="icons.note" [size]="20" [strokeWidth]="1.9"></hugeicons-icon>
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h2 class="text-base font-black tracking-tight" [class]="themeService.isClassic() ? 'text-slate-900' : 'text-white'">
+              <h2 class="text-sm font-semibold tracking-tight text-zinc-900">
                 Notas y Pendientes del Proyecto
               </h2>
-              <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-sans">
+              <span class="px-2 py-0.5 text-[10px] font-medium font-mono tabular-nums rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
                 {{ notes().length }} {{ notes().length === 1 ? 'nota' : 'notas' }}
               </span>
             </div>
-            <p class="text-xs truncate max-w-md font-medium" [class]="themeService.isClassic() ? 'text-slate-500' : 'text-zinc-400'">
-              Proyecto: <span class="font-bold" [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-200'">{{ project().name }}</span>
+            <p class="text-xs truncate max-w-md text-zinc-500">
+              Proyecto: <span class="font-medium text-zinc-700">{{ project().name }}</span>
               @if (project().clientName) {
                 <span> • {{ project().clientName }}</span>
               }
@@ -49,7 +46,7 @@
             <button
               type="button"
               (click)="openNewNoteForm()"
-              class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95">
+              class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
               <hugeicons-icon [icon]="icons.add" [size]="15" [strokeWidth]="2.2"></hugeicons-icon>
               <span>Nueva Nota</span>
             </button>
@@ -59,33 +56,29 @@
             (click)="close()"
             title="Cerrar notas"
             aria-label="Cerrar notas"
-            [class]="themeService.isClassic() ? 'p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-xl transition cursor-pointer' : 'p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition cursor-pointer'">
-            <hugeicons-icon [icon]="icons.close" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+            class="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200/60 rounded-md transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.close" [size]="18" [strokeWidth]="2"></hugeicons-icon>
           </button>
         </div>
       </div>
 
       <!-- CUERPO PRINCIPAL DEL MODAL -->
-      <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+      <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-zinc-50/50">
 
         <!-- FORMULARIO DE CREACIÓN / EDICIÓN DE NOTA CON EDITOR ESTILO WORD -->
         @if (showAddForm()) {
-          <div
-            class="p-4 sm:p-5 rounded-2xl border space-y-4 shadow-sm animate-in fade-in-50 zoom-in-95"
-            [class]="themeService.isClassic()
-              ? 'bg-gradient-to-b from-amber-50/40 via-white to-white border-amber-300/80 text-slate-800'
-              : 'bg-gradient-to-b from-amber-950/20 via-zinc-900 to-zinc-900 border-amber-600/40 text-zinc-100'">
+          <div class="p-4 sm:p-5 rounded-md border border-zinc-200/90 bg-white space-y-4 shadow-2xs">
 
             <!-- Barra superior del formulario -->
-            <div class="flex items-center justify-between border-b pb-2.5" [class]="themeService.isClassic() ? 'border-amber-200/80' : 'border-amber-800/40'">
-              <span class="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                <hugeicons-icon [icon]="editingNoteId() ? icons.edit : icons.note" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+            <div class="flex items-center justify-between border-b border-zinc-200 pb-2.5">
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-900 flex items-center gap-1.5 font-mono">
+                <hugeicons-icon [icon]="editingNoteId() ? icons.edit : icons.note" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
                 <span>{{ editingNoteId() ? 'Editar Nota' : 'Crear Nueva Nota / Pendiente' }}</span>
               </span>
               <button
                 type="button"
                 (click)="cancelForm()"
-                [class]="themeService.isClassic() ? 'text-slate-400 hover:text-slate-700 text-xs font-medium cursor-pointer' : 'text-zinc-400 hover:text-white text-xs font-medium cursor-pointer'">
+                class="text-zinc-500 hover:text-zinc-800 text-xs font-medium cursor-pointer">
                 Cancelar
               </button>
             </div>
@@ -94,7 +87,7 @@
               <!-- Fila 1: Título y Categoría -->
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="sm:col-span-2">
-                  <label for="note-title-input" [class]="themeService.isClassic() ? 'block text-xs font-bold text-slate-700 mb-1' : 'block text-xs font-bold text-zinc-200 mb-1'">
+                  <label for="note-title-input" class="block text-xs font-medium text-zinc-700 mb-1">
                     Título del Ajuste o Nota:
                   </label>
                   <input
@@ -102,21 +95,17 @@
                     type="text"
                     formControlName="title"
                     placeholder="ej. Ajustar altura de repisa central o verificar herraje"
-                    [class]="themeService.isClassic()
-                      ? 'w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 shadow-2xs'
-                      : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs font-medium text-white focus:outline-hidden focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 shadow-2xs'" />
+                    class="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:outline-hidden focus:border-zinc-500 shadow-2xs" />
                 </div>
 
                 <div>
-                  <label for="note-category-select" [class]="themeService.isClassic() ? 'block text-xs font-bold text-slate-700 mb-1' : 'block text-xs font-bold text-zinc-200 mb-1'">
+                  <label for="note-category-select" class="block text-xs font-medium text-zinc-700 mb-1">
                     Categoría:
                   </label>
                   <select
                     id="note-category-select"
                     formControlName="category"
-                    [class]="themeService.isClassic()
-                      ? 'w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 shadow-2xs'
-                      : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs font-medium text-white focus:outline-hidden focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 shadow-2xs'">
+                    class="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:outline-hidden focus:border-zinc-500 shadow-2xs cursor-pointer">
                     <option value="pending">Por Hacer / Tarea</option>
                     <option value="adjustment">Ajuste de Medidas / Pieza</option>
                     <option value="design">Cambio de Diseño CAD</option>
@@ -128,36 +117,27 @@
               <!-- Fila 2: Editor Enriquecido Estilo Word para "Detalles y Observaciones" -->
               <div>
                 <div class="flex items-center justify-between mb-1.5">
-                  <label class="text-xs font-bold flex items-center gap-1.5" [class]="themeService.isClassic() ? 'text-slate-700' : 'text-zinc-200'">
+                  <label class="text-xs font-medium flex items-center gap-1.5 text-zinc-700">
                     <span>Detalles y Observaciones:</span>
                   </label>
-                  <span class="text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                  <span class="text-[10px] text-zinc-600 font-mono font-medium bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200">
                     Editor con Viñetas y Formato
                   </span>
                 </div>
 
                 <!-- CONTENEDOR INTEGRADO DEL EDITOR TIPO WORD -->
-                <div
-                  class="rounded-xl border overflow-hidden transition-all shadow-2xs"
-                  [class]="themeService.isClassic()
-                    ? 'bg-white border-slate-300 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/20'
-                    : 'bg-zinc-950/80 border-zinc-700 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20'">
+                <div class="rounded-md border border-zinc-300 focus-within:border-zinc-500 overflow-hidden bg-white shadow-2xs">
 
                   <!-- BARRA DE HERRAMIENTAS (TOOLBAR) ESTILO WORD -->
-                  <div
-                    class="flex flex-wrap items-center gap-1 px-2.5 py-1.5 border-b select-none text-xs"
-                    [class]="themeService.isClassic()
-                      ? 'bg-slate-50 border-slate-200 text-slate-700'
-                      : 'bg-zinc-950 border-zinc-800 text-zinc-300'">
+                  <div class="flex flex-wrap items-center gap-1 px-2.5 py-1.5 border-b border-zinc-200 bg-zinc-50 select-none text-xs text-zinc-700">
 
                     <!-- Selector de Fuente (Tipo de Letra) -->
                     <div class="flex items-center gap-1 pr-1">
-                      <hugeicons-icon [icon]="icons.font" [size]="14" [strokeWidth]="2" class="text-slate-400 dark:text-zinc-500"></hugeicons-icon>
+                      <hugeicons-icon [icon]="icons.font" [size]="14" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
                       <select
                         [value]="activeFont()"
                         (change)="applyFontFamily($any($event.target).value)"
-                        class="text-[11px] font-semibold py-1 px-1.5 bg-transparent border rounded-md cursor-pointer focus:outline-hidden"
-                        [class]="themeService.isClassic() ? 'border-slate-200 hover:border-slate-300 text-slate-700' : 'border-zinc-800 hover:border-zinc-700 text-zinc-200'"
+                        class="text-[11px] font-medium py-1 px-1.5 bg-white border border-zinc-200 rounded-md cursor-pointer focus:outline-hidden text-zinc-700"
                         title="Tipo de letra (Fuente)">
                         <option value="Inter">Inter (Estándar)</option>
                         <option value="Georgia">Georgia (Serif)</option>
@@ -166,12 +146,11 @@
                     </div>
 
                     <!-- Selector de Jerarquía (Normal / Título) -->
-                    <div class="flex items-center gap-1 pr-1 border-r border-slate-200 dark:border-zinc-800">
+                    <div class="flex items-center gap-1 pr-1 border-r border-zinc-200">
                       <select
                         [value]="activeBlock()"
                         (change)="applyBlock($any($event.target).value)"
-                        class="text-[11px] font-semibold py-1 px-1.5 bg-transparent border rounded-md cursor-pointer focus:outline-hidden"
-                        [class]="themeService.isClassic() ? 'border-slate-200 hover:border-slate-300 text-slate-700' : 'border-zinc-800 hover:border-zinc-700 text-zinc-200'"
+                        class="text-[11px] font-medium py-1 px-1.5 bg-white border border-zinc-200 rounded-md cursor-pointer focus:outline-hidden text-zinc-700"
                         title="Estilo de párrafo o encabezado">
                         <option value="p">Párrafo Normal</option>
                         <option value="h3">Título (H3)</option>
@@ -180,12 +159,12 @@
                     </div>
 
                     <!-- Botones de Formato en Línea: Negrita, Cursiva, Subrayado, Tachado -->
-                    <div class="flex items-center gap-0.5 px-1 border-r border-slate-200 dark:border-zinc-800">
+                    <div class="flex items-center gap-0.5 px-1 border-r border-zinc-200">
                       <button
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="applyFormat('bold')"
-                        class="w-7 h-7 rounded-lg flex items-center justify-center transition cursor-pointer hover:bg-slate-200/70 dark:hover:bg-zinc-800 active:scale-95"
+                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
                         title="Negrita (Ctrl+B)">
                         <hugeicons-icon [icon]="icons.bold" [size]="14" [strokeWidth]="2.4"></hugeicons-icon>
                       </button>
@@ -194,7 +173,7 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="applyFormat('italic')"
-                        class="w-7 h-7 rounded-lg flex items-center justify-center transition cursor-pointer hover:bg-slate-200/70 dark:hover:bg-zinc-800 active:scale-95"
+                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
                         title="Cursiva (Ctrl+I)">
                         <hugeicons-icon [icon]="icons.italic" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
                       </button>
@@ -203,7 +182,7 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="applyFormat('underline')"
-                        class="w-7 h-7 rounded-lg flex items-center justify-center transition cursor-pointer hover:bg-slate-200/70 dark:hover:bg-zinc-800 active:scale-95"
+                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
                         title="Subrayado (Ctrl+U)">
                         <hugeicons-icon [icon]="icons.underline" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
                       </button>
@@ -212,19 +191,19 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="applyFormat('strikeThrough')"
-                        class="w-7 h-7 rounded-lg flex items-center justify-center transition cursor-pointer hover:bg-slate-200/70 dark:hover:bg-zinc-800 active:scale-95"
+                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
                         title="Tachado (marcar pendiente realizado)">
                         <hugeicons-icon [icon]="icons.strikethrough" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
                       </button>
                     </div>
 
                     <!-- Botones de Listas: Viñetas (Punticos) y Numerada -->
-                    <div class="flex items-center gap-0.5 px-1 border-r border-slate-200 dark:border-zinc-800">
+                    <div class="flex items-center gap-0.5 px-1 border-r border-zinc-200">
                       <button
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="insertBulletList()"
-                        class="h-7 px-2 rounded-lg flex items-center gap-1 transition cursor-pointer hover:bg-amber-500/20 hover:text-amber-700 dark:hover:text-amber-400 active:scale-95 text-amber-600 dark:text-amber-400 font-bold"
+                        class="h-7 px-2 rounded-md flex items-center gap-1 transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-800 font-medium"
                         title="Lista con Viñetas (Punticos)">
                         <hugeicons-icon [icon]="icons.bulletList" [size]="15" [strokeWidth]="2.2"></hugeicons-icon>
                         <span class="text-[11px]">Viñetas</span>
@@ -234,7 +213,7 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="insertNumberedList()"
-                        class="w-7 h-7 rounded-lg flex items-center justify-center transition cursor-pointer hover:bg-slate-200/70 dark:hover:bg-zinc-800 active:scale-95"
+                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
                         title="Lista Numerada (1, 2, 3...)">
                         <hugeicons-icon [icon]="icons.numberedList" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                       </button>
@@ -246,7 +225,7 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="clearFormatting()"
-                        class="w-7 h-7 rounded-lg flex items-center justify-center transition cursor-pointer text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-zinc-800 active:scale-95"
+                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200 active:scale-95"
                         title="Borrar formato de la selección">
                         <hugeicons-icon [icon]="icons.clearFormat" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                       </button>
@@ -263,14 +242,13 @@
                     (input)="onEditorInput()"
                     (keydown)="onEditorKeyDown($event)"
                     data-placeholder="Escribe los detalles que faltan por ajustar o cotizar, haz listas con viñetas, resalta con negritas..."
-                    class="note-editor-content w-full min-h-[140px] max-h-[280px] p-3 text-xs leading-relaxed focus:outline-hidden font-sans"
-                    [class]="themeService.isClassic() ? 'bg-white text-slate-800' : 'bg-zinc-900 text-zinc-100'"></div>
+                    class="note-editor-content w-full min-h-[140px] max-h-[280px] p-3 text-xs leading-relaxed focus:outline-hidden font-sans bg-white text-zinc-900"></div>
                 </div>
               </div>
 
               <!-- Barra inferior del formulario -->
               <div class="flex items-center justify-between pt-1">
-                <span class="text-[11px] text-amber-600 dark:text-amber-400 font-sans flex items-center gap-1.5 font-medium">
+                <span class="text-[11px] text-zinc-500 font-sans flex items-center gap-1.5 font-medium">
                   <hugeicons-icon [icon]="icons.cloud" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                   <span>Se guardará automáticamente con tu proyecto</span>
                 </span>
@@ -278,13 +256,13 @@
                   <button
                     type="button"
                     (click)="cancelForm()"
-                    [class]="themeService.isClassic() ? 'px-3 py-1.5 text-slate-600 hover:text-slate-900 text-xs font-semibold cursor-pointer' : 'px-3 py-1.5 text-zinc-400 hover:text-white text-xs font-semibold cursor-pointer'">
+                    class="px-3 py-1.5 text-zinc-600 hover:text-zinc-900 text-xs font-medium cursor-pointer">
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     [disabled]="noteForm.invalid"
-                    class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95">
+                    class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
                     <hugeicons-icon [icon]="icons.check" [size]="15" [strokeWidth]="2.2"></hugeicons-icon>
                     <span>{{ editingNoteId() ? 'Actualizar Nota' : 'Guardar Nota' }}</span>
                   </button>
@@ -296,46 +274,46 @@
 
         <!-- BARRA DE FILTROS Y BÚSQUEDA -->
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-          <!-- Filtros de Categoría -->
-          <div [class]="themeService.isClassic() ? 'flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto text-xs shrink-0' : 'flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 overflow-x-auto text-xs shrink-0'">
+          <!-- Filtros de Categoría (Unificados a Graphite Activo / Neutral Inactivo) -->
+          <div class="flex items-center gap-1 bg-zinc-100 p-1 rounded-md border border-zinc-200 overflow-x-auto text-xs shrink-0">
             <button
               type="button"
               (click)="activeFilter.set('all')"
               [class]="activeFilter() === 'all'
-                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-slate-900 font-bold shadow-xs cursor-pointer' : 'px-2.5 py-1 rounded-lg bg-zinc-800 text-white font-bold shadow-xs cursor-pointer')
-                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer font-medium' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer font-medium')">
+                ? 'px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs border-zinc-900 cursor-pointer'
+                : 'px-2.5 py-1 rounded-md bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 cursor-pointer font-medium'">
               Todas ({{ notes().length }})
             </button>
             <button
               type="button"
               (click)="activeFilter.set('pending')"
               [class]="activeFilter() === 'pending'
-                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-amber-700 font-bold shadow-xs cursor-pointer' : 'px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-bold shadow-xs cursor-pointer')
-                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer font-medium' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer font-medium')">
+                ? 'px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs border-zinc-900 cursor-pointer'
+                : 'px-2.5 py-1 rounded-md bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 cursor-pointer font-medium'">
               Por Hacer ({{ pendingCount() }})
             </button>
             <button
               type="button"
               (click)="activeFilter.set('adjustment')"
               [class]="activeFilter() === 'adjustment'
-                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-rose-700 font-bold shadow-xs cursor-pointer' : 'px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 font-bold shadow-xs cursor-pointer')
-                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer font-medium' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer font-medium')">
+                ? 'px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs border-zinc-900 cursor-pointer'
+                : 'px-2.5 py-1 rounded-md bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 cursor-pointer font-medium'">
               Ajustes
             </button>
             <button
               type="button"
               (click)="activeFilter.set('design')"
               [class]="activeFilter() === 'design'
-                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-indigo-700 font-bold shadow-xs cursor-pointer' : 'px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 font-bold shadow-xs cursor-pointer')
-                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer font-medium' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer font-medium')">
+                ? 'px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs border-zinc-900 cursor-pointer'
+                : 'px-2.5 py-1 rounded-md bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 cursor-pointer font-medium'">
               Diseño CAD
             </button>
             <button
               type="button"
               (click)="activeFilter.set('completed')"
               [class]="activeFilter() === 'completed'
-                ? (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg bg-white text-emerald-700 font-bold shadow-xs cursor-pointer' : 'px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold shadow-xs cursor-pointer')
-                : (themeService.isClassic() ? 'px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer font-medium' : 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer font-medium')">
+                ? 'px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs border-zinc-900 cursor-pointer'
+                : 'px-2.5 py-1 rounded-md bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 cursor-pointer font-medium'">
               Completadas ({{ completedCount() }})
             </button>
           </div>
@@ -346,7 +324,7 @@
               [icon]="icons.search"
               [size]="15"
               [strokeWidth]="2"
-              class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+              class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none">
             </hugeicons-icon>
             <input
               type="text"
@@ -354,14 +332,12 @@
               (input)="onSearchInput($event)"
               placeholder="Buscar en notas..."
               aria-label="Buscar en notas"
-              [class]="themeService.isClassic()
-                ? 'w-full pl-8 pr-7 py-1.5 bg-slate-100 border border-slate-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-500 text-slate-900 font-medium'
-                : 'w-full pl-8 pr-7 py-1.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs focus:outline-hidden focus:border-amber-400 text-white font-medium'" />
+              class="w-full pl-8 pr-7 py-1.5 bg-white border border-zinc-200 rounded-md text-xs focus:outline-hidden focus:border-zinc-500 text-zinc-900 font-medium shadow-2xs" />
             @if (searchQuery().length > 0) {
               <button
                 type="button"
                 (click)="clearSearch()"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5 rounded cursor-pointer"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded cursor-pointer"
                 title="Limpiar búsqueda">
                 <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
               </button>
@@ -372,13 +348,11 @@
         <!-- LISTADO DE TARJETAS DE NOTAS -->
         <div class="space-y-3">
           @if (filteredNotes().length === 0) {
-            <div
-              class="p-8 text-center rounded-2xl border border-dashed flex flex-col items-center justify-center space-y-2.5"
-              [class]="themeService.isClassic() ? 'border-slate-300 bg-slate-50/50 text-slate-500' : 'border-zinc-800 bg-zinc-950/40 text-zinc-400'">
-              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
-                <hugeicons-icon [icon]="icons.note" [size]="26" [strokeWidth]="1.8"></hugeicons-icon>
+            <div class="p-8 text-center rounded-md border border-dashed border-zinc-200 bg-white text-zinc-500 flex flex-col items-center justify-center space-y-2.5 shadow-2xs">
+              <div class="w-12 h-12 rounded-md bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500">
+                <hugeicons-icon [icon]="icons.note" [size]="24" [strokeWidth]="1.8"></hugeicons-icon>
               </div>
-              <p class="text-xs font-semibold max-w-sm">
+              <p class="text-xs font-medium max-w-sm text-zinc-600">
                 @if (notes().length === 0) {
                   No hay notas guardadas aún en este proyecto. Haz clic en <b>"Nueva Nota"</b> para ir anotando tus pendientes con viñetas y formato.
                 } @else {
@@ -389,7 +363,7 @@
                 <button
                   type="button"
                   (click)="openNewNoteForm()"
-                  class="mt-1 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95">
+                  class="mt-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
                   <hugeicons-icon [icon]="icons.add" [size]="15" [strokeWidth]="2.2"></hugeicons-icon>
                   <span>Crear Primera Nota</span>
                 </button>
@@ -400,10 +374,10 @@
               @for (note of filteredNotes(); track note.id) {
                 @let badge = getCategoryBadge(note.category);
                 <div
-                  class="group relative p-4 rounded-2xl border transition-all hover:shadow-md flex flex-col justify-between"
+                  class="group relative p-3.5 rounded-md border transition-all flex flex-col justify-between"
                   [class]="note.completed
-                    ? (themeService.isClassic() ? 'bg-slate-50/80 border-slate-200 opacity-75' : 'bg-zinc-950/40 border-zinc-800 opacity-65')
-                    : (themeService.isClassic() ? 'bg-white border-slate-200/90 hover:border-amber-400 shadow-2xs' : 'bg-zinc-900 border-zinc-800 hover:border-amber-500/60 shadow-2xs')">
+                    ? 'bg-zinc-50/80 border-zinc-200 opacity-75'
+                    : 'bg-white border-zinc-200/90 hover:border-zinc-300 shadow-2xs'">
 
                   <div class="space-y-2.5">
                     <!-- Cabecera de la tarjeta: checkbox, título, badge y acciones -->
@@ -414,24 +388,24 @@
                           type="button"
                           (click)="toggleComplete(note.id, $event)"
                           [class]="note.completed
-                            ? 'w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 transition cursor-pointer mt-0.5 shadow-xs'
-                            : (themeService.isClassic() ? 'w-5 h-5 rounded-full border-2 border-slate-300 hover:border-amber-500 hover:bg-amber-50/50 flex items-center justify-center shrink-0 transition cursor-pointer mt-0.5' : 'w-5 h-5 rounded-full border-2 border-zinc-600 hover:border-amber-400 hover:bg-amber-950/30 flex items-center justify-center shrink-0 transition cursor-pointer mt-0.5')"
+                            ? 'w-4.5 h-4.5 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 transition cursor-pointer mt-0.5 shadow-2xs'
+                            : 'w-4.5 h-4.5 rounded-full border border-zinc-300 hover:border-zinc-500 flex items-center justify-center shrink-0 transition cursor-pointer mt-0.5 bg-white'"
                           [title]="note.completed ? 'Marcar como pendiente' : 'Marcar como completada'">
                           @if (note.completed) {
-                            <hugeicons-icon [icon]="icons.check" [size]="12" [strokeWidth]="2.6"></hugeicons-icon>
+                            <hugeicons-icon [icon]="icons.check" [size]="11" [strokeWidth]="2.6"></hugeicons-icon>
                           }
                         </button>
 
                         <div class="min-w-0 flex-1">
                           <h3
-                            class="text-xs font-bold leading-snug break-words"
+                            class="text-xs font-semibold leading-snug break-words"
                             [class]="note.completed
-                              ? 'line-through text-slate-400 dark:text-zinc-500'
-                              : (themeService.isClassic() ? 'text-slate-900' : 'text-white')">
+                              ? 'line-through text-zinc-400'
+                              : 'text-zinc-900'">
                             {{ note.title }}
                           </h3>
                           <span
-                            class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1"
+                            class="inline-flex items-center gap-1 text-[10px] font-medium font-mono px-2 py-0.2 rounded-md border mt-1"
                             [class]="badge.bgClass + ' ' + badge.textClass">
                             <hugeicons-icon [icon]="badge.icon" [size]="11" [strokeWidth]="2"></hugeicons-icon>
                             <span>{{ badge.label }}</span>
@@ -440,20 +414,20 @@
                       </div>
 
                       <!-- Acciones de Editar y Eliminar Nota -->
-                      <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition shrink-0">
+                      <div class="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition shrink-0">
                         <button
                           type="button"
                           (click)="startEditNote(note)"
-                          [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer transition' : 'p-1 text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 rounded-lg cursor-pointer transition'"
+                          class="p-1 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-md cursor-pointer transition"
                           title="Editar nota">
-                          <hugeicons-icon [icon]="icons.edit" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+                          <hugeicons-icon [icon]="icons.edit" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                         </button>
                         <button
                           type="button"
                           (click)="deleteNote(note.id, $event)"
-                          [class]="themeService.isClassic() ? 'p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition' : 'p-1 text-zinc-400 hover:text-rose-400 hover:bg-zinc-800 rounded-lg cursor-pointer transition'"
+                          class="p-1 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer transition"
                           title="Eliminar nota">
-                          <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+                          <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                         </button>
                       </div>
                     </div>
@@ -462,24 +436,22 @@
                     <div
                       class="note-card-content text-xs leading-relaxed pl-7 break-words font-sans"
                       [class]="note.completed
-                        ? 'text-slate-400 dark:text-zinc-500'
-                        : (themeService.isClassic() ? 'text-slate-600' : 'text-zinc-300')"
+                        ? 'text-zinc-400'
+                        : 'text-zinc-600'"
                       [innerHTML]="renderNoteHtml(note.content)"></div>
                   </div>
 
                   <!-- Pie de tarjeta con fecha y estado -->
-                  <div
-                    class="pt-3 mt-2.5 border-t flex items-center justify-between text-[10px] font-medium"
-                    [class]="themeService.isClassic() ? 'border-slate-100 text-slate-400' : 'border-zinc-800/80 text-zinc-500'">
+                  <div class="pt-2.5 mt-2 border-t border-zinc-100 flex items-center justify-between text-[10px] font-mono text-zinc-500">
                     <span>Actualizado: {{ note.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span>
                     @if (note.completed) {
-                      <span class="text-emerald-500 font-bold flex items-center gap-1">
+                      <span class="text-emerald-700 font-medium flex items-center gap-1">
                         <hugeicons-icon [icon]="icons.completed" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                         <span>Resuelto</span>
                       </span>
                     } @else {
-                      <span class="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
-                        <hugeicons-icon [icon]="icons.pending" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                      <span class="text-zinc-600 font-medium flex items-center gap-1">
+                        <hugeicons-icon [icon]="icons.pending" [size]="12" [strokeWidth]="2" class="text-amber-500"></hugeicons-icon>
                         <span>Pendiente</span>
                       </span>
                     }
@@ -492,17 +464,15 @@
       </div>
 
       <!-- PIE DEL MODAL -->
-      <div
-        class="flex items-center justify-between px-5 py-3 border-t shrink-0 text-xs font-sans"
-        [class]="themeService.isClassic() ? 'bg-slate-50 border-slate-200 text-slate-600' : 'bg-zinc-950/80 border-zinc-800 text-zinc-400'">
-        <div class="flex items-center gap-2 font-medium text-[11px]">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <div class="flex items-center justify-between px-5 py-3 border-t border-zinc-200 bg-[#F4F4F6] shrink-0 text-xs font-sans text-zinc-600">
+        <div class="flex items-center gap-2 font-medium text-[11px] font-mono">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
           <span>Sincronización en Nube: {{ autoSyncEnabled() ? 'Automática activa' : 'Guardado con proyecto' }}</span>
         </div>
         <button
           type="button"
           (click)="close()"
-          class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-xs">
+          class="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-md text-xs transition cursor-pointer shadow-xs">
           Cerrar
         </button>
       </div>

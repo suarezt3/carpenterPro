@@ -306,3 +306,98 @@ export const RemoveFormattingIcon = defIcon([
   'M12.4922 4L7.49219 20',
   'M14.9922 15L19.9922 20M14.9922 20L19.9922 15'
 ]);
+
+// Iconos añadidos para Módulos y Plantillas
+export const MagicWand01Icon = defIcon([
+  'M14.5 4.5L19.5 9.5L7.5 21.5L2.5 16.5L14.5 4.5Z',
+  'M12 7L17 12',
+  'M19 2V5',
+  'M17.5 3.5H20.5',
+  'M6 3V5',
+  'M5 4H7'
+]);
+
+export const Book01Icon = defIcon([
+  'M4 5.5A2.5 2.5 0 0 1 6.5 3H20V19H6.5A2.5 2.5 0 0 0 4 21.5V5.5Z',
+  'M4 19.5A2.5 2.5 0 0 1 6.5 17H20',
+  'M8 7H16',
+  'M8 11H14'
+]);
+
+export const Cabinet01Icon = defIcon([
+  'M4 4H20V16H4V4Z',
+  'M12 4V16',
+  'M9.5 9V11',
+  'M14.5 9V11',
+  'M4 20H20'
+]);
+
+export const Cabinet02Icon = defIcon([
+  'M3 7H21V10H3V7Z',
+  'M4 10V20H20V10',
+  'M12 10V20',
+  'M9.5 14V15.5',
+  'M14.5 14V15.5'
+]);
+
+export const Wardrobe01Icon = defIcon([
+  'M5 3H19V21H5V3Z',
+  'M12 3V21',
+  'M9.5 11.5V12.5',
+  'M14.5 11.5V12.5'
+]);
+
+export const BathIcon = defIcon([
+  'M4 10H20V20H4V10Z',
+  'M7 10V8A5 5 0 0 1 17 8V10',
+  'M12 4V6',
+  'M8 14H16'
+]);
+
+export const Bookshelf01Icon = defIcon([
+  'M4 3H20V21H4V3Z',
+  'M4 9H20',
+  'M4 15H20'
+]);
+
+export const CubeIcon = defIcon([
+  'M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z',
+  'M12 12L20 7.5',
+  'M12 12L4 7.5',
+  'M12 12V21'
+]);
+
+export const CircleDotIcon = defIcon([
+  'M20 12A8 8 0 1 1 4 12A8 8 0 0 1 20 12Z',
+  'M15 12A3 3 0 1 1 9 12A3 3 0 0 1 15 12Z'
+]);
+
+export const SquareIcon = defIcon(['M4 4H20V20H4V4Z']);
+
+export const Exchange01Icon = defIcon([
+  'M3 9H21',
+  'M7 5L3 9L7 13',
+  'M21 15H3',
+  'M17 11L21 15L17 19'
+]);
+
+export const TableIcon = defIcon([
+  'M4 4H20V20H4V4Z',
+  'M4 9.5H20',
+  'M4 14.5H20'
+]);
+
+export const SlidersHorizontalIcon = defIcon([
+  'M6 18V10',
+  'M12 18V6',
+  'M18 18V13',
+  'M4 18H20'
+]);
+
+export const KitchenUtensilsIcon = defIcon([
+  'M4 4H20V16H4V4Z',
+  'M12 4V16',
+  'M9.5 9V11',
+  'M14.5 9V11',
+  'M4 20H20'
+]);

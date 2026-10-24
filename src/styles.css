@@ -5,6 +5,7 @@
 
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 @layer base {
@@ -18,7 +19,7 @@
   }
 
   body {
-    @apply bg-slate-100 text-slate-800 antialiased selection:bg-sky-600 selection:text-white;
+    @apply bg-zinc-100 text-zinc-900 antialiased selection:bg-zinc-800 selection:text-white;
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   }
 
@@ -28,6 +29,13 @@
   pre,
   .font-mono {
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input,
+  select,
+  table,
+  .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 }

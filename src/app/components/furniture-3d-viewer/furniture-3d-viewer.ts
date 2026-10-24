@@ -930,15 +930,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const isWhite = this.isWhiteTheme();
 
     if (isWhite) {
-      // Clean pure studio white with soft contrast - zero fog for crisp visibility at any distance
-      this.scene.background = new THREE.Color(0xfcfcfd);
+      // Architectural Daylight Grey with soft contrast - zero fog for crisp visibility at any distance
+      this.scene.background = new THREE.Color(0xeae8e1);
       this.scene.fog = null;
       if (this.floorMesh) {
-        (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.09;
+        (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.08;
       }
       if (this.gridHelper) {
         this.scene.remove(this.gridHelper);
-        this.gridHelper = new THREE.GridHelper(5000, 50, 0x0284c7, 0xe2e8f0);
+        this.gridHelper = new THREE.GridHelper(5000, 50, 0xc4c0b8, 0xd6d3cd);
         this.gridHelper.position.y = 0;
         this.scene.add(this.gridHelper);
       }
@@ -1009,8 +1009,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.floorMesh.receiveShadow = true;
     this.scene.add(this.floorMesh);
 
-    // Millimetric Grid Helper
-    this.gridHelper = new THREE.GridHelper(5000, 50, 0x0284c7, 0xe2e8f0);
+    // Millimetric Grid Helper (subtle architectural lines)
+    this.gridHelper = new THREE.GridHelper(5000, 50, 0xc4c0b8, 0xd6d3cd);
     this.gridHelper.position.y = 0;
     this.scene.add(this.gridHelper);
   }
@@ -1255,7 +1255,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
 
       // Edges geometry for crisp technical outline
       const edges = new THREE.EdgesGeometry(geometry);
-      const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x0284c7 : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46));
+      const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x2563eb : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46));
       const edgeMat = new THREE.LineBasicMaterial({
         color: edgeColor,
         linewidth: isColliding ? 3 : (isSelected ? 3 : 1)
@@ -2125,7 +2125,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       // 2. Update technical edge outline color
       for (const child of item.mesh.children) {
         if (child instanceof THREE.LineSegments) {
-          const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x0284c7 : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46));
+          const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x2563eb : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46));
           (child.material as THREE.LineBasicMaterial).color.setHex(edgeColor);
           (child.material as THREE.LineBasicMaterial).linewidth = isSelected || isColliding ? 3 : 1;
         }
@@ -3181,13 +3181,13 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     }
 
     if (isSelected) {
-      // Technical Blueprint Cobalt Blue
+      // Technical Cobalt Blue CAD Selection (Figma / Rayon style)
       return new THREE.MeshStandardMaterial({
-        color: 0x1d4ed8,
-        emissive: 0x1e3a8a,
-        emissiveIntensity: 0.28,
-        roughness: 0.32,
-        metalness: 0.12
+        color: 0x3b82f6,
+        emissive: 0x1d4ed8,
+        emissiveIntensity: 0.22,
+        roughness: 0.38,
+        metalness: 0.08
       });
     }
 
