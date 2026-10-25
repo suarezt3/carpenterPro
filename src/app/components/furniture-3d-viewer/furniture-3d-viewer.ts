@@ -4362,8 +4362,15 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           let partsToSelect: Part[] = [];
           const curIds = this.activeSelectedIds();
           const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === part.id;
+          const isCountertopUnit = part.componentRole === 'countertop' || part.componentRole === 'backsplash';
 
-          if (part.groupId) {
+          if (isCountertopUnit) {
+            // Para mesones y salpicaderos: seleccionamos el tramo individual para que buildGizmo()
+            // dibuje los tirantes 3D interactivos de estiramiento (azul y ámbar) sobre el tramo activo
+            partsToSelect = [part];
+            this.partsSelected.emit([part.id]);
+            this.partSelected.emit(part);
+          } else if (part.groupId) {
             const groupParts = this.parts().filter(p => p.groupId === part.groupId);
             if (isDoubleClickSamePart || isAlreadySingleIsolated) {
               // Doble clic en una pieza del módulo (o arrastrar la pieza ya aislada): seleccionar solo esa pieza
@@ -4397,7 +4404,14 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             this.directPieceDragThresholdPassed = false;
             this.dragStartPointer = { x: e.clientX, y: e.clientY };
             this.dragInitialPart = { ...part };
-            this.dragInitialParts = partsToSelect.map(p => ({ ...p }));
+
+            // Si es mesón o salpicadero, al arrastrar con el mouse se mueve todo el conjunto de placas y salpicaderos en bloque
+            if (isCountertopUnit && part.groupId) {
+              const allCtParts = this.parts().filter(p => p.groupId === part.groupId);
+              this.dragInitialParts = allCtParts.map(p => ({ ...p }));
+            } else {
+              this.dragInitialParts = partsToSelect.map(p => ({ ...p }));
+            }
 
             // Capturar también los electrodomésticos seleccionados o vinculados a los módulos arrastrados
             const targetGroupIds = new Set(partsToSelect.map(p => p.groupId).filter(Boolean));

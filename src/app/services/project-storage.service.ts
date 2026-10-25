@@ -1296,23 +1296,153 @@ export class ProjectStorageService {
   }
 
   updatePart(part: Part, recordHistory = true) {
-    this.updateProject(p => ({
-      ...p,
-      parts: p.parts.map(pt => pt.id === part.id ? part : pt)
-    }), recordHistory);
+    this.updateProject(p => {
+      const updatedParts = p.parts.map(pt => pt.id === part.id ? part : pt);
+      return {
+        ...p,
+        parts: this.syncCountertopBacksplashes(updatedParts)
+      };
+    }, recordHistory);
   }
 
   updateMultipleParts(updatesList: { partId: string; updates: Partial<Part> }[], recordHistory = true) {
     this.updateProject(p => {
       const updatesMap = new Map(updatesList.map(u => [u.partId, u.updates]));
+      const updatedParts = p.parts.map(pt => {
+        const upd = updatesMap.get(pt.id);
+        return upd ? { ...pt, ...upd } : pt;
+      });
       return {
         ...p,
-        parts: p.parts.map(pt => {
-          const upd = updatesMap.get(pt.id);
-          return upd ? { ...pt, ...upd } : pt;
-        })
+        parts: this.syncCountertopBacksplashes(updatedParts)
       };
     }, recordHistory);
+  }
+
+  private syncCountertopBacksplashes(parts: Part[]): Part[] {
+    const countertopGroupIds = new Set(
+      parts
+        .filter(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash')
+        .map(p => p.groupId)
+        .filter((id): id is string => Boolean(id))
+    );
+
+    if (countertopGroupIds.size === 0) return parts;
+
+    let result = [...parts];
+
+    for (const gId of countertopGroupIds) {
+      const gParts = result.filter(p => p.groupId === gId);
+      const slabs = gParts.filter(p => p.componentRole === 'countertop');
+      const splashes = gParts.filter(p => p.componentRole === 'backsplash');
+
+      if (slabs.length === 0 || splashes.length === 0) continue;
+
+      const mainSlab =
+        slabs.find(p => p.name.includes('Principal') || p.id.includes('principal') || p.id.includes('recto')) ||
+        slabs[0];
+      if (!mainSlab || mainSlab.orientation !== 'horizontal') continue;
+
+      const mainLen = mainSlab.length;
+      const mainDepth = mainSlab.width;
+      const mainPosX = mainSlab.posX ?? 0;
+      const mainPosY = mainSlab.posY ?? 860;
+      const mainPosZ = mainSlab.posZ ?? 0;
+      const thick = mainSlab.thickness;
+      const matId = mainSlab.materialId;
+      const matName = mainSlab.materialName;
+      const colHex = mainSlab.colorHex;
+
+      const minX = mainPosX - mainLen / 2;
+      const maxX = mainPosX + mainLen / 2;
+      const minZ = mainPosZ - mainDepth / 2;
+      const maxZ_main = mainPosZ + mainDepth / 2;
+
+      const leftSlab = slabs.find(
+        p => p !== mainSlab && (p.name.includes('Retorno') || p.id.includes('retorno')) && (p.posX ?? 0) < mainPosX
+      );
+      const rightSlab = slabs.find(
+        p => p !== mainSlab && (p.name.includes('Retorno') || p.id.includes('retorno')) && (p.posX ?? 0) > mainPosX
+      );
+
+      const leftTotalSideLen = leftSlab ? mainDepth + leftSlab.width : 0;
+      const rightTotalSideLen = rightSlab ? mainDepth + rightSlab.width : 0;
+      const posteriorSplash = splashes.find(p => p.orientation === 'vertical_xy');
+      const splashT = posteriorSplash ? Math.min(20, posteriorSplash.thickness || 20) : Math.min(20, thick);
+
+      result = result.map(p => {
+        if (p.groupId !== gId) return p;
+
+        if (p === leftSlab) {
+          return {
+            ...p,
+            posY: mainPosY,
+            posZ: Math.round(maxZ_main + p.width / 2),
+            posX: Math.round(minX + p.length / 2),
+            thickness: thick,
+            materialId: matId,
+            materialName: matName,
+            colorHex: colHex
+          };
+        }
+
+        if (p === rightSlab) {
+          return {
+            ...p,
+            posY: mainPosY,
+            posZ: Math.round(maxZ_main + p.width / 2),
+            posX: Math.round(maxX - p.length / 2),
+            thickness: thick,
+            materialId: matId,
+            materialName: matName,
+            colorHex: colHex
+          };
+        }
+
+        if (p.componentRole === 'backsplash') {
+          const splashH = p.width || 75;
+          const splashPosY = Math.round((mainPosY + thick / 2 + splashH / 2 + 0.5) * 10) / 10;
+
+          if (p.orientation === 'vertical_xy') {
+            return {
+              ...p,
+              length: mainLen,
+              posX: mainPosX,
+              posY: splashPosY,
+              posZ: Math.round(minZ + splashT / 2),
+              thickness: splashT,
+              materialId: matId,
+              materialName: matName,
+              colorHex: colHex
+            };
+          } else if (p.orientation === 'vertical_yz') {
+            const isRightSide = (p.posX ?? 0) > mainPosX || p.name.includes('Derecho');
+            const totalSide = isRightSide
+              ? rightTotalSideLen || p.length + splashT
+              : leftTotalSideLen || p.length + splashT;
+            const sideLengthInZ = Math.max(100, Math.round(totalSide - splashT));
+            const targetX = isRightSide ? Math.round(maxX - splashT / 2) : Math.round(minX + splashT / 2);
+            const targetZ = Math.round(minZ + splashT + sideLengthInZ / 2);
+
+            return {
+              ...p,
+              length: sideLengthInZ,
+              posX: targetX,
+              posY: splashPosY,
+              posZ: targetZ,
+              thickness: splashT,
+              materialId: matId,
+              materialName: matName,
+              colorHex: colHex
+            };
+          }
+        }
+
+        return p;
+      });
+    }
+
+    return result;
   }
 
   duplicatePart(partId: string): Part | null {
@@ -2113,10 +2243,11 @@ export class ProjectStorageService {
       const isCountertopGroup = group?.isCountertop || groupParts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
 
       if (isCountertopGroup) {
-        const mesonPart = groupParts.find(p => p.componentRole === 'countertop');
+        const mesonPart = groupParts.find(p => p.componentRole === 'countertop') || groupParts[0];
         const oldMesonT = mesonPart?.thickness || 30;
-        const mesonTopY = (mesonPart?.posY ?? 860) + oldMesonT / 2;
-        const newMesonPosY = Math.round((mesonTopY - newT / 2) * 10) / 10;
+        const baseY = (mesonPart?.posY ?? 860) - oldMesonT / 2;
+        const newMesonPosY = Math.round((baseY + newT / 2) * 10) / 10;
+        const splashT = Math.min(20, newT);
 
         this.updateProject(p => ({
           ...p,
@@ -2127,8 +2258,7 @@ export class ProjectStorageService {
             }
             if (pt.componentRole === 'backsplash') {
               const splashH = pt.width || 75;
-              const splashT = Math.min(20, newT);
-              const newSplashPosY = Math.round((mesonTopY + splashH / 2 + 0.5) * 10) / 10;
+              const newSplashPosY = Math.round((newMesonPosY + newT / 2 + splashH / 2 + 0.5) * 10) / 10;
               return { ...pt, thickness: splashT, posY: newSplashPosY };
             }
             return { ...pt, thickness: newT };
@@ -3068,29 +3198,29 @@ export class ProjectStorageService {
         });
       }
     } else if (options.shape === 'l_shape') {
-      const mainLen = Math.max(1200, Number(options.length) || 2400);
+      const mainLen = Math.max(1200, Number(options.length) || 2100);
       const sideLen = Math.max(1000, Number(options.sideLength) || 1800);
-      const runDepth = Math.max(550, Number(options.depth) || 620);
+      let runDepth = Math.max(500, Number(options.depth) || 620);
+      if (runDepth > 900) runDepth = 620;
+      if (runDepth >= sideLen - 200) runDepth = Math.min(620, Math.max(500, sideLen - 300));
+
       const topPosY = Math.round(maxBaseTopY + thick / 2);
-      const splashPosY = Math.round(maxBaseTopY + thick + splashH / 2) + 0.5;
+      const splashPosY = Math.round(topPosY + thick / 2 + splashH / 2) + 0.5;
 
-      // Polígono monolítico en L (x: 0..mainLen, y: 0..sideLen)
-      const contourL = [
-        { x: 0, y: 0 },
-        { x: mainLen, y: 0 },
-        { x: mainLen, y: runDepth },
-        { x: runDepth, y: runDepth },
-        { x: runDepth, y: sideLen },
-        { x: 0, y: sideLen }
-      ];
+      const minX = Math.round(-mainLen / 2);
+      const maxX = Math.round(mainLen / 2);
+      const minZ = Math.round(-sideLen / 2);
+      const centerX = Math.round((minX + maxX) / 2);
+      const returnZLen = sideLen - runDepth;
 
+      // 1. Tramo Principal (horizontal): Largo principal a lo largo de X, fondo runDepth en Z
       newParts.push({
-        id: `meson_en_l_${uid()}`,
-        name: 'Mesón en L Continuo',
+        id: `meson_l_principal_${uid()}`,
+        name: 'Mesón Tramo Principal (En L)',
         groupId,
         groupName,
         length: mainLen,
-        width: sideLen,
+        width: runDepth,
         thickness: thick,
         quantity: 1,
         materialId: mat.id,
@@ -3098,22 +3228,46 @@ export class ProjectStorageService {
         colorHex: mat.colorHex,
         grain: mat.hasGrain ? 'length' : 'none',
         edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-        posX: 0,
+        posX: centerX,
         posY: topPosY,
-        posZ: 0,
+        posZ: Math.round(minZ + runDepth / 2),
         orientation: 'horizontal',
+        shapeType: 'rectangle',
         componentRole: 'countertop',
-        shapeType: 'freehand',
-        contourPoints: contourL,
         excludeFromCutlist: true,
-        notes: `Mesón en L (${mainLen}x${sideLen}mm, fondo ${runDepth}mm)`
+        notes: `Mesón tramo principal (${mainLen}x${runDepth}mm, e=${thick}mm)`
+      });
+
+      // 2. Retorno Lateral (horizontal): ancho runDepth en X, largo (sideLen - runDepth) en Z
+      newParts.push({
+        id: `meson_l_retorno_${uid()}`,
+        name: 'Mesón Retorno Lateral (En L)',
+        groupId,
+        groupName,
+        length: runDepth,
+        width: returnZLen,
+        thickness: thick,
+        quantity: 1,
+        materialId: mat.id,
+        materialName: mat.name,
+        colorHex: mat.colorHex,
+        grain: mat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX: Math.round(minX + runDepth / 2),
+        posY: topPosY,
+        posZ: Math.round(minZ + runDepth + returnZLen / 2),
+        orientation: 'horizontal',
+        shapeType: 'rectangle',
+        componentRole: 'countertop',
+        excludeFromCutlist: true,
+        notes: `Mesón retorno lateral (${runDepth}x${returnZLen}mm, total ${sideLen}mm)`
       });
 
       if (includeSplash) {
-        // Tramo principal posterior (al ras del muro trasero)
+        // Tramo principal posterior (muro trasero en minZ)
         newParts.push({
           id: `salpicadero_l_fondo_${uid()}`,
-          name: 'Salpicadero Tramo Principal (En L)',
+          name: 'Salpicadero Tramo Posterior (En L)',
           groupId,
           groupName,
           length: mainLen,
@@ -3125,21 +3279,22 @@ export class ProjectStorageService {
           colorHex: mat.colorHex,
           grain: mat.hasGrain ? 'length' : 'none',
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          posX: 0,
+          posX: centerX,
           posY: splashPosY,
-          posZ: Math.round(-sideLen / 2 + splashT / 2),
+          posZ: Math.round(minZ + splashT / 2),
           orientation: 'vertical_xy',
           componentRole: 'backsplash',
           excludeFromCutlist: true
         });
 
-        // Tramo de retorno lateral sincronizado (al ras del borde exterior lateral, iniciando tras el espesor posterior)
+        // Tramo de retorno lateral sincronizado (al ras del borde exterior lateral en minX)
+        const sideSplashLen = Math.max(100, sideLen - splashT);
         newParts.push({
           id: `salpicadero_l_retorno_${uid()}`,
           name: 'Salpicadero Retorno Lateral (En L)',
           groupId,
           groupName,
-          length: sideLen - splashT,
+          length: sideSplashLen,
           width: splashH,
           thickness: splashT,
           quantity: 1,
@@ -3148,39 +3303,38 @@ export class ProjectStorageService {
           colorHex: mat.colorHex,
           grain: mat.hasGrain ? 'length' : 'none',
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          posX: Math.round(-mainLen / 2 + splashT / 2),
+          posX: Math.round(minX + splashT / 2),
           posY: splashPosY,
-          posZ: Math.round(splashT / 2),
+          posZ: Math.round(minZ + splashT + sideSplashLen / 2),
           orientation: 'vertical_yz',
           componentRole: 'backsplash',
           excludeFromCutlist: true
         });
       }
     } else if (options.shape === 'u_shape') {
-      const mainLen = Math.max(1800, Number(options.length) || 2800);
-      const sideLen = Math.max(1200, Number(options.sideLength) || 2000);
-      const runDepth = Math.max(550, Number(options.depth) || 620);
+      const mainLen = Math.max(1600, Number(options.length) || 2100);
+      const sideLen = Math.max(1000, Number(options.sideLength) || 1800);
+      let runDepth = Math.max(500, Number(options.depth) || 620);
+      if (runDepth > 900) runDepth = 620;
+      if (runDepth >= sideLen - 200) runDepth = Math.min(620, Math.max(500, sideLen - 300));
+
       const topPosY = Math.round(maxBaseTopY + thick / 2);
-      const splashPosY = Math.round(maxBaseTopY + thick + splashH / 2) + 0.5;
+      const splashPosY = Math.round(topPosY + thick / 2 + splashH / 2) + 0.5;
 
-      const contourU = [
-        { x: 0, y: 0 },
-        { x: mainLen, y: 0 },
-        { x: mainLen, y: sideLen },
-        { x: mainLen - runDepth, y: sideLen },
-        { x: mainLen - runDepth, y: runDepth },
-        { x: runDepth, y: runDepth },
-        { x: runDepth, y: sideLen },
-        { x: 0, y: sideLen }
-      ];
+      const minX = Math.round(-mainLen / 2);
+      const maxX = Math.round(mainLen / 2);
+      const minZ = Math.round(-sideLen / 2);
+      const centerX = Math.round((minX + maxX) / 2);
+      const returnZLen = sideLen - runDepth;
 
+      // 1. Tramo Principal (horizontal)
       newParts.push({
-        id: `meson_en_u_${uid()}`,
-        name: 'Mesón en U Integral',
+        id: `meson_u_principal_${uid()}`,
+        name: 'Mesón Tramo Principal (En U)',
         groupId,
         groupName,
         length: mainLen,
-        width: sideLen,
+        width: runDepth,
         thickness: thick,
         quantity: 1,
         materialId: mat.id,
@@ -3188,18 +3342,69 @@ export class ProjectStorageService {
         colorHex: mat.colorHex,
         grain: mat.hasGrain ? 'length' : 'none',
         edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-        posX: 0,
+        posX: centerX,
         posY: topPosY,
-        posZ: 0,
+        posZ: Math.round(minZ + runDepth / 2),
         orientation: 'horizontal',
+        shapeType: 'rectangle',
         componentRole: 'countertop',
-        shapeType: 'freehand',
-        contourPoints: contourU,
         excludeFromCutlist: true,
-        notes: `Mesón en U (${mainLen}x${sideLen}mm, fondo ${runDepth}mm)`
+        notes: `Mesón tramo principal (${mainLen}x${runDepth}mm, e=${thick}mm)`
+      });
+
+      // 2. Retorno Izquierdo (horizontal)
+      newParts.push({
+        id: `meson_u_retorno_izq_${uid()}`,
+        name: 'Mesón Retorno Izquierdo (En U)',
+        groupId,
+        groupName,
+        length: runDepth,
+        width: returnZLen,
+        thickness: thick,
+        quantity: 1,
+        materialId: mat.id,
+        materialName: mat.name,
+        colorHex: mat.colorHex,
+        grain: mat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX: Math.round(minX + runDepth / 2),
+        posY: topPosY,
+        posZ: Math.round(minZ + runDepth + returnZLen / 2),
+        orientation: 'horizontal',
+        shapeType: 'rectangle',
+        componentRole: 'countertop',
+        excludeFromCutlist: true,
+        notes: `Mesón retorno izquierdo (${runDepth}x${returnZLen}mm)`
+      });
+
+      // 3. Retorno Derecho (horizontal)
+      newParts.push({
+        id: `meson_u_retorno_der_${uid()}`,
+        name: 'Mesón Retorno Derecho (En U)',
+        groupId,
+        groupName,
+        length: runDepth,
+        width: returnZLen,
+        thickness: thick,
+        quantity: 1,
+        materialId: mat.id,
+        materialName: mat.name,
+        colorHex: mat.colorHex,
+        grain: mat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX: Math.round(maxX - runDepth / 2),
+        posY: topPosY,
+        posZ: Math.round(minZ + runDepth + returnZLen / 2),
+        orientation: 'horizontal',
+        shapeType: 'rectangle',
+        componentRole: 'countertop',
+        excludeFromCutlist: true,
+        notes: `Mesón retorno derecho (${runDepth}x${returnZLen}mm)`
       });
 
       if (includeSplash) {
+        const sideSplashLen = Math.max(100, sideLen - splashT);
+
         // Tramo posterior
         newParts.push({
           id: `salpicadero_u_fondo_${uid()}`,
@@ -3215,21 +3420,21 @@ export class ProjectStorageService {
           colorHex: mat.colorHex,
           grain: mat.hasGrain ? 'length' : 'none',
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          posX: 0,
+          posX: centerX,
           posY: splashPosY,
-          posZ: Math.round(-sideLen / 2 + splashT / 2),
+          posZ: Math.round(minZ + splashT / 2),
           orientation: 'vertical_xy',
           componentRole: 'backsplash',
           excludeFromCutlist: true
         });
 
-        // Retorno lateral izquierdo (borde exterior izquierdo, acortado splashT)
+        // Retorno lateral izquierdo
         newParts.push({
           id: `salpicadero_u_retorno_izq_${uid()}`,
           name: 'Salpicadero Retorno Izquierdo (En U)',
           groupId,
           groupName,
-          length: sideLen - splashT,
+          length: sideSplashLen,
           width: splashH,
           thickness: splashT,
           quantity: 1,
@@ -3238,21 +3443,21 @@ export class ProjectStorageService {
           colorHex: mat.colorHex,
           grain: mat.hasGrain ? 'length' : 'none',
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          posX: Math.round(-mainLen / 2 + splashT / 2),
+          posX: Math.round(minX + splashT / 2),
           posY: splashPosY,
-          posZ: Math.round(splashT / 2),
+          posZ: Math.round(minZ + splashT + sideSplashLen / 2),
           orientation: 'vertical_yz',
           componentRole: 'backsplash',
           excludeFromCutlist: true
         });
 
-        // Retorno lateral derecho (borde exterior derecho, acortado splashT)
+        // Retorno lateral derecho
         newParts.push({
           id: `salpicadero_u_retorno_der_${uid()}`,
           name: 'Salpicadero Retorno Derecho (En U)',
           groupId,
           groupName,
-          length: sideLen - splashT,
+          length: sideSplashLen,
           width: splashH,
           thickness: splashT,
           quantity: 1,
@@ -3261,9 +3466,9 @@ export class ProjectStorageService {
           colorHex: mat.colorHex,
           grain: mat.hasGrain ? 'length' : 'none',
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          posX: Math.round(mainLen / 2 - splashT / 2),
+          posX: Math.round(maxX - splashT / 2),
           posY: splashPosY,
-          posZ: Math.round(splashT / 2),
+          posZ: Math.round(minZ + splashT + sideSplashLen / 2),
           orientation: 'vertical_yz',
           componentRole: 'backsplash',
           excludeFromCutlist: true

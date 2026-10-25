@@ -1864,21 +1864,21 @@
                       <button
                         type="button"
                         (click)="updateSelectedGroupDimension('thickness', 20)"
-                        [class]="gStats.thickness === 20 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        [class]="Math.round(gStats.thickness) === 20 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         20 mm (Cuarzo)
                       </button>
                       <button
                         type="button"
                         (click)="updateSelectedGroupDimension('thickness', 30)"
-                        [class]="gStats.thickness === 30 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        [class]="Math.round(gStats.thickness) === 30 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         30 mm (Piedra)
                       </button>
                       <button
                         type="button"
                         (click)="updateSelectedGroupDimension('thickness', 40)"
-                        [class]="gStats.thickness === 40 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        [class]="Math.round(gStats.thickness) === 40 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         40 mm (Macizo)
                       </button>
@@ -1888,21 +1888,21 @@
                       <button
                         type="button"
                         (click)="updateSelectedGroupDimension('thickness', 15)"
-                        [class]="gStats.thickness === 15 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        [class]="Math.round(gStats.thickness) === 15 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         15 mm (Ligero)
                       </button>
                       <button
                         type="button"
                         (click)="updateSelectedGroupDimension('thickness', 18)"
-                        [class]="gStats.thickness === 18 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        [class]="Math.round(gStats.thickness) === 18 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         18 mm (Estándar)
                       </button>
                       <button
                         type="button"
                         (click)="updateSelectedGroupDimension('thickness', 36)"
-                        [class]="gStats.thickness === 36 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        [class]="Math.round(gStats.thickness) === 36 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         36 mm (Doble)
                       </button>
@@ -2520,21 +2520,21 @@
                       <button
                         type="button"
                         (click)="onThicknessChange(20)"
-                        [class]="sel.thickness === 20 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(sel.thickness) === 20 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         20 mm (Cuarzo)
                       </button>
                       <button
                         type="button"
                         (click)="onThicknessChange(30)"
-                        [class]="sel.thickness === 30 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(sel.thickness) === 30 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         30 mm (Piedra)
                       </button>
                       <button
                         type="button"
                         (click)="onThicknessChange(40)"
-                        [class]="sel.thickness === 40 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(sel.thickness) === 40 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         40 mm (Macizo)
                       </button>
@@ -2544,7 +2544,7 @@
                       <button
                         type="button"
                         (click)="onThicknessChange(3)"
-                        [class]="sel.thickness === 3 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(sel.thickness) === 3 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
                         <span>3 mm</span>
                         <span class="text-[8px] opacity-75">Fondo</span>
@@ -2552,7 +2552,7 @@
                       <button
                         type="button"
                         (click)="onThicknessChange(15)"
-                        [class]="sel.thickness === 15 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(sel.thickness) === 15 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
                         <span>15 mm</span>
                         <span class="text-[8px] opacity-75">Estándar</span>
@@ -2560,7 +2560,7 @@
                       <button
                         type="button"
                         (click)="onThicknessChange(18)"
-                        [class]="sel.thickness === 18 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(sel.thickness) === 18 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
                         <span>18 mm</span>
                         <span class="text-[8px] opacity-75">Robusto</span>
@@ -2568,7 +2568,7 @@
                       <button
                         type="button"
                         (click)="onThicknessChange(36)"
-                        [class]="sel.thickness === 36 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(sel.thickness) === 36 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
                         <span>36 mm</span>
                         <span class="text-[8px] opacity-75">Doble</span>

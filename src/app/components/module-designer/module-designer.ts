@@ -1358,7 +1358,9 @@ export class ModuleDesignerComponent {
       this.showTemplatesDropdown.set(false);
       this.showKitchenProPanel.set(true);
       this.kitchenProTab.set('countertop');
-      const ctPart = parts.find(p => p.componentRole === 'countertop') || parts[0];
+      const ctParts = parts.filter(p => p.componentRole === 'countertop');
+      const ctPart = ctParts.find(p => p.name.includes('Principal')) || ctParts[0] || parts[0];
+      const returnPart = ctParts.find(p => p.name.includes('Retorno'));
       const bsPart = parts.find(p => p.componentRole === 'backsplash');
       if (ctPart) {
         this.countertopMaterialId.set(ctPart.materialId);
@@ -1369,8 +1371,15 @@ export class ModuleDesignerComponent {
         if (ctPart.length >= 400) {
           this.countertopLength.set(Math.round(ctPart.length));
         }
-        if (ctPart.width >= 300) {
-          this.countertopDepth.set(Math.round(ctPart.width));
+        const depthVal = Math.min(Math.round(ctPart.width), 900);
+        if (depthVal >= 300) {
+          this.countertopDepth.set(depthVal);
+        }
+        if (returnPart) {
+          const sideLen = Math.round(returnPart.width + ctPart.width);
+          if (sideLen >= 600) {
+            this.countertopSideLength.set(sideLen);
+          }
         }
       }
       this.showToast('🪨 Configura el mesón en Cocina Pro o ajusta sus medidas directamente en el panel derecho');
@@ -1600,16 +1609,13 @@ export class ModuleDesignerComponent {
 
   onSelectPartFrom3D(part: Part | null) {
     if (part) {
-      // Si la pieza pertenece a un mesón / salpicadero, siempre se selecciona y manipula el conjunto completo
       if (this.isCountertopGroup(part.groupId) || part.componentRole === 'countertop' || part.componentRole === 'backsplash') {
-        const targetGroupId = part.groupId;
-        if (targetGroupId) {
-          const groupParts = this.currentParts().filter(p => p.groupId === targetGroupId);
-          this.selectedPartId.set(part.id);
-          this.selectedPartIds.set(groupParts.map(p => p.id));
-          this.activeDockTab.set('piece');
-          return;
-        }
+        // En mesones y salpicaderos, seleccionamos el tramo individual para poder ajustar
+        // sus dimensiones individuales (Largo x Ancho) en el inspector y ver sus tirantes 3D
+        this.selectedPartId.set(part.id);
+        this.selectedPartIds.set([part.id]);
+        this.activeDockTab.set('piece');
+        return;
       }
 
       if (this.selectedPartIds().includes(part.id)) {
@@ -3606,7 +3612,8 @@ export class ModuleDesignerComponent {
       const mat = this.selectedCountertopMaterial();
       const isStone = mat?.textureType === 'stone';
       this.selectedPartId.set(created[0].id);
-      this.selectedPartIds.set(created.map(p => p.id));
+      this.selectedPartIds.set([created[0].id]);
+      this.activeDockTab.set('piece');
       this.showToast(
         isStone
           ? `🪨 Mesón de piedra generado (${created.length} pzs) · Cotizado por m² en Presupuesto`
