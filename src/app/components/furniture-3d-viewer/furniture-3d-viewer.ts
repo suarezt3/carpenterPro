@@ -3200,7 +3200,14 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     // Material color resolution
     const assignedMat = mats.find(m => m.id === part.materialId);
     let colorHex = assignedMat?.colorHex || part.colorHex || '#b48a60';
-    if (part.name.toLowerCase().includes('fondo') || part.thickness <= 4) {
+    const isBackOrDrawerBottom = !this.isCountertopPartOrGroup(part) &&
+      (part.componentRole === 'back' ||
+        part.thickness <= 4 ||
+        ((part.name.toLowerCase().includes('fondo') || part.name.toLowerCase().includes('trasera')) &&
+          !part.name.toLowerCase().includes('salpicadero') &&
+          part.componentRole !== 'countertop' &&
+          part.componentRole !== 'backsplash'));
+    if (isBackOrDrawerBottom && !assignedMat?.colorHex) {
       colorHex = '#e5e5e5';
     }
 
@@ -3652,6 +3659,46 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     }
   }
 
+  /**
+   * Determina si una pieza o su grupo corresponde a un mesón, encimera o salpicadero 3D.
+   */
+  isCountertopPartOrGroup(part: Part | null | undefined): boolean {
+    if (!part) return false;
+    if (part.componentRole === 'countertop' || part.componentRole === 'backsplash') return true;
+    const nameUpper = (part.name || '').toUpperCase();
+    if (
+      nameUpper.includes('MESÓN') ||
+      nameUpper.includes('MESON') ||
+      nameUpper.includes('ENCIMERA') ||
+      nameUpper.includes('SALPICADERO') ||
+      nameUpper.includes('ISLA CASCADA') ||
+      nameUpper.includes('CASCADA')
+    ) {
+      return true;
+    }
+    if (part.groupId) {
+      const grp = this.partGroups().find(g => g.id === part.groupId);
+      if (grp?.isCountertop) return true;
+      const grpNameUpper = (grp?.name || '').toUpperCase();
+      if (
+        grpNameUpper.includes('MESÓN') ||
+        grpNameUpper.includes('MESON') ||
+        grpNameUpper.includes('ENCIMERA') ||
+        grpNameUpper.includes('ISLA CASCADA')
+      ) {
+        return true;
+      }
+      return this.parts().some(p =>
+        p.groupId === part.groupId &&
+        (p.componentRole === 'countertop' ||
+          p.componentRole === 'backsplash' ||
+          (p.name || '').toUpperCase().includes('MESÓN') ||
+          (p.name || '').toUpperCase().includes('MESON'))
+      );
+    }
+    return false;
+  }
+
  /**
    * Verifica si una pieza está congelada directamente (part.isLocked)
    * o si pertenece a un cajón/módulo congelado (group.isLocked) o si alguna pieza de su grupo está congelada.
@@ -3916,7 +3963,7 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           }
           const curIds = this.activeSelectedIds();
           const isSingleIsolated = curIds.length === 1 && curIds[0] === part.id;
-          if (part.groupId && !isSingleIsolated) {
+          if (part.groupId && (!isSingleIsolated || this.isCountertopPartOrGroup(part))) {
             const grpParts = this.parts().filter(p => p.groupId === part.groupId);
             if (grpParts.length > 1) {
               this.groupRotationRequested.emit({ groupId: part.groupId, deltaAngle: 90 });
@@ -5964,7 +6011,12 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
       if (grp) {
         this.groupRotationRequested.emit({ groupId: grp.id, deltaAngle: 90 });
       } else if (this.selectedPart()) {
-        this.rotatePart90(this.selectedPart()!, 'y');
+        const sel = this.selectedPart()!;
+        if (sel.groupId && this.isCountertopPartOrGroup(sel)) {
+          this.groupRotationRequested.emit({ groupId: sel.groupId, deltaAngle: 90 });
+        } else {
+          this.rotatePart90(sel, 'y');
+        }
       }
     }
     this.clearPushPullHighlight();
@@ -8054,37 +8106,18 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
       return;
     }
     // R: Rotar 90° pieza, cajón, electrodoméstico o módulo seleccionado
-    if (e.key === 'r' || e.key === 'R') {
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R')) {
       const selParts = this.selectedParts();
       const selAppIds = this.activeSelectedApplianceIds();
       const targetApps = this.appliances().filter(a => selAppIds.includes(a.id));
 
-      if (selParts.length > 1 || (selParts.length > 0 && targetApps.length > 0) || targetApps.length > 1) {
+      // Si no hay nada seleccionado, activar herramienta interactiva de giro en el visor
+      if (selParts.length === 0 && targetApps.length === 0) {
         e.preventDefault();
-        this.rotateMultipleParts90(selParts, 90, targetApps);
+        this.setActiveTool('rotate_90');
         return;
       }
-      if (targetApps.length === 1 && selParts.length === 0) {
-        e.preventDefault();
-        const a = targetApps[0];
-        const newRot = (((a.rotation || 0) + 90) % 360 + 360) % 360;
-        this.applianceModified.emit({ appliance: a, updates: { rotation: newRot } });
-        return;
-      }
-      const grp = this.currentSelectedGroup();
-      if (grp) {
-        e.preventDefault();
-        this.groupRotationRequested.emit({ groupId: grp.id, deltaAngle: 90 });
-        return;
-      }
-      const sel = this.selectedPart();
-      if (sel) {
-        e.preventDefault();
-        this.rotatePart90(sel, 'y');
-        return;
-      }
-      e.preventDefault();
-      this.setActiveTool('rotate_90');
+      // Cuando hay elementos seleccionados, la rotación rígida en bloque se ejecuta canónicamente mediante rotateSelectedGroup en ModuleDesigner
       return;
     }
     // Q: Herramienta Rotar 90° con transportador

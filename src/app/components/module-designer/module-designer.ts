@@ -924,6 +924,15 @@ export class ModuleDesignerComponent {
       }
     }
 
+    // Atajo R: Rotar selección en 90° (idéntico a controles de cinta y panel lateral)
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R')) {
+      if (this.selectedApplianceId() || this.selectedPartId() || this.selectedPartIds().length > 0 || this.isAnyGroupSelected()) {
+        e.preventDefault();
+        this.rotateSelectedGroup(90);
+        return;
+      }
+    }
+
     if (e.altKey && (e.key === 'h' || e.key === 'H')) {
       e.preventDefault();
       this.showAllParts();
@@ -2279,9 +2288,15 @@ export class ModuleDesignerComponent {
       return;
     }
     const groupId = this.activeSelectedGroupId();
-    if (!groupId) return;
+    if (!groupId) {
+      if (partIds.length === 1) {
+        this.rotateSelectedPart90('y');
+      }
+      return;
+    }
     this.projectService.rotateGroupRigidly(groupId, deltaAngle);
-    this.showToast(`🔄 Módulo girado ${deltaAngle > 0 ? '+' : ''}${deltaAngle}° en bloque`);
+    const isCt = this.isCountertopGroup(groupId);
+    this.showToast(`🔄 ${isCt ? 'Mesón' : 'Módulo'} girado ${deltaAngle > 0 ? '+' : ''}${deltaAngle}° en bloque`);
   }
 
   /**
@@ -2315,7 +2330,10 @@ export class ModuleDesignerComponent {
 
   onGroupRotationRequested(event: { groupId: string; deltaAngle: 90 | -90 | 180 }) {
     this.projectService.rotateGroupRigidly(event.groupId, event.deltaAngle);
-    this.showToast(`🔄 Cajón girado ${event.deltaAngle > 0 ? '+' : ''}${event.deltaAngle}° (Atajo: tecla R)`);
+    const grp = this.groups().find(g => g.id === event.groupId);
+    const isCt = this.isCountertopGroup(event.groupId) || grp?.isCountertop;
+    const label = isCt ? 'Mesón' : (grp?.type === 'drawer' ? 'Cajón' : 'Módulo');
+    this.showToast(`🔄 ${label} girado ${event.deltaAngle > 0 ? '+' : ''}${event.deltaAngle}° (Atajo: tecla R)`);
   }
 
   onGroupDuplicationRequested(groupId: string) {

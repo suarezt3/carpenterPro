@@ -1343,6 +1343,13 @@ export class ProjectStorageService {
         slabs[0];
       if (!mainSlab || mainSlab.orientation !== 'horizontal') continue;
 
+      const grp = (this.currentProject().groups || []).find(g => g.id === gId);
+      const facing = grp?.facingDirection || 'front';
+      if (facing !== 'front' || mainSlab.length < mainSlab.width) {
+        // Si el mesón ha sido rotado (facing right/back/left), no aplicar las coordenadas fijas en +Z
+        continue;
+      }
+
       const mainLen = mainSlab.length;
       const mainDepth = mainSlab.width;
       const mainPosX = mainSlab.posX ?? 0;
@@ -1616,7 +1623,8 @@ export class ProjectStorageService {
   }
 
   changeGroupMaterial(groupId: string, materialId: string, target: 'all' | 'structure' | 'doors' = 'all') {
-    const mat = this.materialsList().find(m => m.id === materialId);
+    const mat = this.materialsList().find(m => m.id === materialId)
+      || DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId);
     if (!mat) return;
 
     this.updateProject(p => ({
@@ -3497,7 +3505,7 @@ export class ProjectStorageService {
         // Tramo posterior
         newParts.push({
           id: `salpicadero_u_fondo_${uid()}`,
-          name: 'Salpicadero Fondo (En U)',
+          name: 'Salpicadero Tramo Posterior (En U)',
           groupId,
           groupName,
           length: mainLen,
