@@ -1626,21 +1626,23 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
 
       group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
     } else if (orient === 'vertical_yz') {
-      const isPlinth = part.componentRole === 'plinth' ||
+      const isBacksplash = part.componentRole === 'backsplash' ||
+                            part.name.toUpperCase().includes('SALPICADERO');
+      const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
                             part.name.toUpperCase().includes('ZOCALO') ||
-                            part.name.toUpperCase().includes('ZÓCALO');
-      const isCabinetSide = !isPlinth && (part.componentRole === 'side_left' || 
+                            part.name.toUpperCase().includes('ZÓCALO'));
+      const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' || 
                             part.componentRole === 'side_right' ||
                             (part.name.toUpperCase().includes('LATERAL') && 
                              !part.name.toUpperCase().includes('CAJ') && 
                              part.componentRole !== 'drawer_box' && 
                              part.componentRole !== 'drawer_lateral'));
-      const isDrawerLateral = !isCabinetSide && (
+      const isDrawerLateral = !isBacksplash && !isCabinetSide && (
         part.componentRole === 'drawer_box' ||
         part.componentRole === 'drawer_lateral' ||
         (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
       );
-      if ((isPlinth || isDrawerLateral) && (part.length || 0) > (part.width || 0)) {
+      if ((isPlinth || isDrawerLateral || isBacksplash) && (part.length || 0) > (part.width || 0)) {
         // En lateral de cajón: Length es profundidad en eje Z, Width es altura en eje Y
         const handleLPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0x2563eb, 'length', 1);
         const handleLMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0x2563eb, 'length', -1);
@@ -2137,21 +2139,25 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         const W = part.width;
         let sx = L; let sy = t; let sz = W;
         if (part.orientation === 'vertical_yz') {
-          const isPlinth = part.componentRole === 'plinth' ||
+          const isBacksplash = part.componentRole === 'backsplash' ||
+                                part.name.toUpperCase().includes('SALPICADERO');
+          const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
                                 part.name.toUpperCase().includes('ZOCALO') ||
-                                part.name.toUpperCase().includes('ZÓCALO');
-          const isCabinetSide = !isPlinth && (part.componentRole === 'side_left' || 
+                                part.name.toUpperCase().includes('ZÓCALO'));
+          const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' || 
                                 part.componentRole === 'side_right' ||
                                 (part.name.toUpperCase().includes('LATERAL') && 
                                  !part.name.toUpperCase().includes('CAJ') && 
                                  part.componentRole !== 'drawer_box' && 
                                  part.componentRole !== 'drawer_lateral'));
-          const isDrawerLateral = !isCabinetSide && (
+          const isDrawerLateral = !isBacksplash && !isCabinetSide && (
             part.componentRole === 'drawer_box' ||
             part.componentRole === 'drawer_lateral' ||
             (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
           );
-          if ((isPlinth || isDrawerLateral) && L > W) {
+          if (isBacksplash) {
+            sx = t; sy = Math.min(L, W); sz = Math.max(L, W);
+          } else if ((isPlinth || isDrawerLateral) && L > W) {
             sx = t; sy = W; sz = L;
           } else {
             sx = t; sy = L; sz = W;
@@ -3995,14 +4001,15 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             axisName = 'Espesor';
           }
         } else if (orient === 'vertical_yz') {
+          const isBacksplash = part.componentRole === 'backsplash' || part.name.toUpperCase().includes('SALPICADERO');
           if (axis === 'y') {
-            targetDim = 'length';
+            targetDim = isBacksplash ? 'width' : 'length';
             posAxis = 'posY';
             axisName = 'Alto';
           } else if (axis === 'z') {
-            targetDim = 'width';
+            targetDim = isBacksplash ? 'length' : 'width';
             posAxis = 'posZ';
-            axisName = 'Fondo';
+            axisName = isBacksplash ? 'Largo' : 'Fondo';
           } else {
             targetDim = 'thickness';
             posAxis = 'posX';
@@ -6015,10 +6022,11 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
         dimLabel = `Espesor (${part.thickness} mm)`;
       }
     } else if (orient === 'vertical_yz') {
+      const isBacksplash = part.componentRole === 'backsplash' || part.name.toUpperCase().includes('SALPICADERO');
       if (axis === 'y') {
-        dimLabel = `Alto (${part.length} mm)`;
+        dimLabel = `Alto (${isBacksplash ? part.width : part.length} mm)`;
       } else if (axis === 'z') {
-        dimLabel = `Fondo (${part.width} mm)`;
+        dimLabel = `${isBacksplash ? 'Largo' : 'Fondo'} (${isBacksplash ? part.length : part.width} mm)`;
       } else {
         dimLabel = `Espesor (${part.thickness} mm)`;
       }
@@ -8192,21 +8200,27 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
 
     const orient = part.orientation || 'horizontal';
     if (orient === 'vertical_yz') {
-      const isPlinth = part.componentRole === 'plinth' ||
+      const isBacksplash = part.componentRole === 'backsplash' ||
+                            part.name.toUpperCase().includes('SALPICADERO');
+      const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
                             part.name.toUpperCase().includes('ZOCALO') ||
-                            part.name.toUpperCase().includes('ZÓCALO');
-      const isCabinetSide = !isPlinth && (part.componentRole === 'side_left' ||
+                            part.name.toUpperCase().includes('ZÓCALO'));
+      const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' ||
                             part.componentRole === 'side_right' ||
                             (part.name.toUpperCase().includes('LATERAL') &&
                              !part.name.toUpperCase().includes('CAJ') &&
                              part.componentRole !== 'drawer_box' &&
                              part.componentRole !== 'drawer_lateral'));
-      const isDrawerLateral = !isCabinetSide && (
+      const isDrawerLateral = !isBacksplash && !isCabinetSide && (
         part.componentRole === 'drawer_box' ||
         part.componentRole === 'drawer_lateral' ||
         (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
       );
-      if ((isPlinth || isDrawerLateral) && L > W) {
+      if (isBacksplash) {
+        sx = t;
+        sy = Math.min(L, W);
+        sz = Math.max(L, W);
+      } else if ((isPlinth || isDrawerLateral) && L > W) {
         sx = t;
         sy = W;
         sz = L;

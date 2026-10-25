@@ -8,7 +8,8 @@ import {
   Part,
   PlacedPart,
   PlacedSheet,
-  ProjectSettings
+  ProjectSettings,
+  isCountertopMaterial
 } from '../models/melamine.models';
 
 interface FreeRect {
@@ -87,14 +88,13 @@ export class CutOptimizerService {
     };
   }
 
-  /** Piezas que realmente pasan por la sierra (excluye mesones de piedra y piezas marcadas). */
+  /** Piezas que realmente pasan por la sierra (excluye mesones de piedra/cuarzo, salpicaderos y piezas marcadas). */
   getCuttableParts(rawParts: Part[], materials: Material[]): Part[] {
     return rawParts.filter(p => {
       if (p.excludeFromCutlist) return false;
-      if (p.componentRole === 'countertop' || p.componentRole === 'backsplash') {
-        const mat = materials.find(m => m.id === p.materialId);
-        if (mat?.textureType === 'stone') return false;
-      }
+      if (p.componentRole === 'countertop' || p.componentRole === 'backsplash') return false;
+      const mat = materials.find(m => m.id === p.materialId);
+      if (mat && isCountertopMaterial(mat)) return false;
       return true;
     });
   }

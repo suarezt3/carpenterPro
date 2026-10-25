@@ -67,7 +67,15 @@ export class JoineryEngineService {
           part.componentRole === 'drawer_lateral' ||
           (part.name.toUpperCase().includes('LATERAL') && part.name.toUpperCase().includes('CAJ')));
 
-      if ((isPlinth || isDrawerBoxSide) && L > W) {
+      const isBacksplash =
+        part.componentRole === 'backsplash' ||
+        part.name.toUpperCase().includes('SALPICADERO');
+
+      if (isBacksplash) {
+        sx = t;
+        sy = Math.min(L, W);
+        sz = Math.max(L, W);
+      } else if ((isPlinth || isDrawerBoxSide) && L > W) {
         sx = t;
         sy = W;
         sz = L;
@@ -205,6 +213,27 @@ export class JoineryEngineService {
         const overlapZ = Math.min(b1.maxZ, b2.maxZ) - Math.max(b1.minZ, b2.minZ);
 
         if (overlapX > tolerance && overlapY > tolerance && overlapZ > tolerance) {
+          const isCtA =
+            b1.part.componentRole === 'countertop' ||
+            b1.part.componentRole === 'backsplash' ||
+            b1.part.name.toUpperCase().includes('MESÓN') ||
+            b1.part.name.toUpperCase().includes('MESON') ||
+            b1.part.name.toUpperCase().includes('SALPICADERO');
+
+          const isCtB =
+            b2.part.componentRole === 'countertop' ||
+            b2.part.componentRole === 'backsplash' ||
+            b2.part.name.toUpperCase().includes('MESÓN') ||
+            b2.part.name.toUpperCase().includes('MESON') ||
+            b2.part.name.toUpperCase().includes('SALPICADERO');
+
+          const sameGroup = !!(b1.part.groupId && b1.part.groupId === b2.part.groupId);
+
+          // Excluir piezas de mesón y salpicaderos de cualquier cálculo o reporte de colisión
+          if ((isCtA && isCtB) || ((isCtA || isCtB) && sameGroup)) {
+            continue;
+          }
+
           const isBackJoint =
             (b1.part.componentRole === 'back' &&
               b2.part.componentRole &&
@@ -212,7 +241,6 @@ export class JoineryEngineService {
             (b2.part.componentRole === 'back' &&
               b1.part.componentRole &&
               ['side_left', 'side_right', 'top', 'bottom', 'shelf', 'tie'].includes(b1.part.componentRole));
-          const sameGroup = b1.part.groupId && b1.part.groupId === b2.part.groupId;
           if (isBackJoint && (sameGroup || !b1.part.groupId || !b2.part.groupId) && (overlapX <= 12 || overlapY <= 12 || overlapZ <= 12)) {
             continue;
           }
@@ -619,6 +647,18 @@ export class JoineryEngineService {
     // Ignorar fondos delgados (MDF 3-6mm) para tornillos/tarugos estructurales
     if ((b1.part.thickness || 15) <= 8 || (b2.part.thickness || 15) <= 8) return;
     if (b1.part.componentRole === 'back' || b2.part.componentRole === 'back') return;
+
+    // Excluir mesones y salpicaderos de perforaciones CNC estructurales (minifix, espigas, tornillos)
+    if (
+      b1.part.componentRole === 'countertop' ||
+      b1.part.componentRole === 'backsplash' ||
+      b1.part.excludeFromCutlist ||
+      b2.part.componentRole === 'countertop' ||
+      b2.part.componentRole === 'backsplash' ||
+      b2.part.excludeFromCutlist
+    ) {
+      return;
+    }
 
     const contactTolerance = 3.0;
     const overlapX = Math.min(b1.maxX, b2.maxX) - Math.max(b1.minX, b2.minX);

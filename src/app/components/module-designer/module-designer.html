@@ -392,26 +392,20 @@
                   </div>
                 </div>
 
-                <!-- Material del Mesón con Indicador Piedra vs Tablero -->
+                <!-- Material del Mesón Exclusivo (Cero Melaminas) -->
                 <div class="space-y-1">
                   <div class="flex items-center justify-between">
                     <span class="text-[10px] font-semibold text-zinc-300 uppercase">Material del Mesón</span>
-                    @if (selectedCountertopMaterial().textureType === 'stone') {
-                      <span class="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono">
-                        Piedra: Cotiza m² (No va a Sierra)
-                      </span>
-                    } @else {
-                      <span class="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono">
-                        Tablero: Entra a Corte 2D
-                      </span>
-                    }
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-amber-400 border border-zinc-700 font-mono">
+                      Mesón Pro: Cotiza m² (Excluido de Sierra 2D)
+                    </span>
                   </div>
                   <div class="flex items-center gap-1.5">
                     <select
                       [value]="countertopMaterialId()"
                       (change)="countertopMaterialId.set($any($event.target).value)"
                       class="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-white">
-                      @for (m of materials(); track m.id) {
+                      @for (m of countertopMaterials(); track m.id) {
                         <option [value]="m.id">{{ m.name }} ({{ m.thickness }}mm)</option>
                       }
                     </select>
@@ -1698,10 +1692,10 @@
               <div class="p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-2 shadow-2xs">
                 <div class="flex items-center justify-between gap-1.5">
                   <div class="flex items-center gap-1.5 min-w-0">
-                    <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0"></span>
-                    <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-800 truncate">
-                      Módulo Completo ({{ gStats.partsCount }} piezas)
+                    <span class="w-2 h-2 rounded-full shrink-0" [class]="isSelectedGroupCountertop() ? 'bg-amber-500 animate-pulse' : 'bg-indigo-600 animate-pulse'"></span>
+                    <hugeicons-icon [icon]="isSelectedGroupCountertop() ? icons.palette : icons.inbox" [size]="13" [strokeWidth]="2" [class]="isSelectedGroupCountertop() ? 'text-amber-600 shrink-0' : 'text-indigo-600 shrink-0'"></hugeicons-icon>
+                    <span class="text-[10px] font-bold uppercase tracking-wider truncate" [class]="isSelectedGroupCountertop() ? 'text-amber-800' : 'text-indigo-800'">
+                      {{ isSelectedGroupCountertop() ? 'Mesón Monolítico (' + gStats.partsCount + ' pzs)' : 'Módulo Completo (' + gStats.partsCount + ' piezas)' }}
                     </span>
                   </div>
                   <button
@@ -1843,7 +1837,7 @@
                 <!-- Espesor Estructural del Módulo -->
                 <div class="pt-2 border-t border-slate-200/80 space-y-1.5">
                   <div class="flex items-center justify-between">
-                    <span class="text-[10px] text-slate-600 font-semibold">Espesor Estructural (Tablero):</span>
+                    <span class="text-[10px] text-slate-600 font-semibold">{{ isSelectedGroupCountertop() ? 'Espesor de Mesón:' : 'Espesor Estructural (Tablero):' }}</span>
                     <div class="flex items-center gap-1">
                       <button
                         type="button"
@@ -1865,40 +1859,66 @@
                     </div>
                   </div>
 
-                  <div class="grid grid-cols-3 gap-1">
-                    <button
-                      type="button"
-                      (click)="updateSelectedGroupDimension('thickness', 15)"
-                      [class]="gStats.thickness === 15 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                      class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
-                      15 mm (Ligero)
-                    </button>
-                    <button
-                      type="button"
-                      (click)="updateSelectedGroupDimension('thickness', 18)"
-                      [class]="gStats.thickness === 18 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                      class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
-                      18 mm (Estándar)
-                    </button>
-                    <button
-                      type="button"
-                      (click)="updateSelectedGroupDimension('thickness', 36)"
-                      [class]="gStats.thickness === 36 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
-                      class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
-                      36 mm (Doble)
-                    </button>
-                  </div>
+                  @if (isSelectedGroupCountertop()) {
+                    <div class="grid grid-cols-3 gap-1">
+                      <button
+                        type="button"
+                        (click)="updateSelectedGroupDimension('thickness', 20)"
+                        [class]="gStats.thickness === 20 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
+                        20 mm (Cuarzo)
+                      </button>
+                      <button
+                        type="button"
+                        (click)="updateSelectedGroupDimension('thickness', 30)"
+                        [class]="gStats.thickness === 30 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
+                        30 mm (Piedra)
+                      </button>
+                      <button
+                        type="button"
+                        (click)="updateSelectedGroupDimension('thickness', 40)"
+                        [class]="gStats.thickness === 40 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
+                        40 mm (Macizo)
+                      </button>
+                    </div>
+                  } @else {
+                    <div class="grid grid-cols-3 gap-1">
+                      <button
+                        type="button"
+                        (click)="updateSelectedGroupDimension('thickness', 15)"
+                        [class]="gStats.thickness === 15 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
+                        15 mm (Ligero)
+                      </button>
+                      <button
+                        type="button"
+                        (click)="updateSelectedGroupDimension('thickness', 18)"
+                        [class]="gStats.thickness === 18 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
+                        18 mm (Estándar)
+                      </button>
+                      <button
+                        type="button"
+                        (click)="updateSelectedGroupDimension('thickness', 36)"
+                        [class]="gStats.thickness === 36 ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                        class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
+                        36 mm (Doble)
+                      </button>
+                    </div>
+                  }
                 </div>
               </div>
 
-              <!-- 3. MATERIAL DEL MÓDULO (EN BLOQUE) -->
+              <!-- 3. MATERIAL DEL MÓDULO / MESÓN (EN BLOQUE) -->
               <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-                    <span>Material del Módulo</span>
+                    <span>{{ isSelectedGroupCountertop() ? 'Material de Mesón y Salpicaderos' : 'Material del Módulo' }}</span>
                   </span>
-                  <span class="text-[9px] text-slate-400 font-semibold">Aplicar en bloque</span>
+                  <span class="text-[9px] text-slate-400 font-semibold">{{ isSelectedGroupCountertop() ? 'Piedra / Macizo' : 'Aplicar en bloque' }}</span>
                 </div>
 
                 <div class="flex items-center gap-2">
@@ -1911,35 +1931,47 @@
                   }
                   <select
                     #groupMatSelect
-                    [value]="gStats.materialId"
+                    [value]="isSelectedGroupCountertop() ? (selectedCountertopMaterial().id || gStats.materialId) : gStats.materialId"
                     (change)="applyGroupMaterial(groupMatSelect.value, 'all')"
                     class="flex-1 min-w-0 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-indigo-500 shadow-2xs cursor-pointer">
-                    @for (mat of materials(); track mat.id) {
-                      <option [value]="mat.id">{{ mat.name }}</option>
+                    @if (isSelectedGroupCountertop()) {
+                      @for (mat of countertopMaterials(); track mat.id) {
+                        <option [value]="mat.id">{{ mat.name }}</option>
+                      }
+                    } @else {
+                      @for (mat of materials(); track mat.id) {
+                        <option [value]="mat.id">{{ mat.name }}</option>
+                      }
                     }
                   </select>
                 </div>
 
-                <div class="grid grid-cols-3 gap-1 pt-0.5">
-                  <button
-                    type="button"
-                    (click)="applyGroupMaterial(groupMatSelect.value, 'all')"
-                    class="py-1 px-1.5 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-800 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer">
-                    Todo el Módulo
-                  </button>
-                  <button
-                    type="button"
-                    (click)="applyGroupMaterial(groupMatSelect.value, 'structure')"
-                    class="py-1 px-1.5 bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-800 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer">
-                    Solo Estructura
-                  </button>
-                  <button
-                    type="button"
-                    (click)="applyGroupMaterial(groupMatSelect.value, 'doors')"
-                    class="py-1 px-1.5 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer">
-                    Solo Frentes
-                  </button>
-                </div>
+                @if (isSelectedGroupCountertop()) {
+                  <div class="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded-lg border border-amber-200 font-medium text-center">
+                    🪨 Unidad Monolítica: Aplica simultáneamente al mesón y a todos sus salpicaderos
+                  </div>
+                } @else {
+                  <div class="grid grid-cols-3 gap-1 pt-0.5">
+                    <button
+                      type="button"
+                      (click)="applyGroupMaterial(groupMatSelect.value, 'all')"
+                      class="py-1 px-1.5 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-800 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer">
+                      Todo el Módulo
+                    </button>
+                    <button
+                      type="button"
+                      (click)="applyGroupMaterial(groupMatSelect.value, 'structure')"
+                      class="py-1 px-1.5 bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-800 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer">
+                      Solo Estructura
+                    </button>
+                    <button
+                      type="button"
+                      (click)="applyGroupMaterial(groupMatSelect.value, 'doors')"
+                      class="py-1 px-1.5 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer">
+                      Solo Frentes
+                    </button>
+                  </div>
+                }
               </div>
 
               <!-- 4. POSICIÓN 3D Y ALINEACIÓN DEL MÓDULO EN BLOQUE -->
@@ -2112,25 +2144,27 @@
                 </div>
               </div>
 
-              <!-- 6. RESUMEN DE MECANIZADOS DEL MÓDULO -->
-              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex items-center justify-between shadow-2xs">
-                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.cncTarget" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-                  <span>Mecanizados del Módulo</span>
-                </span>
-                <span class="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg border border-amber-200">
-                  {{ selectedGroupDrillHolesCount() }} taladros activos
-                </span>
-              </div>
+              @if (!isSelectedGroupCountertop()) {
+                <!-- 6. RESUMEN DE MECANIZADOS DEL MÓDULO -->
+                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex items-center justify-between shadow-2xs">
+                  <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.cncTarget" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
+                    <span>Mecanizados del Módulo</span>
+                  </span>
+                  <span class="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg border border-amber-200">
+                    {{ selectedGroupDrillHolesCount() }} taladros activos
+                  </span>
+                </div>
+              }
 
-              <!-- 7. LISTA DE PIEZAS DE ESTE MÓDULO (CLIC PARA INSPECCIONAR UNA PIEZA INDIVIDUAL) -->
+              <!-- 7. LISTA DE PIEZAS DE ESTE MÓDULO -->
               <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-                    <span>Piezas del Módulo ({{ selectedGroupParts().length }})</span>
+                    <span>{{ isSelectedGroupCountertop() ? 'Piezas del Mesón (' + selectedGroupParts().length + ')' : 'Piezas del Módulo (' + selectedGroupParts().length + ')' }}</span>
                   </span>
-                  <span class="text-[9px] text-slate-400">Clic para editar 1 pieza</span>
+                  <span class="text-[9px] text-slate-400">{{ isSelectedGroupCountertop() ? 'Unidad Monolítica' : 'Clic para editar 1 pieza' }}</span>
                 </div>
 
                 <div class="space-y-1 max-h-40 overflow-y-auto scrollbar-thin pr-1">
@@ -2239,13 +2273,15 @@
                   <span class="truncate">Ocultar Módulo</span>
                 </button>
 
-                <button
-                  type="button"
-                  (click)="ungroupSelected()"
-                  class="py-2 px-2 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl border border-amber-200 flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer">
-                  <hugeicons-icon [icon]="icons.unlink" [size]="13" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
-                  <span class="truncate">Desagrupar</span>
-                </button>
+                @if (!isSelectedGroupCountertop()) {
+                  <button
+                    type="button"
+                    (click)="ungroupSelected()"
+                    class="py-2 px-2 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl border border-amber-200 flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer">
+                    <hugeicons-icon [icon]="icons.unlink" [size]="13" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+                    <span class="truncate">Desagrupar</span>
+                  </button>
+                }
 
                 <button
                   type="button"
@@ -2479,59 +2515,85 @@
                     </div>
                   </div>
 
-                  <div class="grid grid-cols-4 gap-1">
-                    <button
-                      type="button"
-                      (click)="onThicknessChange(3)"
-                      [class]="sel.thickness === 3 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
-                      class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
-                      <span>3 mm</span>
-                      <span class="text-[8px] opacity-75">Fondo</span>
-                    </button>
-                    <button
-                      type="button"
-                      (click)="onThicknessChange(15)"
-                      [class]="sel.thickness === 15 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
-                      class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
-                      <span>15 mm</span>
-                      <span class="text-[8px] opacity-75">Estándar</span>
-                    </button>
-                    <button
-                      type="button"
-                      (click)="onThicknessChange(18)"
-                      [class]="sel.thickness === 18 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
-                      class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
-                      <span>18 mm</span>
-                      <span class="text-[8px] opacity-75">Robusto</span>
-                    </button>
-                    <button
-                      type="button"
-                      (click)="onThicknessChange(36)"
-                      [class]="sel.thickness === 36 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
-                      class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
-                      <span>36 mm</span>
-                      <span class="text-[8px] opacity-75">Doble</span>
-                    </button>
-                  </div>
+                  @if (isSelectedGroupCountertop()) {
+                    <div class="grid grid-cols-3 gap-1">
+                      <button
+                        type="button"
+                        (click)="onThicknessChange(20)"
+                        [class]="sel.thickness === 20 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
+                        20 mm (Cuarzo)
+                      </button>
+                      <button
+                        type="button"
+                        (click)="onThicknessChange(30)"
+                        [class]="sel.thickness === 30 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
+                        30 mm (Piedra)
+                      </button>
+                      <button
+                        type="button"
+                        (click)="onThicknessChange(40)"
+                        [class]="sel.thickness === 40 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
+                        40 mm (Macizo)
+                      </button>
+                    </div>
+                  } @else {
+                    <div class="grid grid-cols-4 gap-1">
+                      <button
+                        type="button"
+                        (click)="onThicknessChange(3)"
+                        [class]="sel.thickness === 3 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
+                        <span>3 mm</span>
+                        <span class="text-[8px] opacity-75">Fondo</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="onThicknessChange(15)"
+                        [class]="sel.thickness === 15 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
+                        <span>15 mm</span>
+                        <span class="text-[8px] opacity-75">Estándar</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="onThicknessChange(18)"
+                        [class]="sel.thickness === 18 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
+                        <span>18 mm</span>
+                        <span class="text-[8px] opacity-75">Robusto</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="onThicknessChange(36)"
+                        [class]="sel.thickness === 36 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        class="py-1 text-[10px] font-mono tabular-nums rounded-md transition border text-center flex flex-col items-center cursor-pointer">
+                        <span>36 mm</span>
+                        <span class="text-[8px] opacity-75">Doble</span>
+                      </button>
+                    </div>
+                  }
                 </div>
               </div>
 
-              <!-- 3. MATERIAL MELAMINA Y TAPACANTOS (ACABADO DE LA PIEZA) -->
+              <!-- 3. MATERIAL Y ACABADO DE LA PIEZA / MESÓN -->
               <div class="bg-white p-2.5 rounded-md border border-zinc-200/90 space-y-2.5 shadow-2xs">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                    <span>Material y Tapacantos</span>
+                    <span>{{ isSelectedGroupCountertop() ? 'Material de Mesón y Salpicaderos' : 'Material y Tapacantos' }}</span>
                   </span>
                   @if (selectedPartMaterial(); as smat) {
                     <span class="text-[10px] text-zinc-500 font-medium flex items-center gap-1">
                       <span class="w-2.5 h-2.5 rounded-full border border-zinc-300 shadow-2xs shrink-0" [style.background-color]="smat.colorHex"></span>
-                      <span>{{ smat.textureType === 'wood' ? 'Veta madera' : (smat.textureType === 'stone' ? 'Piedra/Mármol' : 'Liso') }}</span>
+                      <span>{{ isSelectedGroupCountertop() ? 'Piedra / Macizo' : (smat.textureType === 'wood' ? 'Veta madera' : (smat.textureType === 'stone' ? 'Piedra/Mármol' : 'Liso')) }}</span>
                     </span>
                   }
                 </div>
 
-                <!-- Selector de Melamina con muestra de color integrada -->
+                <!-- Selector de Material con muestra de color integrada -->
                 <div class="flex items-center gap-2">
                   @if (selectedPartMaterial(); as smat) {
                     <div
@@ -2541,17 +2603,28 @@
                     </div>
                   }
                   <select
-                    [value]="sel.materialId"
+                    [value]="isSelectedGroupCountertop() ? (selectedCountertopMaterial().id || sel.materialId) : sel.materialId"
                     (change)="onMaterialChange($any($event.target).value)"
                     class="flex-1 min-w-0 px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs font-medium text-zinc-800 focus:outline-hidden focus:border-blue-500 shadow-2xs cursor-pointer">
-                    @for (mat of materials(); track mat.id) {
-                      <option [value]="mat.id">{{ mat.name }}</option>
+                    @if (isSelectedGroupCountertop()) {
+                      @for (mat of countertopMaterials(); track mat.id) {
+                        <option [value]="mat.id">{{ mat.name }}</option>
+                      }
+                    } @else {
+                      @for (mat of materials(); track mat.id) {
+                        <option [value]="mat.id">{{ mat.name }}</option>
+                      }
                     }
                   </select>
                 </div>
+                @if (isSelectedGroupCountertop()) {
+                  <div class="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded-lg border border-amber-200 font-medium text-center">
+                    🪨 Unidad Monolítica: Aplica simultáneamente al mesón y a todos sus salpicaderos
+                  </div>
+                }
 
                 <!-- Tapacantos en los 4 Bordes (L1, L2, A1, A2) -->
-                @if ((sel.thickness || 18) > 6) {
+                @if ((sel.thickness || 18) > 6 && sel.componentRole !== 'countertop' && sel.componentRole !== 'backsplash' && !isSelectedGroupCountertop()) {
                   <div class="pt-2 border-t border-zinc-200/80 space-y-1.5">
                     <div class="flex items-center justify-between">
                       <span class="text-[10px] font-semibold text-zinc-500">Tapacantos por Borde:</span>

@@ -104,6 +104,8 @@ export interface PartGroup {
   id: string;
   name: string; // ej. "Cajón 1", "Cajón Inferior"
   type: 'drawer' | 'door_set' | 'assembly' | 'custom';
+  isCountertop?: boolean;
+  facingDirection?: 'front' | 'right' | 'back' | 'left';
   isOpen?: boolean; // Estado abierto/cerrado
   slideExtension?: number; // 0 (cerrado) a 1 (100% abierto)
   slideLength?: number; // Largo de corredera en mm (ej. 400, 450, 500)
@@ -257,7 +259,91 @@ export interface Material {
   thicknessSpecs?: Record<string, MaterialSheetSpec>;
   /** Solo en variantes generadas por el optimizador: id del material base del catálogo. */
   baseMaterialId?: string;
+  category?: 'board' | 'countertop' | 'mdf' | 'stone';
 }
+
+export function isCountertopMaterial(mat: Material | null | undefined): boolean {
+  if (!mat) return false;
+  if (mat.category === 'countertop') return true;
+  const nameLower = (mat.name || '').toLowerCase();
+  const idLower = (mat.id || '').toLowerCase();
+  if (nameLower.includes('melamina')) return false;
+  return (
+    nameLower.includes('mesón') ||
+    nameLower.includes('meson') ||
+    nameLower.includes('encimera') ||
+    idLower.startsWith('mat_stone_') ||
+    idLower.startsWith('mat_wood_butcher_') ||
+    mat.category === 'stone'
+  );
+}
+
+export function isBoardMaterial(mat: Material | null | undefined): boolean {
+  return !isCountertopMaterial(mat);
+}
+
+export const DEFAULT_COUNTERTOP_MATERIALS: Material[] = [
+  {
+    id: 'mat_stone_carrara_30',
+    name: 'Piedra Mármol Carrara Pulido (Mesón)',
+    thickness: 30,
+    sheetLength: 3000,
+    sheetWidth: 1600,
+    sheetCost: 1450000,
+    hasGrain: false,
+    colorHex: '#f8fafc',
+    textureType: 'stone',
+    category: 'countertop'
+  },
+  {
+    id: 'mat_stone_quartz_polar_20',
+    name: 'Cuarzo Blanco Polar Silestone (Mesón)',
+    thickness: 20,
+    sheetLength: 3000,
+    sheetWidth: 1600,
+    sheetCost: 1320000,
+    hasGrain: false,
+    colorHex: '#f1f5f9',
+    textureType: 'stone',
+    category: 'countertop'
+  },
+  {
+    id: 'mat_stone_granite_black_30',
+    name: 'Granito Negro San Gabriel (Mesón)',
+    thickness: 30,
+    sheetLength: 2800,
+    sheetWidth: 1600,
+    sheetCost: 1180000,
+    hasGrain: false,
+    colorHex: '#1e293b',
+    textureType: 'stone',
+    category: 'countertop'
+  },
+  {
+    id: 'mat_stone_dekton_gray_20',
+    name: 'Piedra Sinterizada Gris Dekton (Mesón)',
+    thickness: 20,
+    sheetLength: 3200,
+    sheetWidth: 1440,
+    sheetCost: 1680000,
+    hasGrain: false,
+    colorHex: '#64748b',
+    textureType: 'stone',
+    category: 'countertop'
+  },
+  {
+    id: 'mat_wood_butcher_36',
+    name: 'Madera Roble Macizo Alistonado (Mesón)',
+    thickness: 36,
+    sheetLength: 2440,
+    sheetWidth: 1220,
+    sheetCost: 620000,
+    hasGrain: true,
+    colorHex: '#b47b48',
+    textureType: 'wood',
+    category: 'countertop'
+  }
+];
 
 export interface HardwareItem {
   id: string;

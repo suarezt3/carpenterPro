@@ -14,7 +14,9 @@ import {
   CountertopLayoutShape,
   HandleFinish,
   HandleType,
-  PartCornerCutConfig
+  PartCornerCutConfig,
+  isCountertopMaterial,
+  DEFAULT_COUNTERTOP_MATERIALS
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { JoineryEngineService } from './joinery-engine.service';
@@ -344,6 +346,13 @@ export class ProjectStorageService {
                 parsed.materials.push(dm);
               } else {
                 parsed.materials[existingIdx].name = cleanMaterialName(parsed.materials[existingIdx].name);
+                if (dm.category) parsed.materials[existingIdx].category = dm.category;
+                if (dm.textureType) parsed.materials[existingIdx].textureType = dm.textureType;
+              }
+            }
+            for (const ctMat of DEFAULT_COUNTERTOP_MATERIALS) {
+              if (!parsed.materials.some((m: Material) => m.id === ctMat.id)) {
+                parsed.materials.push(ctMat);
               }
             }
             parsed.materials = parsed.materials.map((m: Material) => ({
@@ -558,7 +567,8 @@ export class ProjectStorageService {
       sheetCost: 1450000,
       hasGrain: false,
       colorHex: '#f8fafc',
-      textureType: 'stone'
+      textureType: 'stone',
+      category: 'countertop'
     };
 
     const matMesonCuarzoBlanco: Material = {
@@ -570,7 +580,8 @@ export class ProjectStorageService {
       sheetCost: 1320000,
       hasGrain: false,
       colorHex: '#f1f5f9',
-      textureType: 'stone'
+      textureType: 'stone',
+      category: 'countertop'
     };
 
     const matMesonGranitoNegro: Material = {
@@ -582,7 +593,8 @@ export class ProjectStorageService {
       sheetCost: 1180000,
       hasGrain: false,
       colorHex: '#1e293b',
-      textureType: 'stone'
+      textureType: 'stone',
+      category: 'countertop'
     };
 
     const matMesonDektonGris: Material = {
@@ -594,7 +606,8 @@ export class ProjectStorageService {
       sheetCost: 1680000,
       hasGrain: false,
       colorHex: '#64748b',
-      textureType: 'stone'
+      textureType: 'stone',
+      category: 'countertop'
     };
 
     const matMesonMaderaRoble: Material = {
@@ -606,7 +619,8 @@ export class ProjectStorageService {
       sheetCost: 620000,
       hasGrain: true,
       colorHex: '#b47b48',
-      textureType: 'wood'
+      textureType: 'wood',
+      category: 'countertop'
     };
 
     const defaultMaterials = [
@@ -1070,10 +1084,15 @@ export class ProjectStorageService {
   }
 
   clearFurniture() {
+    this.selectedApplianceId.set(null);
+    this.selectedApplianceIds.set([]);
     this.updateProject(p => ({
       ...p,
       modules: [],
-      parts: []
+      parts: [],
+      groups: [],
+      appliances: [],
+      hardware: []
     }));
   }
 
@@ -1460,6 +1479,20 @@ export class ProjectStorageService {
       ...p,
       parts: p.parts.map(pt => {
         if (pt.groupId !== groupId) return pt;
+
+        const isCountertopUnit = pt.componentRole === 'countertop' || pt.componentRole === 'backsplash';
+        if (isCountertopUnit) {
+          return {
+            ...pt,
+            materialId: mat.id,
+            materialName: mat.name,
+            colorHex: mat.colorHex,
+            grain: mat.hasGrain ? (pt.grain === 'none' ? 'length' : pt.grain) : 'none',
+            excludeFromCutlist: true,
+            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' }
+          };
+        }
+
         const isDoor = pt.componentRole === 'door' || pt.componentRole === 'drawer_front';
         const isBack = pt.componentRole === 'back' && pt.thickness <= 6;
         if (isBack) return pt;
@@ -1684,7 +1717,9 @@ export class ProjectStorageService {
     if (partIds.length === 0 && applianceIds.length === 0) return;
     this.updateProject(p => {
       const targetParts = p.parts.filter(pt => partIds.includes(pt.id));
-      const groupIdsFromParts = new Set(targetParts.map(pt => pt.groupId).filter(Boolean));
+      const groupIdsFromParts = new Set<string>(
+        targetParts.map(pt => pt.groupId).filter((id): id is string => Boolean(id))
+      );
       const targetAppliances = (p.appliances || []).filter(
         a => applianceIds.includes(a.id) || (a.groupId && groupIdsFromParts.has(a.groupId))
       );
@@ -1743,8 +1778,54 @@ export class ProjectStorageService {
         let newOrientation = currentOrient;
         let newLength = pt.length;
         let newWidth = pt.width;
+        let newContourPoints = pt.contourPoints;
 
-        if (Math.abs(angleDelta) === 90) {
+        // Rotación de mesones y piezas poligonales / dibujo libre (contourPoints)
+        if (pt.shapeType === 'freehand' && pt.contourPoints && pt.contourPoints.length >= 3) {
+          const pts = pt.contourPoints;
+          let minPtX = Infinity, maxPtX = -Infinity, minPtY = Infinity, maxPtY = -Infinity;
+          for (const p of pts) {
+            if (p.x < minPtX) minPtX = p.x;
+            if (p.x > maxPtX) maxPtX = p.x;
+            if (p.y < minPtY) minPtY = p.y;
+            if (p.y > maxPtY) maxPtY = p.y;
+          }
+          const midPtX = (minPtX + maxPtX) / 2;
+          const midPtY = (minPtY + maxPtY) / 2;
+
+          const rotatedPts = pts.map(p => {
+            const rx = p.x - midPtX;
+            const ry = p.y - midPtY;
+            let nrx = rx;
+            let nry = ry;
+            if (angleDelta === 90) {
+              nrx = ry;
+              nry = -rx;
+            } else if (angleDelta === -90) {
+              nrx = -ry;
+              nry = rx;
+            } else if (angleDelta === 180) {
+              nrx = -rx;
+              nry = -ry;
+            }
+            return { x: nrx, y: nry };
+          });
+
+          let newMinX = Infinity, newMaxX = -Infinity, newMinY = Infinity, newMaxY = -Infinity;
+          for (const rp of rotatedPts) {
+            if (rp.x < newMinX) newMinX = rp.x;
+            if (rp.x > newMaxX) newMaxX = rp.x;
+            if (rp.y < newMinY) newMinY = rp.y;
+            if (rp.y > newMaxY) newMaxY = rp.y;
+          }
+
+          newLength = Math.max(10, Math.round(newMaxX - newMinX));
+          newWidth = Math.max(10, Math.round(newMaxY - newMinY));
+          newContourPoints = rotatedPts.map(rp => ({
+            x: Math.round((rp.x - newMinX) * 10) / 10,
+            y: Math.round((rp.y - newMinY) * 10) / 10
+          }));
+        } else if (Math.abs(angleDelta) === 90) {
           if (currentOrient === 'horizontal') {
             newOrientation = 'horizontal';
             newLength = pt.width;
@@ -1754,12 +1835,18 @@ export class ProjectStorageService {
             const horizontalSpan = oldBounds.sx;
             const verticalHeight = oldBounds.sy;
 
+            const isBacksplash =
+              pt.componentRole === 'backsplash' ||
+              pt.name.toUpperCase().includes('SALPICADERO');
+
             const isPlinth =
-              pt.componentRole === 'plinth' ||
-              pt.name.toUpperCase().includes('ZOCALO') ||
-              pt.name.toUpperCase().includes('ZÓCALO');
+              !isBacksplash &&
+              (pt.componentRole === 'plinth' ||
+                pt.name.toUpperCase().includes('ZOCALO') ||
+                pt.name.toUpperCase().includes('ZÓCALO'));
 
             const isCabinetSide =
+              !isBacksplash &&
               !isPlinth &&
               (pt.componentRole === 'side_left' ||
                 pt.componentRole === 'side_right' ||
@@ -1772,13 +1859,14 @@ export class ProjectStorageService {
                   pt.componentRole !== 'drawer_lateral'));
 
             const isDrawerBoxSide =
+              !isBacksplash &&
               !isPlinth &&
               !isCabinetSide &&
               (pt.componentRole === 'drawer_box' ||
                 pt.componentRole === 'drawer_lateral' ||
                 (pt.name.toUpperCase().includes('LATERAL') && pt.name.toUpperCase().includes('CAJ')));
 
-            if ((isPlinth || isDrawerBoxSide) && horizontalSpan > verticalHeight) {
+            if ((isBacksplash || isPlinth || isDrawerBoxSide) && horizontalSpan > verticalHeight) {
               newLength = horizontalSpan;
               newWidth = verticalHeight;
             } else {
@@ -1800,7 +1888,8 @@ export class ProjectStorageService {
           posZ: newPosZ,
           orientation: newOrientation,
           length: newLength,
-          width: newWidth
+          width: newWidth,
+          contourPoints: newContourPoints
         };
       });
 
@@ -1839,10 +1928,42 @@ export class ProjectStorageService {
         };
       });
 
+      // Actualizar la dirección frontal ('front' | 'right' | 'back' | 'left') de los grupos rotados
+      let currentGroups = p.groups ? [...p.groups] : [];
+      for (const gId of groupIdsFromParts) {
+        if (!currentGroups.some(g => g.id === gId)) {
+          const sample = targetParts.find(pt => pt.groupId === gId);
+          const isCt = targetParts.some(
+            pt => pt.groupId === gId && (pt.componentRole === 'countertop' || pt.componentRole === 'backsplash')
+          );
+          currentGroups.push({
+            id: gId,
+            name: sample?.groupName || 'Módulo',
+            type: 'assembly',
+            isCountertop: isCt,
+            facingDirection: 'front'
+          });
+        }
+      }
+
+      const facingOrder: ('front' | 'right' | 'back' | 'left')[] = ['front', 'right', 'back', 'left'];
+      const updatedGroups = currentGroups.map(g => {
+        if (!groupIdsFromParts.has(g.id)) return g;
+        const currentFacing = g.facingDirection || this.computeGeometricFacingDirection(g.id, p.parts);
+        const curIdx = facingOrder.indexOf(currentFacing);
+        const steps = angleDelta === 90 ? 1 : angleDelta === -90 ? -1 : 2;
+        const nextIdx = (curIdx + steps + 4) % 4;
+        return {
+          ...g,
+          facingDirection: facingOrder[nextIdx]
+        };
+      });
+
       return {
         ...p,
         parts: updatedParts,
-        appliances: updatedAppliances
+        appliances: updatedAppliances,
+        groups: updatedGroups
       };
     });
   }
@@ -1986,9 +2107,36 @@ export class ProjectStorageService {
       return;
     }
 
-    // 2. Si es un grupo no paramétrico (cajón independiente, plantilla o ensamble manual)
+    // 2. Si es un grupo no paramétrico (cajón independiente, plantilla o ensamble manual / mesón)
     if (prop === 'thickness') {
       const newT = Math.max(3, Math.min(50, Math.round(rawValue)));
+      const isCountertopGroup = group?.isCountertop || groupParts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
+
+      if (isCountertopGroup) {
+        const mesonPart = groupParts.find(p => p.componentRole === 'countertop');
+        const oldMesonT = mesonPart?.thickness || 30;
+        const mesonTopY = (mesonPart?.posY ?? 860) + oldMesonT / 2;
+        const newMesonPosY = Math.round((mesonTopY - newT / 2) * 10) / 10;
+
+        this.updateProject(p => ({
+          ...p,
+          parts: p.parts.map(pt => {
+            if (pt.groupId !== groupId) return pt;
+            if (pt.componentRole === 'countertop') {
+              return { ...pt, thickness: newT, posY: newMesonPosY };
+            }
+            if (pt.componentRole === 'backsplash') {
+              const splashH = pt.width || 75;
+              const splashT = Math.min(20, newT);
+              const newSplashPosY = Math.round((mesonTopY + splashH / 2 + 0.5) * 10) / 10;
+              return { ...pt, thickness: splashT, posY: newSplashPosY };
+            }
+            return { ...pt, thickness: newT };
+          })
+        }));
+        return;
+      }
+
       this.updateProject(p => ({
         ...p,
         parts: p.parts.map(pt => {
@@ -2086,8 +2234,18 @@ export class ProjectStorageService {
         const orient = pt.orientation || 'horizontal';
         let newLength = pt.length;
         let newWidth = pt.width;
+        let newContourPoints = pt.contourPoints;
 
-        if (orient === 'horizontal') {
+        if (pt.shapeType === 'freehand' && pt.contourPoints && pt.contourPoints.length >= 3) {
+          const scaleX = oldSpanX > 10 ? newSx / oldSpanX : 1;
+          const scaleZ = oldSpanZ > 10 ? newSz / oldSpanZ : 1;
+          newLength = newSx;
+          newWidth = newSz;
+          newContourPoints = pt.contourPoints.map(p => ({
+            x: Math.round(p.x * scaleX * 10) / 10,
+            y: Math.round(p.y * scaleZ * 10) / 10
+          }));
+        } else if (orient === 'horizontal') {
           newLength = newSx;
           newWidth = newSz;
         } else if (orient === 'vertical_xy') {
@@ -2129,6 +2287,7 @@ export class ProjectStorageService {
           ...pt,
           length: newLength,
           width: newWidth,
+          contourPoints: newContourPoints,
           posX: newPx,
           posY: newPy,
           posZ: newPz
@@ -2144,7 +2303,13 @@ export class ProjectStorageService {
   getGroupFacingDirection(groupId: string): 'front' | 'right' | 'back' | 'left' {
     const currentProj = this.currentProject();
     if (!currentProj) return 'front';
-    const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
+    const grp = (currentProj.groups || []).find(g => g.id === groupId);
+    if (grp?.facingDirection) return grp.facingDirection;
+    return this.computeGeometricFacingDirection(groupId, currentProj.parts);
+  }
+
+  computeGeometricFacingDirection(groupId: string, parts: Part[]): 'front' | 'right' | 'back' | 'left' {
+    const groupParts = parts.filter(pt => pt.groupId === groupId);
     if (groupParts.length === 0) return 'front';
 
     let grpMinX = Infinity, grpMaxX = -Infinity;
@@ -2179,12 +2344,14 @@ export class ProjectStorageService {
       return dz >= 0 ? 'front' : 'back';
     }
 
-    // 2. Si es un módulo abierto sin puertas, usar el panel de fondo trasero (el frente es el lado opuesto al fondo)
+    // 2. Si es un módulo abierto sin puertas o un mesón, usar el panel de fondo trasero o salpicadero
     const backPart = groupParts.find(
       p =>
         p.componentRole === 'back' ||
+        p.componentRole === 'backsplash' ||
         (p.name.toUpperCase().includes('FONDO') && p.orientation !== 'horizontal') ||
-        p.name.toUpperCase().includes('TRASERA')
+        p.name.toUpperCase().includes('TRASERA') ||
+        p.name.toUpperCase().includes('SALPICADERO')
     );
 
     if (backPart) {
@@ -2205,6 +2372,48 @@ export class ProjectStorageService {
     }
 
     return 'front';
+  }
+
+  setGroupFacingDirection(groupId: string, targetFace: 'front' | 'right' | 'back' | 'left') {
+    const curFace = this.getGroupFacingDirection(groupId);
+    if (curFace === targetFace) return;
+
+    const faceAngles: Record<'front' | 'right' | 'back' | 'left', number> = {
+      front: 0,
+      right: 90,
+      back: 180,
+      left: 270
+    };
+
+    let diff = faceAngles[targetFace] - faceAngles[curFace];
+    if (diff === 270) diff = -90;
+    if (diff === -270) diff = 90;
+    if (diff === -180) diff = 180;
+
+    this.rotateGroupRigidly(groupId, diff as 90 | -90 | 180);
+    this.updateProject(p => {
+      const groups = p.groups || [];
+      const exists = groups.some(g => g.id === groupId);
+      const isCt = p.parts.some(
+        pt => pt.groupId === groupId && (pt.componentRole === 'countertop' || pt.componentRole === 'backsplash')
+      );
+      const updatedGroups = exists
+        ? groups.map(g => (g.id === groupId ? { ...g, facingDirection: targetFace, ...(isCt ? { isCountertop: true } : {}) } : g))
+        : [
+            ...groups,
+            {
+              id: groupId,
+              name: p.parts.find(pt => pt.groupId === groupId)?.groupName || 'Módulo',
+              type: 'assembly' as const,
+              isCountertop: isCt,
+              facingDirection: targetFace
+            }
+          ];
+      return {
+        ...p,
+        groups: updatedGroups
+      };
+    });
   }
 
   addParametricDrawer(cfg: ParametricDrawerConfig): PartGroup {
@@ -2727,12 +2936,16 @@ export class ProjectStorageService {
     sideLength?: number;
   }): Part[] {
     const project = this.currentProject();
-    const mat =
-      project.materials.find(m => m.id === options.materialId) ||
-      project.materials.find(m => m.textureType === 'stone') ||
-      project.materials[0];
+    const defaultStone = DEFAULT_COUNTERTOP_MATERIALS[0];
+    let mat =
+      project.materials.find(m => m.id === options.materialId && isCountertopMaterial(m)) ||
+      project.materials.find(m => isCountertopMaterial(m)) ||
+      defaultStone;
 
-    const isStone = mat.textureType === 'stone';
+    if (!project.materials.some(m => m.id === mat.id)) {
+      project.materials.push(mat);
+    }
+
     const thick = Number(options.thickness) || mat.thickness || 30;
     const splashH = Number(options.backsplashHeight) || 75;
     const splashT = Math.min(20, thick);
@@ -2805,6 +3018,7 @@ export class ProjectStorageService {
           ? Math.round((minZ + maxZ + overhangFront) / 2)
           : 0;
       const topPosY = Math.round(maxBaseTopY + thick / 2);
+      const splashPosY = Math.round(maxBaseTopY + thick + splashH / 2) + 0.5;
 
       newParts.push({
         id: `meson_recto_${uid()}`,
@@ -2819,16 +3033,14 @@ export class ProjectStorageService {
         materialName: mat.name,
         colorHex: mat.colorHex,
         grain: mat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
         posX: centerX,
         posY: topPosY,
         posZ: centerZ,
         orientation: 'horizontal',
         componentRole: 'countertop',
-        excludeFromCutlist: isStone,
-        notes: isStone
-          ? `Mesón de piedra/cuarzo cotizado por m² (${length}x${depth}mm)`
-          : `Mesón de tablero cortable (${length}x${depth}mm)`
+        excludeFromCutlist: true,
+        notes: `Mesón de encimera (${mat.name}) cotizado por m² (${length}x${depth}mm)`
       });
 
       if (includeSplash) {
@@ -2845,13 +3057,13 @@ export class ProjectStorageService {
           materialName: mat.name,
           colorHex: mat.colorHex,
           grain: mat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'thick', l2: 'none', a1: 'thick', a2: 'thick' },
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
           posX: centerX,
-          posY: Math.round(maxBaseTopY + thick + splashH / 2),
+          posY: splashPosY,
           posZ: Math.round(centerZ - depth / 2 + splashT / 2),
           orientation: 'vertical_xy',
           componentRole: 'backsplash',
-          excludeFromCutlist: isStone,
+          excludeFromCutlist: true,
           notes: 'Salpicadero trasero sobre encimera'
         });
       }
@@ -2860,14 +3072,15 @@ export class ProjectStorageService {
       const sideLen = Math.max(1000, Number(options.sideLength) || 1800);
       const runDepth = Math.max(550, Number(options.depth) || 620);
       const topPosY = Math.round(maxBaseTopY + thick / 2);
+      const splashPosY = Math.round(maxBaseTopY + thick + splashH / 2) + 0.5;
 
-      // Polígono monolítico en L (x: 0..mainLen, y: 0..sideLen donde y=sideLen es la pared del fondo -Z)
+      // Polígono monolítico en L (x: 0..mainLen, y: 0..sideLen)
       const contourL = [
-        { x: 0, y: sideLen - runDepth },
-        { x: mainLen - runDepth, y: sideLen - runDepth },
-        { x: mainLen - runDepth, y: 0 },
+        { x: 0, y: 0 },
         { x: mainLen, y: 0 },
-        { x: mainLen, y: sideLen },
+        { x: mainLen, y: runDepth },
+        { x: runDepth, y: runDepth },
+        { x: runDepth, y: sideLen },
         { x: 0, y: sideLen }
       ];
 
@@ -2884,19 +3097,20 @@ export class ProjectStorageService {
         materialName: mat.name,
         colorHex: mat.colorHex,
         grain: mat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
         posX: 0,
         posY: topPosY,
-        posZ: Math.round(sideLen / 2 - runDepth / 2),
+        posZ: 0,
         orientation: 'horizontal',
         componentRole: 'countertop',
         shapeType: 'freehand',
         contourPoints: contourL,
-        excludeFromCutlist: isStone,
+        excludeFromCutlist: true,
         notes: `Mesón en L (${mainLen}x${sideLen}mm, fondo ${runDepth}mm)`
       });
 
       if (includeSplash) {
+        // Tramo principal posterior (al ras del muro trasero)
         newParts.push({
           id: `salpicadero_l_fondo_${uid()}`,
           name: 'Salpicadero Tramo Principal (En L)',
@@ -2910,13 +3124,36 @@ export class ProjectStorageService {
           materialName: mat.name,
           colorHex: mat.colorHex,
           grain: mat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'thick', l2: 'none', a1: 'thick', a2: 'thick' },
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
           posX: 0,
-          posY: Math.round(maxBaseTopY + thick + splashH / 2),
-          posZ: Math.round(-runDepth / 2 + splashT / 2),
+          posY: splashPosY,
+          posZ: Math.round(-sideLen / 2 + splashT / 2),
           orientation: 'vertical_xy',
           componentRole: 'backsplash',
-          excludeFromCutlist: isStone
+          excludeFromCutlist: true
+        });
+
+        // Tramo de retorno lateral sincronizado (al ras del borde exterior lateral, iniciando tras el espesor posterior)
+        newParts.push({
+          id: `salpicadero_l_retorno_${uid()}`,
+          name: 'Salpicadero Retorno Lateral (En L)',
+          groupId,
+          groupName,
+          length: sideLen - splashT,
+          width: splashH,
+          thickness: splashT,
+          quantity: 1,
+          materialId: mat.id,
+          materialName: mat.name,
+          colorHex: mat.colorHex,
+          grain: mat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: Math.round(-mainLen / 2 + splashT / 2),
+          posY: splashPosY,
+          posZ: Math.round(splashT / 2),
+          orientation: 'vertical_yz',
+          componentRole: 'backsplash',
+          excludeFromCutlist: true
         });
       }
     } else if (options.shape === 'u_shape') {
@@ -2924,15 +3161,16 @@ export class ProjectStorageService {
       const sideLen = Math.max(1200, Number(options.sideLength) || 2000);
       const runDepth = Math.max(550, Number(options.depth) || 620);
       const topPosY = Math.round(maxBaseTopY + thick / 2);
+      const splashPosY = Math.round(maxBaseTopY + thick + splashH / 2) + 0.5;
 
       const contourU = [
         { x: 0, y: 0 },
-        { x: runDepth, y: 0 },
-        { x: runDepth, y: sideLen - runDepth },
-        { x: mainLen - runDepth, y: sideLen - runDepth },
-        { x: mainLen - runDepth, y: 0 },
         { x: mainLen, y: 0 },
         { x: mainLen, y: sideLen },
+        { x: mainLen - runDepth, y: sideLen },
+        { x: mainLen - runDepth, y: runDepth },
+        { x: runDepth, y: runDepth },
+        { x: runDepth, y: sideLen },
         { x: 0, y: sideLen }
       ];
 
@@ -2949,17 +3187,88 @@ export class ProjectStorageService {
         materialName: mat.name,
         colorHex: mat.colorHex,
         grain: mat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
         posX: 0,
         posY: topPosY,
-        posZ: Math.round(sideLen / 2 - runDepth / 2),
+        posZ: 0,
         orientation: 'horizontal',
         componentRole: 'countertop',
         shapeType: 'freehand',
         contourPoints: contourU,
-        excludeFromCutlist: isStone,
+        excludeFromCutlist: true,
         notes: `Mesón en U (${mainLen}x${sideLen}mm, fondo ${runDepth}mm)`
       });
+
+      if (includeSplash) {
+        // Tramo posterior
+        newParts.push({
+          id: `salpicadero_u_fondo_${uid()}`,
+          name: 'Salpicadero Fondo (En U)',
+          groupId,
+          groupName,
+          length: mainLen,
+          width: splashH,
+          thickness: splashT,
+          quantity: 1,
+          materialId: mat.id,
+          materialName: mat.name,
+          colorHex: mat.colorHex,
+          grain: mat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: 0,
+          posY: splashPosY,
+          posZ: Math.round(-sideLen / 2 + splashT / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'backsplash',
+          excludeFromCutlist: true
+        });
+
+        // Retorno lateral izquierdo (borde exterior izquierdo, acortado splashT)
+        newParts.push({
+          id: `salpicadero_u_retorno_izq_${uid()}`,
+          name: 'Salpicadero Retorno Izquierdo (En U)',
+          groupId,
+          groupName,
+          length: sideLen - splashT,
+          width: splashH,
+          thickness: splashT,
+          quantity: 1,
+          materialId: mat.id,
+          materialName: mat.name,
+          colorHex: mat.colorHex,
+          grain: mat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: Math.round(-mainLen / 2 + splashT / 2),
+          posY: splashPosY,
+          posZ: Math.round(splashT / 2),
+          orientation: 'vertical_yz',
+          componentRole: 'backsplash',
+          excludeFromCutlist: true
+        });
+
+        // Retorno lateral derecho (borde exterior derecho, acortado splashT)
+        newParts.push({
+          id: `salpicadero_u_retorno_der_${uid()}`,
+          name: 'Salpicadero Retorno Derecho (En U)',
+          groupId,
+          groupName,
+          length: sideLen - splashT,
+          width: splashH,
+          thickness: splashT,
+          quantity: 1,
+          materialId: mat.id,
+          materialName: mat.name,
+          colorHex: mat.colorHex,
+          grain: mat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: Math.round(mainLen / 2 - splashT / 2),
+          posY: splashPosY,
+          posZ: Math.round(splashT / 2),
+          orientation: 'vertical_yz',
+          componentRole: 'backsplash',
+          excludeFromCutlist: true
+        });
+      }
     } else if (options.shape === 'island_waterfall') {
       const islandLen = Math.max(1200, Number(options.length) || 1800);
       const islandDepth = Math.max(700, Number(options.depth) || 900);
@@ -2980,13 +3289,13 @@ export class ProjectStorageService {
         materialName: mat.name,
         colorHex: mat.colorHex,
         grain: mat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
         posX: 0,
         posY: Math.round(islandHeight - thick / 2),
         posZ: islandZ,
         orientation: 'horizontal',
         componentRole: 'countertop',
-        excludeFromCutlist: isStone,
+        excludeFromCutlist: true,
         notes: 'Cubierta principal de isla desayunadora'
       });
 
@@ -3007,13 +3316,13 @@ export class ProjectStorageService {
           materialName: mat.name,
           colorHex: mat.colorHex,
           grain: mat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
           posX: Math.round(sign * (islandLen / 2 - thick / 2)),
           posY: Math.round(legH / 2),
           posZ: islandZ,
           orientation: 'vertical_yz',
           componentRole: 'countertop',
-          excludeFromCutlist: isStone,
+          excludeFromCutlist: true,
           notes: `Faldón cascada vertical ${side.toLowerCase()} de isla`
         });
       }
@@ -3029,6 +3338,8 @@ export class ProjectStorageService {
             id: groupId,
             name: newParts[0].groupName || groupName,
             type: 'assembly',
+            isCountertop: true,
+            facingDirection: 'front',
             isOpen: false
           }
         ]
