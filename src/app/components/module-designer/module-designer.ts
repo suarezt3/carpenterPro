@@ -540,6 +540,32 @@ export class ModuleDesignerComponent {
   });
 
   /**
+   * Indica si la selección actual contiene 2 o más piezas que no forman ya un único módulo/grupo,
+   * permitiendo agruparlas o reagruparlas como módulo o mesón 3D.
+   */
+  readonly canGroupSelection = computed<boolean>(() => {
+    const ids = this.selectedPartIds();
+    if (ids.length < 2) return false;
+    const parts = this.selectedPartsList();
+    const groupIds = new Set(parts.map(p => p.groupId).filter(Boolean));
+    const allHaveSameGroup = groupIds.size === 1 && parts.every(p => p.groupId);
+    return !allHaveSameGroup;
+  });
+
+  /**
+   * Indica si la multiselección activa contiene piezas con rol de mesón o salpicadero.
+   */
+  readonly isCountertopMultiSelection = computed<boolean>(() => {
+    const parts = this.selectedPartsList();
+    if (parts.length === 0) return false;
+    return parts.some(p =>
+      p.componentRole === 'countertop' ||
+      p.componentRole === 'backsplash' ||
+      (p.name && (p.name.toUpperCase().includes('MESÓN') || p.name.toUpperCase().includes('MESON') || p.name.toUpperCase().includes('SALPICADERO')))
+    );
+  });
+
+  /**
    * Colección de los módulos actualmente seleccionados.
    */
   readonly selectedGroups = computed<PartGroup[]>(() => {
@@ -653,9 +679,25 @@ export class ModuleDesignerComponent {
       if (b.maxY > maxY) maxY = b.maxY;
       if (b.minZ < minZ) minZ = b.minZ;
       if (b.maxZ > maxZ) maxZ = b.maxZ;
-      if ((p.thickness || 15) > 8 && p.componentRole !== 'back') {
-        structuralThickness = p.thickness || 15;
-        mainMaterialId = p.materialId;
+    }
+
+    const isCt = this.isCountertopGroup(gId);
+    if (isCt) {
+      // En mesones 3D, el espesor del grupo debe ser exclusivamente el de la placa horizontal principal,
+      // ignorando el espesor de 20 mm de los salpicaderos para que el inspector refleje 20, 30 o 40 mm exactos
+      const horizontalSlab = grpParts.find(p =>
+        p.orientation === 'horizontal' &&
+        !p.name.toUpperCase().includes('SALPICADERO')
+      ) || grpParts.find(p => p.componentRole === 'countertop' && !p.name.toUpperCase().includes('SALPICADERO')) || grpParts[0];
+
+      structuralThickness = horizontalSlab.thickness || 30;
+      mainMaterialId = horizontalSlab.materialId;
+    } else {
+      for (const p of grpParts) {
+        if ((p.thickness || 15) > 8 && p.componentRole !== 'back') {
+          structuralThickness = p.thickness || 15;
+          mainMaterialId = p.materialId;
+        }
       }
     }
 
@@ -1358,6 +1400,14 @@ export class ModuleDesignerComponent {
       this.showTemplatesDropdown.set(false);
       this.showKitchenProPanel.set(true);
       this.kitchenProTab.set('countertop');
+      const isIsland = parts.some(p => p.name.includes('Cascada') || p.name.includes('Isla'));
+      const isU = parts.some(p => p.name.includes('En U') || p.id.includes('meson_u_'));
+      const isL = parts.some(p => p.name.includes('En L') || p.id.includes('meson_l_'));
+      if (isIsland) this.countertopShape.set('island_waterfall');
+      else if (isU) this.countertopShape.set('u_shape');
+      else if (isL) this.countertopShape.set('l_shape');
+      else this.countertopShape.set('straight');
+
       const ctParts = parts.filter(p => p.componentRole === 'countertop');
       const ctPart = ctParts.find(p => p.name.includes('Principal')) || ctParts[0] || parts[0];
       const returnPart = ctParts.find(p => p.name.includes('Retorno'));
@@ -1367,7 +1417,7 @@ export class ModuleDesignerComponent {
         if (ctPart.thickness === 20 || ctPart.thickness === 30 || ctPart.thickness === 40) {
           this.countertopThickness.set(ctPart.thickness);
         }
-        this.countertopBacksplash.set(!!bsPart);
+        this.countertopBacksplash.set(isIsland ? false : !!bsPart);
         if (ctPart.length >= 400) {
           this.countertopLength.set(Math.round(ctPart.length));
         }
@@ -1609,9 +1659,17 @@ export class ModuleDesignerComponent {
 
   onSelectPartFrom3D(part: Part | null) {
     if (part) {
+      // Si ya hay una multiselección activa que contiene a esta pieza (por Shift+Clic, Todo o lazo),
+      // la preservamos intacta y solo actualizamos la pieza activa en el inspector
+      if (this.selectedPartIds().length > 1 && this.selectedPartIds().includes(part.id)) {
+        this.selectedPartId.set(part.id);
+        this.activeDockTab.set('piece');
+        return;
+      }
+
       if (this.isCountertopGroup(part.groupId) || part.componentRole === 'countertop' || part.componentRole === 'backsplash') {
-        // En mesones y salpicaderos, seleccionamos el tramo individual para poder ajustar
-        // sus dimensiones individuales (Largo x Ancho) en el inspector y ver sus tirantes 3D
+        // En mesones y salpicaderos clicados individualmente sin multiselección previa,
+        // seleccionamos el tramo individual para ajustar dimensiones y ver tirantes 3D
         this.selectedPartId.set(part.id);
         this.selectedPartIds.set([part.id]);
         this.activeDockTab.set('piece');
@@ -1690,16 +1748,38 @@ export class ModuleDesignerComponent {
   }
 
   selectPartById(id: string, e?: MouseEvent) {
+    const targetPart = this.currentParts().find(p => p.id === id);
     if (e && e.shiftKey) {
       const cur = [...this.selectedPartIds()];
-      const idx = cur.indexOf(id);
-      if (idx >= 0) cur.splice(idx, 1);
-      else cur.push(id);
+      const isUngrouped = !targetPart?.groupId;
+      const idsToToggle = (isUngrouped || this.isCountertopGroup(targetPart?.groupId))
+        ? [id]
+        : this.currentParts().filter(p => p.groupId === targetPart?.groupId).map(p => p.id);
+
+      const allPresent = idsToToggle.every(tid => cur.includes(tid));
+      if (allPresent) {
+        for (const tid of idsToToggle) {
+          const idx = cur.indexOf(tid);
+          if (idx >= 0) cur.splice(idx, 1);
+        }
+      } else {
+        for (const tid of idsToToggle) {
+          if (!cur.includes(tid)) cur.push(tid);
+        }
+      }
       this.selectedPartIds.set(cur);
-      this.selectedPartId.set(cur.length > 0 ? cur[0] : null);
+      this.selectedPartId.set(cur.length > 0 ? (cur.includes(id) ? id : cur[0]) : null);
+      if (cur.length > 0) {
+        this.activeDockTab.set('piece');
+      }
     } else {
       this.selectedPartId.set(id);
-      this.selectedPartIds.set([id]);
+      if (targetPart?.groupId && !this.isCountertopGroup(targetPart.groupId)) {
+        const groupParts = this.currentParts().filter(p => p.groupId === targetPart.groupId);
+        this.selectedPartIds.set(groupParts.map(p => p.id));
+      } else {
+        this.selectedPartIds.set([id]);
+      }
       this.activeDockTab.set('piece');
     }
   }
@@ -2205,12 +2285,13 @@ export class ModuleDesignerComponent {
   }
 
   /**
-   * Aplica un material de melamina a todas las piezas o módulos actualmente seleccionados en 1 solo clic.
+   * Aplica un material de melamina o mesón a todas las piezas o módulos actualmente seleccionados en 1 solo clic.
    */
   applyMaterialToSelection(materialId: string) {
     const ids = this.selectedPartIds();
     if (ids.length === 0) return;
-    const mat = this.projectService.materialsList().find(m => m.id === materialId);
+    const mat = this.projectService.materialsList().find(m => m.id === materialId)
+      || this.countertopMaterials().find(m => m.id === materialId);
     if (!mat) return;
     this.projectService.changeMultiplePartsMaterial(ids, materialId);
     const gCount = this.selectedGroupIds().length;
@@ -2808,6 +2889,23 @@ export class ModuleDesignerComponent {
 
   // --- AGRUPACIÓN MANUAL Y DESAGRUPACIÓN ---
 
+  quickGroupSelectedParts() {
+    const selIds = this.selectedPartIds();
+    if (selIds.length < 2) return;
+    const isCt = this.isCountertopMultiSelection();
+    if (isCt) {
+      const mat = this.selectedCountertopMaterial();
+      const matName = mat?.name ? ` (${mat.name})` : '';
+      const baseName = `Mesón Cocina${matName}`;
+      const uniqueName = this.getNextUniqueGroupName(baseName);
+      const grp = this.projectService.createGroup(uniqueName, selIds, 'assembly', 450, true);
+      this.selectEntireGroup(grp.id);
+      this.showToast(`🪨 ${grp.name} reagrupado exitosamente`);
+      return;
+    }
+    this.openGroupNamingModal();
+  }
+
   openGroupNamingModal() {
     const selCount = this.selectedPartIds().length;
     if (selCount < 2) {
@@ -2815,12 +2913,17 @@ export class ModuleDesignerComponent {
       return;
     }
     const selParts = this.currentParts().filter(p => this.selectedPartIds().includes(p.id));
-    const isDrawerLike = selParts.some(p =>
+    const isCountertopLike = selParts.some(p =>
+      p.componentRole === 'countertop' ||
+      p.componentRole === 'backsplash' ||
+      (p.name && (p.name.toUpperCase().includes('MESÓN') || p.name.toUpperCase().includes('MESON') || p.name.toUpperCase().includes('SALPICADERO')))
+    );
+    const isDrawerLike = !isCountertopLike && selParts.some(p =>
       p.name.toUpperCase().includes('CAJ') ||
       p.name.toUpperCase().includes('GAVET') ||
       p.componentRole?.includes('drawer')
     );
-    const baseDefault = isDrawerLike ? 'Cajón' : 'Conjunto';
+    const baseDefault = isCountertopLike ? 'Mesón Cocina' : (isDrawerLike ? 'Cajón' : 'Conjunto');
     const uniqueName = this.getNextUniqueGroupName(baseDefault);
     this.newGroupNameInput.set(uniqueName);
     this.showGroupNamingModal.set(true);
@@ -2835,10 +2938,15 @@ export class ModuleDesignerComponent {
     if (selIds.length < 2) return;
 
     const selParts = this.currentParts().filter(p => selIds.includes(p.id));
-    const isDrawerLike = selParts.length >= 4 && selParts.every(p =>
+    const isCountertopLike = selParts.some(p =>
+      p.componentRole === 'countertop' ||
+      p.componentRole === 'backsplash' ||
+      (p.name && (p.name.toUpperCase().includes('MESÓN') || p.name.toUpperCase().includes('MESON') || p.name.toUpperCase().includes('SALPICADERO')))
+    );
+    const isDrawerLike = !isCountertopLike && selParts.length >= 4 && selParts.every(p =>
       p.componentRole?.includes('drawer') || p.id.includes('caj_ind_')
     );
-    const baseDefault = isDrawerLike ? 'Cajón' : 'Conjunto';
+    const baseDefault = isCountertopLike ? 'Mesón Cocina' : (isDrawerLike ? 'Cajón' : 'Conjunto');
     const name = this.newGroupNameInput().trim() || this.getNextUniqueGroupName(baseDefault);
 
     if (this.isGroupNameTaken(name)) {
@@ -2848,9 +2956,10 @@ export class ModuleDesignerComponent {
     }
 
     const groupType: 'drawer' | 'assembly' = isDrawerLike ? 'drawer' : 'assembly';
-    const grp = this.projectService.createGroup(name, selIds, groupType);
+    const grp = this.projectService.createGroup(name, selIds, groupType, 450, isCountertopLike);
     this.showGroupNamingModal.set(false);
     this.openGroupCardIds.update(s => new Set(s).add(grp.id));
+    this.selectEntireGroup(grp.id);
     this.showToast(`🔗 ${grp.name} agrupado (${selIds.length} piezas)`);
   }
 
@@ -3509,7 +3618,7 @@ export class ModuleDesignerComponent {
     showAppliances: true
   });
 
-  readonly countertopShape = signal<CountertopLayoutShape>('auto_modules');
+  readonly countertopShape = signal<CountertopLayoutShape>('straight');
   readonly countertopMaterialId = signal<string>('mat_stone_carrara_30');
   readonly countertopThickness = signal<number>(30);
   readonly countertopBacksplash = signal<boolean>(true);
@@ -3544,6 +3653,35 @@ export class ModuleDesignerComponent {
     }
     const id = this.countertopMaterialId();
     return this.countertopMaterials().find(m => m.id === id) || this.countertopMaterials()[0];
+  });
+
+  readonly selectedCountertopThickness = computed<number>(() => {
+    const stats = this.selectedGroupStats();
+    if (this.isSelectedGroupCountertop() && stats) {
+      return stats.thickness;
+    }
+    const gId = this.activeSelectedGroupId() || this.selectedPart()?.groupId;
+    if (gId) {
+      const parts = this.currentParts().filter(p => p.groupId === gId);
+      const horizontalSlab = parts.find(p =>
+        p.orientation === 'horizontal' &&
+        !p.name.toUpperCase().includes('SALPICADERO')
+      ) || parts.find(p => p.componentRole === 'countertop' && !p.name.toUpperCase().includes('SALPICADERO'));
+      if (horizontalSlab) return horizontalSlab.thickness || 30;
+    }
+    const sel = this.selectedPart();
+    if (sel) {
+      if (sel.orientation === 'horizontal' && !sel.name.toUpperCase().includes('SALPICADERO')) {
+        return sel.thickness || 30;
+      }
+      if (sel.groupId) {
+        const parts = this.currentParts().filter(p => p.groupId === sel.groupId);
+        const horizontalSlab = parts.find(p => p.orientation === 'horizontal' && !p.name.toUpperCase().includes('SALPICADERO'));
+        if (horizontalSlab) return horizontalSlab.thickness || 30;
+      }
+      return sel.thickness || 30;
+    }
+    return this.countertopThickness();
   });
 
   toggleKitchenProPanel() {
@@ -3597,11 +3735,12 @@ export class ModuleDesignerComponent {
   }
 
   generateKitchenCountertop() {
+    const isWaterfall = this.countertopShape() === 'island_waterfall';
     const created = this.projectService.generateSmartCountertop({
       shape: this.countertopShape(),
       materialId: this.countertopMaterialId(),
       thickness: this.countertopThickness(),
-      includeBacksplash: this.countertopBacksplash(),
+      includeBacksplash: isWaterfall ? false : this.countertopBacksplash(),
       backsplashHeight: 75,
       length: this.countertopLength(),
       sideLength: this.countertopSideLength(),

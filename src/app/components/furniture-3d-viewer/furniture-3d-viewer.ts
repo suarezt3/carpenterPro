@@ -4364,7 +4364,13 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === part.id;
           const isCountertopUnit = part.componentRole === 'countertop' || part.componentRole === 'backsplash';
 
-          if (isCountertopUnit) {
+          if (curIds.includes(part.id) && curIds.length > 1) {
+            // Si la pieza ya forma parte de una selección múltiple activa (por Shift+Clic, lazo o 'Todo'),
+            // preservamos la selección múltiple intacta para permitir moverlas juntas en bloque
+            partsToSelect = this.parts().filter(p => curIds.includes(p.id));
+            this.partsSelected.emit(curIds);
+            this.partSelected.emit(part);
+          } else if (isCountertopUnit) {
             // Para mesones y salpicaderos: seleccionamos el tramo individual para que buildGizmo()
             // dibuje los tirantes 3D interactivos de estiramiento (azul y ámbar) sobre el tramo activo
             partsToSelect = [part];
@@ -4380,10 +4386,6 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
               partsToSelect = groupParts.length > 0 ? groupParts : [part];
             }
             this.partsSelected.emit(partsToSelect.map(p => p.id));
-            this.partSelected.emit(part);
-          } else if (curIds.includes(part.id) && curIds.length > 1) {
-            partsToSelect = this.parts().filter(p => curIds.includes(p.id));
-            this.partsSelected.emit(curIds);
             this.partSelected.emit(part);
           } else {
             partsToSelect = [part];
@@ -7326,11 +7328,13 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
         const curIds = new Set(this.activeSelectedIds());
         const curAppIds = new Set(this.activeSelectedApplianceIds());
 
-        // Si la pieza pertenece a un módulo, alternamos el módulo completo y sus electrodomésticos vinculados
-        const partsToToggle = part.groupId
+        // Si la pieza pertenece a un módulo estándar, alternamos el módulo completo y sus equipos.
+        // Si es una pieza de mesón (agrupada o desagrupada), permitimos alternar cada tramo/pieza individualmente con Shift+Clic.
+        const isCountertopUnit = part.componentRole === 'countertop' || part.componentRole === 'backsplash';
+        const partsToToggle = (part.groupId && !isCountertopUnit)
           ? this.parts().filter(p => p.groupId === part.groupId)
           : [part];
-        const appsToToggle = part.groupId
+        const appsToToggle = (part.groupId && !isCountertopUnit)
           ? this.appliances().filter(a => a.groupId === part.groupId)
           : [];
 

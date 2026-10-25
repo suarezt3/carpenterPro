@@ -1519,16 +1519,30 @@ export class ProjectStorageService {
   // ACCIONES DE GRUPOS (CAJONES Y ENSAMBLES)
   // ==========================================
 
-  createGroup(name: string, partIds: string[], type: 'drawer' | 'door_set' | 'assembly' | 'custom' = 'drawer', slideLength = 450): PartGroup {
+  createGroup(
+    name: string,
+    partIds: string[],
+    type: 'drawer' | 'door_set' | 'assembly' | 'custom' = 'drawer',
+    slideLength = 450,
+    isCountertop?: boolean
+  ): PartGroup {
+    const currentParts = (this.currentProject().parts || []).filter(pt => partIds.includes(pt.id));
+    const isCountertopDetected = !!isCountertop || currentParts.some(p =>
+      p.componentRole === 'countertop' ||
+      p.componentRole === 'backsplash' ||
+      (p.name && (p.name.toUpperCase().includes('MESÓN') || p.name.toUpperCase().includes('MESON') || p.name.toUpperCase().includes('SALPICADERO')))
+    );
+
     const newGroup: PartGroup = {
       id: 'grp_' + crypto.randomUUID().slice(0, 8),
-      name: name || `Cajón ${(this.groupsList().length) + 1}`,
-      type,
+      name: name || (isCountertopDetected ? 'Mesón Cocina' : `Módulo ${(this.groupsList().length) + 1}`),
+      type: isCountertopDetected ? 'assembly' : type,
       isOpen: false,
       slideExtension: 0,
       slideLength,
       slideType: 'telescopic',
-      frontGap: 26
+      frontGap: 26,
+      ...(isCountertopDetected ? { isCountertop: true, facingDirection: 'front' as const } : {})
     };
 
     this.updateProject(p => {
@@ -2099,15 +2113,31 @@ export class ProjectStorageService {
   }
 
   /**
-   * Cambia el material de melamina a múltiples piezas a la vez (para varios módulos seleccionados).
+   * Cambia el material de melamina o mesón a múltiples piezas a la vez (para varios módulos seleccionados).
+   * Protege las piezas de mesón para no recibir melamina y las de mueble para no recibir mesón.
    */
   changeMultiplePartsMaterial(partIds: string[], materialId: string) {
-    const mat = this.materialsList().find(m => m.id === materialId);
+    const mat = this.materialsList().find(m => m.id === materialId)
+      || DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId);
     if (!mat) return;
+    const isTargetMatCountertop = isCountertopMaterial(mat);
+
     this.updateProject(p => ({
       ...p,
       parts: p.parts.map(part => {
         if (partIds.includes(part.id)) {
+          const isCtPart = part.componentRole === 'countertop' || part.componentRole === 'backsplash' ||
+            (part.name && (part.name.toUpperCase().includes('MESÓN') || part.name.toUpperCase().includes('MESON') || part.name.toUpperCase().includes('SALPICADERO')));
+
+          // Si el material a aplicar es de mesón, NO aplicarlo a piezas que no sean de mesón (ej. muebles estándar)
+          if (isTargetMatCountertop && !isCtPart) {
+            return part;
+          }
+          // Si el material a aplicar es melamina, NUNCA aplicarlo a piezas de mesón o salpicadero
+          if (!isTargetMatCountertop && isCtPart) {
+            return part;
+          }
+
           return {
             ...part,
             materialId: mat.id,
@@ -2243,9 +2273,68 @@ export class ProjectStorageService {
       const isCountertopGroup = group?.isCountertop || groupParts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
 
       if (isCountertopGroup) {
-        const mesonPart = groupParts.find(p => p.componentRole === 'countertop') || groupParts[0];
-        const oldMesonT = mesonPart?.thickness || 30;
-        const baseY = (mesonPart?.posY ?? 860) - oldMesonT / 2;
+        const isWaterfallIsland = groupParts.some(p =>
+          p.name.toUpperCase().includes('CASCADA') ||
+          p.name.toUpperCase().includes('ISLA')
+        );
+
+        if (isWaterfallIsland) {
+          const cubierta = groupParts.find(p => p.orientation === 'horizontal') || groupParts[0];
+          const oldT = cubierta.thickness || 30;
+          // Mantener la cota superior de la isla intacta (aprox. 860-890 mm)
+          const islandTopY = (cubierta.posY ?? 860) + oldT / 2;
+          const newCubiertaPosY = Math.round((islandTopY - newT / 2) * 10) / 10;
+          const legH = Math.max(100, Math.round((islandTopY - newT) * 10) / 10);
+          const legPosY = Math.round((legH / 2) * 10) / 10;
+          const islandLen = cubierta.length || 1800;
+          const islandCx = cubierta.posX ?? 0;
+          const leftCostadoPosX = Math.round((islandCx - islandLen / 2 + newT / 2) * 10) / 10;
+          const rightCostadoPosX = Math.round((islandCx + islandLen / 2 - newT / 2) * 10) / 10;
+
+          this.updateProject(p => ({
+            ...p,
+            parts: p.parts.map(pt => {
+              if (pt.groupId !== groupId) return pt;
+              const nameUpper = pt.name.toUpperCase();
+              if (pt.orientation === 'horizontal') {
+                return {
+                  ...pt,
+                  thickness: newT,
+                  posY: newCubiertaPosY
+                };
+              }
+              if (nameUpper.includes('IZQUIERDO') || (pt.posX ?? 0) < islandCx) {
+                return {
+                  ...pt,
+                  thickness: newT,
+                  length: legH,
+                  posX: leftCostadoPosX,
+                  posY: legPosY
+                };
+              }
+              if (nameUpper.includes('DERECHO') || (pt.posX ?? 0) >= islandCx) {
+                return {
+                  ...pt,
+                  thickness: newT,
+                  length: legH,
+                  posX: rightCostadoPosX,
+                  posY: legPosY
+                };
+              }
+              return { ...pt, thickness: newT };
+            })
+          }));
+          return;
+        }
+
+        // Para mesones Rectos, En L o En U con o sin salpicadero:
+        const horizontalSlab = groupParts.find(p =>
+          p.orientation === 'horizontal' &&
+          !p.name.toUpperCase().includes('SALPICADERO')
+        ) || groupParts.find(p => p.orientation === 'horizontal') || groupParts[0];
+
+        const oldMesonT = horizontalSlab?.thickness || 30;
+        const baseY = (horizontalSlab?.posY ?? 860) - oldMesonT / 2;
         const newMesonPosY = Math.round((baseY + newT / 2) * 10) / 10;
         const splashT = Math.min(20, newT);
 
@@ -2253,10 +2342,10 @@ export class ProjectStorageService {
           ...p,
           parts: p.parts.map(pt => {
             if (pt.groupId !== groupId) return pt;
-            if (pt.componentRole === 'countertop') {
+            if (pt.orientation === 'horizontal' || (pt.componentRole === 'countertop' && !pt.name.toUpperCase().includes('SALPICADERO'))) {
               return { ...pt, thickness: newT, posY: newMesonPosY };
             }
-            if (pt.componentRole === 'backsplash') {
+            if (pt.componentRole === 'backsplash' || pt.name.toUpperCase().includes('SALPICADERO')) {
               const splashH = pt.width || 75;
               const newSplashPosY = Math.round((newMesonPosY + newT / 2 + splashH / 2 + 0.5) * 10) / 10;
               return { ...pt, thickness: splashT, posY: newSplashPosY };

@@ -353,14 +353,7 @@
               <div class="p-3 space-y-2.5 max-h-96 overflow-y-auto scrollbar-thin">
                 <div class="space-y-1">
                   <span class="text-[10px] font-semibold text-zinc-300 uppercase tracking-wider block">Forma del Mesón / Encimera</span>
-                  <div class="grid grid-cols-5 gap-1 text-[10px]">
-                    <button
-                      type="button"
-                      (click)="countertopShape.set('auto_modules')"
-                      [class]="countertopShape() === 'auto_modules' ? 'bg-zinc-800 text-white font-medium shadow-xs border border-zinc-700' : 'bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'"
-                      class="py-1.5 px-1 rounded-md text-center transition cursor-pointer">
-                      Auto Bajos
-                    </button>
+                  <div class="grid grid-cols-4 gap-1 text-[10px]">
                     <button
                       type="button"
                       (click)="countertopShape.set('straight')"
@@ -462,14 +455,16 @@
                   </div>
                 }
 
-                <label class="flex items-center justify-between p-2 bg-zinc-850 rounded-md border border-zinc-750 cursor-pointer">
-                  <span class="text-xs font-medium text-zinc-200">Incluir Salpicadero Posterior (75mm)</span>
-                  <input
-                    type="checkbox"
-                    [checked]="countertopBacksplash()"
-                    (change)="countertopBacksplash.set($any($event.target).checked)"
-                    class="w-4 h-4 accent-zinc-700 rounded cursor-pointer" />
-                </label>
+                @if (countertopShape() !== 'island_waterfall') {
+                  <label class="flex items-center justify-between p-2 bg-zinc-850 rounded-md border border-zinc-750 cursor-pointer">
+                    <span class="text-xs font-medium text-zinc-200">Incluir Salpicadero Posterior (75mm)</span>
+                    <input
+                      type="checkbox"
+                      [checked]="countertopBacksplash()"
+                      (change)="countertopBacksplash.set($any($event.target).checked)"
+                      class="w-4 h-4 accent-zinc-700 rounded cursor-pointer" />
+                  </label>
+                }
 
                 <button
                   type="button"
@@ -576,6 +571,20 @@
               </div>
 
               <div class="h-3 w-px bg-zinc-800 shrink-0 mx-0.5"></div>
+
+              @if (canGroupSelection()) {
+                <!-- Botón Agrupar / Reagrupar Mesón -->
+                <button
+                  type="button"
+                  (click)="quickGroupSelectedParts()"
+                  class="h-6 px-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 shadow-xs transition shrink-0 cursor-pointer"
+                  [title]="isCountertopMultiSelection() ? 'Reagrupar piezas como un Mesón 3D completo' : 'Agrupar piezas seleccionadas'">
+                  <hugeicons-icon [icon]="icons.link" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  <span>{{ isCountertopMultiSelection() ? 'Reagrupar Mesón' : 'Agrupar' }}</span>
+                </button>
+
+                <div class="h-3 w-px bg-zinc-800 shrink-0 mx-0.5"></div>
+              }
 
               <!-- Botón Congelar / Descongelar Selección Múltiple -->
               <button
@@ -715,11 +724,11 @@
               @if (!activeSelectedGroupName()) {
                 <button
                   type="button"
-                  (click)="openGroupNamingModal()"
-                  class="h-6 px-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-md text-[11px] font-medium flex items-center gap-1 shadow-xs transition shrink-0 cursor-pointer"
-                  title="Agrupar las piezas seleccionadas como un cajón o módulo">
-                  <hugeicons-icon [icon]="icons.link" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-                  <span>Agrupar</span>
+                  (click)="quickGroupSelectedParts()"
+                  class="h-6 px-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 shadow-xs transition shrink-0 cursor-pointer"
+                  [title]="isCountertopMultiSelection() ? 'Reagrupar piezas como un Mesón 3D completo' : 'Agrupar las piezas seleccionadas como un cajón o módulo'">
+                  <hugeicons-icon [icon]="icons.link" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  <span>{{ isCountertopMultiSelection() ? 'Reagrupar Mesón' : 'Agrupar' }}</span>
                 </button>
               } @else {
                 <!-- Duplicar Cajón (Icono) -->
@@ -1558,6 +1567,16 @@
                     <span>Acciones en Bloque</span>
                   </span>
 
+                  @if (canGroupSelection()) {
+                    <button
+                      type="button"
+                      (click)="quickGroupSelectedParts()"
+                      class="w-full py-2 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 shadow-xs transition active:scale-98 cursor-pointer">
+                      <hugeicons-icon [icon]="icons.link" [size]="14" [strokeWidth]="2.2" class="shrink-0"></hugeicons-icon>
+                      <span>{{ isCountertopMultiSelection() ? 'Reagrupar Mesón (Unidad 3D)' : 'Agrupar Piezas Seleccionadas' }}</span>
+                    </button>
+                  }
+
                   <div class="grid grid-cols-2 gap-1.5">
                     <!-- Girar 90° con R -->
                     <button
@@ -1632,40 +1651,76 @@
                   </div>
                 </div>
 
-                <!-- 4. PALETA DE CAMBIO DE MELAMINA EN BLOQUE -->
-                <div class="bg-white dark:bg-zinc-900/80 p-2.5 rounded-xl border border-slate-200/90 dark:border-zinc-800 space-y-2 shadow-2xs">
-                  <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                      <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
-                      <span>Cambiar Melamina en Bloque</span>
-                    </span>
-                    <span class="text-[9px] text-slate-400 font-medium">1 Clic</span>
-                  </div>
+                <!-- 4. PALETA DE CAMBIO DE MATERIAL EN BLOQUE -->
+                @if (isCountertopMultiSelection()) {
+                  <div class="bg-white dark:bg-zinc-900/80 p-2.5 rounded-xl border border-slate-200/90 dark:border-zinc-800 space-y-2 shadow-2xs">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+                        <span>Cambiar Material de Mesón en Bloque</span>
+                      </span>
+                      <span class="text-[9px] text-slate-400 font-medium">1 Clic</span>
+                    </div>
 
-                  <div class="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto scrollbar-thin">
-                    @for (mat of materials(); track mat.id) {
-                      <button
-                        type="button"
-                        (click)="applyMaterialToSelection(mat.id)"
-                        class="p-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 hover:border-indigo-400 bg-slate-50 dark:bg-zinc-800/60 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 flex items-center gap-2 text-left transition cursor-pointer group">
-                        <span
-                          class="w-5 h-5 rounded-md border border-slate-300 dark:border-zinc-600 shrink-0 shadow-2xs"
-                          [style.background-color]="mat.colorHex || '#e2e8f0'"></span>
-                        <div class="min-w-0 flex-1">
-                          <div class="text-[10px] font-bold text-slate-800 dark:text-zinc-200 truncate group-hover:text-indigo-600 transition">{{ mat.name }}</div>
-                          <div class="text-[8px] font-mono text-slate-400">{{ mat.thickness || 18 }} mm</div>
-                        </div>
-                      </button>
+                    <div class="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto scrollbar-thin">
+                      @for (mat of countertopMaterials(); track mat.id) {
+                        <button
+                          type="button"
+                          (click)="applyMaterialToSelection(mat.id)"
+                          class="p-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 hover:border-blue-400 bg-slate-50 dark:bg-zinc-800/60 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 flex items-center gap-2 text-left transition cursor-pointer group">
+                          <span
+                            class="w-5 h-5 rounded-md border border-slate-300 dark:border-zinc-600 shrink-0 shadow-2xs"
+                            [style.background-color]="mat.colorHex || '#e2e8f0'"></span>
+                          <div class="min-w-0 flex-1">
+                            <div class="text-[10px] font-bold text-slate-800 dark:text-zinc-200 truncate group-hover:text-blue-600 transition">{{ mat.name }}</div>
+                            <div class="text-[8px] font-mono text-slate-400">{{ mat.category === 'stone' ? 'Piedra' : (mat.thickness + ' mm') }}</div>
+                          </div>
+                        </button>
+                      }
+                    </div>
+
+                    @if (selectedAppliances().length > 0) {
+                      <div class="mt-2 px-2 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/50 text-[9.5px] text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.info" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+                        <span>Aplica exclusivamente a mesones y salpicaderos.</span>
+                      </div>
                     }
                   </div>
-
-                  @if (selectedAppliances().length > 0) {
-                    <div class="mt-2 px-2 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/50 text-[9.5px] text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                      <hugeicons-icon [icon]="icons.info" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
-                      <span>Aplica solo a melaminas. Los electrodomésticos conservan su acabado de catálogo intacto.</span>
+                } @else {
+                  <div class="bg-white dark:bg-zinc-900/80 p-2.5 rounded-xl border border-slate-200/90 dark:border-zinc-800 space-y-2 shadow-2xs">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
+                        <span>Cambiar Melamina en Bloque</span>
+                      </span>
+                      <span class="text-[9px] text-slate-400 font-medium">1 Clic</span>
                     </div>
-                  }
-                </div>
+
+                    <div class="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto scrollbar-thin">
+                      @for (mat of materials(); track mat.id) {
+                        <button
+                          type="button"
+                          (click)="applyMaterialToSelection(mat.id)"
+                          class="p-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 hover:border-indigo-400 bg-slate-50 dark:bg-zinc-800/60 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 flex items-center gap-2 text-left transition cursor-pointer group">
+                          <span
+                            class="w-5 h-5 rounded-md border border-slate-300 dark:border-zinc-600 shrink-0 shadow-2xs"
+                            [style.background-color]="mat.colorHex || '#e2e8f0'"></span>
+                          <div class="min-w-0 flex-1">
+                            <div class="text-[10px] font-bold text-slate-800 dark:text-zinc-200 truncate group-hover:text-indigo-600 transition">{{ mat.name }}</div>
+                            <div class="text-[8px] font-mono text-slate-400">{{ mat.thickness || 18 }} mm</div>
+                          </div>
+                        </button>
+                      }
+                    </div>
+
+                    @if (selectedAppliances().length > 0) {
+                      <div class="mt-2 px-2 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/50 text-[9.5px] text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.info" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+                        <span>Aplica solo a melaminas. Los electrodomésticos conservan su acabado de catálogo intacto.</span>
+                      </div>
+                    }
+                  </div>
+                }
 
                 <!-- 5. CALLOUT DE COHERENCIA CAD / SKETCHUP -->
                 <div class="p-3 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl flex items-start gap-2.5 shadow-2xs">
@@ -2504,7 +2559,7 @@
                         min="1"
                         max="100"
                         step="1"
-                        [value]="sel.thickness"
+                        [value]="isSelectedGroupCountertop() ? selectedCountertopThickness() : sel.thickness"
                         (input)="onThicknessChange(+$any($event.target).value)"
                         class="w-12 h-5 bg-white border border-zinc-200 rounded-md text-center text-[11px] font-semibold text-zinc-900 font-mono tabular-nums focus:outline-hidden focus:border-blue-500" />
                       <span class="text-[10px] text-zinc-400 font-mono tabular-nums">mm</span>
@@ -2520,21 +2575,21 @@
                       <button
                         type="button"
                         (click)="onThicknessChange(20)"
-                        [class]="Math.round(sel.thickness) === 20 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(selectedCountertopThickness()) === 20 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         20 mm (Cuarzo)
                       </button>
                       <button
                         type="button"
                         (click)="onThicknessChange(30)"
-                        [class]="Math.round(sel.thickness) === 30 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(selectedCountertopThickness()) === 30 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         30 mm (Piedra)
                       </button>
                       <button
                         type="button"
                         (click)="onThicknessChange(40)"
-                        [class]="Math.round(sel.thickness) === 40 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
+                        [class]="Math.round(selectedCountertopThickness()) === 40 ? 'bg-amber-600 text-white font-bold shadow-2xs border-amber-700' : 'bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200'"
                         class="py-1 text-[10px] font-mono rounded-lg transition border text-center cursor-pointer">
                         40 mm (Macizo)
                       </button>
