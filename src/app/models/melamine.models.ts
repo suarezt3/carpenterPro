@@ -793,12 +793,30 @@ export const WALL_FINISHES_CATALOG: FinishCatalogItem<WallMaterialType>[] = [
 ];
 
 
+export interface RoomWallInstance {
+  id: string;
+  name: string;
+  length: number;              // Longitud en mm
+  height: number;              // Altura en mm
+  thickness: number;           // Espesor en mm
+  posX: number;                // Posición central X en mm
+  posZ: number;                // Posición central Z en mm
+  rotationY: number;           // Giro sobre su propio eje en grados (0, 90, 180, 270)
+  material?: WallMaterialType;
+  showSkirting?: boolean;
+  isLocked?: boolean;
+  isHidden?: boolean;
+}
+
 export interface RoomConfiguration {
   layout: RoomLayoutType;
   mainWallLength: number;      // Longitud en mm (ej. 3600)
   sideWallLength: number;      // Longitud en mm para L o lateral izquierdo (ej. 2400)
   rightWallLength?: number;     // Longitud en mm para lateral derecho en U (ej. 2400)
-  wallHeight: number;          // Altura en mm (ej. 2600)
+  wallHeight: number;          // Altura base en mm (ej. 2600)
+  mainWallHeight?: number;     // Altura independiente muro principal en mm
+  sideWallHeight?: number;     // Altura independiente muro lateral izquierdo en mm
+  rightWallHeight?: number;    // Altura independiente muro lateral derecho en mm
   wallThickness: number;       // Espesor en mm (ej. 150)
   floorWidth: number;          // Ancho de piso en mm (ej. 5000)
   floorDepth: number;          // Profundidad de piso en mm (ej. 5000)
@@ -808,6 +826,10 @@ export interface RoomConfiguration {
   showSkirting: boolean;       // Zócalo o rodapié inferior
   wallOffsetX: number;         // Desfase modular X en mm (posición del muro)
   wallOffsetZ: number;         // Desfase modular Z en mm (hacia el fondo)
+  isWallsLocked?: boolean;     // Bloqueo global de todos los muros
+  lockedWalls?: { [wallId: string]: boolean | undefined }; // Bloqueo individual por muro
+  hiddenWalls?: { [wallId: string]: boolean | undefined }; // Ocultar individualmente muros
+  walls?: RoomWallInstance[];  // Muros independientes y divisorios en el espacio
 }
 
 export const DEFAULT_ROOM_CONFIG: RoomConfiguration = {
@@ -816,6 +838,9 @@ export const DEFAULT_ROOM_CONFIG: RoomConfiguration = {
   sideWallLength: 2400,
   rightWallLength: 2400,
   wallHeight: 2600,
+  mainWallHeight: 2600,
+  sideWallHeight: 2600,
+  rightWallHeight: 2600,
   wallThickness: 150,
   floorWidth: 5000,
   floorDepth: 5000,
@@ -825,7 +850,234 @@ export const DEFAULT_ROOM_CONFIG: RoomConfiguration = {
   showSkirting: true,
   wallOffsetX: 0,
   wallOffsetZ: 0,
+  isWallsLocked: false,
+  lockedWalls: { main: false, side: false, right_side: false },
+  hiddenWalls: { main: false, side: false, right_side: false }
 };
+
+/**
+ * Redimensiona y reubica proporcionalmente los muros cuando el tamaño del entorno cambia,
+ * garantizando que los muros a ras se mantengan alineados y ningún muro quede por fuera del piso.
+ */
+export function rescaleWallsToFloor(
+  walls: RoomWallInstance[],
+  prevFloorW: number,
+  prevFloorD: number,
+  newFloorW: number,
+  newFloorD: number,
+  wallThickness = 150,
+  offX = 0,
+  offZ = 0
+): RoomWallInstance[] {
+  const safePrevW = Math.max(1000, prevFloorW || 5000);
+  const safePrevD = Math.max(1000, prevFloorD || 5000);
+  const sx = newFloorW / safePrevW;
+  const sz = newFloorD / safePrevD;
+  const halfNewW = newFloorW / 2;
+  const halfNewD = newFloorD / 2;
+  const maxSideL = Math.max(600, newFloorD - wallThickness);
+
+  return walls.map(w => {
+    const rot = ((w.rotationY || 0) % 360 + 360) % 360;
+    const isHoriz = rot === 0 || rot === 180;
+    const isVert = rot === 90 || rot === 270;
+
+    if (w.id === 'main') {
+      const wasFull = w.length >= safePrevW * 0.85;
+      const newL = wasFull ? newFloorW : Math.min(newFloorW, Math.max(600, Math.round(w.length * sx)));
+      const baseRearZ = -halfNewD + offZ + wallThickness / 2;
+      const baseLeftX = -halfNewW + offX + newL / 2;
+      return {
+        ...w,
+        length: newL,
+        posX: Math.round(Math.max(-halfNewW + newL / 2, Math.min(halfNewW - newL / 2, baseLeftX))),
+        posZ: Math.round(Math.max(-halfNewD + wallThickness / 2, Math.min(halfNewD - wallThickness / 2, baseRearZ)))
+      };
+    }
+
+    if (w.id === 'side') {
+      const wasFull = w.length >= (safePrevD - wallThickness) * 0.85;
+      const newL = wasFull ? maxSideL : Math.min(maxSideL, Math.max(600, Math.round(w.length * sz)));
+      const baseLeftX = -halfNewW + offX + wallThickness / 2;
+      const baseRearZ = -halfNewD + offZ + wallThickness + newL / 2;
+      return {
+        ...w,
+        length: newL,
+        posX: Math.round(Math.max(-halfNewW + wallThickness / 2, Math.min(halfNewW - wallThickness / 2, baseLeftX))),
+        posZ: Math.round(Math.max(-halfNewD + wallThickness + newL / 2, Math.min(halfNewD - newL / 2, baseRearZ)))
+      };
+    }
+
+    if (w.id === 'right_side') {
+      const wasFull = w.length >= (safePrevD - wallThickness) * 0.85;
+      const newL = wasFull ? maxSideL : Math.min(maxSideL, Math.max(600, Math.round(w.length * sz)));
+      const baseRightX = halfNewW + offX - wallThickness / 2;
+      const baseRearZ = -halfNewD + offZ + wallThickness + newL / 2;
+      return {
+        ...w,
+        length: newL,
+        posX: Math.round(Math.max(-halfNewW + wallThickness / 2, Math.min(halfNewW - wallThickness / 2, baseRightX))),
+        posZ: Math.round(Math.max(-halfNewD + wallThickness + newL / 2, Math.min(halfNewD - newL / 2, baseRearZ)))
+      };
+    }
+
+    // Muros divisorios / independientes
+    let newL = w.length;
+    if (isHoriz) {
+      newL = Math.min(newFloorW, Math.max(400, Math.round(w.length * sx)));
+    } else if (isVert) {
+      newL = Math.min(newFloorD, Math.max(400, Math.round(w.length * sz)));
+    } else {
+      newL = Math.min(Math.max(newFloorW, newFloorD), Math.max(400, Math.round(w.length * Math.min(sx, sz))));
+    }
+
+    const halfSpanX = isHoriz ? newL / 2 : wallThickness / 2;
+    const halfSpanZ = isHoriz ? wallThickness / 2 : newL / 2;
+    const scaledX = Math.round(w.posX * sx);
+    const scaledZ = Math.round(w.posZ * sz);
+    const clampedX = Math.max(-halfNewW + halfSpanX, Math.min(halfNewW - halfSpanX, scaledX));
+    const clampedZ = Math.max(-halfNewD + halfSpanZ, Math.min(halfNewD - halfSpanZ, scaledZ));
+
+    return {
+      ...w,
+      length: newL,
+      posX: clampedX,
+      posZ: clampedZ
+    };
+  });
+}
+
+/**
+ * Resuelve la lista de muros independientes de la habitación.
+ * Si ya existen en config.walls, se retornan adaptados y validados estrictamente dentro del piso.
+ * De lo contrario, se sintetizan a partir de la distribución base (main, side, right_side)
+ * preservando la alineación exacta a los bordes y las dimensiones del espacio.
+ */
+export function getResolvedRoomWalls(config: RoomConfiguration): RoomWallInstance[] {
+  const effectiveFloorWidth = config.floorWidth || 5000;
+  const effectiveFloorDepth = config.floorDepth || 5000;
+  const wallThickness = config.wallThickness || 150;
+  const offX = config.wallOffsetX ?? 0;
+  const offZ = config.wallOffsetZ ?? 0;
+  const halfFloorW = effectiveFloorWidth / 2;
+  const halfFloorD = effectiveFloorDepth / 2;
+
+  if (config.walls && config.walls.length > 0) {
+    const maxSideL = Math.max(600, effectiveFloorDepth - wallThickness);
+    return config.walls.map(w => {
+      let len = w.length;
+      let px = w.posX;
+      let pz = w.posZ;
+      const rot = ((w.rotationY || 0) % 360 + 360) % 360;
+      const isHoriz = rot === 0 || rot === 180;
+      const isVert = rot === 90 || rot === 270;
+
+      if (w.id === 'main') {
+        len = Math.min(effectiveFloorWidth, Math.max(600, len));
+        const halfSpanX = len / 2;
+        px = Math.max(-halfFloorW + halfSpanX, Math.min(halfFloorW - halfSpanX, px));
+        pz = Math.max(-halfFloorD + wallThickness / 2, Math.min(halfFloorD - wallThickness / 2, pz));
+      } else if (w.id === 'side' || w.id === 'right_side') {
+        len = Math.min(maxSideL, Math.max(600, len));
+        const halfSpanZ = len / 2;
+        px = Math.max(-halfFloorW + wallThickness / 2, Math.min(halfFloorW - wallThickness / 2, px));
+        pz = Math.max(-halfFloorD + wallThickness + halfSpanZ, Math.min(halfFloorD - halfSpanZ, pz));
+      } else {
+        const maxLen = isHoriz ? effectiveFloorWidth : (isVert ? effectiveFloorDepth : Math.max(effectiveFloorWidth, effectiveFloorDepth));
+        len = Math.min(maxLen, Math.max(400, len));
+        const halfSpanX = isHoriz ? len / 2 : wallThickness / 2;
+        const halfSpanZ = isHoriz ? wallThickness / 2 : len / 2;
+        px = Math.max(-halfFloorW + halfSpanX, Math.min(halfFloorW - halfSpanX, px));
+        pz = Math.max(-halfFloorD + halfSpanZ, Math.min(halfFloorD - halfSpanZ, pz));
+      }
+
+      return {
+        ...w,
+        length: Math.round(len),
+        posX: Math.round(px),
+        posZ: Math.round(pz)
+      };
+    });
+  }
+
+  const {
+    layout,
+    mainWallLength,
+    sideWallLength,
+    wallHeight,
+    wallMaterial,
+    showSkirting
+  } = config;
+
+  const baseX = -(effectiveFloorWidth / 2) + offX;
+  const baseZ = -(effectiveFloorDepth / 2) + offZ;
+
+  const effMainH = config.mainWallHeight ?? wallHeight;
+  const effSideH = config.sideWallHeight ?? wallHeight;
+  const effRightH = config.rightWallHeight ?? wallHeight;
+
+  const effMainL = Math.min(effectiveFloorWidth, Math.max(600, mainWallLength));
+  const maxSideL = Math.max(600, effectiveFloorDepth - wallThickness);
+  const effSideL = Math.min(maxSideL, Math.max(600, sideWallLength));
+  const rightLength = config.rightWallLength || sideWallLength;
+  const effRightL = Math.min(maxSideL, Math.max(600, rightLength));
+
+  const list: RoomWallInstance[] = [];
+
+  // Muro Principal (Horizontal a lo largo de X, cara posterior en baseZ)
+  list.push({
+    id: 'main',
+    name: 'Muro Principal',
+    length: effMainL,
+    height: effMainH,
+    thickness: wallThickness,
+    posX: Math.round(baseX + effMainL / 2),
+    posZ: Math.round(baseZ + wallThickness / 2),
+    rotationY: 0,
+    material: wallMaterial,
+    showSkirting: showSkirting,
+    isLocked: !!config.isWallsLocked || !!config.lockedWalls?.['main'],
+    isHidden: !!config.hiddenWalls?.['main']
+  });
+
+  // Muro Lateral Izquierdo (Vertical a lo largo de Z, cara izquierda en baseX)
+  if (layout === 'l_shape' || layout === 'u_shape') {
+    list.push({
+      id: 'side',
+      name: 'Muro Lateral Izquierdo',
+      length: effSideL,
+      height: effSideH,
+      thickness: wallThickness,
+      posX: Math.round(baseX + wallThickness / 2),
+      posZ: Math.round(baseZ + wallThickness + effSideL / 2),
+      rotationY: 90,
+      material: wallMaterial,
+      showSkirting: showSkirting,
+      isLocked: !!config.isWallsLocked || !!config.lockedWalls?.['side'],
+      isHidden: !!config.hiddenWalls?.['side']
+    });
+  }
+
+  // Muro Lateral Derecho (Vertical a lo largo de Z, cara derecha en baseX + effMainL)
+  if (layout === 'u_shape') {
+    list.push({
+      id: 'right_side',
+      name: 'Muro Lateral Derecho',
+      length: effRightL,
+      height: effRightH,
+      thickness: wallThickness,
+      posX: Math.round(baseX + effMainL - wallThickness / 2),
+      posZ: Math.round(baseZ + wallThickness + effRightL / 2),
+      rotationY: 90,
+      material: wallMaterial,
+      showSkirting: showSkirting,
+      isLocked: !!config.isWallsLocked || !!config.lockedWalls?.['right_side'],
+      isHidden: !!config.hiddenWalls?.['right_side']
+    });
+  }
+
+  return list;
+}
 
 // ==========================================
 // FASE 2: REPOSITORIO DE ELECTRODOMÉSTICOS Y ACCESORIOS 3D

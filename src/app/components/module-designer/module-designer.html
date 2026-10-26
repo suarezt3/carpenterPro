@@ -1187,22 +1187,76 @@
               <span>Mover Mueble</span>
             </button>
 
-            <!-- Control Interactivo del Muro Seleccionado en 3D -->
-            @if (selectedWall(); as wall) {
-              <div class="flex items-center gap-1 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2 py-0.5 rounded-lg text-[11px] font-semibold animate-in fade-in duration-100">
-                <hugeicons-icon [icon]="icons.ruler" [size]="12" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
-                <span>{{ wall === 'main' ? 'Muro Principal' : 'Muro Lateral L' }}:</span>
-                <span class="font-mono text-white">{{ wall === 'main' ? roomConfig().mainWallLength : roomConfig().sideWallLength }} mm</span>
+            <!-- Botón Añadir Muro Divisorio -->
+            <button
+              type="button"
+              (click)="addRoomWall()"
+              class="px-2.5 py-0.5 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Añadir un nuevo muro independiente o divisorio a la habitación 3D">
+              <hugeicons-icon [icon]="icons.cube3d" [size]="12" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
+              <span>+ Muro</span>
+            </button>
+
+            <!-- Barra Flotante de Acciones Rápidas del Muro Seleccionado en 3D -->
+            @if (selectedWallInstance(); as wallInst) {
+              <div class="flex items-center gap-1.5 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold animate-in fade-in duration-100 shadow-md">
+                <hugeicons-icon [icon]="icons.cube3d" [size]="12" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
+                <span class="text-white font-bold truncate max-w-[120px]">{{ wallInst.name }}:</span>
+                <span class="font-mono text-sky-300 text-[10px]">{{ wallInst.length }}×{{ wallInst.height }} mm</span>
+
+                <!-- Badge Rotación -->
+                <span class="px-1.5 py-0.2 bg-sky-900/80 text-sky-200 rounded text-[9px] font-mono border border-sky-700/60">
+                  {{ (wallInst.rotationY || 0) }}° ({{ (wallInst.rotationY || 0) % 180 === 0 ? 'Horiz' : 'Vert' }})
+                </span>
+
+                <!-- Botón Girar 90° (R) -->
                 <button
                   type="button"
-                  (click)="wall === 'main' ? stretchMainWall(-200) : stretchSideWall(-200)"
-                  class="px-1.5 py-0.2 bg-white/10 hover:bg-white/20 rounded text-[10px] font-bold transition cursor-pointer"
-                  title="Encoger muro 200 mm">-200</button>
+                  (click)="rotateWall(wallInst.id, 90)"
+                  class="px-1.5 py-0.5 bg-sky-700 hover:bg-sky-600 active:scale-95 text-white rounded text-[10px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title="Girar muro 90° en su propio eje (Atajo: tecla R)">
+                  <hugeicons-icon [icon]="icons.rotate" [size]="11" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  <span>Girar 90° (R)</span>
+                </button>
+
+                <!-- Botón Duplicar -->
                 <button
                   type="button"
-                  (click)="wall === 'main' ? stretchMainWall(200) : stretchSideWall(200)"
-                  class="px-1.5 py-0.2 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-bold transition cursor-pointer"
-                  title="Estirar muro 200 mm">+200</button>
+                  (click)="duplicateWall(wallInst.id)"
+                  class="px-1.5 py-0.5 bg-white/10 hover:bg-white/20 text-sky-200 hover:text-white rounded text-[10px] font-medium transition cursor-pointer flex items-center gap-0.5"
+                  title="Duplicar este muro">
+                  <hugeicons-icon [icon]="icons.copy" [size]="11" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  <span class="hidden md:inline">Duplicar</span>
+                </button>
+
+                <!-- Botón Congelar / Bloquear -->
+                <button
+                  type="button"
+                  (click)="toggleWallLock(wallInst.id)"
+                  [class]="isWallLocked(wallInst.id) ? 'bg-amber-600 text-white' : 'bg-white/10 text-sky-200 hover:bg-white/20'"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-medium transition cursor-pointer flex items-center gap-0.5"
+                  [title]="isWallLocked(wallInst.id) ? 'Desbloquear muro' : 'Congelar muro'">
+                  <hugeicons-icon [icon]="isWallLocked(wallInst.id) ? icons.lock : icons.unlock" [size]="11" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                </button>
+
+                <!-- Botón Ocultar -->
+                <button
+                  type="button"
+                  (click)="toggleWallVisibility(wallInst.id)"
+                  [class]="isWallHidden(wallInst.id) ? 'bg-zinc-700 text-zinc-400' : 'bg-white/10 text-sky-200 hover:bg-white/20'"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-medium transition cursor-pointer flex items-center gap-0.5"
+                  [title]="isWallHidden(wallInst.id) ? 'Mostrar muro' : 'Ocultar muro'">
+                  <hugeicons-icon [icon]="isWallHidden(wallInst.id) ? icons.eyeOff : icons.eye" [size]="11" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                </button>
+
+                <!-- Botón Eliminar -->
+                <button
+                  type="button"
+                  (click)="deleteWall(wallInst.id)"
+                  class="px-1.5 py-0.5 bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white rounded text-[10px] font-bold transition cursor-pointer flex items-center gap-0.5"
+                  title="Eliminar muro (Supr o Backspace)">
+                  <hugeicons-icon [icon]="icons.delete" [size]="11" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                </button>
               </div>
             }
 
@@ -1371,8 +1425,10 @@
                 : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium'"
               class="flex-auto py-1.5 px-2.5 text-xs rounded-md flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap">
               <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-zinc-400]="activeDockTab() !== 'piece'"></hugeicons-icon>
-              <span>Propiedades</span>
-              @if (selectedPart()) {
+              <span>{{ selectedWall() ? 'Muro' : (selectedPart() ? 'Pieza' : 'Propiedades') }}</span>
+              @if (selectedWall()) {
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0 animate-pulse"></span>
+              } @else if (selectedPart()) {
                 <span class="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0 animate-pulse"></span>
               }
             </button>
@@ -3265,6 +3321,759 @@
                   <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
                   <span class="truncate">{{ activeSelectedGroupId() ? 'Eliminar Módulo' : 'Eliminar' }}</span>
                 </button>
+              </div>
+
+            } @else if (selectedWallInstance() || workspaceMode() === 'room') {
+
+              <!-- ======================================================== -->
+              <!-- INSPECTOR DOCK LATERAL DERECHO: HABITACIÓN 3D Y MUROS    -->
+              <!-- ======================================================== -->
+              <div class="space-y-3">
+
+                <!-- 1. SELECTOR SEGMENTADO PRINCIPAL: MUROS / ENTORNO / ACABADOS -->
+                <div class="p-1 bg-zinc-200/70 rounded-lg flex items-center gap-1">
+                  <button
+                    type="button"
+                    (click)="roomDockSubTab.set('wall')"
+                    [class]="roomDockSubTab() === 'wall'
+                      ? 'bg-white text-zinc-900 font-semibold shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900 font-medium'"
+                    class="flex-1 py-1.5 px-2 text-xs rounded-md transition text-center cursor-pointer flex items-center justify-center gap-1.5 truncate">
+                    <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-sky-600]="roomDockSubTab() === 'wall'"></hugeicons-icon>
+                    <span>Muros</span>
+                    @if (selectedWall()) {
+                      <span class="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0"></span>
+                    }
+                  </button>
+
+                  <button
+                    type="button"
+                    (click)="roomDockSubTab.set('environment')"
+                    [class]="roomDockSubTab() === 'environment'
+                      ? 'bg-white text-zinc-900 font-semibold shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900 font-medium'"
+                    class="flex-1 py-1.5 px-2 text-xs rounded-md transition text-center cursor-pointer flex items-center justify-center gap-1.5 truncate">
+                    <hugeicons-icon [icon]="icons.expandArea" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-indigo-600]="roomDockSubTab() === 'environment'"></hugeicons-icon>
+                    <span>Entorno</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    (click)="roomDockSubTab.set('finishes')"
+                    [class]="roomDockSubTab() === 'finishes'
+                      ? 'bg-white text-zinc-900 font-semibold shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900 font-medium'"
+                    class="flex-1 py-1.5 px-2 text-xs rounded-md transition text-center cursor-pointer flex items-center justify-center gap-1.5 truncate">
+                    <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-amber-600]="roomDockSubTab() === 'finishes'"></hugeicons-icon>
+                    <span>Acabados</span>
+                  </button>
+                </div>
+
+                <!-- SUB-PESTAÑA 1: GESTIÓN Y PROPIEDADES DE MUROS -->
+                @if (roomDockSubTab() === 'wall') {
+
+                  @if (selectedWallInstance(); as selWall) {
+
+                    <!-- Cabecera Muro Seleccionado -->
+                    <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
+                      <div class="flex items-center justify-between gap-1.5">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                          <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+                          <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 truncate">
+                            Muro Seleccionado
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          (click)="onWallSelected(null)"
+                          class="text-zinc-400 hover:text-zinc-700 p-0.5 rounded-md hover:bg-zinc-100 cursor-pointer flex items-center justify-center transition"
+                          title="Deseleccionar muro (Esc)">
+                          <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                        </button>
+                      </div>
+
+                      <div class="flex items-center gap-2">
+                        <input
+                          type="text"
+                          [value]="selWall.name"
+                          (change)="updateWallName(selWall.id, $any($event.target).value)"
+                          class="text-xs font-semibold text-zinc-900 bg-zinc-50 px-2 py-1 rounded border border-zinc-200 w-full focus:outline-hidden focus:border-zinc-400"
+                          title="Clic para renombrar este muro" />
+                        <span class="text-[10px] font-mono px-2 py-1 rounded bg-zinc-100 text-zinc-600 font-bold border border-zinc-200 shrink-0">
+                          {{ selWall.length }}×{{ selWall.height }} mm
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Selector Chips de Muros + Botón Añadir Muro -->
+                    <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                          <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                          <span>Muros en Habitación</span>
+                        </span>
+                        <button
+                          type="button"
+                          (click)="addRoomWall()"
+                          class="text-[11px] font-semibold text-zinc-800 hover:text-black flex items-center gap-1 cursor-pointer transition">
+                          <hugeicons-icon [icon]="icons.add" [size]="12" [strokeWidth]="2.2"></hugeicons-icon>
+                          <span>+ Muro</span>
+                        </button>
+                      </div>
+
+                      <div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto scrollbar-thin">
+                        @for (w of resolvedWalls(); track w.id) {
+                          <button
+                            type="button"
+                            (click)="onWallSelected(w.id)"
+                            [class]="selectedWall() === w.id
+                              ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
+                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200 font-normal'"
+                            class="px-2 py-1 text-[11px] rounded-md border transition flex items-center gap-1 cursor-pointer">
+                            <span class="w-1.5 h-1.5 rounded-full" [class]="selectedWall() === w.id ? 'bg-white' : 'bg-sky-500'"></span>
+                            <span class="truncate max-w-[120px]">{{ w.name }}</span>
+                            <span class="text-[9px] opacity-70 font-mono">({{ (w.rotationY || 0) % 180 === 0 ? 'H' : 'V' }})</span>
+                          </button>
+                        }
+                      </div>
+                    </div>
+
+                    <!-- Orientación y Giro sobre su propio eje -->
+                    <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                          <hugeicons-icon [icon]="icons.rotate" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                          <span>Orientación y Giro (R)</span>
+                        </span>
+                        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 font-bold border border-zinc-200">
+                          {{ (selWall.rotationY || 0) }}°
+                        </span>
+                      </div>
+
+                      <div class="grid grid-cols-3 gap-1.5 text-xs">
+                        <button
+                          type="button"
+                          (click)="setWallOrientation(selWall.id, 'horizontal')"
+                          [class]="(selWall.rotationY || 0) % 180 === 0
+                            ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                            : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200'"
+                          class="py-1.5 rounded-md transition text-center cursor-pointer">
+                          Horizontal
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setWallOrientation(selWall.id, 'vertical')"
+                          [class]="(selWall.rotationY || 0) % 180 === 90
+                            ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                            : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200'"
+                          class="py-1.5 rounded-md transition text-center cursor-pointer">
+                          Vertical
+                        </button>
+                        <button
+                          type="button"
+                          (click)="rotateWall(selWall.id, 90)"
+                          class="py-1.5 font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 rounded-md transition text-center flex items-center justify-center gap-1 cursor-pointer"
+                          title="Girar +90° sobre su propio eje (Atajo: tecla R)">
+                          <hugeicons-icon [icon]="icons.rotate" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                          <span>+90° (R)</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Dimensiones del Muro -->
+                    <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2.5 shadow-2xs">
+                      <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.ruler" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                        <span>Dimensiones del Muro</span>
+                      </span>
+
+                      <!-- Largo -->
+                      <div class="p-2 bg-zinc-50 rounded-md border border-zinc-200 space-y-1.5">
+                        <div class="flex items-center justify-between text-[11px]">
+                          <span class="font-medium text-zinc-600">Longitud (Largo)</span>
+                          <span class="font-mono font-bold text-zinc-900">{{ selWall.length }} mm</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                          <button
+                            type="button"
+                            (click)="nudgeWallLength(selWall.id, -500)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            title="-500 mm">-500</button>
+                          <button
+                            type="button"
+                            (click)="nudgeWallLength(selWall.id, -100)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            title="-100 mm">-100</button>
+                          <input
+                            type="number"
+                            min="400"
+                            step="50"
+                            [value]="selWall.length"
+                            (input)="setWallLength(selWall.id, +$any($event.target).value)"
+                            class="w-full text-center py-0.5 bg-white border border-zinc-200 rounded text-xs font-mono font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-400" />
+                          <button
+                            type="button"
+                            (click)="nudgeWallLength(selWall.id, 100)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            title="+100 mm">+100</button>
+                          <button
+                            type="button"
+                            (click)="nudgeWallLength(selWall.id, 500)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            title="+500 mm">+500</button>
+                        </div>
+                      </div>
+
+                      <!-- Altura -->
+                      <div class="p-2 bg-zinc-50 rounded-md border border-zinc-200 space-y-1.5">
+                        <div class="flex items-center justify-between text-[11px]">
+                          <span class="font-medium text-zinc-600">Altura (Eje Y)</span>
+                          <span class="font-mono font-bold text-zinc-900">{{ selWall.height }} mm</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                          <button
+                            type="button"
+                            (click)="nudgeWallHeight(selWall.id, -100)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            title="-100 mm">-100</button>
+                          <button
+                            type="button"
+                            (click)="nudgeWallHeight(selWall.id, -50)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            title="-50 mm">-50</button>
+                          <input
+                            type="number"
+                            min="400"
+                            max="4500"
+                            step="10"
+                            [value]="selWall.height"
+                            (input)="setWallHeight(selWall.id, +$any($event.target).value)"
+                            class="w-full text-center py-0.5 bg-white border border-zinc-200 rounded text-xs font-mono font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-400" />
+                          <button
+                            type="button"
+                            (click)="nudgeWallHeight(selWall.id, 50)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            title="+50 mm">+50</button>
+                          <button
+                            type="button"
+                            (click)="nudgeWallHeight(selWall.id, 100)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            title="+100 mm">+100</button>
+                        </div>
+                      </div>
+
+                      <!-- Grosor -->
+                      <div class="p-2 bg-zinc-50 rounded-md border border-zinc-200 space-y-1.5">
+                        <div class="flex items-center justify-between text-[11px]">
+                          <span class="font-medium text-zinc-600">Grosor / Espesor</span>
+                          <span class="font-mono font-bold text-zinc-900">{{ selWall.thickness }} mm</span>
+                        </div>
+                        <div class="grid grid-cols-4 gap-1">
+                          @for (th of [100, 150, 200, 250]; track th) {
+                            <button
+                              type="button"
+                              (click)="setWallThickness(selWall.id, th)"
+                              [class]="selWall.thickness === th
+                                ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                                : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 font-normal'"
+                              class="py-1 text-[10px] rounded transition text-center cursor-pointer">
+                              {{ th }} mm
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Posición en el Piso -->
+                    <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
+                      <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                        <span>Posición en el Piso</span>
+                      </span>
+
+                      <div class="space-y-1.5 text-[11px]">
+                        <div class="flex items-center justify-between gap-1">
+                          <span class="w-12 font-medium text-zinc-600">Eje X:</span>
+                          <button
+                            type="button"
+                            (click)="nudgeWallPos(selWall.id, 'x', -50)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold cursor-pointer transition">-50</button>
+                          <input
+                            type="number"
+                            step="50"
+                            [value]="Math.round(selWall.posX)"
+                            (input)="setWallPosX(selWall.id, +$any($event.target).value)"
+                            class="w-full text-center py-0.5 bg-zinc-50 border border-zinc-200 rounded text-xs font-mono font-bold text-zinc-900" />
+                          <button
+                            type="button"
+                            (click)="nudgeWallPos(selWall.id, 'x', 50)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold cursor-pointer transition">+50</button>
+                        </div>
+
+                        <div class="flex items-center justify-between gap-1">
+                          <span class="w-12 font-medium text-zinc-600">Eje Z:</span>
+                          <button
+                            type="button"
+                            (click)="nudgeWallPos(selWall.id, 'z', -50)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold cursor-pointer transition">-50</button>
+                          <input
+                            type="number"
+                            step="50"
+                            [value]="Math.round(selWall.posZ)"
+                            (input)="setWallPosZ(selWall.id, +$any($event.target).value)"
+                            class="w-full text-center py-0.5 bg-zinc-50 border border-zinc-200 rounded text-xs font-mono font-bold text-zinc-900" />
+                          <button
+                            type="button"
+                            (click)="nudgeWallPos(selWall.id, 'z', 50)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold cursor-pointer transition">+50</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Acciones del Muro -->
+                    <div class="grid grid-cols-2 gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        (click)="duplicateWall(selWall.id)"
+                        class="py-1.5 px-2 text-xs font-medium bg-white hover:bg-zinc-50 text-zinc-700 rounded-md border border-zinc-200 flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer">
+                        <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
+                        <span>Duplicar Muro</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="toggleWallLock(selWall.id)"
+                        [class]="isWallLocked(selWall.id)
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                          : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-200'"
+                        class="py-1.5 px-2 text-xs font-medium rounded-md border flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer">
+                        <hugeicons-icon [icon]="isWallLocked(selWall.id) ? icons.lock : icons.unlock" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                        <span>{{ isWallLocked(selWall.id) ? 'Congelado' : 'Congelar Muro' }}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="toggleWallVisibility(selWall.id)"
+                        [class]="isWallHidden(selWall.id)
+                          ? 'bg-zinc-800 text-zinc-200 border-zinc-800'
+                          : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-200'"
+                        class="py-1.5 px-2 text-xs font-medium rounded-md border flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer">
+                        <hugeicons-icon [icon]="isWallHidden(selWall.id) ? icons.eyeOff : icons.eye" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                        <span>{{ isWallHidden(selWall.id) ? 'Muro Oculto' : 'Ocultar Muro' }}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="deleteWall(selWall.id)"
+                        class="py-1.5 px-2 text-xs font-medium bg-white hover:bg-rose-50 text-rose-700 rounded-md border border-rose-200 flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer">
+                        <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="2" class="text-rose-500"></hugeicons-icon>
+                        <span>Eliminar Muro</span>
+                      </button>
+                    </div>
+
+                  } @else {
+
+                    <!-- Estado Muros: Lista General cuando no hay muro seleccionado -->
+                    <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2.5 shadow-2xs">
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                          <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                          <span>Muros en Habitación ({{ resolvedWalls().length }})</span>
+                        </span>
+                        <button
+                          type="button"
+                          (click)="addRoomWall()"
+                          class="px-2 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-[11px] font-medium transition flex items-center gap-1 cursor-pointer shadow-xs">
+                          <hugeicons-icon [icon]="icons.add" [size]="12" [strokeWidth]="2.2"></hugeicons-icon>
+                          <span>+ Muro</span>
+                        </button>
+                      </div>
+
+                      <p class="text-[11px] text-zinc-500 leading-relaxed">
+                        Selecciona un muro para editar sus medidas o arrástralo directamente en el lienzo 3D.
+                      </p>
+
+                      <div class="space-y-1.5 max-h-64 overflow-y-auto scrollbar-thin">
+                        @for (w of resolvedWalls(); track w.id) {
+                          <div class="flex items-center justify-between p-2 rounded-md bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 transition">
+                            <button
+                              type="button"
+                              (click)="onWallSelected(w.id)"
+                              class="flex items-center gap-2 flex-1 text-left cursor-pointer min-w-0">
+                              <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+                              <span class="text-xs font-medium text-zinc-900 truncate">{{ w.name }}</span>
+                              <span class="text-[10px] text-zinc-500 font-mono shrink-0">{{ w.length }}×{{ w.height }} mm</span>
+                            </button>
+                            <button
+                              type="button"
+                              (click)="rotateWall(w.id, 90)"
+                              class="p-1 hover:bg-white rounded text-zinc-500 hover:text-zinc-900 transition cursor-pointer"
+                              title="Girar 90°">
+                              <hugeicons-icon [icon]="icons.rotate" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    </div>
+
+                  }
+
+                }
+
+                <!-- SUB-PESTAÑA 2: ENTORNO Y DIMENSIONES DEL SUELO -->
+                @if (roomDockSubTab() === 'environment') {
+
+                  <!-- Dimensiones del Suelo -->
+                  <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2.5 shadow-2xs">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.expandArea" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                        <span>Dimensiones del Suelo</span>
+                      </span>
+                      <span class="text-[10px] font-mono text-zinc-500">
+                        {{ ((roomConfig().floorWidth || 5000) / 1000).toFixed(1) }} × {{ ((roomConfig().floorDepth || 5000) / 1000).toFixed(1) }} m
+                      </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-[11px]">
+                      <div class="p-2 bg-zinc-50 rounded-md border border-zinc-200 space-y-1">
+                        <div class="flex items-center justify-between text-zinc-600">
+                          <span>Ancho (Eje X)</span>
+                          <span class="font-mono text-zinc-400">{{ ((roomConfig().floorWidth || 5000) / 1000).toFixed(1) }} m</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="2000"
+                          max="25000"
+                          step="500"
+                          [value]="roomConfig().floorWidth || 5000"
+                          (change)="setWorkspaceSize(+$any($event.target).value, roomConfig().floorDepth || 5000)"
+                          class="w-full py-1 text-center bg-white border border-zinc-200 rounded font-mono font-bold text-xs text-zinc-900 focus:outline-hidden focus:border-zinc-400" />
+                      </div>
+
+                      <div class="p-2 bg-zinc-50 rounded-md border border-zinc-200 space-y-1">
+                        <div class="flex items-center justify-between text-zinc-600">
+                          <span>Fondo (Eje Z)</span>
+                          <span class="font-mono text-zinc-400">{{ ((roomConfig().floorDepth || 5000) / 1000).toFixed(1) }} m</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="2000"
+                          max="25000"
+                          step="500"
+                          [value]="roomConfig().floorDepth || 5000"
+                          (change)="setWorkspaceSize(roomConfig().floorWidth || 5000, +$any($event.target).value)"
+                          class="w-full py-1 text-center bg-white border border-zinc-200 rounded font-mono font-bold text-xs text-zinc-900 focus:outline-hidden focus:border-zinc-400" />
+                      </div>
+                    </div>
+
+                    <!-- Preajustes Rápidos -->
+                    <div class="space-y-1 pt-1">
+                      <span class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block">Preajustes Rápidos</span>
+                      <div class="grid grid-cols-2 gap-1.5 text-xs">
+                        <button
+                          type="button"
+                          (click)="setWorkspaceSize(5000, 5000)"
+                          [class]="(roomConfig().floorWidth === 5000 && roomConfig().floorDepth === 5000)
+                            ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
+                          class="py-1.5 px-2 rounded-md transition text-center cursor-pointer">
+                          5 × 5 m <span class="text-[10px] opacity-75">(Estándar)</span>
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setWorkspaceSize(8000, 6000)"
+                          [class]="(roomConfig().floorWidth === 8000 && roomConfig().floorDepth === 6000)
+                            ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
+                          class="py-1.5 px-2 rounded-md transition text-center cursor-pointer">
+                          8 × 6 m <span class="text-[10px] opacity-75">(Amplio)</span>
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setWorkspaceSize(10000, 8000)"
+                          [class]="(roomConfig().floorWidth === 10000 && roomConfig().floorDepth === 8000)
+                            ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
+                          class="py-1.5 px-2 rounded-md transition text-center cursor-pointer">
+                          10 × 8 m <span class="text-[10px] opacity-75">(Salón)</span>
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setWorkspaceSize(12000, 10000)"
+                          [class]="(roomConfig().floorWidth === 12000 && roomConfig().floorDepth === 10000)
+                            ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
+                          class="py-1.5 px-2 rounded-md transition text-center cursor-pointer">
+                          12 × 10 m <span class="text-[10px] opacity-75">(Grande)</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Disposición Arquitectónica -->
+                  <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
+                    <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.homeRoof" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                      <span>Disposición Arquitectónica</span>
+                    </span>
+
+                    <div class="grid grid-cols-3 gap-1.5 text-xs">
+                      <button
+                        type="button"
+                        (click)="setRoomLayout('single_wall')"
+                        [class]="roomConfig().layout === 'single_wall'
+                          ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                          : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
+                        class="py-1.5 rounded-md transition text-center cursor-pointer">
+                        Pared Recta
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setRoomLayout('l_shape')"
+                        [class]="roomConfig().layout === 'l_shape'
+                          ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                          : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
+                        class="py-1.5 rounded-md transition text-center cursor-pointer">
+                        Esquina en L
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setRoomLayout('u_shape')"
+                        [class]="roomConfig().layout === 'u_shape'
+                          ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                          : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
+                        class="py-1.5 rounded-md transition text-center cursor-pointer">
+                        Cocina en U
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Altura General de Techo -->
+                  <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="font-semibold text-zinc-900 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.ruler" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                        <span>Altura General de Techo</span>
+                      </span>
+                      <span class="font-mono font-bold text-zinc-900">{{ roomConfig().wallHeight || 2600 }} mm</span>
+                    </div>
+
+                    <div class="grid grid-cols-4 gap-1">
+                      @for (h of [2400, 2600, 2800, 3000]; track h) {
+                        <button
+                          type="button"
+                          (click)="updateRoomConfig({ wallHeight: h })"
+                          [class]="(roomConfig().wallHeight || 2600) === h
+                            ? 'bg-zinc-900 text-white font-medium shadow-xs'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200 font-normal'"
+                          class="py-1 text-[10px] rounded transition text-center cursor-pointer">
+                          {{ h }} mm
+                        </button>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Acciones de Alineación y Cámara -->
+                  <div class="grid grid-cols-2 gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      (click)="alignWallsToEdge()"
+                      class="py-2 px-2 text-xs font-medium bg-white hover:bg-zinc-50 text-zinc-700 rounded-md border border-zinc-200 flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
+                      title="Alinear los muros al borde exacto (0, 0) del espacio de trabajo">
+                      <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
+                      <span>Alinear al Borde</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      (click)="frameRoomCamera()"
+                      class="py-2 px-2 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
+                      title="Encuadrar y centrar la cámara para ver toda la habitación completa">
+                      <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                      <span>Centrar Vista 3D</span>
+                    </button>
+                  </div>
+
+                }
+
+                <!-- SUB-PESTAÑA 3: ACABADOS DE PISO, MUROS Y OPCIONES TÉCNICAS -->
+                @if (roomDockSubTab() === 'finishes') {
+
+                  <!-- Catálogo de Acabado de Piso -->
+                  <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+                        <span>Acabado del Piso</span>
+                      </span>
+                      <span class="text-[10px] text-zinc-400 font-mono">({{ filteredFloorCatalog().length }} modelos)</span>
+                    </div>
+
+                    <!-- Filtros de categoría de piso -->
+                    <div class="flex items-center gap-1 p-0.5 bg-zinc-100 rounded-md text-[10px] overflow-x-auto scrollbar-thin">
+                      <button
+                        type="button"
+                        (click)="setFloorCategory('all')"
+                        [class]="activeFloorCategory() === 'all' ? 'bg-white text-zinc-900 font-semibold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
+                        class="py-0.5 px-1.5 rounded transition whitespace-nowrap cursor-pointer">
+                        Todos
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setFloorCategory('cement')"
+                        [class]="activeFloorCategory() === 'cement' ? 'bg-white text-zinc-900 font-semibold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
+                        class="py-0.5 px-1.5 rounded transition whitespace-nowrap cursor-pointer">
+                        Porcelanatos & Cemento
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setFloorCategory('wood')"
+                        [class]="activeFloorCategory() === 'wood' ? 'bg-white text-zinc-900 font-semibold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
+                        class="py-0.5 px-1.5 rounded transition whitespace-nowrap cursor-pointer">
+                        Maderas & SPC
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setFloorCategory('marble')"
+                        [class]="activeFloorCategory() === 'marble' ? 'bg-white text-zinc-900 font-semibold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
+                        class="py-0.5 px-1.5 rounded transition whitespace-nowrap cursor-pointer">
+                        Mármol & Piedra
+                      </button>
+                    </div>
+
+                    <!-- Grilla de acabados de piso -->
+                    <div class="grid grid-cols-2 gap-1.5 max-h-44 overflow-y-auto scrollbar-thin pr-0.5">
+                      @for (item of filteredFloorCatalog(); track item.id) {
+                        <button
+                          type="button"
+                          (click)="setFloorMaterial(item.id)"
+                          [class]="roomConfig().floorMaterial === item.id
+                            ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-800 border-zinc-200'"
+                          class="p-1.5 rounded-md border text-left flex items-center gap-1.5 transition cursor-pointer group">
+                          <span
+                            class="w-6 h-6 rounded border border-zinc-300 shrink-0 shadow-2xs"
+                            [style.backgroundColor]="item.swatchBg"></span>
+                          <div class="min-w-0 flex-1">
+                            <div class="text-[10px] font-semibold truncate">{{ item.name }}</div>
+                            <div class="text-[8.5px] opacity-70 truncate">{{ item.tag }}</div>
+                          </div>
+                        </button>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Catálogo de Acabado de Muros -->
+                  <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                        <span>Acabado de Muros</span>
+                      </span>
+                      <span class="text-[10px] text-zinc-400 font-mono">({{ filteredWallCatalog().length }} modelos)</span>
+                    </div>
+
+                    <!-- Filtros de categoría de muros -->
+                    <div class="flex items-center gap-1 p-0.5 bg-zinc-100 rounded-md text-[10px] overflow-x-auto scrollbar-thin">
+                      <button
+                        type="button"
+                        (click)="setWallCategory('all')"
+                        [class]="activeWallCategory() === 'all' ? 'bg-white text-zinc-900 font-semibold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
+                        class="py-0.5 px-1.5 rounded transition whitespace-nowrap cursor-pointer">
+                        Todos
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setWallCategory('brick')"
+                        [class]="activeWallCategory() === 'brick' ? 'bg-white text-zinc-900 font-semibold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
+                        class="py-0.5 px-1.5 rounded transition whitespace-nowrap cursor-pointer">
+                        Ladrillo
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setWallCategory('tile')"
+                        [class]="activeWallCategory() === 'tile' ? 'bg-white text-zinc-900 font-semibold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
+                        class="py-0.5 px-1.5 rounded transition whitespace-nowrap cursor-pointer">
+                        Cerámica
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setWallCategory('marble')"
+                        [class]="activeWallCategory() === 'marble' ? 'bg-white text-zinc-900 font-semibold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
+                        class="py-0.5 px-1.5 rounded transition whitespace-nowrap cursor-pointer">
+                        Mármol
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setWallCategory('panel')"
+                        [class]="activeWallCategory() === 'panel' ? 'bg-white text-zinc-900 font-semibold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
+                        class="py-0.5 px-1.5 rounded transition whitespace-nowrap cursor-pointer">
+                        Paneles
+                      </button>
+                    </div>
+
+                    <!-- Grilla de acabados de muros -->
+                    <div class="grid grid-cols-2 gap-1.5 max-h-44 overflow-y-auto scrollbar-thin pr-0.5">
+                      @for (item of filteredWallCatalog(); track item.id) {
+                        <button
+                          type="button"
+                          (click)="setWallMaterial(item.id)"
+                          [class]="roomConfig().wallMaterial === item.id
+                            ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-800 border-zinc-200'"
+                          class="p-1.5 rounded-md border text-left flex items-center gap-1.5 transition cursor-pointer group">
+                          <span
+                            class="w-6 h-6 rounded border border-zinc-300 shrink-0 shadow-2xs"
+                            [style.backgroundColor]="item.swatchBg"></span>
+                          <div class="min-w-0 flex-1">
+                            <div class="text-[10px] font-semibold truncate">{{ item.name }}</div>
+                            <div class="text-[8.5px] opacity-70 truncate">{{ item.tag }}</div>
+                          </div>
+                        </button>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Opciones Técnicas -->
+                  <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
+                    <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                      <span>Opciones Técnicas</span>
+                    </span>
+
+                    <div class="space-y-1.5 text-xs">
+                      <label class="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-zinc-50 transition">
+                        <input
+                          type="checkbox"
+                          [checked]="roomConfig().showFloorGrid"
+                          (change)="toggleFloorGrid()"
+                          class="rounded text-zinc-900 focus:ring-zinc-800 w-4 h-4 cursor-pointer" />
+                        <span class="text-zinc-700 font-medium">Rejilla de suelo milimétrica (cada 500 mm)</span>
+                      </label>
+
+                      <label class="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-zinc-50 transition">
+                        <input
+                          type="checkbox"
+                          [checked]="roomConfig().showSkirting"
+                          (change)="toggleSkirting()"
+                          class="rounded text-zinc-900 focus:ring-zinc-800 w-4 h-4 cursor-pointer" />
+                        <span class="text-zinc-700 font-medium">Zócalos / Rodapiés sanitarios (100 mm)</span>
+                      </label>
+
+                      <label class="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-zinc-50 transition">
+                        <input
+                          type="checkbox"
+                          [checked]="roomConfig().isWallsLocked"
+                          (change)="toggleAllWallsLock()"
+                          class="rounded text-zinc-900 focus:ring-zinc-800 w-4 h-4 cursor-pointer" />
+                        <span class="text-zinc-700 font-medium">Bloquear muros contra arrastre accidental</span>
+                      </label>
+                    </div>
+                  </div>
+
+                }
+
               </div>
 
             } @else {

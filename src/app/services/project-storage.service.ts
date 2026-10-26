@@ -16,7 +16,11 @@ import {
   HandleType,
   PartCornerCutConfig,
   isCountertopMaterial,
-  DEFAULT_COUNTERTOP_MATERIALS
+  DEFAULT_COUNTERTOP_MATERIALS,
+  RoomConfiguration,
+  DEFAULT_ROOM_CONFIG,
+  getResolvedRoomWalls,
+  rescaleWallsToFloor
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { JoineryEngineService } from './joinery-engine.service';
@@ -804,6 +808,7 @@ export class ProjectStorageService {
       laborType: 'fixed',
       profitMarginPercent: 25,
       taxPercent: 0,
+      roomConfig: DEFAULT_ROOM_CONFIG,
       updatedAt: new Date().toISOString()
     };
   }
@@ -2929,6 +2934,78 @@ export class ProjectStorageService {
         parts
       };
     });
+  }
+
+  updateRoomConfig(updates: Partial<RoomConfiguration>, recordHistory = false) {
+    this.updateProject(p => {
+      const curConfig = p.roomConfig || DEFAULT_ROOM_CONFIG;
+      const targetW = updates.floorWidth ?? curConfig.floorWidth ?? 5000;
+      const targetD = updates.floorDepth ?? curConfig.floorDepth ?? 5000;
+      const prevW = curConfig.floorWidth ?? 5000;
+      const prevD = curConfig.floorDepth ?? 5000;
+
+      let walls = updates.walls ?? curConfig.walls;
+      let extraUpdates: Partial<RoomConfiguration> = {};
+
+      if ((targetW !== prevW || targetD !== prevD) && !updates.walls) {
+        const wallT = updates.wallThickness ?? curConfig.wallThickness ?? 150;
+        const offX = updates.wallOffsetX ?? curConfig.wallOffsetX ?? 0;
+        const offZ = updates.wallOffsetZ ?? curConfig.wallOffsetZ ?? 0;
+        const curWalls = getResolvedRoomWalls(curConfig);
+        const rescaled = rescaleWallsToFloor(curWalls, prevW, prevD, targetW, targetD, wallT, offX, offZ);
+        walls = rescaled;
+        const mainWall = rescaled.find(item => item.id === 'main');
+        const sideWall = rescaled.find(item => item.id === 'side');
+        const rightWall = rescaled.find(item => item.id === 'right_side');
+        extraUpdates = {
+          mainWallLength: mainWall ? mainWall.length : Math.min(targetW, curConfig.mainWallLength),
+          sideWallLength: sideWall ? sideWall.length : Math.min(Math.max(600, targetD - wallT), curConfig.sideWallLength),
+          rightWallLength: rightWall ? rightWall.length : (curConfig.rightWallLength ? Math.min(Math.max(600, targetD - wallT), curConfig.rightWallLength) : undefined)
+        };
+      }
+
+      return {
+        ...p,
+        roomConfig: {
+          ...curConfig,
+          ...updates,
+          ...extraUpdates,
+          ...(walls ? { walls } : {})
+        }
+      };
+    }, recordHistory);
+  }
+
+  updateWorkspaceDimensions(floorWidth: number, floorDepth: number) {
+    const w = Math.max(2000, Math.min(25000, floorWidth));
+    const d = Math.max(2000, Math.min(25000, floorDepth));
+    this.updateProject(p => {
+      const curConfig = p.roomConfig || DEFAULT_ROOM_CONFIG;
+      const prevW = curConfig.floorWidth || 5000;
+      const prevD = curConfig.floorDepth || 5000;
+      const wallT = curConfig.wallThickness || 150;
+      const offX = curConfig.wallOffsetX ?? 0;
+      const offZ = curConfig.wallOffsetZ ?? 0;
+      const currentWalls = getResolvedRoomWalls(curConfig);
+      const rescaledWalls = rescaleWallsToFloor(currentWalls, prevW, prevD, w, d, wallT, offX, offZ);
+
+      const mainWall = rescaledWalls.find(item => item.id === 'main');
+      const sideWall = rescaledWalls.find(item => item.id === 'side');
+      const rightWall = rescaledWalls.find(item => item.id === 'right_side');
+
+      return {
+        ...p,
+        roomConfig: {
+          ...curConfig,
+          floorWidth: w,
+          floorDepth: d,
+          mainWallLength: mainWall ? mainWall.length : Math.min(w, curConfig.mainWallLength),
+          sideWallLength: sideWall ? sideWall.length : Math.min(Math.max(600, d - wallT), curConfig.sideWallLength),
+          rightWallLength: rightWall ? rightWall.length : (curConfig.rightWallLength ? Math.min(Math.max(600, d - wallT), curConfig.rightWallLength) : undefined),
+          walls: rescaledWalls
+        }
+      };
+    }, true);
   }
 
   // ==========================================

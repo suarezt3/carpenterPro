@@ -46,7 +46,7 @@ import { DocumentationModalComponent } from '../documentation-modal/documentatio
 import { ProjectNotesModalComponent } from '../project-notes-modal/project-notes-modal';
 import { ChangelogModalComponent } from '../changelog-modal/changelog-modal';
 import { APP_CURRENT_VERSION } from '../../data/changelog.data';
-import { ProjectSettings } from '../../models/melamine.models';
+import { ProjectSettings, DEFAULT_ROOM_CONFIG, RoomConfiguration } from '../../models/melamine.models';
 
 /**
  * Barra de navegación superior global de Piezo3D Studio.
@@ -174,7 +174,9 @@ export class HeaderComponent {
     thinEdgeCostPerMeter: [1800, [Validators.required, Validators.min(0)]],
     thickEdgeCostPerMeter: [4200, [Validators.required, Validators.min(0)]],
     currency: ['COP', Validators.required],
-    optimizationPreference: ['best_fit', Validators.required]
+    optimizationPreference: ['best_fit', Validators.required],
+    floorWidth: [5000, [Validators.required, Validators.min(2000), Validators.max(25000)]],
+    floorDepth: [5000, [Validators.required, Validators.min(2000), Validators.max(25000)]]
   });
 
   constructor() {
@@ -202,6 +204,7 @@ export class HeaderComponent {
 
   openSettings() {
     const s = this.project().settings;
+    const room = this.project().roomConfig || DEFAULT_ROOM_CONFIG;
     this.settingsForm.patchValue({
       sawKerf: s.sawKerf,
       trimMargin: s.trimMargin,
@@ -212,9 +215,20 @@ export class HeaderComponent {
       thinEdgeCostPerMeter: s.thinEdgeCostPerMeter,
       thickEdgeCostPerMeter: s.thickEdgeCostPerMeter,
       currency: s.currency,
-      optimizationPreference: s.optimizationPreference
+      optimizationPreference: s.optimizationPreference,
+      floorWidth: room.floorWidth || 5000,
+      floorDepth: room.floorDepth || 5000
     });
     this.showSettingsModal.set(true);
+  }
+
+  setWorkspaceSize(width: number, depth: number) {
+    this.settingsForm.patchValue({
+      floorWidth: width,
+      floorDepth: depth
+    });
+    this.projectService.updateWorkspaceDimensions(width, depth);
+    this.showToast(`📐 Espacio de Trabajo: ${(width / 1000).toFixed(1)} × ${(depth / 1000).toFixed(1)} m`);
   }
 
   saveSettings() {
@@ -233,6 +247,11 @@ export class HeaderComponent {
         optimizationPreference: raw.optimizationPreference
       };
       this.projectService.updateSettings(val, applyToAll);
+
+      if (raw.floorWidth && raw.floorDepth) {
+        this.projectService.updateWorkspaceDimensions(Number(raw.floorWidth), Number(raw.floorDepth));
+      }
+
       this.showSettingsModal.set(false);
       this.showToast(applyToAll
         ? `Configuración guardada. Espesor base ${val.defaultBoardThickness} mm aplicado a las piezas.`

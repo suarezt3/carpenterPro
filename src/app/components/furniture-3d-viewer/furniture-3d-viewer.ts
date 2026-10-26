@@ -55,6 +55,8 @@ import {
   OpeningDirection,
   WorkspaceMode,
   RoomConfiguration,
+  RoomWallInstance,
+  getResolvedRoomWalls,
   DEFAULT_ROOM_CONFIG,
   ApplianceItem
 } from '../../models/melamine.models';
@@ -113,7 +115,7 @@ export interface WallSnapResult {
   correctedZ: number;
   deltaX: number;
   deltaZ: number;
-  snappedWallType?: 'main' | 'side' | 'right_side' | 'corner' | 'right_corner';
+  snappedWallType?: 'main' | 'side' | 'right_side' | 'corner' | 'right_corner' | string;
   contactGuide?: {
     mainWallContact?: {
       xStart: number;
@@ -325,8 +327,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   hiddenPartsChanged = output<string[]>();
   showAllRequested = output<void>();
   roomConfigModified = output<Partial<RoomConfiguration>>();
-  wallSelected = output<'main' | 'side' | null>();
-  readonly selectedWallType = signal<'main' | 'side' | null>(null);
+  wallSelected = output<string | null>();
+  readonly selectedWallType = signal<string | null>(null);
   applianceSelected = output<ApplianceItem | null>();
   appliancesSelected = output<string[]>();
   applianceModified = output<{ appliance: ApplianceItem; updates: Partial<ApplianceItem> }>();
@@ -370,10 +372,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return;
     }
     this.referenceGuideGroup.visible = true;
+    const cfg = this.roomConfig();
+    const floorW = cfg.floorWidth || 5000;
+    const floorD = cfg.floorDepth || 5000;
     const built = this.spatialGuideBuilder.buildGuideScene({
       figurePos: this.referenceGuidePos(),
       isSelected: this.isReferenceGuideSelected(),
-      isWhiteTheme: this.isWhiteTheme()
+      isWhiteTheme: this.isWhiteTheme(),
+      width: floorW,
+      depth: floorD
     });
     this.referenceGuideGroup.add(built);
   }
@@ -699,13 +706,22 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private dragPlane = new THREE.Plane();
   private dragPlaneIntersectionStart = new THREE.Vector3();
   private isWallDragging = false;
+  private activeWallTarget: string | null = null;
+  private initialWallPosX = 0;
+  private initialWallPosZ = 0;
   private initialWallOffsetX = 0;
   private initialWallOffsetZ = 0;
   private wallGizmoGroup = new THREE.Group();
   private wallGizmoHitMeshes: THREE.Mesh[] = [];
   private isWallGizmoDragging = false;
-  private activeWallGizmoHit: { isWallGizmo: boolean; type: 'wall_move' | 'wall_stretch'; axis?: 'x' | 'z'; wallTarget?: 'main' | 'side' } | null = null;
+  private activeWallGizmoHit: {
+    isWallGizmo: boolean;
+    type: 'wall_move' | 'wall_stretch' | 'wall_stretch_height';
+    axis?: 'x' | 'y' | 'z';
+    wallTarget?: string;
+  } | null = null;
   private initialWallLength = 0;
+  private initialWallHeight = 0;
 
   // Appliance Direct Drag & 3D Resize State
   private isApplianceDragging = false;
@@ -812,16 +828,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     });
 
-    // 7. Actualizar Guía de Referencia Espacial y Escala Humana 3D
- effect(() => {
-   this.showReferenceGuide();
-   this.referenceGuidePos();
-   this.isReferenceGuideSelected();
-   this.isWhiteTheme();
-   if (this.scene) {
-     this.updateReferenceGuideScene();
-   }
- });
+    // 7. Actualizar Guía de Referencia Espacial, Escala Humana 3D y GridHelper al cambiar tamaño de escenario
+    effect(() => {
+      this.showReferenceGuide();
+      this.referenceGuidePos();
+      this.isReferenceGuideSelected();
+      this.isWhiteTheme();
+      const cfg = this.roomConfig();
+      // Track floorWidth and floorDepth for reactivity
+      const _fw = cfg.floorWidth;
+      const _fd = cfg.floorDepth;
+      if (this.scene) {
+        this.updateGridHelper();
+        this.updateReferenceGuideScene();
+      }
+    });
 
   }
 
@@ -838,7 +859,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.applyThemeColors();
 
     // 2. Camera
-    this.camera = new THREE.PerspectiveCamera(45, width / height, 10, 15000);
+    this.camera = new THREE.PerspectiveCamera(45, width / height, 10, 80000);
     this.camera.position.set(1500, 1100, 1900);
 
     // 3. Renderer
@@ -857,8 +878,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.06;
-    this.controls.maxDistance = 9000;
-    this.controls.minDistance = 150;
+    this.controls.maxDistance = 45000;
+    this.controls.minDistance = 100;
     this.controls.maxPolarAngle = Math.PI / 2 + 0.08;
     this.controls.target.set(0, 480, 0);
 
@@ -930,32 +951,51 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const isWhite = this.isWhiteTheme();
 
     if (isWhite) {
-      // Architectural Daylight Grey with soft contrast - zero fog for crisp visibility at any distance
+      // Architectural Daylight Grey with soft contrast - subtle atmospheric fog
       this.scene.background = new THREE.Color(0xeae8e1);
-      this.scene.fog = null;
+      this.scene.fog = new THREE.FogExp2(0xeae8e1, 0.000025);
       if (this.floorMesh) {
         (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.08;
       }
-      if (this.gridHelper) {
-        this.scene.remove(this.gridHelper);
-        this.gridHelper = new THREE.GridHelper(5000, 50, 0xc4c0b8, 0xd6d3cd);
-        this.gridHelper.position.y = 0;
-        this.scene.add(this.gridHelper);
-      }
+      this.updateGridHelper();
     } else {
-      // Dark CAD Mode - zero fog for crisp visibility at any distance
+      // Dark CAD Mode - subtle atmospheric fog
       this.scene.background = new THREE.Color(0x0e0e11);
-      this.scene.fog = null;
+      this.scene.fog = new THREE.FogExp2(0x0e0e11, 0.00006);
       if (this.floorMesh) {
         (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.35;
       }
-      if (this.gridHelper) {
-        this.scene.remove(this.gridHelper);
-        this.gridHelper = new THREE.GridHelper(5000, 50, 0x06b6d4, 0x27272a);
-        this.gridHelper.position.y = 0;
-        this.scene.add(this.gridHelper);
-      }
+      this.updateGridHelper();
     }
+  }
+
+  private updateGridHelper() {
+    if (!this.scene) return;
+    const cfg = this.roomConfig();
+    const floorW = cfg.floorWidth || 5000;
+    const floorD = cfg.floorDepth || 5000;
+    const gridSpan = Math.max(floorW, floorD);
+    const divisions = Math.max(10, Math.round(gridSpan / 100));
+
+    if (this.gridHelper) {
+      this.scene.remove(this.gridHelper);
+      this.gridHelper.geometry.dispose();
+      if (Array.isArray(this.gridHelper.material)) {
+        this.gridHelper.material.forEach(m => m.dispose());
+      } else {
+        this.gridHelper.material.dispose();
+      }
+      this.gridHelper = null;
+    }
+
+    if (this.isWhiteTheme()) {
+      this.gridHelper = new THREE.GridHelper(gridSpan, divisions, 0xc4c0b8, 0xd6d3cd);
+    } else {
+      this.gridHelper = new THREE.GridHelper(gridSpan, divisions, 0x06b6d4, 0x27272a);
+    }
+    this.gridHelper.position.y = 0;
+    this.gridHelper.visible = (this.workspaceMode() !== 'room');
+    this.scene.add(this.gridHelper);
   }
 
   toggleTheme() {
@@ -1009,10 +1049,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.floorMesh.receiveShadow = true;
     this.scene.add(this.floorMesh);
 
-    // Millimetric Grid Helper (subtle architectural lines)
-    this.gridHelper = new THREE.GridHelper(5000, 50, 0xc4c0b8, 0xd6d3cd);
-    this.gridHelper.position.y = 0;
-    this.scene.add(this.gridHelper);
+    // Millimetric Grid Helper sincronizado con el espacio de trabajo
+    this.updateGridHelper();
   }
 
   private calculateCentroid(parts: Part[]): { x: number; y: number; z: number } {
@@ -4130,28 +4168,41 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       }
     }
 
-    // 0.8 Check if clicking on Wall Gizmo (Axis translation arrow or Edge stretch handle)
+    // 0.8 Check if clicking on Wall Gizmo (Axis translation arrow, Edge stretch handle or Top Height handle)
     if (this.workspaceMode() === 'room' && this.wallGizmoHitMeshes.length > 0) {
       const wallGizmoIntersects = this.raycaster.intersectObjects(this.wallGizmoHitMeshes, true);
       if (wallGizmoIntersects.length > 0) {
         const hitObj = wallGizmoIntersects[0].object;
         const hitData = hitObj.userData as {
           isWallGizmo: boolean;
-          type: 'wall_move' | 'wall_stretch';
-          axis?: 'x' | 'z';
-          wallTarget?: 'main' | 'side';
+          type: 'wall_move' | 'wall_stretch' | 'wall_stretch_height';
+          axis?: 'x' | 'y' | 'z';
+          wallTarget?: string;
         };
-        if (hitData && hitData.isWallGizmo) {
+        if (hitData && hitData.isWallGizmo && hitData.wallTarget) {
+          const cfg = this.roomConfig();
+          const targetWall = getResolvedRoomWalls(cfg).find(w => w.id === hitData.wallTarget);
+          const isLocked = !targetWall || !!cfg.isWallsLocked || !!targetWall.isLocked || !!cfg.lockedWalls?.[hitData.wallTarget];
+          if (isLocked || !targetWall) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+
           this.isWallGizmoDragging = true;
           this.activeWallGizmoHit = hitData;
+          this.activeWallTarget = hitData.wallTarget;
           this.dragStartPointer = { x: e.clientX, y: e.clientY };
-          this.initialWallOffsetX = this.roomConfig().wallOffsetX ?? 0;
-          this.initialWallOffsetZ = this.roomConfig().wallOffsetZ ?? 0;
-          this.initialWallLength = hitData.wallTarget === 'main'
-            ? this.roomConfig().mainWallLength
-            : this.roomConfig().sideWallLength;
+          this.initialWallPosX = targetWall.posX;
+          this.initialWallPosZ = targetWall.posZ;
+          this.initialWallLength = targetWall.length;
+          this.initialWallHeight = targetWall.height;
           this.controls.enabled = false;
-          canvas.style.cursor = hitData.type === 'wall_stretch' ? 'ew-resize' : 'grabbing';
+          canvas.style.cursor = hitData.type === 'wall_stretch_height'
+            ? 'ns-resize'
+            : hitData.type === 'wall_stretch'
+              ? 'ew-resize'
+              : 'grabbing';
           e.preventDefault();
           e.stopPropagation();
           return;
@@ -4492,15 +4543,23 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         const roomHits = this.raycaster.intersectObjects(this.roomGroup.children, true);
         const wallHit = roomHits.find(h => h.object.userData?.['isWall']);
         if (wallHit) {
-          const wallType = wallHit.object.userData['wallType'] as 'main' | 'side';
-          this.selectedWallType.set(wallType);
-          this.wallSelected.emit(wallType);
-          this.isWallDragging = true;
-          this.dragStartPointer = { x: e.clientX, y: e.clientY };
-          this.initialWallOffsetX = this.roomConfig().wallOffsetX ?? 0;
-          this.initialWallOffsetZ = this.roomConfig().wallOffsetZ ?? 0;
-          this.controls.enabled = false;
-          if (canvas) canvas.style.cursor = 'move';
+          const wallId = (wallHit.object.userData['wallId'] || wallHit.object.userData['wallType']) as string;
+          this.selectedWallType.set(wallId);
+          this.wallSelected.emit(wallId);
+          const cfg = this.roomConfig();
+          const targetWall = getResolvedRoomWalls(cfg).find(w => w.id === wallId);
+          const isLocked = !targetWall || !!cfg.isWallsLocked || !!targetWall.isLocked || !!cfg.lockedWalls?.[wallId];
+          if (!isLocked && targetWall) {
+            this.isWallDragging = true;
+            this.activeWallTarget = wallId;
+            this.dragStartPointer = { x: e.clientX, y: e.clientY };
+            this.initialWallPosX = targetWall.posX;
+            this.initialWallPosZ = targetWall.posZ;
+            this.controls.enabled = false;
+            if (canvas) canvas.style.cursor = 'move';
+          } else {
+            this.isWallDragging = false;
+          }
           return;
         }
       }
@@ -4755,7 +4814,15 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     }
 
     // Direct Room Wall Dragging (X / Z translation)
-    if (this.isWallDragging) {
+    if (this.isWallDragging && this.activeWallTarget) {
+      const cfg = this.roomConfig();
+      const allWalls = getResolvedRoomWalls(cfg);
+      const activeWall = allWalls.find(w => w.id === this.activeWallTarget);
+      if (!activeWall || activeWall.isLocked || cfg.isWallsLocked || cfg.lockedWalls?.[activeWall.id]) {
+        this.isWallDragging = false;
+        return;
+      }
+
       const dx = (e.clientX - this.dragStartPointer.x) * 1.5;
       const dy = (e.clientY - this.dragStartPointer.y) * 1.5;
       const camAngle = this.controls.getAzimuthalAngle();
@@ -4764,50 +4831,98 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       const moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
       const moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
 
-      const newOffsetX = this.initialWallOffsetX + moveX;
-      const newOffsetZ = this.initialWallOffsetZ + moveZ;
-      this.roomConfigModified.emit({
-        wallOffsetX: newOffsetX,
-        wallOffsetZ: newOffsetZ
-      });
+      let candX = this.initialWallPosX + moveX;
+      let candZ = this.initialWallPosZ + moveZ;
+
+      // Clamping dentro del piso de la habitación
+      const floorW = cfg.floorWidth || 5000;
+      const floorD = cfg.floorDepth || 5000;
+      const isHoriz = activeWall.rotationY === 0 || activeWall.rotationY === 180;
+      const halfSpanX = isHoriz ? activeWall.length / 2 : activeWall.thickness / 2;
+      const halfSpanZ = isHoriz ? activeWall.thickness / 2 : activeWall.length / 2;
+      const minFloorX = -(floorW / 2) + halfSpanX;
+      const maxFloorX = (floorW / 2) - halfSpanX;
+      const minFloorZ = -(floorD / 2) + halfSpanZ;
+      const maxFloorZ = (floorD / 2) - halfSpanZ;
+
+      candX = Math.max(minFloorX, Math.min(maxFloorX, candX));
+      candZ = Math.max(minFloorZ, Math.min(maxFloorZ, candZ));
+
+      // Imán Muro a Muro (Wall-to-Wall Snap)
+      const snapRes = this.calculateWallToWallSnap(activeWall, candX, candZ, allWalls);
+      if (snapRes.isSnapped) {
+        candX = snapRes.snappedX;
+        candZ = snapRes.snappedZ;
+        this.renderWallToWallSnapGuide(snapRes);
+      } else {
+        this.clearWallSnapGuides();
+      }
+
+      this.updateSingleWall(activeWall.id, { posX: candX, posZ: candZ });
       return;
     }
 
-    // Direct Wall Gizmo Dragging (Axis Translation or Edge Stretch)
+    // Direct Wall Gizmo Dragging (Axis Translation, Edge Stretch or Height Stretch)
     if (this.isWallGizmoDragging && this.activeWallGizmoHit) {
       const hit = this.activeWallGizmoHit;
+      const cfg = this.roomConfig();
+      const allWalls = getResolvedRoomWalls(cfg);
+      const activeWall = allWalls.find(w => w.id === hit.wallTarget);
+      if (!activeWall || activeWall.isLocked || cfg.isWallsLocked || cfg.lockedWalls?.[activeWall.id]) {
+        this.isWallGizmoDragging = false;
+        return;
+      }
+
       const dx = (e.clientX - this.dragStartPointer.x) * 1.5;
       const dy = (e.clientY - this.dragStartPointer.y) * 1.5;
       const camAngle = this.controls.getAzimuthalAngle();
       const sin = Math.sin(camAngle);
       const cos = Math.cos(camAngle);
 
+      const floorW = cfg.floorWidth || 5000;
+      const floorD = cfg.floorDepth || 5000;
+
       if (hit.type === 'wall_move') {
+        let candX = activeWall.posX;
+        let candZ = activeWall.posZ;
         if (hit.axis === 'x') {
           const moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
-          this.roomConfigModified.emit({
-            wallOffsetX: this.initialWallOffsetX + moveX
-          });
+          candX = this.initialWallPosX + moveX;
         } else {
           const moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
-          this.roomConfigModified.emit({
-            wallOffsetZ: this.initialWallOffsetZ + moveZ
-          });
+          candZ = this.initialWallPosZ + moveZ;
         }
-      } else if (hit.type === 'wall_stretch') {
-        if (hit.wallTarget === 'main') {
-          const stretchX = Math.round((dx * cos + dy * sin) / 50) * 50;
-          const nextL = Math.max(1200, Math.min(10000, this.initialWallLength + stretchX));
-          this.roomConfigModified.emit({
-            mainWallLength: nextL
-          });
+
+        const isHoriz = activeWall.rotationY === 0 || activeWall.rotationY === 180;
+        const halfSpanX = isHoriz ? activeWall.length / 2 : activeWall.thickness / 2;
+        const halfSpanZ = isHoriz ? activeWall.thickness / 2 : activeWall.length / 2;
+        candX = Math.max(-(floorW / 2) + halfSpanX, Math.min((floorW / 2) - halfSpanX, candX));
+        candZ = Math.max(-(floorD / 2) + halfSpanZ, Math.min((floorD / 2) - halfSpanZ, candZ));
+
+        const snapRes = this.calculateWallToWallSnap(activeWall, candX, candZ, allWalls);
+        if (snapRes.isSnapped) {
+          candX = snapRes.snappedX;
+          candZ = snapRes.snappedZ;
+          this.renderWallToWallSnapGuide(snapRes);
         } else {
-          const stretchZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
-          const nextL = Math.max(1000, Math.min(8000, this.initialWallLength + stretchZ));
-          this.roomConfigModified.emit({
-            sideWallLength: nextL
-          });
+          this.clearWallSnapGuides();
         }
+
+        this.updateSingleWall(activeWall.id, { posX: candX, posZ: candZ });
+      } else if (hit.type === 'wall_stretch') {
+        const rotRad = -((activeWall.rotationY || 0) * (Math.PI / 180));
+        const worldDx = dx * cos + dy * sin;
+        const worldDz = -dx * sin + dy * cos;
+        const proj = worldDx * Math.cos(rotRad) - worldDz * Math.sin(rotRad);
+        const stretch = Math.round(proj / 50) * 50;
+        const maxLen = Math.max(floorW, floorD);
+        const nextL = Math.max(400, Math.min(maxLen, this.initialWallLength + stretch));
+        this.updateSingleWall(activeWall.id, { length: nextL });
+      } else if (hit.type === 'wall_stretch_height') {
+        const vertDy = -(e.clientY - this.dragStartPointer.y) * 2.0;
+        const stretchY = Math.round(vertDy / 10) * 10;
+        const nextH = Math.max(400, Math.min(4500, this.initialWallHeight + stretchY));
+        this.updateSingleWall(activeWall.id, { height: nextH });
       }
       return;
     }
@@ -5670,6 +5785,22 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
       }
     }
 
+    // Hover feedback for 3D Wall Gizmo (Move, Length, Height)
+    if (this.workspaceMode() === 'room' && this.wallGizmoHitMeshes.length > 0) {
+      const wallGizmoIntersects = this.raycaster.intersectObjects(this.wallGizmoHitMeshes, true);
+      if (wallGizmoIntersects.length > 0) {
+        const hit = wallGizmoIntersects[0].object.userData as { type?: string };
+        if (hit.type === 'wall_stretch_height') {
+          canvas.style.cursor = 'ns-resize';
+        } else if (hit.type === 'wall_stretch') {
+          canvas.style.cursor = 'ew-resize';
+        } else {
+          canvas.style.cursor = 'grab';
+        }
+        return;
+      }
+    }
+
     // Hover feedback for 3D appliance resize handles
     if (this.applianceHandleHitMeshes.length > 0) {
       const handleIntersects = this.raycaster.intersectObjects(this.applianceHandleHitMeshes, true);
@@ -5920,16 +6051,12 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
       }
     }
 
-    if (this.isWallDragging) {
+    if (this.isWallDragging || this.isWallGizmoDragging) {
       this.isWallDragging = false;
-      this.controls.enabled = true;
-      const canvas = this.canvasRef()?.nativeElement;
-      if (canvas) canvas.style.cursor = 'default';
-    }
-
-    if (this.isWallGizmoDragging) {
       this.isWallGizmoDragging = false;
+      this.activeWallTarget = null;
       this.activeWallGizmoHit = null;
+      this.clearWallSnapGuides();
       this.controls.enabled = true;
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) canvas.style.cursor = 'default';
@@ -7421,8 +7548,10 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     this.dragInitialPart = null;
     this.dragInitialParts = [];
     this.isWallDragging = false;
+    this.activeWallTarget = null;
     this.isWallGizmoDragging = false;
     this.activeWallGizmoHit = null;
+    this.clearWallSnapGuides();
     this.isApplianceDragging = false;
     this.isApplianceResizing = false;
     this.draggingAppliance = null;
@@ -8459,6 +8588,249 @@ private applyMagneticSnapToPosition(
     return { pos: proposedPos, isSnapped: false, snappedPart: null, snapFace: null };
   }
 
+  private updateSingleWall(wallId: string, updates: Partial<RoomWallInstance>) {
+    const config = this.roomConfig();
+    const currentWalls = getResolvedRoomWalls(config);
+    const updatedWalls = currentWalls.map(w => {
+      if (w.id === wallId) {
+        return { ...w, ...updates };
+      }
+      return w;
+    });
+    this.roomConfigModified.emit({ walls: updatedWalls });
+  }
+
+  private calculateWallToWallSnap(
+    movingWall: RoomWallInstance,
+    candX: number,
+    candZ: number,
+    allWalls: RoomWallInstance[],
+    threshold = 45
+  ): {
+    isSnapped: boolean;
+    snappedX: number;
+    snappedZ: number;
+    guide?: {
+      xStart: number;
+      zStart: number;
+      xEnd: number;
+      zEnd: number;
+      yMin: number;
+      yMax: number;
+    };
+  } {
+    let bestDist = threshold;
+    let snappedX = candX;
+    let snappedZ = candZ;
+    let isSnapped = false;
+    let snapGuide: any = null;
+
+    const isMovingHoriz = movingWall.rotationY === 0 || movingWall.rotationY === 180;
+    const movingHalfL = movingWall.length / 2;
+    const movingHalfT = movingWall.thickness / 2;
+
+    const otherWalls = allWalls.filter(w => w.id !== movingWall.id && !w.isHidden);
+
+    for (const other of otherWalls) {
+      const isOtherHoriz = other.rotationY === 0 || other.rotationY === 180;
+      const otherHalfL = other.length / 2;
+      const otherHalfT = other.thickness / 2;
+
+      if (isMovingHoriz && !isOtherHoriz) {
+        // Muro activo es horizontal (eje X), el otro es vertical (eje Z)
+        const otherFaceLeft = other.posX - otherHalfT;
+        const otherFaceRight = other.posX + otherHalfT;
+
+        const leftEnd = candX - movingHalfL;
+        const rightEnd = candX + movingHalfL;
+
+        const inOtherZSpan = candZ >= other.posZ - otherHalfL - 100 && candZ <= other.posZ + otherHalfL + 100;
+
+        if (inOtherZSpan) {
+          const distLRight = Math.abs(leftEnd - otherFaceRight);
+          if (distLRight <= bestDist) {
+            bestDist = distLRight;
+            snappedX = otherFaceRight + movingHalfL;
+            isSnapped = true;
+            snapGuide = {
+              xStart: otherFaceRight,
+              zStart: candZ - movingHalfT,
+              xEnd: otherFaceRight,
+              zEnd: candZ + movingHalfT,
+              yMin: 0,
+              yMax: Math.min(movingWall.height, other.height)
+            };
+          }
+          const distRLeft = Math.abs(rightEnd - otherFaceLeft);
+          if (distRLeft <= bestDist) {
+            bestDist = distRLeft;
+            snappedX = otherFaceLeft - movingHalfL;
+            isSnapped = true;
+            snapGuide = {
+              xStart: otherFaceLeft,
+              zStart: candZ - movingHalfT,
+              xEnd: otherFaceLeft,
+              zEnd: candZ + movingHalfT,
+              yMin: 0,
+              yMax: Math.min(movingWall.height, other.height)
+            };
+          }
+        }
+
+        const movingFaceFront = candZ + movingHalfT;
+        const movingFaceBack = candZ - movingHalfT;
+        const otherEndBack = other.posZ - otherHalfL;
+        const otherEndFront = other.posZ + otherHalfL;
+
+        if (Math.abs(candX - other.posX) <= movingHalfL + otherHalfT + 50) {
+          const distFrontEnd = Math.abs(movingFaceFront - otherEndBack);
+          if (distFrontEnd <= bestDist) {
+            bestDist = distFrontEnd;
+            snappedZ = otherEndBack - movingHalfT;
+            isSnapped = true;
+          }
+          const distBackEnd = Math.abs(movingFaceBack - otherEndFront);
+          if (distBackEnd <= bestDist) {
+            bestDist = distBackEnd;
+            snappedZ = otherEndFront + movingHalfT;
+            isSnapped = true;
+          }
+        }
+      } else if (!isMovingHoriz && isOtherHoriz) {
+        // Muro activo es vertical (eje Z), el otro es horizontal (eje X)
+        const otherFaceBack = other.posZ - otherHalfT;
+        const otherFaceFront = other.posZ + otherHalfT;
+
+        const backEnd = candZ - movingHalfL;
+        const frontEnd = candZ + movingHalfL;
+
+        const inOtherXSpan = candX >= other.posX - otherHalfL - 100 && candX <= other.posX + otherHalfL + 100;
+
+        if (inOtherXSpan) {
+          const distBackFront = Math.abs(backEnd - otherFaceFront);
+          if (distBackFront <= bestDist) {
+            bestDist = distBackFront;
+            snappedZ = otherFaceFront + movingHalfL;
+            isSnapped = true;
+            snapGuide = {
+              xStart: candX - movingHalfT,
+              zStart: otherFaceFront,
+              xEnd: candX + movingHalfT,
+              zEnd: otherFaceFront,
+              yMin: 0,
+              yMax: Math.min(movingWall.height, other.height)
+            };
+          }
+          const distFrontBack = Math.abs(frontEnd - otherFaceBack);
+          if (distFrontBack <= bestDist) {
+            bestDist = distFrontBack;
+            snappedZ = otherFaceBack - movingHalfL;
+            isSnapped = true;
+            snapGuide = {
+              xStart: candX - movingHalfT,
+              zStart: otherFaceBack,
+              xEnd: candX + movingHalfT,
+              zEnd: otherFaceBack,
+              yMin: 0,
+              yMax: Math.min(movingWall.height, other.height)
+            };
+          }
+        }
+      } else if (isMovingHoriz && isOtherHoriz) {
+        // Ambos paralelos horizontales (eje X)
+        const distZ = Math.abs(candZ - other.posZ);
+        if (distZ <= bestDist) {
+          bestDist = distZ;
+          snappedZ = other.posZ;
+          isSnapped = true;
+        }
+        const distLeftRight = Math.abs((candX - movingHalfL) - (other.posX + otherHalfL));
+        if (distLeftRight <= bestDist) {
+          bestDist = distLeftRight;
+          snappedX = other.posX + otherHalfL + movingHalfL;
+          isSnapped = true;
+        }
+        const distRightLeft = Math.abs((candX + movingHalfL) - (other.posX - otherHalfL));
+        if (distRightLeft <= bestDist) {
+          bestDist = distRightLeft;
+          snappedX = other.posX - otherHalfL - movingHalfL;
+          isSnapped = true;
+        }
+      } else {
+        // Ambos paralelos verticales (eje Z)
+        const distX = Math.abs(candX - other.posX);
+        if (distX <= bestDist) {
+          bestDist = distX;
+          snappedX = other.posX;
+          isSnapped = true;
+        }
+        const distBackFront = Math.abs((candZ - movingHalfL) - (other.posZ + otherHalfL));
+        if (distBackFront <= bestDist) {
+          bestDist = distBackFront;
+          snappedZ = other.posZ + otherHalfL + movingHalfL;
+          isSnapped = true;
+        }
+        const distFrontBack = Math.abs((candZ + movingHalfL) - (other.posZ - otherHalfL));
+        if (distFrontBack <= bestDist) {
+          bestDist = distFrontBack;
+          snappedZ = other.posZ - otherHalfL - movingHalfL;
+          isSnapped = true;
+        }
+      }
+    }
+
+    return {
+      isSnapped,
+      snappedX,
+      snappedZ,
+      guide: snapGuide
+    };
+  }
+
+  private renderWallToWallSnapGuide(snapRes: { isSnapped: boolean; guide?: any }) {
+    this.clearWallSnapGuides();
+    if (!snapRes.isSnapped) return;
+
+    const laserMat = new THREE.MeshBasicMaterial({
+      color: 0x06b6d4, // Cyan
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
+      depthTest: false
+    });
+
+    if (snapRes.guide) {
+      const g = snapRes.guide;
+      const dx = Math.abs(g.xEnd - g.xStart);
+      const dz = Math.abs(g.zEnd - g.zStart);
+      const dy = Math.max(50, g.yMax - g.yMin);
+      const planeGeo = new THREE.PlaneGeometry(Math.max(20, Math.hypot(dx, dz)), dy);
+      const planeMesh = new THREE.Mesh(planeGeo, laserMat);
+      planeMesh.position.set(
+        (g.xStart + g.xEnd) / 2,
+        (g.yMin + g.yMax) / 2,
+        (g.zStart + g.zEnd) / 2
+      );
+      if (dx > dz) {
+        planeMesh.rotation.y = 0;
+      } else {
+        planeMesh.rotation.y = Math.PI / 2;
+      }
+      planeMesh.renderOrder = 999;
+      this.wallSnapGuideGroup.add(planeMesh);
+    }
+
+    const badgeSprite = this.createWallSnapBadge('🧲 Unión de Muros · 0 mm');
+    if (badgeSprite && snapRes.guide) {
+      badgeSprite.position.set(
+        (snapRes.guide.xStart + snapRes.guide.xEnd) / 2,
+        Math.min(2600, snapRes.guide.yMax + 80),
+        (snapRes.guide.zStart + snapRes.guide.zEnd) / 2
+      );
+      this.wallSnapGuideGroup.add(badgeSprite);
+    }
+  }
+
   private calculateWallSnap(
     bounds: {
       minX: number;
@@ -8483,81 +8855,111 @@ private applyMagneticSnapToPosition(
     }
 
     const config = this.roomConfig();
-    const offX = config.wallOffsetX || 0;
-    const offZ = config.wallOffsetZ || 0;
-    const wallThickness = config.wallThickness || 150;
-    const mainWallLength = config.mainWallLength || 3600;
-    const sideWallLength = config.sideWallLength || 2400;
-    const layout = config.layout || 'single_wall';
+    const walls = getResolvedRoomWalls(config).filter(w => !w.isHidden);
 
     let deltaX = 0;
     let deltaZ = 0;
     let isSnappedX = false;
     let isSnappedZ = false;
+    let minCandidateDistZ = threshold + 1;
+    let minCandidateDistX = threshold + 1;
+    let contactZInfo: any = null;
+    let contactXInfo: any = null;
 
-    // 1. MURO PRINCIPAL (Posterior a lo largo de X): cara interior en Z = offZ + wallThickness
-    const mainWallInnerZ = offZ + wallThickness;
-    const mainWallMinX = offX;
-    const mainWallMaxX = offX + mainWallLength;
+    for (const wall of walls) {
+      const isHoriz = wall.rotationY === 0 || wall.rotationY === 180;
+      const halfL = wall.length / 2;
+      const halfT = wall.thickness / 2;
 
-    const inMainWallSpan = bounds.maxX >= mainWallMinX - 150 && bounds.minX <= mainWallMaxX + 150;
-    if (inMainWallSpan) {
-      const distZ = bounds.minZ - mainWallInnerZ;
-      // Atrae si está dentro del umbral (45mm) y bloquea si intenta atravesar el muro hacia atrás
-      if (distZ <= threshold && distZ >= -(wallThickness + 250)) {
-        deltaZ = mainWallInnerZ - bounds.minZ;
-        isSnappedZ = true;
-      }
-    }
+      if (isHoriz) {
+        // Muro horizontal a lo largo de X
+        const wallMinX = wall.posX - halfL;
+        const wallMaxX = wall.posX + halfL;
+        const inSpan = bounds.maxX >= wallMinX - 150 && bounds.minX <= wallMaxX + 150;
+        if (inSpan) {
+          // Cara Frontal (+Z)
+          const frontZ = wall.posZ + halfT;
+          const distFront = bounds.minZ - frontZ;
+          if (distFront <= threshold && distFront >= -(wall.thickness + 250)) {
+            const absD = Math.abs(distFront);
+            if (absD < minCandidateDistZ) {
+              minCandidateDistZ = absD;
+              deltaZ = frontZ - bounds.minZ;
+              isSnappedZ = true;
+              contactZInfo = {
+                xStart: Math.max(wallMinX, bounds.minX),
+                xEnd: Math.min(wallMaxX, bounds.maxX),
+                yMin: Math.max(0, bounds.minY),
+                yMax: Math.max(bounds.minY + 20, bounds.maxY),
+                z: frontZ + 0.8
+              };
+            }
+          }
 
-    // 2. MURO LATERAL IZQUIERDO (Esquina en L y Cocina en U): cara interior en X = offX + wallThickness
-    let isLeftSnapped = false;
-    let isRightSnapped = false;
-    const sideWallInnerX = offX + wallThickness;
+          // Cara Posterior (-Z)
+          const rearZ = wall.posZ - halfT;
+          const distRear = rearZ - bounds.maxZ;
+          if (distRear <= threshold && distRear >= -(wall.thickness + 250)) {
+            const absD = Math.abs(distRear);
+            if (absD < minCandidateDistZ) {
+              minCandidateDistZ = absD;
+              deltaZ = rearZ - bounds.maxZ;
+              isSnappedZ = true;
+              contactZInfo = {
+                xStart: Math.max(wallMinX, bounds.minX),
+                xEnd: Math.min(wallMaxX, bounds.maxX),
+                yMin: Math.max(0, bounds.minY),
+                yMax: Math.max(bounds.minY + 20, bounds.maxY),
+                z: rearZ - 0.8
+              };
+            }
+          }
+        }
+      } else {
+        // Muro vertical a lo largo de Z
+        const wallMinZ = wall.posZ - halfL;
+        const wallMaxZ = wall.posZ + halfL;
+        const inSpan = bounds.maxZ >= wallMinZ - 150 && bounds.minZ <= wallMaxZ + 150;
+        if (inSpan) {
+          // Cara Derecha (+X)
+          const rightX = wall.posX + halfT;
+          const distRight = bounds.minX - rightX;
+          if (distRight <= threshold && distRight >= -(wall.thickness + 250)) {
+            const absD = Math.abs(distRight);
+            if (absD < minCandidateDistX) {
+              minCandidateDistX = absD;
+              deltaX = rightX - bounds.minX;
+              isSnappedX = true;
+              contactXInfo = {
+                zStart: Math.max(wallMinZ, bounds.minZ),
+                zEnd: Math.min(wallMaxZ, bounds.maxZ),
+                yMin: Math.max(0, bounds.minY),
+                yMax: Math.max(bounds.minY + 20, bounds.maxY),
+                x: rightX + 0.8
+              };
+            }
+          }
 
-    if (layout === 'l_shape' || layout === 'u_shape') {
-      const sideWallMinZ = offZ;
-      const sideWallMaxZ = offZ + wallThickness + sideWallLength;
-      const inSideWallSpan = bounds.maxZ >= sideWallMinZ - 150 && bounds.minZ <= sideWallMaxZ + 150;
-      if (inSideWallSpan) {
-        const distX = bounds.minX - sideWallInnerX;
-        if (distX <= threshold && distX >= -(wallThickness + 250)) {
-          deltaX = sideWallInnerX - bounds.minX;
-          isSnappedX = true;
-          isLeftSnapped = true;
+          // Cara Izquierda (-X)
+          const leftX = wall.posX - halfT;
+          const distLeft = leftX - bounds.maxX;
+          if (distLeft <= threshold && distLeft >= -(wall.thickness + 250)) {
+            const absD = Math.abs(distLeft);
+            if (absD < minCandidateDistX) {
+              minCandidateDistX = absD;
+              deltaX = leftX - bounds.maxX;
+              isSnappedX = true;
+              contactXInfo = {
+                zStart: Math.max(wallMinZ, bounds.minZ),
+                zEnd: Math.min(wallMaxZ, bounds.maxZ),
+                yMin: Math.max(0, bounds.minY),
+                yMax: Math.max(bounds.minY + 20, bounds.maxY),
+                x: leftX - 0.8
+              };
+            }
+          }
         }
       }
-    }
-
-    // 3. MURO LATERAL DERECHO (Cocina en U): cara interior en X = offX + mainWallLength - wallThickness
-    const rightWallLength = config.rightWallLength || sideWallLength;
-    const rightWallInnerX = offX + mainWallLength - wallThickness;
-
-    if (layout === 'u_shape' && !isLeftSnapped) {
-      const rightWallMinZ = offZ;
-      const rightWallMaxZ = offZ + wallThickness + rightWallLength;
-      const inRightWallSpan = bounds.maxZ >= rightWallMinZ - 150 && bounds.minZ <= rightWallMaxZ + 150;
-      if (inRightWallSpan) {
-        const distX = rightWallInnerX - bounds.maxX;
-        if (distX <= threshold && distX >= -(wallThickness + 250)) {
-          deltaX = rightWallInnerX - bounds.maxX;
-          isSnappedX = true;
-          isRightSnapped = true;
-        }
-      }
-    }
-
-    let snappedWallType: 'main' | 'side' | 'right_side' | 'corner' | 'right_corner' | undefined = undefined;
-    if (isSnappedZ && isLeftSnapped) {
-      snappedWallType = 'corner';
-    } else if (isSnappedZ && isRightSnapped) {
-      snappedWallType = 'right_corner';
-    } else if (isSnappedZ) {
-      snappedWallType = 'main';
-    } else if (isLeftSnapped) {
-      snappedWallType = 'side';
-    } else if (isRightSnapped) {
-      snappedWallType = 'right_side';
     }
 
     const res: WallSnapResult = {
@@ -8567,36 +8969,23 @@ private applyMagneticSnapToPosition(
       correctedZ: bounds.minZ + deltaZ,
       deltaX,
       deltaZ,
-      snappedWallType
+      snappedWallType: (isSnappedX && isSnappedZ) ? 'corner' : isSnappedZ ? 'main' : isSnappedX ? 'side' : undefined
     };
 
     if (isSnappedX || isSnappedZ) {
       res.contactGuide = {};
-      if (isSnappedZ) {
+      if (contactZInfo) {
         res.contactGuide.mainWallContact = {
-          xStart: Math.max(mainWallMinX, bounds.minX + deltaX),
-          xEnd: Math.min(mainWallMaxX, bounds.maxX + deltaX),
-          yMin: Math.max(0, bounds.minY),
-          yMax: Math.max(bounds.minY + 20, bounds.maxY),
-          z: mainWallInnerZ + 0.8
+          ...contactZInfo,
+          xStart: contactZInfo.xStart + deltaX,
+          xEnd: contactZInfo.xEnd + deltaX
         };
       }
-      if (isLeftSnapped) {
+      if (contactXInfo) {
         res.contactGuide.sideWallContact = {
-          zStart: Math.max(offZ + wallThickness, bounds.minZ + deltaZ),
-          zEnd: Math.min(offZ + wallThickness + sideWallLength, bounds.maxZ + deltaZ),
-          yMin: Math.max(0, bounds.minY),
-          yMax: Math.max(bounds.minY + 20, bounds.maxY),
-          x: sideWallInnerX + 0.8
-        };
-      }
-      if (isRightSnapped) {
-        res.contactGuide.rightWallContact = {
-          zStart: Math.max(offZ + wallThickness, bounds.minZ + deltaZ),
-          zEnd: Math.min(offZ + wallThickness + rightWallLength, bounds.maxZ + deltaZ),
-          yMin: Math.max(0, bounds.minY),
-          yMax: Math.max(bounds.minY + 20, bounds.maxY),
-          x: rightWallInnerX - 0.8
+          ...contactXInfo,
+          zStart: contactXInfo.zStart + deltaZ,
+          zEnd: contactXInfo.zEnd + deltaZ
         };
       }
     }
@@ -9656,44 +10045,22 @@ private updateOpeningAnimations(delta = 0.016) {
     }
 
     const {
-      layout,
-      mainWallLength,
-      sideWallLength,
-      wallHeight,
-      wallThickness,
       floorWidth,
       floorDepth,
       floorMaterial,
-      wallMaterial,
       showFloorGrid,
-      showSkirting,
-      wallOffsetX,
-      wallOffsetZ
+      showSkirting
     } = config;
 
-    const offX = wallOffsetX ?? 0;
-    const offZ = wallOffsetZ ?? 0;
+    const effectiveFloorWidth = floorWidth || 5000;
+    const effectiveFloorDepth = floorDepth || 5000;
 
-    // Dimensión de piso requerida para cubrir la habitación sin dejar espacio muerto detrás
-    const effectiveSideLength = (layout === 'l_shape' || layout === 'u_shape')
-      ? Math.max(sideWallLength, config.rightWallLength || sideWallLength)
-      : 2000;
-    const effectiveFloorWidth = Math.max(floorWidth || 5000, mainWallLength + 1000);
-    const effectiveFloorDepth = Math.max(floorDepth || 5000, effectiveSideLength + 1500);
-
-    // ALINEACIÓN EXACTA AL BORDE:
-    // La cara posterior del muro principal queda exactamente en Z = offZ (borde posterior del piso)
-    // La cara lateral exterior del muro en L/U queda exactamente en X = offX (borde izquierdo del piso)
-    // El piso se extiende hacia el frente (+Z) y hacia la derecha (+X)
-    const floorCenterX = offX + effectiveFloorWidth / 2;
-    const floorCenterZ = offZ + effectiveFloorDepth / 2;
-
-    // 1. PISO ARQUITECTÓNICO TEXTURIZADO (Alineado al ras de los muros)
+    // 1. PISO ARQUITECTÓNICO TEXTURIZADO
     const floorGeo = new THREE.PlaneGeometry(effectiveFloorWidth, effectiveFloorDepth);
     const floorMat = ProceduralTextureFactory.getFloorMaterial(floorMaterial, effectiveFloorWidth, effectiveFloorDepth);
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(floorCenterX, -0.5, floorCenterZ);
+    floor.position.set(0, -0.5, 0);
     floor.receiveShadow = true;
     floor.userData = { isFloor: true };
     this.roomGroup.add(floor);
@@ -9703,7 +10070,7 @@ private updateOpeningAnimations(delta = 0.016) {
       const gridSpan = Math.max(effectiveFloorWidth, effectiveFloorDepth);
       const divisions = Math.max(10, Math.round(gridSpan / 500));
       const roomGrid = new THREE.GridHelper(gridSpan, divisions, 0x0284c7, 0x64748b);
-      roomGrid.position.set(floorCenterX, 0.2, floorCenterZ);
+      roomGrid.position.set(0, 0.2, 0);
       if (roomGrid.material instanceof THREE.Material) {
         roomGrid.material.opacity = 0.22;
         roomGrid.material.transparent = true;
@@ -9711,103 +10078,53 @@ private updateOpeningAnimations(delta = 0.016) {
       this.roomGroup.add(roomGrid);
     }
 
-    // 2. MURO PRINCIPAL (Back Wall a lo largo de X)
-    // Cara posterior en Z = offZ (borde del piso), cara frontal interior en Z = offZ + wallThickness
-    const mainWallGeo = new THREE.BoxGeometry(mainWallLength, wallHeight, wallThickness);
-    const mainWallMat = ProceduralTextureFactory.getWallMaterial(wallMaterial, mainWallLength, wallHeight);
-    const mainWall = new THREE.Mesh(mainWallGeo, mainWallMat);
-    mainWall.position.set(
-      offX + mainWallLength / 2, 
-      wallHeight / 2, 
-      offZ + wallThickness / 2
-    );
-    mainWall.castShadow = true;
-    mainWall.receiveShadow = true;
-    mainWall.userData = { isWall: true, wallType: 'main' };
-    this.roomGroup.add(mainWall);
+    // 2. MUROS INDEPENDIENTES Y DIVISORIOS
+    const resolvedWalls = getResolvedRoomWalls(config);
+    const skirtingMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc,
+      roughness: 0.25,
+      metalness: 0.05
+    });
 
-    // 3. MURO LATERAL IZQUIERDO (L y U a lo largo de Z)
-    if (layout === 'l_shape' || layout === 'u_shape') {
-      const sideWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, sideWallLength);
-      const sideWallMat = ProceduralTextureFactory.getWallMaterial(wallMaterial, sideWallLength, wallHeight);
-      const sideWall = new THREE.Mesh(sideWallGeo, sideWallMat);
-      sideWall.position.set(
-        offX + wallThickness / 2, 
-        wallHeight / 2, 
-        offZ + wallThickness + sideWallLength / 2
+    for (const wall of resolvedWalls) {
+      if (wall.isHidden) continue;
+
+      const wallGeo = new THREE.BoxGeometry(wall.length, wall.height, wall.thickness);
+      const wallMat = ProceduralTextureFactory.getWallMaterial(
+        wall.material || config.wallMaterial,
+        wall.length,
+        wall.height
       );
-      sideWall.castShadow = true;
-      sideWall.receiveShadow = true;
-      sideWall.userData = { isWall: true, wallType: 'side' };
-      this.roomGroup.add(sideWall);
-    }
+      const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+      const rotRad = -((wall.rotationY || 0) * (Math.PI / 180));
+      wallMesh.rotation.y = rotRad;
+      wallMesh.position.set(wall.posX, wall.height / 2, wall.posZ);
+      wallMesh.castShadow = true;
+      wallMesh.receiveShadow = true;
+      wallMesh.userData = { isWall: true, wallId: wall.id, wallType: wall.id };
+      this.roomGroup.add(wallMesh);
 
-    // 4. MURO LATERAL DERECHO (Solo U a lo largo de Z)
-    if (layout === 'u_shape') {
-      const rightLength = config.rightWallLength || sideWallLength;
-      const rightWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, rightLength);
-      const rightWallMat = ProceduralTextureFactory.getWallMaterial(wallMaterial, rightLength, wallHeight);
-      const rightWall = new THREE.Mesh(rightWallGeo, rightWallMat);
-      rightWall.position.set(
-        offX + mainWallLength - wallThickness / 2,
-        wallHeight / 2,
-        offZ + wallThickness + rightLength / 2
-      );
-      rightWall.castShadow = true;
-      rightWall.receiveShadow = true;
-      rightWall.userData = { isWall: true, wallType: 'right_side' };
-      this.roomGroup.add(rightWall);
-    }
+      // Zócalo / Rodapié inferior (Frontal y Trasero)
+      const hasSkirting = wall.showSkirting ?? showSkirting;
+      if (hasSkirting) {
+        const skirtingH = 100;
+        const skirtingT = 16;
 
-    // 5. ZÓCALOS / RODAPIÉS SANITARIOS (100mm de alto)
-    if (showSkirting) {
-      const skirtingH = 100;
-      const skirtingT = 16;
-      const skirtingMat = new THREE.MeshStandardMaterial({
-        color: 0xf8fafc,
-        roughness: 0.25,
-        metalness: 0.05
-      });
+        // Zócalo frontal (+Z local)
+        const frontSkirtingGeo = new THREE.BoxGeometry(wall.length, skirtingH, skirtingT);
+        const frontSkirting = new THREE.Mesh(frontSkirtingGeo, skirtingMat);
+        frontSkirting.position.set(0, -wall.height / 2 + skirtingH / 2, wall.thickness / 2 + skirtingT / 2);
+        frontSkirting.castShadow = true;
+        frontSkirting.receiveShadow = true;
+        wallMesh.add(frontSkirting);
 
-      // Zócalo muro principal
-      const mainSkirtingGeo = new THREE.BoxGeometry(mainWallLength, skirtingH, skirtingT);
-      const mainSkirting = new THREE.Mesh(mainSkirtingGeo, skirtingMat);
-      mainSkirting.position.set(
-        offX + mainWallLength / 2, 
-        skirtingH / 2, 
-        offZ + wallThickness + skirtingT / 2
-      );
-      mainSkirting.castShadow = true;
-      mainSkirting.receiveShadow = true;
-      this.roomGroup.add(mainSkirting);
-
-      // Zócalo muro lateral izquierdo
-      if (layout === 'l_shape' || layout === 'u_shape') {
-        const sideSkirtingGeo = new THREE.BoxGeometry(skirtingT, skirtingH, sideWallLength);
-        const sideSkirting = new THREE.Mesh(sideSkirtingGeo, skirtingMat);
-        sideSkirting.position.set(
-          offX + wallThickness + skirtingT / 2, 
-          skirtingH / 2, 
-          offZ + wallThickness + sideWallLength / 2
-        );
-        sideSkirting.castShadow = true;
-        sideSkirting.receiveShadow = true;
-        this.roomGroup.add(sideSkirting);
-      }
-
-      // Zócalo muro lateral derecho (U)
-      if (layout === 'u_shape') {
-        const rightLength = config.rightWallLength || sideWallLength;
-        const rightSkirtingGeo = new THREE.BoxGeometry(skirtingT, skirtingH, rightLength);
-        const rightSkirting = new THREE.Mesh(rightSkirtingGeo, skirtingMat);
-        rightSkirting.position.set(
-          offX + mainWallLength - wallThickness - skirtingT / 2,
-          skirtingH / 2,
-          offZ + wallThickness + rightLength / 2
-        );
-        rightSkirting.castShadow = true;
-        rightSkirting.receiveShadow = true;
-        this.roomGroup.add(rightSkirting);
+        // Zócalo posterior (-Z local)
+        const backSkirtingGeo = new THREE.BoxGeometry(wall.length, skirtingH, skirtingT);
+        const backSkirting = new THREE.Mesh(backSkirtingGeo, skirtingMat);
+        backSkirting.position.set(0, -wall.height / 2 + skirtingH / 2, -wall.thickness / 2 - skirtingT / 2);
+        backSkirting.castShadow = true;
+        backSkirting.receiveShadow = true;
+        wallMesh.add(backSkirting);
       }
     }
   }
@@ -9815,22 +10132,21 @@ private updateOpeningAnimations(delta = 0.016) {
   frameRoomView() {
     if (!this.camera || !this.controls) return;
     const config = this.roomConfig();
-    const offX = config.wallOffsetX ?? 0;
-    const offZ = config.wallOffsetZ ?? 0;
-    const sideLen = (config.layout === 'l_shape' || config.layout === 'u_shape')
-      ? Math.max(config.sideWallLength, config.rightWallLength || config.sideWallLength)
-      : 800;
-    const targetX = offX + config.mainWallLength / 2;
-    const targetY = config.wallHeight * 0.45;
-    const targetZ = offZ + (config.layout === 'single_wall' ? 800 : sideLen / 2.5);
+    const effectiveFloorWidth = config.floorWidth || 5000;
+    const effectiveFloorDepth = config.floorDepth || 5000;
+    const frameDistance = Math.max(effectiveFloorWidth, effectiveFloorDepth) * 1.35;
+
+    const targetX = 0;
+    const targetY = (config.wallHeight || 2600) * 0.35;
+    const targetZ = 0;
 
     const startTarget = this.controls.target.clone();
     const startCamPos = this.camera.position.clone();
     const targetCenter = new THREE.Vector3(targetX, targetY, targetZ);
     const targetCamPos = new THREE.Vector3(
-      targetX + 2200,
-      targetY + 1400,
-      targetZ + (config.layout === 'single_wall' ? 2500 : sideLen) + 1200
+      targetX + frameDistance * 0.45,
+      targetY + frameDistance * 0.55,
+      targetZ + frameDistance * 0.8
     );
 
     const startTime = performance.now();
@@ -9856,7 +10172,7 @@ private updateOpeningAnimations(delta = 0.016) {
   // --- WALL SELECTION HIGHLIGHT & 3D GIZMO ---
 
   private updateWallGizmo(
-    wallType: 'main' | 'side' | null,
+    wallType: string | null,
     config: RoomConfiguration,
     mode: WorkspaceMode
   ) {
@@ -9876,42 +10192,19 @@ private updateOpeningAnimations(delta = 0.016) {
       return;
     }
 
-    const {
-      layout,
-      mainWallLength,
-      sideWallLength,
-      wallHeight,
-      wallThickness,
-      wallOffsetX,
-      wallOffsetZ
-    } = config;
-
-    const offX = wallOffsetX ?? 0;
-    const offZ = wallOffsetZ ?? 0;
-
-    let posX = 0;
-    const posY = wallHeight / 2;
-    let posZ = 0;
-    let sizeX = 0;
-    const sizeY = wallHeight;
-    let sizeZ = 0;
-
-    if (wallType === 'main') {
-      sizeX = mainWallLength;
-      sizeZ = wallThickness;
-      posX = offX + mainWallLength / 2;
-      posZ = offZ + wallThickness / 2;
-    } else if (wallType === 'side' && layout === 'l_shape') {
-      sizeX = wallThickness;
-      sizeZ = sideWallLength;
-      posX = offX + wallThickness / 2;
-      posZ = offZ + wallThickness + sideWallLength / 2;
-    } else {
+    const walls = getResolvedRoomWalls(config);
+    const wall = walls.find(w => w.id === wallType);
+    if (!wall || wall.isHidden || config.hiddenWalls?.[wallType]) {
       return;
     }
 
-    // 1. Highlight Outline Mesh around selected wall
-    const outlineGeo = new THREE.BoxGeometry(sizeX + 8, sizeY + 8, sizeZ + 8);
+    const rotRad = -((wall.rotationY || 0) * (Math.PI / 180));
+    const posX = wall.posX;
+    const posY = wall.height / 2;
+    const posZ = wall.posZ;
+
+    // 1. Highlight Outline Mesh around selected wall (Sky Blue)
+    const outlineGeo = new THREE.BoxGeometry(wall.length + 8, wall.height + 8, wall.thickness + 8);
     const edgesGeo = new THREE.EdgesGeometry(outlineGeo);
     const lineMat = new THREE.LineBasicMaterial({
       color: 0x38bdf8,
@@ -9920,8 +10213,15 @@ private updateOpeningAnimations(delta = 0.016) {
     });
     const outlineLines = new THREE.LineSegments(edgesGeo, lineMat);
     outlineLines.position.set(posX, posY, posZ);
+    outlineLines.rotation.y = rotRad;
     outlineLines.renderOrder = 998;
     this.wallGizmoGroup.add(outlineLines);
+
+    // Si el muro está congelado / fijo, bloqueamos sus controles interactivos y mostramos únicamente el outline
+    const isWallLocked = !!config.isWallsLocked || !!wall.isLocked || !!config.lockedWalls?.[wallType];
+    if (isWallLocked) {
+      return;
+    }
 
     // 2. Gizmo: Translation Arrows in X (Lateral) and Z (Depth)
     const arrowLen = 220;
@@ -9981,7 +10281,7 @@ private updateOpeningAnimations(delta = 0.016) {
         isWallGizmo: true,
         type: 'wall_move',
         axis,
-        wallTarget: wallType
+        wallTarget: wall.id
       };
       arrowGroup.add(hitMesh);
       this.wallGizmoHitMeshes.push(hitMesh);
@@ -9989,12 +10289,12 @@ private updateOpeningAnimations(delta = 0.016) {
       return arrowGroup;
     };
 
-    const gizmoAnchor = new THREE.Vector3(posX, wallHeight + 120, posZ);
+    const gizmoAnchor = new THREE.Vector3(posX, wall.height + 120, posZ);
     const arrowX = createArrowMesh(0xef4444, 'x', gizmoAnchor);
     const arrowZ = createArrowMesh(0x0284c7, 'z', gizmoAnchor);
     this.wallGizmoGroup.add(arrowX, arrowZ);
 
-    // 3. Stretch Handle at free end of wall (Cube handle)
+    // 3. Stretch Handle at free end of wall (Cube handle - Emerald)
     const handleSize = 36;
     const handleGeo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
     const handleMat = new THREE.MeshStandardMaterial({
@@ -10011,29 +10311,51 @@ private updateOpeningAnimations(delta = 0.016) {
     );
     handleMesh.add(handleEdge);
 
-    if (wallType === 'main') {
-      handleMesh.position.set(
-        offX + mainWallLength + handleSize / 2 + 10,
-        wallHeight / 2,
-        offZ + wallThickness / 2
-      );
-    } else {
-      handleMesh.position.set(
-        offX + wallThickness / 2,
-        wallHeight / 2,
-        offZ + wallThickness + sideWallLength + handleSize / 2 + 10
-      );
-    }
+    const endDist = wall.length / 2 + handleSize / 2 + 10;
+    const handleX = posX + endDist * Math.cos(rotRad);
+    const handleZ = posZ - endDist * Math.sin(rotRad);
+    handleMesh.position.set(handleX, posY, handleZ);
+    handleMesh.rotation.y = rotRad;
 
     handleMesh.userData = {
       isWallGizmo: true,
       type: 'wall_stretch',
-      axis: wallType === 'main' ? 'x' : 'z',
-      wallTarget: wallType
+      axis: 'x',
+      wallTarget: wall.id
     };
     handleMesh.renderOrder = 999;
     this.wallGizmoGroup.add(handleMesh);
     this.wallGizmoHitMeshes.push(handleMesh);
+
+    // 4. Tirante 3D Superior de Altura (Cube handle - Amber / Eje Y)
+    const topHandleGeo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
+    const topHandleMat = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b,
+      emissive: 0xf59e0b,
+      emissiveIntensity: 0.45,
+      roughness: 0.2,
+      depthTest: false
+    });
+    const topHandleMesh = new THREE.Mesh(topHandleGeo, topHandleMat);
+    const topHandleEdge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(topHandleGeo),
+      new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
+    );
+    topHandleMesh.add(topHandleEdge);
+    topHandleMesh.position.set(
+      posX,
+      wall.height + handleSize / 2 + 8,
+      posZ
+    );
+    topHandleMesh.userData = {
+      isWallGizmo: true,
+      type: 'wall_stretch_height',
+      axis: 'y',
+      wallTarget: wall.id
+    };
+    topHandleMesh.renderOrder = 999;
+    this.wallGizmoGroup.add(topHandleMesh);
+    this.wallGizmoHitMeshes.push(topHandleMesh);
   }
 
   // ==========================================

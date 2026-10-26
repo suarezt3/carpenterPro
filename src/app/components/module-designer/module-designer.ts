@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   ElementRef,
   inject,
   signal,
@@ -46,6 +47,9 @@ import {
   PartHardwareConfig,
   WorkspaceMode,
   RoomConfiguration,
+  RoomWallInstance,
+  getResolvedRoomWalls,
+  rescaleWallsToFloor,
   RoomLayoutType,
   FloorMaterialType,
   WallMaterialType,
@@ -188,6 +192,10 @@ export class ModuleDesignerComponent {
       'M20 11A8 8 0 1 0 17.6 16.6',
       'M20 6V11H15'
     ]),
+    rotate: cadSvg([
+      'M20 11A8 8 0 1 0 17.6 16.6',
+      'M20 6V11H15'
+    ]),
     compass: Compass01Icon,
     eye: ViewIcon,
     eyeOff: cadSvg([
@@ -319,6 +327,11 @@ export class ModuleDesignerComponent {
     ]),
     lock: cadSvg([
       'M6 10V8A6 6 0 0 1 18 8V10',
+      'M5 10H19A1 1 0 0 1 20 11V20A1 1 0 0 1 19 21H5A1 1 0 0 1 4 20V11A1 1 0 0 1 5 10Z',
+      'M12 14V17'
+    ]),
+    unlock: cadSvg([
+      'M6 10V8A6 6 0 0 1 18 8V6',
       'M5 10H19A1 1 0 0 1 20 11V20A1 1 0 0 1 19 21H5A1 1 0 0 1 4 20V11A1 1 0 0 1 5 10Z',
       'M12 14V17'
     ]),
@@ -799,7 +812,15 @@ export class ModuleDesignerComponent {
   readonly workspaceMode = signal<WorkspaceMode>('module');
   readonly roomConfig = signal<RoomConfiguration>(DEFAULT_ROOM_CONFIG);
   readonly showRoomSettingsModal = signal<boolean>(false);
-  readonly selectedWall = signal<'main' | 'side' | null>(null);
+  readonly selectedWall = signal<string | null>(null);
+  readonly roomDockSubTab = signal<'wall' | 'environment' | 'finishes'>('wall');
+
+  readonly resolvedWalls = computed(() => getResolvedRoomWalls(this.roomConfig()));
+  readonly selectedWallInstance = computed(() => {
+    const sel = this.selectedWall();
+    if (!sel) return null;
+    return this.resolvedWalls().find(w => w.id === sel) || null;
+  });
 
   readonly floorCatalog = FLOOR_FINISHES_CATALOG;
   readonly wallCatalog = WALL_FINISHES_CATALOG;
@@ -865,6 +886,12 @@ export class ModuleDesignerComponent {
     }
 
     if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Del') {
+      if (this.workspaceMode() === 'room' && this.selectedWall()) {
+        e.preventDefault();
+        this.deleteWall(this.selectedWall()!);
+        return;
+      }
+
       const selAppId = this.selectedApplianceId();
       if (selAppId) {
         e.preventDefault();
@@ -926,6 +953,11 @@ export class ModuleDesignerComponent {
 
     // Atajo R: Rotar selección en 90° (idéntico a controles de cinta y panel lateral)
     if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R')) {
+      if (this.workspaceMode() === 'room' && this.selectedWall()) {
+        e.preventDefault();
+        this.rotateWall(this.selectedWall()!, 90);
+        return;
+      }
       if (this.selectedApplianceId() || this.selectedPartId() || this.selectedPartIds().length > 0 || this.isAnyGroupSelected()) {
         e.preventDefault();
         this.rotateSelectedGroup(90);
@@ -1222,6 +1254,7 @@ export class ModuleDesignerComponent {
       this.projectService.selectAppliances([app.id]);
       this.selectedPartId.set(null);
       this.selectedPartIds.set([]);
+      this.selectedWall.set(null);
       this.activeDockTab.set('appliances');
     } else {
       this.projectService.selectAppliance(null);
@@ -1657,6 +1690,25 @@ export class ModuleDesignerComponent {
       this.activeDockTab.set('piece');
     }
 
+    // Sincronizar roomConfig si se modifica desde la Configuración de Proyecto (Header)
+    effect(() => {
+      const projRoom = this.project().roomConfig;
+      if (projRoom) {
+        const cur = this.roomConfig();
+        if (
+          cur.floorWidth !== projRoom.floorWidth ||
+          cur.floorDepth !== projRoom.floorDepth ||
+          cur.mainWallLength !== projRoom.mainWallLength ||
+          cur.sideWallLength !== projRoom.sideWallLength ||
+          cur.rightWallLength !== projRoom.rightWallLength ||
+          cur.wallHeight !== projRoom.wallHeight ||
+          cur.layout !== projRoom.layout
+        ) {
+          this.roomConfig.set({ ...cur, ...projRoom });
+        }
+      }
+    });
+
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer) {
         clearTimeout(this.toastTimer);
@@ -1668,6 +1720,7 @@ export class ModuleDesignerComponent {
 
   onSelectPartFrom3D(part: Part | null) {
     if (part) {
+      this.selectedWall.set(null);
       // Si ya hay una multiselección activa que contiene a esta pieza (por Shift+Clic, Todo o lazo),
       // la preservamos intacta y solo actualizamos la pieza activa en el inspector
       if (this.selectedPartIds().length > 1 && this.selectedPartIds().includes(part.id)) {
@@ -1707,6 +1760,7 @@ export class ModuleDesignerComponent {
   onPartsSelectedFrom3D(partIds: string[]) {
     this.selectedPartIds.set(partIds);
     if (partIds.length > 0) {
+      this.selectedWall.set(null);
       if (!this.selectedPartId() || !partIds.includes(this.selectedPartId()!)) {
         this.selectedPartId.set(partIds[partIds.length - 1]);
       }
@@ -1729,6 +1783,7 @@ export class ModuleDesignerComponent {
     this.selectedPartIds.set([]);
     this.projectService.selectAppliances([]);
     this.projectService.selectAppliance(null);
+    this.selectedWall.set(null);
     this.activeDockTab.set('catalog');
   }
 
@@ -3533,11 +3588,41 @@ export class ModuleDesignerComponent {
   }
 
   updateRoomConfig(updates: Partial<RoomConfiguration>) {
-    this.roomConfig.update(c => ({ ...c, ...updates }));
+    const cur = this.roomConfig();
+    const targetW = updates.floorWidth ?? cur.floorWidth ?? 5000;
+    const targetD = updates.floorDepth ?? cur.floorDepth ?? 5000;
+    const prevW = cur.floorWidth ?? 5000;
+    const prevD = cur.floorDepth ?? 5000;
+
+    let walls = updates.walls ?? cur.walls;
+    let extraUpdates: Partial<RoomConfiguration> = {};
+
+    if ((targetW !== prevW || targetD !== prevD) && !updates.walls) {
+      const wallT = updates.wallThickness ?? cur.wallThickness ?? 150;
+      const offX = updates.wallOffsetX ?? cur.wallOffsetX ?? 0;
+      const offZ = updates.wallOffsetZ ?? cur.wallOffsetZ ?? 0;
+      const curWalls = getResolvedRoomWalls(cur);
+      const rescaled = rescaleWallsToFloor(curWalls, prevW, prevD, targetW, targetD, wallT, offX, offZ);
+      walls = rescaled;
+      const mainWall = rescaled.find(item => item.id === 'main');
+      const sideWall = rescaled.find(item => item.id === 'side');
+      const rightWall = rescaled.find(item => item.id === 'right_side');
+      extraUpdates = {
+        mainWallLength: mainWall ? mainWall.length : Math.min(targetW, cur.mainWallLength),
+        sideWallLength: sideWall ? sideWall.length : Math.min(Math.max(600, targetD - wallT), cur.sideWallLength),
+        rightWallLength: rightWall ? rightWall.length : (cur.rightWallLength ? Math.min(Math.max(600, targetD - wallT), cur.rightWallLength) : undefined)
+      };
+    }
+
+    const merged = { ...updates, ...extraUpdates, ...(walls ? { walls } : {}) };
+    this.roomConfig.update(c => ({ ...c, ...merged }));
+    this.projectService.updateRoomConfig(merged);
   }
 
   setRoomLayout(layout: RoomLayoutType) {
-    this.updateRoomConfig({ layout });
+    const cur = this.roomConfig();
+    const newWalls = getResolvedRoomWalls({ ...cur, layout, walls: undefined });
+    this.updateRoomConfig({ layout, walls: newWalls });
     const label = layout === 'u_shape' ? 'Distribución en U' : layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta';
     this.showToast(`📐 Disposición: ${label}`);
   }
@@ -3568,6 +3653,12 @@ export class ModuleDesignerComponent {
     this.updateRoomConfig({ showSkirting: !this.roomConfig().showSkirting });
   }
 
+  toggleAllWallsLock() {
+    const cur = !this.roomConfig().isWallsLocked;
+    this.updateRoomConfig({ isWallsLocked: cur });
+    this.showToast(cur ? '🔒 Todos los muros bloqueados' : '🔓 Muros desbloqueados para edición');
+  }
+
   frameRoomCamera() {
     this.viewer3d()?.frameRoomView();
   }
@@ -3588,30 +3679,344 @@ export class ModuleDesignerComponent {
 
   stretchMainWall(delta: number) {
     const curL = this.roomConfig().mainWallLength;
-    const nextL = Math.max(1200, Math.min(10000, curL + delta));
+    const maxL = this.roomConfig().floorWidth || 5000;
+    const nextL = Math.max(600, Math.min(maxL, curL + delta));
     this.updateRoomConfig({ mainWallLength: nextL });
     this.showToast(`📏 Muro Principal: ${nextL} mm`);
   }
 
   stretchSideWall(delta: number) {
     const curL = this.roomConfig().sideWallLength;
-    const nextL = Math.max(1000, Math.min(10000, curL + delta));
+    const maxL = Math.max(600, (this.roomConfig().floorDepth || 5000) - (this.roomConfig().wallThickness || 150));
+    const nextL = Math.max(600, Math.min(maxL, curL + delta));
     this.updateRoomConfig({ sideWallLength: nextL });
     this.showToast(`📏 Muro Lateral: ${nextL} mm`);
   }
 
-  setFloorDimensions(width: number, depth: number) {
-    this.updateRoomConfig({
-      floorWidth: width,
-      floorDepth: depth
+  setWorkspaceSize(width: number, depth: number) {
+    const curCfg = this.roomConfig();
+    const prevW = curCfg.floorWidth || 5000;
+    const prevD = curCfg.floorDepth || 5000;
+    const w = Math.max(2000, Math.min(25000, width));
+    const d = Math.max(2000, Math.min(25000, depth));
+
+    const currentWalls = getResolvedRoomWalls(curCfg);
+    const wallT = curCfg.wallThickness || 150;
+    const offX = curCfg.wallOffsetX ?? 0;
+    const offZ = curCfg.wallOffsetZ ?? 0;
+    const rescaledWalls = rescaleWallsToFloor(currentWalls, prevW, prevD, w, d, wallT, offX, offZ);
+
+    const mainWall = rescaledWalls.find(item => item.id === 'main');
+    const sideWall = rescaledWalls.find(item => item.id === 'side');
+    const rightWall = rescaledWalls.find(item => item.id === 'right_side');
+
+    this.projectService.updateWorkspaceDimensions(w, d);
+    const updated = this.projectService.currentProject().roomConfig || DEFAULT_ROOM_CONFIG;
+    this.roomConfig.set({
+      ...this.roomConfig(),
+      ...updated,
+      floorWidth: w,
+      floorDepth: d,
+      mainWallLength: mainWall ? mainWall.length : Math.min(w, curCfg.mainWallLength),
+      sideWallLength: sideWall ? sideWall.length : Math.min(Math.max(600, d - wallT), curCfg.sideWallLength),
+      rightWallLength: rightWall ? rightWall.length : undefined,
+      walls: rescaledWalls
     });
-    this.showToast(`📐 Suelo ampliado: ${(width / 1000).toFixed(1)} × ${(depth / 1000).toFixed(1)} m`);
+    this.showToast(`📐 Espacio adaptado: ${(w / 1000).toFixed(1)} × ${(d / 1000).toFixed(1)} m`);
   }
 
-  onWallSelected(wall: 'main' | 'side' | null) {
+  setFloorDimensions(width: number, depth: number) {
+    this.setWorkspaceSize(width, depth);
+  }
+
+  onWallSelected(wall: string | null) {
     this.selectedWall.set(wall);
     if (wall) {
-      this.showToast(`🧱 Seleccionado: ${wall === 'main' ? 'Muro Principal' : 'Muro Lateral L'}`);
+      this.roomDockSubTab.set('wall');
+      this.activeDockTab.set('piece');
+      this.selectedPartId.set(null);
+      this.selectedPartIds.set([]);
+      this.projectService.selectAppliance(null);
+      this.projectService.selectAppliances([]);
+      const inst = this.getWallInstance(wall);
+      const wallName = inst ? inst.name : wall;
+      this.showToast(`🧱 Seleccionado: ${wallName}`);
+    }
+  }
+
+  getWallInstance(wallId: string): RoomWallInstance | null {
+    return this.resolvedWalls().find(w => w.id === wallId) || null;
+  }
+
+  getWallLength(wallId: string): number {
+    const w = this.getWallInstance(wallId);
+    return w ? w.length : 2400;
+  }
+
+  getWallHeight(wallId: string): number {
+    const w = this.getWallInstance(wallId);
+    return w ? w.height : (this.roomConfig().wallHeight || 2600);
+  }
+
+  getWallThickness(wallId: string): number {
+    const w = this.getWallInstance(wallId);
+    return w ? w.thickness : (this.roomConfig().wallThickness || 150);
+  }
+
+  getWallRotation(wallId: string): number {
+    const w = this.getWallInstance(wallId);
+    return w ? (w.rotationY || 0) : 0;
+  }
+
+  isWallLocked(wallId: string): boolean {
+    const cfg = this.roomConfig();
+    const w = this.getWallInstance(wallId);
+    return !!cfg.isWallsLocked || !!w?.isLocked || !!cfg.lockedWalls?.[wallId];
+  }
+
+  toggleWallLock(wallId: string) {
+    const cfg = this.roomConfig();
+    const walls = getResolvedRoomWalls(cfg);
+    const w = walls.find(item => item.id === wallId);
+    const cur = this.isWallLocked(wallId);
+    const updatedWalls = walls.map(item => {
+      if (item.id === wallId) {
+        return { ...item, isLocked: !cur };
+      }
+      return item;
+    });
+    const lockedWalls = { ...(cfg.lockedWalls || {}) };
+    lockedWalls[wallId] = !cur;
+    this.updateRoomConfig({ walls: updatedWalls, lockedWalls });
+    const wallName = w ? w.name : 'Muro';
+    this.showToast(cur ? `🔓 ${wallName} desbloqueado` : `🔒 ${wallName} congelado (inmóvil)`);
+  }
+
+  isWallHidden(wallId: string): boolean {
+    const w = this.getWallInstance(wallId);
+    return !!w?.isHidden || !!this.roomConfig().hiddenWalls?.[wallId];
+  }
+
+  toggleWallVisibility(wallId: string) {
+    const cfg = this.roomConfig();
+    const walls = getResolvedRoomWalls(cfg);
+    const w = walls.find(item => item.id === wallId);
+    const cur = this.isWallHidden(wallId);
+    const updatedWalls = walls.map(item => {
+      if (item.id === wallId) {
+        return { ...item, isHidden: !cur };
+      }
+      return item;
+    });
+    const hiddenWalls = { ...(cfg.hiddenWalls || {}) };
+    hiddenWalls[wallId] = !cur;
+    this.updateRoomConfig({ walls: updatedWalls, hiddenWalls });
+    const wallName = w ? w.name : 'Muro';
+    this.showToast(cur ? `👁️ ${wallName} visible` : `🙈 ${wallName} oculto`);
+  }
+
+  setWallLength(wallId: string, length: number) {
+    const cfg = this.roomConfig();
+    const floorW = cfg.floorWidth || 5000;
+    const floorD = cfg.floorDepth || 5000;
+    const maxLen = Math.max(floorW, floorD);
+    const val = Math.max(400, Math.min(maxLen, length));
+    const walls = getResolvedRoomWalls(cfg);
+    const updatedWalls = walls.map(w => {
+      if (w.id === wallId) return { ...w, length: val };
+      return w;
+    });
+    this.updateRoomConfig({ walls: updatedWalls });
+  }
+
+  nudgeWallLength(wallId: string, delta: number) {
+    const cur = this.getWallLength(wallId);
+    this.setWallLength(wallId, cur + delta);
+  }
+
+  setWallHeight(wallId: string, height: number) {
+    const val = Math.max(400, Math.min(4500, height));
+    const cfg = this.roomConfig();
+    const walls = getResolvedRoomWalls(cfg);
+    const updatedWalls = walls.map(w => {
+      if (w.id === wallId) return { ...w, height: val };
+      return w;
+    });
+    this.updateRoomConfig({ walls: updatedWalls });
+  }
+
+  nudgeWallHeight(wallId: string, delta: number) {
+    const cur = this.getWallHeight(wallId);
+    this.setWallHeight(wallId, cur + delta);
+  }
+
+  setWallRotation(wallId: string, rotationDeg: number) {
+    const normalized = ((rotationDeg % 360) + 360) % 360;
+    const cfg = this.roomConfig();
+    const walls = getResolvedRoomWalls(cfg);
+    const updatedWalls = walls.map(w => {
+      if (w.id === wallId) return { ...w, rotationY: normalized };
+      return w;
+    });
+    this.updateRoomConfig({ walls: updatedWalls });
+    this.showToast(`🔄 Giro de muro: ${normalized}°`);
+  }
+
+  rotateWall(wallId: string, deltaDeg = 90) {
+    const cur = this.getWallRotation(wallId);
+    this.setWallRotation(wallId, cur + deltaDeg);
+  }
+
+  setWallOrientation(wallId: string, orientation: 'horizontal' | 'vertical') {
+    this.setWallRotation(wallId, orientation === 'horizontal' ? 0 : 90);
+  }
+
+  addRoomWall() {
+    const cfg = this.roomConfig();
+    const current = getResolvedRoomWalls(cfg);
+    const newId = 'wall_' + Date.now();
+    const newWall: RoomWallInstance = {
+      id: newId,
+      name: `Muro Divisorio ${current.length + 1}`,
+      length: 2400,
+      height: cfg.wallHeight || 2600,
+      thickness: cfg.wallThickness || 150,
+      posX: 0,
+      posZ: 0,
+      rotationY: 0,
+      material: cfg.wallMaterial,
+      showSkirting: cfg.showSkirting,
+      isLocked: false,
+      isHidden: false
+    };
+    this.updateRoomConfig({ walls: [...current, newWall] });
+    this.onWallSelected(newId);
+    this.showToast(`🧱 Creado "${newWall.name}". Puedes arrastrarlo libremente o girarlo con 'R'`);
+  }
+
+  duplicateWall(wallId?: string) {
+    const targetId = wallId || this.selectedWall();
+    if (!targetId) return;
+    const cfg = this.roomConfig();
+    const current = getResolvedRoomWalls(cfg);
+    const original = current.find(w => w.id === targetId);
+    if (!original) return;
+    const newId = 'wall_' + Date.now();
+    const clonedWall: RoomWallInstance = {
+      ...original,
+      id: newId,
+      name: `${original.name} (Copia)`,
+      posX: original.posX + 200,
+      posZ: original.posZ + 200,
+      isLocked: false,
+      isHidden: false
+    };
+    this.updateRoomConfig({ walls: [...current, clonedWall] });
+    this.onWallSelected(newId);
+    this.showToast(`📋 Duplicado "${clonedWall.name}"`);
+  }
+
+  deleteWall(wallId?: string) {
+    const targetId = wallId || this.selectedWall();
+    if (!targetId) return;
+    const cfg = this.roomConfig();
+    const current = getResolvedRoomWalls(cfg);
+    const wallToDelete = current.find(w => w.id === targetId);
+    const wallName = wallToDelete ? wallToDelete.name : 'Muro';
+    const remaining = current.filter(w => w.id !== targetId);
+    this.updateRoomConfig({ walls: remaining });
+    if (this.selectedWall() === targetId) {
+      this.selectedWall.set(remaining.length > 0 ? remaining[0].id : null);
+    }
+    this.showToast(`🗑️ "${wallName}" eliminado`);
+  }
+
+  nudgeWallPos(wallId: string, axis: 'x' | 'z', delta: number) {
+    const cfg = this.roomConfig();
+    const walls = getResolvedRoomWalls(cfg);
+    const updatedWalls = walls.map(w => {
+      if (w.id === wallId) {
+        return {
+          ...w,
+          posX: axis === 'x' ? w.posX + delta : w.posX,
+          posZ: axis === 'z' ? w.posZ + delta : w.posZ
+        };
+      }
+      return w;
+    });
+    this.updateRoomConfig({ walls: updatedWalls });
+  }
+
+  setWallThickness(wallId: string, thickness: number) {
+    const val = Math.max(50, Math.min(600, thickness));
+    const cfg = this.roomConfig();
+    const walls = getResolvedRoomWalls(cfg);
+    const updatedWalls = walls.map(w => {
+      if (w.id === wallId) return { ...w, thickness: val };
+      return w;
+    });
+    this.updateRoomConfig({ walls: updatedWalls });
+  }
+
+  setWallPosX(wallId: string, posX: number) {
+    const cfg = this.roomConfig();
+    const floorW = cfg.floorWidth || 5000;
+    const val = Math.max(-floorW / 2, Math.min(floorW / 2, posX));
+    const walls = getResolvedRoomWalls(cfg);
+    const updatedWalls = walls.map(w => {
+      if (w.id === wallId) return { ...w, posX: val };
+      return w;
+    });
+    this.updateRoomConfig({ walls: updatedWalls });
+  }
+
+  setWallPosZ(wallId: string, posZ: number) {
+    const cfg = this.roomConfig();
+    const floorD = cfg.floorDepth || 5000;
+    const val = Math.max(-floorD / 2, Math.min(floorD / 2, posZ));
+    const walls = getResolvedRoomWalls(cfg);
+    const updatedWalls = walls.map(w => {
+      if (w.id === wallId) return { ...w, posZ: val };
+      return w;
+    });
+    this.updateRoomConfig({ walls: updatedWalls });
+  }
+
+  updateWallName(wallId: string, name: string) {
+    if (!name.trim()) return;
+    const cfg = this.roomConfig();
+    const walls = getResolvedRoomWalls(cfg);
+    const updatedWalls = walls.map(w => {
+      if (w.id === wallId) return { ...w, name: name.trim() };
+      return w;
+    });
+    this.updateRoomConfig({ walls: updatedWalls });
+  }
+
+  nudgeWallThickness(delta: number) {
+    const cur = this.roomConfig().wallThickness || 150;
+    const nextVal = Math.max(50, Math.min(600, cur + delta));
+    const cfg = this.roomConfig();
+    const walls = getResolvedRoomWalls(cfg).map(w => ({ ...w, thickness: nextVal }));
+    this.updateRoomConfig({ wallThickness: nextVal, walls });
+  }
+
+  nudgeFloorDimension(axis: 'width' | 'depth', delta: number) {
+    const cfg = this.roomConfig();
+    if (axis === 'width') {
+      const cur = cfg.floorWidth || 5000;
+      this.setWorkspaceSize(cur + delta, cfg.floorDepth || 5000);
+    } else {
+      const cur = cfg.floorDepth || 5000;
+      this.setWorkspaceSize(cfg.floorWidth || 5000, cur + delta);
+    }
+  }
+
+  nudgeWallOffset(axis: 'x' | 'z', delta: number) {
+    if (axis === 'x') {
+      this.nudgeWalls(delta, 0);
+    } else {
+      this.nudgeWalls(0, delta);
     }
   }
 

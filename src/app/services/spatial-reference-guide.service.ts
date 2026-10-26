@@ -5,6 +5,8 @@ export interface SpatialGuideOptions {
   figurePos: { x: number; z: number };
   isSelected: boolean;
   isWhiteTheme: boolean;
+  width?: number;
+  depth?: number;
 }
 
 /**
@@ -20,10 +22,10 @@ export class SpatialReferenceGuideService {
 
   buildGuideScene(options: SpatialGuideOptions): THREE.Group {
     const rootGroup = new THREE.Group();
-    const { figurePos, isSelected, isWhiteTheme } = options;
+    const { figurePos, isSelected, isWhiteTheme, width = 5000, depth = 5000 } = options;
 
     // 1. Etiquetas cardinales fijas en los 4 puntos del piso del taller
-    const cardinalGroup = this.buildFloorCardinalMarkers(isWhiteTheme);
+    const cardinalGroup = this.buildFloorCardinalMarkers(isWhiteTheme, width, depth);
     rootGroup.add(cardinalGroup);
 
     // 2. Maniquí arquitectónico 3D móvil (1720 mm de altura) + Brújula y regla
@@ -33,16 +35,18 @@ export class SpatialReferenceGuideService {
     return rootGroup;
   }
 
-  private buildFloorCardinalMarkers(isWhiteTheme: boolean): THREE.Group {
+  private buildFloorCardinalMarkers(isWhiteTheme: boolean, width = 5000, depth = 5000): THREE.Group {
     const group = new THREE.Group();
+    const halfW = (width || 5000) / 2;
+    const halfD = (depth || 5000) / 2;
 
-    // 1. Marco perimetral completo del taller (5000 x 5000 mm)
+    // 1. Marco perimetral completo del taller sincronizado con el espacio de trabajo
     const borderPoints = [
-      new THREE.Vector3(-2500, 1.2, 2500),
-      new THREE.Vector3(2500, 1.2, 2500),
-      new THREE.Vector3(2500, 1.2, -2500),
-      new THREE.Vector3(-2500, 1.2, -2500),
-      new THREE.Vector3(-2500, 1.2, 2500)
+      new THREE.Vector3(-halfW, 1.2, halfD),
+      new THREE.Vector3(halfW, 1.2, halfD),
+      new THREE.Vector3(halfW, 1.2, -halfD),
+      new THREE.Vector3(-halfW, 1.2, -halfD),
+      new THREE.Vector3(-halfW, 1.2, halfD)
     ];
     const borderGeo = new THREE.BufferGeometry().setFromPoints(borderPoints);
     const borderMat = new THREE.LineBasicMaterial({
@@ -54,36 +58,36 @@ export class SpatialReferenceGuideService {
     group.add(borderLine);
 
     // 2. Cantoneras arquitectónicas CAD en las 4 esquinas del taller
-    const cornerLen = 220;
+    const cornerLen = Math.min(220, Math.min(halfW, halfD) * 0.2);
     const cornerMat = new THREE.LineBasicMaterial({
       color: isWhiteTheme ? 0x0284c7 : 0x38bdf8,
       transparent: true,
       opacity: isWhiteTheme ? 0.8 : 0.9
     });
     const corners = [
-      // Delantera Izquierda (-2500, 2500)
+      // Delantera Izquierda (-halfW, halfD)
       [
-        new THREE.Vector3(-2500 + cornerLen, 1.5, 2500),
-        new THREE.Vector3(-2500, 1.5, 2500),
-        new THREE.Vector3(-2500, 1.5, 2500 - cornerLen)
+        new THREE.Vector3(-halfW + cornerLen, 1.5, halfD),
+        new THREE.Vector3(-halfW, 1.5, halfD),
+        new THREE.Vector3(-halfW, 1.5, halfD - cornerLen)
       ],
-      // Delantera Derecha (2500, 2500)
+      // Delantera Derecha (halfW, halfD)
       [
-        new THREE.Vector3(2500 - cornerLen, 1.5, 2500),
-        new THREE.Vector3(2500, 1.5, 2500),
-        new THREE.Vector3(2500, 1.5, 2500 - cornerLen)
+        new THREE.Vector3(halfW - cornerLen, 1.5, halfD),
+        new THREE.Vector3(halfW, 1.5, halfD),
+        new THREE.Vector3(halfW, 1.5, halfD - cornerLen)
       ],
-      // Trasera Derecha (2500, -2500)
+      // Trasera Derecha (halfW, -halfD)
       [
-        new THREE.Vector3(2500 - cornerLen, 1.5, -2500),
-        new THREE.Vector3(2500, 1.5, -2500),
-        new THREE.Vector3(2500, 1.5, -2500 + cornerLen)
+        new THREE.Vector3(halfW - cornerLen, 1.5, -halfD),
+        new THREE.Vector3(halfW, 1.5, -halfD),
+        new THREE.Vector3(halfW, 1.5, -halfD + cornerLen)
       ],
-      // Trasera Izquierda (-2500, -2500)
+      // Trasera Izquierda (-halfW, -halfD)
       [
-        new THREE.Vector3(-2500 + cornerLen, 1.5, -2500),
-        new THREE.Vector3(-2500, 1.5, -2500),
-        new THREE.Vector3(-2500, 1.5, -2500 + cornerLen)
+        new THREE.Vector3(-halfW + cornerLen, 1.5, -halfD),
+        new THREE.Vector3(-halfW, 1.5, -halfD),
+        new THREE.Vector3(-halfW, 1.5, -halfD + cornerLen)
       ]
     ];
     for (const pts of corners) {
@@ -92,8 +96,9 @@ export class SpatialReferenceGuideService {
       group.add(cLine);
     }
 
-    // 3. Cinta frontal azul distintiva en todo el borde delantero (+Z = 2500)
-    const frontBarGeo = new THREE.PlaneGeometry(2800, 24);
+    // 3. Cinta frontal azul distintiva en todo el borde delantero (+Z = halfD)
+    const frontBarWidth = Math.min(width * 0.56, 2800);
+    const frontBarGeo = new THREE.PlaneGeometry(frontBarWidth, 24);
     const frontBarMat = new THREE.MeshBasicMaterial({
       color: 0x0284c7,
       transparent: true,
@@ -103,7 +108,7 @@ export class SpatialReferenceGuideService {
     });
     const frontBar = new THREE.Mesh(frontBarGeo, frontBarMat);
     frontBar.rotation.x = -Math.PI / 2;
-    frontBar.position.set(0, 1.6, 2500);
+    frontBar.position.set(0, 1.6, halfD);
     group.add(frontBar);
 
     // 4. Chevrons direccionales en el piso apuntando al interior del taller
@@ -133,13 +138,13 @@ export class SpatialReferenceGuideService {
     };
 
     // Frontal (+Z): flecha apuntando hacia el centro (-Z)
-    group.add(createInwardChevron(0, 2420, Math.PI, 0x0284c7));
+    group.add(createInwardChevron(0, halfD - 80, Math.PI, 0x0284c7));
     // Trasero (-Z): flecha apuntando hacia el centro (+Z)
-    group.add(createInwardChevron(0, -2420, 0, 0x64748b));
+    group.add(createInwardChevron(0, -halfD + 80, 0, 0x64748b));
     // Izquierdo (-X): flecha apuntando hacia el centro (+X)
-    group.add(createInwardChevron(-2420, 0, -Math.PI / 2, 0x64748b));
+    group.add(createInwardChevron(-halfW + 80, 0, -Math.PI / 2, 0x64748b));
     // Derecho (+X): flecha apuntando hacia el centro (-X)
-    group.add(createInwardChevron(2420, 0, Math.PI / 2, 0x64748b));
+    group.add(createInwardChevron(halfW - 80, 0, Math.PI / 2, 0x64748b));
 
     // 5. Badges cardinales perimetrales de alta visibilidad en los 4 bordes exteriores
     // FRENTE (+Z)
@@ -153,7 +158,7 @@ export class SpatialReferenceGuideService {
       subtitleColor: '#38bdf8',
       isFront: true
     });
-    frontSprite.position.set(0, 65, 2680);
+    frontSprite.position.set(0, 65, halfD + 180);
     frontSprite.scale.set(820, 155, 1);
     group.add(frontSprite);
 
@@ -168,7 +173,7 @@ export class SpatialReferenceGuideService {
       subtitleColor: '#94a3b8',
       isFront: false
     });
-    backSprite.position.set(0, 65, -2680);
+    backSprite.position.set(0, 65, -halfD - 180);
     backSprite.scale.set(780, 148, 1);
     group.add(backSprite);
 
@@ -183,7 +188,7 @@ export class SpatialReferenceGuideService {
       subtitleColor: '#94a3b8',
       isFront: false
     });
-    leftSprite.position.set(-2680, 65, 0);
+    leftSprite.position.set(-halfW - 180, 65, 0);
     leftSprite.scale.set(780, 148, 1);
     group.add(leftSprite);
 
@@ -198,7 +203,9 @@ export class SpatialReferenceGuideService {
       subtitleColor: '#94a3b8',
       isFront: false
     });
-    rightSprite.position.set(2680, 65, 0);
+    rightSprite.position.set(halfW + 180, 65, 0);
+    rightSprite.scale.set(780, 148, 1);
+    group.add(rightSprite);
     rightSprite.scale.set(780, 148, 1);
     group.add(rightSprite);
 
