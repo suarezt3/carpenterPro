@@ -136,6 +136,7 @@
                       <hugeicons-icon [icon]="icons.font" [size]="14" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
                       <select
                         [value]="activeFont()"
+                        (pointerdown)="saveSelection()"
                         (change)="applyFontFamily($any($event.target).value)"
                         class="text-[11px] font-medium py-1 px-1.5 bg-white border border-zinc-200 rounded-md cursor-pointer focus:outline-hidden text-zinc-700"
                         title="Tipo de letra (Fuente)">
@@ -149,6 +150,7 @@
                     <div class="flex items-center gap-1 pr-1 border-r border-zinc-200">
                       <select
                         [value]="activeBlock()"
+                        (pointerdown)="saveSelection()"
                         (change)="applyBlock($any($event.target).value)"
                         class="text-[11px] font-medium py-1 px-1.5 bg-white border border-zinc-200 rounded-md cursor-pointer focus:outline-hidden text-zinc-700"
                         title="Estilo de párrafo o encabezado">
@@ -164,7 +166,9 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="applyFormat('bold')"
-                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
+                        [class]="isBold()
+                          ? 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer bg-zinc-900 text-white font-bold shadow-xs border border-zinc-900'
+                          : 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 text-zinc-700 border border-transparent'"
                         title="Negrita (Ctrl+B)">
                         <hugeicons-icon [icon]="icons.bold" [size]="14" [strokeWidth]="2.4"></hugeicons-icon>
                       </button>
@@ -173,7 +177,9 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="applyFormat('italic')"
-                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
+                        [class]="isItalic()
+                          ? 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer bg-zinc-900 text-white font-bold shadow-xs border border-zinc-900'
+                          : 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 text-zinc-700 border border-transparent'"
                         title="Cursiva (Ctrl+I)">
                         <hugeicons-icon [icon]="icons.italic" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
                       </button>
@@ -182,7 +188,9 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="applyFormat('underline')"
-                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
+                        [class]="isUnderline()
+                          ? 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer bg-zinc-900 text-white font-bold shadow-xs border border-zinc-900'
+                          : 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 text-zinc-700 border border-transparent'"
                         title="Subrayado (Ctrl+U)">
                         <hugeicons-icon [icon]="icons.underline" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
                       </button>
@@ -191,7 +199,9 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="applyFormat('strikeThrough')"
-                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
+                        [class]="isStrikethrough()
+                          ? 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer bg-zinc-900 text-white font-bold shadow-xs border border-zinc-900'
+                          : 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 text-zinc-700 border border-transparent'"
                         title="Tachado (marcar pendiente realizado)">
                         <hugeicons-icon [icon]="icons.strikethrough" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
                       </button>
@@ -203,7 +213,9 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="insertBulletList()"
-                        class="h-7 px-2 rounded-md flex items-center gap-1 transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-800 font-medium"
+                        [class]="isBulletList()
+                          ? 'h-7 px-2 rounded-md flex items-center gap-1 transition cursor-pointer bg-zinc-900 text-white font-bold shadow-xs border border-zinc-900'
+                          : 'h-7 px-2 rounded-md flex items-center gap-1 transition cursor-pointer hover:bg-zinc-200 text-zinc-800 font-medium border border-transparent'"
                         title="Lista con Viñetas (Punticos)">
                         <hugeicons-icon [icon]="icons.bulletList" [size]="15" [strokeWidth]="2.2"></hugeicons-icon>
                         <span class="text-[11px]">Viñetas</span>
@@ -213,7 +225,9 @@
                         type="button"
                         (mousedown)="$event.preventDefault()"
                         (click)="insertNumberedList()"
-                        class="w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 active:scale-95 text-zinc-700"
+                        [class]="isNumberedList()
+                          ? 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer bg-zinc-900 text-white font-bold shadow-xs border border-zinc-900'
+                          : 'w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer hover:bg-zinc-200 text-zinc-700 border border-transparent'"
                         title="Lista Numerada (1, 2, 3...)">
                         <hugeicons-icon [icon]="icons.numberedList" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                       </button>
@@ -240,9 +254,11 @@
                     aria-multiline="true"
                     spellcheck="true"
                     (input)="onEditorInput()"
+                    (keyup)="updateToolbarState()"
+                    (mouseup)="updateToolbarState()"
                     (keydown)="onEditorKeyDown($event)"
                     data-placeholder="Escribe los detalles que faltan por ajustar o cotizar, haz listas con viñetas, resalta con negritas..."
-                    class="note-editor-content w-full min-h-[140px] max-h-[280px] p-3 text-xs leading-relaxed focus:outline-hidden font-sans bg-white text-zinc-900"></div>
+                    class="note-editor-content w-full min-h-[140px] max-h-[280px] p-3 text-xs leading-relaxed focus:outline-hidden font-sans bg-white text-zinc-900 overflow-y-auto"></div>
                 </div>
               </div>
 
@@ -319,27 +335,25 @@
           </div>
 
           <!-- Buscador de notas -->
-          <div class="relative flex-1 max-w-xs">
-            <hugeicons-icon
-              [icon]="icons.search"
-              [size]="15"
-              [strokeWidth]="2"
-              class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none">
-            </hugeicons-icon>
+          <div class="relative flex-1 max-w-xs flex items-center">
+            <span class="absolute left-3 inset-y-0 flex items-center pointer-events-none text-zinc-400">
+              <hugeicons-icon [icon]="icons.search" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            </span>
             <input
               type="text"
               [value]="searchQuery()"
               (input)="onSearchInput($event)"
               placeholder="Buscar en notas..."
               aria-label="Buscar en notas"
-              class="w-full pl-8 pr-7 py-1.5 bg-white border border-zinc-200 rounded-md text-xs focus:outline-hidden focus:border-zinc-500 text-zinc-900 font-medium shadow-2xs" />
+              autocomplete="off"
+              class="w-full pl-9 pr-8 py-1.5 bg-white border border-zinc-200 rounded-md text-xs focus:outline-hidden focus:border-zinc-900 text-zinc-900 font-medium placeholder:text-zinc-400 shadow-2xs transition" />
             @if (searchQuery().length > 0) {
               <button
                 type="button"
                 (click)="clearSearch()"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded cursor-pointer"
+                class="absolute right-2.5 inset-y-0 flex items-center text-zinc-400 hover:text-zinc-700 transition cursor-pointer"
                 title="Limpiar búsqueda">
-                <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
               </button>
             }
           </div>
@@ -436,8 +450,8 @@
                     <div
                       class="note-card-content text-xs leading-relaxed pl-7 break-words font-sans"
                       [class]="note.completed
-                        ? 'text-zinc-400'
-                        : 'text-zinc-600'"
+                        ? 'note-card-completed text-zinc-400 opacity-75'
+                        : 'text-zinc-700'"
                       [innerHTML]="renderNoteHtml(note.content)"></div>
                   </div>
 

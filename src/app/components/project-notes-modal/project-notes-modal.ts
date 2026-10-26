@@ -1,5 +1,5 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject, viewChild, ElementRef } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { Component, ChangeDetectionStrategy, OnInit, OnDestroy, input, output, signal, computed, inject, viewChild, ElementRef, PLATFORM_ID } from '@angular/core';
+import { DatePipe, isPlatformBrowser } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
@@ -45,12 +45,14 @@ import { ProjectNoteItem } from '../../models/melamine.models';
   styleUrl: './project-notes-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ProjectNotesModalComponent {
+export class ProjectNotesModalComponent implements OnInit, OnDestroy {
   readonly themeService = inject(ThemeService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly fb = inject(FormBuilder);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly isBrowser = isPlatformBrowser(this.platformId);
 
   // Referencia al elemento editable de texto enriquecido (contenteditable)
   readonly editorRef = viewChild<ElementRef<HTMLDivElement>>('editorElement');
@@ -93,9 +95,25 @@ export class ProjectNotesModalComponent {
   readonly editingNoteId = signal<string | null>(null);
   readonly showAddForm = signal<boolean>(false);
 
-  // Estados de formato activo en la barra de herramientas del editor
+  // Estados de formato activo en la barra de herramientas del editor (Reactivos)
+  readonly isBold = signal<boolean>(false);
+  readonly isItalic = signal<boolean>(false);
+  readonly isUnderline = signal<boolean>(false);
+  readonly isStrikethrough = signal<boolean>(false);
+  readonly isBulletList = signal<boolean>(false);
+  readonly isNumberedList = signal<boolean>(false);
   readonly activeFont = signal<'Inter' | 'Georgia' | 'JetBrains Mono'>('Inter');
   readonly activeBlock = signal<'p' | 'h3' | 'h4'>('p');
+
+  // Referencia en memoria a la selección previa dentro del editor para preservación de foco
+  private savedRange: Range | null = null;
+
+  // Listener para capturar cambios de selección en el documento
+  private readonly onSelectionChange = () => {
+    if (this.showAddForm()) {
+      this.updateToolbarState();
+    }
+  };
 
   // Referencias reactivas al proyecto actual y sus notas
   readonly project = this.projectService.currentProject;
@@ -108,6 +126,18 @@ export class ProjectNotesModalComponent {
     content: ['', [Validators.required]],
     category: ['pending' as const, [Validators.required]]
   });
+
+  ngOnInit() {
+    if (this.isBrowser && typeof document !== 'undefined') {
+      document.addEventListener('selectionchange', this.onSelectionChange);
+    }
+  }
+
+  ngOnDestroy() {
+    if (this.isBrowser && typeof document !== 'undefined') {
+      document.removeEventListener('selectionchange', this.onSelectionChange);
+    }
+  }
 
   /**
    * Filtra dinámicamente la lista de notas según la pestaña activa y el texto de búsqueda.
@@ -160,6 +190,13 @@ export class ProjectNotesModalComponent {
     });
     this.activeFont.set('Inter');
     this.activeBlock.set('p');
+    this.isBold.set(false);
+    this.isItalic.set(false);
+    this.isUnderline.set(false);
+    this.isStrikethrough.set(false);
+    this.isBulletList.set(false);
+    this.isNumberedList.set(false);
+    this.savedRange = null;
     this.showAddForm.set(true);
     this.syncEditorContent('');
   }
@@ -183,7 +220,16 @@ export class ProjectNotesModalComponent {
       const el = this.editorRef()?.nativeElement;
       if (el) {
         el.innerHTML = html;
+        el.style.fontFamily = '';
         el.focus();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        this.savedRange = range.cloneRange();
+        this.updateToolbarState();
       }
     }, 60);
   }
@@ -192,6 +238,128 @@ export class ProjectNotesModalComponent {
     this.showAddForm.set(false);
     this.editingNoteId.set(null);
     this.noteForm.reset();
+    this.savedRange = null;
+    this.isBold.set(false);
+    this.isItalic.set(false);
+    this.isUnderline.set(false);
+    this.isStrikethrough.set(false);
+    this.isBulletList.set(false);
+    this.isNumberedList.set(false);
+  }
+
+  // --- MÉTODOS DE PRESERVACIÓN DE SELECCIÓN Y ESTADO DE FORMATO ---
+
+  /**
+   * Guarda el rango de selección actual del editor antes de interactuar con la barra de herramientas.
+   */
+  saveSelection() {
+    if (!this.isBrowser || typeof window === 'undefined') return;
+    const el = this.editorRef()?.nativeElement;
+    if (!el) return;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
+      this.savedRange = sel.getRangeAt(0).cloneRange();
+    }
+  }
+
+  /**
+   * Restaura el rango de selección dentro del editor editable para no perder el foco ni el cursor.
+   */
+  restoreSelection() {
+    if (!this.isBrowser || typeof window === 'undefined') return;
+    const el = this.editorRef()?.nativeElement;
+    if (!el) return;
+    const sel = window.getSelection();
+    if (!sel) return;
+
+    if (this.savedRange && el.contains(this.savedRange.commonAncestorContainer)) {
+      sel.removeAllRanges();
+      sel.addRange(this.savedRange);
+      el.focus();
+    } else {
+      el.focus();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      this.savedRange = range.cloneRange();
+    }
+  }
+
+  /**
+   * Detecta y sincroniza en tiempo real los formatos activos en la posición actual del cursor.
+   */
+  updateToolbarState() {
+    if (!this.isBrowser || typeof window === 'undefined' || typeof document === 'undefined') return;
+    const el = this.editorRef()?.nativeElement;
+    if (!el) return;
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+
+    const anchor = sel.anchorNode;
+    if (!anchor || !el.contains(anchor)) return;
+
+    // Guarda el rango activo
+    this.savedRange = sel.getRangeAt(0).cloneRange();
+
+    let bold = false;
+    let italic = false;
+    let underline = false;
+    let strikethrough = false;
+    let bulletList = false;
+    let numberedList = false;
+
+    try {
+      bold = document.queryCommandState('bold');
+      italic = document.queryCommandState('italic');
+      underline = document.queryCommandState('underline');
+      strikethrough = document.queryCommandState('strikeThrough');
+      bulletList = document.queryCommandState('insertUnorderedList');
+      numberedList = document.queryCommandState('insertOrderedList');
+    } catch {
+      // Ignorar excepciones en contextos desacoplados
+    }
+
+    // Inspección en profundidad del árbol de elementos para mayor fiabilidad
+    let curr: Node | null = anchor;
+    let foundBlock: 'p' | 'h3' | 'h4' = 'p';
+    let foundFont: 'Inter' | 'Georgia' | 'JetBrains Mono' = 'Inter';
+
+    while (curr && curr !== el) {
+      if (curr.nodeType === Node.ELEMENT_NODE) {
+        const elem = curr as HTMLElement;
+        const tag = elem.tagName.toLowerCase();
+        if (tag === 'h3') foundBlock = 'h3';
+        else if (tag === 'h4') foundBlock = 'h4';
+        else if (tag === 'ul') bulletList = true;
+        else if (tag === 'ol') numberedList = true;
+        else if (tag === 'b' || tag === 'strong') bold = true;
+        else if (tag === 'i' || tag === 'em') italic = true;
+        else if (tag === 'u') underline = true;
+        else if (tag === 's' || tag === 'strike' || tag === 'del') strikethrough = true;
+
+        const face = elem.getAttribute('face') || elem.style.fontFamily || '';
+        if (/georgia/i.test(face)) foundFont = 'Georgia';
+        else if (/jetbrains mono|mono/i.test(face)) foundFont = 'JetBrains Mono';
+        else if (/inter/i.test(face)) foundFont = 'Inter';
+      }
+      curr = curr.parentNode;
+    }
+
+    if (foundFont === 'Inter' && el.style.fontFamily) {
+      if (/georgia/i.test(el.style.fontFamily)) foundFont = 'Georgia';
+      else if (/jetbrains mono|mono/i.test(el.style.fontFamily)) foundFont = 'JetBrains Mono';
+    }
+
+    this.isBold.set(bold);
+    this.isItalic.set(italic);
+    this.isUnderline.set(underline);
+    this.isStrikethrough.set(strikethrough);
+    this.isBulletList.set(bulletList);
+    this.isNumberedList.set(numberedList);
+    this.activeBlock.set(foundBlock);
+    this.activeFont.set(foundFont);
   }
 
   // --- MÉTODOS DE LA BARRA DE HERRAMIENTAS TIPO WORD ---
@@ -200,59 +368,142 @@ export class ProjectNotesModalComponent {
    * Ejecuta un comando estándar de edición enriquecida en la selección del usuario.
    */
   applyFormat(command: string, value: string | undefined = undefined) {
+    this.restoreSelection();
     document.execCommand(command, false, value);
     this.onEditorInput();
-    this.editorRef()?.nativeElement?.focus();
+    this.updateToolbarState();
   }
 
   /**
-   * Aplica un tipo de letra a la selección o texto.
+   * Aplica un tipo de letra a la selección o texto nuevo.
    */
   applyFontFamily(font: 'Inter' | 'Georgia' | 'JetBrains Mono') {
+    this.restoreSelection();
     this.activeFont.set(font);
-    const fontCss = font === 'Inter'
-      ? 'Inter, sans-serif'
-      : (font === 'Georgia' ? 'Georgia, serif' : 'JetBrains Mono, monospace');
-    document.execCommand('fontName', false, fontCss);
+    const el = this.editorRef()?.nativeElement;
+
+    if (el && (!el.innerHTML.trim() || el.innerHTML.trim() === '<br>')) {
+      const fontCss = font === 'Georgia'
+        ? "Georgia, 'Times New Roman', serif"
+        : (font === 'JetBrains Mono' ? "'JetBrains Mono', monospace" : "'Inter', sans-serif");
+      el.style.fontFamily = fontCss;
+    } else {
+      document.execCommand('fontName', false, font);
+    }
+
     this.onEditorInput();
-    this.editorRef()?.nativeElement?.focus();
+    this.updateToolbarState();
   }
 
   /**
-   * Aplica estilo de bloque (Párrafo o Encabezado).
+   * Aplica estilo de bloque (Párrafo o Encabezado H3/H4).
    */
   applyBlock(tag: 'p' | 'h3' | 'h4') {
+    this.restoreSelection();
     this.activeBlock.set(tag);
-    document.execCommand('formatBlock', false, '<' + tag + '>');
+    const el = this.editorRef()?.nativeElement;
+
+    if (el && (!el.innerHTML.trim() || el.innerHTML.trim() === '<br>')) {
+      el.innerHTML = `<${tag}><br></${tag}>`;
+      const blockEl = el.querySelector(tag);
+      if (blockEl) {
+        const range = document.createRange();
+        range.setStart(blockEl, 0);
+        range.collapse(true);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        this.savedRange = range.cloneRange();
+      }
+    } else {
+      try {
+        document.execCommand('formatBlock', false, '<' + tag + '>');
+      } catch {
+        document.execCommand('formatBlock', false, tag);
+      }
+    }
+
     this.onEditorInput();
-    this.editorRef()?.nativeElement?.focus();
+    this.updateToolbarState();
   }
 
   /**
    * Inserta o alterna una lista con viñetas (punticos).
    */
   insertBulletList() {
-    document.execCommand('insertUnorderedList', false);
+    this.restoreSelection();
+    const el = this.editorRef()?.nativeElement;
+    if (!el) return;
+
+    const currentContent = el.innerHTML.trim();
+    if (!currentContent || currentContent === '<br>') {
+      el.innerHTML = '<ul><li><br></li></ul>';
+      const li = el.querySelector('li');
+      if (li) {
+        const range = document.createRange();
+        range.setStart(li, 0);
+        range.collapse(true);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        this.savedRange = range.cloneRange();
+      }
+    } else {
+      document.execCommand('insertUnorderedList', false);
+    }
+
     this.onEditorInput();
-    this.editorRef()?.nativeElement?.focus();
+    this.updateToolbarState();
+    el.focus();
   }
 
   /**
    * Inserta o alterna una lista numerada (1, 2, 3...).
    */
   insertNumberedList() {
-    document.execCommand('insertOrderedList', false);
+    this.restoreSelection();
+    const el = this.editorRef()?.nativeElement;
+    if (!el) return;
+
+    const currentContent = el.innerHTML.trim();
+    if (!currentContent || currentContent === '<br>') {
+      el.innerHTML = '<ol><li><br></li></ol>';
+      const li = el.querySelector('li');
+      if (li) {
+        const range = document.createRange();
+        range.setStart(li, 0);
+        range.collapse(true);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        this.savedRange = range.cloneRange();
+      }
+    } else {
+      document.execCommand('insertOrderedList', false);
+    }
+
     this.onEditorInput();
-    this.editorRef()?.nativeElement?.focus();
+    this.updateToolbarState();
+    el.focus();
   }
 
   /**
    * Limpia el formato de la selección actual.
    */
   clearFormatting() {
+    this.restoreSelection();
     document.execCommand('removeFormat', false);
+    try {
+      document.execCommand('formatBlock', false, '<p>');
+    } catch {
+      document.execCommand('formatBlock', false, 'p');
+    }
+    const el = this.editorRef()?.nativeElement;
+    if (el) {
+      el.style.fontFamily = '';
+    }
     this.onEditorInput();
-    this.editorRef()?.nativeElement?.focus();
+    this.updateToolbarState();
   }
 
   /**
@@ -265,6 +516,7 @@ export class ProjectNotesModalComponent {
     const html = text.length === 0 ? '' : el.innerHTML;
     this.noteForm.patchValue({ content: html }, { emitEvent: false });
     this.noteForm.get('content')?.updateValueAndValidity();
+    this.updateToolbarState();
   }
 
   /**
@@ -273,8 +525,17 @@ export class ProjectNotesModalComponent {
   onEditorKeyDown(event: KeyboardEvent) {
     if (event.key === 'Tab') {
       event.preventDefault();
-      document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+      if (this.isBulletList() || this.isNumberedList()) {
+        if (event.shiftKey) {
+          document.execCommand('outdent', false);
+        } else {
+          document.execCommand('indent', false);
+        }
+      } else {
+        document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+      }
       this.onEditorInput();
+      this.updateToolbarState();
     }
   }
 
@@ -283,28 +544,32 @@ export class ProjectNotesModalComponent {
    */
   saveNote() {
     const el = this.editorRef()?.nativeElement;
-    const editorHtml = (el?.innerText?.trim() ? el.innerHTML : '').trim();
+    const rawText = (el?.innerText || '').trim();
+    const rawHtml = (el?.innerHTML || '').trim();
 
-    if (!editorHtml) {
+    if (!rawText && !rawHtml.includes('<img') && !rawHtml.includes('<hr')) {
       this.noteForm.get('content')?.setErrors({ required: true });
       return;
     }
 
     const val = this.noteForm.value;
     const title = String(val.title || '').trim();
-    if (!title) return;
+    if (!title) {
+      this.noteForm.get('title')?.setErrors({ required: true });
+      return;
+    }
 
     const editId = this.editingNoteId();
     if (editId) {
       this.projectService.updateProjectNote(editId, {
         title,
-        content: editorHtml,
+        content: rawHtml,
         category: val.category
       });
     } else {
       this.projectService.addProjectNote({
         title,
-        content: editorHtml,
+        content: rawHtml,
         category: val.category
       });
     }
@@ -345,6 +610,7 @@ export class ProjectNotesModalComponent {
   }
 
   close() {
+    this.cancelForm();
     this.modalClose.emit();
   }
 
@@ -355,7 +621,7 @@ export class ProjectNotesModalComponent {
    */
   formatNoteContent(content: string): string {
     if (!content) return '';
-    if (/<(p|ul|ol|li|b|i|u|s|h[1-6]|div|span)[>\s]/i.test(content)) {
+    if (/<(p|ul|ol|li|b|i|u|s|h[1-6]|div|span|font)[>\s]/i.test(content)) {
       return content;
     }
 

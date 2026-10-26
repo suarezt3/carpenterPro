@@ -11,87 +11,123 @@
   font-style: normal;
 }
 
-/* Reglas tipográficas para listas, viñetas y formato en el editor y en la tarjeta */
-.note-editor-content ul,
-.note-card-content ul,
-.note-bullet-list {
-  list-style-type: disc;
-  padding-left: 1.25rem;
-  margin: 0.35rem 0;
+/* Reglas tipográficas para listas, viñetas y formato enriquecido (Editor y Tarjetas) */
+:host ::ng-deep .note-editor-content ul,
+:host ::ng-deep .note-card-content ul,
+:host ::ng-deep .note-bullet-list {
+  list-style-type: disc !important;
+  padding-left: 1.4rem !important;
+  margin: 0.35rem 0 !important;
 }
 
-.note-editor-content ol,
-.note-card-content ol {
-  list-style-type: decimal;
-  padding-left: 1.25rem;
-  margin: 0.35rem 0;
+:host ::ng-deep .note-editor-content ol,
+:host ::ng-deep .note-card-content ol {
+  list-style-type: decimal !important;
+  padding-left: 1.4rem !important;
+  margin: 0.35rem 0 !important;
 }
 
-.note-editor-content li,
-.note-card-content li {
-  margin: 0.25rem 0;
-  line-height: 1.55;
+:host ::ng-deep .note-editor-content li,
+:host ::ng-deep .note-card-content li {
+  display: list-item !important;
+  margin: 0.2rem 0 !important;
+  line-height: 1.55 !important;
 }
 
-.note-editor-content h3,
-.note-card-content h3 {
-  font-size: 0.95rem;
-  font-weight: 700;
-  margin: 0.5rem 0 0.25rem 0;
-  line-height: 1.35;
+:host ::ng-deep .note-editor-content ul li::marker,
+:host ::ng-deep .note-card-content ul li::marker,
+:host ::ng-deep .note-bullet-list li::marker {
+  color: #2563eb !important; /* Azul cobalto nítido */
+  font-size: 1.1em !important;
 }
 
-.note-editor-content h4,
-.note-card-content h4 {
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin: 0.4rem 0 0.2rem 0;
-  line-height: 1.35;
+:host ::ng-deep .note-editor-content ol li::marker,
+:host ::ng-deep .note-card-content ol li::marker {
+  color: #1d4ed8 !important;
+  font-weight: 600 !important;
 }
 
-.note-editor-content p,
-.note-card-content p {
-  margin: 0.25rem 0;
-  line-height: 1.55;
+:host ::ng-deep .note-editor-content h3,
+:host ::ng-deep .note-card-content h3 {
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #09090b !important;
+  margin: 0.45rem 0 0.2rem 0 !important;
+  line-height: 1.35 !important;
 }
 
-.note-editor-content b,
-.note-editor-content strong,
-.note-card-content b,
-.note-card-content strong {
-  font-weight: 700;
+:host ::ng-deep .note-editor-content h4,
+:host ::ng-deep .note-card-content h4 {
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  color: #18181b !important;
+  margin: 0.35rem 0 0.15rem 0 !important;
+  line-height: 1.35 !important;
 }
 
-.note-editor-content i,
-.note-editor-content em,
-.note-card-content i,
-.note-card-content em {
-  font-style: italic;
+:host ::ng-deep .note-editor-content p,
+:host ::ng-deep .note-card-content p {
+  margin: 0.25rem 0 !important;
+  line-height: 1.55 !important;
 }
 
-.note-editor-content u,
-.note-card-content u {
-  text-decoration: underline;
-  text-underline-offset: 2.5px;
+:host ::ng-deep .note-editor-content b,
+:host ::ng-deep .note-editor-content strong,
+:host ::ng-deep .note-card-content b,
+:host ::ng-deep .note-card-content strong {
+  font-weight: 700 !important;
+  color: #09090b !important;
 }
 
-.note-editor-content s,
-.note-editor-content strike,
-.note-card-content s,
-.note-card-content strike {
-  text-decoration: line-through;
-  opacity: 0.75;
+:host ::ng-deep .note-editor-content i,
+:host ::ng-deep .note-editor-content em,
+:host ::ng-deep .note-card-content i,
+:host ::ng-deep .note-card-content em {
+  font-style: italic !important;
 }
 
-/* Marcadores de viñetas con color armonizado */
-.note-editor-content ul li::marker,
-.note-card-content ul li::marker,
-.note-bullet-list li::marker {
-  color: #f59e0b; /* Amber */
+:host ::ng-deep .note-editor-content u,
+:host ::ng-deep .note-card-content u {
+  text-decoration: underline !important;
+  text-underline-offset: 2.5px !important;
 }
 
-.note-editor-content ol li::marker,
-.note-card-content ol li::marker {
-  color: #d97706; /* Amber oscuro */
-  font-weight: 600;
+:host ::ng-deep .note-editor-content s,
+:host ::ng-deep .note-editor-content strike,
+:host ::ng-deep .note-card-content s,
+:host ::ng-deep .note-card-content strike {
+  text-decoration: line-through !important;
+  opacity: 0.75 !important;
+}
+
+/* Soporte de Fuentes Tipográficas seleccionables */
+:host ::ng-deep [face="Georgia"],
+:host ::ng-deep [style*="Georgia"],
+:host ::ng-deep .font-georgia {
+  font-family: Georgia, Cambria, 'Times New Roman', serif !important;
+}
+
+:host ::ng-deep [face="JetBrains Mono"],
+:host ::ng-deep [style*="JetBrains Mono"],
+:host ::ng-deep .font-mono {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+:host ::ng-deep [face="Inter"],
+:host ::ng-deep [style*="Inter"],
+:host ::ng-deep .font-inter {
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* Atenuación armónica para notas completadas */
+.note-card-completed :host ::ng-deep b,
+.note-card-completed :host ::ng-deep strong,
+.note-card-completed :host ::ng-deep h3,
+.note-card-completed :host ::ng-deep h4 {
+  color: #94a3b8 !important;
+}
+
+.note-card-completed :host ::ng-deep ul li::marker,
+.note-card-completed :host ::ng-deep ol li::marker {
+  color: #94a3b8 !important;
 }
