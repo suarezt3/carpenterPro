@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
@@ -126,6 +126,92 @@ export class PartsListComponent {
   readonly filterModuleId = signal<string>('all');
   readonly filterMaterialId = signal<string>('all');
   readonly searchQuery = signal<string>('');
+
+  /**
+   * Materiales únicos actualmente en uso por las piezas del proyecto con su conteo de piezas.
+   * Filtra el catálogo global para listar únicamente aquellos materiales con al menos una pieza creada.
+   * Si el lienzo no tiene piezas (0 piezas), la lista permanece vacía y el selector solo muestra la opción general.
+   */
+  readonly usedMaterials = computed(() => {
+    const partsList = this.parts();
+    if (!partsList || partsList.length === 0) {
+      return [];
+    }
+
+    const allMaterials = this.materials();
+    const countMap = new Map<string, { count: number; name: string }>();
+
+    for (const part of partsList) {
+      const matId = part.materialId;
+      if (!matId) continue;
+      const qty = Number(part.quantity) || 1;
+      const existing = countMap.get(matId);
+      if (existing) {
+        existing.count += qty;
+      } else {
+        countMap.set(matId, {
+          count: qty,
+          name: part.materialName || 'Material sin nombre'
+        });
+      }
+    }
+
+    // Preservar el orden del catálogo global
+    const used: Array<{ id: string; name: string; partsCount: number }> = [];
+    const addedIds = new Set<string>();
+
+    for (const mat of allMaterials) {
+      const info = countMap.get(mat.id);
+      if (info && info.count > 0) {
+        used.push({
+          id: mat.id,
+          name: mat.name,
+          partsCount: info.count
+        });
+        addedIds.add(mat.id);
+      }
+    }
+
+    // Materiales presentes en piezas que no figuren en el catálogo (fallback)
+    for (const [matId, info] of countMap.entries()) {
+      if (!addedIds.has(matId) && info.count > 0) {
+        used.push({
+          id: matId,
+          name: info.name,
+          partsCount: info.count
+        });
+      }
+    }
+
+    return used;
+  });
+
+  constructor() {
+    // Reinicio automático del filtro activo cuando el material seleccionado ya no esté en uso
+    effect(() => {
+      const currentMat = this.filterMaterialId();
+      if (currentMat !== 'all') {
+        const used = this.usedMaterials();
+        const stillInUse = used.some(m => m.id === currentMat);
+        if (!stillInUse) {
+          untracked(() => {
+            this.filterMaterialId.set('all');
+          });
+        }
+      }
+
+      const currentMod = this.filterModuleId();
+      if (currentMod !== 'all') {
+        const mods = this.modules();
+        const modExists = mods.some(m => m.id === currentMod);
+        if (!modExists) {
+          untracked(() => {
+            this.filterModuleId.set('all');
+          });
+        }
+      }
+    });
+  }
 
   // Control del modal de agregar pieza manual
   readonly showAddPartModal = signal<boolean>(false);
