@@ -698,11 +698,46 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private appliancesGroup = new THREE.Group();
   private applianceGizmoGroup = new THREE.Group();
 
-  // Mesh & Raycast Tracking
+  // Mesh & Raycast Tracking + GPU Performance Caches
   private pieceObjects: PieceMeshData[] = [];
+  private pieceObjectMap = new Map<string, PieceMeshData>();
+  private raycastablePieceMeshes: THREE.Mesh[] = [];
   private gizmoHitMeshes: THREE.Mesh[] = [];
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
+  private isCameraInteracting = false;
+  private lastHoverRaycastTime = 0;
+  private renderFramesRemaining = 60;
+  private lastSnapIndicatorKey = '';
+  private materialCache = new Map<string, THREE.Material>();
+  private geometryPool = new Map<string, THREE.BufferGeometry>();
+  private readonly boundVisibilityChange = () => {
+    if (typeof document !== 'undefined' && !document.hidden) {
+      this.requestRender(12);
+    }
+  };
+
+  // Live In-Place Transform Buffers (evita reconstruir toda la escena 3D en cada píxel de pointermove)
+  private liveDragPartUpdates = new Map<string, { part: Part; updates: Partial<Part> }>();
+  private liveDragApplianceUpdates = new Map<string, { id: string; updates: Partial<ApplianceItem> }>();
+  private liveDragPrimaryApplianceUpdate: { appliance: ApplianceItem; updates: Partial<ApplianceItem> } | null = null;
+
+  // Firma reactiva ligera que solo cambia cuando se añade/mueve un lavaplatos ('sink') o estufa ('cooktop') que perfora mesones
+  private readonly cutoutAppliancesSignature = computed(() => {
+    const apps = this.appliances() || [];
+    return apps
+      .filter(a => !a.isHidden && (a.type === 'sink' || a.type === 'cooktop'))
+      .map(a => `${a.id}:${Math.round(a.position.x)},${Math.round(a.position.y)},${Math.round(a.position.z)}:${a.width}x${a.depth}:${a.rotation || 0}`)
+      .join('|');
+  });
+
+  /**
+   * Solicita renderizar un número acotado de fotogramas bajo demanda (On-Demand Rendering)
+   * cuando ocurre un cambio visual, movimiento de cámara o interacción.
+   */
+  requestRender(frames = 8) {
+    this.renderFramesRemaining = Math.max(this.renderFramesRemaining, frames);
+  }
 
   // Dragging State
   private isDragging = false;
@@ -777,16 +812,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const showDims = this.show3dDimensions();
       this.showDrillHoles();
       this.showHardware();
-      this.activeTool();
       this.hiddenPartIds();
       this.layerVisibility();
-      this.appliances();
+      this.cutoutAppliancesSignature();
 
       if (this.scene) {
         // Read activeSelectedIds untracked so selection changes don't destroy and rebuild the 3D scene!
         const selIds = untracked(() => this.activeSelectedIds());
         this.buildFurnitureScene(parts, selIds, mats, xRay, showDims);
         this.updateExplodedOffsets(this.explodedPercent());
+        this.requestRender(10);
       }
     });
 
@@ -795,9 +830,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const selIds = this.activeSelectedIds();
       const mats = this.materials();
       const xRay = this.isXRay();
+      this.activeTool();
 
       if (this.scene && this.pieceObjects.length > 0) {
         this.updateSelectionHighlights(selIds, mats, xRay);
+        this.requestRender(8);
       }
     });
 
@@ -805,6 +842,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     effect(() => {
       const exp = this.explodedPercent();
       this.updateExplodedOffsets(exp);
+      this.requestRender(6);
     });
 
     // 4. Update architectural room scene when workspaceMode or roomConfig changes
@@ -813,6 +851,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const config = this.roomConfig();
       if (this.scene) {
         this.updateRoomScene(mode, config);
+        this.requestRender(10);
       }
     });
 
@@ -823,6 +862,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const mode = this.workspaceMode();
       if (this.scene) {
         this.updateWallGizmo(wallType, config, mode);
+        this.requestRender(8);
       }
     });
 
@@ -834,6 +874,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.layerVisibility();
       if (this.scene) {
         this.updateAppliancesScene(appls, selId);
+        this.requestRender(10);
       }
     });
 
@@ -850,6 +891,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (this.scene) {
         this.updateGridHelper();
         this.updateReferenceGuideScene();
+        this.requestRender(8);
       }
     });
 
@@ -883,14 +925,28 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // 4. OrbitControls
-    this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.06;
-    this.controls.maxDistance = 45000;
-    this.controls.minDistance = 100;
-    this.controls.maxPolarAngle = Math.PI / 2 + 0.08;
-    this.controls.target.set(0, 480, 0);
+    // 4. OrbitControls (instanciado fuera de NgZone para que wheel/pointermove de cámara no disparen Change Detection)
+    this.ngZone.runOutsideAngular(() => {
+      this.controls = new OrbitControls(this.camera, canvas);
+      this.controls.enableDamping = true;
+      this.controls.dampingFactor = 0.06;
+      this.controls.maxDistance = 45000;
+      this.controls.minDistance = 100;
+      this.controls.maxPolarAngle = Math.PI / 2 + 0.08;
+      this.controls.target.set(0, 480, 0);
+
+      this.controls.addEventListener('start', () => {
+        this.isCameraInteracting = true;
+        this.requestRender(12);
+      });
+      this.controls.addEventListener('change', () => {
+        this.requestRender(8);
+      });
+      this.controls.addEventListener('end', () => {
+        this.isCameraInteracting = false;
+        this.requestRender(16);
+      });
+    });
 
     // 5. Lighting
     this.setupLighting();
@@ -916,7 +972,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.appliancesGroup);
     this.scene.add(this.applianceGizmoGroup);
     this.scene.add(this.referenceGuideGroup);
- this.updateReferenceGuideScene();
+    this.updateReferenceGuideScene();
 
     // Initial Appliances Setup
     this.updateAppliancesScene(this.appliances(), this.selectedApplianceId());
@@ -935,7 +991,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.show3dDimensions()
     );
 
-    // 8, 9 y 10. Ejecutar el bucle WebGL de 60 FPS y eventos continuos fuera de NgZone
+    // 8, 9 y 10. Ejecutar el bucle WebGL y eventos continuos estrictamente fuera de NgZone
     // para no disparar ciclos innecesarios de detección de cambios en Angular
     this.ngZone.runOutsideAngular(() => {
       this.animate();
@@ -951,8 +1007,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
       window.addEventListener('pointermove', this.boundPointerMove);
       window.addEventListener('pointerup', this.boundPointerUp);
       window.addEventListener('pointercancel', this.boundPointerUp);
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', this.boundVisibilityChange);
+      }
     });
-  
   }
 
   private applyThemeColors() {
@@ -1077,31 +1135,70 @@ export class Furniture3dViewerComponent implements OnDestroy {
       z: Math.round(sumZ / parts.length)
     };
   }
-private buildFurnitureScene(
+  /**
+   * Obtiene o instancia una geometría compartida en caché (Geometry Pooling) marcada con `isShared: true`
+   * para evitar duplicar buffers WebGL (VBOs) en piezas, herrajes o perforaciones CNC de iguales dimensiones.
+   */
+  private getSharedGeometry<T extends THREE.BufferGeometry>(key: string, factory: () => T): T {
+    const existing = this.geometryPool.get(key) as T | undefined;
+    if (existing) {
+      return existing;
+    }
+    const created = factory();
+    created.userData['isShared'] = true;
+    this.geometryPool.set(key, created);
+    return created;
+  }
+
+  /**
+   * Obtiene o instancia un material compartido en caché (Material Pooling) marcado con `isShared: true`
+   * para reutilizar shaders y estados WebGL entre piezas con la misma melamina, herrajes o contornos.
+   */
+  private getSharedMaterial<T extends THREE.Material>(key: string, factory: () => T): T {
+    const existing = this.materialCache.get(key) as T | undefined;
+    if (existing) {
+      return existing;
+    }
+    const created = factory();
+    created.userData['isShared'] = true;
+    this.materialCache.set(key, created);
+    return created;
+  }
+
+  private getSharedEdgeMaterial(isColliding: boolean, isSelected: boolean): THREE.LineBasicMaterial {
+    const isWhite = this.isWhiteTheme();
+    const key = isColliding
+      ? 'edge_colliding'
+      : isSelected
+        ? 'edge_selected'
+        : isWhite
+          ? 'edge_default_light'
+          : 'edge_default_dark';
+    return this.getSharedMaterial(key, () => {
+      const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x2563eb : (isWhite ? 0x94a3b8 : 0x3f3f46));
+      return new THREE.LineBasicMaterial({
+        color: edgeColor,
+        linewidth: isColliding || isSelected ? 3 : 1
+      });
+    });
+  }
+
+  private buildFurnitureScene(
     parts: Part[],
     selectedIds: string[],
     mats: Material[],
     xRay: boolean,
     showDims: boolean
   ) {
-    // Clear previous furniture & dimensions & gizmo & drills
-    while (this.furnitureGroup.children.length > 0) {
-      const obj = this.furnitureGroup.children[0];
-      this.furnitureGroup.remove(obj);
-    }
-    while (this.dimensionGroup.children.length > 0) {
-      const obj = this.dimensionGroup.children[0];
-      this.dimensionGroup.remove(obj);
-    }
-    while (this.gizmoGroup.children.length > 0) {
-      const obj = this.gizmoGroup.children[0];
-      this.gizmoGroup.remove(obj);
-    }
-    while (this.drillGroup.children.length > 0) {
-      const obj = this.drillGroup.children[0];
-      this.drillGroup.remove(obj);
-    }
+    // Liberar explícitamente geometrías, materiales no compartidos y texturas temporales en GPU (VRAM)
+    this.disposeGroup(this.furnitureGroup);
+    this.disposeGroup(this.dimensionGroup);
+    this.disposeGroup(this.gizmoGroup);
+    this.disposeGroup(this.drillGroup);
+
     this.pieceObjects = [];
+    this.pieceObjectMap.clear();
+    this.raycastablePieceMeshes = [];
     this.gizmoHitMeshes = [];
 
     // Preserve open animation states for existing parts (prevents jumping!)
@@ -1125,8 +1222,8 @@ private buildFurnitureScene(
     }
 
     // 1. Calculate Joinery & Collisions via JoineryEngineService
-   const visiblePartsForJoinery = parts.filter(p => !this.hiddenPartIds().has(p.id));
-const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
+    const visiblePartsForJoinery = parts.filter(p => !this.hiddenPartIds().has(p.id));
+    const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
     this.detectedCollisions.set(joinery.collisions);
     this.collisionsDetected.emit(joinery.collisions);
     this.allDrillHoles.set(joinery.allDrillHoles);
@@ -1219,12 +1316,15 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         }
       }
 
-      // Geometry according to shapeType: circle, freehand, countertop with cutout holes, or standard box
+      // Geometry according to shapeType: circle, freehand, countertop with cutout holes, or pooled standard box
       let geometry: THREE.BufferGeometry;
+      let edges: THREE.EdgesGeometry;
       if (part.shapeType === 'circle') {
         const radius = part.radius || (part.diameter ? part.diameter / 2 : Math.max(10, (part.width || 600) / 2));
         const cylHeight = (part.length && part.length > part.thickness) ? part.length : (part.thickness || 15);
-        geometry = new THREE.CylinderGeometry(radius, radius, cylHeight, 48);
+        const cylKey = `piece_cyl_${radius}_${cylHeight}`;
+        geometry = this.getSharedGeometry(cylKey, () => new THREE.CylinderGeometry(radius, radius, cylHeight, 48));
+        edges = this.getSharedGeometry(`${cylKey}_edges`, () => new THREE.EdgesGeometry(geometry));
       } else if (
         (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) ||
         overlappingCutouts.length > 0
@@ -1282,8 +1382,11 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         extrudeGeom.rotateX(Math.PI / 2);
         extrudeGeom.translate(0, localDims.sy / 2, 0);
         geometry = extrudeGeom;
+        edges = new THREE.EdgesGeometry(geometry);
       } else {
-        geometry = new THREE.BoxGeometry(localDims.sx, localDims.sy, localDims.sz);
+        const boxKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}`;
+        geometry = this.getSharedGeometry(boxKey, () => new THREE.BoxGeometry(localDims.sx, localDims.sy, localDims.sz));
+        edges = this.getSharedGeometry(`${boxKey}_edges`, () => new THREE.EdgesGeometry(geometry));
       }
 
       const material = this.createPieceMaterial(part, isSelected, mats, xRay, isColliding);
@@ -1300,13 +1403,8 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       mesh.receiveShadow = true;
       mesh.userData = { part, isPiece: true };
 
-      // Edges geometry for crisp technical outline
-      const edges = new THREE.EdgesGeometry(geometry);
-      const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x2563eb : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46));
-      const edgeMat = new THREE.LineBasicMaterial({
-        color: edgeColor,
-        linewidth: isColliding ? 3 : (isSelected ? 3 : 1)
-      });
+      // Edges geometry for crisp technical outline (pooled geometry & shared material)
+      const edgeMat = this.getSharedEdgeMaterial(isColliding, isSelected);
       const edgeLines = new THREE.LineSegments(edges, edgeMat);
       mesh.add(edgeLines);
 
@@ -1537,7 +1635,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         mesh.userData = { part, isPiece: true };
       }
 
-      this.pieceObjects.push({
+      const pieceData: PieceMeshData = {
         part,
         mesh,
         originalPos: new THREE.Vector3(px, py, pz),
@@ -1554,7 +1652,10 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
         slideGroup,
         slideAxis,
         slideDir
-      });
+      };
+      this.pieceObjects.push(pieceData);
+      this.pieceObjectMap.set(part.id, pieceData);
+      this.raycastablePieceMeshes.push(mesh);
     }
 
     // 2. Render Drill Holes when toggle is enabled
@@ -1995,7 +2096,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
 
     // 3. Fallback en la cara (Superficie 3D cuando el cursor está lejos de las aristas)
     const faceCandidates: THREE.Object3D[] = [
-      ...this.pieceObjects.map(p => p.mesh),
+      ...this.raycastablePieceMeshes,
       ...this.appliancesGroup.children,
       ...this.roomGroup.children,
       ...(this.floorMesh ? [this.floorMesh] : [])
@@ -2034,14 +2135,34 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       edgeDir?: THREE.Vector3;
     } | null
   ) {
-    while (this.magneticSnapGroup.children.length > 0) {
-      const obj = this.magneticSnapGroup.children[0];
-      this.magneticSnapGroup.remove(obj);
+    if (!candidate) {
+      if (this.magneticSnapGroup.children.length > 0) {
+        this.disposeGroup(this.magneticSnapGroup);
+        this.lastSnapIndicatorKey = '';
+        this.requestRender(4);
+      }
+      return;
     }
 
-    if (!candidate) return;
-
     this.magneticSnapGroup.position.copy(candidate.worldPos);
+    const snapKey = `${candidate.type}_${candidate.objectName}`;
+
+    // If the snap badge type and object name haven't changed, simply update orientation & position without recreating CanvasTexture
+    if (snapKey === this.lastSnapIndicatorKey && this.magneticSnapGroup.children.length > 0) {
+      for (const child of this.magneticSnapGroup.children) {
+        if (child instanceof THREE.Mesh) {
+          child.quaternion.copy(this.camera.quaternion);
+          if (candidate.type === 'midpoint' || candidate.type === 'edge') {
+            child.rotateZ(Math.PI / 4);
+          }
+        }
+      }
+      this.requestRender(4);
+      return;
+    }
+
+    this.disposeGroup(this.magneticSnapGroup);
+    this.lastSnapIndicatorKey = snapKey;
 
     let colorHex = 0x10b981; // Green for Corner
     let colorCss = '#10b981';
@@ -2160,6 +2281,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
     sprite.position.set(0, 16, 0);
     sprite.scale.set(62, 14, 1);
     this.magneticSnapGroup.add(sprite);
+    this.requestRender(4);
   }
 
   // Resolves Point B applying orthogonal axis inference, perpendicular edge projection and HUD modes
@@ -2289,19 +2411,15 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
     this.measurePointAEdgeDir = null;
     this.activeInferredAxis.set(null);
     this.measureProjectionMode.set('direct');
-    while (this.measureGroup.children.length > 0) {
-      const obj = this.measureGroup.children[0];
-      this.measureGroup.remove(obj);
-    }
+    this.disposeGroup(this.measureGroup);
     this.updateMagneticSnapIndicator(null);
+    this.requestRender(6);
   }
 
   // Render Interactive 3D Measurement Visuals with Fine CAD Arrowheads & Subtle Center Cross
   renderMeasurementVisuals() {
-    while (this.measureGroup.children.length > 0) {
-      const obj = this.measureGroup.children[0];
-      this.measureGroup.remove(obj);
-    }
+    this.disposeGroup(this.measureGroup);
+    this.requestRender(6);
 
     const a = this.measurePointA();
     const b = this.measurePointB();
@@ -2563,12 +2681,11 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       // 1. Update mesh material highlight in place
       item.mesh.material = this.createPieceMaterial(part, isSelected, mats, xRay, isColliding);
 
-      // 2. Update technical edge outline color
+      // 2. Update technical edge outline color using pooled material
+      const edgeMat = this.getSharedEdgeMaterial(isColliding, isSelected);
       for (const child of item.mesh.children) {
         if (child instanceof THREE.LineSegments) {
-          const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x2563eb : (this.isWhiteTheme() ? 0x94a3b8 : 0x3f3f46));
-          (child.material as THREE.LineBasicMaterial).color.setHex(edgeColor);
-          (child.material as THREE.LineBasicMaterial).linewidth = isSelected || isColliding ? 3 : 1;
+          child.material = edgeMat;
         }
       }
 
@@ -2627,13 +2744,9 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       }
     }
 
-    // Refresh CAD Gizmo & Dimension overlays only
-    while (this.dimensionGroup.children.length > 0) {
-      this.dimensionGroup.remove(this.dimensionGroup.children[0]);
-    }
-    while (this.gizmoGroup.children.length > 0) {
-      this.gizmoGroup.remove(this.gizmoGroup.children[0]);
-    }
+    // Refresh CAD Gizmo & Dimension overlays only (properly disposing GPU resources)
+    this.disposeGroup(this.dimensionGroup);
+    this.disposeGroup(this.gizmoGroup);
     this.gizmoHitMeshes = [];
 
     if (selectedDataList.length === 1) {
@@ -2653,6 +2766,7 @@ const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
       this.clearanceCalculated.emit(null);
       // Group selection: translation arrows removed to eliminate visual clutter (moved via direct mouse drag)
     }
+    this.requestRender(8);
   }
 
   private getDrawerFacing(part: Part, parts: Part[]): 'front' | 'right' | 'back' | 'left' {
@@ -2759,17 +2873,15 @@ private createHandleMesh(
     const metalness = effectiveFinish === 'black' ? 0.35 : 0.88;
     const roughness = effectiveFinish === 'black' ? 0.4 : 0.2;
 
-    const handleMat = new THREE.MeshStandardMaterial({
-      color: hexColor,
-      metalness,
-      roughness
-    });
-
-    const standoffMat = new THREE.MeshStandardMaterial({
-      color: hexColor,
-      metalness,
-      roughness
-    });
+    const handleMat = this.getSharedMaterial(
+      `hw_handle_${effectiveFinish}`,
+      () => new THREE.MeshStandardMaterial({
+        color: hexColor,
+        metalness,
+        roughness
+      })
+    );
+    const standoffMat = handleMat;
 
     const isSideFacing = drawerFacing === 'right' || drawerFacing === 'left';
 
@@ -2925,22 +3037,28 @@ private createHandleMesh(
     const doorW = isSideFacing ? sz : sx;
     const doorT = isSideFacing ? sx : sz;
 
-    const hingeMat = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8,
-      metalness: 0.85,
-      roughness: 0.25
-    });
+    const hingeMat = this.getSharedMaterial(
+      'hw_hinge_steel',
+      () => new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        metalness: 0.85,
+        roughness: 0.25
+      })
+    );
+    const pistonRodMat = this.getSharedMaterial(
+      'hw_piston_rod',
+      () => new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.1 })
+    );
 
     const isGasPiston = hw.hingeType === 'gas_piston' || hingeSide === 'top';
     if (isGasPiston) {
+      const cylGeo = this.getSharedGeometry('hw_piston_cyl', () => new THREE.CylinderGeometry(7, 7, 120, 16));
+      const rodGeo = this.getSharedGeometry('hw_piston_rod', () => new THREE.CylinderGeometry(4, 4, 100, 14));
       const pistonOffsets = [-doorW / 2 + 35, doorW / 2 - 35];
       for (const ox of pistonOffsets) {
         const piston = new THREE.Group();
-        const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 120, 16), hingeMat);
-        const rod = new THREE.Mesh(
-          new THREE.CylinderGeometry(4, 4, 100, 14),
-          new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.1 })
-        );
+        const cylinder = new THREE.Mesh(cylGeo, hingeMat);
+        const rod = new THREE.Mesh(rodGeo, pistonRodMat);
         rod.position.y = -60;
         piston.add(cylinder);
         piston.add(rod);
@@ -2960,15 +3078,17 @@ private createHandleMesh(
         hingeYPositions.push(sy / 4);
       }
 
+      const cupGeo = this.getSharedGeometry('hw_hinge_cup', () => new THREE.CylinderGeometry(17.5, 17.5, 12, 20));
+      const armGeo = this.getSharedGeometry('hw_hinge_arm', () => new THREE.BoxGeometry(18, 14, 45));
       const hingeX = hingeSide === 'left' ? -doorW / 2 + 22.5 : doorW / 2 - 22.5;
       for (const hy of hingeYPositions) {
         const singleHinge = new THREE.Group();
-        const cup = new THREE.Mesh(new THREE.CylinderGeometry(17.5, 17.5, 12, 20), hingeMat);
+        const cup = new THREE.Mesh(cupGeo, hingeMat);
         cup.rotation.x = Math.PI / 2;
         cup.position.set(0, 0, -doorT / 2 + 6);
         singleHinge.add(cup);
 
-        const arm = new THREE.Mesh(new THREE.BoxGeometry(18, 14, 45), hingeMat);
+        const arm = new THREE.Mesh(armGeo, hingeMat);
         const armOffsetX = hingeSide === 'left' ? -12 : 12;
         arm.position.set(armOffsetX, 0, -doorT / 2 - 16);
         singleHinge.add(arm);
@@ -3113,22 +3233,31 @@ private createHandleMesh(
     const boxOuterWidth = Math.max(120, frontWidth - (2 * carcassSideT) - (2 * clearance));
     const boxInnerWidth = Math.max(80, boxOuterWidth - (2 * t));
 
-    const boxMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc, // Clean melamine interior
-      roughness: 0.65,
-      metalness: 0.05
-    });
+    const boxMat = this.getSharedMaterial(
+      'hw_drawer_box',
+      () => new THREE.MeshStandardMaterial({
+        color: 0xf8fafc, // Clean melamine interior
+        roughness: 0.65,
+        metalness: 0.05
+      })
+    );
 
-    const bottomMat = new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0, // MDF bottom board
-      roughness: 0.7,
-      metalness: 0.02
-    });
+    const bottomMat = this.getSharedMaterial(
+      'hw_drawer_bottom',
+      () => new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0, // MDF bottom board
+        roughness: 0.7,
+        metalness: 0.02
+      })
+    );
 
-    const edgeLineMat = new THREE.LineBasicMaterial({
-      color: 0x94a3b8,
-      linewidth: 1
-    });
+    const edgeLineMat = this.getSharedMaterial(
+      'hw_drawer_edge',
+      () => new THREE.LineBasicMaterial({
+        color: 0x94a3b8,
+        linewidth: 1
+      })
+    );
 
     const addBoxPart = (geometry: THREE.BoxGeometry, x: number, y: number, z: number, mat: THREE.Material) => {
       const pMesh = new THREE.Mesh(geometry, mat);
@@ -3227,28 +3356,45 @@ private createHandleMesh(
       railThickness = 21; // under-mount bottom clearance
     }
 
-    const slideSteelMat = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8,
-      metalness: 0.88,
-      roughness: 0.22
-    });
+    const slideSteelMat = this.getSharedMaterial(
+      'hw_slide_steel',
+      () => new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        metalness: 0.88,
+        roughness: 0.22
+      })
+    );
 
-    const ballBearingMat = new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0,
-      metalness: 0.95,
-      roughness: 0.1
-    });
+    const ballBearingMat = this.getSharedMaterial(
+      'hw_slide_bearing',
+      () => new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0,
+        metalness: 0.95,
+        roughness: 0.1
+      })
+    );
 
-    const damperMat = new THREE.MeshStandardMaterial({
-      color: 0x0284c7, // Hydraulic blue damper
-      metalness: 0.5,
-      roughness: 0.3
-    });
+    const damperMat = this.getSharedMaterial(
+      'hw_slide_damper',
+      () => new THREE.MeshStandardMaterial({
+        color: 0x0284c7, // Hydraulic blue damper
+        metalness: 0.5,
+        roughness: 0.3
+      })
+    );
 
-    const clipMat = new THREE.MeshStandardMaterial({
-      color: 0xea580c, // Undermount front quick-release orange clip
-      roughness: 0.35
-    });
+    const clipMat = this.getSharedMaterial(
+      'hw_slide_clip',
+      () => new THREE.MeshStandardMaterial({
+        color: 0xea580c, // Undermount front quick-release orange clip
+        roughness: 0.35
+      })
+    );
+
+    const holeGeo = this.getSharedGeometry('hw_slide_hole_geo', () => new THREE.CylinderGeometry(2.2, 2.2, 5, 12));
+    const holeMat = this.getSharedMaterial('hw_slide_hole_mat', () => new THREE.MeshBasicMaterial({ color: 0x1e293b }));
+    const pistonGeo = this.getSharedGeometry('hw_slide_piston_geo', () => new THREE.CylinderGeometry(3.2, 3.2, 50, 12));
+    const triggerGeo = this.getSharedGeometry('hw_slide_trigger_geo', () => new THREE.BoxGeometry(5, 10, 16));
 
     const createSingleSlideAssembly = (isLeft: boolean): THREE.Group => {
       const slideAssembly = new THREE.Group();
@@ -3256,7 +3402,7 @@ private createHandleMesh(
       if (slideType === 'undermount') {
         // --- CORREDERA OCULTA BAJO CAJÓN (TANDEM) ---
         const mainTrack = new THREE.Mesh(
-          new THREE.BoxGeometry(18, railHeight, nominalLength),
+          this.getSharedGeometry(`hw_slide_um_${railHeight}_${nominalLength}`, () => new THREE.BoxGeometry(18, railHeight, nominalLength)),
           slideSteelMat
         );
         mainTrack.position.set(0, 0, -nominalLength / 2);
@@ -3264,7 +3410,7 @@ private createHandleMesh(
 
         // Front 3D quick-release locking catch
         const frontClip = new THREE.Mesh(
-          new THREE.BoxGeometry(22, 14, 25),
+          this.getSharedGeometry('hw_slide_um_clip', () => new THREE.BoxGeometry(22, 14, 25)),
           clipMat
         );
         frontClip.position.set(0, -railHeight / 2 + 7, -12.5);
@@ -3272,7 +3418,7 @@ private createHandleMesh(
 
         // Synchronizer pinion / rear damper
         const rearDamper = new THREE.Mesh(
-          new THREE.BoxGeometry(14, 12, 45),
+          this.getSharedGeometry('hw_slide_um_damper', () => new THREE.BoxGeometry(14, 12, 45)),
           damperMat
         );
         rearDamper.position.set(0, 0, -nominalLength + 25);
@@ -3281,7 +3427,7 @@ private createHandleMesh(
         // --- CORREDERA TELESCÓPICA (45mm, SOFT-CLOSE O 35mm) ---
         // 1. Carcase Outer Member (Stationary C-profile against internal side wall)
         const outerProfile = new THREE.Mesh(
-          new THREE.BoxGeometry(4.5, railHeight, nominalLength),
+          this.getSharedGeometry(`hw_slide_outer_${railHeight}_${nominalLength}`, () => new THREE.BoxGeometry(4.5, railHeight, nominalLength)),
           slideSteelMat
         );
         outerProfile.position.set(isLeft ? -3.5 : 3.5, 0, -nominalLength / 2);
@@ -3289,7 +3435,7 @@ private createHandleMesh(
 
         // 2. Intermediate Ball-Bearing Carriage
         const intermediateProfile = new THREE.Mesh(
-          new THREE.BoxGeometry(3.5, railHeight * 0.72, nominalLength * 0.9),
+          this.getSharedGeometry(`hw_slide_mid_${railHeight}_${nominalLength}`, () => new THREE.BoxGeometry(3.5, railHeight * 0.72, nominalLength * 0.9)),
           ballBearingMat
         );
         intermediateProfile.position.set(0, 0, -nominalLength / 2 + 10);
@@ -3297,15 +3443,13 @@ private createHandleMesh(
 
         // 3. Inner Drawer Member (Attached to drawer box)
         const innerProfile = new THREE.Mesh(
-          new THREE.BoxGeometry(4.0, railHeight * 0.55, nominalLength * 0.85),
+          this.getSharedGeometry(`hw_slide_inner_${railHeight}_${nominalLength}`, () => new THREE.BoxGeometry(4.0, railHeight * 0.55, nominalLength * 0.85)),
           slideSteelMat
         );
         innerProfile.position.set(isLeft ? 3.5 : -3.5, 0, -nominalLength / 2 + 15);
         slideAssembly.add(innerProfile);
 
         // System 32 stamped mounting hole visual dots on rail
-        const holeGeo = new THREE.CylinderGeometry(2.2, 2.2, 5, 12);
-        const holeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
         const holeSpacings = [37, 69, 101, 165, 229];
         for (const distFromFront of holeSpacings) {
           if (distFromFront < nominalLength - 30) {
@@ -3318,18 +3462,12 @@ private createHandleMesh(
 
         // Soft-Close Hydraulic Piston & Spring Return Unit
         if (slideType === 'soft_close') {
-          const piston = new THREE.Mesh(
-            new THREE.CylinderGeometry(3.2, 3.2, 50, 12),
-            damperMat
-          );
+          const piston = new THREE.Mesh(pistonGeo, damperMat);
           piston.rotation.x = Math.PI / 2;
           piston.position.set(isLeft ? -1 : 1, -railHeight * 0.2, -nominalLength + 35);
           slideAssembly.add(piston);
 
-          const triggerCatch = new THREE.Mesh(
-            new THREE.BoxGeometry(5, 10, 16),
-            damperMat
-          );
+          const triggerCatch = new THREE.Mesh(triggerGeo, damperMat);
           triggerCatch.position.set(isLeft ? 1 : -1, railHeight * 0.2, -nominalLength + 55);
           slideAssembly.add(triggerCatch);
         }
@@ -3514,10 +3652,22 @@ private createHandleMesh(
     return group;
   }
 
-private renderDrillHolesVisuals(holes: DrillHole[]) {
+  private renderDrillHolesVisuals(holes: DrillHole[]) {
+    const ringMat = this.getSharedMaterial(
+      'drill_ring_mat',
+      () => new THREE.MeshBasicMaterial({
+        color: 0x0f172a,
+        side: THREE.DoubleSide,
+        depthTest: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1
+      })
+    );
+
     for (const hole of holes) {
       if (this.hiddenPartIds().has(hole.partId)) continue;
-      const targetPieceItem = this.pieceObjects.find(p => p.part.id === hole.partId);
+      const targetPieceItem = this.pieceObjectMap.get(hole.partId);
       if (!targetPieceItem) continue;
 
       const holeGroup = new THREE.Group();
@@ -3543,16 +3693,22 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         cylHeight = 18;
       }
 
-      // 3D Drill Bore Cylinder
-      const cylGeo = new THREE.CylinderGeometry(cylRadius, cylRadius, cylHeight, 20);
-      const cylMat = new THREE.MeshStandardMaterial({
-        color,
-        roughness: 0.25,
-        metalness: 0.35,
-        emissive: color,
-        emissiveIntensity: 0.35,
-        depthTest: true
-      });
+      // 3D Drill Bore Cylinder (Pooled Geometry + Pooled Material)
+      const cylGeo = this.getSharedGeometry(
+        `drill_cyl_${cylRadius}_${cylHeight}`,
+        () => new THREE.CylinderGeometry(cylRadius, cylRadius, cylHeight, 16)
+      );
+      const cylMat = this.getSharedMaterial(
+        `drill_mat_${color}`,
+        () => new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.25,
+          metalness: 0.35,
+          emissive: color,
+          emissiveIntensity: 0.35,
+          depthTest: true
+        })
+      );
       const cylMesh = new THREE.Mesh(cylGeo, cylMat);
 
       // Orient cylinder based on normalAxis
@@ -3563,16 +3719,11 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       }
       holeGroup.add(cylMesh);
 
-      // Technical entry ring for high-precision CAD look
-      const ringGeo = new THREE.RingGeometry(cylRadius * 0.75, cylRadius * 1.15, 24);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x0f172a,
-        side: THREE.DoubleSide,
-        depthTest: true,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1
-      });
+      // Technical entry ring for high-precision CAD look (Pooled Geometry)
+      const ringGeo = this.getSharedGeometry(
+        `drill_ring_${cylRadius}`,
+        () => new THREE.RingGeometry(cylRadius * 0.75, cylRadius * 1.15, 20)
+      );
       const ringMesh = new THREE.Mesh(ringGeo, ringMat);
       if (hole.normalAxis === 'x') {
         ringMesh.rotation.y = Math.PI / 2;
@@ -3613,27 +3764,31 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     isColliding = false
   ): THREE.Material {
     if (isColliding) {
-      // Striking ruby red highlight for collided / penetrating pieces
-      return new THREE.MeshStandardMaterial({
-        color: 0xef4444,
-        emissive: 0x991b1b,
-        emissiveIntensity: 0.55,
-        transparent: true,
-        opacity: 0.85,
-        roughness: 0.25,
-        metalness: 0.15
-      });
+      return this.getSharedMaterial(
+        'piece_colliding',
+        () => new THREE.MeshStandardMaterial({
+          color: 0xef4444,
+          emissive: 0x991b1b,
+          emissiveIntensity: 0.55,
+          transparent: true,
+          opacity: 0.85,
+          roughness: 0.25,
+          metalness: 0.15
+        })
+      );
     }
 
     if (isSelected) {
-      // Technical Cobalt Blue CAD Selection (Figma / Rayon style)
-      return new THREE.MeshStandardMaterial({
-        color: 0x3b82f6,
-        emissive: 0x1d4ed8,
-        emissiveIntensity: 0.22,
-        roughness: 0.38,
-        metalness: 0.08
-      });
+      return this.getSharedMaterial(
+        'piece_selected',
+        () => new THREE.MeshStandardMaterial({
+          color: 0x3b82f6,
+          emissive: 0x1d4ed8,
+          emissiveIntensity: 0.22,
+          roughness: 0.38,
+          metalness: 0.08
+        })
+      );
     }
 
     // Material color resolution
@@ -3651,26 +3806,33 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     }
 
     if (xRay) {
-      return new THREE.MeshStandardMaterial({
-        color: new THREE.Color(colorHex),
-        transparent: true,
-        opacity: 0.35,
-        roughness: 0.4
-      });
+      return this.getSharedMaterial(
+        `piece_xray_${colorHex}`,
+        () => new THREE.MeshStandardMaterial({
+          color: new THREE.Color(colorHex),
+          transparent: true,
+          opacity: 0.35,
+          roughness: 0.4
+        })
+      );
     }
 
-    const texType = assignedMat?.textureType;
-    let textureMap: THREE.CanvasTexture | null = null;
-    if (typeof document !== 'undefined' && (texType === 'wood' || texType === 'stone')) {
-      textureMap = this.getProceduralTexture(colorHex, texType);
-    }
-
-    return new THREE.MeshStandardMaterial({
-      color: new THREE.Color(colorHex),
-      map: textureMap,
-      roughness: texType === 'wood' ? 0.65 : (texType === 'stone' ? 0.25 : 0.4),
-      metalness: texType === 'stone' ? 0.1 : 0.05
-    });
+    const texType = assignedMat?.textureType || 'solid';
+    return this.getSharedMaterial(
+      `piece_std_${colorHex}_${texType}`,
+      () => {
+        let textureMap: THREE.CanvasTexture | null = null;
+        if (typeof document !== 'undefined' && (texType === 'wood' || texType === 'stone')) {
+          textureMap = this.getProceduralTexture(colorHex, texType);
+        }
+        return new THREE.MeshStandardMaterial({
+          color: new THREE.Color(colorHex),
+          map: textureMap,
+          roughness: texType === 'wood' ? 0.65 : (texType === 'stone' ? 0.25 : 0.4),
+          metalness: texType === 'stone' ? 0.1 : 0.05
+        });
+      }
+    );
   }
 
   private textureCache = new Map<string, THREE.CanvasTexture>();
@@ -3716,6 +3878,7 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(2, 2);
+    tex.userData = { ...(tex.userData || {}), isShared: true };
     this.textureCache.set(key, tex);
     return tex;
   }
@@ -4318,7 +4481,7 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     if (this.activeTool() === 'draw_rect') {
       const allFloorAndParts = [
         ...(this.floorMesh ? [this.floorMesh] : []),
-        ...this.pieceObjects.map(p => p.mesh)
+        ...this.raycastablePieceMeshes
       ];
       const floorIntersects = this.raycaster.intersectObjects(allFloorAndParts, false);
       if (floorIntersects.length > 0) {
@@ -4343,7 +4506,7 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     if (this.activeTool() === 'draw_circle') {
       const allFloorAndParts = [
         ...(this.floorMesh ? [this.floorMesh] : []),
-        ...this.pieceObjects.map(p => p.mesh)
+        ...this.raycastablePieceMeshes
       ];
       const floorIntersects = this.raycaster.intersectObjects(allFloorAndParts, false);
       if (floorIntersects.length > 0) {
@@ -4368,7 +4531,7 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     if (this.activeTool() === 'draw_freehand') {
       const allFloorAndParts = [
         ...(this.floorMesh ? [this.floorMesh] : []),
-        ...this.pieceObjects.map(p => p.mesh)
+        ...this.raycastablePieceMeshes
       ];
       const floorIntersects = this.raycaster.intersectObjects(allFloorAndParts, false);
       if (floorIntersects.length > 0) {
@@ -4391,37 +4554,35 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     // 0.3. Rotate 90° Tool
     if (this.activeTool() === 'rotate_90') {
       const intersects = this.raycaster.intersectObjects(
-        this.pieceObjects.map(p => p.mesh),
+        this.raycastablePieceMeshes,
         false
       );
       if (intersects.length > 0) {
         const hit = intersects[0].object as THREE.Mesh;
         const part = hit.userData['part'] as Part;
         if (part) {
-          if (this.isPartOrGroupLocked(part)) {
-            this.partsSelected.emit([part.id]);
-            this.partSelected.emit(part);
-            canvas.style.cursor = 'not-allowed';
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-          const curIds = this.activeSelectedIds();
-          const isSingleIsolated = curIds.length === 1 && curIds[0] === part.id;
-          if (part.groupId && (!isSingleIsolated || this.isCountertopPartOrGroup(part))) {
-            const grpParts = this.parts().filter(p => p.groupId === part.groupId);
-            if (grpParts.length > 1) {
-              this.groupRotationRequested.emit({ groupId: part.groupId, deltaAngle: 90 });
-              this.partsSelected.emit(grpParts.map(p => p.id));
+          this.ngZone.run(() => {
+            if (this.isPartOrGroupLocked(part)) {
+              this.partsSelected.emit([part.id]);
               this.partSelected.emit(part);
-              e.preventDefault();
-              e.stopPropagation();
+              canvas.style.cursor = 'not-allowed';
               return;
             }
-          }
-          this.rotatePart90(part, 'y');
-          this.partsSelected.emit([part.id]);
-          this.partSelected.emit(part);
+            const curIds = this.activeSelectedIds();
+            const isSingleIsolated = curIds.length === 1 && curIds[0] === part.id;
+            if (part.groupId && (!isSingleIsolated || this.isCountertopPartOrGroup(part))) {
+              const grpParts = this.parts().filter(p => p.groupId === part.groupId);
+              if (grpParts.length > 1) {
+                this.groupRotationRequested.emit({ groupId: part.groupId, deltaAngle: 90 });
+                this.partsSelected.emit(grpParts.map(p => p.id));
+                this.partSelected.emit(part);
+                return;
+              }
+            }
+            this.rotatePart90(part, 'y');
+            this.partsSelected.emit([part.id]);
+            this.partSelected.emit(part);
+          });
           e.preventDefault();
           e.stopPropagation();
           return;
@@ -4432,7 +4593,7 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
     // 0.5. Push/Pull (Empujar / Tirar) Tool
     if (this.activeTool() === 'push_pull') {
       const intersects = this.raycaster.intersectObjects(
-        this.pieceObjects.map(p => p.mesh),
+        this.raycastablePieceMeshes,
         false
       );
       if (intersects.length > 0) {
@@ -4443,8 +4604,10 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
 
         // Si la pieza o su grupo están congelados, impedir estirarla con Empujar/Tirar
         if (this.isPartOrGroupLocked(part)) {
-          this.partsSelected.emit([part.id]);
-          this.partSelected.emit(part);
+          this.ngZone.run(() => {
+            this.partsSelected.emit([part.id]);
+            this.partSelected.emit(part);
+          });
           canvas.style.cursor = 'not-allowed';
           e.preventDefault();
           e.stopPropagation();
@@ -4524,11 +4687,13 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         }
 
         this.isPushPulling = true;
+        this.liveDragPartUpdates.clear();
         this.controls.enabled = false;
-        this.dragStarted.emit();
-
-        this.partsSelected.emit([part.id]);
-        this.partSelected.emit(part);
+        this.ngZone.run(() => {
+          this.dragStarted.emit();
+          this.partsSelected.emit([part.id]);
+          this.partSelected.emit(part);
+        });
 
         const initialDim = targetDim === 'thickness'
           ? (part.thickness || 18)
@@ -4634,12 +4799,14 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           }
 
           this.isDragging = true;
+          this.liveDragPartUpdates.clear();
+          this.liveDragApplianceUpdates.clear();
           this.activeGizmoHit = hitData;
           this.dragStartPointer = { x: e.clientX, y: e.clientY };
           this.dragInitialPart = { ...selParts[0] };
           this.dragInitialParts = selParts.map(p => ({ ...p }));
 
-          this.dragStarted.emit();
+          this.ngZone.run(() => this.dragStarted.emit());
           this.controls.enabled = false;
 
           const centroid = this.calculateCentroid(selParts);
@@ -4669,6 +4836,7 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         const handleData = hit.userData;
         if (handleData && handleData['isApplianceHandle']) {
           this.isApplianceResizing = true;
+          this.liveDragPrimaryApplianceUpdate = null;
           this.draggingAppliance = handleData['appliance'];
           this.activeApplianceHandle = {
             axis: handleData['axis'],
@@ -4681,7 +4849,7 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
             depth: handleData['appliance'].depth
           };
           this.dragStartPointer = { x: e.clientX, y: e.clientY };
-          this.dragStarted.emit();
+          this.ngZone.run(() => this.dragStarted.emit());
           this.controls.enabled = false;
 
           const camDir = new THREE.Vector3();
@@ -4718,8 +4886,9 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           hitObj = hitObj.parent;
         }
         if (foundApp) {
+          const targetApp = foundApp;
           if (e.shiftKey) {
-            this.handleShiftClickSelection(e);
+            this.ngZone.run(() => this.handleShiftClickSelection(e));
             e.preventDefault();
             e.stopPropagation();
             return;
@@ -4727,42 +4896,47 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
 
           const curPartIds = this.activeSelectedIds();
           const curAppIds = this.activeSelectedApplianceIds();
-          const isPartOfActiveMulti = curAppIds.includes(foundApp.id) && (curPartIds.length > 0 || curAppIds.length > 1);
+          const isPartOfActiveMulti = curAppIds.includes(targetApp.id) && (curPartIds.length > 0 || curAppIds.length > 1);
 
-          this.applianceSelected.emit(foundApp);
-          if (!isPartOfActiveMulti) {
-            this.appliancesSelected.emit([foundApp.id]);
-            this.partsSelected.emit([]);
-            this.partSelected.emit(null);
-          }
-          this.selectedWallType.set(null);
-          this.wallSelected.emit(null);
+          this.ngZone.run(() => {
+            this.applianceSelected.emit(targetApp);
+            if (!isPartOfActiveMulti) {
+              this.appliancesSelected.emit([targetApp.id]);
+              this.partsSelected.emit([]);
+              this.partSelected.emit(null);
+            }
+            this.selectedWallType.set(null);
+            this.wallSelected.emit(null);
+          });
 
-          if (e.button === 0 && !this.isApplianceLocked(foundApp)) {
+          if (e.button === 0 && !this.isApplianceLocked(targetApp)) {
             this.isApplianceDragging = true;
-            this.draggingAppliance = { ...foundApp };
-            this.dragInitialAppliancePos = { ...foundApp.position };
+            this.liveDragPartUpdates.clear();
+            this.liveDragApplianceUpdates.clear();
+            this.liveDragPrimaryApplianceUpdate = null;
+            this.draggingAppliance = { ...targetApp };
+            this.dragInitialAppliancePos = { ...targetApp.position };
             this.dragStartPointer = { x: e.clientX, y: e.clientY };
-            this.dragStarted.emit();
+            this.ngZone.run(() => this.dragStarted.emit());
             this.controls.enabled = false;
 
             // Almacenar las piezas y equipos que deben desplazarse junto a este electrodoméstico
-            const activeParts = foundApp.groupId
-              ? this.parts().filter(p => p.groupId === foundApp.groupId)
+            const activeParts = targetApp.groupId
+              ? this.parts().filter(p => p.groupId === targetApp.groupId)
               : this.selectedParts();
             this.dragInitialParts = activeParts.map(p => ({ ...p }));
             const relevantGroupIds = new Set(activeParts.map(p => p.groupId).filter(Boolean));
             const activeApps = this.appliances().filter(
-              a => a.id !== foundApp.id && (curAppIds.includes(a.id) || (a.groupId && (a.groupId === foundApp.groupId || relevantGroupIds.has(a.groupId))))
+              a => a.id !== targetApp.id && (curAppIds.includes(a.id) || (a.groupId && (a.groupId === targetApp.groupId || relevantGroupIds.has(a.groupId))))
             );
             this.dragInitialSelectedAppliances = activeApps.map(a => ({ ...a, position: { ...a.position } }));
 
             const camDir = new THREE.Vector3();
             this.camera.getWorldDirection(camDir);
             const appCenterPos = new THREE.Vector3(
-              foundApp.position.x,
-              foundApp.position.y + foundApp.height / 2,
-              foundApp.position.z
+              targetApp.position.x,
+              targetApp.position.y + targetApp.height / 2,
+              targetApp.position.z
             );
             this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), appCenterPos);
 
@@ -4788,10 +4962,12 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       const guideIntersects = this.raycaster.intersectObjects(this.referenceGuideGroup.children, true);
       const hitGuide = guideIntersects.find(h => h.object.userData?.['isReferenceGuide']);
       if (hitGuide) {
-        this.isReferenceGuideSelected.set(true);
-        this.partSelected.emit(null);
-        this.partsSelected.emit([]);
-        this.applianceSelected.emit(null);
+        this.ngZone.run(() => {
+          this.isReferenceGuideSelected.set(true);
+          this.partSelected.emit(null);
+          this.partsSelected.emit([]);
+          this.applianceSelected.emit(null);
+        });
 
         if (e.button === 0) {
           this.isReferenceGuideDragging = true;
@@ -4842,65 +5018,64 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
       }
 
       if (part) {
+        const hitPart = part;
         if (isHandle) {
-          this.togglePartOpen(part.id);
+          this.ngZone.run(() => this.togglePartOpen(hitPart.id));
         }
         if (e.shiftKey) {
-          const cur = [...this.activeSelectedIds()];
-          const idx = cur.indexOf(part.id);
-          if (idx >= 0) {
-            cur.splice(idx, 1);
-          } else {
-            cur.push(part.id);
-          }
-          this.partsSelected.emit(cur);
-          if (cur.length === 0) {
-            this.partSelected.emit(null);
-          }
+          this.ngZone.run(() => {
+            const cur = [...this.activeSelectedIds()];
+            const idx = cur.indexOf(hitPart.id);
+            if (idx >= 0) {
+              cur.splice(idx, 1);
+            } else {
+              cur.push(hitPart.id);
+            }
+            this.partsSelected.emit(cur);
+            if (cur.length === 0) {
+              this.partSelected.emit(null);
+            }
+          });
         } else {
           const now = Date.now();
           const isDoubleClickSamePart =
-            now - this.lastPieceClickTime < 350 && this.lastClickedPartId === part.id;
+            now - this.lastPieceClickTime < 350 && this.lastClickedPartId === hitPart.id;
           this.lastPieceClickTime = now;
-          this.lastClickedPartId = part.id;
+          this.lastClickedPartId = hitPart.id;
 
           let partsToSelect: Part[] = [];
           const curIds = this.activeSelectedIds();
-          const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === part.id;
-          const isCountertopUnit = part.componentRole === 'countertop' || part.componentRole === 'backsplash';
+          const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === hitPart.id;
+          const isCountertopUnit = hitPart.componentRole === 'countertop' || hitPart.componentRole === 'backsplash';
 
-          if (curIds.includes(part.id) && curIds.length > 1) {
-            // Si la pieza ya forma parte de una selección múltiple activa (por Shift+Clic, lazo o 'Todo'),
-            // preservamos la selección múltiple intacta para permitir moverlas juntas en bloque
-            partsToSelect = this.parts().filter(p => curIds.includes(p.id));
-            this.partsSelected.emit(curIds);
-            this.partSelected.emit(part);
-          } else if (isCountertopUnit) {
-            // Para mesones y salpicaderos: seleccionamos el tramo individual para que buildGizmo()
-            // dibuje los tirantes 3D interactivos de estiramiento (azul y ámbar) sobre el tramo activo
-            partsToSelect = [part];
-            this.partsSelected.emit([part.id]);
-            this.partSelected.emit(part);
-          } else if (part.groupId) {
-            const groupParts = this.parts().filter(p => p.groupId === part.groupId);
-            if (isDoubleClickSamePart || isAlreadySingleIsolated) {
-              // Doble clic en una pieza del módulo (o arrastrar la pieza ya aislada): seleccionar solo esa pieza
-              partsToSelect = [part];
+          this.ngZone.run(() => {
+            if (curIds.includes(hitPart.id) && curIds.length > 1) {
+              partsToSelect = this.parts().filter(p => curIds.includes(p.id));
+              this.partsSelected.emit(curIds);
+              this.partSelected.emit(hitPart);
+            } else if (isCountertopUnit) {
+              partsToSelect = [hitPart];
+              this.partsSelected.emit([hitPart.id]);
+              this.partSelected.emit(hitPart);
+            } else if (hitPart.groupId) {
+              const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
+              if (isDoubleClickSamePart || isAlreadySingleIsolated) {
+                partsToSelect = [hitPart];
+              } else {
+                partsToSelect = groupParts.length > 0 ? groupParts : [hitPart];
+              }
+              this.partsSelected.emit(partsToSelect.map(p => p.id));
+              this.partSelected.emit(hitPart);
             } else {
-              // Clic normal en cualquier pieza del módulo: seleccionar el módulo/grupo completo
-              partsToSelect = groupParts.length > 0 ? groupParts : [part];
+              partsToSelect = [hitPart];
+              this.partsSelected.emit([hitPart.id]);
+              this.partSelected.emit(hitPart);
             }
-            this.partsSelected.emit(partsToSelect.map(p => p.id));
-            this.partSelected.emit(part);
-          } else {
-            partsToSelect = [part];
-            this.partsSelected.emit([part.id]);
-            this.partSelected.emit(part);
-          }
+          });
 
           // Si la pieza o alguna pieza del grupo seleccionado está CONGELADA (isLocked),
           // permitimos seleccionarla pero NO iniciamos el arrastre con el mouse (isDirectPieceDrag = false)
-          const anyLocked = this.isPartOrGroupLocked(part) || partsToSelect.some(p => this.isPartOrGroupLocked(p));
+          const anyLocked = this.isPartOrGroupLocked(hitPart) || partsToSelect.some(p => this.isPartOrGroupLocked(p));
           if (anyLocked) {
             this.isDirectPieceDrag = false;
             return;
@@ -4909,12 +5084,14 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           if (e.button === 0 && (this.activeTool() === 'select' || this.activeTool() === 'move') && !isHandle) {
             this.isDirectPieceDrag = true;
             this.directPieceDragThresholdPassed = false;
+            this.liveDragPartUpdates.clear();
+            this.liveDragApplianceUpdates.clear();
             this.dragStartPointer = { x: e.clientX, y: e.clientY };
-            this.dragInitialPart = { ...part };
+            this.dragInitialPart = { ...hitPart };
 
             // Si es mesón o salpicadero, al arrastrar con el mouse se mueve todo el conjunto de placas y salpicaderos en bloque
-            if (isCountertopUnit && part.groupId) {
-              const allCtParts = this.parts().filter(p => p.groupId === part.groupId);
+            if (isCountertopUnit && hitPart.groupId) {
+              const allCtParts = this.parts().filter(p => p.groupId === hitPart.groupId);
               this.dragInitialParts = allCtParts.map(p => ({ ...p }));
             } else {
               this.dragInitialParts = partsToSelect.map(p => ({ ...p }));
@@ -4951,8 +5128,10 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         const wallHit = roomHits.find(h => h.object.userData?.['isWall']);
         if (wallHit) {
           const wallId = (wallHit.object.userData['wallId'] || wallHit.object.userData['wallType']) as string;
-          this.selectedWallType.set(wallId);
-          this.wallSelected.emit(wallId);
+          this.ngZone.run(() => {
+            this.selectedWallType.set(wallId);
+            this.wallSelected.emit(wallId);
+          });
           const cfg = this.roomConfig();
           const targetWall = getResolvedRoomWalls(cfg).find(w => w.id === wallId);
           const isLocked = !targetWall || !!cfg.isWallsLocked || !!targetWall.isLocked || !!cfg.lockedWalls?.[wallId];
@@ -4970,11 +5149,13 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           return;
         }
       }
-      this.selectedWallType.set(null);
-      this.wallSelected.emit(null);
-      this.partsSelected.emit([]);
-      this.partSelected.emit(null);
-      this.applianceSelected.emit(null);
+      this.ngZone.run(() => {
+        this.selectedWallType.set(null);
+        this.wallSelected.emit(null);
+        this.partsSelected.emit([]);
+        this.partSelected.emit(null);
+        this.applianceSelected.emit(null);
+      });
     }
   }
 
@@ -5070,9 +5251,11 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           };
         }
 
-        this.applianceModified.emit({
-          appliance: this.draggingAppliance,
-          updates
+        this.ngZone.run(() => {
+          this.applianceModified.emit({
+            appliance: this.draggingAppliance!,
+            updates
+          });
         });
       }
       return;
@@ -5177,15 +5360,8 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
         const appDeltaY = newY - initialPos.y;
         const appDeltaZ = newZ - initialPos.z;
 
-        this.applianceModified.emit({
-          appliance: app,
-          updates: {
-            position: { x: newX, y: newY, z: newZ }
-          }
-        });
-
+        const partUpdates: { part: Part; updates: Partial<Part> }[] = [];
         if (this.dragInitialParts.length > 0) {
-          const partUpdates: { part: Part; updates: Partial<Part> }[] = [];
           for (const p of this.dragInitialParts) {
             const b = this.getPartBounds(p);
             partUpdates.push({
@@ -5197,11 +5373,10 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
               }
             });
           }
-          this.multiplePartsModified.emit({ updates: partUpdates });
         }
 
+        const appUpdates: { id: string; updates: Partial<ApplianceItem> }[] = [];
         if (this.dragInitialSelectedAppliances.length > 0) {
-          const appUpdates: { id: string; updates: Partial<ApplianceItem> }[] = [];
           for (const a of this.dragInitialSelectedAppliances) {
             appUpdates.push({
               id: a.id,
@@ -5214,8 +5389,14 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
               }
             });
           }
-          this.multipleAppliancesModified.emit({ updates: appUpdates });
         }
+
+        this.previewPartUpdatesInPlace(partUpdates, appUpdates, {
+          appliance: app,
+          updates: {
+            position: { x: newX, y: newY, z: newZ }
+          }
+        });
       }
       return;
     }
@@ -5501,7 +5682,7 @@ private renderDrillHolesVisuals(holes: DrillHole[]) {
           data.dir
         );
 
-        this.partModified.emit({ part: data.part, updates });
+        this.previewPartUpdatesInPlace([{ part: data.part, updates }]);
       }
       return;
     }
@@ -5646,13 +5827,9 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
               };
               updatesList.push({ part: p, updates: upd });
             }
-            this.multiplePartsModified.emit({ updates: updatesList });
-            if (updatesList.length > 0) {
-              this.partModified.emit(updatesList[0]);
-            }
 
+            const appUpdatesList: { id: string; updates: Partial<ApplianceItem> }[] = [];
             if (this.dragInitialSelectedAppliances.length > 0) {
-              const appUpdatesList: { id: string; updates: Partial<ApplianceItem> }[] = [];
               for (const a of this.dragInitialSelectedAppliances) {
                 appUpdatesList.push({
                   id: a.id,
@@ -5665,8 +5842,8 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
                   }
                 });
               }
-              this.multipleAppliancesModified.emit({ updates: appUpdatesList });
             }
+            this.previewPartUpdatesInPlace(updatesList, appUpdatesList);
           } else if (this.dragInitialPart) {
             const part = this.dragInitialPart;
             const initBounds = this.getPartBounds(part);
@@ -5797,7 +5974,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
               updates.posZ = Math.round(targetPos.z);
             }
 
-            this.partModified.emit({ part, updates });
+            this.previewPartUpdatesInPlace([{ part, updates }]);
           }
         } else if (hit.type === 'handle' && this.dragInitialPart) {
           // Edge Stretch Handle: Length or Width with magnetic snap to adjacent faces
@@ -5835,7 +6012,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
             updates[posAxis] = res.pos;
           }
 
-          this.partModified.emit({ part, updates });
+          this.previewPartUpdatesInPlace([{ part, updates }]);
         }
       }
       return;
@@ -5846,7 +6023,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
       const distFromStart = Math.hypot(e.clientX - this.dragStartPointer.x, e.clientY - this.dragStartPointer.y);
       if (!this.directPieceDragThresholdPassed && distFromStart > 4) {
         this.directPieceDragThresholdPassed = true;
-        this.dragStarted.emit();
+        this.ngZone.run(() => this.dragStarted.emit());
         this.controls.enabled = false;
         canvas.style.cursor = 'grabbing';
       }
@@ -6000,13 +6177,9 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
               };
               updatesList.push({ part: p, updates: upd });
             }
-            this.multiplePartsModified.emit({ updates: updatesList });
-            if (updatesList.length > 0) {
-              this.partModified.emit(updatesList[0]);
-            }
 
+            const appUpdatesList: { id: string; updates: Partial<ApplianceItem> }[] = [];
             if (this.dragInitialSelectedAppliances.length > 0) {
-              const appUpdatesList: { id: string; updates: Partial<ApplianceItem> }[] = [];
               for (const a of this.dragInitialSelectedAppliances) {
                 appUpdatesList.push({
                   id: a.id,
@@ -6019,8 +6192,8 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
                   }
                 });
               }
-              this.multipleAppliancesModified.emit({ updates: appUpdatesList });
             }
+            this.previewPartUpdatesInPlace(updatesList, appUpdatesList);
           } else if (this.dragInitialPart) {
             // Arrastre de Pieza Individual con bloqueo estricto de suelo (minY >= 0) e imán entre piezas y muros
             const part = this.dragInitialPart;
@@ -6120,12 +6293,18 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
               posY: Math.round(targetPos.y),
               posZ: Math.round(targetPos.z)
             };
-            this.partModified.emit({ part, updates });
+            this.previewPartUpdatesInPlace([{ part, updates }]);
           }
         }
         return;
       }
     }
+
+    // Skip hover raycasting while orbiting/panning the camera or if throttled (<15ms / ~60Hz)
+    if (this.isCameraInteracting) return;
+    const nowPerf = performance.now();
+    if (nowPerf - this.lastHoverRaycastTime < 15) return;
+    this.lastHoverRaycastTime = nowPerf;
 
     // Hover cursor updates when not dragging
     if (this.activeTool() === 'push_pull') {
@@ -6194,7 +6373,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     }
 
     const pieceIntersects = this.raycaster.intersectObjects(
-      this.pieceObjects.map(p => p.mesh),
+      this.raycastablePieceMeshes,
       false
     );
     if (pieceIntersects.length > 0) {
@@ -6209,6 +6388,187 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     } else {
       canvas.style.cursor = 'default';
     }
+  }
+
+  /**
+   * Actualiza matrices de posición y escala en tiempo real (60 FPS) durante el arrastre o estiramiento
+   * sin reconstruir la escena 3D completa ni serializar el proyecto en cada píxel de movimiento.
+   */
+  private previewPartUpdatesInPlace(
+    partUpdates: { part: Part; updates: Partial<Part> }[],
+    appUpdates: { id: string; updates: Partial<ApplianceItem> }[] = [],
+    primaryAppUpdate: { appliance: ApplianceItem; updates: Partial<ApplianceItem> } | null = null
+  ) {
+    let singleMovedDelta: THREE.Vector3 | null = null;
+    let singleStretchedPart: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number } | null = null;
+
+    for (const entry of partUpdates) {
+      this.liveDragPartUpdates.set(entry.part.id, entry);
+      const item = this.pieceObjectMap.get(entry.part.id);
+      if (!item) continue;
+
+      const updatedPart: Part = { ...item.part, ...entry.updates };
+      item.part = updatedPart;
+      item.mesh.userData['part'] = updatedPart;
+
+      const b = this.getPartBounds(updatedPart);
+      const dx = b.px - item.originalPos.x;
+      const dy = b.py - item.originalPos.y;
+      const dz = b.pz - item.originalPos.z;
+      item.originalPos.set(b.px, b.py, b.pz);
+
+      if (item.doorPivot) {
+        item.doorPivot.position.x += dx;
+        item.doorPivot.position.y += dy;
+        item.doorPivot.position.z += dz;
+      } else {
+        item.mesh.position.x += dx;
+        item.mesh.position.y += dy;
+        item.mesh.position.z += dz;
+      }
+
+      const isDimensionChanged =
+        entry.updates.length !== undefined ||
+        entry.updates.width !== undefined ||
+        entry.updates.thickness !== undefined;
+
+      if (isDimensionChanged && (!updatedPart.shapeType || updatedPart.shapeType === 'rectangle')) {
+        const newGeoKey = `box_${b.sx}_${b.sy}_${b.sz}`;
+        const newBoxGeo = this.getSharedGeometry(newGeoKey, () => new THREE.BoxGeometry(b.sx, b.sy, b.sz));
+        item.mesh.geometry = newBoxGeo;
+        const newEdgesGeo = this.getSharedGeometry(`edges_${newGeoKey}`, () => new THREE.EdgesGeometry(newBoxGeo));
+        for (const child of item.mesh.children) {
+          if (child instanceof THREE.LineSegments) {
+            child.geometry = newEdgesGeo;
+          }
+        }
+        if (partUpdates.length === 1) {
+          singleStretchedPart = { part: updatedPart, px: b.px, py: b.py, pz: b.pz, sx: b.sx, sy: b.sy, sz: b.sz };
+        }
+      } else if (partUpdates.length === 1) {
+        singleMovedDelta = new THREE.Vector3(dx, dy, dz);
+      }
+    }
+
+    if (singleStretchedPart) {
+      this.disposeGroup(this.dimensionGroup);
+      this.disposeGroup(this.gizmoGroup);
+      this.gizmoHitMeshes = [];
+      if (this.show3dDimensions()) {
+        this.renderPieceDimensions(
+          singleStretchedPart.part,
+          singleStretchedPart.px,
+          singleStretchedPart.py,
+          singleStretchedPart.pz,
+          singleStretchedPart.sx,
+          singleStretchedPart.sy,
+          singleStretchedPart.sz
+        );
+      }
+      if (this.activeTool() === 'move' || this.activeTool() === 'select') {
+        this.buildGizmo(
+          singleStretchedPart.part,
+          singleStretchedPart.px,
+          singleStretchedPart.py,
+          singleStretchedPart.pz,
+          singleStretchedPart.sx,
+          singleStretchedPart.sy,
+          singleStretchedPart.sz
+        );
+      }
+    } else if (singleMovedDelta) {
+      for (const child of this.gizmoGroup.children) {
+        child.position.add(singleMovedDelta);
+      }
+      for (const child of this.dimensionGroup.children) {
+        child.position.add(singleMovedDelta);
+      }
+    }
+
+    if (primaryAppUpdate) {
+      this.liveDragPrimaryApplianceUpdate = primaryAppUpdate;
+      const newPos = primaryAppUpdate.updates.position;
+      if (newPos) {
+        const app = primaryAppUpdate.appliance;
+        const visualBaseY =
+          app.type === 'sink' && newPos.y >= 500
+            ? newPos.y - app.height + 8
+            : (app.type === 'cooktop' && newPos.y >= 500)
+              ? newPos.y - app.height + 14
+              : newPos.y;
+        for (const child of this.appliancesGroup.children) {
+          if (child.userData?.['appliance']?.id === app.id) {
+            const dx = newPos.x - child.position.x;
+            const dy = visualBaseY - child.position.y;
+            const dz = newPos.z - child.position.z;
+            child.position.set(newPos.x, visualBaseY, newPos.z);
+            child.userData['appliance'] = { ...app, ...primaryAppUpdate.updates };
+            for (const gChild of this.applianceGizmoGroup.children) {
+              gChild.position.x += dx;
+              gChild.position.y += dy;
+              gChild.position.z += dz;
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    for (const appUpd of appUpdates) {
+      this.liveDragApplianceUpdates.set(appUpd.id, appUpd);
+      const newPos = appUpd.updates.position;
+      if (newPos) {
+        for (const child of this.appliancesGroup.children) {
+          const childApp = child.userData?.['appliance'] as ApplianceItem | undefined;
+          if (childApp && childApp.id === appUpd.id) {
+            const visualBaseY =
+              childApp.type === 'sink' && newPos.y >= 500
+                ? newPos.y - childApp.height + 8
+                : (childApp.type === 'cooktop' && newPos.y >= 500)
+                  ? newPos.y - childApp.height + 14
+                  : newPos.y;
+            child.position.set(newPos.x, visualBaseY, newPos.z);
+            child.userData['appliance'] = { ...childApp, ...appUpd.updates };
+            break;
+          }
+        }
+      }
+    }
+
+    this.requestRender(4);
+  }
+
+  /**
+   * Consolida en la zona de Angular los cambios acumulados tras finalizar un arrastre 3D (`pointerup`).
+   */
+  private commitLiveDragUpdates() {
+    const hasPartUpdates = this.liveDragPartUpdates.size > 0;
+    const hasAppUpdates = this.liveDragApplianceUpdates.size > 0;
+    const primaryApp = this.liveDragPrimaryApplianceUpdate;
+
+    if (!hasPartUpdates && !hasAppUpdates && !primaryApp) return;
+
+    const partUpdatesList = Array.from(this.liveDragPartUpdates.values());
+    const appUpdatesList = Array.from(this.liveDragApplianceUpdates.values());
+
+    this.liveDragPartUpdates.clear();
+    this.liveDragApplianceUpdates.clear();
+    this.liveDragPrimaryApplianceUpdate = null;
+
+    this.ngZone.run(() => {
+      if (primaryApp) {
+        this.applianceModified.emit(primaryApp);
+      }
+      if (partUpdatesList.length > 1) {
+        this.multiplePartsModified.emit({ updates: partUpdatesList });
+        this.partModified.emit(partUpdatesList[0]);
+      } else if (partUpdatesList.length === 1) {
+        this.partModified.emit(partUpdatesList[0]);
+      }
+      if (appUpdatesList.length > 0) {
+        this.multipleAppliancesModified.emit({ updates: appUpdatesList });
+      }
+    });
   }
 
   // Pointer Up: Release Dragging
@@ -6227,11 +6587,13 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
       const clientY = e ? e.clientY : this.marqueeStart.clientY;
       const dragDist = Math.hypot(clientX - this.marqueeStart.clientX, clientY - this.marqueeStart.clientY);
 
-      if (dragDist >= 6 && currentBox) {
-        this.performMarqueeSelection(currentBox);
-      } else if (e) {
-        this.handleShiftClickSelection(e);
-      }
+      this.ngZone.run(() => {
+        if (dragDist >= 6 && currentBox) {
+          this.performMarqueeSelection(currentBox);
+        } else if (e) {
+          this.handleShiftClickSelection(e);
+        }
+      });
       return;
     }
 
@@ -6244,19 +6606,21 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
         const posZ = Math.round((this.rectStartPoint.z + this.rectCurrentPoint.z) / 2);
         const posY = this.rectStartPoint.y + 7.5;
 
-        this.partCreated.emit({
-          name: `Pieza Dibujada ${this.parts().length + 1}`,
-          length: L,
-          width: W,
-          thickness: 15,
-          posX,
-          posY,
-          posZ,
-          orientation: 'horizontal'
-        });
+        this.ngZone.run(() => {
+          this.partCreated.emit({
+            name: `Pieza Dibujada ${this.parts().length + 1}`,
+            length: L,
+            width: W,
+            thickness: 15,
+            posX,
+            posY,
+            posZ,
+            orientation: 'horizontal'
+          });
 
-        // Switch to Push/Pull so user can immediately pull it upwards if desired
-        this.setActiveTool('push_pull');
+          // Switch to Push/Pull so user can immediately pull it upwards if desired
+          this.setActiveTool('push_pull');
+        });
       }
 
       this.isDrawingRect.set(false);
@@ -6282,22 +6646,24 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
         const posZ = Math.round(this.circleCenterPoint.z);
         const posY = this.circleCenterPoint.y + 7.5;
 
-        this.partCreated.emit({
-          name: `Pieza Circular ${this.parts().length + 1} (Ø${diameter})`,
-          length: diameter,
-          width: diameter,
-          thickness: 15,
-          posX,
-          posY,
-          posZ,
-          orientation: 'horizontal',
-          shapeType: 'circle',
-          radius: R,
-          diameter
-        });
+        this.ngZone.run(() => {
+          this.partCreated.emit({
+            name: `Pieza Circular ${this.parts().length + 1} (Ø${diameter})`,
+            length: diameter,
+            width: diameter,
+            thickness: 15,
+            posX,
+            posY,
+            posZ,
+            orientation: 'horizontal',
+            shapeType: 'circle',
+            radius: R,
+            diameter
+          });
 
-        // Switch to Push/Pull for immediate height extrude
-        this.setActiveTool('push_pull');
+          // Switch to Push/Pull for immediate height extrude
+          this.setActiveTool('push_pull');
+        });
       }
 
       this.isDrawingCircle.set(false);
@@ -6337,21 +6703,23 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
           y: Math.round((p.y - centerZ) * 10) / 10
         }));
 
-        this.partCreated.emit({
-          name: `Pieza Libre ${this.parts().length + 1}`,
-          length,
-          width,
-          thickness: 15,
-          posX: centerX,
-          posY,
-          posZ: centerZ,
-          orientation: 'horizontal',
-          shapeType: 'freehand',
-          contourPoints: localContour
-        });
+        this.ngZone.run(() => {
+          this.partCreated.emit({
+            name: `Pieza Libre ${this.parts().length + 1}`,
+            length,
+            width,
+            thickness: 15,
+            posX: centerX,
+            posY,
+            posZ: centerZ,
+            orientation: 'horizontal',
+            shapeType: 'freehand',
+            contourPoints: localContour
+          });
 
-        // Switch to Push/Pull for immediate height extrude
-        this.setActiveTool('push_pull');
+          // Switch to Push/Pull for immediate height extrude
+          this.setActiveTool('push_pull');
+        });
       }
 
       this.isDrawingFreehand.set(false);
@@ -6399,6 +6767,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     }
 
     if (this.isPushPulling) {
+      this.commitLiveDragUpdates();
       this.isPushPulling = false;
       this.pushPullData = null;
       this.controls.enabled = true;
@@ -6409,6 +6778,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     }
 
     if (this.isDirectPieceDrag) {
+      this.commitLiveDragUpdates();
       this.isDirectPieceDrag = false;
       this.directPieceDragThresholdPassed = false;
       this.dragInitialPart = null;
@@ -6432,6 +6802,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     }
 
     if (this.isDragging) {
+      this.commitLiveDragUpdates();
       this.isDragging = false;
       this.activeGizmoHit = null;
       this.dragInitialPart = null;
@@ -6444,13 +6815,14 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     }
 
     if (this.isReferenceGuideDragging) {
-   this.isReferenceGuideDragging = false;
-   this.controls.enabled = true;
-   const canvas = this.canvasRef()?.nativeElement;
-   if (canvas) canvas.style.cursor = 'default';
- }
+      this.isReferenceGuideDragging = false;
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+    }
 
     if (this.isApplianceDragging) {
+      this.commitLiveDragUpdates();
       this.isApplianceDragging = false;
       this.draggingAppliance = null;
       this.controls.enabled = true;
@@ -6523,6 +6895,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     if (canvas) {
       canvas.style.cursor = (tool === 'draw_rect' || tool === 'draw_circle' || tool === 'draw_freehand') ? 'crosshair' : 'default';
     }
+    this.requestRender(6);
   }
 
   private updatePushPullHover(e: PointerEvent) {
@@ -6535,7 +6908,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
     const intersects = this.raycaster.intersectObjects(
-      this.pieceObjects.map(p => p.mesh),
+      this.raycastablePieceMeshes,
       false
     );
 
@@ -6666,12 +7039,13 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
 
     this.pushPullHighlightGroup.add(faceMesh);
     this.pushPullHighlightGroup.add(outline);
+    this.requestRender(4);
   }
 
   private clearPushPullHighlight() {
-    while (this.pushPullHighlightGroup.children.length > 0) {
-      const obj = this.pushPullHighlightGroup.children[0];
-      this.pushPullHighlightGroup.remove(obj);
+    if (this.pushPullHighlightGroup.children.length > 0) {
+      this.disposeGroup(this.pushPullHighlightGroup);
+      this.requestRender(4);
     }
   }
 
@@ -6710,12 +7084,13 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     mesh.add(wireframe);
 
     this.rectPreviewGroup.add(mesh);
+    this.requestRender(4);
   }
 
   private clearRectPreview() {
-    while (this.rectPreviewGroup.children.length > 0) {
-      const obj = this.rectPreviewGroup.children[0];
-      this.rectPreviewGroup.remove(obj);
+    if (this.rectPreviewGroup.children.length > 0) {
+      this.disposeGroup(this.rectPreviewGroup);
+      this.requestRender(4);
     }
   }
 
@@ -6755,12 +7130,13 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     mesh.add(radiusLine);
 
     this.circlePreviewGroup.add(mesh);
+    this.requestRender(4);
   }
 
   private clearCirclePreview() {
-    while (this.circlePreviewGroup.children.length > 0) {
-      const obj = this.circlePreviewGroup.children[0];
-      this.circlePreviewGroup.remove(obj);
+    if (this.circlePreviewGroup.children.length > 0) {
+      this.disposeGroup(this.circlePreviewGroup);
+      this.requestRender(4);
     }
   }
 
@@ -6782,12 +7158,13 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     const dotMesh = new THREE.Mesh(dotGeom, dotMat);
     dotMesh.position.copy(linePoints[0]);
     this.freehandPreviewGroup.add(dotMesh);
+    this.requestRender(4);
   }
 
   private clearFreehandPreview() {
-    while (this.freehandPreviewGroup.children.length > 0) {
-      const obj = this.freehandPreviewGroup.children[0];
-      this.freehandPreviewGroup.remove(obj);
+    if (this.freehandPreviewGroup.children.length > 0) {
+      this.disposeGroup(this.freehandPreviewGroup);
+      this.requestRender(4);
     }
   }
 
@@ -8978,13 +9355,23 @@ private applyMagneticSnapToPosition(
   private updateSingleWall(wallId: string, updates: Partial<RoomWallInstance>) {
     const config = this.roomConfig();
     const currentWalls = getResolvedRoomWalls(config);
+    const existing = currentWalls.find(w => w.id === wallId);
+    if (!existing) return;
+
+    const hasChanged = Object.entries(updates).some(
+      ([k, v]) => v !== undefined && (existing as unknown as Record<string, unknown>)[k] !== v
+    );
+    if (!hasChanged) return;
+
     const updatedWalls = currentWalls.map(w => {
       if (w.id === wallId) {
         return { ...w, ...updates };
       }
       return w;
     });
-    this.roomConfigModified.emit({ walls: updatedWalls });
+    this.ngZone.run(() => {
+      this.roomConfigModified.emit({ walls: updatedWalls });
+    });
   }
 
   private calculateWallToWallSnap(
@@ -10237,6 +10624,7 @@ private applyMagneticSnapToPosition(
     }
     this.camera.lookAt(target);
     this.controls.update();
+    this.requestRender(12);
   }
 
   togglePartOpen(partId: string) {
@@ -10303,6 +10691,7 @@ private applyMagneticSnapToPosition(
       const allOpen = allDoorsDrawers.every(p => (this.openTargetMap.get(p.part.id) || 0) > 0.5);
       this.isAllOpen.set(allOpen);
     }
+    this.requestRender(60);
   }
 
   toggleAllDoorsAndDrawers() {
@@ -10313,11 +10702,13 @@ private applyMagneticSnapToPosition(
         this.openTargetMap.set(p.part.id, next ? 1 : 0);
       }
     }
+    this.requestRender(60);
   }
 
   private clock = new THREE.Clock();
 
-private updateOpeningAnimations(delta = 0.016) {
+  private updateOpeningAnimations(delta = 0.016): boolean {
+    let anyAnimating = false;
     const lerpFactor = Math.min(1, delta * 9.5);
     for (const p of this.pieceObjects) {
       if (!p.isDoor && !p.isDrawer) continue;
@@ -10326,6 +10717,7 @@ private updateOpeningAnimations(delta = 0.016) {
       if (Math.abs(cur - tgt) > 0.001) {
         cur += (tgt - cur) * lerpFactor;
         this.openCurrentMap.set(p.part.id, cur);
+        anyAnimating = true;
       } else {
         cur = tgt;
         this.openCurrentMap.set(p.part.id, cur);
@@ -10356,6 +10748,7 @@ private updateOpeningAnimations(delta = 0.016) {
         }
       }
     }
+    return anyAnimating;
   }
 
   toggleOpenClose() {
@@ -10381,21 +10774,38 @@ private updateOpeningAnimations(delta = 0.016) {
 
     const width = container.clientWidth;
     const height = container.clientHeight;
+    if (width <= 0 || height <= 0) return;
 
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.requestRender(8);
   }
 
   private animate() {
     this.animationFrameId = requestAnimationFrame(() => this.animate());
-    const delta = Math.min(this.clock.getDelta(), 0.1);
-    this.updateOpeningAnimations(delta);
-    if (this.controls) {
-      this.controls.update();
+
+    // Pausar renderizado WebGL si la pestaña del navegador está en segundo plano
+    if (typeof document !== 'undefined' && document.hidden) {
+      return;
     }
-    if (this.renderer && this.scene && this.camera) {
-      this.renderer.render(this.scene, this.camera);
+
+    const container = this.containerRef()?.nativeElement;
+    if (!container || container.clientWidth <= 0 || container.clientHeight <= 0) {
+      return;
+    }
+
+    const delta = Math.min(this.clock.getDelta(), 0.1);
+    const isAnimatingOpenings = this.updateOpeningAnimations(delta);
+    const controlsChanged = this.controls ? this.controls.update() : false;
+
+    if (isAnimatingOpenings || controlsChanged || this.renderFramesRemaining > 0) {
+      if (this.renderFramesRemaining > 0) {
+        this.renderFramesRemaining--;
+      }
+      if (this.renderer && this.scene && this.camera) {
+        this.renderer.render(this.scene, this.camera);
+      }
     }
   }
 
@@ -10410,6 +10820,7 @@ private updateOpeningAnimations(delta = 0.016) {
       this.roomGroup.visible = false;
       if (this.floorMesh) this.floorMesh.visible = true;
       if (this.gridHelper) this.gridHelper.visible = true;
+      this.requestRender(4);
       return;
     }
 
@@ -10417,19 +10828,8 @@ private updateOpeningAnimations(delta = 0.016) {
     if (this.floorMesh) this.floorMesh.visible = false;
     if (this.gridHelper) this.gridHelper.visible = false;
 
-    // Limpiar geometrías y mallas anteriores del entorno
-    while (this.roomGroup.children.length > 0) {
-      const child = this.roomGroup.children[0] as THREE.Mesh;
-      this.roomGroup.remove(child);
-      if (child.geometry) child.geometry.dispose();
-      if (child.material) {
-        if (Array.isArray(child.material)) {
-          child.material.forEach(m => m.dispose());
-        } else {
-          child.material.dispose();
-        }
-      }
-    }
+    // Limpiar recursivamente geometrías y mallas anteriores del entorno (incluyendo zócalos hijos)
+    this.disposeGroup(this.roomGroup);
 
     const {
       floorWidth,
@@ -10514,6 +10914,7 @@ private updateOpeningAnimations(delta = 0.016) {
         wallMesh.add(backSkirting);
       }
     }
+    this.requestRender(8);
   }
 
   frameRoomView() {
@@ -10547,6 +10948,7 @@ private updateOpeningAnimations(delta = 0.016) {
       this.controls.target.lerpVectors(startTarget, targetCenter, ease);
       this.camera.position.lerpVectors(startCamPos, targetCamPos, ease);
       this.controls.update();
+      this.requestRender(4);
 
       if (progress < 1) {
         requestAnimationFrame(animateTransition);
@@ -10563,25 +10965,19 @@ private updateOpeningAnimations(delta = 0.016) {
     config: RoomConfiguration,
     mode: WorkspaceMode
   ) {
-    // Clear previous wall gizmos
-    while (this.wallGizmoGroup.children.length > 0) {
-      const child = this.wallGizmoGroup.children[0] as THREE.Mesh;
-      this.wallGizmoGroup.remove(child);
-      if (child.geometry) child.geometry.dispose();
-      if (child.material) {
-        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-        else child.material.dispose();
-      }
-    }
+    // Clear previous wall gizmos recursively
+    this.disposeGroup(this.wallGizmoGroup);
     this.wallGizmoHitMeshes = [];
 
     if (mode !== 'room' || !wallType) {
+      this.requestRender(4);
       return;
     }
 
     const walls = getResolvedRoomWalls(config);
     const wall = walls.find(w => w.id === wallType);
     if (!wall || wall.isHidden || config.hiddenWalls?.[wallType]) {
+      this.requestRender(4);
       return;
     }
 
@@ -10593,6 +10989,7 @@ private updateOpeningAnimations(delta = 0.016) {
     // 1. Highlight Outline Mesh around selected wall (Sky Blue)
     const outlineGeo = new THREE.BoxGeometry(wall.length + 8, wall.height + 8, wall.thickness + 8);
     const edgesGeo = new THREE.EdgesGeometry(outlineGeo);
+    outlineGeo.dispose();
     const lineMat = new THREE.LineBasicMaterial({
       color: 0x38bdf8,
       linewidth: 3,
@@ -10607,6 +11004,7 @@ private updateOpeningAnimations(delta = 0.016) {
     // Si el muro está congelado / fijo, bloqueamos sus controles interactivos y mostramos únicamente el outline
     const isWallLocked = !!config.isWallsLocked || !!wall.isLocked || !!config.lockedWalls?.[wallType];
     if (isWallLocked) {
+      this.requestRender(4);
       return;
     }
 
@@ -10743,6 +11141,7 @@ private updateOpeningAnimations(delta = 0.016) {
     topHandleMesh.renderOrder = 999;
     this.wallGizmoGroup.add(topHandleMesh);
     this.wallGizmoHitMeshes.push(topHandleMesh);
+    this.requestRender(8);
   }
 
   // ==========================================
@@ -10752,36 +11151,17 @@ private updateOpeningAnimations(delta = 0.016) {
   private updateAppliancesScene(appls: ApplianceItem[], selectedId: string | null) {
     if (!this.scene) return;
 
-    // 1. Limpiar mallas de electrodomésticos anteriores
-    while (this.appliancesGroup.children.length > 0) {
-      const child = this.appliancesGroup.children[0];
-      this.appliancesGroup.remove(child);
-      child.traverse(c => {
-        if (c instanceof THREE.Mesh) {
-          if (c.geometry) c.geometry.dispose();
-          if (c.material) {
-            if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
-            else c.material.dispose();
-          }
-        }
-      });
-    }
-
-    // 2. Limpiar gizmos y cajas de selección de electrodomésticos
-    while (this.applianceGizmoGroup.children.length > 0) {
-      const child = this.applianceGizmoGroup.children[0];
-      this.applianceGizmoGroup.remove(child);
-      child.traverse(c => {
-        if (c instanceof THREE.Mesh || c instanceof THREE.LineSegments) {
-          if (c.geometry) c.geometry.dispose();
-        }
-      });
-    }
+    // 1. Limpiar mallas de electrodomésticos anteriores y sus gizmos
+    this.disposeGroup(this.appliancesGroup);
+    this.disposeGroup(this.applianceGizmoGroup);
     this.applianceHandleHitMeshes = [];
     const showAppls = this.layerVisibility().showAppliances;
     this.appliancesGroup.visible = showAppls;
     this.applianceGizmoGroup.visible = showAppls;
-    if (!showAppls) return;
+    if (!showAppls) {
+      this.requestRender(4);
+      return;
+    }
 
     // 3. Reconstruir cada electrodoméstico
     for (const app of appls) {
@@ -10797,6 +11177,7 @@ private updateOpeningAnimations(delta = 0.016) {
             : app.position.y;
       appGroup.position.set(app.position.x, visualBaseY, app.position.z);
       appGroup.rotation.y = THREE.MathUtils.degToRad(app.rotation || 0);
+      appGroup.userData = { ...(appGroup.userData || {}), appliance: app };
       this.appliancesGroup.add(appGroup);
 
       // Si es el electrodoméstico seleccionado (individual o en multiselección), dibujar contorno técnico, aro de suelo y tiradores 3D
@@ -10807,6 +11188,7 @@ private updateOpeningAnimations(delta = 0.016) {
         // Marco de alambre técnico azul cobalto
         const boxGeo = new THREE.BoxGeometry(app.width + 6, app.height + 6, app.depth + 6);
         const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+        boxGeo.dispose();
         const lineMat = new THREE.LineBasicMaterial({
           color: 0x0284c7, // sky-600
           linewidth: 2,
@@ -10923,6 +11305,7 @@ private updateOpeningAnimations(delta = 0.016) {
         addHandle('z', -1, 0, halfH, -halfD - 18, 0x0284c7);
       }
     }
+    this.requestRender(8);
   }
 
   /**
@@ -10972,31 +11355,37 @@ private updateOpeningAnimations(delta = 0.016) {
   }
 
   /**
-   * Libera recursivamente las geometrías y materiales de un grupo de Three.js en la GPU (VRAM).
+   * Libera recursivamente las geometrías y materiales de un grupo de Three.js en la GPU (VRAM),
+   * preservando aquellos marcados como compartidos en caché (userData.isShared).
    */
   private disposeGroup(group: THREE.Group) {
+    if (!group) return;
     while (group.children.length > 0) {
       const child = group.children[0];
       group.remove(child);
       child.traverse(obj => {
         if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
-          if (obj.geometry) {
+          if (obj.geometry && !obj.geometry.userData?.['isShared']) {
             obj.geometry.dispose();
           }
           if (obj.material) {
             if (Array.isArray(obj.material)) {
               for (const m of obj.material) {
-                m.dispose();
+                if (m && !m.userData?.['isShared']) {
+                  m.dispose();
+                }
               }
-            } else {
+            } else if (!obj.material.userData?.['isShared']) {
               obj.material.dispose();
             }
           }
         } else if (obj instanceof THREE.Sprite) {
-          if (obj.material.map) {
+          if (obj.material.map && !obj.material.map.userData?.['isShared']) {
             obj.material.map.dispose();
           }
-          obj.material.dispose();
+          if (!obj.material.userData?.['isShared']) {
+            obj.material.dispose();
+          }
         }
       });
     }
@@ -11025,6 +11414,9 @@ private updateOpeningAnimations(delta = 0.016) {
       window.removeEventListener('pointerup', this.boundPointerUp);
       window.removeEventListener('pointercancel', this.boundPointerUp);
     }
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.boundVisibilityChange);
+    }
 
     this.disposeGroup(this.furnitureGroup);
     this.disposeGroup(this.dimensionGroup);
@@ -11034,10 +11426,26 @@ private updateOpeningAnimations(delta = 0.016) {
     this.disposeGroup(this.wallGizmoGroup);
     this.disposeGroup(this.appliancesGroup);
     this.disposeGroup(this.applianceGizmoGroup);
+    this.disposeGroup(this.measureGroup);
+    this.disposeGroup(this.magneticSnapGroup);
+    this.disposeGroup(this.pushPullHighlightGroup);
+    this.disposeGroup(this.rectPreviewGroup);
+    this.disposeGroup(this.circlePreviewGroup);
+    this.disposeGroup(this.freehandPreviewGroup);
 
     this.clearWallSnapGuides();
     this.clearLegSnapGuides();
     this.clearPartSnapGuides();
+
+    for (const geo of this.geometryPool.values()) {
+      geo.dispose();
+    }
+    this.geometryPool.clear();
+
+    for (const mat of this.materialCache.values()) {
+      mat.dispose();
+    }
+    this.materialCache.clear();
 
     for (const tex of this.textureCache.values()) {
       tex.dispose();
