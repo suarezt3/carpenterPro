@@ -1037,6 +1037,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       window.addEventListener('pointerup', this.boundPointerUp);
       window.addEventListener('pointercancel', this.boundPointerUp);
       if (typeof document !== 'undefined') {
+        this.timer.connect(document);
         document.addEventListener('visibilitychange', this.boundVisibilityChange);
       }
     });
@@ -10793,7 +10794,7 @@ private applyMagneticSnapToPosition(
     this.requestRender(60);
   }
 
-  private clock = new THREE.Clock();
+  private timer = new THREE.Timer();
 
   private updateOpeningAnimations(delta = 0.016): boolean {
     let anyAnimating = false;
@@ -10871,8 +10872,8 @@ private applyMagneticSnapToPosition(
     this.requestRender(8);
   }
 
-  private animate() {
-    this.animationFrameId = requestAnimationFrame(() => this.animate());
+  private animate(timestamp?: number) {
+    this.animationFrameId = requestAnimationFrame((ts) => this.animate(ts));
 
     // Pausar renderizado WebGL si la pestaña del navegador está en segundo plano
     if (typeof document !== 'undefined' && document.hidden) {
@@ -10884,7 +10885,8 @@ private applyMagneticSnapToPosition(
       return;
     }
 
-    const delta = Math.min(this.clock.getDelta(), 0.1);
+    this.timer.update(timestamp);
+    const delta = Math.min(this.timer.getDelta(), 0.1);
     const isAnimatingOpenings = this.updateOpeningAnimations(delta);
     const controlsChanged = this.controls ? this.controls.update() : false;
 
@@ -11547,5 +11549,6 @@ private applyMagneticSnapToPosition(
     if (this.renderer) {
       this.renderer.dispose();
     }
+    this.timer.dispose();
   }
 }
