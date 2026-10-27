@@ -503,10 +503,20 @@ export class ModuleDesignerComponent {
   readonly groupsWithParts = computed(() => {
     const grps = this.groups();
     const parts = this.currentParts();
+    const partsByGroup = new Map<string, Part[]>();
+    for (const p of parts) {
+      if (!p.groupId) continue;
+      let list = partsByGroup.get(p.groupId);
+      if (!list) {
+        list = [];
+        partsByGroup.set(p.groupId, list);
+      }
+      list.push(p);
+    }
     return grps
       .map(g => ({
         group: g,
-        parts: parts.filter(p => p.groupId === g.id)
+        parts: partsByGroup.get(g.id) || []
       }))
       .filter(item => item.parts.length > 0);
   });
@@ -521,10 +531,12 @@ export class ModuleDesignerComponent {
   readonly selectedGroupIds = computed<string[]>(() => {
     const ids = this.selectedPartIds();
     if (ids.length === 0) return [];
-    const parts = this.currentParts().filter(p => ids.includes(p.id));
+    const idSet = new Set(ids);
     const gIds = new Set<string>();
-    for (const p of parts) {
-      if (p.groupId) gIds.add(p.groupId);
+    for (const p of this.currentParts()) {
+      if (p.groupId && idSet.has(p.id)) {
+        gIds.add(p.groupId);
+      }
     }
     return Array.from(gIds);
   });

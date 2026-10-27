@@ -1268,28 +1268,36 @@
 }
 
 <!-- MODAL: PLANO TÉCNICO 2D DE FABRICACIÓN (TALLER) -->
-@if (showTechnicalSheetModal()) {
-  <app-technical-sheet-modal
-    [project]="project()"
-    (modalClose)="closeTechnicalSheet()">
-  </app-technical-sheet-modal>
+@defer (when showTechnicalSheetModal()) {
+  @if (showTechnicalSheetModal()) {
+    <app-technical-sheet-modal
+      [project]="project()"
+      (modalClose)="closeTechnicalSheet()">
+    </app-technical-sheet-modal>
+  }
 }
 
 <!-- MODAL: DOCUMENTACIÓN Y MANUAL DE HERRAMIENTAS -->
-<app-documentation-modal
-  [isOpen]="showDocumentationModal()"
-  (modalClose)="closeDocumentationModal()"
-  (openChangelog)="openChangelogModal()">
-</app-documentation-modal>
+@defer (when showDocumentationModal()) {
+  <app-documentation-modal
+    [isOpen]="showDocumentationModal()"
+    (modalClose)="closeDocumentationModal()"
+    (openChangelog)="openChangelogModal()">
+  </app-documentation-modal>
+}
 
 <!-- MODAL: NOTAS Y PENDIENTES DEL PROYECTO -->
-<app-project-notes-modal
-  [isOpen]="showNotesModal()"
-  (modalClose)="showNotesModal.set(false)">
-</app-project-notes-modal>
+@defer (when showNotesModal()) {
+  <app-project-notes-modal
+    [isOpen]="showNotesModal()"
+    (modalClose)="showNotesModal.set(false)">
+  </app-project-notes-modal>
+}
 
 <!-- MODAL: NOVEDADES (CHANGELOG) Y HOJA DE RUTA (ROADMAP) -->
-<app-changelog-modal
-  [isOpen]="showChangelogModal()"
-  (modalClose)="closeChangelogModal()">
-</app-changelog-modal>
+@defer (when showChangelogModal()) {
+  <app-changelog-modal
+    [isOpen]="showChangelogModal()"
+    (modalClose)="closeChangelogModal()">
+  </app-changelog-modal>
+}

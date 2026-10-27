@@ -90,6 +90,8 @@ export class ProjectStorageService {
   private cutOptimizer = inject(CutOptimizerService);
   readonly supabase = inject(SupabaseService);
   private autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
+  private localSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pendingStorageProject: Project | null = null;
 
   // Pilas de historial Undo / Redo (almacenan snapshots profundos del proyecto activo)
   private undoStack: Project[] = [];
@@ -327,8 +329,14 @@ export class ProjectStorageService {
   }
 
   constructor() {
-    if (this.isBrowser() && !localStorage.getItem(STORAGE_KEY)) {
-      this.saveToStorage(this.currentProject());
+    if (this.isBrowser()) {
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        this.saveToStorage(this.currentProject(), true);
+      }
+      // Garantizar volcado inmediato a localStorage si el usuario cierra o recarga la pestaña dentro de la ventana de debounce
+      const flushHandler = () => this.flushPendingStorageSave();
+      window.addEventListener('beforeunload', flushHandler);
+      window.addEventListener('pagehide', flushHandler);
     }
   }
 
@@ -817,9 +825,20 @@ export class ProjectStorageService {
   // HISTORIAL DE CAMBIOS (UNDO / REDO)
   // ==========================================
 
+  private cloneProjectSnapshot(proj: Project): Project {
+    if (typeof structuredClone === 'function') {
+      try {
+        return structuredClone(proj);
+      } catch {
+        // Fallback a JSON si algún objeto no es clonable directamente
+      }
+    }
+    return JSON.parse(JSON.stringify(proj));
+  }
+
   pushSnapshot() {
     try {
-      const snap = JSON.parse(JSON.stringify(this.currentProject()));
+      const snap = this.cloneProjectSnapshot(this.currentProject());
       this.undoStack.push(snap);
       if (this.undoStack.length > 35) {
         this.undoStack.shift();
@@ -842,7 +861,7 @@ export class ProjectStorageService {
   undo() {
     if (this.undoStack.length === 0) return;
     try {
-      const currentSnap = JSON.parse(JSON.stringify(this.currentProject()));
+      const currentSnap = this.cloneProjectSnapshot(this.currentProject());
       this.redoStack.push(currentSnap);
       const prev = this.undoStack.pop()!;
       this.currentProject.set(prev);
@@ -857,7 +876,7 @@ export class ProjectStorageService {
   redo() {
     if (this.redoStack.length === 0) return;
     try {
-      const currentSnap = JSON.parse(JSON.stringify(this.currentProject()));
+      const currentSnap = this.cloneProjectSnapshot(this.currentProject());
       this.undoStack.push(currentSnap);
       const next = this.redoStack.pop()!;
       this.currentProject.set(next);
@@ -893,12 +912,12 @@ export class ProjectStorageService {
     }));
   }
 
-  saveToStorage(project: Project) {
+  saveToStorage(project: Project, immediate = false) {
     if (!this.isBrowser()) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
 
-    const list = this.loadSavedProjectsList();
-    const existingIndex = list.findIndex(p => p.id === project.id);
+    // 1. Actualizar metadatos en memoria reactiva inmediatamente (sin parsear localStorage en cada cambio)
+    const currentList = [...this.savedProjects()];
+    const existingIndex = currentList.findIndex(p => p.id === project.id);
     const meta: ProjectMeta = {
       id: project.id,
       name: project.name,
@@ -909,20 +928,55 @@ export class ProjectStorageService {
     };
 
     if (existingIndex >= 0) {
-      list[existingIndex] = meta;
+      currentList[existingIndex] = meta;
     } else {
-      list.unshift(meta);
+      currentList.unshift(meta);
+    }
+    this.savedProjects.set(currentList);
+
+    // 2. Diferir la serialización pesada JSON.stringify a localStorage con debounce de 280ms
+    this.pendingStorageProject = project;
+    if (this.localSaveTimeout) {
+      clearTimeout(this.localSaveTimeout);
+      this.localSaveTimeout = null;
     }
 
-    localStorage.setItem(PROJECTS_LIST_KEY, JSON.stringify(list));
-    localStorage.setItem(`melamipro_project_${project.id}`, JSON.stringify(project));
-    this.savedProjects.set(list);
+    if (immediate) {
+      this.flushPendingStorageSave();
+    } else {
+      this.localSaveTimeout = setTimeout(() => {
+        this.localSaveTimeout = null;
+        this.flushPendingStorageSave();
+      }, 280);
+    }
 
     if (this.autoSyncEnabled()) {
       this.scheduleCloudAutoSync(project);
     } else if (this.autoSyncTimeout) {
       clearTimeout(this.autoSyncTimeout);
       this.autoSyncTimeout = null;
+    }
+  }
+
+  /**
+   * Vuelca inmediatamente cualquier cambio pendiente hacia localStorage,
+   * serializando el proyecto una única vez.
+   */
+  flushPendingStorageSave() {
+    if (!this.isBrowser() || !this.pendingStorageProject) return;
+    const project = this.pendingStorageProject;
+    this.pendingStorageProject = null;
+    if (this.localSaveTimeout) {
+      clearTimeout(this.localSaveTimeout);
+      this.localSaveTimeout = null;
+    }
+    try {
+      const serializedProject = JSON.stringify(project);
+      localStorage.setItem(STORAGE_KEY, serializedProject);
+      localStorage.setItem(`melamipro_project_${project.id}`, serializedProject);
+      localStorage.setItem(PROJECTS_LIST_KEY, JSON.stringify(this.savedProjects()));
+    } catch (e) {
+      console.error('Error writing project to localStorage', e);
     }
   }
 
@@ -977,6 +1031,7 @@ export class ProjectStorageService {
 
   loadProjectById(id: string) {
     if (!this.isBrowser()) return;
+    this.flushPendingStorageSave();
     const raw = localStorage.getItem(`melamipro_project_${id}`);
     if (raw) {
       try {

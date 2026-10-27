@@ -152,8 +152,9 @@
         </app-furniture-3d-viewer>
 
         <!-- PANEL FLOTANTE MAESTRO "COCINA PRO / CLICK-CUISINE 2" (REDISEÑADO CON INTERFAZ CAD CORPORATIVA) -->
-        @if (showKitchenProPanel()) {
-          <div class="absolute top-12 left-3 z-40 w-85 sm:w-96 bg-zinc-900/95 text-zinc-100 backdrop-blur-md border border-zinc-700/80 rounded-lg shadow-2xl overflow-hidden pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-150">
+        @defer (when showKitchenProPanel()) {
+          @if (showKitchenProPanel()) {
+            <div class="absolute top-12 left-3 z-40 w-85 sm:w-96 bg-zinc-900/95 text-zinc-100 backdrop-blur-md border border-zinc-700/80 rounded-lg shadow-2xl overflow-hidden pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-150">
             <!-- Cabecera del Panel Maestro -->
             <div class="px-3.5 py-2.5 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between">
               <div class="flex items-center gap-2">
@@ -542,7 +543,8 @@
                 </div>
               </div>
             }
-          </div>
+            </div>
+          }
         }
 
 <!-- BARRA FLOTANTE DE ACCIONES SUPERIOR (Grupo, Multiselección o Pieza Individual) -->
@@ -5068,8 +5070,9 @@
 </div>
 
 <!-- MODAL: ASISTENTE DE CAJÓN MODULAR -->
-@if (showDrawerWizard()) {
-  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+@defer (when showDrawerWizard()) {
+  @if (showDrawerWizard()) {
+    <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-8">
 
       <!-- Cabecera -->
@@ -5304,6 +5307,7 @@
 
     </div>
   </div>
+  }
 }
 
 <!-- MODAL: AGRUPAR PIEZAS SELECCIONADAS -->
@@ -5384,16 +5388,19 @@
 }
 
 <!-- MODAL: PLANO TÉCNICO 2D DE FABRICACIÓN (TALLER) -->
-@if (showTechnicalSheetModal()) {
-  <app-technical-sheet-modal
-    [project]="project()"
-    (modalClose)="closeTechnicalSheet()">
-  </app-technical-sheet-modal>
+@defer (when showTechnicalSheetModal()) {
+  @if (showTechnicalSheetModal()) {
+    <app-technical-sheet-modal
+      [project]="project()"
+      (modalClose)="closeTechnicalSheet()">
+    </app-technical-sheet-modal>
+  }
 }
 
 <!-- MODAL: CONFIGURACIÓN DE HABITACIÓN 3D Y TEXTURAS ARQUITECTÓNICAS -->
-@if (showRoomSettingsModal()) {
-  <div class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+@defer (when showRoomSettingsModal()) {
+  @if (showRoomSettingsModal()) {
+    <div class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
     <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl sm:max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
 
       <!-- Cabecera -->
@@ -5968,6 +5975,7 @@
 
     </div>
   </div>
+  }
 }
 
 <!-- NOTIFICACIÓN FLOTANTE TOAST -->
@@ -5979,24 +5987,28 @@
 }
 
 <!-- MODAL: CATÁLOGO DE PLANTILLAS MULTI-CATEGORÍA -->
-<app-templates-modal
-  [isOpen]="showTemplatesModal()"
-  [materials]="materials()"
-  [editingGroupId]="editingGroupId()"
-  [editingConfig]="editingGroupConfig()"
-  (modalClose)="closeTemplatesModal()"
-  (cabinetCreated)="onCabinetCreated($event)"
-  (cabinetUpdated)="onCabinetUpdated($event)"
-  (templateSelected)="onTemplateSelected($event)"
-  (configureParametricRequested)="onConfigureParametric($event)"
-  (startBlankRequested)="startBlank()">
-</app-templates-modal>
+@defer (when showTemplatesModal()) {
+  <app-templates-modal
+    [isOpen]="showTemplatesModal()"
+    [materials]="materials()"
+    [editingGroupId]="editingGroupId()"
+    [editingConfig]="editingGroupConfig()"
+    (modalClose)="closeTemplatesModal()"
+    (cabinetCreated)="onCabinetCreated($event)"
+    (cabinetUpdated)="onCabinetUpdated($event)"
+    (templateSelected)="onTemplateSelected($event)"
+    (configureParametricRequested)="onConfigureParametric($event)"
+    (startBlankRequested)="startBlank()">
+  </app-templates-modal>
+}
 
 <!-- MODAL: OPCIONES DE COMPONENTE PARAMÉTRICO -->
-<app-component-options-modal
-  [isOpen]="showComponentOptionsModal()"
-  [materials]="materials()"
-  [initialConfig]="selectedParametricConfig()"
-  (modalClose)="showComponentOptionsModal.set(false)"
-  (cabinetSubmitted)="onCabinetSubmitted($event)">
-</app-component-options-modal>
+@defer (when showComponentOptionsModal()) {
+  <app-component-options-modal
+    [isOpen]="showComponentOptionsModal()"
+    [materials]="materials()"
+    [initialConfig]="selectedParametricConfig()"
+    (modalClose)="showComponentOptionsModal.set(false)"
+    (cabinetSubmitted)="onCabinetSubmitted($event)">
+  </app-component-options-modal>
+}

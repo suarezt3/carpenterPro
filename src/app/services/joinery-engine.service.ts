@@ -27,6 +27,12 @@ export interface JoineryAnalysis {
   providedIn: 'root'
 })
 export class JoineryEngineService {
+  // Caché en memoria WeakMap para evitar recalcular trigonometría Euler y AABB en piezas inmutadas
+  private readonly boundsCache = new WeakMap<Part, { sig: string; bounds: Part3DBounds }>();
+
+  // Caché reactiva de firma geométrica para retornar instantáneamente O(1) cuando solo cambian colores, cantos o capas
+  private lastJoinerySignature = '';
+  private lastJoineryResult: JoineryAnalysis | null = null;
 
   /**
    * Calcula las dimensiones locales (sx, sy, sz) antes de aplicar rotaciones Euler (rotationX/Y/Z).
@@ -99,6 +105,12 @@ export class JoineryEngineService {
    * Es la única fuente de verdad compartida entre el motor de uniones, el almacenamiento y el visor 3D.
    */
   getPartBounds(part: Part): Part3DBounds {
+    const geomSig = `${part.length}|${part.width}|${part.thickness ?? 15}|${part.posX ?? 0}|${part.posY ?? ''}|${part.posZ ?? 0}|${part.orientation || 'h'}|${part.rotationX || 0}|${part.rotationY || 0}|${part.rotationZ || 0}|${part.componentRole || ''}|${part.name}`;
+    const cached = this.boundsCache.get(part);
+    if (cached && cached.sig === geomSig) {
+      return cached.bounds;
+    }
+
     let { sx, sy, sz } = this.getPartLocalDimensions(part);
 
     const rx = ((part.rotationX || 0) * Math.PI) / 180;
@@ -134,7 +146,7 @@ export class JoineryEngineService {
     const py = part.posY ?? (sy / 2);
     const pz = part.posZ ?? 0;
 
-    return {
+    const bounds: Part3DBounds = {
       part,
       minX: px - sx / 2,
       maxX: px + sx / 2,
@@ -149,6 +161,8 @@ export class JoineryEngineService {
       py,
       pz
     };
+    this.boundsCache.set(part, { sig: geomSig, bounds });
+    return bounds;
   }
 
   /**
@@ -195,18 +209,35 @@ export class JoineryEngineService {
     return dz >= 0 ? 'front' : 'back';
   }
 
-  // --- COLLISION DETECTION ENGINE ---
+  // --- COLLISION DETECTION ENGINE (Sweep-and-Prune Spatial AABB Optimization) ---
   detectCollisions(parts: Part[]): CollisionRecord[] {
-    const collisions: CollisionRecord[] = [];
-    if (!parts || parts.length < 2) return collisions;
-
+    if (!parts || parts.length < 2) return [];
     const boundsList = parts.map(p => this.getPartBounds(p));
-    const tolerance = 0.8; // mm tolerance to ignore ideal flush contacts
+    return this.detectCollisionsFromBounds(boundsList);
+  }
 
-    for (let i = 0; i < boundsList.length; i++) {
-      for (let j = i + 1; j < boundsList.length; j++) {
-        const b1 = boundsList[i];
-        const b2 = boundsList[j];
+  private detectCollisionsFromBounds(boundsList: Part3DBounds[]): CollisionRecord[] {
+    const collisions: CollisionRecord[] = [];
+    if (boundsList.length < 2) return collisions;
+
+    const tolerance = 0.8; // mm tolerance to ignore ideal flush contacts
+    // Ordenar copias de referencias por minX para poda espacial Sweep-and-Prune O(N log N)
+    const sorted = [...boundsList].sort((a, b) => a.minX - b.minX);
+
+    for (let i = 0; i < sorted.length; i++) {
+      const b1 = sorted[i];
+      const maxXLimit = b1.maxX - tolerance;
+
+      for (let j = i + 1; j < sorted.length; j++) {
+        const b2 = sorted[j];
+        // Poda espacial temprana en eje X: ninguna pieza siguiente puede solaparse con b1
+        if (b2.minX >= maxXLimit) {
+          break;
+        }
+
+        // Filtro rápido AABB en ejes Y y Z antes de evaluar cadenas de texto o roles
+        if (b2.minY >= b1.maxY - tolerance || b1.minY >= b2.maxY - tolerance) continue;
+        if (b2.minZ >= b1.maxZ - tolerance || b1.minZ >= b2.maxZ - tolerance) continue;
 
         const overlapX = Math.min(b1.maxX, b2.maxX) - Math.max(b1.minX, b2.minX);
         const overlapY = Math.min(b1.maxY, b2.maxY) - Math.max(b1.minY, b2.minY);
@@ -273,6 +304,25 @@ export class JoineryEngineService {
 
   // --- JOINERY & PARAMETRIC DRILLING ENGINE ---
   calculateJoinery(parts: Part[]): JoineryAnalysis {
+    if (!parts || parts.length === 0) {
+      return {
+        drillHolesByPart: new Map<string, DrillHole[]>(),
+        allDrillHoles: [],
+        collisions: []
+      };
+    }
+
+    // Construir firma geométrica rápida O(N): si solo cambiaron materiales, colores, cantos o capas, retornar en O(1)
+    let signature = '';
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      signature += `${p.id}:${p.name}:${p.length}x${p.width}x${p.thickness ?? 15}@${p.posX ?? 0},${p.posY ?? ''},${p.posZ ?? 0}:${p.orientation || 'h'}:${p.rotationX || 0},${p.rotationY || 0},${p.rotationZ || 0}:${p.componentRole || ''}:${p.groupId || ''}:${p.moduleId || ''}:${p.excludeFromCutlist ? 1 : 0}:${p.hardwareConfig?.openingDirection || ''}:${p.hardwareConfig?.movableType || ''};`;
+    }
+
+    if (this.lastJoineryResult && this.lastJoinerySignature === signature) {
+      return this.lastJoineryResult;
+    }
+
     const drillHolesByPart = new Map<string, DrillHole[]>();
     const allDrillHoles: DrillHole[] = [];
 
@@ -280,25 +330,22 @@ export class JoineryEngineService {
       drillHolesByPart.set(p.id, []);
     }
 
-    if (!parts || parts.length === 0) {
-      return { drillHolesByPart, allDrillHoles, collisions: [] };
-    }
-
     const boundsList = parts.map(p => this.getPartBounds(p));
-    const collisions = this.detectCollisions(parts);
+    const collisions = this.detectCollisionsFromBounds(boundsList);
 
     // 1. Compute Hinge Cup Drill Holes for Door Panels ONLY (Ø35mm)
     for (const b of boundsList) {
+      const upperName = b.part.name.toUpperCase();
       const isDrawer =
         b.part.componentRole === 'drawer_front' ||
-        b.part.name.toUpperCase().includes('CAJON') ||
-        b.part.name.toUpperCase().includes('CAJÓN') ||
-        b.part.name.toUpperCase().includes('GAVETA') ||
+        upperName.includes('CAJON') ||
+        upperName.includes('CAJÓN') ||
+        upperName.includes('GAVETA') ||
         b.part.id.includes('caj_ind_');
       const isDoor =
         !isDrawer &&
         (b.part.componentRole === 'door' ||
-          (b.part.name.toUpperCase().includes('PUERTA') && !b.part.name.toUpperCase().includes('CAJ')));
+          (upperName.includes('PUERTA') && !upperName.includes('CAJ')));
 
       if (isDoor && b.sy >= 250) {
         const holes = this.generateDoorHingeHoles(b, parts);
@@ -311,21 +358,22 @@ export class JoineryEngineService {
 
     // 2. Compute Technical System 32 Slide Drill Holes on Cabinet Side Panels
     for (const b of boundsList) {
+      const upperName = b.part.name.toUpperCase();
       const isInternalBox =
         b.part.componentRole === 'drawer_box' ||
-        b.part.name.toUpperCase().includes('LATERAL') ||
-        b.part.name.toUpperCase().includes('COSTADO') ||
-        b.part.name.toUpperCase().includes('TRASERA') ||
-        b.part.name.toUpperCase().includes('FONDO') ||
-        b.part.name.toUpperCase().includes('CONTRAFRENTE') ||
-        b.part.name.toUpperCase().includes('INTERIOR');
+        upperName.includes('LATERAL') ||
+        upperName.includes('COSTADO') ||
+        upperName.includes('TRASERA') ||
+        upperName.includes('FONDO') ||
+        upperName.includes('CONTRAFRENTE') ||
+        upperName.includes('INTERIOR');
       const isDrawerFront =
         !isInternalBox &&
         (b.part.componentRole === 'drawer_front' ||
           b.part.hardwareConfig?.movableType === 'drawer' ||
-          (b.part.name.toUpperCase().includes('FRENTE') &&
-            (b.part.name.toUpperCase().includes('CAJ') || b.part.name.toUpperCase().includes('GAVET'))) ||
-          ((b.part.name.toUpperCase().startsWith('CAJ') || b.part.name.toUpperCase().startsWith('GAVET')) &&
+          (upperName.includes('FRENTE') &&
+            (upperName.includes('CAJ') || upperName.includes('GAVET'))) ||
+          ((upperName.startsWith('CAJ') || upperName.startsWith('GAVET')) &&
             !isInternalBox));
 
       if (isDrawerFront) {
@@ -337,21 +385,62 @@ export class JoineryEngineService {
       }
     }
 
-    // 3. Compute 90° Butt Joints between contacting pieces
-    for (let i = 0; i < boundsList.length; i++) {
-      for (let j = i + 1; j < boundsList.length; j++) {
-        const b1 = boundsList[i];
-        const b2 = boundsList[j];
+    // 3. Compute 90° Butt Joints between contacting pieces using O(N) Pre-Filtering + Sweep-and-Prune AABB
+    const contactTolerance = 3.0;
+    const structuralBounds = boundsList
+      .filter(b => {
+        if ((b.part.thickness || 15) <= 8) return false;
+        const role = b.part.componentRole;
+        if (
+          role === 'door' ||
+          role === 'drawer_front' ||
+          role === 'back' ||
+          role === 'countertop' ||
+          role === 'backsplash' ||
+          b.part.excludeFromCutlist
+        ) {
+          return false;
+        }
+        const upperName = b.part.name.toUpperCase();
+        if (
+          upperName.includes('PUERTA') ||
+          upperName.includes('CAJON') ||
+          upperName.includes('CAJÓN') ||
+          upperName.includes('GAVETA') ||
+          upperName.includes('FRENTE')
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => a.minX - b.minX);
+
+    for (let i = 0; i < structuralBounds.length; i++) {
+      const b1 = structuralBounds[i];
+      const maxXReach = b1.maxX + contactTolerance;
+
+      for (let j = i + 1; j < structuralBounds.length; j++) {
+        const b2 = structuralBounds[j];
+        // Poda espacial Sweep-and-Prune en X: ninguna pieza posterior está a distancia de contacto con b1
+        if (b2.minX > maxXReach) {
+          break;
+        }
+        // Poda espacial rápida AABB en Y y Z antes de llamar a analyzeJointContact
+        if (b2.minY > b1.maxY + contactTolerance || b1.minY > b2.maxY + contactTolerance) continue;
+        if (b2.minZ > b1.maxZ + contactTolerance || b1.minZ > b2.maxZ + contactTolerance) continue;
 
         this.analyzeJointContact(b1, b2, drillHolesByPart, allDrillHoles);
       }
     }
 
-    return {
+    const result: JoineryAnalysis = {
       drillHolesByPart,
       allDrillHoles,
       collisions
     };
+    this.lastJoinerySignature = signature;
+    this.lastJoineryResult = result;
+    return result;
   }
 
   private generateSlideSystem32Holes(drawer: Part3DBounds, allBounds: Part3DBounds[], allParts: Part[]): DrillHole[] {

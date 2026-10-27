@@ -6,31 +6,20 @@
     (tabChanged)="onTabChanged($event)">
   </app-header>
 
-  <!-- Main Content Area -->
-  @if (activeTab() === 'modules') {
-    <main class="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
-      <app-module-designer class="h-full w-full flex flex-col min-h-0"></app-module-designer>
-    </main>
-  } @else {
-    <main class="flex-1 min-h-0 w-full overflow-y-auto scrollbar-thin">
-      <div class="min-h-full flex flex-col justify-between">
-        <div class="flex-1 w-full max-w-[1920px] 2xl:max-w-[2240px] mx-auto">
-          @switch (activeTab()) {
-            @case ('parts') {
-              <app-parts-list></app-parts-list>
-            }
-            @case ('optimizer') {
-              <app-cut-optimizer-view></app-cut-optimizer-view>
-            }
-            @case ('budget') {
-              <app-budget-view></app-budget-view>
-            }
-            @case ('labels') {
-              <app-labels-view></app-labels-view>
-            }
-          }
-        </div>
+  <!-- Main Content Area (Lazy Loaded via Angular Router) -->
+  <main [class]="activeTab() === 'modules'
+    ? 'flex-1 min-h-0 w-full flex flex-col overflow-hidden'
+    : 'flex-1 min-h-0 w-full overflow-y-auto scrollbar-thin'">
+    <div [class]="activeTab() === 'modules'
+      ? 'h-full w-full flex flex-col min-h-0 flex-1'
+      : 'min-h-full flex flex-col justify-between'">
+      <div [class]="activeTab() === 'modules'
+        ? 'h-full w-full flex flex-col min-h-0 flex-1'
+        : 'flex-1 w-full max-w-[1920px] 2xl:max-w-[2240px] mx-auto'">
+        <router-outlet></router-outlet>
+      </div>
 
+      @if (activeTab() !== 'modules') {
         <!-- Global Footer on Document / Report Pages -->
         <footer [class]="themeService.isClassic() ? 'bg-white border-t border-slate-200 py-2.5 lg:py-3.5 text-center text-xs text-slate-500 print:hidden mt-6 shrink-0' : 'bg-zinc-900/60 border-t border-zinc-800/80 py-2.5 lg:py-3.5 text-center text-xs text-zinc-500 print:hidden mt-6 shrink-0'">
           <div class="w-full max-w-[1920px] 2xl:max-w-[2240px] mx-auto px-3 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -48,9 +37,9 @@
             </div>
           </div>
         </footer>
-      </div>
-    </main>
-  }
+      }
+    </div>
+  </main>
 
   <!-- Global Confirm Dialog Modal -->
   <app-confirm-dialog></app-confirm-dialog>
