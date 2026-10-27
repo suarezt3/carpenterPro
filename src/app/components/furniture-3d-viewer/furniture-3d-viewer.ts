@@ -91,10 +91,25 @@ interface PieceMeshData {
 
 interface GizmoHitData {
   isGizmo: boolean;
-  type: 'axis' | 'handle';
+  type: 'axis' | 'handle' | 'corner_handle';
   axis?: 'x' | 'y' | 'z';
-  handleTarget?: 'length' | 'width';
+  handleTarget?: 'length' | 'width' | 'corner';
   dir: number;
+  dirW?: number;
+  lengthAxis?: 'x' | 'y' | 'z';
+  widthAxis?: 'x' | 'y' | 'z';
+  posAxisL?: 'posX' | 'posY' | 'posZ';
+  posAxisW?: 'posX' | 'posY' | 'posZ';
+  worldHitPos?: THREE.Vector3;
+  cursor?: string;
+}
+
+interface PartStretchAxesConfig {
+  lengthAxis: 'x' | 'y' | 'z';
+  lengthPosAxis: 'posX' | 'posY' | 'posZ';
+  widthAxis: 'x' | 'y' | 'z';
+  widthPosAxis: 'posX' | 'posY' | 'posZ';
+  thicknessAxis: 'x' | 'y' | 'z';
 }
 
 export interface ClearanceInfo {
@@ -290,6 +305,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private readonly boundPointerDown = (e: PointerEvent) => this.onPointerDown(e);
   private readonly boundPointerMove = (e: PointerEvent) => this.onPointerMove(e);
   private readonly boundPointerUp = (e: PointerEvent) => this.onPointerUp(e);
+  private readonly boundCanvasWheel = (e: WheelEvent) => this.onCanvasWheel(e);
   // Inputs
   parts = input<Part[]>([]);
   selectedPartId = input<string | null>(null);
@@ -770,6 +786,31 @@ export class Furniture3dViewerComponent implements OnDestroy {
   // Dragging State
   private isDragging = false;
   private activeGizmoHit: GizmoHitData | null = null;
+  private dynamicEdgeHandleMesh: THREE.Mesh | null = null;
+  private activeDynamicEdgeHit: GizmoHitData | null = null;
+
+  // Vectores y objetos pre-alojados en memoria (Zero-Allocation en bucles calientes wheel / pointermove / rAF)
+  private readonly scratchWheelMouse = new THREE.Vector2();
+  private readonly scratchWheelDelta = new THREE.Vector3();
+  private readonly scratchWheelCamForward = new THREE.Vector3();
+  private readonly scratchWheelPlane = new THREE.Plane();
+  private readonly scratchWheelPlaneHit = new THREE.Vector3();
+  private readonly scratchGizmoWorldPos = new THREE.Vector3();
+  private readonly scratchCurrentIntersection = new THREE.Vector3();
+  private readonly scratchDeltaWorld = new THREE.Vector3();
+  private readonly scratchSingleMovedDelta = new THREE.Vector3();
+  private readonly scratchCamForward = new THREE.Vector3();
+  private readonly scratchEdgeA = new THREE.Vector3();
+  private readonly scratchEdgeB = new THREE.Vector3();
+  private readonly scratchClippedA = new THREE.Vector3();
+  private readonly scratchClippedB = new THREE.Vector3();
+  private readonly scratchScreenA = new THREE.Vector3();
+  private readonly scratchScreenB = new THREE.Vector3();
+  private readonly scratchClosestWorld = new THREE.Vector3();
+  private readonly scratchBestHitWorld = new THREE.Vector3();
+  private readonly scratchSegDir = new THREE.Vector3();
+  private readonly scratchW0 = new THREE.Vector3();
+
   private isDirectPieceDrag = false;
   private directPieceDragThresholdPassed = false;
   private dragStartPointer = { x: 0, y: 0 };
@@ -937,8 +978,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene = new THREE.Scene();
     this.applyThemeColors();
 
-    // 2. Camera
-    this.camera = new THREE.PerspectiveCamera(45, width / height, 10, 80000);
+    // 2. Camera (near = 1.5 mm para permitir zoom cercano milimétrico a cantos y esquinas sin recortar geometría)
+    this.camera = new THREE.PerspectiveCamera(45, width / height, 1.5, 80000);
     this.camera.position.set(1500, 1100, 1900);
 
     // 3. Renderer (con límite inteligente de devicePixelRatio <= 1.5x o 1.0x en Modo Rendimiento)
@@ -960,19 +1001,26 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.controls.enableDamping = true;
       this.controls.dampingFactor = 0.06;
       this.controls.maxDistance = 45000;
-      this.controls.minDistance = 100;
+      this.controls.minDistance = 5;
       this.controls.maxPolarAngle = Math.PI / 2 + 0.08;
       this.controls.target.set(0, 480, 0);
+      this.updateAdaptiveCameraSpeeds();
 
       this.controls.addEventListener('start', () => {
         this.isCameraInteracting = true;
+        this.hideDynamicEdgeHandle();
+        this.updateAdaptiveCameraSpeeds();
         this.requestRender(12);
       });
       this.controls.addEventListener('change', () => {
+        this.updateAdaptiveCameraSpeeds();
+        this.updateAdaptiveGizmoScale();
         this.requestRender(8);
       });
       this.controls.addEventListener('end', () => {
         this.isCameraInteracting = false;
+        this.updateAdaptiveCameraSpeeds();
+        this.updateAdaptiveGizmoScale();
         this.requestRender(16);
       });
     });
@@ -1033,6 +1081,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
 
       canvas.addEventListener('pointerdown', this.boundPointerDown);
+      canvas.addEventListener('wheel', this.boundCanvasWheel, { passive: true });
       window.addEventListener('pointermove', this.boundPointerMove);
       window.addEventListener('pointerup', this.boundPointerUp);
       window.addEventListener('pointercancel', this.boundPointerUp);
@@ -1040,6 +1089,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.timer.connect(document);
         document.addEventListener('visibilitychange', this.boundVisibilityChange);
       }
+      this.updateAdaptiveGizmoScale();
     });
   }
 
@@ -1794,7 +1844,145 @@ export class Furniture3dViewerComponent implements OnDestroy {
       else doorPivot.rotation.z = cur * (Math.PI / 2.2);
     }
   }
-// Create Interactive 3D Gizmo: Edge Stretch Handles (Translation is done cleanly via direct mouse drag)
+  /**
+   * Determina de forma exacta qué ejes globales ('x' | 'y' | 'z') y qué propiedades de posición
+   * ('posX' | 'posY' | 'posZ') corresponden al Largo (length), Ancho (width) y Espesor (thickness) de la pieza.
+   */
+  private getPartStretchAxesConfig(part: Part): PartStretchAxesConfig {
+    const orient = part.orientation || 'horizontal';
+    const L = part.length || 0;
+    const W = part.width || 0;
+
+    if (orient === 'horizontal') {
+      return {
+        lengthAxis: 'x',
+        lengthPosAxis: 'posX',
+        widthAxis: 'z',
+        widthPosAxis: 'posZ',
+        thicknessAxis: 'y'
+      };
+    }
+
+    if (orient === 'vertical_yz') {
+      const isBacksplash = part.componentRole === 'backsplash' ||
+                            part.name.toUpperCase().includes('SALPICADERO');
+      const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
+                            part.name.toUpperCase().includes('ZOCALO') ||
+                            part.name.toUpperCase().includes('ZÓCALO'));
+      const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' ||
+                            part.componentRole === 'side_right' ||
+                            (part.name.toUpperCase().includes('LATERAL') &&
+                             !part.name.toUpperCase().includes('CAJ') &&
+                             part.componentRole !== 'drawer_box' &&
+                             part.componentRole !== 'drawer_lateral'));
+      const isDrawerLateral = !isBacksplash && !isCabinetSide && (
+        part.componentRole === 'drawer_box' ||
+        part.componentRole === 'drawer_lateral' ||
+        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
+      );
+
+      if ((isPlinth || isDrawerLateral || isBacksplash) && L > W) {
+        return {
+          lengthAxis: 'z',
+          lengthPosAxis: 'posZ',
+          widthAxis: 'y',
+          widthPosAxis: 'posY',
+          thicknessAxis: 'x'
+        };
+      }
+      return {
+        lengthAxis: 'y',
+        lengthPosAxis: 'posY',
+        widthAxis: 'z',
+        widthPosAxis: 'posZ',
+        thicknessAxis: 'x'
+      };
+    }
+
+    // orient === 'vertical_xy'
+    const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
+      !part.name.toUpperCase().includes('CAJ');
+    const isDrawerFront = part.componentRole === 'drawer_front';
+    const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
+      part.name.toUpperCase().includes('CONTRA') ||
+      part.name.toUpperCase().includes('TRASERA');
+
+    if (!isDrawerBoxHead && part.componentRole !== 'door' && ((isDoor && L > W) || (isDrawerFront && W > L))) {
+      return {
+        lengthAxis: 'y',
+        lengthPosAxis: 'posY',
+        widthAxis: 'x',
+        widthPosAxis: 'posX',
+        thicknessAxis: 'z'
+      };
+    }
+
+    return {
+      lengthAxis: 'x',
+      lengthPosAxis: 'posX',
+      widthAxis: 'y',
+      widthPosAxis: 'posY',
+      thicknessAxis: 'z'
+    };
+  }
+
+  private getSharedGizmoMaterial(colorHex: number): THREE.MeshStandardMaterial {
+    const key = `gizmo_handle_mat_${colorHex}`;
+    let mat = this.materialCache.get(key) as THREE.MeshStandardMaterial | undefined;
+    if (!mat) {
+      mat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        roughness: 0.2,
+        metalness: 0.3,
+        emissive: colorHex,
+        emissiveIntensity: 0.38,
+        depthTest: false
+      });
+      mat.userData = { isShared: true };
+      this.materialCache.set(key, mat);
+    }
+    return mat;
+  }
+
+  private getSharedGizmoOutlineMaterial(): THREE.LineBasicMaterial {
+    const key = 'gizmo_handle_outline_white';
+    let mat = this.materialCache.get(key) as THREE.LineBasicMaterial | undefined;
+    if (!mat) {
+      mat = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false });
+      mat.userData = { isShared: true };
+      this.materialCache.set(key, mat);
+    }
+    return mat;
+  }
+
+  private ensureDynamicEdgeHandle(): THREE.Mesh {
+    if (!this.dynamicEdgeHandleMesh) {
+      const handleSize = 22;
+      const geo = this.getSharedGeometry('gizmo_dynamic_edge_box_22', () => new THREE.BoxGeometry(handleSize, handleSize, handleSize));
+      const edgeGeo = this.getSharedGeometry('gizmo_dynamic_edge_outline_22', () => new THREE.EdgesGeometry(geo));
+      const mat = this.getSharedGizmoMaterial(0x06b6d4);
+      const mesh = new THREE.Mesh(geo, mat);
+      const outline = new THREE.LineSegments(edgeGeo, this.getSharedGizmoOutlineMaterial());
+      mesh.add(outline);
+      mesh.renderOrder = 1000;
+      mesh.visible = false;
+      this.dynamicEdgeHandleMesh = mesh;
+    }
+    if (this.dynamicEdgeHandleMesh.parent !== this.gizmoGroup) {
+      this.gizmoGroup.add(this.dynamicEdgeHandleMesh);
+    }
+    return this.dynamicEdgeHandleMesh;
+  }
+
+  private hideDynamicEdgeHandle() {
+    this.activeDynamicEdgeHit = null;
+    if (this.dynamicEdgeHandleMesh && this.dynamicEdgeHandleMesh.visible) {
+      this.dynamicEdgeHandleMesh.visible = false;
+      this.requestRender(4);
+    }
+  }
+
+  // Create Interactive 3D Gizmo: Edge Stretch Handles (Translation is done cleanly via direct mouse drag)
   private buildGizmo(
     part: Part,
     px: number,
@@ -1806,106 +1994,541 @@ export class Furniture3dViewerComponent implements OnDestroy {
   ) {
     // Si la pieza o su módulo están congelados, no mostrar tiradores de estiramiento 3D
     if (this.isPartOrGroupLocked(part)) {
+      this.hideDynamicEdgeHandle();
       return;
     }
 
     const group = new THREE.Group();
     group.position.set(px, py, pz);
 
-    // Edge Stretch Handles (Tiradores de borde interactivos)
-    // Cubos en los bordes para alargar o ensanchar la pieza arrastrando directamente
+    const axesCfg = this.getPartStretchAxesConfig(part);
+    const sharedGeo = this.getSharedGeometry('gizmo_handle_box_24', () => new THREE.BoxGeometry(24, 24, 24));
+    const sharedEdgeGeo = this.getSharedGeometry('gizmo_handle_edges_24', () => new THREE.EdgesGeometry(sharedGeo));
+    const outlineMat = this.getSharedGizmoOutlineMaterial();
+
+    // Edge Stretch Handles (Tiradores centrales de borde con geometría y materiales compartidos en caché)
     const createStretchHandle = (
-      pos: THREE.Vector3,
+      edgeCenterLocal: THREE.Vector3,
+      offsetDir: THREE.Vector3,
       colorHex: number,
       handleTarget: 'length' | 'width',
       dir: number
     ) => {
-      const handleSize = 24;
-      const geo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
-      const mat = new THREE.MeshStandardMaterial({
-        color: colorHex,
-        roughness: 0.2,
-        metalness: 0.3,
-        emissive: colorHex,
-        emissiveIntensity: 0.35,
-        depthTest: false
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.copy(pos);
+      const mat = this.getSharedGizmoMaterial(colorHex);
+      const mesh = new THREE.Mesh(sharedGeo, mat);
+      mesh.position.copy(edgeCenterLocal).addScaledVector(offsetDir, 16);
 
-      // Outline
-      const edge = new THREE.LineSegments(
-        new THREE.EdgesGeometry(geo),
-        new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
-      );
+      const edge = new THREE.LineSegments(sharedEdgeGeo, outlineMat);
       mesh.add(edge);
 
       const hitData: GizmoHitData = {
         isGizmo: true,
         type: 'handle',
         handleTarget,
-        dir
+        dir,
+        lengthAxis: axesCfg.lengthAxis,
+        widthAxis: axesCfg.widthAxis,
+        posAxisL: axesCfg.lengthPosAxis,
+        posAxisW: axesCfg.widthPosAxis
       };
-      mesh.userData = hitData;
+      mesh.userData = {
+        ...hitData,
+        baseLocalPos: edgeCenterLocal,
+        offsetDir
+      };
       this.gizmoHitMeshes.push(mesh);
       return mesh;
     };
 
-    // Determine dimensions orientation
-    const orient = part.orientation || 'horizontal';
+    const halfL = (axesCfg.lengthAxis === 'x' ? sx : axesCfg.lengthAxis === 'y' ? sy : sz) * 0.5;
+    const halfW = (axesCfg.widthAxis === 'x' ? sx : axesCfg.widthAxis === 'y' ? sy : sz) * 0.5;
 
-    if (orient === 'horizontal') {
-      // Length along X, Width along Z
-      const handleLPlus = createStretchHandle(new THREE.Vector3(sx / 2 + 16, 0, 0), 0x2563eb, 'length', 1);
-      const handleLMinus = createStretchHandle(new THREE.Vector3(-sx / 2 - 16, 0, 0), 0x2563eb, 'length', -1);
-      const handleWPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0xf59e0b, 'width', 1);
-      const handleWMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0xf59e0b, 'width', -1);
+    const posLPlus = new THREE.Vector3();
+    posLPlus[axesCfg.lengthAxis] = halfL;
+    const dirLPlus = new THREE.Vector3();
+    dirLPlus[axesCfg.lengthAxis] = 1;
 
-      group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
-    } else if (orient === 'vertical_yz') {
-      const isBacksplash = part.componentRole === 'backsplash' ||
-                            part.name.toUpperCase().includes('SALPICADERO');
-      const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
-                            part.name.toUpperCase().includes('ZOCALO') ||
-                            part.name.toUpperCase().includes('ZÓCALO'));
-      const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' || 
-                            part.componentRole === 'side_right' ||
-                            (part.name.toUpperCase().includes('LATERAL') && 
-                             !part.name.toUpperCase().includes('CAJ') && 
-                             part.componentRole !== 'drawer_box' && 
-                             part.componentRole !== 'drawer_lateral'));
-      const isDrawerLateral = !isBacksplash && !isCabinetSide && (
-        part.componentRole === 'drawer_box' ||
-        part.componentRole === 'drawer_lateral' ||
-        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
-      );
-      if ((isPlinth || isDrawerLateral || isBacksplash) && (part.length || 0) > (part.width || 0)) {
-        // En lateral de cajón: Length es profundidad en eje Z, Width es altura en eje Y
-        const handleLPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0x2563eb, 'length', 1);
-        const handleLMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0x2563eb, 'length', -1);
-        const handleWPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16), 0xf59e0b, 'width', 1);
-        const handleWMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16), 0xf59e0b, 'width', -1);
-        group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
-      } else {
-        // Length along Y (Height), Width along Z
-        const handleLPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16, 0), 0x2563eb, 'length', 1);
-        const handleLMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16, 0), 0x2563eb, 'length', -1);
-        const handleWPlus = createStretchHandle(new THREE.Vector3(0, 0, sz / 2 + 16), 0xf59e0b, 'width', 1);
-        const handleWMinus = createStretchHandle(new THREE.Vector3(0, 0, -sz / 2 - 16), 0xf59e0b, 'width', -1);
-        group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
-      }
-    } else {
-      // Frontal (XY): Length along X, Width along Y
-      const handleLPlus = createStretchHandle(new THREE.Vector3(sx / 2 + 16, 0, 0), 0x2563eb, 'length', 1);
-      const handleLMinus = createStretchHandle(new THREE.Vector3(-sx / 2 - 16, 0, 0), 0x2563eb, 'length', -1);
-      const handleWPlus = createStretchHandle(new THREE.Vector3(0, sy / 2 + 16), 0xf59e0b, 'width', 1);
-      const handleWMinus = createStretchHandle(new THREE.Vector3(0, -sy / 2 - 16), 0xf59e0b, 'width', -1);
+    const posLMinus = new THREE.Vector3();
+    posLMinus[axesCfg.lengthAxis] = -halfL;
+    const dirLMinus = new THREE.Vector3();
+    dirLMinus[axesCfg.lengthAxis] = -1;
 
-      group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
-    }
+    const posWPlus = new THREE.Vector3();
+    posWPlus[axesCfg.widthAxis] = halfW;
+    const dirWPlus = new THREE.Vector3();
+    dirWPlus[axesCfg.widthAxis] = 1;
 
+    const posWMinus = new THREE.Vector3();
+    posWMinus[axesCfg.widthAxis] = -halfW;
+    const dirWMinus = new THREE.Vector3();
+    dirWMinus[axesCfg.widthAxis] = -1;
+
+    const handleLPlus = createStretchHandle(posLPlus, dirLPlus, 0x2563eb, 'length', 1);
+    const handleLMinus = createStretchHandle(posLMinus, dirLMinus, 0x2563eb, 'length', -1);
+    const handleWPlus = createStretchHandle(posWPlus, dirWPlus, 0xf59e0b, 'width', 1);
+    const handleWMinus = createStretchHandle(posWMinus, dirWMinus, 0xf59e0b, 'width', -1);
+
+    group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
     group.renderOrder = 999;
     this.gizmoGroup.add(group);
+
+    // Garantizar que el indicador dinámico de esquinas/aristas esté vinculado al gizmoGroup
+    const dynMesh = this.ensureDynamicEdgeHandle();
+    if (!this.isDragging) {
+      dynMesh.visible = false;
+    }
+
+    this.updateAdaptiveGizmoScale();
+  }
+
+  /**
+   * Detección Matemática Ultra-Ligera (Zero-Allocation) de Esquinas (Vértices) y Aristas Perimetrales
+   * sobre la pieza actualmente seleccionada. Permite estirar desde cualquier esquina o tramo continuo de borde
+   * incluso en zoom extremo cercano donde los tiradores centrales quedan fuera de pantalla.
+   */
+  private detectSelectedPartEdgeOrCornerHover(clientX: number, clientY: number): GizmoHitData | null {
+    const selParts = this.selectedParts();
+    if (selParts.length !== 1) {
+      this.hideDynamicEdgeHandle();
+      return null;
+    }
+    const part = selParts[0];
+    if (
+      this.isPartOrGroupLocked(part) ||
+      (this.activeTool() !== 'select' && this.activeTool() !== 'move') ||
+      !this.camera ||
+      !this.canvasRef()?.nativeElement
+    ) {
+      this.hideDynamicEdgeHandle();
+      return null;
+    }
+
+    const canvas = this.canvasRef()!.nativeElement;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+
+    this.mouse.x = (mx / rect.width) * 2 - 1;
+    this.mouse.y = -(my / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    this.camera.getWorldDirection(this.scratchCamForward);
+
+    const b = this.getPartBounds(part);
+    const axesCfg = this.getPartStretchAxesConfig(part);
+
+    const halfL = (axesCfg.lengthAxis === 'x' ? b.sx : axesCfg.lengthAxis === 'y' ? b.sy : b.sz) * 0.5;
+    const halfW = (axesCfg.widthAxis === 'x' ? b.sx : axesCfg.widthAxis === 'y' ? b.sy : b.sz) * 0.5;
+    const halfT = (axesCfg.thicknessAxis === 'x' ? b.sx : axesCfg.thicknessAxis === 'y' ? b.sy : b.sz) * 0.5;
+
+    const setWorldPt = (cL: number, cW: number, cT: number, out: THREE.Vector3) => {
+      out.set(b.px, b.py, b.pz);
+      out[axesCfg.lengthAxis] += cL;
+      out[axesCfg.widthAxis] += cW;
+      out[axesCfg.thicknessAxis] += cT;
+    };
+
+    const nearPlaneDist = this.camera.near + 0.5;
+    const projectClippedSegment = (pA: THREE.Vector3, pB: THREE.Vector3): boolean => {
+      const dA =
+        (pA.x - this.camera.position.x) * this.scratchCamForward.x +
+        (pA.y - this.camera.position.y) * this.scratchCamForward.y +
+        (pA.z - this.camera.position.z) * this.scratchCamForward.z;
+      const dB =
+        (pB.x - this.camera.position.x) * this.scratchCamForward.x +
+        (pB.y - this.camera.position.y) * this.scratchCamForward.y +
+        (pB.z - this.camera.position.z) * this.scratchCamForward.z;
+
+      if (dA < nearPlaneDist && dB < nearPlaneDist) return false;
+
+      this.scratchClippedA.copy(pA);
+      this.scratchClippedB.copy(pB);
+
+      if (dA < nearPlaneDist) {
+        const t = (nearPlaneDist - dA) / (dB - dA);
+        this.scratchClippedA.lerpVectors(pA, pB, t);
+      } else if (dB < nearPlaneDist) {
+        const t = (nearPlaneDist - dB) / (dA - dB);
+        this.scratchClippedB.lerpVectors(pB, pA, t);
+      }
+
+      this.scratchScreenA.copy(this.scratchClippedA).project(this.camera);
+      this.scratchScreenB.copy(this.scratchClippedB).project(this.camera);
+
+      this.scratchScreenA.x = (this.scratchScreenA.x * 0.5 + 0.5) * rect.width;
+      this.scratchScreenA.y = (-this.scratchScreenA.y * 0.5 + 0.5) * rect.height;
+      this.scratchScreenB.x = (this.scratchScreenB.x * 0.5 + 0.5) * rect.width;
+      this.scratchScreenB.y = (-this.scratchScreenB.y * 0.5 + 0.5) * rect.height;
+      return true;
+    };
+
+    const distToScreenSegment = (px2d: number, py2d: number): number => {
+      const ax = this.scratchScreenA.x;
+      const ay = this.scratchScreenA.y;
+      const bx = this.scratchScreenB.x;
+      const by = this.scratchScreenB.y;
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq < 0.0001) {
+        return Math.hypot(px2d - ax, py2d - ay);
+      }
+      const t = Math.max(0, Math.min(1, ((px2d - ax) * dx + (py2d - ay) * dy) / lenSq));
+      return Math.hypot(px2d - (ax + t * dx), py2d - (ay + t * dy));
+    };
+
+    // 1. Evaluar las 4 Esquinas (Vértices y aristas cortas de espesor en cada esquina)
+    const cornerThresholdPx = 20;
+    let bestCornerScore = Infinity;
+    let bestCornerDirL = 1;
+    let bestCornerDirW = 1;
+    let foundCorner = false;
+
+    const signs: (-1 | 1)[] = [-1, 1];
+    for (const sL of signs) {
+      for (const sW of signs) {
+        setWorldPt(sL * halfL, sW * halfW, -halfT, this.scratchEdgeA);
+        setWorldPt(sL * halfL, sW * halfW, halfT, this.scratchEdgeB);
+        if (!projectClippedSegment(this.scratchEdgeA, this.scratchEdgeB)) continue;
+
+        const dPx = distToScreenSegment(mx, my);
+        if (dPx <= cornerThresholdPx) {
+          this.raycaster.ray.distanceSqToSegment(this.scratchEdgeA, this.scratchEdgeB, undefined, this.scratchClosestWorld);
+          const camDist = this.camera.position.distanceTo(this.scratchClosestWorld);
+          const score = dPx + camDist * 0.0015;
+          if (score < bestCornerScore) {
+            bestCornerScore = score;
+            bestCornerDirL = sL;
+            bestCornerDirW = sW;
+            this.scratchBestHitWorld.copy(this.scratchClosestWorld);
+            foundCorner = true;
+          }
+        }
+      }
+    }
+
+    // 2. Si no está sobre una esquina, evaluar los 8 tramos continuos de aristas perimetrales
+    let bestEdgeScore = Infinity;
+    let bestEdgeTarget: 'length' | 'width' = 'length';
+    let bestEdgeDir: -1 | 1 = 1;
+    let bestEdgeCursor = 'ew-resize';
+    let foundEdge = false;
+
+    if (!foundCorner) {
+      const edgeThresholdPx = 15;
+
+      // 4 aristas de borde +/- Length (recorren a lo largo de Width)
+      for (const sL of signs) {
+        for (const sT of signs) {
+          setWorldPt(sL * halfL, -halfW, sT * halfT, this.scratchEdgeA);
+          setWorldPt(sL * halfL, halfW, sT * halfT, this.scratchEdgeB);
+          if (!projectClippedSegment(this.scratchEdgeA, this.scratchEdgeB)) continue;
+
+          const dPx = distToScreenSegment(mx, my);
+          if (dPx <= edgeThresholdPx) {
+            this.raycaster.ray.distanceSqToSegment(this.scratchEdgeA, this.scratchEdgeB, undefined, this.scratchClosestWorld);
+            const camDist = this.camera.position.distanceTo(this.scratchClosestWorld);
+            const score = dPx + camDist * 0.002;
+            if (score < bestEdgeScore) {
+              bestEdgeScore = score;
+              bestEdgeTarget = 'length';
+              bestEdgeDir = sL;
+              this.scratchBestHitWorld.copy(this.scratchClosestWorld);
+              const edgeDx = Math.abs(this.scratchScreenB.x - this.scratchScreenA.x);
+              const edgeDy = Math.abs(this.scratchScreenB.y - this.scratchScreenA.y);
+              // El estiramiento es perpendicular a la arista
+              bestEdgeCursor = edgeDy >= edgeDx ? 'ew-resize' : 'ns-resize';
+              foundEdge = true;
+            }
+          }
+        }
+      }
+
+      // 4 aristas de borde +/- Width (recorren a lo largo de Length)
+      for (const sW of signs) {
+        for (const sT of signs) {
+          setWorldPt(-halfL, sW * halfW, sT * halfT, this.scratchEdgeA);
+          setWorldPt(halfL, sW * halfW, sT * halfT, this.scratchEdgeB);
+          if (!projectClippedSegment(this.scratchEdgeA, this.scratchEdgeB)) continue;
+
+          const dPx = distToScreenSegment(mx, my);
+          if (dPx <= edgeThresholdPx) {
+            this.raycaster.ray.distanceSqToSegment(this.scratchEdgeA, this.scratchEdgeB, undefined, this.scratchClosestWorld);
+            const camDist = this.camera.position.distanceTo(this.scratchClosestWorld);
+            const score = dPx + camDist * 0.002;
+            if (score < bestEdgeScore) {
+              bestEdgeScore = score;
+              bestEdgeTarget = 'width';
+              bestEdgeDir = sW;
+              this.scratchBestHitWorld.copy(this.scratchClosestWorld);
+              const edgeDx = Math.abs(this.scratchScreenB.x - this.scratchScreenA.x);
+              const edgeDy = Math.abs(this.scratchScreenB.y - this.scratchScreenA.y);
+              bestEdgeCursor = edgeDy >= edgeDx ? 'ew-resize' : 'ns-resize';
+              foundEdge = true;
+            }
+          }
+        }
+      }
+    }
+
+    if (!foundCorner && !foundEdge) {
+      this.hideDynamicEdgeHandle();
+      return null;
+    }
+
+    // Verificar que otra pieza no seleccionada no esté ocultando en primer plano este borde/esquina
+    const hitDistToCam = this.camera.position.distanceTo(this.scratchBestHitWorld);
+    if (this.raycastablePieceMeshes.length > 1) {
+      const pieceHits = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+      if (pieceHits.length > 0) {
+        const frontPart = pieceHits[0].object.userData?.['part'] as Part | undefined;
+        if (frontPart && frontPart.id !== part.id && pieceHits[0].distance < hitDistToCam - 25) {
+          this.hideDynamicEdgeHandle();
+          return null;
+        }
+      }
+    }
+
+    const dynMesh = this.ensureDynamicEdgeHandle();
+    dynMesh.position.copy(this.scratchBestHitWorld);
+    dynMesh.visible = true;
+
+    let hitResult: GizmoHitData;
+    if (foundCorner) {
+      dynMesh.material = this.getSharedGizmoMaterial(0x06b6d4); // Cyan técnico para vértices/esquinas
+      // Calcular orientación diagonal del cursor respecto al centro de la pieza en pantalla
+      this.scratchScreenA.set(b.px, b.py, b.pz).project(this.camera);
+      this.scratchScreenB.copy(this.scratchBestHitWorld).project(this.camera);
+      const diagX = this.scratchScreenB.x - this.scratchScreenA.x;
+      const diagY = -(this.scratchScreenB.y - this.scratchScreenA.y);
+      const diagCursor = diagX * diagY >= 0 ? 'nwse-resize' : 'nesw-resize';
+
+      hitResult = {
+        isGizmo: true,
+        type: 'corner_handle',
+        handleTarget: 'corner',
+        dir: bestCornerDirL,
+        dirW: bestCornerDirW,
+        lengthAxis: axesCfg.lengthAxis,
+        widthAxis: axesCfg.widthAxis,
+        posAxisL: axesCfg.lengthPosAxis,
+        posAxisW: axesCfg.widthPosAxis,
+        worldHitPos: this.scratchBestHitWorld.clone(),
+        cursor: diagCursor
+      };
+    } else {
+      const colorHex = bestEdgeTarget === 'length' ? 0x2563eb : 0xf59e0b;
+      dynMesh.material = this.getSharedGizmoMaterial(colorHex);
+      hitResult = {
+        isGizmo: true,
+        type: 'handle',
+        handleTarget: bestEdgeTarget,
+        dir: bestEdgeDir,
+        lengthAxis: axesCfg.lengthAxis,
+        widthAxis: axesCfg.widthAxis,
+        posAxisL: axesCfg.lengthPosAxis,
+        posAxisW: axesCfg.widthPosAxis,
+        worldHitPos: this.scratchBestHitWorld.clone(),
+        cursor: bestEdgeCursor
+      };
+    }
+
+    this.activeDynamicEdgeHit = hitResult;
+    this.updateAdaptiveGizmoScale();
+    this.requestRender(4);
+    return hitResult;
+  }
+
+  /**
+   * Zoom Cercano Milimétrico (Zoom Dirigido al Cursor con Target Dolly):
+   * Desplaza suavemente controls.target hacia el punto o esquina bajo el cursor al acercar la rueda,
+   * eliminando el bloqueo prematuro de minDistance y permitiendo acercamientos a nivel de cantos y vértices.
+   * Ejecutado estrictamente fuera de NgZone y sin instanciar vectores en memoria (Zero-Allocation).
+   */
+  private onCanvasWheel(e: WheelEvent) {
+    if (!this.controls || !this.controls.enabled || !this.camera) return;
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    this.scratchWheelMouse.set(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    this.raycaster.setFromCamera(this.scratchWheelMouse, this.camera);
+    this.camera.getWorldDirection(this.scratchWheelCamForward);
+
+    const camDist = this.camera.position.distanceTo(this.controls.target);
+
+    if (e.deltaY < 0) {
+      // Zoom In: dirigir hacia la esquina/arista/pieza bajo el cursor
+      let hasHit = false;
+      let hitDist = camDist;
+
+      if (this.activeDynamicEdgeHit?.worldHitPos) {
+        this.scratchWheelPlaneHit.copy(this.activeDynamicEdgeHit.worldHitPos);
+        hitDist = this.camera.position.distanceTo(this.scratchWheelPlaneHit);
+        hasHit = true;
+      } else if (this.raycastablePieceMeshes.length > 0) {
+        const hits = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+        if (hits.length > 0) {
+          this.scratchWheelPlaneHit.copy(hits[0].point);
+          hitDist = hits[0].distance;
+          hasHit = true;
+        }
+      }
+
+      if (!hasHit) {
+        const selParts = this.selectedParts();
+        if (selParts.length === 1) {
+          const b = this.getPartBounds(selParts[0]);
+          this.scratchGizmoWorldPos.set(b.px, b.py, b.pz);
+          this.scratchWheelPlane.setFromNormalAndCoplanarPoint(this.scratchWheelCamForward, this.scratchGizmoWorldPos);
+        } else {
+          this.scratchWheelPlane.setFromNormalAndCoplanarPoint(this.scratchWheelCamForward, this.controls.target);
+        }
+        if (this.raycaster.ray.intersectPlane(this.scratchWheelPlane, this.scratchWheelPlaneHit)) {
+          hitDist = this.camera.position.distanceTo(this.scratchWheelPlaneHit);
+          hasHit = true;
+        }
+      }
+
+      if (hasHit) {
+        this.scratchWheelDelta.subVectors(this.scratchWheelPlaneHit, this.controls.target);
+        const lerpAlpha = camDist < 350 ? 0.26 : 0.14;
+        this.controls.target.addScaledVector(this.scratchWheelDelta, lerpAlpha);
+        this.camera.position.addScaledVector(this.scratchWheelDelta, lerpAlpha * 0.65);
+      }
+
+      // Target Dolly en rango cercano/macro para impedir que controls.target bloquee el avance de la cámara
+      if (camDist < 220 || hitDist < 160) {
+        const dollyStep = Math.min(Math.max(4, Math.min(camDist, hitDist) * 0.16), 36);
+        this.controls.target.addScaledVector(this.raycaster.ray.direction, dollyStep * 0.55);
+        if (hitDist > 8) {
+          this.camera.position.addScaledVector(this.raycaster.ray.direction, dollyStep * 0.55);
+        }
+      }
+    } else if (e.deltaY > 0) {
+      // Zoom Out: asistencia suave al salir de zoom macro cercano (cuando camDist es muy pequeño)
+      if (camDist < 240) {
+        const backStep = Math.max(14, (240 - camDist) * 0.18);
+        this.camera.position.addScaledVector(this.scratchWheelCamForward, -backStep);
+      }
+    }
+
+    this.updateAdaptiveCameraSpeeds();
+    this.updateAdaptiveGizmoScale();
+    this.requestRender(10);
+  }
+
+  /**
+   * Compensación Dinámica O(1) de panSpeed y rotateSpeed según la distancia de cámara al objetivo.
+   * Garantiza un desplazamiento lateral/vertical (clic derecho) ágil en zoom macro cercano
+   * y controlado en vistas panorámicas lejanas.
+   */
+  private updateAdaptiveCameraSpeeds() {
+    if (!this.camera || !this.controls) return;
+    const dist = Math.max(1, this.camera.position.distanceTo(this.controls.target));
+
+    let effectivePanDist: number;
+    if (dist < 480) {
+      // Zoom cercano / macro: piso mínimo garantizado (280mm efectivos) para paneo fluido a lo largo de cantos y esquinas
+      effectivePanDist = 280 + dist * 0.55;
+    } else if (dist <= 3200) {
+      // Zoom medio de trabajo: seguimiento natural 1:1
+      effectivePanDist = 544 + (dist - 480) * 1.0;
+    } else {
+      // Zoom lejano de habitación: amortiguación progresiva para evitar saltos bruscos
+      effectivePanDist = 3264 + (dist - 3200) * 0.55;
+    }
+
+    this.controls.panSpeed = effectivePanDist / dist;
+    this.controls.rotateSpeed = dist < 240 ? Math.max(0.5, dist / 240) : 1.0;
+  }
+
+  /**
+   * Escalado Visual Adaptativo O(1) para tiradores de agarre y etiquetas de cota 3D:
+   * Mantiene el tamaño aparente en pantalla proporcional a la distancia de la cámara
+   * y desliza las etiquetas de medida dentro del encuadre visible durante el zoom extremo cercano.
+   */
+  private updateAdaptiveGizmoScale() {
+    if (!this.camera) return;
+
+    // 1. Escalar tiradores de borde (4 centrales + 1 dinámico de esquina/arista)
+    for (const groupChild of this.gizmoGroup.children) {
+      if (groupChild instanceof THREE.Mesh) {
+        if (groupChild.visible) {
+          const dist = this.camera.position.distanceTo(groupChild.position);
+          const scale = Math.max(0.06, Math.min(1.35, dist / 950));
+          groupChild.scale.setScalar(scale);
+        }
+      } else if (groupChild instanceof THREE.Group) {
+        for (const handle of groupChild.children) {
+          if (handle instanceof THREE.Mesh) {
+            handle.getWorldPosition(this.scratchGizmoWorldPos);
+            const dist = this.camera.position.distanceTo(this.scratchGizmoWorldPos);
+            const scale = Math.max(0.06, Math.min(1.4, dist / 950));
+            handle.scale.setScalar(scale);
+
+            const basePos = handle.userData?.['baseLocalPos'] as THREE.Vector3 | undefined;
+            const offsetDir = handle.userData?.['offsetDir'] as THREE.Vector3 | undefined;
+            if (basePos && offsetDir) {
+              const dynamicOffset = 16 * Math.max(0.15, Math.min(1.2, dist / 950));
+              handle.position.copy(basePos).addScaledVector(offsetDir, dynamicOffset);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Escalar y mantener visibles las etiquetas de medida (dimensionGroup) en zoom cercano
+    for (const dimGroup of this.dimensionGroup.children) {
+      for (const child of dimGroup.children) {
+        if (child instanceof THREE.Sprite) {
+          const u = child.userData;
+          if (u?.['edgeP1'] && u?.['edgeP2'] && this.controls) {
+            const p1 = u['edgeP1'] as THREE.Vector3;
+            const p2 = u['edgeP2'] as THREE.Vector3;
+            const midX = (p1.x + p2.x) * 0.5;
+            const midY = (p1.y + p2.y) * 0.5;
+            const midZ = (p1.z + p2.z) * 0.5;
+            const distToMid = this.camera.position.distanceTo(
+              this.scratchGizmoWorldPos.set(midX, midY, midZ)
+            );
+
+            if (distToMid < 850) {
+              this.scratchSegDir.subVectors(p2, p1);
+              const segLenSq = this.scratchSegDir.lengthSq();
+              if (segLenSq > 1) {
+                this.scratchW0.subVectors(this.controls.target, p1);
+                const t = Math.max(0.12, Math.min(0.88, this.scratchW0.dot(this.scratchSegDir) / segLenSq));
+                const blend = Math.max(0, Math.min(1, (850 - distToMid) / 500));
+                const finalT = 0.5 + (t - 0.5) * blend;
+                child.position.lerpVectors(p1, p2, finalT);
+                if (u['labelOffset']) {
+                  const off = u['labelOffset'] as THREE.Vector3;
+                  const offScale = Math.max(0.25, Math.min(1.0, distToMid / 900));
+                  child.position.addScaledVector(off, offScale);
+                }
+              }
+            } else {
+              child.position.set(midX, midY, midZ);
+              if (u['labelOffset']) {
+                child.position.add(u['labelOffset'] as THREE.Vector3);
+              }
+            }
+          }
+
+          const dist = this.camera.position.distanceTo(child.position);
+          const baseX = child.userData?.['baseScaleX'] || 130;
+          const baseY = child.userData?.['baseScaleY'] || 42;
+          const sDim = Math.max(0.10, Math.min(1.35, dist / 1150));
+          child.scale.set(baseX * sDim, baseY * sDim, 1);
+        }
+      }
+    }
   }
 
   // --- MAGNETIC SNAP ENGINE (MOTOR DE INFERENCIAS ESTILO SKETCHUP) ---
@@ -3983,14 +4606,24 @@ private createHandleMesh(
     sz: number
   ) {
     const dimGroup = new THREE.Group();
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x2563eb, linewidth: 2 });
+    let lineMat = this.materialCache.get('dim_line_mat_blue') as THREE.LineBasicMaterial | undefined;
+    if (!lineMat) {
+      lineMat = new THREE.LineBasicMaterial({ color: 0x2563eb, linewidth: 2 });
+      lineMat.userData = { isShared: true };
+      this.materialCache.set('dim_line_mat_blue', lineMat);
+    }
 
     const offsetY = sy / 2 + 35;
     const offsetZ = sz / 2 + 25;
 
-    // Horizontal dimension line along X
-    const p1 = new THREE.Vector3(px - sx / 2, py + offsetY, pz + offsetZ);
-    const p2 = new THREE.Vector3(px + sx / 2, py + offsetY, pz + offsetZ);
+    // Horizontal dimension line along X (or vertical along Y for vertical_yz pieces)
+    const isVertYZ = part.orientation === 'vertical_yz';
+    const p1 = isVertYZ
+      ? new THREE.Vector3(px + sx / 2 + 24, py - sy / 2, pz + sz / 2 + 20)
+      : new THREE.Vector3(px - sx / 2, py + offsetY, pz + offsetZ);
+    const p2 = isVertYZ
+      ? new THREE.Vector3(px + sx / 2 + 24, py + sy / 2, pz + sz / 2 + 20)
+      : new THREE.Vector3(px + sx / 2, py + offsetY, pz + offsetZ);
 
     const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
     const line = new THREE.Line(lineGeo, lineMat);
@@ -3998,24 +4631,39 @@ private createHandleMesh(
 
     const tickH = 15;
     const t1 = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(p1.x, p1.y - tickH, p1.z),
-        new THREE.Vector3(p1.x, p1.y + tickH, p1.z)
-      ]),
+      new THREE.BufferGeometry().setFromPoints(
+        isVertYZ
+          ? [new THREE.Vector3(p1.x, p1.y, p1.z - tickH), new THREE.Vector3(p1.x, p1.y, p1.z + tickH)]
+          : [new THREE.Vector3(p1.x, p1.y - tickH, p1.z), new THREE.Vector3(p1.x, p1.y + tickH, p1.z)]
+      ),
       lineMat
     );
     const t2 = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(p2.x, p2.y - tickH, p2.z),
-        new THREE.Vector3(p2.x, p2.y + tickH, p2.z)
-      ]),
+      new THREE.BufferGeometry().setFromPoints(
+        isVertYZ
+          ? [new THREE.Vector3(p2.x, p2.y, p2.z - tickH), new THREE.Vector3(p2.x, p2.y, p2.z + tickH)]
+          : [new THREE.Vector3(p2.x, p2.y - tickH, p2.z), new THREE.Vector3(p2.x, p2.y + tickH, p2.z)]
+      ),
       lineMat
     );
     dimGroup.add(t1);
     dimGroup.add(t2);
 
+    const lengthLabelOffset = isVertYZ ? new THREE.Vector3(18, 0, 18) : new THREE.Vector3(0, 25, 0);
     const lengthSprite = this.createTextSprite(`${part.length} mm`);
-    lengthSprite.position.set((p1.x + p2.x) / 2, py + offsetY + 25, (p1.z + p2.z) / 2);
+    lengthSprite.position.set(
+      (p1.x + p2.x) / 2 + lengthLabelOffset.x,
+      (p1.y + p2.y) / 2 + lengthLabelOffset.y,
+      (p1.z + p2.z) / 2 + lengthLabelOffset.z
+    );
+    lengthSprite.userData = {
+      ...lengthSprite.userData,
+      edgeP1: p1,
+      edgeP2: p2,
+      labelOffset: lengthLabelOffset,
+      baseScaleX: 130,
+      baseScaleY: 42
+    };
     dimGroup.add(lengthSprite);
 
     // Width / Depth dimension line
@@ -4027,49 +4675,77 @@ private createHandleMesh(
     );
     dimGroup.add(widthLine);
 
+    const widthLabelOffset = new THREE.Vector3(15, 20, 0);
     const widthSprite = this.createTextSprite(`${part.width} mm`);
     widthSprite.position.set(px + sx / 2 + 45, py + 20, (p3.z + p4.z) / 2);
+    widthSprite.userData = {
+      ...widthSprite.userData,
+      edgeP1: p3,
+      edgeP2: p4,
+      labelOffset: widthLabelOffset,
+      baseScaleX: 130,
+      baseScaleY: 42
+    };
     dimGroup.add(widthSprite);
 
     this.dimensionGroup.add(dimGroup);
+    this.updateAdaptiveGizmoScale();
   }
 
-  // Generates 3D billboard sprite with high-res text
+  // Generates 3D billboard sprite with high-res text (cached in materialCache / textureCache to avoid per-frame allocations)
   private createTextSprite(text: string): THREE.Sprite {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 80;
-    const ctx = canvas.getContext('2d');
+    const cacheKey = `dim_sprite_mat_${text}`;
+    let spriteMat = this.materialCache.get(cacheKey) as THREE.SpriteMaterial | undefined;
 
-    if (ctx) {
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 3;
-      const r = 16;
-      ctx.beginPath();
-      ctx.moveTo(r, 4);
-      ctx.lineTo(256 - r, 4);
-      ctx.quadraticCurveTo(256 - 4, 4, 256 - 4, r);
-      ctx.lineTo(256 - 4, 80 - r);
-      ctx.quadraticCurveTo(256 - 4, 80 - 4, 256 - r, 80 - 4);
-      ctx.lineTo(r, 80 - 4);
-      ctx.quadraticCurveTo(4, 80 - 4, 4, 80 - r);
-      ctx.lineTo(4, r);
-      ctx.quadraticCurveTo(4, 4, r, 4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
+    if (!spriteMat) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 80;
+      const ctx = canvas.getContext('2d');
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 30px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, 128, 42);
+      if (ctx) {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 3;
+        const r = 16;
+        ctx.beginPath();
+        ctx.moveTo(r, 4);
+        ctx.lineTo(256 - r, 4);
+        ctx.quadraticCurveTo(256 - 4, 4, 256 - 4, r);
+        ctx.lineTo(256 - 4, 80 - r);
+        ctx.quadraticCurveTo(256 - 4, 80 - 4, 256 - r, 80 - 4);
+        ctx.lineTo(r, 80 - 4);
+        ctx.quadraticCurveTo(4, 80 - 4, 4, 80 - r);
+        ctx.lineTo(4, r);
+        ctx.quadraticCurveTo(4, 4, r, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 30px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 128, 42);
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.userData = { isShared: true };
+      spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+      spriteMat.userData = { isShared: true };
+
+      if (this.textureCache.size > 300) {
+        const oldestKey = this.textureCache.keys().next().value;
+        if (oldestKey && oldestKey.startsWith('dim_')) {
+          this.textureCache.get(oldestKey)?.dispose();
+          this.textureCache.delete(oldestKey);
+        }
+      }
+      this.textureCache.set(`dim_tex_${text}`, texture);
+      this.materialCache.set(cacheKey, spriteMat);
     }
 
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
     const sprite = new THREE.Sprite(spriteMat);
     sprite.scale.set(130, 42, 1);
     return sprite;
@@ -4871,49 +5547,67 @@ private createHandleMesh(
       }
     }
 
-    // 1. Check if clicking on Gizmo translation arrow or stretch handle
+    // 1. Check if clicking on Gizmo stretch handle or directly on a Corner (Vertex) / Continuous Edge (Arista) of the selected piece
+    let matchedGizmoHit: GizmoHitData | null = null;
     if (this.gizmoHitMeshes.length > 0) {
       const gizmoIntersects = this.raycaster.intersectObjects(this.gizmoHitMeshes, true);
       if (gizmoIntersects.length > 0) {
-        const hit = gizmoIntersects[0].object;
-        const hitData = hit.userData as GizmoHitData;
-        const selParts = this.selectedParts();
+        const hitObj = gizmoIntersects[0].object;
+        const rawHit = hitObj.userData as GizmoHitData;
+        if (rawHit && rawHit.isGizmo) {
+          hitObj.getWorldPosition(this.scratchGizmoWorldPos);
+          matchedGizmoHit = {
+            ...rawHit,
+            worldHitPos: this.scratchGizmoWorldPos.clone()
+          };
+        }
+      }
+    }
+    if (!matchedGizmoHit) {
+      matchedGizmoHit = this.detectSelectedPartEdgeOrCornerHover(e.clientX, e.clientY);
+    }
 
-        if (hitData && hitData.isGizmo && selParts.length > 0) {
-          if (selParts.some(p => this.isPartOrGroupLocked(p))) {
-            canvas.style.cursor = 'not-allowed';
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-
-          this.isDragging = true;
-          this.liveDragPartUpdates.clear();
-          this.liveDragApplianceUpdates.clear();
-          this.activeGizmoHit = hitData;
-          this.dragStartPointer = { x: e.clientX, y: e.clientY };
-          this.dragInitialPart = { ...selParts[0] };
-          this.dragInitialParts = selParts.map(p => ({ ...p }));
-
-          this.ngZone.run(() => this.dragStarted.emit());
-          this.controls.enabled = false;
-
-          const centroid = this.calculateCentroid(selParts);
-          const piecePos = new THREE.Vector3(centroid.x, centroid.y, centroid.z);
-          const camDir = new THREE.Vector3();
-          this.camera.getWorldDirection(camDir);
-          this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), piecePos);
-
-          const intersectPoint = new THREE.Vector3();
-          if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
-            this.dragPlaneIntersectionStart.copy(intersectPoint);
-          }
-
-          canvas.style.cursor = 'grabbing';
+    if (matchedGizmoHit) {
+      const selParts = this.selectedParts();
+      if (selParts.length > 0) {
+        if (selParts.some(p => this.isPartOrGroupLocked(p))) {
+          canvas.style.cursor = 'not-allowed';
           e.preventDefault();
           e.stopPropagation();
           return;
         }
+
+        this.isDragging = true;
+        this.liveDragPartUpdates.clear();
+        this.liveDragApplianceUpdates.clear();
+        this.activeGizmoHit = matchedGizmoHit;
+        this.dragStartPointer = { x: e.clientX, y: e.clientY };
+        this.dragInitialPart = { ...selParts[0] };
+        this.dragInitialParts = selParts.map(p => ({ ...p }));
+
+        this.ngZone.run(() => this.dragStarted.emit());
+        this.controls.enabled = false;
+
+        // Anclar el plano de arrastre exactamente en el punto de la esquina o borde clickeado (precisión 1:1 en zoom macro)
+        if (matchedGizmoHit.worldHitPos) {
+          this.scratchGizmoWorldPos.copy(matchedGizmoHit.worldHitPos);
+        } else {
+          const centroid = this.calculateCentroid(selParts);
+          this.scratchGizmoWorldPos.set(centroid.x, centroid.y, centroid.z);
+        }
+        this.camera.getWorldDirection(this.scratchCamForward);
+        this.dragPlane.setFromNormalAndCoplanarPoint(this.scratchCamForward.negate(), this.scratchGizmoWorldPos);
+
+        if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
+          this.dragPlaneIntersectionStart.copy(this.scratchCurrentIntersection);
+        } else {
+          this.dragPlaneIntersectionStart.copy(this.scratchGizmoWorldPos);
+        }
+
+        canvas.style.cursor = matchedGizmoHit.cursor || 'grabbing';
+        e.preventDefault();
+        e.stopPropagation();
+        return;
       }
     }
 
@@ -5732,11 +6426,10 @@ private createHandleMesh(
       this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       this.raycaster.setFromCamera(this.mouse, this.camera);
 
-      const currentIntersection = new THREE.Vector3();
-      if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersection)) {
+      if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
         const data = this.pushPullData;
-        const deltaWorld = currentIntersection.clone().sub(this.dragPlaneIntersectionStart);
-        const axisDisplacement = deltaWorld.dot(data.axisVector) * data.dir;
+        this.scratchDeltaWorld.subVectors(this.scratchCurrentIntersection, this.dragPlaneIntersectionStart);
+        const axisDisplacement = this.scratchDeltaWorld.dot(data.axisVector) * data.dir;
         const snap = 1; // 1 mm fine CAD precision
         const steppedDelta = Math.round(axisDisplacement / snap) * snap;
 
@@ -5775,15 +6468,14 @@ private createHandleMesh(
       }
       return;
     }
-if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
+    if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
       const rect = canvas.getBoundingClientRect();
       this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       this.raycaster.setFromCamera(this.mouse, this.camera);
 
-      const currentIntersection = new THREE.Vector3();
-      if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersection)) {
-        const deltaWorld = currentIntersection.clone().sub(this.dragPlaneIntersectionStart);
+      if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
+        const deltaWorld = this.scratchDeltaWorld.subVectors(this.scratchCurrentIntersection, this.dragPlaneIntersectionStart);
         const hit = this.activeGizmoHit;
         const snap = 1; // 1 mm fine precision
 
@@ -6065,40 +6757,116 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
 
             this.previewPartUpdatesInPlace([{ part, updates }]);
           }
-        } else if (hit.type === 'handle' && this.dragInitialPart) {
-          // Edge Stretch Handle: Length or Width with magnetic snap to adjacent faces
+        } else if ((hit.type === 'handle' || hit.type === 'corner_handle') && this.dragInitialPart) {
+          // Estiramiento directo desde Arista Continua (handle) o Esquina/Vértice (corner_handle)
           const part = this.dragInitialPart;
           const updates: Partial<Part> = {};
-          const orient = part.orientation || 'horizontal';
+          const axesCfg = this.getPartStretchAxesConfig(part);
 
-          if (hit.handleTarget === 'length') {
-            let axisDelta = 0;
-            let posAxis: 'posX' | 'posY' | 'posZ' = 'posX';
-            if (orient === 'horizontal' || orient === 'vertical_xy') {
-              axisDelta = deltaWorld.x * hit.dir;
-              posAxis = 'posX';
-            } else {
-              axisDelta = deltaWorld.y * hit.dir;
-              posAxis = 'posY';
+          if (hit.type === 'corner_handle') {
+            const axisL = hit.lengthAxis || axesCfg.lengthAxis;
+            const posAxisL = hit.posAxisL || axesCfg.lengthPosAxis;
+            const axisW = hit.widthAxis || axesCfg.widthAxis;
+            const posAxisW = hit.posAxisW || axesCfg.widthPosAxis;
+            const dirL = hit.dir;
+            const dirW = hit.dirW ?? 1;
+
+            const rawDeltaL = deltaWorld[axisL] * dirL;
+            const rawDeltaW = deltaWorld[axisW] * dirW;
+
+            let steppedDeltaL = Math.round(rawDeltaL / snap) * snap;
+            let steppedDeltaW = Math.round(rawDeltaW / snap) * snap;
+
+            // Zona muerta inteligente: si el usuario estira desde una esquina en línea recta sobre un eje,
+            // evita la deriva accidental de 1-2 mm en el eje perpendicular
+            if (Math.abs(rawDeltaL) > 5 && Math.abs(rawDeltaW) < 3) {
+              steppedDeltaW = 0;
+            } else if (Math.abs(rawDeltaW) > 5 && Math.abs(rawDeltaL) < 3) {
+              steppedDeltaL = 0;
             }
+
+            const resL = this.applyMagneticSnapToStretch(part, 'length', posAxisL, dirL, steppedDeltaL);
+            const resW = this.applyMagneticSnapToStretch(part, 'width', posAxisW, dirW, steppedDeltaW);
+
+            updates.length = resL.dim;
+            updates[posAxisL] = resL.pos;
+            updates.width = resW.dim;
+            updates[posAxisW] = resW.pos;
+
+            if (this.dynamicEdgeHandleMesh && hit.worldHitPos) {
+              this.dynamicEdgeHandleMesh.visible = true;
+              this.dynamicEdgeHandleMesh.position.copy(hit.worldHitPos);
+              this.dynamicEdgeHandleMesh.position[axisL] += (resL.dim - part.length) * dirL;
+              this.dynamicEdgeHandleMesh.position[axisW] += (resW.dim - part.width) * dirW;
+            }
+
+            if (resL.isSnapped && resL.snappedPart && resL.snapFace !== null && resL.snapFace !== undefined) {
+              const previewPart = { ...part, ...updates };
+              this.renderPartSnapGuides(previewPart, resL.snappedPart, resL.snapFace, axisL, {
+                x: previewPart.posX ?? 0,
+                y: previewPart.posY ?? 0,
+                z: previewPart.posZ ?? 0
+              });
+            } else if (resW.isSnapped && resW.snappedPart && resW.snapFace !== null && resW.snapFace !== undefined) {
+              const previewPart = { ...part, ...updates };
+              this.renderPartSnapGuides(previewPart, resW.snappedPart, resW.snapFace, axisW, {
+                x: previewPart.posX ?? 0,
+                y: previewPart.posY ?? 0,
+                z: previewPart.posZ ?? 0
+              });
+            } else {
+              this.clearPartSnapGuides();
+            }
+          } else if (hit.handleTarget === 'length') {
+            const axis = hit.lengthAxis || axesCfg.lengthAxis;
+            const posAxis = hit.posAxisL || axesCfg.lengthPosAxis;
+            const axisDelta = deltaWorld[axis] * hit.dir;
             const steppedDelta = Math.round(axisDelta / snap) * snap;
             const res = this.applyMagneticSnapToStretch(part, 'length', posAxis, hit.dir, steppedDelta);
             updates.length = res.dim;
             updates[posAxis] = res.pos;
-          } else if (hit.handleTarget === 'width') {
-            let axisDelta = 0;
-            let posAxis: 'posX' | 'posY' | 'posZ' = 'posZ';
-            if (orient === 'horizontal' || orient === 'vertical_yz') {
-              axisDelta = deltaWorld.z * hit.dir;
-              posAxis = 'posZ';
-            } else {
-              axisDelta = deltaWorld.y * hit.dir;
-              posAxis = 'posY';
+
+            if (this.dynamicEdgeHandleMesh && hit.worldHitPos) {
+              this.dynamicEdgeHandleMesh.visible = true;
+              this.dynamicEdgeHandleMesh.position.copy(hit.worldHitPos);
+              this.dynamicEdgeHandleMesh.position[axis] += (res.dim - part.length) * hit.dir;
             }
+
+            if (res.isSnapped && res.snappedPart && res.snapFace !== null && res.snapFace !== undefined) {
+              const previewPart = { ...part, ...updates };
+              this.renderPartSnapGuides(previewPart, res.snappedPart, res.snapFace, axis, {
+                x: previewPart.posX ?? 0,
+                y: previewPart.posY ?? 0,
+                z: previewPart.posZ ?? 0
+              });
+            } else {
+              this.clearPartSnapGuides();
+            }
+          } else if (hit.handleTarget === 'width') {
+            const axis = hit.widthAxis || axesCfg.widthAxis;
+            const posAxis = hit.posAxisW || axesCfg.widthPosAxis;
+            const axisDelta = deltaWorld[axis] * hit.dir;
             const steppedDelta = Math.round(axisDelta / snap) * snap;
             const res = this.applyMagneticSnapToStretch(part, 'width', posAxis, hit.dir, steppedDelta);
             updates.width = res.dim;
             updates[posAxis] = res.pos;
+
+            if (this.dynamicEdgeHandleMesh && hit.worldHitPos) {
+              this.dynamicEdgeHandleMesh.visible = true;
+              this.dynamicEdgeHandleMesh.position.copy(hit.worldHitPos);
+              this.dynamicEdgeHandleMesh.position[axis] += (res.dim - part.width) * hit.dir;
+            }
+
+            if (res.isSnapped && res.snappedPart && res.snapFace !== null && res.snapFace !== undefined) {
+              const previewPart = { ...part, ...updates };
+              this.renderPartSnapGuides(previewPart, res.snappedPart, res.snapFace, axis, {
+                x: previewPart.posX ?? 0,
+                y: previewPart.posY ?? 0,
+                z: previewPart.posZ ?? 0
+              });
+            } else {
+              this.clearPartSnapGuides();
+            }
           }
 
           this.previewPartUpdatesInPlace([{ part, updates }]);
@@ -6123,9 +6891,8 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
         this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         this.raycaster.setFromCamera(this.mouse, this.camera);
 
-        const currentIntersection = new THREE.Vector3();
-        if (this.raycaster.ray.intersectPlane(this.dragPlane, currentIntersection)) {
-          const deltaWorld = currentIntersection.clone().sub(this.dragPlaneIntersectionStart);
+        if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
+          const deltaWorld = this.scratchDeltaWorld.subVectors(this.scratchCurrentIntersection, this.dragPlaneIntersectionStart);
           const snap = 1; // 1 mm CAD precision
           const dx = Math.round(deltaWorld.x / snap) * snap;
           const dy = Math.round(deltaWorld.y / snap) * snap;
@@ -6410,6 +7177,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
     if (this.gizmoHitMeshes.length > 0) {
       const gizmoIntersects = this.raycaster.intersectObjects(this.gizmoHitMeshes, true);
       if (gizmoIntersects.length > 0) {
+        this.hideDynamicEdgeHandle();
         const hit = gizmoIntersects[0].object.userData as GizmoHitData;
         if (hit.type === 'axis') {
           canvas.style.cursor = 'grab';
@@ -6418,6 +7186,13 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
         }
         return;
       }
+    }
+
+    // Detección matemática de esquinas (vértices) y cualquier tramo continuo de arista de la pieza seleccionada
+    const edgeOrCornerHit = this.detectSelectedPartEdgeOrCornerHover(e.clientX, e.clientY);
+    if (edgeOrCornerHit) {
+      canvas.style.cursor = edgeOrCornerHit.cursor || 'ew-resize';
+      return;
     }
 
     // Hover feedback for 3D Wall Gizmo (Move, Length, Height)
@@ -6535,11 +7310,15 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
           singleStretchedPart = { part: updatedPart, px: b.px, py: b.py, pz: b.pz, sx: b.sx, sy: b.sy, sz: b.sz };
         }
       } else if (partUpdates.length === 1) {
-        singleMovedDelta = new THREE.Vector3(dx, dy, dz);
+        singleMovedDelta = this.scratchSingleMovedDelta.set(dx, dy, dz);
       }
     }
 
     if (singleStretchedPart) {
+      const dynWasVisible = !!this.dynamicEdgeHandleMesh?.visible;
+      if (dynWasVisible && this.dynamicEdgeHandleMesh) {
+        this.scratchClosestWorld.copy(this.dynamicEdgeHandleMesh.position);
+      }
       this.disposeGroup(this.dimensionGroup);
       this.disposeGroup(this.gizmoGroup);
       this.gizmoHitMeshes = [];
@@ -6564,6 +7343,11 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
           singleStretchedPart.sy,
           singleStretchedPart.sz
         );
+        if (dynWasVisible && this.dynamicEdgeHandleMesh) {
+          this.dynamicEdgeHandleMesh.position.copy(this.scratchClosestWorld);
+          this.dynamicEdgeHandleMesh.visible = true;
+          this.updateAdaptiveGizmoScale();
+        }
       }
     } else if (singleMovedDelta) {
       for (const child of this.gizmoGroup.children) {
@@ -6895,6 +7679,7 @@ if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.drag
       this.isDragging = false;
       this.activeGizmoHit = null;
       this.dragInitialPart = null;
+      this.hideDynamicEdgeHandle();
       this.controls.enabled = true;
 
       const canvas = this.canvasRef()?.nativeElement;
@@ -10576,8 +11361,8 @@ private applyMagneticSnapToPosition(
     posAxis: 'posX' | 'posY' | 'posZ',
     dir: number,
     steppedDelta: number,
-    threshold = 12
-  ): { dim: number; pos: number } {
+    threshold = 14
+  ): { dim: number; pos: number; isSnapped?: boolean; snappedPart?: Part | null; snapFace?: number | null } {
     const initialPart = this.dragInitialPart || part;
     const initBounds = this.getPartBounds(initialPart);
     const initialDim = initialPart[targetDimension];
@@ -10592,7 +11377,7 @@ private applyMagneticSnapToPosition(
     }
 
     if (!this.isMagneticSnap()) {
-      return { dim: proposedDim, pos: defPos };
+      return { dim: proposedDim, pos: defPos, isSnapped: false, snappedPart: null, snapFace: null };
     }
 
     let anchoredFace = 0;
@@ -10626,45 +11411,58 @@ private applyMagneticSnapToPosition(
 
     const otherParts = this.parts().filter(p => p.id !== part.id);
     let bestCandidateFace: number | null = null;
-    let minDistance = threshold;
+    let bestCandidatePart: Part | null = null;
+    let bestScore = threshold;
 
     for (const other of otherParts) {
       const otherBounds = this.getPartBounds(other);
 
       if (posAxis === 'posX') {
-        const overlapY = initBounds.minY < otherBounds.maxY + 60 && initBounds.maxY > otherBounds.minY - 60;
-        const overlapZ = initBounds.minZ < otherBounds.maxZ + 60 && initBounds.maxZ > otherBounds.minZ - 60;
-        if (!overlapY || !overlapZ) continue;
+        const nearY = initBounds.minY < otherBounds.maxY + 450 && initBounds.maxY > otherBounds.minY - 450;
+        const nearZ = initBounds.minZ < otherBounds.maxZ + 450 && initBounds.maxZ > otherBounds.minZ - 450;
+        if (!nearY || !nearZ) continue;
+        const directTouch = initBounds.minY < otherBounds.maxY + 60 && initBounds.maxY > otherBounds.minY - 60 &&
+                            initBounds.minZ < otherBounds.maxZ + 60 && initBounds.maxZ > otherBounds.minZ - 60;
 
         for (const face of [otherBounds.minX, otherBounds.maxX]) {
           const dist = Math.abs(proposedMovingFace - face);
-          if (dist < minDistance) {
-            minDistance = dist;
+          const score = directTouch ? dist : dist + 1.5;
+          if (dist < threshold && score < bestScore) {
+            bestScore = score;
             bestCandidateFace = face;
+            bestCandidatePart = other;
           }
         }
       } else if (posAxis === 'posY') {
-        const overlapX = initBounds.minX < otherBounds.maxX + 60 && initBounds.maxX > otherBounds.minX - 60;
-        const overlapZ = initBounds.minZ < otherBounds.maxZ + 60 && initBounds.maxZ > otherBounds.minZ - 60;
-        if (!overlapX || !overlapZ) continue;
+        const nearX = initBounds.minX < otherBounds.maxX + 450 && initBounds.maxX > otherBounds.minX - 450;
+        const nearZ = initBounds.minZ < otherBounds.maxZ + 450 && initBounds.maxZ > otherBounds.minZ - 450;
+        if (!nearX || !nearZ) continue;
+        const directTouch = initBounds.minX < otherBounds.maxX + 60 && initBounds.maxX > otherBounds.minX - 60 &&
+                            initBounds.minZ < otherBounds.maxZ + 60 && initBounds.maxZ > otherBounds.minZ - 60;
 
         for (const face of [otherBounds.minY, otherBounds.maxY]) {
           const dist = Math.abs(proposedMovingFace - face);
-          if (dist < minDistance) {
-            minDistance = dist;
+          const score = directTouch ? dist : dist + 1.5;
+          if (dist < threshold && score < bestScore) {
+            bestScore = score;
             bestCandidateFace = face;
+            bestCandidatePart = other;
           }
         }
       } else if (posAxis === 'posZ') {
-        const overlapX = initBounds.minX < otherBounds.maxX + 60 && initBounds.maxX > otherBounds.minX - 60;
-        const overlapY = initBounds.minY < otherBounds.maxY + 60 && initBounds.maxY > otherBounds.minY - 60;
-        if (!overlapX || !overlapY) continue;
+        const nearX = initBounds.minX < otherBounds.maxX + 450 && initBounds.maxX > otherBounds.minX - 450;
+        const nearY = initBounds.minY < otherBounds.maxY + 450 && initBounds.maxY > otherBounds.minY - 450;
+        if (!nearX || !nearY) continue;
+        const directTouch = initBounds.minX < otherBounds.maxX + 60 && initBounds.maxX > otherBounds.minX - 60 &&
+                            initBounds.minY < otherBounds.maxY + 60 && initBounds.maxY > otherBounds.minY - 60;
 
         for (const face of [otherBounds.minZ, otherBounds.maxZ]) {
           const dist = Math.abs(proposedMovingFace - face);
-          if (dist < minDistance) {
-            minDistance = dist;
+          const score = directTouch ? dist : dist + 1.5;
+          if (dist < threshold && score < bestScore) {
+            bestScore = score;
             bestCandidateFace = face;
+            bestCandidatePart = other;
           }
         }
       }
@@ -10683,11 +11481,17 @@ private applyMagneticSnapToPosition(
         if (posAxis === 'posY') {
           snappedPos = Math.max(snappedDim / 2, snappedPos);
         }
-        return { dim: snappedDim, pos: snappedPos };
+        return {
+          dim: snappedDim,
+          pos: snappedPos,
+          isSnapped: true,
+          snappedPart: bestCandidatePart,
+          snapFace: bestCandidateFace
+        };
       }
     }
 
-    return { dim: proposedDim, pos: defPos };
+    return { dim: proposedDim, pos: defPos, isSnapped: false, snappedPart: null, snapFace: null };
   }
 
   // Camera preset controls
@@ -11499,6 +12303,7 @@ private applyMagneticSnapToPosition(
     const canvas = this.canvasRef()?.nativeElement;
     if (canvas) {
       canvas.removeEventListener('pointerdown', this.boundPointerDown);
+      canvas.removeEventListener('wheel', this.boundCanvasWheel);
     }
     if (typeof window !== 'undefined') {
       window.removeEventListener('pointermove', this.boundPointerMove);
