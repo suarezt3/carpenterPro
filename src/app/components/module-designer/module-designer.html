@@ -6,11 +6,38 @@
       <hugeicons-icon [icon]="icons.cube3d" [size]="16" [strokeWidth]="1.9" class="text-sky-600 shrink-0"></hugeicons-icon>
       <span class="text-xs font-bold text-slate-800 tracking-tight whitespace-nowrap">Modelador 3D</span>
       <span class="text-slate-300 hidden sm:inline">|</span>
-      <div class="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-mono">
+      <div class="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-mono whitespace-nowrap">
         <span>Piezas: <strong class="text-sky-600">{{ currentParts().length }}</strong></span>
         <span>·</span>
         <span>Área: <strong class="text-amber-600">{{ totalAreaM2() }} m²</strong></span>
       </div>
+      <span class="text-slate-300 hidden md:inline">|</span>
+      <!-- Botón de Modo Rendimiento (PC Bajos Recursos / 60 FPS) integrado en la cabecera del Modelador 3D -->
+      <button
+        type="button"
+        (click)="toggleViewerPerformanceMode()"
+        [class]="viewer3d.isPerformanceMode()
+          ? 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border-emerald-300 ring-1 ring-emerald-500/20 font-semibold'
+          : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900 border-zinc-200/90 font-medium'"
+        class="h-6 px-2 text-[11px] rounded-md border flex items-center gap-1 transition cursor-pointer shrink-0 shadow-2xs"
+        [title]="viewer3d.isPerformanceMode()
+          ? 'Modo Rendimiento ACTIVO (PC Bajo Recursos · 60 FPS): Sombras en tiempo real y niebla desactivadas, PixelRatio 1.0x. Clic para volver a Calidad Alta'
+          : 'Activar Modo Rendimiento (PC Bajo Recursos · 60 FPS): Desactiva sombras pesadas y optimiza píxeles GPU para portátiles con gráficos integrados'">
+        <hugeicons-icon
+          [icon]="icons.performanceBolt"
+          [size]="13"
+          [strokeWidth]="2"
+          [class]="viewer3d.isPerformanceMode() ? 'text-emerald-600 shrink-0' : 'text-zinc-400 shrink-0'">
+        </hugeicons-icon>
+        <span class="hidden lg:inline">Modo Rendimiento</span>
+        <span
+          [class]="viewer3d.isPerformanceMode()
+            ? 'bg-emerald-600 text-white'
+            : 'bg-zinc-200/80 text-zinc-600'"
+          class="px-1 py-0.2 rounded text-[9px] font-mono font-bold tabular-nums leading-tight">
+          {{ viewer3d.isPerformanceMode() ? '60 FPS ON' : '60 FPS' }}
+        </span>
+      </button>
     </div>
 
     <!-- Menú de Acciones Rápidas -->

@@ -359,6 +359,9 @@ export class ModuleDesignerComponent {
     chamferCut: cadSvg([
       'M4 4H14L20 10V20H4V4Z',
       'M14 4V10H20'
+    ]),
+    performanceBolt: cadSvg([
+      'M13 2L4 14H11L9 22L20 10H13L13 2Z'
     ])
   };
 
@@ -415,6 +418,17 @@ export class ModuleDesignerComponent {
   readonly viewer3d = viewChild<Furniture3dViewerComponent>('viewer3d');
   readonly viewer3dRef = this.viewer3d;
   readonly chipsScrollContainer = viewChild<ElementRef<HTMLDivElement>>('chipsScrollContainer');
+
+  toggleViewerPerformanceMode() {
+    const v = this.viewer3d();
+    if (!v) return;
+    v.togglePerformanceMode();
+    if (v.isPerformanceMode()) {
+      this.showToast('⚡ Modo Rendimiento (60 FPS) activado para bajo consumo GPU');
+    } else {
+      this.showToast('✨ Calidad Gráfica Alta activada (Sombras suaves 3D)');
+    }
+  }
 
   // Signals principales sincronizados con ProjectStorageService
   readonly project = this.projectService.currentProject;

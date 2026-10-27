@@ -222,6 +222,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     inbox: Archive01Icon,
     sun: Sun01Icon,
     moon: Moon02Icon,
+    performanceBolt: cadSvg([
+      'M13 2L4 14H11L9 22L20 10H13L13 2Z'
+    ]),
     humanGuide: cadSvg([
       'M12 3.5A2.2 2.2 0 1 0 12 7.9A2.2 2.2 0 1 0 12 3.5Z',
       'M8.5 10.5C8.5 9.4 9.4 8.5 10.5 8.5H13.5C14.6 8.5 15.5 9.4 15.5 10.5V15H14V20.5H10V15H8.5V10.5Z'
@@ -692,6 +695,31 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private pushPullHighlightGroup = new THREE.Group();
   private gridHelper: THREE.GridHelper | null = null;
   private floorMesh: THREE.Mesh | null = null;
+  private keyLightRef: THREE.DirectionalLight | null = null;
+  private frontLightRef: THREE.DirectionalLight | null = null;
+
+  // Modo de Rendimiento Adaptativo para PCs de Bajos Recursos / Gráficos Integrados (60 FPS)
+  readonly isPerformanceMode = signal<boolean>(this.loadInitialPerformanceMode());
+
+  private loadInitialPerformanceMode(): boolean {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      return localStorage.getItem('melamipro_3d_performance_mode') === 'true';
+    }
+    return false;
+  }
+
+  /**
+   * Calcula el devicePixelRatio óptimo:
+   * - Modo Rendimiento (Bajo Recursos): 1.0x estricto (ahorra hasta 75% de carga de fragmentos en GPU).
+   * - Modo Calidad Alta: limitado a máximo 1.5x para evitar sobrecarga 4x en pantallas Retina/2K/4K.
+   */
+  private getTargetPixelRatio(): number {
+    if (this.isPerformanceMode()) {
+      return 1;
+    }
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    return Math.min(dpr, 1.5);
+  }
   private roomGroup = new THREE.Group();
   private wallSnapGuideGroup = new THREE.Group();
   private legSnapGuideGroup = new THREE.Group();
@@ -913,7 +941,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.camera = new THREE.PerspectiveCamera(45, width / height, 10, 80000);
     this.camera.position.set(1500, 1100, 1900);
 
-    // 3. Renderer
+    // 3. Renderer (con límite inteligente de devicePixelRatio <= 1.5x o 1.0x en Modo Rendimiento)
+    const lowSpec = this.isPerformanceMode();
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -921,8 +950,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.setPixelRatio(this.getTargetPixelRatio());
+    this.renderer.shadowMap.enabled = !lowSpec;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // 4. OrbitControls (instanciado fuera de NgZone para que wheel/pointermove de cámara no disparen Change Detection)
@@ -1016,19 +1045,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private applyThemeColors() {
     if (!this.scene) return;
     const isWhite = this.isWhiteTheme();
+    const lowSpec = this.isPerformanceMode();
 
     if (isWhite) {
-      // Architectural Daylight Grey with soft contrast - subtle atmospheric fog
+      // Architectural Daylight Grey with soft contrast - subtle atmospheric fog (omitted in Performance Mode)
       this.scene.background = new THREE.Color(0xeae8e1);
-      this.scene.fog = new THREE.FogExp2(0xeae8e1, 0.000025);
+      this.scene.fog = lowSpec ? null : new THREE.FogExp2(0xeae8e1, 0.000025);
       if (this.floorMesh) {
         (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.08;
       }
       this.updateGridHelper();
     } else {
-      // Dark CAD Mode - subtle atmospheric fog
+      // Dark CAD Mode - subtle atmospheric fog (omitted in Performance Mode)
       this.scene.background = new THREE.Color(0x0e0e11);
-      this.scene.fog = new THREE.FogExp2(0x0e0e11, 0.00006);
+      this.scene.fog = lowSpec ? null : new THREE.FogExp2(0x0e0e11, 0.00006);
       if (this.floorMesh) {
         (this.floorMesh.material as THREE.ShadowMaterial).opacity = 0.35;
       }
@@ -1069,9 +1099,62 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.isWhiteTheme.update(v => !v);
     this.applyThemeColors();
     this.updateReferenceGuideScene();
+    this.requestRender(8);
+  }
+
+  /**
+   * Alterna entre el Modo Rendimiento (60 FPS para PCs de bajos recursos / gráficos integrados)
+   * y el Modo de Calidad Alta (sombras suaves PCF en tiempo real y DPR hasta 1.5x).
+   */
+  togglePerformanceMode() {
+    const next = !this.isPerformanceMode();
+    this.isPerformanceMode.set(next);
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.setItem('melamipro_3d_performance_mode', next ? 'true' : 'false');
+    }
+    this.applyPerformanceProfile();
+  }
+
+  private applyPerformanceProfile() {
+    if (!this.renderer || !this.scene) return;
+    const lowSpec = this.isPerformanceMode();
+
+    this.renderer.setPixelRatio(this.getTargetPixelRatio());
+    this.renderer.shadowMap.enabled = !lowSpec;
+    this.renderer.shadowMap.needsUpdate = true;
+
+    if (this.keyLightRef) {
+      this.keyLightRef.castShadow = !lowSpec;
+    }
+    if (this.frontLightRef) {
+      this.frontLightRef.visible = !lowSpec;
+    }
+    if (this.floorMesh) {
+      this.floorMesh.receiveShadow = !lowSpec;
+      this.floorMesh.visible = !lowSpec && this.workspaceMode() !== 'room';
+    }
+
+    this.applyThemeColors();
+
+    // Notificar a los materiales del grafo de escena para recompilar shaders con/sin mapa de sombras
+    this.scene.traverse(obj => {
+      if (obj instanceof THREE.Mesh && obj.material) {
+        if (Array.isArray(obj.material)) {
+          for (const m of obj.material) {
+            if (m) m.needsUpdate = true;
+          }
+        } else {
+          obj.material.needsUpdate = true;
+        }
+      }
+    });
+
+    this.requestRender(12);
   }
 
   private setupLighting() {
+    const lowSpec = this.isPerformanceMode();
+
     // Soft Ambient Light
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
     this.scene.add(ambientLight);
@@ -1083,9 +1166,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     // Key Directional Light for Crisp Shadows
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
     keyLight.position.set(1600, 2600, 1800);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 2048;
-    keyLight.shadow.mapSize.height = 2048;
+    keyLight.castShadow = !lowSpec;
+    keyLight.shadow.mapSize.width = 1536;
+    keyLight.shadow.mapSize.height = 1536;
     keyLight.shadow.camera.near = 200;
     keyLight.shadow.camera.far = 7000;
     const d = 2200;
@@ -1094,6 +1177,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     keyLight.shadow.camera.top = d;
     keyLight.shadow.camera.bottom = -d;
     keyLight.shadow.bias = -0.0003;
+    this.keyLightRef = keyLight;
     this.scene.add(keyLight);
 
     // Soft Side & Back Fill Lights
@@ -1103,17 +1187,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     const frontLight = new THREE.DirectionalLight(0xffffff, 0.45);
     frontLight.position.set(0, 800, 2200);
+    frontLight.visible = !lowSpec;
+    this.frontLightRef = frontLight;
     this.scene.add(frontLight);
   }
 
   private setupFloorGrid() {
+    const lowSpec = this.isPerformanceMode();
     // Soft shadow receiver plane
     const floorGeo = new THREE.PlaneGeometry(8000, 8000);
     const floorMat = new THREE.ShadowMaterial({ opacity: 0.09 });
     this.floorMesh = new THREE.Mesh(floorGeo, floorMat);
     this.floorMesh.rotation.x = -Math.PI / 2;
     this.floorMesh.position.y = -1;
-    this.floorMesh.receiveShadow = true;
+    this.floorMesh.receiveShadow = !lowSpec;
+    this.floorMesh.visible = !lowSpec && this.workspaceMode() !== 'room';
     this.scene.add(this.floorMesh);
 
     // Millimetric Grid Helper sincronizado con el espacio de trabajo
@@ -10778,6 +10866,7 @@ private applyMagneticSnapToPosition(
 
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    this.renderer.setPixelRatio(this.getTargetPixelRatio());
     this.renderer.setSize(width, height);
     this.requestRender(8);
   }
@@ -10818,7 +10907,7 @@ private applyMagneticSnapToPosition(
 
     if (mode !== 'room') {
       this.roomGroup.visible = false;
-      if (this.floorMesh) this.floorMesh.visible = true;
+      if (this.floorMesh) this.floorMesh.visible = !this.isPerformanceMode();
       if (this.gridHelper) this.gridHelper.visible = true;
       this.requestRender(4);
       return;
