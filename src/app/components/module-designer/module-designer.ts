@@ -3,7 +3,6 @@ import {
   Component,
   computed,
   DestroyRef,
-  effect,
   ElementRef,
   inject,
   signal,
@@ -49,11 +48,9 @@ import {
   RoomConfiguration,
   RoomWallInstance,
   getResolvedRoomWalls,
-  rescaleWallsToFloor,
   RoomLayoutType,
   FloorMaterialType,
   WallMaterialType,
-  DEFAULT_ROOM_CONFIG,
   FLOOR_FINISHES_CATALOG,
   WALL_FINISHES_CATALOG,
   FloorFinishCategory,
@@ -504,9 +501,9 @@ export class ModuleDesignerComponent {
     }
   }
 
-  // Estado de selección en 3D (pieza individual, multiselección y luz libre)
-  readonly selectedPartId = signal<string | null>(null);
-  readonly selectedPartIds = signal<string[]>([]);
+  // Estado de selección en 3D persistido en el servicio global para conservarse al cambiar de vista
+  readonly selectedPartId = this.projectService.designerSelectedPartId;
+  readonly selectedPartIds = this.projectService.designerSelectedPartIds;
   readonly clearanceInfo = signal<ClearanceInfo | null>(null);
 
   readonly Math = Math;
@@ -834,12 +831,12 @@ export class ModuleDesignerComponent {
   });
   readonly totalHiddenCount = computed(() => this.hiddenPartIds().size + this.hiddenAppliancesCount());
 
-  // Configuración del Modo Habitación 3D y Catálogos de Acabados Arquitectónicos
-  readonly workspaceMode = signal<WorkspaceMode>('module');
-  readonly roomConfig = signal<RoomConfiguration>(DEFAULT_ROOM_CONFIG);
+  // Configuración del Modo Habitación 3D y Catálogos de Acabados Arquitectónicos (sincronizados globalmente)
+  readonly workspaceMode = this.projectService.workspaceMode;
+  readonly roomConfig = this.projectService.roomConfig;
   readonly showRoomSettingsModal = signal<boolean>(false);
-  readonly selectedWall = signal<string | null>(null);
-  readonly roomDockSubTab = signal<'wall' | 'environment' | 'finishes'>('wall');
+  readonly selectedWall = this.projectService.selectedWallId;
+  readonly roomDockSubTab = this.projectService.designerRoomDockSubTab;
 
   readonly resolvedWalls = computed(() => getResolvedRoomWalls(this.roomConfig()));
   readonly selectedWallInstance = computed(() => {
@@ -999,7 +996,7 @@ export class ModuleDesignerComponent {
   }
 
   // Pestaña activa de la bandeja derecha: 'piece', 'catalog' o 'appliances'
-  readonly activeDockTab = signal<'piece' | 'catalog' | 'appliances'>('catalog');
+  readonly activeDockTab = this.projectService.designerActiveDockTab;
 
   // Electrodomésticos y Accesorios 3D
   readonly appliances = this.projectService.appliancesList;
@@ -1708,32 +1705,20 @@ export class ModuleDesignerComponent {
   }
 
   constructor() {
-    const parts = this.currentParts();
-    if (parts.length > 0) {
-      const topPart = parts.find(p => p.name.toUpperCase().includes('TECHO') || p.id === 'desk_top') || parts[0];
-      this.selectedPartId.set(topPart.id);
-      this.selectedPartIds.set([topPart.id]);
-      this.activeDockTab.set('piece');
-    }
-
-    // Sincronizar roomConfig si se modifica desde la Configuración de Proyecto (Header)
-    effect(() => {
-      const projRoom = this.project().roomConfig;
-      if (projRoom) {
-        const cur = this.roomConfig();
-        if (
-          cur.floorWidth !== projRoom.floorWidth ||
-          cur.floorDepth !== projRoom.floorDepth ||
-          cur.mainWallLength !== projRoom.mainWallLength ||
-          cur.sideWallLength !== projRoom.sideWallLength ||
-          cur.rightWallLength !== projRoom.rightWallLength ||
-          cur.wallHeight !== projRoom.wallHeight ||
-          cur.layout !== projRoom.layout
-        ) {
-          this.roomConfig.set({ ...cur, ...projRoom });
-        }
+    if (!this.projectService.designerSessionInitialized()) {
+      const parts = this.currentParts();
+      if (this.workspaceMode() === 'room') {
+        this.selectedPartId.set(null);
+        this.selectedPartIds.set([]);
+        this.activeDockTab.set('piece');
+      } else if (parts.length > 0) {
+        const topPart = parts.find(p => p.name.toUpperCase().includes('TECHO') || p.id === 'desk_top') || parts[0];
+        this.selectedPartId.set(topPart.id);
+        this.selectedPartIds.set([topPart.id]);
+        this.activeDockTab.set('piece');
       }
-    });
+      this.projectService.designerSessionInitialized.set(true);
+    }
 
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer) {
@@ -3590,13 +3575,17 @@ export class ModuleDesignerComponent {
   // --- MODO HABITACIÓN Y ENTORNO ARQUITECTÓNICO ---
 
   setWorkspaceMode(mode: WorkspaceMode) {
-    this.workspaceMode.set(mode);
+    const prevMode = this.workspaceMode();
+    this.projectService.setWorkspaceMode(mode);
     if (mode === 'room') {
-      setTimeout(() => {
-        this.viewer3d()?.frameRoomView();
-      }, 60);
+      if (prevMode !== 'room') {
+        setTimeout(() => {
+          this.viewer3d()?.frameRoomView();
+        }, 60);
+      }
       this.showToast('🏠 Modo Habitación 3D activado');
     } else {
+      this.selectedWall.set(null);
       this.showToast('🪵 Modo Módulo Individual activado');
     }
   }
@@ -3614,41 +3603,16 @@ export class ModuleDesignerComponent {
   }
 
   updateRoomConfig(updates: Partial<RoomConfiguration>) {
-    const cur = this.roomConfig();
-    const targetW = updates.floorWidth ?? cur.floorWidth ?? 5000;
-    const targetD = updates.floorDepth ?? cur.floorDepth ?? 5000;
-    const prevW = cur.floorWidth ?? 5000;
-    const prevD = cur.floorDepth ?? 5000;
-
-    let walls = updates.walls ?? cur.walls;
-    let extraUpdates: Partial<RoomConfiguration> = {};
-
-    if ((targetW !== prevW || targetD !== prevD) && !updates.walls) {
-      const wallT = updates.wallThickness ?? cur.wallThickness ?? 150;
-      const offX = updates.wallOffsetX ?? cur.wallOffsetX ?? 0;
-      const offZ = updates.wallOffsetZ ?? cur.wallOffsetZ ?? 0;
-      const curWalls = getResolvedRoomWalls(cur);
-      const rescaled = rescaleWallsToFloor(curWalls, prevW, prevD, targetW, targetD, wallT, offX, offZ);
-      walls = rescaled;
-      const mainWall = rescaled.find(item => item.id === 'main');
-      const sideWall = rescaled.find(item => item.id === 'side');
-      const rightWall = rescaled.find(item => item.id === 'right_side');
-      extraUpdates = {
-        mainWallLength: mainWall ? mainWall.length : Math.min(targetW, cur.mainWallLength),
-        sideWallLength: sideWall ? sideWall.length : Math.min(Math.max(600, targetD - wallT), cur.sideWallLength),
-        rightWallLength: rightWall ? rightWall.length : (cur.rightWallLength ? Math.min(Math.max(600, targetD - wallT), cur.rightWallLength) : undefined)
-      };
-    }
-
-    const merged = { ...updates, ...extraUpdates, ...(walls ? { walls } : {}) };
-    this.roomConfig.update(c => ({ ...c, ...merged }));
-    this.projectService.updateRoomConfig(merged);
+    this.projectService.updateRoomConfig(updates);
   }
 
   setRoomLayout(layout: RoomLayoutType) {
     const cur = this.roomConfig();
-    const newWalls = getResolvedRoomWalls({ ...cur, layout, walls: undefined });
-    this.updateRoomConfig({ layout, walls: newWalls });
+    const baseWalls = getResolvedRoomWalls({ ...cur, layout, walls: undefined });
+    const customDividers = (cur.walls || []).filter(
+      w => w.id !== 'main' && w.id !== 'side' && w.id !== 'right_side'
+    );
+    this.updateRoomConfig({ layout, walls: [...baseWalls, ...customDividers] });
     const label = layout === 'u_shape' ? 'Distribución en U' : layout === 'l_shape' ? 'Esquina en L' : 'Pared Recta';
     this.showToast(`📐 Disposición: ${label}`);
   }
@@ -3690,7 +3654,21 @@ export class ModuleDesignerComponent {
   }
 
   alignWallsToEdge() {
-    this.updateRoomConfig({ wallOffsetX: 0, wallOffsetZ: 0 });
+    const cur = this.roomConfig();
+    const resetWalls = getResolvedRoomWalls({
+      ...cur,
+      wallOffsetX: 0,
+      wallOffsetZ: 0,
+      walls: undefined
+    });
+    const extraWalls = (cur.walls || []).filter(
+      w => w.id !== 'main' && w.id !== 'side' && w.id !== 'right_side'
+    );
+    this.updateRoomConfig({
+      wallOffsetX: 0,
+      wallOffsetZ: 0,
+      walls: [...resetWalls, ...extraWalls]
+    });
     this.showToast('📐 Muros alineados al borde exacto del piso');
   }
 
@@ -3720,34 +3698,9 @@ export class ModuleDesignerComponent {
   }
 
   setWorkspaceSize(width: number, depth: number) {
-    const curCfg = this.roomConfig();
-    const prevW = curCfg.floorWidth || 5000;
-    const prevD = curCfg.floorDepth || 5000;
     const w = Math.max(2000, Math.min(25000, width));
     const d = Math.max(2000, Math.min(25000, depth));
-
-    const currentWalls = getResolvedRoomWalls(curCfg);
-    const wallT = curCfg.wallThickness || 150;
-    const offX = curCfg.wallOffsetX ?? 0;
-    const offZ = curCfg.wallOffsetZ ?? 0;
-    const rescaledWalls = rescaleWallsToFloor(currentWalls, prevW, prevD, w, d, wallT, offX, offZ);
-
-    const mainWall = rescaledWalls.find(item => item.id === 'main');
-    const sideWall = rescaledWalls.find(item => item.id === 'side');
-    const rightWall = rescaledWalls.find(item => item.id === 'right_side');
-
     this.projectService.updateWorkspaceDimensions(w, d);
-    const updated = this.projectService.currentProject().roomConfig || DEFAULT_ROOM_CONFIG;
-    this.roomConfig.set({
-      ...this.roomConfig(),
-      ...updated,
-      floorWidth: w,
-      floorDepth: d,
-      mainWallLength: mainWall ? mainWall.length : Math.min(w, curCfg.mainWallLength),
-      sideWallLength: sideWall ? sideWall.length : Math.min(Math.max(600, d - wallT), curCfg.sideWallLength),
-      rightWallLength: rightWall ? rightWall.length : undefined,
-      walls: rescaledWalls
-    });
     this.showToast(`📐 Espacio adaptado: ${(w / 1000).toFixed(1)} × ${(d / 1000).toFixed(1)} m`);
   }
 

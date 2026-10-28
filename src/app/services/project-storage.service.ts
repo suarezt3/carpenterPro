@@ -20,7 +20,9 @@ import {
   RoomConfiguration,
   DEFAULT_ROOM_CONFIG,
   getResolvedRoomWalls,
-  rescaleWallsToFloor
+  rescaleWallsToFloor,
+  WorkspaceMode,
+  Camera3DState
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { JoineryEngineService } from './joinery-engine.service';
@@ -136,6 +138,17 @@ export class ProjectStorageService {
   });
   readonly projectSettings = computed(() => this.currentProject().settings);
   readonly projectNotes = computed<ProjectNoteItem[]>(() => this.currentProject().projectNotes || []);
+
+  // Estado global persistente del entorno Habitación 3D, Cámara 3D y Selección del Diseñador
+  readonly workspaceMode = computed<WorkspaceMode>(() => this.currentProject().workspaceMode || 'module');
+  readonly roomConfig = computed<RoomConfiguration>(() => this.currentProject().roomConfig || DEFAULT_ROOM_CONFIG);
+  readonly lastCameraState = signal<Camera3DState | null>(this.currentProject().cameraState || null);
+  readonly selectedWallId = signal<string | null>(null);
+  readonly designerSelectedPartId = signal<string | null>(null);
+  readonly designerSelectedPartIds = signal<string[]>([]);
+  readonly designerActiveDockTab = signal<'piece' | 'catalog' | 'appliances'>('catalog');
+  readonly designerRoomDockSubTab = signal<'wall' | 'environment' | 'finishes'>('wall');
+  readonly designerSessionInitialized = signal<boolean>(false);
 
   // ==========================================
   // GESTIÓN DE NOTAS DEL PROYECTO
@@ -387,6 +400,15 @@ export class ProjectStorageService {
             }
             if (!parsed.appliances || !Array.isArray(parsed.appliances)) {
               parsed.appliances = [];
+            }
+            const mergedRoom: RoomConfiguration = {
+              ...DEFAULT_ROOM_CONFIG,
+              ...(parsed.roomConfig || {})
+            };
+            mergedRoom.walls = getResolvedRoomWalls(mergedRoom);
+            parsed.roomConfig = mergedRoom;
+            if (!parsed.workspaceMode) {
+              parsed.workspaceMode = 'module';
             }
             return parsed;
           }
@@ -816,7 +838,11 @@ export class ProjectStorageService {
       laborType: 'fixed',
       profitMarginPercent: 25,
       taxPercent: 0,
-      roomConfig: DEFAULT_ROOM_CONFIG,
+      workspaceMode: 'module',
+      roomConfig: {
+        ...DEFAULT_ROOM_CONFIG,
+        walls: getResolvedRoomWalls(DEFAULT_ROOM_CONFIG)
+      },
       updatedAt: new Date().toISOString()
     };
   }
@@ -1005,8 +1031,20 @@ export class ProjectStorageService {
     }
 
     if (projectData) {
+      const mergedRoom: RoomConfiguration = {
+        ...DEFAULT_ROOM_CONFIG,
+        ...(projectData.roomConfig || {})
+      };
+      mergedRoom.walls = getResolvedRoomWalls(mergedRoom);
+      projectData.roomConfig = mergedRoom;
+      if (!projectData.workspaceMode) {
+        projectData.workspaceMode = 'module';
+      }
       this.clearHistory();
       this.selectedApplianceId.set(null);
+      this.selectedWallId.set(null);
+      this.lastCameraState.set(projectData.cameraState || null);
+      this.designerSessionInitialized.set(false);
       this.currentProject.set(projectData);
       this.saveToStorage(projectData);
     }
@@ -1036,10 +1074,22 @@ export class ProjectStorageService {
     if (raw) {
       try {
         const proj = JSON.parse(raw) as Project;
+        const mergedRoom: RoomConfiguration = {
+          ...DEFAULT_ROOM_CONFIG,
+          ...(proj.roomConfig || {})
+        };
+        mergedRoom.walls = getResolvedRoomWalls(mergedRoom);
+        proj.roomConfig = mergedRoom;
+        if (!proj.workspaceMode) {
+          proj.workspaceMode = 'module';
+        }
         this.clearHistory();
         this.selectedApplianceId.set(null);
+        this.selectedWallId.set(null);
+        this.lastCameraState.set(proj.cameraState || null);
+        this.designerSessionInitialized.set(false);
         this.currentProject.set(proj);
-        localStorage.setItem(STORAGE_KEY, raw);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(proj));
       } catch (e) {
         console.error('Error loading project by ID', e);
       }
@@ -1072,6 +1122,9 @@ export class ProjectStorageService {
     };
     this.clearHistory();
     this.selectedApplianceId.set(null);
+    this.selectedWallId.set(null);
+    this.lastCameraState.set(null);
+    this.designerSessionInitialized.set(false);
     this.currentProject.set(newProj);
     this.saveToStorage(newProj);
   }
@@ -1080,6 +1133,9 @@ export class ProjectStorageService {
     const demo = this.createDemoProject();
     this.clearHistory();
     this.selectedApplianceId.set(null);
+    this.selectedWallId.set(null);
+    this.lastCameraState.set(null);
+    this.designerSessionInitialized.set(false);
     this.currentProject.set(demo);
     this.saveToStorage(demo);
   }
@@ -2991,6 +3047,49 @@ export class ProjectStorageService {
     });
   }
 
+  setWorkspaceMode(mode: WorkspaceMode) {
+    this.updateProject(p => {
+      const curConfig = p.roomConfig || DEFAULT_ROOM_CONFIG;
+      const resolvedWalls = getResolvedRoomWalls(curConfig);
+      return {
+        ...p,
+        workspaceMode: mode,
+        roomConfig: {
+          ...curConfig,
+          walls: resolvedWalls
+        }
+      };
+    }, false);
+  }
+
+  saveCameraState(
+    position: { x: number; y: number; z: number },
+    target: { x: number; y: number; z: number },
+    persistToProject = false
+  ) {
+    const cameraState: Camera3DState = {
+      position: {
+        x: Math.round(position.x * 10) / 10,
+        y: Math.round(position.y * 10) / 10,
+        z: Math.round(position.z * 10) / 10
+      },
+      target: {
+        x: Math.round(target.x * 10) / 10,
+        y: Math.round(target.y * 10) / 10,
+        z: Math.round(target.z * 10) / 10
+      }
+    };
+    this.lastCameraState.set(cameraState);
+    if (persistToProject) {
+      const updated: Project = {
+        ...this.currentProject(),
+        cameraState
+      };
+      this.currentProject.set(updated);
+      this.saveToStorage(updated);
+    }
+  }
+
   updateRoomConfig(updates: Partial<RoomConfiguration>, recordHistory = false) {
     this.updateProject(p => {
       const curConfig = p.roomConfig || DEFAULT_ROOM_CONFIG;
@@ -2999,10 +3098,21 @@ export class ProjectStorageService {
       const prevW = curConfig.floorWidth ?? 5000;
       const prevD = curConfig.floorDepth ?? 5000;
 
-      let walls = updates.walls ?? curConfig.walls;
+      let walls = updates.walls
+        ? updates.walls.map(w => ({ ...w }))
+        : curConfig.walls
+          ? curConfig.walls.map(w => ({ ...w }))
+          : undefined;
       let extraUpdates: Partial<RoomConfiguration> = {};
 
-      if ((targetW !== prevW || targetD !== prevD) && !updates.walls) {
+      if (updates.walls) {
+        const mainWall = updates.walls.find(item => item.id === 'main');
+        const sideWall = updates.walls.find(item => item.id === 'side');
+        const rightWall = updates.walls.find(item => item.id === 'right_side');
+        if (mainWall) extraUpdates.mainWallLength = mainWall.length;
+        if (sideWall) extraUpdates.sideWallLength = sideWall.length;
+        if (rightWall) extraUpdates.rightWallLength = rightWall.length;
+      } else if (targetW !== prevW || targetD !== prevD) {
         const wallT = updates.wallThickness ?? curConfig.wallThickness ?? 150;
         const offX = updates.wallOffsetX ?? curConfig.wallOffsetX ?? 0;
         const offZ = updates.wallOffsetZ ?? curConfig.wallOffsetZ ?? 0;
@@ -3017,16 +3127,36 @@ export class ProjectStorageService {
           sideWallLength: sideWall ? sideWall.length : Math.min(Math.max(600, targetD - wallT), curConfig.sideWallLength),
           rightWallLength: rightWall ? rightWall.length : (curConfig.rightWallLength ? Math.min(Math.max(600, targetD - wallT), curConfig.rightWallLength) : undefined)
         };
+      } else if (walls && walls.length > 0) {
+        const dx = updates.wallOffsetX !== undefined ? updates.wallOffsetX - (curConfig.wallOffsetX ?? 0) : 0;
+        const dz = updates.wallOffsetZ !== undefined ? updates.wallOffsetZ - (curConfig.wallOffsetZ ?? 0) : 0;
+        walls = walls.map(w => {
+          const next = { ...w };
+          if (updates.wallMaterial !== undefined) next.material = updates.wallMaterial;
+          if (updates.showSkirting !== undefined) next.showSkirting = updates.showSkirting;
+          if (updates.wallThickness !== undefined) next.thickness = updates.wallThickness;
+          if (updates.wallHeight !== undefined) next.height = updates.wallHeight;
+          if (updates.isWallsLocked !== undefined) next.isLocked = updates.isWallsLocked;
+          if (w.id === 'main' && updates.mainWallLength !== undefined) next.length = updates.mainWallLength;
+          if (w.id === 'side' && updates.sideWallLength !== undefined) next.length = updates.sideWallLength;
+          if (w.id === 'right_side' && updates.rightWallLength !== undefined) next.length = updates.rightWallLength;
+          if (dx !== 0) next.posX = Math.round(next.posX + dx);
+          if (dz !== 0) next.posZ = Math.round(next.posZ + dz);
+          return next;
+        });
       }
+
+      const mergedConfig: RoomConfiguration = {
+        ...curConfig,
+        ...updates,
+        ...extraUpdates,
+        ...(walls ? { walls } : {})
+      };
+      mergedConfig.walls = getResolvedRoomWalls(mergedConfig);
 
       return {
         ...p,
-        roomConfig: {
-          ...curConfig,
-          ...updates,
-          ...extraUpdates,
-          ...(walls ? { walls } : {})
-        }
+        roomConfig: mergedConfig
       };
     }, recordHistory);
   }
@@ -3088,8 +3218,20 @@ export class ProjectStorageService {
       if (!parsed.id || !Array.isArray(parsed.parts) || !Array.isArray(parsed.materials)) {
         throw new Error('Formato de proyecto inválido');
       }
+      const mergedRoom: RoomConfiguration = {
+        ...DEFAULT_ROOM_CONFIG,
+        ...(parsed.roomConfig || {})
+      };
+      mergedRoom.walls = getResolvedRoomWalls(mergedRoom);
+      parsed.roomConfig = mergedRoom;
+      if (!parsed.workspaceMode) {
+        parsed.workspaceMode = 'module';
+      }
       this.clearHistory();
       this.selectedApplianceId.set(null);
+      this.selectedWallId.set(null);
+      this.lastCameraState.set(parsed.cameraState || null);
+      this.designerSessionInitialized.set(false);
       this.currentProject.set(parsed);
       this.saveToStorage(parsed);
       return true;

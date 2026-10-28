@@ -465,6 +465,11 @@ export interface ProjectNoteItem {
   updatedAt: string;
 }
 
+export interface Camera3DState {
+  position: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -483,7 +488,9 @@ export interface Project {
   profitMarginPercent: number;
   taxPercent: number;
   updatedAt: string;
+  workspaceMode?: WorkspaceMode;
   roomConfig?: RoomConfiguration;
+  cameraState?: Camera3DState;
   appliances?: ApplianceItem[];
 }
 

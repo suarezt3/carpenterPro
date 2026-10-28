@@ -65,6 +65,7 @@ import { HardwareCatalogService } from '../../services/hardware-catalog.service'
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
 import { SpatialReferenceGuideService } from '../../services/spatial-reference-guide.service';
+import { ProjectStorageService } from '../../services/project-storage.service';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
@@ -170,9 +171,10 @@ export interface WallSnapResult {
 })
 export class Furniture3dViewerComponent implements OnDestroy {
   private readonly ngZone = inject(NgZone);
+  private readonly projectStorage = inject(ProjectStorageService);
   private joineryEngine = inject(JoineryEngineService);
   readonly hardwareCatalog = inject(HardwareCatalogService);
- private appliance3dBuilder = inject(Appliance3dBuilderService);
+  private appliance3dBuilder = inject(Appliance3dBuilderService);
   private spatialGuideBuilder = inject(SpatialReferenceGuideService);
 
   // Iconos vectoriales estilizados para la cinta de herramientas CAD y menús 3D
@@ -314,6 +316,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   materials = input<Material[]>([]);
   workspaceMode = input<WorkspaceMode>('module');
   roomConfig = input<RoomConfiguration>(DEFAULT_ROOM_CONFIG);
+  selectedWallId = input<string | null>(null);
   appliances = input<ApplianceItem[]>([]);
   selectedApplianceId = input<string | null>(null);
   selectedApplianceIds = input<string[]>([]);
@@ -924,7 +927,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     });
 
-    // 5. Update wall selection highlight & 3D Gizmo when selectedWallType, roomConfig or workspaceMode changes
+    // 5. Update wall selection highlight & 3D Gizmo when selectedWallId, selectedWallType, roomConfig or workspaceMode changes
+    effect(() => {
+      const parentWallId = this.selectedWallId();
+      untracked(() => {
+        if (this.selectedWallType() !== parentWallId) {
+          this.selectedWallType.set(parentWallId);
+        }
+      });
+    });
+
     effect(() => {
       const wallType = this.selectedWallType();
       const config = this.roomConfig();
@@ -980,7 +992,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     // 2. Camera (near = 1.5 mm para permitir zoom cercano milimétrico a cantos y esquinas sin recortar geometría)
     this.camera = new THREE.PerspectiveCamera(45, width / height, 1.5, 80000);
-    this.camera.position.set(1500, 1100, 1900);
+    const savedCam = this.projectStorage.lastCameraState();
+    const initialMode = this.workspaceMode();
+    const initialRoomCfg = this.roomConfig();
+    if (savedCam && savedCam.position && savedCam.target) {
+      this.camera.position.set(savedCam.position.x, savedCam.position.y, savedCam.position.z);
+    } else if (initialMode === 'room') {
+      const effW = initialRoomCfg.floorWidth || 5000;
+      const effD = initialRoomCfg.floorDepth || 5000;
+      const frameDist = Math.max(effW, effD) * 1.35;
+      const tgtY = (initialRoomCfg.wallHeight || 2600) * 0.35;
+      this.camera.position.set(frameDist * 0.45, tgtY + frameDist * 0.55, frameDist * 0.8);
+    } else {
+      this.camera.position.set(1500, 1100, 1900);
+    }
 
     // 3. Renderer (con límite inteligente de devicePixelRatio <= 1.5x o 1.0x en Modo Rendimiento)
     const lowSpec = this.isPerformanceMode();
@@ -1003,7 +1028,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.controls.maxDistance = 45000;
       this.controls.minDistance = 5;
       this.controls.maxPolarAngle = Math.PI / 2 + 0.08;
-      this.controls.target.set(0, 480, 0);
+      if (savedCam && savedCam.target) {
+        this.controls.target.set(savedCam.target.x, savedCam.target.y, savedCam.target.z);
+      } else if (initialMode === 'room') {
+        this.controls.target.set(0, (initialRoomCfg.wallHeight || 2600) * 0.35, 0);
+      } else {
+        this.controls.target.set(0, 480, 0);
+      }
+      this.controls.update();
       this.updateAdaptiveCameraSpeeds();
 
       this.controls.addEventListener('start', () => {
@@ -1021,6 +1053,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.isCameraInteracting = false;
         this.updateAdaptiveCameraSpeeds();
         this.updateAdaptiveGizmoScale();
+        this.projectStorage.saveCameraState(this.camera.position, this.controls.target, true);
         this.requestRender(16);
       });
     });
@@ -1054,10 +1087,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
     // Initial Appliances Setup
     this.updateAppliancesScene(this.appliances(), this.selectedApplianceId());
 
-    // Initial Room Environment Setup
-    if (this.workspaceMode() === 'room') {
-      this.updateRoomScene('room', this.roomConfig());
-    }
+    // Initial Room Environment & Wall Gizmo Setup (rehidratación inmediata en modo Habitación 3D)
+    this.selectedWallType.set(this.selectedWallId());
+    this.updateRoomScene(initialMode, initialRoomCfg);
+    this.updateWallGizmo(this.selectedWallType(), initialRoomCfg, initialMode);
 
     // Initial Scene Build
     this.buildFurnitureScene(
@@ -11517,6 +11550,7 @@ private applyMagneticSnapToPosition(
     }
     this.camera.lookAt(target);
     this.controls.update();
+    this.projectStorage.saveCameraState(this.camera.position, this.controls.target, true);
     this.requestRender(12);
   }
 
@@ -11847,6 +11881,8 @@ private applyMagneticSnapToPosition(
 
       if (progress < 1) {
         requestAnimationFrame(animateTransition);
+      } else {
+        this.projectStorage.saveCameraState(this.camera.position, this.controls.target, true);
       }
     };
 
@@ -12291,6 +12327,11 @@ private applyMagneticSnapToPosition(
    * remueve los listeners globales de window y libera la memoria WebGL al destruir el componente.
    */
   ngOnDestroy() {
+    if (this.camera && this.controls) {
+      this.projectStorage.saveCameraState(this.camera.position, this.controls.target, true);
+    }
+    this.projectStorage.flushPendingStorageSave();
+
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
@@ -12322,6 +12363,7 @@ private applyMagneticSnapToPosition(
     this.disposeGroup(this.wallGizmoGroup);
     this.disposeGroup(this.appliancesGroup);
     this.disposeGroup(this.applianceGizmoGroup);
+    this.disposeGroup(this.referenceGuideGroup);
     this.disposeGroup(this.measureGroup);
     this.disposeGroup(this.magneticSnapGroup);
     this.disposeGroup(this.pushPullHighlightGroup);

@@ -191,6 +191,10 @@ export class ProceduralTextureFactory {
     const repeatKey = `${baseKey}_${repeatX}_${repeatY}`;
     const existingRepeat = this.repeatCache.get(repeatKey);
     if (existingRepeat) {
+      existingRepeat.map.needsUpdate = true;
+      if (existingRepeat.bump) {
+        existingRepeat.bump.needsUpdate = true;
+      }
       return existingRepeat;
     }
 
