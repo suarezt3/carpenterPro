@@ -9,6 +9,17 @@ import {
   providedIn: 'root'
 })
 export class Appliance3dBuilderService {
+  private readonly materialCache = new Map<string, THREE.Material>();
+
+  private getCachedMaterial<T extends THREE.Material>(key: string, factory: () => T): T {
+    let mat = this.materialCache.get(key) as T;
+    if (!mat) {
+      mat = factory();
+      mat.userData = { ...(mat.userData || {}), isShared: true };
+      this.materialCache.set(key, mat);
+    }
+    return mat;
+  }
 
   /**
    * Builds a high-fidelity parametric 3D model for an appliance item.
@@ -20,28 +31,28 @@ export class Appliance3dBuilderService {
 
     const { width: w, depth: d, height: h, finish, type } = appliance;
 
-    // Materials based on finish
-    const bodyMat = this.createFinishMaterial(finish);
-    const accentMat = this.createAccentMaterial(finish);
-    const darkGlassMat = new THREE.MeshStandardMaterial({
+    // Materials based on finish (utilizando caché reutilizable para máximo rendimiento GPU)
+    const bodyMat = this.getCachedMaterial(`appliance_body_${finish}`, () => this.createFinishMaterial(finish));
+    const accentMat = this.getCachedMaterial(`appliance_accent_${finish}`, () => this.createAccentMaterial(finish));
+    const darkGlassMat = this.getCachedMaterial('appliance_dark_glass', () => new THREE.MeshStandardMaterial({
       color: 0x11161d,
       roughness: 0.12,
       metalness: 0.2,
       transparent: true,
       opacity: 0.92
-    });
-    const chromeMat = new THREE.MeshStandardMaterial({
+    }));
+    const chromeMat = this.getCachedMaterial('appliance_chrome', () => new THREE.MeshStandardMaterial({
       color: 0xefefef,
       metalness: 0.92,
       roughness: 0.18
-    });
-    const castIronMat = new THREE.MeshStandardMaterial({
+    }));
+    const castIronMat = this.getCachedMaterial('appliance_cast_iron', () => new THREE.MeshStandardMaterial({
       color: 0x222326,
       metalness: 0.25,
       roughness: 0.8
-    });
-    const ledBlueMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const ledOrangeMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
+    }));
+    const ledBlueMat = this.getCachedMaterial('appliance_led_blue', () => new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+    const ledOrangeMat = this.getCachedMaterial('appliance_led_orange', () => new THREE.MeshBasicMaterial({ color: 0xf97316 }));
 
     // Build specific appliance geometry
     switch (type) {
@@ -58,7 +69,7 @@ export class Appliance3dBuilderService {
         this.buildHood(group, w, h, d, bodyMat, accentMat, chromeMat, ledBlueMat);
         break;
       case 'sink':
-        this.buildSink(group, w, h, d, bodyMat, chromeMat);
+        this.buildSink(group, appliance, w, h, d, bodyMat, chromeMat);
         break;
       case 'microwave':
         this.buildMicrowave(group, w, h, d, bodyMat, accentMat, darkGlassMat, chromeMat, ledBlueMat);
@@ -570,104 +581,423 @@ export class Appliance3dBuilderService {
 
   private buildSink(
     group: THREE.Group,
+    appliance: ApplianceItem,
     w: number,
     h: number,
     d: number,
     bodyMat: THREE.Material,
     chromeMat: THREE.Material
   ) {
-    const rimH = 12;
-    const bowlDepth = Math.max(160, h - rimH);
+    const code = (appliance.modelCode || '').toUpperCase();
+    const name = (appliance.name || '').toUpperCase();
+    const id = (appliance.id || '').toUpperCase();
 
-    // 1. Countertop Outer Flange Rim
-    const rimGeo = new THREE.BoxGeometry(w, rimH, d);
-    const rimMesh = new THREE.Mesh(rimGeo, bodyMat);
-    rimMesh.position.set(0, h - rimH / 2, 0);
-    group.add(rimMesh);
-
-    // 2. Recessed Sink Bowl(s)
-    const isDouble = w >= 780 && !w.toString().includes('single');
-    const innerD = d - 70;
-
-    if (!isDouble) {
-      // SINGLE LARGE BOWL
-      const bowlW = w * 0.68;
-      const bowlGeo = new THREE.BoxGeometry(bowlW, bowlDepth, innerD);
-      const bowlMesh = new THREE.Mesh(bowlGeo, bodyMat);
-      bowlMesh.position.set(-w * 0.12, (h - rimH) / 2, 0);
-      group.add(bowlMesh);
-
-      // Drain basket strainer
-      const drainGeo = new THREE.CylinderGeometry(40, 36, 6, 24);
-      const drainMesh = new THREE.Mesh(drainGeo, chromeMat);
-      drainMesh.position.set(-w * 0.12, h - rimH - bowlDepth + 4, 0);
-      group.add(drainMesh);
-
-      // Right-side grooved draining board (escurridor)
-      const drainBoardGeo = new THREE.BoxGeometry(w * 0.28, 6, innerD);
-      const drainBoard = new THREE.Mesh(drainBoardGeo, bodyMat);
-      drainBoard.position.set(w * 0.32, h - 3, 0);
-      group.add(drainBoard);
-
+    // Identificar claramente el modelo de lavaplatos según el catálogo
+    let sinkType: 'single_drainer' | 'double_bowl' | 'single_square';
+    if (code.includes('8048') || code.includes('DX') || name.includes('ESCURRIDOR') || id.includes('DRAINER')) {
+      sinkType = 'single_drainer';
+    } else if (code.includes('840') || code.includes('DB') || name.includes('DOBLE') || id.includes('DOUBLE')) {
+      sinkType = 'double_bowl';
+    } else if (code.includes('SQR') || name.includes('CUADRADO') || name.includes('SUBMONTAR') || id.includes('SQUARE')) {
+      sinkType = 'single_square';
+    } else if (w >= 780) {
+      sinkType = 'single_drainer';
     } else {
-      // DOUBLE EQUAL BOWLS
-      const halfBowlW = (w - 70) / 2;
-
-      // Left Bowl
-      const b1 = new THREE.Mesh(new THREE.BoxGeometry(halfBowlW, bowlDepth, innerD), bodyMat);
-      b1.position.set(-halfBowlW / 2 - 10, (h - rimH) / 2, 0);
-      group.add(b1);
-
-      // Right Bowl
-      const b2 = new THREE.Mesh(new THREE.BoxGeometry(halfBowlW, bowlDepth, innerD), bodyMat);
-      b2.position.set(halfBowlW / 2 + 10, (h - rimH) / 2, 0);
-      group.add(b2);
-
-      // Strainers in both bowls
-      const d1 = new THREE.Mesh(new THREE.CylinderGeometry(38, 34, 6, 24), chromeMat);
-      d1.position.set(-halfBowlW / 2 - 10, h - rimH - bowlDepth + 4, 0);
-      group.add(d1);
-
-      const d2 = new THREE.Mesh(new THREE.CylinderGeometry(38, 34, 6, 24), chromeMat);
-      d2.position.set(halfBowlW / 2 + 10, h - rimH - bowlDepth + 4, 0);
-      group.add(d2);
+      sinkType = 'single_square';
     }
 
-    // 3. Swivel Gooseneck Designer Faucet (Escalado Armónico y Proporcional)
-    const faucetGroup = new THREE.Group();
-    const fScale = Math.max(0.55, Math.min(1.7, Math.min(w / 800, d / 480)));
-    faucetGroup.scale.set(fScale, fScale, fScale);
-    faucetGroup.position.set(0, h, -d / 2 + 38 * fScale);
+    const isBlack = appliance.finish === 'black_matte';
+    const innerMat = this.getCachedMaterial(`sink_inner_${appliance.finish}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isBlack ? 0x16181a : 0xa4a8ad,
+        metalness: isBlack ? 0.20 : 0.82,
+        roughness: isBlack ? 0.60 : 0.35,
+        side: THREE.DoubleSide
+      })
+    );
+    const darkMat = this.getCachedMaterial('sink_drain_cup', () =>
+      new THREE.MeshStandardMaterial({
+        color: 0x1a1c1e,
+        metalness: 0.35,
+        roughness: 0.70
+      })
+    );
+    const ribMat = this.getCachedMaterial(`sink_rib_${appliance.finish}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isBlack ? 0x272a2e : 0xd8dbe0,
+        metalness: isBlack ? 0.25 : 0.88,
+        roughness: isBlack ? 0.50 : 0.22
+      })
+    );
 
-    // Faucet Base Hub
-    const fBase = new THREE.Mesh(new THREE.CylinderGeometry(22, 24, 30, 20), chromeMat);
-    fBase.position.y = 15;
+    const rimH = 8; // Altura del labio/borde perimetral exterior
+
+    if (sinkType === 'single_drainer') {
+      // =========================================================================
+      // MODELO 1: LAVAPLATOS 1 POZO GRANDE + ESCURRIDOR (LVP-8048-DX - 800x480x210)
+      // =========================================================================
+      const rearDeckD = 65;
+      const frontDeckD = 28;
+      const leftRimW = 24;
+      const rightRimW = 24;
+      const dividerW = 28;
+      const innerD = Math.max(250, d - rearDeckD - frontDeckD);
+      const innerCenterZ = (-d / 2 + rearDeckD + (d / 2 - frontDeckD)) / 2;
+
+      // Ancho del pozo (lado izquierdo, aprox. 54% del ancho útil)
+      const usableW = Math.max(300, w - leftRimW - rightRimW - dividerW);
+      const bowlW = Math.round(usableW * 0.54);
+      const drainerW = usableW - bowlW;
+
+      const bowlX = -w / 2 + leftRimW + bowlW / 2;
+      const dividerX = -w / 2 + leftRimW + bowlW + dividerW / 2;
+      const drainerX = dividerX + dividerW / 2 + drainerW / 2;
+
+      // 1. Marco perimetral abierto superior (sin tapa ciega sobre el pozo)
+      // A. Reborde posterior (donde apoya firmemente la grifería)
+      const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(w, rimH, rearDeckD), bodyMat);
+      rearDeck.position.set(0, h - rimH / 2, -d / 2 + rearDeckD / 2);
+      group.add(rearDeck);
+
+      // B. Reborde frontal
+      const frontDeck = new THREE.Mesh(new THREE.BoxGeometry(w, rimH, frontDeckD), bodyMat);
+      frontDeck.position.set(0, h - rimH / 2, d / 2 - frontDeckD / 2);
+      group.add(frontDeck);
+
+      // C. Reborde lateral izquierdo
+      const leftRim = new THREE.Mesh(new THREE.BoxGeometry(leftRimW, rimH, innerD), bodyMat);
+      leftRim.position.set(-w / 2 + leftRimW / 2, h - rimH / 2, innerCenterZ);
+      group.add(leftRim);
+
+      // D. Reborde lateral derecho
+      const rightRim = new THREE.Mesh(new THREE.BoxGeometry(rightRimW, rimH, innerD), bodyMat);
+      rightRim.position.set(w / 2 - rightRimW / 2, h - rimH / 2, innerCenterZ);
+      group.add(rightRim);
+
+      // E. Tabique divisor intermedio entre pozo y escurridor
+      const dividerMesh = new THREE.Mesh(new THREE.BoxGeometry(dividerW, rimH, innerD), bodyMat);
+      dividerMesh.position.set(dividerX, h - rimH / 2, innerCenterZ);
+      group.add(dividerMesh);
+
+      // 2. Pozo profundo hueco (Cavidad abierta con paredes internas, fondo y desagüe)
+      this.buildHollowBasinCavity(
+        group,
+        bowlX,
+        innerCenterZ,
+        bowlW,
+        innerD,
+        h,
+        bodyMat,
+        innerMat,
+        chromeMat,
+        darkMat,
+        false
+      );
+
+      // 3. Bandeja de escurridor superior (sin cajón profundo por debajo)
+      const drainerPlateThick = 6;
+      const drainerTray = new THREE.Mesh(
+        new THREE.BoxGeometry(drainerW, drainerPlateThick, innerD),
+        bodyMat
+      );
+      drainerTray.position.set(drainerX, h - rimH + drainerPlateThick / 2 - 2, innerCenterZ);
+      group.add(drainerTray);
+
+      // Ranuras de escurrido de agua longitudinales con relieve hacia el pozo
+      const ribCount = 6;
+      const ribLen = Math.max(50, drainerW - 32);
+      const ribSpacing = innerD / (ribCount + 1);
+      const ribW = 8;
+      const ribH = 2.2;
+      for (let i = 1; i <= ribCount; i++) {
+        const rz = innerCenterZ - innerD / 2 + i * ribSpacing;
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(ribLen, ribH, ribW), ribMat);
+        rib.position.set(drainerX, h - rimH + drainerPlateThick - 1 + ribH / 2, rz);
+        group.add(rib);
+      }
+
+      // 4. Grifería de diseño cuello de ganso ubicada sobre el marco posterior detrás del pozo
+      const faucet = this.buildGooseneckFaucet(bowlX, h, -d / 2 + rearDeckD / 2, w, d, chromeMat);
+      group.add(faucet);
+
+    } else if (sinkType === 'double_bowl') {
+      // =========================================================================
+      // MODELO 2: LAVAPLATOS DOBLE POZO ACERO INOX (DB-840-INX - 840x480x220)
+      // =========================================================================
+      const rearDeckD = 65;
+      const frontDeckD = 28;
+      const outerRimW = 24;
+      const centerDividerW = 28;
+      const innerD = Math.max(250, d - rearDeckD - frontDeckD);
+      const innerCenterZ = (-d / 2 + rearDeckD + (d / 2 - frontDeckD)) / 2;
+
+      // Dos pozos simétricos iguales
+      const usableW = Math.max(300, w - outerRimW * 2 - centerDividerW);
+      const bowlW = Math.round(usableW / 2);
+
+      const bowlX1 = -centerDividerW / 2 - bowlW / 2;
+      const bowlX2 = centerDividerW / 2 + bowlW / 2;
+
+      // 1. Marco perimetral abierto superior
+      // A. Reborde posterior
+      const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(w, rimH, rearDeckD), bodyMat);
+      rearDeck.position.set(0, h - rimH / 2, -d / 2 + rearDeckD / 2);
+      group.add(rearDeck);
+
+      // B. Reborde frontal
+      const frontDeck = new THREE.Mesh(new THREE.BoxGeometry(w, rimH, frontDeckD), bodyMat);
+      frontDeck.position.set(0, h - rimH / 2, d / 2 - frontDeckD / 2);
+      group.add(frontDeck);
+
+      // C. Reborde lateral izquierdo
+      const leftRim = new THREE.Mesh(new THREE.BoxGeometry(outerRimW, rimH, innerD), bodyMat);
+      leftRim.position.set(-w / 2 + outerRimW / 2, h - rimH / 2, innerCenterZ);
+      group.add(leftRim);
+
+      // D. Reborde lateral derecho
+      const rightRim = new THREE.Mesh(new THREE.BoxGeometry(outerRimW, rimH, innerD), bodyMat);
+      rightRim.position.set(w / 2 - outerRimW / 2, h - rimH / 2, innerCenterZ);
+      group.add(rightRim);
+
+      // E. Puente divisor central entre ambos pozos
+      const centerBridge = new THREE.Mesh(new THREE.BoxGeometry(centerDividerW, rimH, innerD), bodyMat);
+      centerBridge.position.set(0, h - rimH / 2, innerCenterZ);
+      group.add(centerBridge);
+
+      // 2. Pozo Izquierdo (Hollow Cavity con su propio desagüe y rebosadero)
+      this.buildHollowBasinCavity(
+        group,
+        bowlX1,
+        innerCenterZ,
+        bowlW,
+        innerD,
+        h,
+        bodyMat,
+        innerMat,
+        chromeMat,
+        darkMat,
+        false
+      );
+
+      // 3. Pozo Derecho (Hollow Cavity con su propio desagüe y rebosadero)
+      this.buildHollowBasinCavity(
+        group,
+        bowlX2,
+        innerCenterZ,
+        bowlW,
+        innerD,
+        h,
+        bodyMat,
+        innerMat,
+        chromeMat,
+        darkMat,
+        false
+      );
+
+      // 4. Grifería cuello de cisne centrada exactamente entre los dos pozos sobre el marco posterior
+      const faucet = this.buildGooseneckFaucet(0, h, -d / 2 + rearDeckD / 2, w, d, chromeMat);
+      group.add(faucet);
+
+    } else {
+      // =========================================================================
+      // MODELO 3: LAVAPLATOS POZO CUADRADO SUBMONTAR (LVP-SQR-50 - 500x450x210)
+      // =========================================================================
+      const rearDeckD = 58;
+      const frontDeckD = 22;
+      const outerRimW = 22;
+      const innerD = Math.max(200, d - rearDeckD - frontDeckD);
+      const innerCenterZ = (-d / 2 + rearDeckD + (d / 2 - frontDeckD)) / 2;
+      const bowlW = Math.max(250, w - outerRimW * 2);
+
+      // 1. Marco perimetral delgado y moderno
+      const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(w, rimH, rearDeckD), bodyMat);
+      rearDeck.position.set(0, h - rimH / 2, -d / 2 + rearDeckD / 2);
+      group.add(rearDeck);
+
+      const frontDeck = new THREE.Mesh(new THREE.BoxGeometry(w, rimH, frontDeckD), bodyMat);
+      frontDeck.position.set(0, h - rimH / 2, d / 2 - frontDeckD / 2);
+      group.add(frontDeck);
+
+      const leftRim = new THREE.Mesh(new THREE.BoxGeometry(outerRimW, rimH, innerD), bodyMat);
+      leftRim.position.set(-w / 2 + outerRimW / 2, h - rimH / 2, innerCenterZ);
+      group.add(leftRim);
+
+      const rightRim = new THREE.Mesh(new THREE.BoxGeometry(outerRimW, rimH, innerD), bodyMat);
+      rightRim.position.set(w / 2 - outerRimW / 2, h - rimH / 2, innerCenterZ);
+      group.add(rightRim);
+
+      // 2. Pozo cuadrado amplio y hueco con diagonales de plegado en cruz X
+      this.buildHollowBasinCavity(
+        group,
+        0,
+        innerCenterZ,
+        bowlW,
+        innerD,
+        h,
+        bodyMat,
+        innerMat,
+        chromeMat,
+        darkMat,
+        true
+      );
+
+      // 3. Grifería centrada en el marco posterior
+      const faucet = this.buildGooseneckFaucet(0, h, -d / 2 + rearDeckD / 2, w, d, chromeMat);
+      group.add(faucet);
+    }
+  }
+
+  /**
+   * Construye una cubeta o pozo hueco realista con paredes interiores verticales, placa de fondo sombreada,
+   * desagüe con rejilla cromada y rebosadero antirreboce.
+   */
+  private buildHollowBasinCavity(
+    group: THREE.Group,
+    xCenter: number,
+    zCenter: number,
+    bowlW: number,
+    bowlD: number,
+    totalH: number,
+    bodyMat: THREE.Material,
+    innerMat: THREE.Material,
+    chromeMat: THREE.Material,
+    darkMat: THREE.Material,
+    includeCreases = false
+  ) {
+    const wallT = 4; // Grosor de lámina de acero
+    const bottomThickness = 3;
+    const basinDepth = totalH - 12; // Altura de las paredes verticales
+    const bottomY = bottomThickness / 2;
+
+    // A. Placa de fondo horizontal en la base inferior
+    const bottomGeo = new THREE.BoxGeometry(bowlW - wallT * 2, bottomThickness, bowlD - wallT * 2);
+    const bottomMesh = new THREE.Mesh(bottomGeo, innerMat);
+    bottomMesh.position.set(xCenter, bottomY, zCenter);
+    group.add(bottomMesh);
+
+    // B. Pared vertical frontal (+Z)
+    const frontWallGeo = new THREE.BoxGeometry(bowlW, basinDepth, wallT);
+    const frontWall = new THREE.Mesh(frontWallGeo, innerMat);
+    frontWall.position.set(xCenter, basinDepth / 2 + bottomThickness, zCenter + bowlD / 2 - wallT / 2);
+    group.add(frontWall);
+
+    // C. Pared vertical trasera (-Z)
+    const backWallGeo = new THREE.BoxGeometry(bowlW, basinDepth, wallT);
+    const backWall = new THREE.Mesh(backWallGeo, innerMat);
+    backWall.position.set(xCenter, basinDepth / 2 + bottomThickness, zCenter - bowlD / 2 + wallT / 2);
+    group.add(backWall);
+
+    // D. Pared vertical lateral izquierda (-X)
+    const leftWallGeo = new THREE.BoxGeometry(wallT, basinDepth, bowlD - wallT * 2);
+    const leftWall = new THREE.Mesh(leftWallGeo, innerMat);
+    leftWall.position.set(xCenter - bowlW / 2 + wallT / 2, basinDepth / 2 + bottomThickness, zCenter);
+    group.add(leftWall);
+
+    // E. Pared vertical lateral derecha (+X)
+    const rightWallGeo = new THREE.BoxGeometry(wallT, basinDepth, bowlD - wallT * 2);
+    const rightWall = new THREE.Mesh(rightWallGeo, innerMat);
+    rightWall.position.set(xCenter + bowlW / 2 - wallT / 2, basinDepth / 2 + bottomThickness, zCenter);
+    group.add(rightWall);
+
+    // F. Rejilla y canastilla de desagüe (sifón) en el fondo del pozo
+    const drainRingGeo = new THREE.CylinderGeometry(38, 42, 2.5, 24);
+    const drainRing = new THREE.Mesh(drainRingGeo, chromeMat);
+    drainRing.position.set(xCenter, bottomThickness + 1.25, zCenter);
+    group.add(drainRing);
+
+    const drainCupGeo = new THREE.CylinderGeometry(28, 24, 4, 24);
+    const drainCup = new THREE.Mesh(drainCupGeo, darkMat);
+    drainCup.position.set(xCenter, bottomThickness + 1.5, zCenter);
+    group.add(drainCup);
+
+    const plugGeo = new THREE.CylinderGeometry(14, 14, 2, 16);
+    const plugMesh = new THREE.Mesh(plugGeo, chromeMat);
+    plugMesh.position.set(xCenter, bottomThickness + 3, zCenter);
+    group.add(plugMesh);
+
+    const pinGeo = new THREE.CylinderGeometry(3.5, 3.5, 10, 12);
+    const pinMesh = new THREE.Mesh(pinGeo, chromeMat);
+    pinMesh.position.set(xCenter, bottomThickness + 7, zCenter);
+    group.add(pinMesh);
+
+    // G. Rebosadero antirreboce en la pared posterior
+    const overflowPlateGeo = new THREE.BoxGeometry(36, 12, 1.5);
+    const overflowPlate = new THREE.Mesh(overflowPlateGeo, chromeMat);
+    overflowPlate.position.set(xCenter, basinDepth + bottomThickness - 24, zCenter - bowlD / 2 + wallT + 0.75);
+    group.add(overflowPlate);
+
+    const overflowSlitGeo = new THREE.BoxGeometry(24, 4, 1.8);
+    const overflowSlit = new THREE.Mesh(overflowSlitGeo, darkMat);
+    overflowSlit.position.set(xCenter, basinDepth + bottomThickness - 24, zCenter - bowlD / 2 + wallT + 0.9);
+    group.add(overflowSlit);
+
+    // H. Diagonales de plegado en cruz (X-creases) si se solicitan (estilo moderno submontar)
+    if (includeCreases) {
+      const creaseMat = this.getCachedMaterial('sink_crease_line', () =>
+        new THREE.LineBasicMaterial({ color: 0x5a5d62, transparent: true, opacity: 0.6 })
+      );
+      const halfBW = (bowlW - wallT * 2) / 2;
+      const halfBD = (bowlD - wallT * 2) / 2;
+      const cPoints = [
+        new THREE.Vector3(xCenter - halfBW, bottomThickness + 0.8, zCenter - halfBD),
+        new THREE.Vector3(xCenter, bottomThickness + 0.8, zCenter),
+        new THREE.Vector3(xCenter + halfBW, bottomThickness + 0.8, zCenter + halfBD),
+        new THREE.Vector3(xCenter, bottomThickness + 0.8, zCenter),
+        new THREE.Vector3(xCenter - halfBW, bottomThickness + 0.8, zCenter + halfBD),
+        new THREE.Vector3(xCenter, bottomThickness + 0.8, zCenter),
+        new THREE.Vector3(xCenter + halfBW, bottomThickness + 0.8, zCenter - halfBD)
+      ];
+      const creaseGeo = new THREE.BufferGeometry().setFromPoints(cPoints);
+      const creaseLine = new THREE.Line(creaseGeo, creaseMat);
+      group.add(creaseLine);
+    }
+  }
+
+  /**
+   * Construye una grifería cuello de ganso giratoria con monomando, firmemente apoyada en el marco posterior.
+   */
+  private buildGooseneckFaucet(
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    d: number,
+    chromeMat: THREE.Material
+  ): THREE.Group {
+    const faucetGroup = new THREE.Group();
+    const fScale = Math.max(0.60, Math.min(1.4, Math.min(w / 750, d / 450)));
+    faucetGroup.scale.set(fScale, fScale, fScale);
+    faucetGroup.position.set(x, y, z);
+
+    // 1. Faucet Base Hub
+    const fBase = new THREE.Mesh(new THREE.CylinderGeometry(20, 22, 28, 20), chromeMat);
+    fBase.position.y = 14;
     faucetGroup.add(fBase);
 
-    // Single lever mixer joystick handle
-    const fLever = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 60, 16), chromeMat);
+    // 2. Single lever mixer joystick handle
+    const fLever = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 55, 16), chromeMat);
     fLever.rotation.z = Math.PI / 4;
-    fLever.position.set(22, 35, 0);
+    fLever.position.set(20, 32, 0);
     faucetGroup.add(fLever);
 
-    // Tall curved neck (using torus arc + vertical stem)
-    const fStem = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 190, 20), chromeMat);
-    fStem.position.y = 110;
+    // 3. Tall curved neck (using vertical stem + torus arc)
+    const fStem = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 170, 20), chromeMat);
+    fStem.position.y = 100;
     faucetGroup.add(fStem);
 
     // Curved gooseneck spout arch
-    const archGeo = new THREE.TorusGeometry(60, 11, 16, 24, Math.PI);
+    const archGeo = new THREE.TorusGeometry(55, 10, 16, 24, Math.PI);
     const archMesh = new THREE.Mesh(archGeo, chromeMat);
     archMesh.rotation.y = -Math.PI / 2;
-    archMesh.position.set(0, 205, 60);
+    archMesh.position.set(0, 185, 55);
     faucetGroup.add(archMesh);
 
     // Aerator nozzle tip
-    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(12, 10, 26, 16), chromeMat);
-    nozzle.position.set(0, 190, 120);
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(11, 9, 24, 16), chromeMat);
+    nozzle.position.set(0, 172, 110);
     faucetGroup.add(nozzle);
 
-    group.add(faucetGroup);
+    return faucetGroup;
   }
 
   private buildMicrowave(

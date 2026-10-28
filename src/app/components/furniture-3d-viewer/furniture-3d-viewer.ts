@@ -12100,10 +12100,12 @@ private applyMagneticSnapToPosition(
       const appGroup = this.appliance3dBuilder.buildApplianceGroup(app);
       // Si es un lavaplatos ('sink') o estufa ('cooktop') empotrable montada sobre mesón (y >= 500mm), empotrar la cubeta/chasis hacia abajo
       // para que solo la pestaña perimetral (8mm en lavaplatos, 14mm en estufa) sobresalga sobre la cara superior del mueble/mesón
+      const isMountedSink = app.type === 'sink' && ((app.mountType === 'countertop' && app.position.y > 60) || app.position.y >= 350);
+      const isMountedCooktop = app.type === 'cooktop' && ((app.mountType === 'countertop' && app.position.y > 60) || app.position.y >= 350);
       const visualBaseY =
-        app.type === 'sink' && app.position.y >= 500
+        isMountedSink
           ? app.position.y - app.height + 8
-          : (app.type === 'cooktop' && app.position.y >= 500)
+          : isMountedCooktop
             ? app.position.y - app.height + 14
             : app.position.y;
       appGroup.position.set(app.position.x, visualBaseY, app.position.z);
