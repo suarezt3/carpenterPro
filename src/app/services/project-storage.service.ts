@@ -245,6 +245,33 @@ export class ProjectStorageService {
     this.selectedApplianceId.set(copy.id);
   }
 
+  duplicateMultipleAppliances(ids: string[]): string[] {
+    if (ids.length === 0) return [];
+    const idSet = new Set(ids);
+    const existingList = (this.currentProject().appliances || []).filter(a => idSet.has(a.id));
+    if (existingList.length === 0) return [];
+
+    const copies: ApplianceItem[] = existingList.map((existing, idx) => ({
+      ...existing,
+      id: 'appliance_' + (Date.now() + idx) + '_' + Math.random().toString(36).substring(2, 6),
+      name: `${existing.name} (Copia)`,
+      position: {
+        x: existing.position.x + 80,
+        y: existing.position.y,
+        z: existing.position.z + 80
+      }
+    }));
+
+    this.updateProject(p => ({
+      ...p,
+      appliances: [...(p.appliances || []), ...copies]
+    }));
+    const newIds = copies.map(c => c.id);
+    this.selectedApplianceIds.set(newIds);
+    this.selectedApplianceId.set(newIds[0]);
+    return newIds;
+  }
+
   selectAppliance(id: string | null) {
     this.selectedApplianceId.set(id);
     this.selectedApplianceIds.set(id ? [id] : []);

@@ -210,6 +210,7 @@ export class ModuleDesignerComponent {
     alignRight: cadSvg(['M20 4V20', 'M4 7H16V11H4V7Z', 'M8 13H16V17H8V13Z']),
     alignCenter: cadSvg(['M12 3V21', 'M6 7H18V11H6V7Z', 'M8 13H16V17H8V13Z']),
     alignBottom: cadSvg(['M4 20H20', 'M12 4V16', 'M8 12L12 16L16 12']),
+    alignTop: cadSvg(['M4 4H20', 'M12 20V8', 'M8 12L12 8L16 12']),
     cameraFocus: cadSvg([
       'M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8',
       'M16 4H18.5A1.5 1.5 0 0 1 20 5.5V8',
@@ -602,6 +603,133 @@ export class ModuleDesignerComponent {
   });
 
   /**
+   * Determina si una pieza específica corresponde a la categoría de mesón o salpicadero.
+   */
+  isPartCountertop(part: Part): boolean {
+    if (part.componentRole === 'countertop' || part.componentRole === 'backsplash') return true;
+    if (part.materialId) {
+      const mat = this.materials().find(m => m.id === part.materialId)
+        || this.countertopMaterials().find(m => m.id === part.materialId);
+      if (mat && isCountertopMaterial(mat)) return true;
+    }
+    if (part.groupId && this.isCountertopGroup(part.groupId)) return true;
+    const uName = (part.name || '').toUpperCase();
+    return uName.includes('MESÓN') || uName.includes('MESON') || uName.includes('SALPICADERO');
+  }
+
+  /**
+   * Piezas de melamina / mobiliario seleccionadas (excluye mesones y salpicaderos).
+   */
+  readonly selectedMelamineParts = computed<Part[]>(() => {
+    const parts = this.selectedPartsList();
+    if (parts.length === 0) return [];
+    return parts.filter(p => !this.isPartCountertop(p));
+  });
+
+  /**
+   * Piezas de mesón o salpicadero seleccionadas.
+   */
+  readonly selectedCountertopParts = computed<Part[]>(() => {
+    const parts = this.selectedPartsList();
+    if (parts.length === 0) return [];
+    return parts.filter(p => this.isPartCountertop(p));
+  });
+
+  /**
+   * Piezas sueltas seleccionadas que no pertenecen a ningún módulo/grupo.
+   */
+  readonly selectedUngroupedParts = computed<Part[]>(() => {
+    const parts = this.selectedPartsList();
+    if (parts.length === 0) return [];
+    return parts.filter(p => !p.groupId);
+  });
+
+  /**
+   * Presencia de piezas de melamina en la selección actual.
+   */
+  readonly hasSelectedMelamine = computed<boolean>(() => this.selectedMelamineParts().length > 0);
+
+  /**
+   * Presencia de piezas de mesón / salpicadero en la selección actual.
+   */
+  readonly hasSelectedCountertops = computed<boolean>(() => this.selectedCountertopParts().length > 0);
+
+  /**
+   * Presencia de electrodomésticos en la selección actual.
+   */
+  readonly hasSelectedAppliances = computed<boolean>(() => this.selectedApplianceIds().length > 0);
+
+  /**
+   * Contador de categorías presentes en la selección múltiple.
+   */
+  readonly multiSelectionCategoryCount = computed<number>(() => {
+    let count = 0;
+    if (this.hasSelectedMelamine()) count++;
+    if (this.hasSelectedCountertops()) count++;
+    if (this.hasSelectedAppliances()) count++;
+    return count;
+  });
+
+  /**
+   * Tipo semántico de la selección múltiple actual.
+   */
+  readonly multiSelectionType = computed<'only_melamine' | 'only_countertops' | 'only_appliances' | 'mixed'>(() => {
+    const catCount = this.multiSelectionCategoryCount();
+    if (catCount > 1) return 'mixed';
+    if (this.hasSelectedAppliances()) return 'only_appliances';
+    if (this.hasSelectedCountertops()) return 'only_countertops';
+    return 'only_melamine';
+  });
+
+  /**
+   * Título principal descriptivo del banner de multiselección.
+   */
+  readonly multiSelectionTitle = computed<string>(() => {
+    const type = this.multiSelectionType();
+    if (type === 'only_appliances') {
+      const count = this.selectedApplianceIds().length;
+      return count === 1 ? 'Multi-Selección de Equipos' : `Multi-Selección: ${count} Equipos`;
+    }
+    if (type === 'only_countertops') {
+      return 'Multi-Selección de Mesón';
+    }
+    if (type === 'only_melamine') {
+      const gCount = this.selectedGroupIds().length;
+      if (gCount > 1) return `Multi-Selección: ${gCount} Módulos`;
+      return `Multi-Selección: ${this.selectedMelamineParts().length} Piezas`;
+    }
+    const labels: string[] = [];
+    if (this.hasSelectedMelamine()) labels.push('Muebles');
+    if (this.hasSelectedCountertops()) labels.push('Mesón');
+    if (this.hasSelectedAppliances()) labels.push('Equipos');
+    return `Selección Mixta (${labels.join(' + ')})`;
+  });
+
+  /**
+   * Subtítulo con desglose de cantidades para la cabecera.
+   */
+  readonly multiSelectionSubtitle = computed<string>(() => {
+    const parts: string[] = [];
+    const melCount = this.selectedMelamineParts().length;
+    const ctCount = this.selectedCountertopParts().length;
+    const appCount = this.selectedApplianceIds().length;
+    const gCount = this.selectedGroupIds().length;
+
+    if (gCount > 0) {
+      parts.push(`${gCount} ${gCount === 1 ? 'módulo' : 'módulos'}`);
+    } else if (melCount > 0) {
+      parts.push(`${melCount} ${melCount === 1 ? 'pieza melamina' : 'piezas melamina'}`);
+    }
+    if (ctCount > 0) {
+      parts.push(`${ctCount} ${ctCount === 1 ? 'tramo mesón' : 'tramos mesón'}`);
+    }
+    if (appCount > 0) {
+      parts.push(`${appCount} ${appCount === 1 ? 'equipo' : 'equipos'}`);
+    }
+    return parts.join(' · ') || 'Elementos seleccionados';
+  });
+
+  /**
    * Colección de los módulos actualmente seleccionados.
    */
   readonly selectedGroups = computed<PartGroup[]>(() => {
@@ -630,11 +758,13 @@ export class ModuleDesignerComponent {
       const found = this.groups().find(g => g.id === id);
       const groupParts = parts.filter(p => p.groupId === id);
       const name = found?.name || groupParts[0]?.groupName || groupParts[0]?.moduleName || 'Módulo';
+      const isCountertop = this.isCountertopGroup(id) || !!found?.isCountertop || groupParts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
       return {
         id,
         name,
         partsCount: groupParts.length,
-        type: found?.type || 'assembly'
+        type: found?.type || 'assembly',
+        isCountertop
       };
     });
   });
@@ -2304,33 +2434,42 @@ export class ModuleDesignerComponent {
   }
 
   duplicateSelectedGroup() {
-    if (this.isMultiGroupSelected()) {
-      const gIds = this.selectedGroupIds();
-      const allNewIds: string[] = [];
+    const selAppIds = this.selectedApplianceIds();
+    const gIds = this.selectedGroupIds();
+    const selPartIds = this.selectedPartIds();
+
+    let newAppIds: string[] = [];
+    if (selAppIds.length > 0) {
+      newAppIds = this.projectService.duplicateMultipleAppliances(selAppIds);
+    }
+
+    const allNewPartIds: string[] = [];
+    if (gIds.length > 0) {
       for (const gid of gIds) {
         const res = this.projectService.duplicateGroup(gid);
-        if (res) allNewIds.push(...res.newPartIds);
+        if (res) allNewPartIds.push(...res.newPartIds);
       }
-      if (allNewIds.length > 0) {
-        this.selectedPartIds.set(allNewIds);
-        if (allNewIds.length > 0) {
-          this.selectedPartId.set(allNewIds[0]);
-        }
-        this.activeDockTab.set('piece');
-        this.showToast(`📋 Se duplicaron ${gIds.length} módulos seleccionados`);
+    } else if (selPartIds.length > 0) {
+      for (const pid of selPartIds) {
+        const dup = this.projectService.duplicatePart(pid);
+        if (dup) allNewPartIds.push(dup.id);
       }
-      return;
     }
-    const groupId = this.activeSelectedGroupId();
-    if (!groupId) return;
-    const result = this.projectService.duplicateGroup(groupId);
-    if (result) {
-      this.selectedPartIds.set(result.newPartIds);
-      if (result.newPartIds.length > 0) {
-        this.selectedPartId.set(result.newPartIds[0]);
-      }
-      this.activeDockTab.set('piece');
-      this.showToast(`📋 Se duplicó "${result.newGroup.name}" apilado verticalmente`);
+
+    if (allNewPartIds.length > 0) {
+      this.selectedPartIds.set(allNewPartIds);
+      this.selectedPartId.set(allNewPartIds[0]);
+    }
+    if (newAppIds.length > 0) {
+      this.selectedApplianceIds.set(newAppIds);
+      this.selectedApplianceId.set(newAppIds[0]);
+    }
+
+    this.activeDockTab.set('piece');
+
+    const totalCount = (gIds.length > 0 ? gIds.length : allNewPartIds.length) + newAppIds.length;
+    if (totalCount > 0) {
+      this.showToast(`📋 Se duplicaron ${totalCount} elemento(s) seleccionados`);
     }
   }
 
@@ -2369,18 +2508,96 @@ export class ModuleDesignerComponent {
    * Aplica un material de melamina o mesón a todas las piezas o módulos actualmente seleccionados en 1 solo clic.
    */
   applyMaterialToSelection(materialId: string) {
-    const ids = this.selectedPartIds();
-    if (ids.length === 0) return;
-    const mat = this.projectService.materialsList().find(m => m.id === materialId)
-      || this.countertopMaterials().find(m => m.id === materialId);
+    const isCt = this.isCountertopMultiSelection();
+    if (isCt) {
+      this.applyBulkCountertopMaterial(materialId);
+    } else {
+      this.applyBulkMelamineMaterial(materialId);
+    }
+  }
+
+  /**
+   * Aplica un material de melamina exclusivamente a las piezas de melamina seleccionadas.
+   */
+  applyBulkMelamineMaterial(materialId: string) {
+    const parts = this.selectedMelamineParts();
+    if (parts.length === 0) return;
+    const ids = parts.map(p => p.id);
+    const mat = this.materials().find(m => m.id === materialId)
+      || this.projectService.materialsList().find(m => m.id === materialId);
     if (!mat) return;
     this.projectService.changeMultiplePartsMaterial(ids, materialId);
-    const gCount = this.selectedGroupIds().length;
-    if (gCount > 1) {
-      this.showToast(`🎨 "${mat.name}" aplicado a los ${gCount} módulos seleccionados (${ids.length} piezas)`);
+    this.showToast(`🎨 Melamina "${mat.name}" aplicada a ${ids.length} pieza(s)`);
+  }
+
+  /**
+   * Aplica un material de mesón exclusivamente a las piezas de mesón/salpicadero seleccionadas.
+   */
+  applyBulkCountertopMaterial(materialId: string) {
+    const parts = this.selectedCountertopParts();
+    if (parts.length === 0) return;
+    const ids = parts.map(p => p.id);
+    const mat = this.countertopMaterials().find(m => m.id === materialId)
+      || this.projectService.materialsList().find(m => m.id === materialId);
+    if (!mat) return;
+    this.projectService.changeMultiplePartsMaterial(ids, materialId);
+    this.showToast(`🏛️ Acabado "${mat.name}" aplicado a ${ids.length} tramo(s) de mesón`);
+  }
+
+  /**
+   * Aplica un acabado en bloque a todos los electrodomésticos seleccionados.
+   */
+  applyBulkApplianceFinish(finish: ApplianceFinish) {
+    const ids = this.selectedApplianceIds();
+    if (ids.length === 0) return;
+    const updates = ids.map(id => ({ id, updates: { finish } }));
+    this.projectService.updateMultipleAppliances(updates);
+    const finishOpt = this.applianceFinishOptions.find(o => o.id === finish);
+    const label = finishOpt ? finishOpt.label : finish;
+    this.showToast(`✨ Acabado "${label}" aplicado a ${ids.length} equipo(s)`);
+  }
+
+  /**
+   * Alinea o eleva en bloque todos los electrodomésticos seleccionados.
+   */
+  bulkSnapAppliances(preset: 'floor' | 'countertop') {
+    const ids = this.selectedApplianceIds();
+    if (ids.length === 0) return;
+    const targetY = preset === 'floor' ? 0 : 900;
+    const updates = ids.map(id => {
+      const app = this.appliances().find(a => a.id === id);
+      const currentPos = app?.position || { x: 0, y: 0, z: 0 };
+      return {
+        id,
+        updates: {
+          position: { ...currentPos, y: targetY }
+        }
+      };
+    });
+    this.projectService.updateMultipleAppliances(updates);
+    this.showToast(`📍 ${ids.length} equipo(s) colocados ${preset === 'floor' ? 'al piso (0 mm)' : 'sobre mesón (900 mm)'}`);
+  }
+
+  togglePartInMultiSelection(partId: string) {
+    const currentSel = new Set(this.selectedPartIds());
+    if (currentSel.has(partId)) {
+      currentSel.delete(partId);
     } else {
-      this.showToast(`🎨 "${mat.name}" aplicado a ${ids.length} piezas seleccionadas`);
+      currentSel.add(partId);
     }
+    const nextIds = Array.from(currentSel);
+    this.selectedPartIds.set(nextIds);
+    this.selectedPartId.set(nextIds.length > 0 ? nextIds[0] : null);
+    if (nextIds.length === 0 && this.selectedApplianceIds().length === 0) {
+      this.activeDockTab.set('catalog');
+    }
+  }
+
+  selectOnlyPart(partId: string) {
+    this.selectedPartIds.set([partId]);
+    this.selectedPartId.set(partId);
+    this.projectService.selectAppliances([]);
+    this.activeDockTab.set('piece');
   }
 
   rotateSelectedGroup90() {
@@ -3431,7 +3648,7 @@ export class ModuleDesignerComponent {
       this.projectService.updateMultipleAppliances(appUpdates);
     }
 
-    if (gId) {
+    if (gId && selAppIds.length === 0) {
       this.toggleGroupLockById(gId, event);
       return;
     }
