@@ -142,14 +142,13 @@
             <span>Personalizado</span>
           </button>
 
-          @if (activePreset() === 'oven_base' || activePreset() === 'sink_base' || activePreset() === 'corner_base' || activePreset() === 'oven_tower') {
+          @if (activePreset() === 'oven_base' || activePreset() === 'sink_base' || activePreset() === 'oven_tower') {
             <span class="px-3 py-1.5 rounded-md text-xs bg-zinc-800 text-zinc-100 font-medium shadow-xs flex items-center gap-1.5 shrink-0 border border-zinc-700">
               <hugeicons-icon [icon]="icons.kitchen" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
               <span>
                 @switch (activePreset()) {
                   @case ('oven_base') { Cocina Pro: Horno Empotrado }
                   @case ('sink_base') { Cocina Pro: Bajo Lavaplatos }
-                  @case ('corner_base') { Cocina Pro: Esquinero 45° }
                   @case ('oven_tower') { Cocina Pro: Torre Hornos }
                 }
               </span>

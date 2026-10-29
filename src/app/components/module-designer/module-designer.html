@@ -541,21 +541,7 @@
                     </button>
                   </div>
 
-                  <!-- 3. Esquinero Diagonal 45° -->
-                  <div class="p-2.5 bg-zinc-850 border border-zinc-750 rounded-md flex items-center justify-between gap-2">
-                    <div class="min-w-0">
-                      <span class="text-xs font-semibold text-white block truncate">Módulo Esquinero Diagonal 45° (90×90)</span>
-                      <span class="text-[10px] text-zinc-400 block font-mono">Chaflán paramétrico a 45° para cocinas en L o U</span>
-                    </div>
-                    <button
-                      type="button"
-                      (click)="insertSpecializedKitchenModule('modulo_bajo_esquinero_45', false)"
-                      class="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-600 font-medium text-[11px] rounded-md transition cursor-pointer shrink-0">
-                      + Insertar
-                    </button>
-                  </div>
-
-                  <!-- 4. Torre de Hornos -->
+                  <!-- 3. Torre de Hornos -->
                   <div class="p-2.5 bg-zinc-850 border border-zinc-750 rounded-md flex items-center justify-between gap-2">
                     <div class="min-w-0">
                       <span class="text-xs font-semibold text-white block truncate">Torre Columna Horno + Microondas 215cm</span>
@@ -2669,7 +2655,7 @@
                     <div class="bg-zinc-50 p-2 rounded-md border border-zinc-200/80 shadow-2xs">
                       <div class="flex items-center justify-between mb-1">
                         <span class="text-[10px] font-semibold text-zinc-500">
-                          {{ sel.orientation === 'vertical_yz' ? 'Alto / Largo' : 'Largo' }}
+                          {{ sel.orientation === 'vertical_yz' ? 'Alto (Y) / Largo' : sel.orientation === 'vertical_xy' ? 'Ancho (X) / Largo' : 'Largo (X)' }}
                         </span>
                         <span class="text-[9px] font-mono tabular-nums text-zinc-400">mm</span>
                       </div>
@@ -2697,7 +2683,7 @@
                     <div class="bg-zinc-50 p-2 rounded-md border border-zinc-200/80 shadow-2xs">
                       <div class="flex items-center justify-between mb-1">
                         <span class="text-[10px] font-semibold text-zinc-500">
-                          {{ sel.orientation === 'vertical_xy' ? 'Alto / Ancho' : 'Ancho / Prof.' }}
+                          {{ sel.orientation === 'vertical_xy' ? 'Alto (Y) / Ancho' : 'Ancho / Fondo (Z)' }}
                         </span>
                         <span class="text-[9px] font-mono tabular-nums text-zinc-400">mm</span>
                       </div>
@@ -2727,7 +2713,9 @@
                 <!-- Espesor de Pieza (Grosor) -->
                 <div class="pt-2 border-t border-zinc-200/80 space-y-1.5">
                   <div class="flex items-center justify-between">
-                    <span class="text-[10px] text-zinc-500 font-medium">Espesor de Tablero (Grosor):</span>
+                    <span class="text-[10px] text-zinc-500 font-medium">
+                      {{ sel.orientation === 'horizontal' ? 'Espesor (Y):' : sel.orientation === 'vertical_yz' ? 'Espesor (X):' : 'Espesor (Z):' }}
+                    </span>
                     <div class="flex items-center gap-1">
                       <button
                         type="button"

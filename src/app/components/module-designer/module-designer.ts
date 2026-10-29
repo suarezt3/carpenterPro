@@ -2351,18 +2351,41 @@ export class ModuleDesignerComponent {
     if (!sel) return;
 
     const groupId = this.activeSelectedGroupId();
-    if (!groupId) {
-      this.updateSelectedPart({ orientation });
+    if (groupId) {
+      if (orientation === 'vertical_xy') {
+        this.setGroupFaceDirection('front');
+      } else if (orientation === 'vertical_yz') {
+        this.setGroupFaceDirection('right');
+      } else {
+        this.rotateSelectedGroup(90);
+      }
       return;
     }
 
-    if (orientation === 'vertical_xy') {
-      this.setGroupFaceDirection('front');
-    } else if (orientation === 'vertical_yz') {
-      this.setGroupFaceDirection('right');
-    } else {
-      this.rotateSelectedGroup(90);
+    const currentOrient = sel.orientation || 'horizontal';
+    if (currentOrient === orientation) return;
+
+    let nextL = sel.length;
+    let nextW = sel.width;
+
+    // Adaptar dimensiones para preservar el tamaño físico visual al cambiar orientación directamente
+    if (
+      (currentOrient === 'vertical_yz' && orientation === 'vertical_xy') ||
+      (currentOrient === 'vertical_xy' && orientation === 'vertical_yz')
+    ) {
+      nextL = sel.width;
+      nextW = sel.length;
     }
+
+    this.updateSelectedPart({
+      orientation,
+      length: nextL,
+      width: nextW,
+      rotationX: 0,
+      rotationY: 0,
+      rotationZ: 0
+    });
+    this.showToast(`📐 Orientación: ${orientation === 'horizontal' ? 'Horizontal (XZ)' : orientation === 'vertical_yz' ? 'Lateral (YZ)' : 'Frontal (XY)'}`);
   }
 
   rotateSelectedPart90(axis: 'x' | 'y' | 'z' = 'y') {
@@ -2377,9 +2400,53 @@ export class ModuleDesignerComponent {
     if (viewer) {
       viewer.rotatePart90(sel, axis);
     } else {
-      const prop = axis === 'x' ? 'rotationX' : (axis === 'y' ? 'rotationY' : 'rotationZ');
-      const current = sel[prop] || 0;
-      this.updateSelectedPart({ [prop]: (current + 90) % 360 });
+      const currentOrient = sel.orientation || 'horizontal';
+      let nextOrient = currentOrient;
+      let nextL = sel.length;
+      let nextW = sel.width;
+      if (axis === 'y') {
+        const isStrip =
+          (sel.componentRole === 'plinth' ||
+            sel.componentRole === 'drawer_box' ||
+            sel.componentRole === 'drawer_lateral' ||
+            sel.componentRole === 'backsplash' ||
+            (sel.name && (sel.name.toUpperCase().includes('ZOCALO') || sel.name.toUpperCase().includes('ZÓCALO')))) &&
+          sel.length > sel.width;
+
+        if (currentOrient === 'horizontal') {
+          nextL = sel.width; nextW = sel.length;
+        } else if (currentOrient === 'vertical_yz') {
+          nextOrient = 'vertical_xy';
+          if (!isStrip) { nextL = sel.width; nextW = sel.length; }
+        } else if (currentOrient === 'vertical_xy') {
+          nextOrient = 'vertical_yz';
+          if (!isStrip) { nextL = sel.width; nextW = sel.length; }
+        }
+      } else if (axis === 'x') {
+        if (currentOrient === 'vertical_yz') {
+          nextL = sel.width; nextW = sel.length;
+        } else if (currentOrient === 'horizontal') {
+          nextOrient = 'vertical_xy';
+        } else if (currentOrient === 'vertical_xy') {
+          nextOrient = 'horizontal';
+        }
+      } else if (axis === 'z') {
+        if (currentOrient === 'vertical_xy') {
+          nextL = sel.width; nextW = sel.length;
+        } else if (currentOrient === 'horizontal') {
+          nextOrient = 'vertical_yz';
+        } else if (currentOrient === 'vertical_yz') {
+          nextOrient = 'horizontal';
+        }
+      }
+      this.updateSelectedPart({
+        orientation: nextOrient,
+        length: nextL,
+        width: nextW,
+        rotationX: 0,
+        rotationY: 0,
+        rotationZ: 0
+      });
     }
     this.showToast('🔄 Pieza girada 90°');
   }

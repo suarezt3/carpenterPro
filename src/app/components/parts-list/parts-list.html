@@ -202,6 +202,11 @@
                       <span>Cilindro Ø{{ part.diameter || part.width }}mm (Longitud {{ part.length }}mm)</span>
                     </div>
                   }
+                  @if (part.cornerCutConfig && part.cornerCutConfig.type !== 'none') {
+                    <div class="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-amber-50 text-amber-800 border border-amber-300">
+                      <span>Corte: {{ part.cornerCutConfig.type === 'chamfer_corner' ? 'Chaflán' : (part.cornerCutConfig.type === 'notch_l' ? 'Destaje L' : (part.cornerCutConfig.type === 'rounded_corners' ? 'Curva' : 'Diagonal')) }} ({{ part.cornerCutConfig.cutX }}×{{ part.cornerCutConfig.cutY }}mm - {{ part.cornerCutConfig.corner }})</span>
+                    </div>
+                  }
                   @if (part.rotationX || part.rotationY || part.rotationZ) {
                     <div class="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-100 text-zinc-600 border border-zinc-200">
                       <hugeicons-icon [icon]="icons.rotate3d" [size]="11" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>

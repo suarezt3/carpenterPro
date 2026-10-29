@@ -58,14 +58,18 @@ import {
   RoomWallInstance,
   getResolvedRoomWalls,
   DEFAULT_ROOM_CONFIG,
-  ApplianceItem
+  ApplianceItem,
+  PartCornerCutConfig
 } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
+import { CabinetGeneratorService } from '../../services/cabinet-generator.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
 import { SpatialReferenceGuideService } from '../../services/spatial-reference-guide.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
+import { CadDrawingEngineService } from '../../services/cad-drawing-engine.service';
+import { CadGuide, CadHoveredFace, CadFacePartition, CadToolType } from '../../models/cad-tools.models';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
@@ -176,6 +180,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly hardwareCatalog = inject(HardwareCatalogService);
   private appliance3dBuilder = inject(Appliance3dBuilderService);
   private spatialGuideBuilder = inject(SpatialReferenceGuideService);
+  private cadDrawingEngine = inject(CadDrawingEngineService);
+  private readonly cabinetGen = inject(CabinetGeneratorService);
 
   // Iconos vectoriales estilizados para la cinta de herramientas CAD y menús 3D
   readonly icons = {
@@ -196,6 +202,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
     squareShape: cadSvg(['M4 4H20V20H4V4Z']),
     circleShape: cadSvg(['M21 12A9 9 0 1 1 3 12A9 9 0 0 1 21 12Z']),
     freehandWave: cadSvg(['M3.5 16.5C6.5 8.5 10 8.5 12 12.5C14 16.5 17.5 16.5 20.5 7.5']),
+    pencil: cadSvg(['M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z']),
+    rectCut: cadSvg(['M4 4h16v16H4V4z', 'M4 14h6v6']),
+    arcShape: cadSvg(['M4 20A16 16 0 0 1 20 4', 'M4 20h4', 'M20 4v4']),
+    protractor: cadSvg(['M4 14a8 8 0 0 1 16 0H4z', 'M12 14v-4', 'M12 14l3-3']),
+    clearGuides: cadSvg([
+      'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12z',
+      'M19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+      'M9 10v6',
+      'M15 10v6'
+    ]),
     ruler: RulerIcon,
     cncTarget: cadSvg([
       'M20 12A8 8 0 1 1 4 12A8 8 0 0 1 20 12Z',
@@ -413,9 +429,46 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly hiddenHardwarePartIds = signal<Set<string>>(new Set<string>());
 
   // CAD Palette & Push/Pull State
-  readonly activeTool = signal<'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect' | 'draw_circle' | 'draw_freehand'>('select');
+  readonly activeTool = signal<CadToolType>('select');
   readonly pushPullDelta = signal<{ axisName: string; initialVal: number; currentVal: number; delta: number } | null>(null);
   readonly hoveredFaceInfo = signal<{ partName: string; faceLabel: string; dimLabel: string } | null>(null);
+
+  // Fase 2 CAD Guides & Face Cutting State
+  readonly cadGuides = signal<CadGuide[]>([]);
+  readonly activeFacePartition = signal<CadFacePartition | null>(null);
+  readonly hoveredPartitionRegion = signal<'main' | 'cutout' | null>(null);
+  readonly lineDrawLength = signal<number | null>(null);
+  readonly faceRectDims = signal<{ width: number; height: number } | null>(null);
+  readonly arcDrawRadius = signal<number | null>(null);
+  readonly protractorAngle = signal<number | null>(null);
+
+  readonly isDrawingLine = signal<boolean>(false);
+  readonly isDrawingFaceRect = signal<boolean>(false);
+  readonly isDrawingArc = signal<boolean>(false);
+  readonly isUsingProtractor = signal<boolean>(false);
+  readonly cadNumericInput = signal<string>('');
+
+  private lineStartPoint: THREE.Vector3 | null = null;
+  private faceRectStart: THREE.Vector3 | null = null;
+  private arcPoints: THREE.Vector3[] = [];
+  private protractorOrigin: THREE.Vector3 | null = null;
+  private protractorBaseDir: THREE.Vector3 | null = null;
+  private activeCadHoveredFace: CadHoveredFace | null = null;
+  private activeCadPart: Part | null = null;
+  private activeCadMesh: THREE.Mesh | null = null;
+  private isPartitionPushPulling = false;
+  private partitionPushPullData: {
+    partition: CadFacePartition;
+    part: Part;
+    mesh: THREE.Mesh;
+    maxDepth: number;
+    normal: THREE.Vector3;
+    currentDepth: number;
+  } | null = null;
+
+  private guidesGroup = new THREE.Group();
+  private faceDrawingGroup = new THREE.Group();
+  private partitionHighlightGroup = new THREE.Group();
   readonly showViewsDropdown = signal<boolean>(false);
   readonly showExplodedSlider = signal<boolean>(false);
   readonly showGroupsFlyout = signal<boolean>(false);
@@ -1075,6 +1128,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.rectPreviewGroup);
     this.scene.add(this.circlePreviewGroup);
     this.scene.add(this.freehandPreviewGroup);
+    this.scene.add(this.guidesGroup);
+    this.scene.add(this.faceDrawingGroup);
+    this.scene.add(this.partitionHighlightGroup);
     this.scene.add(this.roomGroup);
     this.scene.add(this.wallSnapGuideGroup);
     this.scene.add(this.legSnapGuideGroup);
@@ -1499,14 +1555,19 @@ export class Furniture3dViewerComponent implements OnDestroy {
         edges = this.getSharedGeometry(`${cylKey}_edges`, () => new THREE.EdgesGeometry(geometry));
       } else if (
         (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) ||
+        (part.cornerCutConfig && part.cornerCutConfig.type !== 'none') ||
         overlappingCutouts.length > 0
       ) {
         const shape = new THREE.Shape();
         const halfSX = localDims.sx / 2;
         const halfSZ = localDims.sz / 2;
 
-        if (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) {
-          const pts = part.contourPoints;
+        let pts = part.contourPoints;
+        if ((!pts || pts.length < 3) && part.cornerCutConfig && part.cornerCutConfig.type !== 'none') {
+          pts = this.cabinetGen.buildCornerCutContour(part.length, part.width, part.cornerCutConfig);
+        }
+
+        if (pts && pts.length >= 3) {
           let minPtX = Infinity, maxPtX = -Infinity, minPtY = Infinity, maxPtY = -Infinity;
           for (const pt of pts) {
             if (pt.x < minPtX) minPtX = pt.x;
@@ -1879,12 +1940,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
   }
   /**
    * Determina de forma exacta qué ejes globales ('x' | 'y' | 'z') y qué propiedades de posición
-   * ('posX' | 'posY' | 'posZ') corresponden al Largo (length), Ancho (width) y Espesor (thickness) de la pieza.
+   * ('posX' | 'posY' | 'posZ') corresponden al Largo (length), Ancho (width) y Espesor (thickness) de la pieza,
+   * de forma 100% universal y desacoplada de nombres o roles de catálogo.
    */
   private getPartStretchAxesConfig(part: Part): PartStretchAxesConfig {
     const orient = part.orientation || 'horizontal';
-    const L = part.length || 0;
-    const W = part.width || 0;
 
     if (orient === 'horizontal') {
       return {
@@ -1897,24 +1957,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
 
     if (orient === 'vertical_yz') {
-      const isBacksplash = part.componentRole === 'backsplash' ||
-                            part.name.toUpperCase().includes('SALPICADERO');
-      const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
-                            part.name.toUpperCase().includes('ZOCALO') ||
-                            part.name.toUpperCase().includes('ZÓCALO'));
-      const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' ||
-                            part.componentRole === 'side_right' ||
-                            (part.name.toUpperCase().includes('LATERAL') &&
-                             !part.name.toUpperCase().includes('CAJ') &&
-                             part.componentRole !== 'drawer_box' &&
-                             part.componentRole !== 'drawer_lateral'));
-      const isDrawerLateral = !isBacksplash && !isCabinetSide && (
-        part.componentRole === 'drawer_box' ||
-        part.componentRole === 'drawer_lateral' ||
-        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
-      );
+      const isStripOrBoxSide =
+        (part.componentRole === 'plinth' ||
+          part.componentRole === 'drawer_box' ||
+          part.componentRole === 'drawer_lateral' ||
+          part.componentRole === 'backsplash' ||
+          (part.name && (part.name.toUpperCase().includes('ZOCALO') || part.name.toUpperCase().includes('ZÓCALO')))) &&
+        (part.length || 0) > (part.width || 0);
 
-      if ((isPlinth || isDrawerLateral || isBacksplash) && L > W) {
+      if (isStripOrBoxSide) {
         return {
           lengthAxis: 'z',
           lengthPosAxis: 'posZ',
@@ -1933,23 +1984,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
 
     // orient === 'vertical_xy'
-    const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
-      !part.name.toUpperCase().includes('CAJ');
-    const isDrawerFront = part.componentRole === 'drawer_front';
-    const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
-      part.name.toUpperCase().includes('CONTRA') ||
-      part.name.toUpperCase().includes('TRASERA');
-
-    if (!isDrawerBoxHead && part.componentRole !== 'door' && ((isDoor && L > W) || (isDrawerFront && W > L))) {
-      return {
-        lengthAxis: 'y',
-        lengthPosAxis: 'posY',
-        widthAxis: 'x',
-        widthPosAxis: 'posX',
-        thicknessAxis: 'z'
-      };
-    }
-
     return {
       lengthAxis: 'x',
       lengthPosAxis: 'posX',
@@ -2591,6 +2625,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.raycaster.setFromCamera(mouse, this.camera);
     const rayOrigin = this.raycaster.ray.origin;
     const rayDir = this.raycaster.ray.direction;
+
+    // 0. Enganche con máxima prioridad a Guías de Referencia CAD (+) y Líneas Guía
+    if (this.cadGuides().length > 0) {
+      const gSnap = this.cadDrawingEngine.findGuideSnap(this.cadGuides(), this.raycaster.ray, 24);
+      if (gSnap) {
+        return {
+          worldPos: gSnap.snapPoint,
+          type: gSnap.type === 'point' ? 'corner' : 'edge',
+          objectName: 'Guía de Referencia CAD'
+        };
+      }
+    }
 
     // 1. Recolección universal de aristas (12 segmentos por caja orientada)
     interface SceneEdgeSegment {
@@ -3435,56 +3481,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
 
       if (isSelected) {
-        const t = part.thickness || 15;
-        const L = part.length;
-        const W = part.width;
-        let sx = L; let sy = t; let sz = W;
-        if (part.orientation === 'vertical_yz') {
-          const isBacksplash = part.componentRole === 'backsplash' ||
-                                part.name.toUpperCase().includes('SALPICADERO');
-          const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
-                                part.name.toUpperCase().includes('ZOCALO') ||
-                                part.name.toUpperCase().includes('ZÓCALO'));
-          const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' || 
-                                part.componentRole === 'side_right' ||
-                                (part.name.toUpperCase().includes('LATERAL') && 
-                                 !part.name.toUpperCase().includes('CAJ') && 
-                                 part.componentRole !== 'drawer_box' && 
-                                 part.componentRole !== 'drawer_lateral'));
-          const isDrawerLateral = !isBacksplash && !isCabinetSide && (
-            part.componentRole === 'drawer_box' ||
-            part.componentRole === 'drawer_lateral' ||
-            (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
-          );
-          if (isBacksplash) {
-            sx = t; sy = Math.min(L, W); sz = Math.max(L, W);
-          } else if ((isPlinth || isDrawerLateral) && L > W) {
-            sx = t; sy = W; sz = L;
-          } else {
-            sx = t; sy = L; sz = W;
-          }
-        } else if (part.orientation === 'vertical_xy') {
-          const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
-            part.name.toUpperCase().includes('CONTRA') ||
-            part.name.toUpperCase().includes('TRASERA');
-          if (isDrawerBoxHead) {
-            sx = L; sy = W; sz = t;
-          } else if (part.componentRole === 'door') {
-            sx = L; sy = W; sz = t;
-          } else if (item.isDoor && L > W) {
-            sx = W; sy = L; sz = t;
-          } else if (item.isDrawer && W > L) {
-            sx = W; sy = L; sz = t;
-          } else {
-            sx = L; sy = W; sz = t;
-          }
-        }
+        const bounds = this.joineryEngine.getPartBounds(part);
         selectedDataList.push({
           part,
           px: item.originalPos.x,
           py: item.originalPos.y,
           pz: item.originalPos.z,
-          sx, sy, sz
+          sx: bounds.sx,
+          sy: bounds.sy,
+          sz: bounds.sz
         });
       }
     }
@@ -5268,6 +5273,7 @@ private createHandleMesh(
           this.controls.enabled = true;
           this.renderMeasurementVisuals();
           this.updateMagneticSnapIndicator(null);
+          this.createGuideFromMeasurement();
           e.preventDefault();
           e.stopPropagation();
           return;
@@ -5349,6 +5355,201 @@ private createHandleMesh(
       }
     }
 
+    // 0.25. Transportador / Guía Angular CAD (Protractor)
+    if (this.activeTool() === 'protractor') {
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
+      const intersects = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+      const pt = snapCand ? snapCand.worldPos.clone() : (intersects.length > 0 ? intersects[0].point.clone() : null);
+
+      if (pt) {
+        if (!this.protractorOrigin) {
+          // Paso 1: Clic en el origen / vértice del transportador
+          this.protractorOrigin = pt;
+          this.isUsingProtractor.set(true);
+          this.controls.enabled = false;
+        } else if (!this.protractorBaseDir) {
+          // Paso 2: Clic en el eje / línea base (0°)
+          const dir = pt.clone().sub(this.protractorOrigin);
+          if (dir.lengthSq() > 1) {
+            this.protractorBaseDir = dir.normalize();
+          }
+        } else {
+          // Paso 3: Clic para fijar el ángulo y trazar la guía angular
+          const dir = pt.clone().sub(this.protractorOrigin);
+          if (dir.lengthSq() > 1) {
+            const currentDir = dir.normalize();
+            let angleDeg = (this.protractorBaseDir.angleTo(currentDir) * 180) / Math.PI;
+            // Snap magnético suave a ángulos estándar (15°, 30°, 45°, 60°, 90°)
+            for (const snapA of [15, 30, 45, 60, 75, 90, 120, 135, 180]) {
+              if (Math.abs(angleDeg - snapA) <= 3) {
+                angleDeg = snapA;
+                break;
+              }
+            }
+            this.addCadGuide({
+              type: 'angle',
+              origin: { x: this.protractorOrigin.x, y: this.protractorOrigin.y, z: this.protractorOrigin.z },
+              direction: { x: currentDir.x, y: currentDir.y, z: currentDir.z },
+              angleDeg: Math.round(angleDeg * 10) / 10
+            });
+          }
+          this.protractorOrigin = null;
+          this.protractorBaseDir = null;
+          this.isUsingProtractor.set(false);
+          this.protractorAngle.set(null);
+          this.clearFaceDrawingPreview();
+          this.controls.enabled = true;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
+    // 0.26. Lápiz / Línea Directa de Partición sobre Cara (L)
+    if (this.activeTool() === 'draw_line') {
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
+      const intersects = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+
+      if (intersects.length > 0 && intersects[0].face) {
+        const hit = intersects[0];
+        const mesh = hit.object as THREE.Mesh;
+        const part = mesh.userData['part'] as Part;
+        const face = this.cadDrawingEngine.detectPieceFace(hit, part, mesh);
+        const pt = snapCand ? snapCand.worldPos.clone() : hit.point.clone();
+
+        if (!this.lineStartPoint) {
+          // Primer clic: Punto inicial sobre la cara o borde
+          this.lineStartPoint = pt;
+          this.activeCadHoveredFace = face;
+          this.activeCadPart = part;
+          this.activeCadMesh = mesh;
+          this.isDrawingLine.set(true);
+          this.controls.enabled = false;
+        } else {
+          // Segundo clic: Punto final de la línea divisoria
+          if (this.activeCadPart && this.activeCadHoveredFace && this.activeCadMesh) {
+            const partition = this.cadDrawingEngine.calculateLinePartition(
+              this.activeCadPart,
+              this.activeCadHoveredFace,
+              this.lineStartPoint,
+              pt,
+              this.activeCadMesh
+            );
+            if (partition) {
+              this.activeFacePartition.set(partition);
+              this.hoveredPartitionRegion.set('cutout');
+              this.renderPartitionHighlight();
+            }
+          }
+          this.lineStartPoint = null;
+          this.isDrawingLine.set(false);
+          this.lineDrawLength.set(null);
+          this.clearFaceDrawingPreview();
+          this.controls.enabled = true;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
+    // 0.27. Rectángulo de Corte / Destaje sobre Cara (R)
+    if (this.activeTool() === 'draw_rect_face') {
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
+      const intersects = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+
+      if (intersects.length > 0 && intersects[0].face) {
+        const hit = intersects[0];
+        const mesh = hit.object as THREE.Mesh;
+        const part = mesh.userData['part'] as Part;
+        const face = this.cadDrawingEngine.detectPieceFace(hit, part, mesh);
+        const pt = snapCand ? snapCand.worldPos.clone() : hit.point.clone();
+
+        if (!this.faceRectStart) {
+          this.faceRectStart = pt;
+          this.activeCadHoveredFace = face;
+          this.activeCadPart = part;
+          this.activeCadMesh = mesh;
+          this.isDrawingFaceRect.set(true);
+          this.controls.enabled = false;
+        } else {
+          if (this.activeCadPart && this.activeCadHoveredFace && this.activeCadMesh) {
+            const partition = this.cadDrawingEngine.calculateRectPartition(
+              this.activeCadPart,
+              this.activeCadHoveredFace,
+              this.faceRectStart,
+              pt,
+              this.activeCadMesh
+            );
+            if (partition) {
+              this.activeFacePartition.set(partition);
+              this.hoveredPartitionRegion.set('cutout');
+              this.renderPartitionHighlight();
+            }
+          }
+          this.faceRectStart = null;
+          this.isDrawingFaceRect.set(false);
+          this.faceRectDims.set(null);
+          this.clearFaceDrawingPreview();
+          this.controls.enabled = true;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
+    // 0.28. Arco de 3 Puntos sobre Cara (A)
+    if (this.activeTool() === 'draw_arc') {
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
+      const intersects = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+
+      if (intersects.length > 0 && intersects[0].face) {
+        const hit = intersects[0];
+        const mesh = hit.object as THREE.Mesh;
+        const part = mesh.userData['part'] as Part;
+        const face = this.cadDrawingEngine.detectPieceFace(hit, part, mesh);
+        const pt = snapCand ? snapCand.worldPos.clone() : hit.point.clone();
+
+        if (this.arcPoints.length === 0) {
+          this.arcPoints = [pt];
+          this.activeCadHoveredFace = face;
+          this.activeCadPart = part;
+          this.activeCadMesh = mesh;
+          this.isDrawingArc.set(true);
+          this.controls.enabled = false;
+        } else if (this.arcPoints.length === 1) {
+          this.arcPoints.push(pt);
+        } else {
+          // Tercer clic: punto medio de curvatura
+          if (this.activeCadPart && this.activeCadHoveredFace && this.activeCadMesh) {
+            const partition = this.cadDrawingEngine.calculateArcPartition(
+              this.activeCadPart,
+              this.activeCadHoveredFace,
+              this.arcPoints[0],
+              this.arcPoints[1],
+              pt,
+              this.activeCadMesh
+            );
+            if (partition) {
+              this.activeFacePartition.set(partition);
+              this.hoveredPartitionRegion.set('cutout');
+              this.renderPartitionHighlight();
+            }
+          }
+          this.arcPoints = [];
+          this.isDrawingArc.set(false);
+          this.arcDrawRadius.set(null);
+          this.clearFaceDrawingPreview();
+          this.controls.enabled = true;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
     // 0.3. Rotate 90° Tool
     if (this.activeTool() === 'rotate_90') {
       const intersects = this.raycaster.intersectObjects(
@@ -5390,6 +5591,48 @@ private createHandleMesh(
 
     // 0.5. Push/Pull (Empujar / Tirar) Tool
     if (this.activeTool() === 'push_pull') {
+      // 0.5.1. Push/Pull sobre Región de Corte Dividida (Fase 3: Corte Sustractivo)
+      const partition = this.activeFacePartition();
+      if (partition && this.hoveredPartitionRegion() === 'cutout') {
+        const part = this.parts().find(p => p.id === partition.partId);
+        const meshObj = this.pieceObjects.find(p => p.part.id === partition.partId);
+        if (part && meshObj) {
+          const normal = new THREE.Vector3(
+            partition.faceNormal.x,
+            partition.faceNormal.y,
+            partition.faceNormal.z
+          ).normalize();
+
+          this.isPartitionPushPulling = true;
+          this.controls.enabled = false;
+
+          const camDir = new THREE.Vector3();
+          this.camera.getWorldDirection(camDir);
+          const hitPt = partition.cutoutWorldVertices[0]
+            ? new THREE.Vector3(partition.cutoutWorldVertices[0].x, partition.cutoutWorldVertices[0].y, partition.cutoutWorldVertices[0].z)
+            : this.raycaster.ray.origin.clone().addScaledVector(this.raycaster.ray.direction, 50);
+          this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hitPt);
+
+          const intersectPoint = new THREE.Vector3();
+          if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
+            this.dragPlaneIntersectionStart.copy(intersectPoint);
+          }
+
+          this.partitionPushPullData = {
+            partition,
+            part: { ...part },
+            mesh: meshObj.mesh,
+            maxDepth: part.thickness || 18,
+            normal,
+            currentDepth: 0
+          };
+
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+
       const intersects = this.raycaster.intersectObjects(
         this.raycastablePieceMeshes,
         false
@@ -5454,15 +5697,22 @@ private createHandleMesh(
             axisName = 'Espesor';
           }
         } else if (orient === 'vertical_yz') {
-          const isBacksplash = part.componentRole === 'backsplash' || part.name.toUpperCase().includes('SALPICADERO');
+          const isStripOrBoxSide =
+            (part.componentRole === 'plinth' ||
+              part.componentRole === 'drawer_box' ||
+              part.componentRole === 'drawer_lateral' ||
+              part.componentRole === 'backsplash' ||
+              (part.name && (part.name.toUpperCase().includes('ZOCALO') || part.name.toUpperCase().includes('ZÓCALO')))) &&
+            (part.length || 0) > (part.width || 0);
+
           if (axis === 'y') {
-            targetDim = isBacksplash ? 'width' : 'length';
+            targetDim = isStripOrBoxSide ? 'width' : 'length';
             posAxis = 'posY';
             axisName = 'Alto';
           } else if (axis === 'z') {
-            targetDim = isBacksplash ? 'length' : 'width';
+            targetDim = isStripOrBoxSide ? 'length' : 'width';
             posAxis = 'posZ';
-            axisName = isBacksplash ? 'Largo' : 'Fondo';
+            axisName = 'Fondo';
           } else {
             targetDim = 'thickness';
             posAxis = 'posX';
@@ -6452,6 +6702,190 @@ private createHandleMesh(
       return;
     }
 
+    // 0.13. Transportador / Guía Angular CAD Live Preview
+    if (this.isUsingProtractor() && this.protractorOrigin) {
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
+      this.updateMagneticSnapIndicator(snapCand);
+      const intersects = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+      const pt = snapCand ? snapCand.worldPos.clone() : (intersects.length > 0 ? intersects[0].point.clone() : null);
+
+      if (pt) {
+        this.disposeGroup(this.faceDrawingGroup);
+        if (!this.protractorBaseDir) {
+          const lineGeo = new THREE.BufferGeometry().setFromPoints([this.protractorOrigin, pt]);
+          const lineMat = new THREE.LineDashedMaterial({ color: 0x64748b, dashSize: 6, gapSize: 3, depthTest: false });
+          const line = new THREE.Line(lineGeo, lineMat);
+          line.computeLineDistances();
+          this.faceDrawingGroup.add(line);
+        } else {
+          const dir = pt.clone().sub(this.protractorOrigin);
+          if (dir.lengthSq() > 1) {
+            let angleDeg = (this.protractorBaseDir.angleTo(dir.normalize()) * 180) / Math.PI;
+            for (const snapA of [15, 30, 45, 60, 75, 90, 120, 135, 180]) {
+              if (Math.abs(angleDeg - snapA) <= 3) {
+                angleDeg = snapA;
+                break;
+              }
+            }
+            this.protractorAngle.set(Math.round(angleDeg * 10) / 10);
+            const fanGroup = this.cadDrawingEngine.buildProtractorFanGroup(
+              this.protractorOrigin,
+              this.protractorBaseDir,
+              dir.normalize(),
+              angleDeg
+            );
+            while (fanGroup.children.length > 0) {
+              this.faceDrawingGroup.add(fanGroup.children[0]);
+            }
+          }
+        }
+        this.requestRender(6);
+      }
+      return;
+    }
+
+    // 0.14. Lápiz / Línea Directa CAD Live Preview (L)
+    if (this.isDrawingLine() && this.lineStartPoint) {
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
+      this.updateMagneticSnapIndicator(snapCand);
+      const intersects = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+      const pt = snapCand ? snapCand.worldPos.clone() : (intersects.length > 0 ? intersects[0].point.clone() : null);
+
+      if (pt) {
+        const len = this.lineStartPoint.distanceTo(pt);
+        this.lineDrawLength.set(Math.round(len));
+        this.disposeGroup(this.faceDrawingGroup);
+        const prevGroup = this.cadDrawingEngine.buildPreviewLineGroup(this.lineStartPoint, pt, len);
+        while (prevGroup.children.length > 0) {
+          this.faceDrawingGroup.add(prevGroup.children[0]);
+        }
+        this.requestRender(6);
+      }
+      return;
+    }
+
+    // 0.15. Rectángulo de Corte CAD Live Preview (R)
+    if (this.isDrawingFaceRect() && this.faceRectStart && this.activeCadHoveredFace && this.activeCadMesh) {
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
+      this.updateMagneticSnapIndicator(snapCand);
+      const intersects = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+      const pt = snapCand ? snapCand.worldPos.clone() : (intersects.length > 0 ? intersects[0].point.clone() : null);
+
+      if (pt) {
+        this.disposeGroup(this.faceDrawingGroup);
+        const prevGroup = this.cadDrawingEngine.buildPreviewRectGroup(
+          this.activeCadHoveredFace,
+          this.faceRectStart,
+          pt,
+          this.activeCadMesh
+        );
+        while (prevGroup.children.length > 0) {
+          this.faceDrawingGroup.add(prevGroup.children[0]);
+        }
+        const spanU = Math.round(Math.abs(pt.x - this.faceRectStart.x));
+        const spanV = Math.round(Math.abs(pt.z - this.faceRectStart.z));
+        this.faceRectDims.set({ width: spanU, height: spanV });
+        this.requestRender(6);
+      }
+      return;
+    }
+
+    // 0.16. Arco CAD Live Preview (A)
+    if (this.isDrawingArc() && this.arcPoints.length > 0) {
+      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
+      this.updateMagneticSnapIndicator(snapCand);
+      const intersects = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+      const pt = snapCand ? snapCand.worldPos.clone() : (intersects.length > 0 ? intersects[0].point.clone() : null);
+
+      if (pt) {
+        this.disposeGroup(this.faceDrawingGroup);
+        if (this.arcPoints.length === 1) {
+          const lineGeo = new THREE.BufferGeometry().setFromPoints([this.arcPoints[0], pt]);
+          const lineMat = new THREE.LineDashedMaterial({ color: 0x0284c7, dashSize: 6, gapSize: 3, depthTest: false });
+          const line = new THREE.Line(lineGeo, lineMat);
+          line.computeLineDistances();
+          this.faceDrawingGroup.add(line);
+        } else if (this.arcPoints.length === 2) {
+          const chord = this.arcPoints[0].distanceTo(this.arcPoints[1]);
+          const mid = this.arcPoints[0].clone().lerp(this.arcPoints[1], 0.5);
+          const sagitta = Math.max(3, mid.distanceTo(pt));
+          const radius = Math.max(10, Math.round((sagitta / 2) + (chord * chord) / (8 * sagitta)));
+          this.arcDrawRadius.set(radius);
+          const arcGroup = this.cadDrawingEngine.buildPreviewArcGroup(
+            this.arcPoints[0],
+            this.arcPoints[1],
+            pt,
+            radius
+          );
+          while (arcGroup.children.length > 0) {
+            this.faceDrawingGroup.add(arcGroup.children[0]);
+          }
+        }
+        this.requestRender(6);
+      }
+      return;
+    }
+
+    // 0.17. Push/Pull sobre Región de Corte Dividida (Fase 3: Corte Sustractivo en Tiempo Real)
+    if (this.isPartitionPushPulling && this.partitionPushPullData) {
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
+        this.scratchDeltaWorld.subVectors(this.scratchCurrentIntersection, this.dragPlaneIntersectionStart);
+        const data = this.partitionPushPullData;
+        const disp = this.scratchDeltaWorld.dot(data.normal.clone().negate());
+
+        if (disp >= 0) {
+          // Empujar hacia adentro (Corte)
+          const capped = Math.min(data.maxDepth, Math.round(disp));
+          data.currentDepth = capped;
+          const isAtLimit = capped >= data.maxDepth;
+
+          this.pushPullDelta.set({
+            axisName: isAtLimit ? `Corte pasante completo` : `Corte`,
+            initialVal: 0,
+            currentVal: -capped,
+            delta: -capped
+          });
+
+          this.disposeGroup(this.faceDrawingGroup);
+          const prevGroup = this.cadDrawingEngine.buildCutDepthPreviewGroup(
+            data.partition,
+            -capped,
+            data.maxDepth
+          );
+          while (prevGroup.children.length > 0) {
+            this.faceDrawingGroup.add(prevGroup.children[0]);
+          }
+        } else {
+          // Tirar hacia afuera (Extrusión positiva)
+          const ext = Math.round(-disp);
+          data.currentDepth = -ext;
+          this.pushPullDelta.set({
+            axisName: 'Extrusión',
+            initialVal: 0,
+            currentVal: ext,
+            delta: ext
+          });
+
+          this.disposeGroup(this.faceDrawingGroup);
+          const prevGroup = this.cadDrawingEngine.buildCutDepthPreviewGroup(
+            data.partition,
+            ext,
+            data.maxDepth
+          );
+          while (prevGroup.children.length > 0) {
+            this.faceDrawingGroup.add(prevGroup.children[0]);
+          }
+        }
+        this.requestRender(6);
+      }
+      return;
+    }
+
     // 0. Push/Pull Active Dragging
     if (this.isPushPulling && this.pushPullData) {
       const rect = canvas.getBoundingClientRect();
@@ -7196,6 +7630,10 @@ private createHandleMesh(
     this.lastHoverRaycastTime = nowPerf;
 
     // Hover cursor updates when not dragging
+    if (this.activeFacePartition()) {
+      this.updatePartitionHover(e);
+    }
+
     if (this.activeTool() === 'push_pull') {
       this.updatePushPullHover(e);
       return;
@@ -7663,11 +8101,45 @@ private createHandleMesh(
           if (dist >= 3) {
             this.isMeasurementPersistent.set(true);
             this.updateMagneticSnapIndicator(null);
+            this.createGuideFromMeasurement();
           }
         }
         this.renderMeasurementVisuals();
       } else {
         // Clic simple: El Punto A queda fijado firmemente y la cámara queda libre para orbitar/inspeccionar antes del segundo clic
+      }
+      return;
+    }
+
+    if (this.isPartitionPushPulling && this.partitionPushPullData) {
+      const data = this.partitionPushPullData;
+      this.isPartitionPushPulling = false;
+      this.partitionPushPullData = null;
+      this.controls.enabled = true;
+      this.disposeGroup(this.faceDrawingGroup);
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+
+      if (data.currentDepth >= data.maxDepth * 0.70 || data.currentDepth >= 8) {
+        // Ejecutar corte sustractivo permanente
+        this.executeActivePartitionCut();
+      } else if (data.currentDepth < -10) {
+        // Ejecutar extrusión hacia afuera
+        const ext = Math.round(-data.currentDepth);
+        const orient = data.part.orientation || 'horizontal';
+        const updates: Partial<Part> = {};
+        if (orient === 'horizontal') {
+          updates.thickness = (data.part.thickness || 18) + ext;
+        } else {
+          updates.length = (data.part.length || 600) + ext;
+        }
+        this.projectStorage.updatePart({ ...data.part, ...updates });
+        this.partModified.emit({ part: data.part, updates });
+        this.clearFacePartition();
+      } else {
+        // No superó umbral mínimo, mantener partición activa
+        this.pushPullDelta.set(null);
+        this.renderPartitionHighlight();
       }
       return;
     }
@@ -7753,9 +8225,9 @@ private createHandleMesh(
 
   // --- CAD TOOLS & PUSH/PULL FACE RAYCASTING ---
 
-  setActiveTool(tool: 'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect' | 'draw_circle' | 'draw_freehand') {
+  setActiveTool(tool: CadToolType) {
     this.activeTool.set(tool);
-    if (tool === 'measure') {
+    if (tool === 'measure' || tool === 'protractor') {
       this.isMeasureMode.set(true);
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) canvas.style.cursor = 'crosshair';
@@ -7783,6 +8255,29 @@ private createHandleMesh(
       this.freehandPoints = [];
       this.freehandStats.set(null);
     }
+    if (tool !== 'draw_line') {
+      this.lineStartPoint = null;
+      this.isDrawingLine.set(false);
+      this.lineDrawLength.set(null);
+    }
+    if (tool !== 'draw_rect_face') {
+      this.faceRectStart = null;
+      this.isDrawingFaceRect.set(false);
+      this.faceRectDims.set(null);
+    }
+    if (tool !== 'draw_arc') {
+      this.arcPoints = [];
+      this.isDrawingArc.set(false);
+      this.arcDrawRadius.set(null);
+    }
+    if (tool !== 'protractor') {
+      this.protractorOrigin = null;
+      this.protractorBaseDir = null;
+      this.isUsingProtractor.set(false);
+      this.protractorAngle.set(null);
+    }
+    this.clearFaceDrawingPreview();
+
     if (tool === 'rotate_90') {
       const grp = this.currentSelectedGroup();
       if (grp) {
@@ -7800,9 +8295,325 @@ private createHandleMesh(
     this.hoveredFaceInfo.set(null);
     const canvas = this.canvasRef()?.nativeElement;
     if (canvas) {
-      canvas.style.cursor = (tool === 'draw_rect' || tool === 'draw_circle' || tool === 'draw_freehand') ? 'crosshair' : 'default';
+      canvas.style.cursor = (
+        tool === 'draw_rect' ||
+        tool === 'draw_circle' ||
+        tool === 'draw_freehand' ||
+        tool === 'draw_line' ||
+        tool === 'draw_rect_face' ||
+        tool === 'draw_arc' ||
+        tool === 'measure' ||
+        tool === 'protractor'
+      ) ? 'crosshair' : 'default';
     }
     this.requestRender(6);
+  }
+
+  // --- FASE 2: GESTIÓN DE GUÍAS Y HERRAMIENTAS DE TRAZADO CAD ---
+
+  addCadGuide(guideData: Omit<CadGuide, 'id' | 'createdAt'>) {
+    const newGuide: CadGuide = {
+      ...guideData,
+      id: `cad_guide_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: Date.now()
+    };
+    this.cadGuides.update(list => [...list, newGuide]);
+    this.renderCadGuidesVisuals();
+    this.requestRender(6);
+  }
+
+  clearAllGuides() {
+    this.cadGuides.set([]);
+    this.renderCadGuidesVisuals();
+    this.requestRender(6);
+  }
+
+  renderCadGuidesVisuals() {
+    this.disposeGroup(this.guidesGroup);
+    const group = this.cadDrawingEngine.buildGuidesGroup(this.cadGuides());
+    while (group.children.length > 0) {
+      this.guidesGroup.add(group.children[0]);
+    }
+    this.requestRender(6);
+  }
+
+  clearFaceDrawingPreview() {
+    this.disposeGroup(this.faceDrawingGroup);
+    this.requestRender(6);
+  }
+
+  clearFacePartition() {
+    this.activeFacePartition.set(null);
+    this.hoveredPartitionRegion.set(null);
+    this.disposeGroup(this.partitionHighlightGroup);
+    this.requestRender(6);
+  }
+
+  renderPartitionHighlight() {
+    this.disposeGroup(this.partitionHighlightGroup);
+    const partition = this.activeFacePartition();
+    if (!partition) {
+      this.requestRender(6);
+      return;
+    }
+    const isHovered = this.hoveredPartitionRegion() === 'cutout';
+    const group = this.cadDrawingEngine.buildPartitionHighlightGroup(partition, isHovered);
+    while (group.children.length > 0) {
+      this.partitionHighlightGroup.add(group.children[0]);
+    }
+    this.requestRender(6);
+  }
+
+  private createGuideFromMeasurement() {
+    const a = this.measurePointA();
+    const b = this.measurePointB();
+    if (!a || !b) return;
+
+    // 1. Agregar punto auxiliar (+) en la posición B
+    this.addCadGuide({
+      type: 'point',
+      origin: { x: b.x, y: b.y, z: b.z }
+    });
+
+    // 2. Si la medición inició desde una arista (measurePointAEdgeDir), trazar línea guía paralela a esa arista
+    if (this.measurePointAEdgeDir) {
+      this.addCadGuide({
+        type: 'line',
+        origin: { x: b.x, y: b.y, z: b.z },
+        direction: {
+          x: this.measurePointAEdgeDir.x,
+          y: this.measurePointAEdgeDir.y,
+          z: this.measurePointAEdgeDir.z
+        }
+      });
+    } else {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dz = b.z - a.z;
+      const len = Math.hypot(dx, dy, dz);
+      if (len > 5) {
+        this.addCadGuide({
+          type: 'line',
+          origin: { x: b.x, y: b.y, z: b.z },
+          direction: { x: dx / len, y: dy / len, z: dz / len }
+        });
+      }
+    }
+  }
+
+  private updatePartitionHover(e: PointerEvent) {
+    const partition = this.activeFacePartition();
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!partition || !canvas || !this.camera) return;
+
+    const rect = canvas.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    const intersects = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
+    if (intersects.length === 0 || !intersects[0].face) {
+      if (this.hoveredPartitionRegion() !== null) {
+        this.hoveredPartitionRegion.set(null);
+        this.renderPartitionHighlight();
+      }
+      return;
+    }
+
+    const hit = intersects[0];
+    const mesh = hit.object as THREE.Mesh;
+    const part = mesh.userData['part'] as Part;
+    if (!part || part.id !== partition.partId) {
+      if (this.hoveredPartitionRegion() !== null) {
+        this.hoveredPartitionRegion.set(null);
+        this.renderPartitionHighlight();
+      }
+      return;
+    }
+
+    const face = this.cadDrawingEngine.detectPieceFace(hit, part, mesh);
+    if (!face) return;
+
+    const isInsideCutout = this.cadDrawingEngine.isPointInPolygon2D(
+      { u: face.localU, v: face.localV },
+      partition.cutoutPolygon
+    );
+
+    const nextRegion = isInsideCutout ? 'cutout' : 'main';
+    if (this.hoveredPartitionRegion() !== nextRegion) {
+      this.hoveredPartitionRegion.set(nextRegion);
+      canvas.style.cursor = isInsideCutout ? 'pointer' : 'default';
+      this.renderPartitionHighlight();
+    }
+  }
+
+  private commitCadNumericInput() {
+    const rawVal = this.cadNumericInput().trim();
+    if (!rawVal) return;
+    const num = parseFloat(rawVal);
+    if (isNaN(num) || num <= 0) {
+      this.cadNumericInput.set('');
+      return;
+    }
+
+    // 1. En Cinta Métrica: fijar punto exacto en milímetros desde Punto A
+    if (this.isMeasureMode() && this.measurePointA()) {
+      const a = this.measurePointA()!;
+      let dir = new THREE.Vector3(1, 0, 0);
+      const b = this.measurePointB();
+      if (b) {
+        const d = new THREE.Vector3(b.x - a.x, b.y - a.y, b.z - a.z);
+        if (d.lengthSq() > 1) dir = d.normalize();
+      }
+      const resolvedB = {
+        x: Math.round(a.x + dir.x * num),
+        y: Math.round(a.y + dir.y * num),
+        z: Math.round(a.z + dir.z * num)
+      };
+      this.measurePointB.set(resolvedB);
+      this.isMeasurementPersistent.set(true);
+      this.renderMeasurementVisuals();
+      this.createGuideFromMeasurement();
+      this.cadNumericInput.set('');
+      return;
+    }
+
+    // 2. En Transportador: trazar guía en ángulo exacto (ej. 45°)
+    if (this.isUsingProtractor() && this.protractorOrigin && this.protractorBaseDir) {
+      const normal = new THREE.Vector3(0, 1, 0);
+      const rotDir = this.protractorBaseDir.clone().applyAxisAngle(normal, (num * Math.PI) / 180).normalize();
+      this.addCadGuide({
+        type: 'angle',
+        origin: { x: this.protractorOrigin.x, y: this.protractorOrigin.y, z: this.protractorOrigin.z },
+        direction: { x: rotDir.x, y: rotDir.y, z: rotDir.z },
+        angleDeg: num
+      });
+      this.protractorOrigin = null;
+      this.protractorBaseDir = null;
+      this.isUsingProtractor.set(false);
+      this.protractorAngle.set(null);
+      this.clearFaceDrawingPreview();
+      this.controls.enabled = true;
+      this.cadNumericInput.set('');
+      return;
+    }
+
+    // 3. En Lápiz: proyectar longitud de línea exacta
+    if (this.isDrawingLine() && this.lineStartPoint && this.activeCadPart && this.activeCadHoveredFace && this.activeCadMesh) {
+      let dir = new THREE.Vector3(1, 0, 0);
+      const mouseHit = this.findMagneticSnapCandidate(0, 0, 100);
+      if (mouseHit) {
+        const d = mouseHit.worldPos.clone().sub(this.lineStartPoint);
+        if (d.lengthSq() > 1) dir = d.normalize();
+      }
+      const p2 = this.lineStartPoint.clone().addScaledVector(dir, num);
+      const partition = this.cadDrawingEngine.calculateLinePartition(
+        this.activeCadPart,
+        this.activeCadHoveredFace,
+        this.lineStartPoint,
+        p2,
+        this.activeCadMesh
+      );
+      if (partition) {
+        this.activeFacePartition.set(partition);
+        this.hoveredPartitionRegion.set('cutout');
+        this.renderPartitionHighlight();
+      }
+      this.lineStartPoint = null;
+      this.isDrawingLine.set(false);
+      this.lineDrawLength.set(null);
+      this.clearFaceDrawingPreview();
+      this.controls.enabled = true;
+      this.cadNumericInput.set('');
+      return;
+    }
+
+    // 4. En Empujar/Tirar (P) sobre partición activa: ejecutar corte
+    if (this.activeFacePartition() && (this.activeTool() === 'push_pull' || this.hoveredPartitionRegion() === 'cutout')) {
+      this.executeActivePartitionCut();
+      this.cadNumericInput.set('');
+      return;
+    }
+
+    this.cadNumericInput.set('');
+  }
+
+  executeActivePartitionCut() {
+    const partition = this.activeFacePartition();
+    if (!partition) return;
+    const part = this.parts().find(p => p.id === partition.partId);
+    if (!part) return;
+
+    const corner = partition.corner || 'front_right';
+    let cfg: PartCornerCutConfig;
+
+    if (partition.cutType === 'line_cut') {
+      cfg = {
+        type: 'chamfer_corner',
+        corner,
+        cutX: partition.cutDimensions.width,
+        cutY: partition.cutDimensions.height
+      };
+    } else if (partition.cutType === 'rect_notch') {
+      cfg = {
+        type: 'notch_l',
+        corner,
+        cutX: partition.cutDimensions.width,
+        cutY: partition.cutDimensions.height
+      };
+    } else {
+      cfg = {
+        type: 'rounded_corners',
+        corner,
+        cutX: partition.cutDimensions.radius || partition.cutDimensions.width,
+        cutY: partition.cutDimensions.radius || partition.cutDimensions.height
+      };
+    }
+
+    this.applyPartitionCut(part, cfg, partition);
+  }
+
+  applyPartitionCut(
+    part: Part,
+    cfg: PartCornerCutConfig,
+    partition: CadFacePartition
+  ) {
+    const L = part.length;
+    const W = part.width;
+    const contourPoints = this.cabinetGen.buildCornerCutContour(L, W, cfg);
+
+    // 1. Guardar en ProjectStorageService
+    this.projectStorage.applyCornerCutToPart(part.id, cfg);
+
+    // 2. Emitir evento para sincronizar con ModuleDesignerComponent
+    this.partModified.emit({
+      part,
+      updates: {
+        shapeType: 'freehand',
+        cornerCutConfig: cfg,
+        contourPoints
+      }
+    });
+
+    // 3. Limpiar estado de partición activo
+    this.clearFacePartition();
+    this.clearFaceDrawingPreview();
+    this.pushPullDelta.set(null);
+
+    // 4. Seleccionar la pieza para que el panel lateral derecho inspeccione de inmediato sus nuevas propiedades
+    this.ngZone.run(() => {
+      this.partsSelected.emit([part.id]);
+      this.partSelected.emit({ ...part, cornerCutConfig: cfg, contourPoints });
+    });
+
+    this.requestRender(10);
+  }
+
+  getActivePartitionPartThickness(): number {
+    const partition = this.activeFacePartition();
+    if (!partition) return 18;
+    const part = this.parts().find(p => p.id === partition.partId);
+    return part?.thickness || 18;
   }
 
   private updatePushPullHover(e: PointerEvent) {
@@ -7868,11 +8679,18 @@ private createHandleMesh(
         dimLabel = `Espesor (${part.thickness} mm)`;
       }
     } else if (orient === 'vertical_yz') {
-      const isBacksplash = part.componentRole === 'backsplash' || part.name.toUpperCase().includes('SALPICADERO');
+      const isStripOrBoxSide =
+        (part.componentRole === 'plinth' ||
+          part.componentRole === 'drawer_box' ||
+          part.componentRole === 'drawer_lateral' ||
+          part.componentRole === 'backsplash' ||
+          (part.name && (part.name.toUpperCase().includes('ZOCALO') || part.name.toUpperCase().includes('ZÓCALO')))) &&
+        (part.length || 0) > (part.width || 0);
+
       if (axis === 'y') {
-        dimLabel = `Alto (${isBacksplash ? part.width : part.length} mm)`;
+        dimLabel = `Alto (${isStripOrBoxSide ? part.width : part.length} mm)`;
       } else if (axis === 'z') {
-        dimLabel = `${isBacksplash ? 'Largo' : 'Fondo'} (${isBacksplash ? part.length : part.width} mm)`;
+        dimLabel = `Fondo (${isStripOrBoxSide ? part.length : part.width} mm)`;
       } else {
         dimLabel = `Espesor (${part.thickness} mm)`;
       }
@@ -8071,6 +8889,9 @@ private createHandleMesh(
   private clearFreehandPreview() {
     if (this.freehandPreviewGroup.children.length > 0) {
       this.disposeGroup(this.freehandPreviewGroup);
+    this.disposeGroup(this.guidesGroup);
+    this.disposeGroup(this.faceDrawingGroup);
+    this.disposeGroup(this.partitionHighlightGroup);
       this.requestRender(4);
     }
   }
@@ -8675,75 +9496,93 @@ private createHandleMesh(
   }
 
   rotatePart90(part: Part, axis: 'x' | 'y' | 'z' = 'y') {
-    const oldBounds = this.joineryEngine.getPartBounds(part);
+    if (part.shapeType === 'circle') {
+      this.closeContextMenu();
+      return;
+    }
+
+    const currentOrient = part.orientation || 'horizontal';
     const updates: Partial<Part> = {
       rotationX: 0,
       rotationY: 0,
       rotationZ: 0
     };
-    const currentOrient = part.orientation || 'horizontal';
 
     if (axis === 'y') {
-      if (part.shapeType !== 'circle') {
-        if (currentOrient === 'horizontal') {
-          updates.orientation = 'horizontal';
+      // Giro 90° sobre eje vertical Y (yaw en planta)
+      const isStrip =
+        (part.componentRole === 'plinth' ||
+          part.componentRole === 'drawer_box' ||
+          part.componentRole === 'drawer_lateral' ||
+          part.componentRole === 'backsplash' ||
+          (part.name && (part.name.toUpperCase().includes('ZOCALO') || part.name.toUpperCase().includes('ZÓCALO')))) &&
+        part.length > part.width;
+
+      if (currentOrient === 'horizontal') {
+        updates.orientation = 'horizontal';
+        updates.length = part.width;
+        updates.width = part.length;
+      } else if (currentOrient === 'vertical_yz') {
+        // Normal X pasa a Z -> vertical_xy
+        updates.orientation = 'vertical_xy';
+        if (isStrip) {
+          updates.length = part.length;
+          updates.width = part.width;
+        } else {
           updates.length = part.width;
           updates.width = part.length;
-        } else if (currentOrient === 'vertical_xy') {
-          updates.orientation = 'vertical_yz';
-          const horizontalSpan = oldBounds.sx;
-          const verticalHeight = oldBounds.sy;
-
-          const isPlinth =
-            part.componentRole === 'plinth' ||
-            part.name.toUpperCase().includes('ZOCALO') ||
-            part.name.toUpperCase().includes('ZÓCALO');
-          const isCabinetSide =
-            !isPlinth &&
-            (part.componentRole === 'side_left' ||
-              part.componentRole === 'side_right' ||
-              part.componentRole === 'divider' ||
-              part.componentRole === 'door' ||
-              part.componentRole === 'back' ||
-              (part.name.toUpperCase().includes('LATERAL') &&
-                !ptIncludesDrawer(part)));
-          const isDrawerBoxSide =
-            !isPlinth &&
-            !isCabinetSide &&
-            ptIncludesDrawer(part);
-
-          if ((isPlinth || isDrawerBoxSide) && horizontalSpan > verticalHeight) {
-            updates.length = horizontalSpan;
-            updates.width = verticalHeight;
-          } else {
-            updates.length = verticalHeight;
-            updates.width = horizontalSpan;
-          }
-        } else if (currentOrient === 'vertical_yz') {
-          updates.orientation = 'vertical_xy';
-          updates.length = oldBounds.sz;
-          updates.width = oldBounds.sy;
+        }
+      } else if (currentOrient === 'vertical_xy') {
+        // Normal Z pasa a X -> vertical_yz
+        updates.orientation = 'vertical_yz';
+        if (isStrip) {
+          updates.length = part.length;
+          updates.width = part.width;
+        } else {
+          updates.length = part.width;
+          updates.width = part.length;
         }
       }
     } else if (axis === 'x') {
-      if (part.shapeType !== 'circle') {
-        updates.orientation = currentOrient === 'horizontal' ? 'vertical_xy' : 'horizontal';
+      // Giro 90° sobre eje X (inclinación frontal / pitch)
+      if (currentOrient === 'vertical_yz') {
+        // Normal sigue en X -> vertical_yz, intercambia Y (Alto) y Z (Fondo)
+        updates.orientation = 'vertical_yz';
+        updates.length = part.width;
+        updates.width = part.length;
+      } else if (currentOrient === 'horizontal') {
+        // Normal Y pasa a Z -> vertical_xy
+        updates.orientation = 'vertical_xy';
+        updates.length = part.length;
+        updates.width = part.width;
+      } else if (currentOrient === 'vertical_xy') {
+        // Normal Z pasa a Y -> horizontal
+        updates.orientation = 'horizontal';
+        updates.length = part.length;
+        updates.width = part.width;
       }
     } else if (axis === 'z') {
-      if (part.shapeType !== 'circle') {
-        updates.orientation = currentOrient === 'horizontal' ? 'vertical_yz' : 'horizontal';
+      // Giro 90° sobre eje Z (inclinación lateral / roll)
+      if (currentOrient === 'vertical_xy') {
+        // Normal sigue en Z -> vertical_xy, intercambia X (Ancho) e Y (Alto)
+        updates.orientation = 'vertical_xy';
+        updates.length = part.width;
+        updates.width = part.length;
+      } else if (currentOrient === 'horizontal') {
+        // Normal Y pasa a X -> vertical_yz
+        updates.orientation = 'vertical_yz';
+        updates.length = part.length;
+        updates.width = part.width;
+      } else if (currentOrient === 'vertical_yz') {
+        // Normal X pasa a Y -> horizontal
+        updates.orientation = 'horizontal';
+        updates.length = part.length;
+        updates.width = part.width;
       }
     }
+
     this.partModified.emit({ part, updates });
     this.closeContextMenu();
-
-    function ptIncludesDrawer(p: Part): boolean {
-      return (
-        p.componentRole === 'drawer_box' ||
-        p.componentRole === 'drawer_lateral' ||
-        (p.name.toUpperCase().includes('LATERAL') && p.name.toUpperCase().includes('CAJ'))
-      );
-    }
   }
 
   /**
@@ -8812,12 +9651,36 @@ private createHandleMesh(
           newWidth = pt.length;
         } else if (currentOrient === 'vertical_xy') {
           newOrientation = 'vertical_yz';
-          newLength = pt.length;
-          newWidth = pt.width;
+          const isStrip =
+            (pt.componentRole === 'plinth' ||
+              pt.componentRole === 'drawer_box' ||
+              pt.componentRole === 'drawer_lateral' ||
+              pt.componentRole === 'backsplash' ||
+              (pt.name && (pt.name.toUpperCase().includes('ZOCALO') || pt.name.toUpperCase().includes('ZÓCALO')))) &&
+            pt.length > pt.width;
+          if (isStrip) {
+            newLength = pt.length;
+            newWidth = pt.width;
+          } else {
+            newLength = pt.width;
+            newWidth = pt.length;
+          }
         } else if (currentOrient === 'vertical_yz') {
           newOrientation = 'vertical_xy';
-          newLength = pt.length;
-          newWidth = pt.width;
+          const isStrip =
+            (pt.componentRole === 'plinth' ||
+              pt.componentRole === 'drawer_box' ||
+              pt.componentRole === 'drawer_lateral' ||
+              pt.componentRole === 'backsplash' ||
+              (pt.name && (pt.name.toUpperCase().includes('ZOCALO') || pt.name.toUpperCase().includes('ZÓCALO')))) &&
+            pt.length > pt.width;
+          if (isStrip) {
+            newLength = pt.length;
+            newWidth = pt.width;
+          } else {
+            newLength = pt.width;
+            newWidth = pt.length;
+          }
         }
       }
 
@@ -9923,6 +10786,38 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
       this.setActiveTool('measure');
       return;
     }
+    // L: Lápiz / Línea Directa CAD
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'l' || e.key === 'L')) {
+      e.preventDefault();
+      this.setActiveTool('draw_line');
+      return;
+    }
+    // A: Arco de 3 Puntos CAD
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault();
+      this.setActiveTool('draw_arc');
+      return;
+    }
+
+    // Entrada Numérica Directa CAD (Medidas exactas en mm o grados y Enter)
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && /^[0-9.]$/.test(e.key)) {
+      if (this.isMeasureMode() || this.activeTool() === 'protractor' || this.activeTool() === 'draw_line') {
+        e.preventDefault();
+        this.cadNumericInput.update(s => s + e.key);
+        return;
+      }
+    }
+    if (e.key === 'Backspace' && this.cadNumericInput().length > 0) {
+      e.preventDefault();
+      this.cadNumericInput.update(s => s.slice(0, -1));
+      return;
+    }
+    if (e.key === 'Enter' && this.cadNumericInput().length > 0) {
+      e.preventDefault();
+      this.commitCadNumericInput();
+      return;
+    }
+
     // Z: Centrar y reiniciar cámara (sin Ctrl/Meta/Alt para no colisionar con Deshacer)
     if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
       e.preventDefault();
@@ -9936,6 +10831,18 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
       this.clearMeasure();
       this.clearPushPullHighlight();
       this.clearRectPreview();
+      this.clearFaceDrawingPreview();
+      this.clearFacePartition();
+      this.cadNumericInput.set('');
+      this.lineStartPoint = null;
+      this.faceRectStart = null;
+      this.arcPoints = [];
+      this.protractorOrigin = null;
+      this.protractorBaseDir = null;
+      this.isDrawingLine.set(false);
+      this.isDrawingFaceRect.set(false);
+      this.isDrawingArc.set(false);
+      this.isUsingProtractor.set(false);
       return;
     }
 
@@ -10042,111 +10949,18 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     customPos?: { x: number; y: number; z: number },
     customSize?: { length?: number; width?: number }
   ) {
-    const t = part.thickness || 18;
-    const L = customSize?.length ?? part.length;
-    const W = customSize?.width ?? part.width;
-    let sx = L;
-    let sy = t;
-    let sz = W;
-
-    const orient = part.orientation || 'horizontal';
-    if (orient === 'vertical_yz') {
-      const isBacksplash = part.componentRole === 'backsplash' ||
-                            part.name.toUpperCase().includes('SALPICADERO');
-      const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
-                            part.name.toUpperCase().includes('ZOCALO') ||
-                            part.name.toUpperCase().includes('ZÓCALO'));
-      const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' ||
-                            part.componentRole === 'side_right' ||
-                            (part.name.toUpperCase().includes('LATERAL') &&
-                             !part.name.toUpperCase().includes('CAJ') &&
-                             part.componentRole !== 'drawer_box' &&
-                             part.componentRole !== 'drawer_lateral'));
-      const isDrawerLateral = !isBacksplash && !isCabinetSide && (
-        part.componentRole === 'drawer_box' ||
-        part.componentRole === 'drawer_lateral' ||
-        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
-      );
-      if (isBacksplash) {
-        sx = t;
-        sy = Math.min(L, W);
-        sz = Math.max(L, W);
-      } else if ((isPlinth || isDrawerLateral) && L > W) {
-        sx = t;
-        sy = W;
-        sz = L;
-      } else {
-        sx = t;
-        sy = L;
-        sz = W;
-      }
-    } else if (orient === 'vertical_xy') {
-      const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
-        !part.name.toUpperCase().includes('CAJ');
-      const isDrawerFront = part.componentRole === 'drawer_front';
-      const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
-        part.name.toUpperCase().includes('CONTRA') ||
-        part.name.toUpperCase().includes('TRASERA');
-
-      if (isDrawerBoxHead) {
-        sx = L;
-        sy = W;
-        sz = t;
-      } else if (part.componentRole === 'door') {
-        sx = L;
-        sy = W;
-        sz = t;
-      } else if (isDoor && L > W) {
-        sx = W;
-        sy = L;
-        sz = t;
-      } else if (isDrawerFront && W > L) {
-        sx = W;
-        sy = L;
-        sz = t;
-      } else {
-        sx = L;
-        sy = W;
-        sz = t;
-      }
+    if (!customPos && !customSize) {
+      return this.joineryEngine.getPartBounds(part);
     }
-
-    if (part.rotationX || part.rotationY || part.rotationZ) {
-      const rx = THREE.MathUtils.degToRad(part.rotationX || 0);
-      const ry = THREE.MathUtils.degToRad(part.rotationY || 0);
-      const rz = THREE.MathUtils.degToRad(part.rotationZ || 0);
-      const euler = new THREE.Euler(rx, ry, rz, 'XYZ');
-      const m = new THREE.Matrix4().makeRotationFromEuler(euler).elements;
-      const rSx = Math.abs(m[0]) * sx + Math.abs(m[4]) * sy + Math.abs(m[8]) * sz;
-      const rSy = Math.abs(m[1]) * sx + Math.abs(m[5]) * sy + Math.abs(m[9]) * sz;
-      const rSz = Math.abs(m[2]) * sx + Math.abs(m[6]) * sy + Math.abs(m[10]) * sz;
-      sx = Math.round(rSx * 10) / 10;
-      sy = Math.round(rSy * 10) / 10;
-      sz = Math.round(rSz * 10) / 10;
-    }
-
-    const px = customPos?.x ?? (part.posX ?? 0);
-    const py = customPos?.y ?? (part.posY ?? (sy / 2));
-    const pz = customPos?.z ?? (part.posZ ?? 0);
-
-    const hx = sx / 2;
-    const hy = sy / 2;
-    const hz = sz / 2;
-
-    return {
-      minX: px - hx,
-      maxX: px + hx,
-      minY: py - hy,
-      maxY: py + hy,
-      minZ: pz - hz,
-      maxZ: pz + hz,
-      sx,
-      sy,
-      sz,
-      px,
-      py,
-      pz
+    const tempPart: Part = {
+      ...part,
+      posX: customPos?.x ?? part.posX,
+      posY: customPos?.y ?? part.posY,
+      posZ: customPos?.z ?? part.posZ,
+      length: customSize?.length ?? part.length,
+      width: customSize?.width ?? part.width
     };
+    return this.joineryEngine.getPartBounds(tempPart);
   }
 
 private applyMagneticSnapToPosition(
@@ -12372,6 +13186,9 @@ private applyMagneticSnapToPosition(
     this.disposeGroup(this.rectPreviewGroup);
     this.disposeGroup(this.circlePreviewGroup);
     this.disposeGroup(this.freehandPreviewGroup);
+    this.disposeGroup(this.guidesGroup);
+    this.disposeGroup(this.faceDrawingGroup);
+    this.disposeGroup(this.partitionHighlightGroup);
 
     this.clearWallSnapGuides();
     this.clearLegSnapGuides();

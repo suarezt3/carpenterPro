@@ -139,7 +139,7 @@ export interface ParametricCabinetConfig {
   code: string; // ej. "MALT1PU001"
   name: string; // ej. "Módulo Alto 1 Puerta (MAL-1P)"
   moduleType: 'wall_cabinet' | 'base_cabinet' | 'tall_cabinet' | 'closet' | 'vanity' | 'bookshelf' | 'drawer_unit' | 'custom';
-  category?: 'kitchen_base' | 'kitchen_wall' | 'oven_base' | 'sink_base' | 'corner_base' | 'oven_tower' | 'drawers' | 'cajones' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
+  category?: 'kitchen_base' | 'kitchen_wall' | 'oven_base' | 'sink_base' | 'oven_tower' | 'drawers' | 'cajones' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
   width: number; // Ancho exterior X (ej. 600 mm)
   height: number; // Altura exterior Y (ej. 800 mm)
   depth: number; // Profundidad exterior Z (ej. 320 mm)

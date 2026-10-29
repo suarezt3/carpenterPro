@@ -594,7 +594,7 @@ export class CabinetGeneratorService {
     config: ParametricCabinetConfig, 
     materials: Material[]
   ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
-    if (config.category === 'oven_base' || config.category === 'sink_base' || config.category === 'corner_base' || config.category === 'oven_tower') {
+    if (config.category === 'oven_base' || config.category === 'sink_base' || config.category === 'oven_tower') {
       return this.generateSpecializedKitchenModule(config, materials);
     }
     if (config.moduleType === 'drawer_unit' || config.category === 'drawers' || config.category === 'cajones' || (config.drawersCount && config.drawersCount > 0 && config.moduleType !== 'wall_cabinet')) {
@@ -1784,7 +1784,6 @@ export class CabinetGeneratorService {
    * Genera módulos especializados de cocina real:
    * - 'oven_base': Módulo bajo para horno empotrado con nicho de 595mm y gaveta/puerta inferior para latas.
    * - 'sink_base': Módulo bajo lavaplatos sin tapa maciza (con amarres superiores) y libre paso hidráulico.
-   * - 'corner_base': Módulo bajo esquinero con chaflán diagonal a 45° para cocinas en L o en U.
    * - 'oven_tower': Torre columna para Horno + Microondas con alacena superior y puerta inferior.
    */
   private generateSpecializedKitchenModule(
@@ -1830,7 +1829,7 @@ export class CabinetGeneratorService {
 
     const parts: Part[] = [];
 
-    // 1. Zócalo perimetral común (4 lados)
+    // 1. Zócalo perimetral común (4 lados) para módulos rectangulares estándar (oven_base, sink_base, oven_tower)
     if (hasPlinth && plinthH > 0) {
       const recess = 25;
       const plinthOuterW = Math.max(50, w - (2 * recess));
@@ -1927,164 +1926,8 @@ export class CabinetGeneratorService {
       });
     }
 
-    if (config.category === 'corner_base') {
-      // MÓDULO ESQUINERO DIAGONAL 45° (900x900)
-      const cutX = Math.round(w * 0.38);
-      const cutY = Math.round(carcassDepth * 0.38);
-      const cornerConfig: PartCornerCutConfig = {
-        type: 'chamfer_corner',
-        corner: 'front_right',
-        cutX,
-        cutY
-      };
-      const contour = this.buildCornerCutContour(innerWidth, carcassDepth, cornerConfig);
-
-      // Laterales
-      parts.push({
-        id: `${moduleId}_lat_izq_${Date.now()}`,
-        name: 'Lateral Izquierdo Esquinero',
-        moduleId,
-        moduleName: groupName,
-        groupId,
-        groupName,
-        length: sideH,
-        width: carcassDepth,
-        thickness: t,
-        quantity: 1,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-        posX: posX - (w / 2) + (t / 2),
-        posY: sideCenterY,
-        posZ: carcassCenterZ,
-        orientation: 'vertical_yz',
-        componentRole: 'side_left',
-        notes: 'Costado profundo esquinero'
-      });
-
-      const rightSideDepth = Math.max(250, carcassDepth - cutY);
-      parts.push({
-        id: `${moduleId}_lat_der_${Date.now()}`,
-        name: 'Lateral Derecho Corto (Encuentro 45°)',
-        moduleId,
-        moduleName: groupName,
-        groupId,
-        groupName,
-        length: sideH,
-        width: rightSideDepth,
-        thickness: t,
-        quantity: 1,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-        posX: posX + (w / 2) - (t / 2),
-        posY: sideCenterY,
-        posZ: carcassBackZ + (rightSideDepth / 2),
-        orientation: 'vertical_yz',
-        componentRole: 'side_right',
-        notes: 'Costado lateral para encuentro a 45°'
-      });
-
-      // Piso, Techo y Entrepaño con chaflán diagonal 45°
-      const levels = [
-        { role: 'bottom' as const, name: 'Piso Esquinero Chaflanado 45°', y: bottomOfCarcassY + (t / 2) },
-        { role: 'shelf' as const, name: 'Entrepaño Interior Esquinero 45°', y: bottomOfCarcassY + (sideH / 2) },
-        { role: 'top' as const, name: 'Tapa Superior Esquinera 45°', y: bottomOfCarcassY + sideH - (t / 2) }
-      ];
-      for (const lv of levels) {
-        parts.push({
-          id: `${moduleId}_${lv.role}_45_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
-          name: lv.name,
-          moduleId,
-          moduleName: groupName,
-          groupId,
-          groupName,
-          length: innerWidth,
-          width: carcassDepth,
-          thickness: t,
-          quantity: 1,
-          materialId: mainMat.id,
-          materialName: mainMat.name,
-          grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
-          posX,
-          posY: lv.y,
-          posZ: carcassCenterZ,
-          orientation: 'horizontal',
-          componentRole: lv.role,
-          shapeType: 'freehand',
-          contourPoints: contour,
-          cornerCutConfig: cornerConfig,
-          notes: `Corte diagonal 45° (${cutX}x${cutY} mm)`
-        });
-      }
-
-      // Puerta diagonal en chaflán
-      const diagDoorW = Math.max(240, Math.round(Math.hypot(cutX, cutY) - 8));
-      parts.push({
-        id: `${moduleId}_puerta_diag_${Date.now()}`,
-        name: 'Puerta Esquinera Diagonal 45°',
-        moduleId,
-        moduleName: groupName,
-        groupId,
-        groupName,
-        length: diagDoorW,
-        width: sideH - gap,
-        thickness: doorT,
-        quantity: 1,
-        materialId: doorMat.id,
-        materialName: doorMat.name,
-        grain: doorMat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-        posX: posX + (innerWidth / 2) - (cutX / 2),
-        posY: sideCenterY,
-        posZ: carcassFrontZ - (cutY / 2),
-        rotationY: 45,
-        orientation: 'vertical_xy',
-        componentRole: 'door',
-        hardwareConfig: {
-          isMovable: true,
-          movableType: 'door',
-          openingDirection: 'left',
-          hingeType: 'straight',
-          handleType: hType,
-          handleFinish: hFinish,
-          handlePosition: 'vertical',
-          isOpen: false
-        },
-        notes: 'Puerta esquinera con bisagra angular 45°'
-      });
-
-      // Fondo trasero esquinero MDF
-      if (config.hasBackPanel !== false) {
-        parts.push({
-          id: `${moduleId}_fondo_esq_${Date.now()}`,
-          name: 'Fondo Trasero Ranurado Esquinero',
-          moduleId,
-          moduleName: groupName,
-          groupId,
-          groupName,
-          length: Math.max(50, innerWidth - 2),
-          width: Math.max(50, sideH - (2 * t)),
-          thickness: backT,
-          quantity: 1,
-          materialId: backMat.id,
-          materialName: backMat.name,
-          grain: 'none',
-          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          posX,
-          posY: sideCenterY,
-          posZ: carcassBackZ + 15 + (backT / 2),
-          orientation: 'vertical_xy',
-          componentRole: 'back',
-          notes: `Fondo MDF ${backT}mm módulo esquinero`
-        });
-      }
-    } else {
-      // Laterales estándar para oven_base, sink_base y oven_tower
-      parts.push({
+    // Laterales estándar para oven_base, sink_base y oven_tower
+    parts.push({
         id: `${moduleId}_lat_izq_${Date.now()}`,
         name: 'Lateral Izquierdo',
         moduleId,
@@ -2579,7 +2422,6 @@ export class CabinetGeneratorService {
           notes: 'Fondo MDF ranurado con rejilla de ventilación'
         });
       }
-    }
 
     const module: FurnitureModule = {
       id: moduleId,

@@ -58,7 +58,6 @@ export type ModuleCategoryPreset =
   | 'drawers'
   | 'oven_base'
   | 'sink_base'
-  | 'corner_base'
   | 'oven_tower'
   | 'custom';
 
@@ -512,7 +511,7 @@ export class TemplatesModalComponent {
           if (this.wasEditingGroup || (this.structureThickness() !== 15 && this.structureThickness() !== 18)) {
             this.wasEditingGroup = false;
             const p = this.activePreset();
-            const isSpec = p === 'oven_base' || p === 'sink_base' || p === 'corner_base' || p === 'oven_tower';
+            const isSpec = p === 'oven_base' || p === 'sink_base' || p === 'oven_tower';
             this.selectPreset(isSpec ? 'kitchen_base' : p);
           }
         });
@@ -638,20 +637,6 @@ export class TemplatesModalComponent {
         this.hasHandle.set(true);
         this.hasBackPanel.set(false);
         break;
-      case 'corner_base':
-        this.moduleName.set('Esquinero Diagonal 45°');
-        this.width.set(900);
-        this.height.set(860);
-        this.depth.set(900);
-        this.structureThickness.set(defaultT);
-        this.doorThickness.set(defaultT);
-        this.hasPlinth.set(true);
-        this.plinthHeight.set(80);
-        this.doorOpening.set('left');
-        this.shelvesCount.set(1);
-        this.hasHandle.set(true);
-        this.hasBackPanel.set(true);
-        break;
       case 'oven_tower':
         this.moduleName.set('Torre Horno + Microondas');
         this.width.set(600);
@@ -769,7 +754,7 @@ export class TemplatesModalComponent {
 
     const preset = this.activePreset();
     const isDrawers = preset === 'drawers';
-    const isSpecKitchen = preset === 'oven_base' || preset === 'sink_base' || preset === 'corner_base' || preset === 'oven_tower';
+    const isSpecKitchen = preset === 'oven_base' || preset === 'sink_base' || preset === 'oven_tower';
 
     let moduleType: ParametricCabinetConfig['moduleType'] = 'base_cabinet';
     if (isDrawers) {

@@ -95,14 +95,71 @@
       <hugeicons-icon [icon]="icons.freehandWave" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
-    <!-- 6. CINTA MÉTRICA 3D -->
+    <!-- 6. CINTA MÉTRICA 3D Y PUNTOS GUÍA -->
     <button
       type="button"
       (click)="setActiveTool('measure')"
       [class]="activeTool() === 'measure' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-      title="Cinta Métrica 3D (T): Mide distancias reales y luces entre aristas o caras">
+      title="Cinta Métrica 3D (T): Mide distancias reales y fija puntos auxiliares (+) o líneas guía punteadas">
       <hugeicons-icon [icon]="icons.ruler" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+    </button>
+
+    <!-- 6.1. TRANSPORTADOR / GUÍA ANGULAR -->
+    <button
+      type="button"
+      (click)="setActiveTool('protractor')"
+      [class]="activeTool() === 'protractor' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
+      title="Transportador / Guía Angular: Traza líneas guía en cualquier ángulo exacto (45°, 30°, 60°)">
+      <hugeicons-icon [icon]="icons.protractor" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+    </button>
+
+    @if (cadGuides().length > 0) {
+      <!-- 6.2. BORRAR TODAS LAS GUÍAS -->
+      <button
+        type="button"
+        (click)="clearAllGuides()"
+        class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 relative"
+        title="Borrar Guías de Referencia: Elimina todos los puntos (+) y líneas guía activas">
+        <hugeicons-icon [icon]="icons.clearGuides" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+        <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-rose-600 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
+          {{ cadGuides().length }}
+        </span>
+      </button>
+    }
+
+    <div class="cad-toolbar-divider w-5 h-px bg-zinc-200/90 shrink-0"></div>
+
+    <!-- 7. HERRAMIENTAS DE TRAZADO Y CORTES DIRECTOS (FASE 2) -->
+    <!-- 7.1. LÁPIZ / LÍNEA DIRECTA (L) -->
+    <button
+      type="button"
+      (click)="setActiveTool('draw_line')"
+      [class]="activeTool() === 'draw_line' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
+      title="Lápiz / Línea Directa (L): Traza líneas de corte de borde a borde sobre caras y cantos con imán a guías">
+      <hugeicons-icon [icon]="icons.pencil" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+    </button>
+
+    <!-- 7.2. RECTÁNGULO DE CORTE / DESTAJE (R) -->
+    <button
+      type="button"
+      (click)="setActiveTool('draw_rect_face')"
+      [class]="activeTool() === 'draw_rect_face' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
+      title="Rectángulo de Corte (R): Traza destajes en L y cajas directamente sobre la superficie o canto">
+      <hugeicons-icon [icon]="icons.rectCut" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+    </button>
+
+    <!-- 7.3. ARCO DE 3 PUNTOS (A) -->
+    <button
+      type="button"
+      (click)="setActiveTool('draw_arc')"
+      [class]="activeTool() === 'draw_arc' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
+      title="Arco de 3 Puntos (A): Traza esquinas curvas y redondeos conectando dos bordes">
+      <hugeicons-icon [icon]="icons.arcShape" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
     <div class="cad-toolbar-divider w-5 h-px bg-zinc-200/90 shrink-0"></div>
@@ -1747,15 +1804,53 @@
         <span class="truncate text-zinc-300"><strong class="text-white">Mover (M):</strong> Arrastra las flechas 3D para posicionar la pieza en X, Y o Z.</span>
       } @else if (activeTool() === 'measure') {
         <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
-        <span class="truncate text-zinc-300"><strong class="text-white">Cinta Métrica (T):</strong> Clic en dos puntos para medir la distancia real en milímetros.</span>
+        <span class="truncate text-zinc-300"><strong class="text-white">Cinta Métrica (T):</strong> Clic o arrastra desde un borde/vértice para fijar un punto (+) o línea guía.</span>
+      } @else if (activeTool() === 'protractor') {
+        <hugeicons-icon [icon]="icons.protractor" [size]="14" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Guía Angular:</strong> Clic en vértice origen, clic en eje base y mueve o escribe el ángulo (ej. 45°).</span>
+      } @else if (activeTool() === 'draw_line') {
+        <hugeicons-icon [icon]="icons.pencil" [size]="14" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Lápiz / Línea (L):</strong> Clic en un borde/guía y clic en el borde opuesto para dividir la cara.</span>
+      } @else if (activeTool() === 'draw_rect_face') {
+        <hugeicons-icon [icon]="icons.rectCut" [size]="14" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Rectángulo de Corte (R):</strong> Clic en una esquina para trazar un destaje en L o cajón de corte.</span>
+      } @else if (activeTool() === 'draw_arc') {
+        <hugeicons-icon [icon]="icons.arcShape" [size]="14" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
+        <span class="truncate text-zinc-300"><strong class="text-white">Arco (A):</strong> Clic en punto 1, clic en punto 2 y clic en curvatura para chaflán curvo.</span>
       }
     </div>
+
+    @if (activeFacePartition(); as partn) {
+      <div class="flex items-center gap-1.5 shrink-0 bg-sky-950/80 text-sky-200 px-2.5 py-0.5 rounded-md border border-sky-600/60 text-xs shadow-xs">
+        <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+        <span>Región dividida: <strong>{{ partn.cutDimensions.width }} × {{ partn.cutDimensions.height }} mm</strong></span>
+        <button
+          type="button"
+          (click)="executeActivePartitionCut()"
+          class="ml-1 px-2 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-white font-medium text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+          title="Cortar sección recortada a través del espesor (P o Clic en Empujar/Tirar)">
+          <hugeicons-icon [icon]="icons.pushPull" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+          Cortar (-{{ getActivePartitionPartThickness() }}mm)
+        </button>
+        <button type="button" (click)="clearFacePartition()" class="text-sky-300 hover:text-white ml-1 cursor-pointer font-bold" title="Descartar partición (Escape)">✕</button>
+      </div>
+    }
 
     <!-- Derecha: Cuadro de Medidas CAD (Largo x Ancho - Espesor mm) -->
     <div class="flex items-center gap-1.5 shrink-0 bg-zinc-800 text-zinc-100 px-2.5 py-0.5 rounded-md border border-zinc-700 font-mono text-xs tabular-nums">
       <span class="text-[10px] uppercase font-bold text-zinc-400">Medidas:</span>
-      @if (pushPullDelta(); as pp) {
+      @if (cadNumericInput(); as ci) {
+        <strong class="text-emerald-400 font-mono tabular-nums underline">{{ ci }} mm</strong>
+      } @else if (pushPullDelta(); as pp) {
         <strong class="text-amber-400 font-mono tabular-nums">{{ pp.axisName }} {{ pp.currentVal }} mm</strong>
+      } @else if (lineDrawLength(); as ll) {
+        <strong class="text-amber-400 font-mono tabular-nums">Línea: {{ ll }} mm</strong>
+      } @else if (faceRectDims(); as fr) {
+        <strong class="text-amber-400 font-mono tabular-nums">{{ fr.width }} × {{ fr.height }} mm</strong>
+      } @else if (arcDrawRadius(); as ar) {
+        <strong class="text-amber-400 font-mono tabular-nums">Radio: {{ ar }} mm</strong>
+      } @else if (protractorAngle(); as pa) {
+        <strong class="text-amber-400 font-mono tabular-nums">Ángulo: {{ pa }}°</strong>
       } @else if (rectDrawDims(); as rd) {
         <strong class="text-zinc-100 font-mono tabular-nums">{{ rd.length }} × {{ rd.width }} mm</strong>
       } @else if (circleDrawDims(); as cd) {

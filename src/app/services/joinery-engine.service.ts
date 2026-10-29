@@ -40,8 +40,8 @@ export class JoineryEngineService {
    */
   getPartLocalDimensions(part: Part): { sx: number; sy: number; sz: number } {
     const t = part.thickness || 15;
-    const L = part.length;
-    const W = part.width;
+    const L = part.length || 600;
+    const W = part.width || 300;
 
     let sx = L;
     let sy = t;
@@ -49,39 +49,17 @@ export class JoineryEngineService {
 
     const orient = part.orientation || 'horizontal';
     if (orient === 'vertical_yz') {
-      const isPlinth =
-        part.componentRole === 'plinth' ||
-        part.name.toUpperCase().includes('ZOCALO') ||
-        part.name.toUpperCase().includes('ZÓCALO');
-
-      const isCabinetSide =
-        !isPlinth &&
-        (part.componentRole === 'side_left' ||
-          part.componentRole === 'side_right' ||
-          part.componentRole === 'divider' ||
-          part.componentRole === 'door' ||
-          part.componentRole === 'back' ||
-          (part.name.toUpperCase().includes('LATERAL') &&
-            !part.name.toUpperCase().includes('CAJ') &&
-            part.componentRole !== 'drawer_box' &&
-            part.componentRole !== 'drawer_lateral'));
-
-      const isDrawerBoxSide =
-        !isPlinth &&
-        !isCabinetSide &&
-        (part.componentRole === 'drawer_box' ||
+      // Tiras estrechas y laterales de cajón, zócalo o salpicadero perimetrales que van a lo largo de Z (profundidad)
+      // donde L > W: su cota de altura (sy) es W y su profundidad (sz) es L
+      const isStripOrBoxSide =
+        (part.componentRole === 'plinth' ||
+          part.componentRole === 'drawer_box' ||
           part.componentRole === 'drawer_lateral' ||
-          (part.name.toUpperCase().includes('LATERAL') && part.name.toUpperCase().includes('CAJ')));
+          part.componentRole === 'backsplash' ||
+          (part.name && (part.name.toUpperCase().includes('ZOCALO') || part.name.toUpperCase().includes('ZÓCALO')))) &&
+        L > W;
 
-      const isBacksplash =
-        part.componentRole === 'backsplash' ||
-        part.name.toUpperCase().includes('SALPICADERO');
-
-      if (isBacksplash) {
-        sx = t;
-        sy = Math.min(L, W);
-        sz = Math.max(L, W);
-      } else if ((isPlinth || isDrawerBoxSide) && L > W) {
+      if (isStripOrBoxSide) {
         sx = t;
         sy = W;
         sz = L;
@@ -258,10 +236,25 @@ export class JoineryEngineService {
             b2.part.name.toUpperCase().includes('MESON') ||
             b2.part.name.toUpperCase().includes('SALPICADERO');
 
-          const sameGroup = !!(b1.part.groupId && b1.part.groupId === b2.part.groupId);
+          const sameGroup = !!(
+            (b1.part.groupId && b2.part.groupId && b1.part.groupId === b2.part.groupId) ||
+            (b1.part.moduleId && b2.part.moduleId && b1.part.moduleId === b2.part.moduleId)
+          );
 
           // Excluir piezas de mesón y salpicaderos de cualquier cálculo o reporte de colisión
           if ((isCtA && isCtB) || ((isCtA || isCtB) && sameGroup)) {
+            continue;
+          }
+
+          // Excluir puertas, frentes de cajón y encuentros de zócalos de generar falsos solapamientos por rotación angular (ej. 45°) o ajuste milimétrico contra piezas de su propio módulo
+          const isPermittedInSameGroup =
+            sameGroup &&
+            (b1.part.componentRole === 'door' ||
+              b2.part.componentRole === 'door' ||
+              b1.part.componentRole === 'drawer_front' ||
+              b2.part.componentRole === 'drawer_front' ||
+              (b1.part.componentRole === 'plinth' && b2.part.componentRole === 'plinth'));
+          if (isPermittedInSameGroup) {
             continue;
           }
 
