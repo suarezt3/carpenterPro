@@ -2127,36 +2127,53 @@ export class ProjectStorageService {
             newWidth = pt.length;
           } else if (currentOrient === 'vertical_xy') {
             newOrientation = 'vertical_yz';
-            const isStrip =
+            const horizontalSpan = oldBounds.sx;
+            const verticalHeight = oldBounds.sy;
+
+            const isBacksplash =
+              pt.componentRole === 'backsplash' ||
+              pt.name.toUpperCase().includes('SALPICADERO');
+
+            const isPlinth =
+              !isBacksplash &&
               (pt.componentRole === 'plinth' ||
-                pt.componentRole === 'drawer_box' ||
+                pt.name.toUpperCase().includes('ZOCALO') ||
+                pt.name.toUpperCase().includes('ZÓCALO'));
+
+            const isCabinetSide =
+              !isBacksplash &&
+              !isPlinth &&
+              (pt.componentRole === 'side_left' ||
+                pt.componentRole === 'side_right' ||
+                pt.componentRole === 'divider' ||
+                pt.componentRole === 'door' ||
+                pt.componentRole === 'back' ||
+                (pt.name.toUpperCase().includes('LATERAL') &&
+                  !pt.name.toUpperCase().includes('CAJ') &&
+                  pt.componentRole !== 'drawer_box' &&
+                  pt.componentRole !== 'drawer_lateral'));
+
+            const isDrawerBoxSide =
+              !isBacksplash &&
+              !isPlinth &&
+              !isCabinetSide &&
+              (pt.componentRole === 'drawer_box' ||
                 pt.componentRole === 'drawer_lateral' ||
-                pt.componentRole === 'backsplash' ||
-                (pt.name && (pt.name.toUpperCase().includes('ZOCALO') || pt.name.toUpperCase().includes('ZÓCALO')))) &&
-              pt.length > pt.width;
-            if (isStrip) {
-              newLength = pt.length;
-              newWidth = pt.width;
+                (pt.name.toUpperCase().includes('LATERAL') && pt.name.toUpperCase().includes('CAJ')));
+
+            if ((isBacksplash || isPlinth || isDrawerBoxSide) && horizontalSpan > verticalHeight) {
+              newLength = horizontalSpan;
+              newWidth = verticalHeight;
             } else {
-              newLength = pt.width;
-              newWidth = pt.length;
+              newLength = verticalHeight;
+              newWidth = horizontalSpan;
             }
           } else if (currentOrient === 'vertical_yz') {
             newOrientation = 'vertical_xy';
-            const isStrip =
-              (pt.componentRole === 'plinth' ||
-                pt.componentRole === 'drawer_box' ||
-                pt.componentRole === 'drawer_lateral' ||
-                pt.componentRole === 'backsplash' ||
-                (pt.name && (pt.name.toUpperCase().includes('ZOCALO') || pt.name.toUpperCase().includes('ZÓCALO')))) &&
-              pt.length > pt.width;
-            if (isStrip) {
-              newLength = pt.length;
-              newWidth = pt.width;
-            } else {
-              newLength = pt.width;
-              newWidth = pt.length;
-            }
+            const horizontalSpan = oldBounds.sz;
+            const verticalHeight = oldBounds.sy;
+            newLength = horizontalSpan;
+            newWidth = verticalHeight;
           }
         }
 
