@@ -1328,6 +1328,120 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   /**
+   * Calcula una posición inicial visible y despejada para un nuevo equipo, evitando que se
+   * superponga exactamente sobre muebles u otros equipos existentes contra la pared trasera.
+   */
+  private computeSmartAppliancePosition(
+    targetWidth: number,
+    targetDepth: number,
+    targetHeight: number,
+    defaultY: number,
+    wallInnerZ: number,
+    mountType: string
+  ): { x: number; y: number; z: number } {
+    const config = this.roomConfig();
+    const floorW = config.floorWidth || 5000;
+    const floorD = config.floorDepth || 5000;
+    const margin = 50;
+    const halfW = targetWidth / 2;
+    const halfD = targetDepth / 2;
+
+    const baseZ = Math.round(wallInnerZ + halfD);
+    const existingParts = this.currentParts();
+    const existingApps = this.appliances();
+
+    const collidesWithScene = (candX: number, candY: number, candZ: number): boolean => {
+      const boxMinX = candX - halfW - margin;
+      const boxMaxX = candX + halfW + margin;
+      const boxMinY = candY;
+      const boxMaxY = candY + targetHeight;
+      const boxMinZ = candZ - halfD - margin;
+      const boxMaxZ = candZ + halfD + margin;
+
+      for (const a of existingApps) {
+        if (a.isHidden) continue;
+        const aHalfW = (a.width || 600) / 2;
+        const aHalfD = (a.depth || 600) / 2;
+        const aMinX = a.position.x - aHalfW;
+        const aMaxX = a.position.x + aHalfW;
+        const aMinY = a.position.y;
+        const aMaxY = a.position.y + (a.height || 850);
+        const aMinZ = a.position.z - aHalfD;
+        const aMaxZ = a.position.z + aHalfD;
+
+        if (boxMinX < aMaxX && boxMaxX > aMinX &&
+            boxMinY < aMaxY && boxMaxY > aMinY &&
+            boxMinZ < aMaxZ && boxMaxZ > aMinZ) {
+          return true;
+        }
+      }
+
+      for (const p of existingParts) {
+        const b = this.joineryEngine.getPartBounds(p);
+        if (boxMinX < b.maxX && boxMaxX > b.minX &&
+            boxMinY < b.maxY && boxMaxY > b.minY &&
+            boxMinZ < b.maxZ && boxMaxZ > b.minZ) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    // 1. Si la coordenada por defecto central (0, defaultY, baseZ) está libre, usarla
+    if (!collidesWithScene(0, defaultY, baseZ)) {
+      return { x: 0, y: defaultY, z: baseZ };
+    }
+
+    // 2. Buscar espacio libre en el eje X a lo largo del muro (hacia la derecha e izquierda)
+    const roomLimitX = Math.round(floorW / 2 - halfW - 80);
+    const candidateXs: number[] = [];
+
+    for (const a of existingApps) {
+      if (a.isHidden) continue;
+      const aHalfW = (a.width || 600) / 2;
+      candidateXs.push(Math.round(a.position.x + aHalfW + halfW + margin));
+      candidateXs.push(Math.round(a.position.x - aHalfW - halfW - margin));
+    }
+    for (const p of existingParts) {
+      const b = this.joineryEngine.getPartBounds(p);
+      candidateXs.push(Math.round(b.maxX + halfW + margin));
+      candidateXs.push(Math.round(b.minX - halfW - margin));
+    }
+
+    candidateXs.sort((a, b) => Math.abs(a) - Math.abs(b));
+
+    for (const candX of candidateXs) {
+      if (Math.abs(candX) <= roomLimitX && !collidesWithScene(candX, defaultY, baseZ)) {
+        return { x: candX, y: defaultY, z: baseZ };
+      }
+    }
+
+    // 3. Si toda la pared trasera en ese Z está saturada, adelantar el equipo hacia el espacio libre frontal
+    let maxFrontZ = baseZ;
+    for (const p of existingParts) {
+      const b = this.joineryEngine.getPartBounds(p);
+      if (b.maxZ > maxFrontZ) maxFrontZ = b.maxZ;
+    }
+    for (const a of existingApps) {
+      const frontZ = a.position.z + (a.depth || 600) / 2;
+      if (frontZ > maxFrontZ) maxFrontZ = frontZ;
+    }
+
+    const forwardZ = Math.round(maxFrontZ + halfD + 120);
+    const roomLimitZ = Math.round(floorD / 2 - halfD - 80);
+    const finalZ = forwardZ <= roomLimitZ ? forwardZ : baseZ;
+
+    for (const candX of [0, 450, -450, 900, -900, 1350, -1350]) {
+      if (Math.abs(candX) <= roomLimitX && !collidesWithScene(candX, defaultY, finalZ)) {
+        return { x: candX, y: defaultY, z: finalZ };
+      }
+    }
+
+    return { x: Math.min(roomLimitX, (existingApps.length + 1) * 200), y: defaultY, z: finalZ };
+  }
+
+  /**
    * Inserta un electrodoméstico o juego de patas desde el catálogo calculando su elevación
    * y posición inicial según el tipo de montaje (suelo, encimera, pared o empotrado).
    */
@@ -1384,11 +1498,15 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
           }
         }
         posY = highestY > 0 ? highestY : 880;
-        posZ = Math.round(wallInnerZ + (targetDepth / 2));
+        const smartPos = this.computeSmartAppliancePosition(targetWidth, targetDepth, targetHeight, posY, wallInnerZ, 'countertop');
+        posX = smartPos.x;
+        posZ = smartPos.z;
       }
     } else if (preset.defaultMountType === 'floor') {
       posY = 0;
-      posZ = Math.round(wallInnerZ + (targetDepth / 2));
+      const smartPos = this.computeSmartAppliancePosition(targetWidth, targetDepth, targetHeight, 0, wallInnerZ, 'floor');
+      posX = smartPos.x;
+      posZ = smartPos.z;
     } else if (preset.defaultMountType === 'countertop') {
       if (selPart && (selPart.orientation === 'horizontal' || !selPart.orientation)) {
         posX = selPart.posX || 0;
@@ -1404,7 +1522,9 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
           }
         }
         posY = highestY > 0 ? highestY : 880;
-        posZ = Math.round(wallInnerZ + (targetDepth / 2));
+        const smartPos = this.computeSmartAppliancePosition(targetWidth, targetDepth, targetHeight, posY, wallInnerZ, 'countertop');
+        posX = smartPos.x;
+        posZ = smartPos.z;
       }
     } else if (preset.defaultMountType === 'wall') {
       if (preset.type === 'pendant_lamp') {
@@ -1415,7 +1535,9 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
         posZ = Math.round(wallInnerZ + (targetDepth / 2));
       } else {
         posY = preset.type === 'hood' ? 1500 : 1200;
-        posZ = Math.round(wallInnerZ + (targetDepth / 2));
+        const smartPos = this.computeSmartAppliancePosition(targetWidth, targetDepth, targetHeight, posY, wallInnerZ, 'wall');
+        posX = smartPos.x;
+        posZ = smartPos.z;
       }
     } else if (preset.defaultMountType === 'built_in') {
       if (selPart) {
@@ -1424,7 +1546,9 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
         posZ = selPart.posZ || 0;
       } else {
         posY = 800;
-        posZ = Math.round(wallInnerZ + (targetDepth / 2));
+        const smartPos = this.computeSmartAppliancePosition(targetWidth, targetDepth, targetHeight, posY, wallInnerZ, 'built_in');
+        posX = smartPos.x;
+        posZ = smartPos.z;
       }
     }
 
@@ -1441,6 +1565,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       position: { x: posX, y: posY, z: posZ },
       rotation: 0,
       mountType: preset.defaultMountType,
+      groupId: (preset.defaultMountType === 'built_in' && selPart?.groupId) ? selPart.groupId : undefined,
       price: preset.defaultPrice,
       includeInBudget: true,
       notes: preset.description,

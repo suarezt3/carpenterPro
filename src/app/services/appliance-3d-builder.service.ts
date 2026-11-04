@@ -159,14 +159,14 @@ export class Appliance3dBuilderService {
     );
     const hitMesh = new THREE.Mesh(hitGeo, hitMat);
     hitMesh.position.set(0, h / 2, 0);
-    hitMesh.userData = { isApplianceHitBox: true, applianceId: appliance.id, appliance };
+    hitMesh.userData = { isApplianceHitBox: true, applianceId: appliance.id };
     group.add(hitMesh);
 
     // Tag entire group and its children with appliance metadata for raycasting
     group.userData = { isAppliance: true, applianceId: appliance.id, appliance };
     group.traverse(child => {
       if (child instanceof THREE.Mesh) {
-        child.userData = { ...child.userData, isAppliance: true, applianceId: appliance.id, appliance };
+        child.userData = { ...child.userData, isAppliance: true, applianceId: appliance.id };
         child.castShadow = true;
         child.receiveShadow = true;
       }

@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import * as THREE from 'three';
 import { Appliance3dBuilderService } from './appliance-3d-builder.service';
+import { ProjectStorageService } from './project-storage.service';
 import { ApplianceItem, DEFAULT_ROOM_CONFIG, getResolvedRoomWalls } from '../models/melamine.models';
 
 function createMockAppliance(overrides: Partial<ApplianceItem>): ApplianceItem {
@@ -138,6 +139,148 @@ describe('Fase 2: Rendimiento GPU, Posicionamiento y Habitación 3D Magnética',
       expect(getElevationForCategory('vanity')).toBe(450);
       expect(getElevationForCategory('kitchen_wall')).toBe(1450);
       expect(getElevationForCategory('wall_cabinet')).toBe(1450);
+    });
+  });
+
+  describe('Auditoría y Corrección del Ciclo de Movimiento de Equipos 3D', () => {
+    let projectStorage: ProjectStorageService;
+
+    beforeEach(() => {
+      projectStorage = TestBed.inject(ProjectStorageService);
+    });
+
+    it('las mallas hijas del equipo 3D no deben retener un objeto appliance estático obsoleto', () => {
+      const fridge = createMockAppliance({
+        id: 'fridge_test_1',
+        type: 'refrigerator',
+        position: { x: 0, y: 0, z: -2150 }
+      });
+      const group = applianceBuilder.buildApplianceGroup(fridge);
+
+      // El grupo raíz sí contiene la referencia inicial
+      expect(group.userData['isAppliance']).toBe(true);
+      expect(group.userData['applianceId']).toBe('fridge_test_1');
+      expect(group.userData['appliance']).toBeTruthy();
+
+      // Las mallas hijas internas NO deben contener la referencia al objeto estático appliance
+      // para evitar que el raycasting devuelva coordenadas obsoletas en clics posteriores
+      group.traverse(child => {
+        if (child instanceof THREE.Mesh) {
+          expect(child.userData['applianceId']).toBe('fridge_test_1');
+          expect(child.userData['appliance']).toBeUndefined();
+        }
+      });
+    });
+
+    it('ProjectStorageService.updateAppliance debe actualizar coordenadas mundiales y desvincular groupId limpiamente', () => {
+      const oven = createMockAppliance({
+        id: 'oven_test_1',
+        type: 'oven',
+        position: { x: 0, y: 800, z: -2150 },
+        groupId: 'mod_oven_tower_123'
+      });
+
+      projectStorage.addAppliance(oven);
+      expect(projectStorage.currentProject().appliances?.find(a => a.id === 'oven_test_1')?.position).toEqual({
+        x: 0,
+        y: 800,
+        z: -2150
+      });
+      expect(projectStorage.currentProject().appliances?.find(a => a.id === 'oven_test_1')?.groupId).toBe('mod_oven_tower_123');
+
+      // Simular arrastre individual (pointerup): nuevas coordenadas y desvinculación de groupId
+      projectStorage.updateAppliance('oven_test_1', {
+        position: { x: 1200, y: 850, z: -500 },
+        groupId: undefined
+      });
+
+      const updated = projectStorage.currentProject().appliances?.find(a => a.id === 'oven_test_1');
+      expect(updated).toBeTruthy();
+      expect(updated!.position).toEqual({ x: 1200, y: 850, z: -500 });
+      expect(updated!.groupId).toBeUndefined();
+      expect('groupId' in updated!).toBe(false);
+
+      // Simular un segundo arrastre (pointerdown y pointerup) desde la nueva posición
+      projectStorage.updateAppliance('oven_test_1', {
+        position: { x: 1500, y: 850, z: -200 }
+      });
+
+      const updated2 = projectStorage.currentProject().appliances?.find(a => a.id === 'oven_test_1');
+      expect(updated2!.position).toEqual({ x: 1500, y: 850, z: -200 });
+    });
+
+    it('ProjectStorageService.updateMultipleAppliances debe actualizar múltiples equipos y desvincular groupId cuando es undefined', () => {
+      const fridge = createMockAppliance({
+        id: 'fridge_multi_1',
+        type: 'refrigerator',
+        position: { x: 0, y: 0, z: -2150 },
+        groupId: 'mod_kitchen_1'
+      });
+      const microwave = createMockAppliance({
+        id: 'micro_multi_1',
+        type: 'microwave',
+        position: { x: 600, y: 900, z: -2150 },
+        groupId: 'mod_kitchen_1'
+      });
+
+      projectStorage.addAppliance(fridge);
+      projectStorage.addAppliance(microwave);
+
+      projectStorage.updateMultipleAppliances([
+        {
+          id: 'fridge_multi_1',
+          updates: { position: { x: -800, y: 0, z: -1000 }, groupId: undefined }
+        },
+        {
+          id: 'micro_multi_1',
+          updates: { position: { x: 900, y: 900, z: -1200 } }
+        }
+      ]);
+
+      const storedFridge = projectStorage.currentProject().appliances?.find(a => a.id === 'fridge_multi_1');
+      const storedMicro = projectStorage.currentProject().appliances?.find(a => a.id === 'micro_multi_1');
+
+      expect(storedFridge?.position).toEqual({ x: -800, y: 0, z: -1000 });
+      expect(storedFridge?.groupId).toBeUndefined();
+      expect('groupId' in storedFridge!).toBe(false);
+
+      expect(storedMicro?.position).toEqual({ x: 900, y: 900, z: -1200 });
+      expect(storedMicro?.groupId).toBe('mod_kitchen_1');
+    });
+
+    it('ciclo continuo de 3 movimientos consecutivos para Nevera, Horno, Microondas y Estufa preserva coordenadas acumuladas', () => {
+      const types = ['refrigerator', 'oven', 'microwave', 'cooktop'] as const;
+      const initialPositions = [
+        { x: 0, y: 0, z: -2150 },
+        { x: 700, y: 800, z: -2150 },
+        { x: 1300, y: 1200, z: -2150 },
+        { x: 1900, y: 880, z: -2150 }
+      ];
+
+      types.forEach((type, index) => {
+        const id = `seq_${type}_test`;
+        const initialPos = initialPositions[index];
+        const app = createMockAppliance({ id, type, position: initialPos });
+        projectStorage.addAppliance(app);
+
+        // Movimiento 1 (arrastrar y soltar)
+        const pos1 = { x: initialPos.x + 250, y: initialPos.y, z: initialPos.z + 500 };
+        projectStorage.updateAppliance(id, { position: pos1 });
+        let current = projectStorage.currentProject().appliances?.find(a => a.id === id);
+        expect(current?.position).toEqual(pos1);
+
+        // Movimiento 2 (segundo clic y arrastrar de nuevo)
+        const pos2 = { x: pos1.x + 300, y: pos1.y + 50, z: pos1.z + 400 };
+        projectStorage.updateAppliance(id, { position: pos2 });
+        current = projectStorage.currentProject().appliances?.find(a => a.id === id);
+        expect(current?.position).toEqual(pos2);
+
+        // Movimiento 3 (tercer clic y arrastrar de nuevo)
+        const pos3 = { x: pos2.x - 150, y: pos2.y, z: pos2.z - 200 };
+        projectStorage.updateAppliance(id, { position: pos3 });
+        current = projectStorage.currentProject().appliances?.find(a => a.id === id);
+        expect(current?.position).toEqual(pos3);
+      });
     });
   });
 });

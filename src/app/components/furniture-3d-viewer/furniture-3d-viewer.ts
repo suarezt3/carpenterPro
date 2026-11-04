@@ -2776,8 +2776,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
       let objName = 'Superficie 3D';
       if (hit.object.userData?.['part']) {
         objName = hit.object.userData['part'].name;
-      } else if (hit.object.userData?.['appliance']) {
-        objName = hit.object.userData['appliance'].name;
+      } else if (hit.object.userData?.['appliance'] || hit.object.userData?.['applianceId']) {
+        const resolved = this.resolveApplianceFromObject(hit.object);
+        objName = resolved?.app.name || 'Equipo';
       } else if (hit.object.userData?.['isWall']) {
         objName = 'Muro';
       } else if (hit.object.userData?.['isFloor']) {
@@ -4956,6 +4957,71 @@ private createHandleMesh(
   }
 
   /**
+   * Resuelve con precisión atómica el ApplianceItem actualizado y su grupo raíz de Three.js
+   * a partir de cualquier malla hija o grupo interceptado por raycasting.
+   */
+  private resolveApplianceFromObject(startObj: THREE.Object3D | null): { app: ApplianceItem; rootGroup: THREE.Object3D | null } | null {
+    let hitObj: THREE.Object3D | null = startObj;
+    let foundAppId: string | null = null;
+    let foundApp: ApplianceItem | null = null;
+    let appRootGroup: THREE.Object3D | null = null;
+
+    while (hitObj && hitObj !== this.appliancesGroup && hitObj !== this.scene) {
+      if (hitObj.userData?.['applianceId']) {
+        foundAppId = hitObj.userData['applianceId'];
+      }
+      if (hitObj.userData?.['appliance']?.id) {
+        foundAppId = hitObj.userData['appliance'].id;
+      }
+      if (hitObj.parent === this.appliancesGroup) {
+        appRootGroup = hitObj;
+        break;
+      }
+      hitObj = hitObj.parent;
+    }
+
+    if (!foundAppId && appRootGroup?.userData?.['applianceId']) {
+      foundAppId = appRootGroup.userData['applianceId'];
+    }
+    if (!foundAppId && appRootGroup?.userData?.['appliance']?.id) {
+      foundAppId = appRootGroup.userData['appliance'].id;
+    }
+
+    if (foundAppId) {
+      foundApp = this.appliances().find(a => a.id === foundAppId) || null;
+    }
+    if (!foundApp && appRootGroup?.userData?.['appliance']) {
+      foundApp = appRootGroup.userData['appliance'];
+    }
+
+    if (!foundApp) return null;
+
+    // Obtener la posición física real actual de la malla 3D en la escena para prevenir cualquier salto
+    const currentMeshPos = appRootGroup ? appRootGroup.position : null;
+    const isMountedSink = foundApp.type === 'sink' && ((foundApp.mountType === 'countertop' && foundApp.position.y > 60) || foundApp.position.y >= 350);
+    const isMountedCooktop = foundApp.type === 'cooktop' && ((foundApp.mountType === 'countertop' && foundApp.position.y > 60) || foundApp.position.y >= 350);
+    const resolvedY = (currentMeshPos !== null && !isMountedSink && !isMountedCooktop)
+      ? Math.round(currentMeshPos.y)
+      : (currentMeshPos !== null && isMountedSink)
+        ? Math.round(currentMeshPos.y + foundApp.height - 8)
+        : (currentMeshPos !== null && isMountedCooktop)
+          ? Math.round(currentMeshPos.y + foundApp.height - 14)
+          : foundApp.position.y;
+
+    const targetApp: ApplianceItem = {
+      ...foundApp,
+      position: {
+        x: currentMeshPos !== null ? Math.round(currentMeshPos.x) : foundApp.position.x,
+        y: resolvedY,
+        z: currentMeshPos !== null ? Math.round(currentMeshPos.z) : foundApp.position.z
+      },
+      rotation: appRootGroup ? Math.round(THREE.MathUtils.radToDeg(appRootGroup.rotation.y)) : (foundApp.rotation || 0)
+    };
+
+    return { app: targetApp, rootGroup: appRootGroup };
+  }
+
+  /**
    * Congela o descongela únicamente la pieza actual desde el menú contextual.
    */
   togglePartLockFromContext() {
@@ -5264,18 +5330,19 @@ private createHandleMesh(
         const hit = handleIntersects[0].object as THREE.Mesh;
         const handleData = hit.userData;
         if (handleData && handleData['isApplianceHandle']) {
+          const freshApp = this.appliances().find(a => a.id === handleData['appliance']?.id) || handleData['appliance'];
           this.isApplianceResizing = true;
           this.liveDragPrimaryApplianceUpdate = null;
-          this.draggingAppliance = handleData['appliance'];
+          this.draggingAppliance = freshApp;
           this.activeApplianceHandle = {
             axis: handleData['axis'],
             direction: handleData['direction']
           };
-          this.dragInitialAppliancePos = { ...handleData['appliance'].position };
+          this.dragInitialAppliancePos = { ...freshApp.position };
           this.dragInitialApplianceDim = {
-            width: handleData['appliance'].width,
-            height: handleData['appliance'].height,
-            depth: handleData['appliance'].depth
+            width: freshApp.width,
+            height: freshApp.height,
+            depth: freshApp.depth
           };
           this.dragStartPointer = { x: e.clientX, y: e.clientY };
           this.ngZone.run(() => this.dragStarted.emit());
@@ -5305,17 +5372,9 @@ private createHandleMesh(
     if (this.appliancesGroup.children.length > 0) {
       const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
       if (appIntersects.length > 0) {
-        let hitObj: THREE.Object3D | null = appIntersects[0].object;
-        let foundApp: ApplianceItem | null = null;
-        while (hitObj && hitObj !== this.appliancesGroup && hitObj !== this.scene) {
-          if (hitObj.userData?.['appliance']) {
-            foundApp = hitObj.userData['appliance'];
-            break;
-          }
-          hitObj = hitObj.parent;
-        }
-        if (foundApp) {
-          const targetApp = foundApp;
+        const resolved = this.resolveApplianceFromObject(appIntersects[0].object);
+        if (resolved) {
+          const targetApp = resolved.app;
           if (e.shiftKey) {
             this.ngZone.run(() => this.handleShiftClickSelection(e));
             e.preventDefault();
@@ -5349,15 +5408,17 @@ private createHandleMesh(
             this.ngZone.run(() => this.dragStarted.emit());
             this.controls.enabled = false;
 
-            // Almacenar las piezas y equipos que deben desplazarse junto a este electrodoméstico
-            const activeParts = targetApp.groupId
+            // Almacenar las piezas y equipos que deben desplazarse junto a este electrodoméstico SOLO si es multiselección activa
+            const activeParts = isPartOfActiveMulti && targetApp.groupId
               ? this.parts().filter(p => p.groupId === targetApp.groupId)
-              : this.selectedParts();
+              : (isPartOfActiveMulti ? this.selectedParts() : []);
             this.dragInitialParts = activeParts.map(p => ({ ...p }));
             const relevantGroupIds = new Set(activeParts.map(p => p.groupId).filter(Boolean));
-            const activeApps = this.appliances().filter(
-              a => a.id !== targetApp.id && (curAppIds.includes(a.id) || (a.groupId && (a.groupId === targetApp.groupId || relevantGroupIds.has(a.groupId))))
-            );
+            const activeApps = isPartOfActiveMulti
+              ? this.appliances().filter(
+                  a => a.id !== targetApp.id && (curAppIds.includes(a.id) || (a.groupId && (a.groupId === targetApp.groupId || relevantGroupIds.has(a.groupId))))
+                )
+              : [];
             this.dragInitialSelectedAppliances = activeApps.map(a => ({ ...a, position: { ...a.position } }));
 
             const camDir = new THREE.Vector3();
@@ -5827,11 +5888,16 @@ private createHandleMesh(
           }
         }
 
+        const primaryAppUpdates: Partial<ApplianceItem> = {
+          position: { x: newX, y: newY, z: newZ }
+        };
+        if (app.groupId && this.dragInitialParts.length === 0) {
+          primaryAppUpdates.groupId = undefined;
+        }
+
         this.previewPartUpdatesInPlace(partUpdates, appUpdates, {
           appliance: app,
-          updates: {
-            position: { x: newX, y: newY, z: newZ }
-          }
+          updates: primaryAppUpdates
         });
       }
       return;
@@ -6980,12 +7046,23 @@ private createHandleMesh(
               ? newPos.y - app.height + 14
               : newPos.y;
         for (const child of this.appliancesGroup.children) {
-          if (child.userData?.['appliance']?.id === app.id) {
+          const cId = child.userData?.['appliance']?.id || child.userData?.['applianceId'];
+          if (cId === app.id) {
             const dx = newPos.x - child.position.x;
             const dy = visualBaseY - child.position.y;
             const dz = newPos.z - child.position.z;
             child.position.set(newPos.x, visualBaseY, newPos.z);
-            child.userData['appliance'] = { ...app, ...primaryAppUpdate.updates };
+            const updatedApp = { ...app, ...primaryAppUpdate.updates };
+            if ('groupId' in primaryAppUpdate.updates && primaryAppUpdate.updates.groupId === undefined) {
+              delete updatedApp.groupId;
+            }
+            child.userData['appliance'] = updatedApp;
+            child.userData['applianceId'] = app.id;
+            child.traverse(c => {
+              if (c !== child && 'appliance' in c.userData) {
+                delete c.userData['appliance'];
+              }
+            });
             for (const gChild of this.applianceGizmoGroup.children) {
               gChild.position.x += dx;
               gChild.position.y += dy;
@@ -7002,16 +7079,30 @@ private createHandleMesh(
       const newPos = appUpd.updates.position;
       if (newPos) {
         for (const child of this.appliancesGroup.children) {
-          const childApp = child.userData?.['appliance'] as ApplianceItem | undefined;
-          if (childApp && childApp.id === appUpd.id) {
+          const cId = child.userData?.['appliance']?.id || child.userData?.['applianceId'];
+          if (cId === appUpd.id) {
+            const childApp = (child.userData?.['appliance'] as ApplianceItem | undefined) ||
+              this.appliances().find(a => a.id === appUpd.id);
             const visualBaseY =
-              childApp.type === 'sink' && newPos.y >= 500
+              childApp && childApp.type === 'sink' && newPos.y >= 500
                 ? newPos.y - childApp.height + 8
-                : (childApp.type === 'cooktop' && newPos.y >= 500)
+                : (childApp && childApp.type === 'cooktop' && newPos.y >= 500)
                   ? newPos.y - childApp.height + 14
                   : newPos.y;
             child.position.set(newPos.x, visualBaseY, newPos.z);
-            child.userData['appliance'] = { ...childApp, ...appUpd.updates };
+            if (childApp) {
+              const updatedApp = { ...childApp, ...appUpd.updates };
+              if ('groupId' in appUpd.updates && appUpd.updates.groupId === undefined) {
+                delete updatedApp.groupId;
+              }
+              child.userData['appliance'] = updatedApp;
+              child.userData['applianceId'] = appUpd.id;
+              child.traverse(c => {
+                if (c !== child && 'appliance' in c.userData) {
+                  delete c.userData['appliance'];
+                }
+              });
+            }
             break;
           }
         }
@@ -7722,17 +7813,9 @@ private createHandleMesh(
     if (this.layerVisibility().showAppliances && this.appliancesGroup.children.length > 0) {
       const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
       if (appIntersects.length > 0) {
-        let hitObj: THREE.Object3D | null = appIntersects[0].object;
-        let foundApp: ApplianceItem | null = null;
-        while (hitObj && hitObj !== this.appliancesGroup && hitObj !== this.scene) {
-          if (hitObj.userData?.['appliance']) {
-            foundApp = hitObj.userData['appliance'];
-            break;
-          }
-          hitObj = hitObj.parent;
-        }
-
-        if (foundApp) {
+        const resolved = this.resolveApplianceFromObject(appIntersects[0].object);
+        if (resolved) {
+          const foundApp = resolved.app;
           this.contextMenuAppliance.set(foundApp);
           this.contextMenuPart.set(null);
           this.contextMenuPos.set({ x: posX, y: posY });
@@ -8418,12 +8501,8 @@ private createHandleMesh(
     // Intersección de electrodomésticos en 3D
     if (this.layerVisibility().showAppliances) {
       for (const appGroup of this.appliancesGroup.children) {
-        let app: ApplianceItem | undefined = appGroup.userData?.['appliance'];
-        if (!app) {
-          appGroup.traverse(c => {
-            if (!app && c.userData?.['appliance']) app = c.userData['appliance'];
-          });
-        }
+        const appId = appGroup.userData?.['applianceId'] || appGroup.userData?.['appliance']?.id;
+        const app: ApplianceItem | undefined = (appId ? this.appliances().find(a => a.id === appId) : null) || appGroup.userData?.['appliance'];
         if (!app) continue;
 
         const bbox = new THREE.Box3().setFromObject(appGroup);
@@ -8556,17 +8635,9 @@ private createHandleMesh(
     if (this.layerVisibility().showAppliances && this.appliancesGroup.children.length > 0) {
       const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
       if (appIntersects.length > 0) {
-        let hitObj: THREE.Object3D | null = appIntersects[0].object;
-        let foundApp: ApplianceItem | null = null;
-        while (hitObj && hitObj !== this.appliancesGroup && hitObj !== this.scene) {
-          if (hitObj.userData?.['appliance']) {
-            foundApp = hitObj.userData['appliance'];
-            break;
-          }
-          hitObj = hitObj.parent;
-        }
-
-        if (foundApp) {
+        const resolved = this.resolveApplianceFromObject(appIntersects[0].object);
+        if (resolved) {
+          const foundApp = resolved.app;
           const curAppIds = new Set(this.activeSelectedApplianceIds());
           const curPartIds = new Set(this.activeSelectedIds());
 
@@ -11490,9 +11561,20 @@ private applyMagneticSnapToPosition(
 
       if (!appGroup) continue;
 
-      appGroup.position.set(app.position.x, visualBaseY, app.position.z);
-      appGroup.rotation.y = THREE.MathUtils.degToRad(app.rotation || 0);
-      appGroup.userData = { ...(appGroup.userData || {}), appliance: app };
+      const isActivelyDragged = this.isApplianceDragging && (this.draggingAppliance?.id === app.id || this.liveDragApplianceUpdates.has(app.id));
+      if (!isActivelyDragged) {
+        appGroup.position.set(app.position.x, visualBaseY, app.position.z);
+        appGroup.rotation.y = THREE.MathUtils.degToRad(app.rotation || 0);
+      }
+      appGroup.userData = { ...(appGroup.userData || {}), appliance: app, applianceId: app.id };
+      appGroup.traverse(child => {
+        if (child instanceof THREE.Mesh) {
+          child.userData = { ...(child.userData || {}), isAppliance: true, applianceId: app.id };
+          if ('appliance' in child.userData) {
+            delete child.userData['appliance'];
+          }
+        }
+      });
 
       // Si es el electrodoméstico seleccionado (individual o en multiselección), dibujar contorno técnico, aro de suelo y tiradores 3D
       const isSelected = app.id === selectedId || this.activeSelectedApplianceIds().includes(app.id);
@@ -11697,7 +11779,7 @@ private applyMagneticSnapToPosition(
 
           glbGroup.position.set(app.position.x, visualBaseY, app.position.z);
           glbGroup.rotation.y = THREE.MathUtils.degToRad(app.rotation || 0);
-          glbGroup.userData = { ...(glbGroup.userData || {}), appliance: app };
+          glbGroup.userData = { ...(glbGroup.userData || {}), appliance: app, applianceId: app.id };
 
           this.appliancesGroup.add(glbGroup);
           this.applianceMeshMap.set(app.id, glbGroup);

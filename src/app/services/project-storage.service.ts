@@ -214,7 +214,14 @@ export class ProjectStorageService {
   updateAppliance(id: string, updates: Partial<ApplianceItem>) {
     this.updateProject(p => ({
       ...p,
-      appliances: (p.appliances || []).map(a => a.id === id ? { ...a, ...updates } : a)
+      appliances: (p.appliances || []).map(a => {
+        if (a.id !== id) return a;
+        const updated = { ...a, ...updates };
+        if ('groupId' in updates && updates.groupId === undefined) {
+          delete updated.groupId;
+        }
+        return updated;
+      })
     }));
   }
 
@@ -304,7 +311,12 @@ export class ProjectStorageService {
       ...p,
       appliances: (p.appliances || []).map(a => {
         const upd = updatesMap.get(a.id);
-        return upd ? { ...a, ...upd } : a;
+        if (!upd) return a;
+        const updated = { ...a, ...upd };
+        if ('groupId' in upd && upd.groupId === undefined) {
+          delete updated.groupId;
+        }
+        return updated;
       })
     }));
   }
