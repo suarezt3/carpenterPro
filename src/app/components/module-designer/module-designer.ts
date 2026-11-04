@@ -284,6 +284,19 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       'M5 3H19',
       'M5 21H19'
     ]),
+    centerVertical: cadSvg([
+      'M4 12H20',
+      'M12 3V8',
+      'M9 5.5L12 3L15 5.5',
+      'M12 21V16',
+      'M9 18.5L12 21L15 18.5'
+    ]),
+    distributeVertical: cadSvg([
+      'M4 3H20',
+      'M6 9H18',
+      'M6 15H18',
+      'M4 21H20'
+    ]),
     palette: PaintBoardIcon,
     cncTarget: cadSvg([
       'M20 12A8 8 0 1 1 4 12A8 8 0 0 1 20 12Z',
@@ -2115,6 +2128,52 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     return this.currentParts().find(p => p.id === id) || null;
   });
 
+  readonly isInternalShelfSelected = computed<boolean>(() => {
+    const sel = this.selectedPart();
+    if (!sel || !sel.groupId) return false;
+    const role = sel.componentRole;
+    if (role === 'shelf') return true;
+    if (
+      role === 'top' ||
+      role === 'bottom' ||
+      role === 'countertop' ||
+      role === 'backsplash' ||
+      role === 'plinth' ||
+      role === 'side_left' ||
+      role === 'side_right' ||
+      role === 'back' ||
+      role === 'door'
+    ) {
+      return false;
+    }
+    const name = (sel.name || '').toLowerCase();
+    if (
+      name.includes('repisa') ||
+      name.includes('entrepaño') ||
+      name.includes('entrepano') ||
+      name.includes('estante') ||
+      name.includes('balda') ||
+      name.includes('shelf')
+    ) {
+      return true;
+    }
+    if (
+      sel.orientation === 'horizontal' &&
+      (role === 'drawer_box' || name.includes('cajón') || name.includes('cajon'))
+    ) {
+      return true;
+    }
+    return false;
+  });
+
+  readonly effectiveClearanceInfo = computed<ClearanceInfo | null>(() => {
+    const fromViewer = this.clearanceInfo();
+    const sel = this.selectedPart();
+    if (!sel) return null;
+    if (fromViewer) return fromViewer;
+    return this.computeClearanceForPart(sel, this.currentParts());
+  });
+
   readonly selectedPartMaterial = computed<Material | null>(() => {
     const sel = this.selectedPart();
     if (!sel) return null;
@@ -3423,6 +3482,395 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
   onClearanceCalculated(info: ClearanceInfo | null) {
     this.clearanceInfo.set(info);
+  }
+
+  computeClearanceForPart(part: Part, allParts: Part[]): ClearanceInfo {
+    const selBounds = this.joineryEngine.getPartBounds(part);
+    const others = allParts.filter(p => p.id !== part.id);
+
+    let topClearance: number | null = null;
+    let topNeighborName: string | null = null;
+    let bottomClearance: number | null = null;
+    let bottomNeighborName: string | null = null;
+    let leftClearance: number | null = null;
+    let leftNeighborName: string | null = null;
+    let rightClearance: number | null = null;
+    let rightNeighborName: string | null = null;
+
+    let minTopGap = Infinity;
+    let minBottomGap = Infinity;
+    let minLeftGap = Infinity;
+    let minRightGap = Infinity;
+
+    for (const o of others) {
+      const oBounds = this.joineryEngine.getPartBounds(o);
+
+      const overlapX = Math.max(0, Math.min(selBounds.maxX, oBounds.maxX) - Math.max(selBounds.minX, oBounds.minX));
+      const overlapZ = Math.max(0, Math.min(selBounds.maxZ, oBounds.maxZ) - Math.max(selBounds.minZ, oBounds.minZ));
+
+      if (overlapX > 15 && overlapZ > 15) {
+        if (oBounds.minY >= selBounds.maxY - 1) {
+          const gap = oBounds.minY - selBounds.maxY;
+          if (gap < minTopGap) {
+            minTopGap = gap;
+            topClearance = Math.round(gap);
+            topNeighborName = o.name;
+          }
+        }
+        if (oBounds.maxY <= selBounds.minY + 1) {
+          const gap = selBounds.minY - oBounds.maxY;
+          if (gap < minBottomGap) {
+            minBottomGap = gap;
+            bottomClearance = Math.round(gap);
+            bottomNeighborName = o.name;
+          }
+        }
+      }
+
+      const overlapY = Math.max(0, Math.min(selBounds.maxY, oBounds.maxY) - Math.max(selBounds.minY, oBounds.minY));
+      if (overlapY > 15 && overlapZ > 15) {
+        if (oBounds.maxX <= selBounds.minX + 1) {
+          const gap = selBounds.minX - oBounds.maxX;
+          if (gap < minLeftGap) {
+            minLeftGap = gap;
+            leftClearance = Math.round(gap);
+            leftNeighborName = o.name;
+          }
+        }
+        if (oBounds.minX >= selBounds.maxX - 1) {
+          const gap = oBounds.minX - selBounds.maxX;
+          if (gap < minRightGap) {
+            minRightGap = gap;
+            rightClearance = Math.round(gap);
+            rightNeighborName = o.name;
+          }
+        }
+      }
+    }
+
+    return {
+      topClearance,
+      bottomClearance,
+      leftClearance,
+      rightClearance,
+      topNeighborName,
+      bottomNeighborName,
+      leftNeighborName,
+      rightNeighborName
+    };
+  }
+
+  onShelfBottomClearanceInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input) {
+      this.onShelfBottomClearanceChange(input.value);
+    }
+  }
+
+  onShelfTopClearanceInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input) {
+      this.onShelfTopClearanceChange(input.value);
+    }
+  }
+
+  onShelfBottomClearanceChange(rawValue: string | number) {
+    const shelf = this.selectedPart();
+    if (!shelf || !shelf.groupId) return;
+    const num = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue);
+    if (isNaN(num) || num < 0) return;
+
+    const minGap = 40;
+    const allParts = this.currentParts();
+    const shelfBounds = this.joineryEngine.getPartBounds(shelf);
+    const shelfHalfThick = shelfBounds.sy / 2;
+
+    const groupParts = allParts.filter(p => p.groupId === shelf.groupId && p.id !== shelf.id);
+    let belowObstacleTopY = 0;
+    let aboveObstacleBottomY = Infinity;
+
+    for (const o of groupParts) {
+      const oBounds = this.joineryEngine.getPartBounds(o);
+      const overlapX = Math.max(0, Math.min(shelfBounds.maxX, oBounds.maxX) - Math.max(shelfBounds.minX, oBounds.minX));
+      const overlapZ = Math.max(0, Math.min(shelfBounds.maxZ, oBounds.maxZ) - Math.max(shelfBounds.minZ, oBounds.minZ));
+      if (overlapX > 15 && overlapZ > 15) {
+        if (oBounds.maxY <= shelfBounds.minY + 1 && oBounds.maxY > belowObstacleTopY) {
+          belowObstacleTopY = oBounds.maxY;
+        }
+        if (oBounds.minY >= shelfBounds.maxY - 1 && oBounds.minY < aboveObstacleBottomY) {
+          aboveObstacleBottomY = oBounds.minY;
+        }
+      }
+    }
+
+    if (aboveObstacleBottomY === Infinity) {
+      const topPart = groupParts.find(p => p.componentRole === 'top' || p.componentRole === 'tie');
+      if (topPart) {
+        aboveObstacleBottomY = this.joineryEngine.getPartBounds(topPart).minY;
+      } else {
+        const sides = groupParts.filter(p => p.orientation === 'vertical_yz');
+        if (sides.length > 0) {
+          aboveObstacleBottomY = Math.max(...sides.map(s => this.joineryEngine.getPartBounds(s).maxY));
+        }
+      }
+    }
+
+    if (belowObstacleTopY === 0) {
+      const bottomPart = groupParts.find(p => p.componentRole === 'bottom');
+      if (bottomPart) {
+        belowObstacleTopY = this.joineryEngine.getPartBounds(bottomPart).maxY;
+      }
+    }
+
+    let targetPosY = belowObstacleTopY + num + shelfHalfThick;
+    const minAllowedY = belowObstacleTopY + minGap + shelfHalfThick;
+    const maxAllowedY = aboveObstacleBottomY !== Infinity ? aboveObstacleBottomY - minGap - shelfHalfThick : Infinity;
+
+    if (maxAllowedY !== Infinity && minAllowedY > maxAllowedY) {
+      targetPosY = (belowObstacleTopY + aboveObstacleBottomY) / 2;
+    } else {
+      targetPosY = Math.max(minAllowedY, Math.min(maxAllowedY, targetPosY));
+    }
+    targetPosY = Math.max(shelfHalfThick, Math.round(targetPosY));
+
+    const updated: Part = { ...shelf, posY: targetPosY };
+    this.projectService.updatePart(updated);
+  }
+
+  onShelfTopClearanceChange(rawValue: string | number) {
+    const shelf = this.selectedPart();
+    if (!shelf || !shelf.groupId) return;
+    const num = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue);
+    if (isNaN(num) || num < 0) return;
+
+    const minGap = 40;
+    const allParts = this.currentParts();
+    const shelfBounds = this.joineryEngine.getPartBounds(shelf);
+    const shelfHalfThick = shelfBounds.sy / 2;
+
+    const groupParts = allParts.filter(p => p.groupId === shelf.groupId && p.id !== shelf.id);
+    let belowObstacleTopY = 0;
+    let aboveObstacleBottomY = Infinity;
+
+    for (const o of groupParts) {
+      const oBounds = this.joineryEngine.getPartBounds(o);
+      const overlapX = Math.max(0, Math.min(shelfBounds.maxX, oBounds.maxX) - Math.max(shelfBounds.minX, oBounds.minX));
+      const overlapZ = Math.max(0, Math.min(shelfBounds.maxZ, oBounds.maxZ) - Math.max(shelfBounds.minZ, oBounds.minZ));
+      if (overlapX > 15 && overlapZ > 15) {
+        if (oBounds.maxY <= shelfBounds.minY + 1 && oBounds.maxY > belowObstacleTopY) {
+          belowObstacleTopY = oBounds.maxY;
+        }
+        if (oBounds.minY >= shelfBounds.maxY - 1 && oBounds.minY < aboveObstacleBottomY) {
+          aboveObstacleBottomY = oBounds.minY;
+        }
+      }
+    }
+
+    if (aboveObstacleBottomY === Infinity) {
+      const topPart = groupParts.find(p => p.componentRole === 'top' || p.componentRole === 'tie');
+      if (topPart) {
+        aboveObstacleBottomY = this.joineryEngine.getPartBounds(topPart).minY;
+      } else {
+        const sides = groupParts.filter(p => p.orientation === 'vertical_yz');
+        if (sides.length > 0) {
+          aboveObstacleBottomY = Math.max(...sides.map(s => this.joineryEngine.getPartBounds(s).maxY));
+        }
+      }
+    }
+
+    if (belowObstacleTopY === 0) {
+      const bottomPart = groupParts.find(p => p.componentRole === 'bottom');
+      if (bottomPart) {
+        belowObstacleTopY = this.joineryEngine.getPartBounds(bottomPart).maxY;
+      }
+    }
+
+    if (aboveObstacleBottomY === Infinity) return;
+
+    let targetPosY = aboveObstacleBottomY - num - shelfHalfThick;
+    const minAllowedY = belowObstacleTopY + minGap + shelfHalfThick;
+    const maxAllowedY = aboveObstacleBottomY - minGap - shelfHalfThick;
+
+    if (minAllowedY > maxAllowedY) {
+      targetPosY = (belowObstacleTopY + aboveObstacleBottomY) / 2;
+    } else {
+      targetPosY = Math.max(minAllowedY, Math.min(maxAllowedY, targetPosY));
+    }
+    targetPosY = Math.max(shelfHalfThick, Math.round(targetPosY));
+
+    const updated: Part = { ...shelf, posY: targetPosY };
+    this.projectService.updatePart(updated);
+  }
+
+  centerShelfInBay() {
+    const shelf = this.selectedPart();
+    if (!shelf || !shelf.groupId) return;
+
+    const allParts = this.currentParts();
+    const shelfBounds = this.joineryEngine.getPartBounds(shelf);
+    const shelfHalfThick = shelfBounds.sy / 2;
+
+    const groupParts = allParts.filter(p => p.groupId === shelf.groupId && p.id !== shelf.id);
+    let belowObstacleTopY = 0;
+    let aboveObstacleBottomY = Infinity;
+
+    for (const o of groupParts) {
+      const oBounds = this.joineryEngine.getPartBounds(o);
+      const overlapX = Math.max(0, Math.min(shelfBounds.maxX, oBounds.maxX) - Math.max(shelfBounds.minX, oBounds.minX));
+      const overlapZ = Math.max(0, Math.min(shelfBounds.maxZ, oBounds.maxZ) - Math.max(shelfBounds.minZ, oBounds.minZ));
+      if (overlapX > 15 && overlapZ > 15) {
+        if (oBounds.maxY <= shelfBounds.minY + 1 && oBounds.maxY > belowObstacleTopY) {
+          belowObstacleTopY = oBounds.maxY;
+        }
+        if (oBounds.minY >= shelfBounds.maxY - 1 && oBounds.minY < aboveObstacleBottomY) {
+          aboveObstacleBottomY = oBounds.minY;
+        }
+      }
+    }
+
+    if (aboveObstacleBottomY === Infinity) {
+      const topPart = groupParts.find(p => p.componentRole === 'top' || p.componentRole === 'tie');
+      if (topPart) {
+        aboveObstacleBottomY = this.joineryEngine.getPartBounds(topPart).minY;
+      } else {
+        const sides = groupParts.filter(p => p.orientation === 'vertical_yz');
+        if (sides.length > 0) {
+          aboveObstacleBottomY = Math.max(...sides.map(s => this.joineryEngine.getPartBounds(s).maxY));
+        }
+      }
+    }
+
+    if (belowObstacleTopY === 0) {
+      const bottomPart = groupParts.find(p => p.componentRole === 'bottom');
+      if (bottomPart) {
+        belowObstacleTopY = this.joineryEngine.getPartBounds(bottomPart).maxY;
+      }
+    }
+
+    if (aboveObstacleBottomY === Infinity) return;
+
+    const availableGap = aboveObstacleBottomY - belowObstacleTopY - shelfBounds.sy;
+    if (availableGap <= 0) return;
+
+    const halfGap = Math.round(availableGap / 2);
+    const targetPosY = Math.round(belowObstacleTopY + halfGap + shelfHalfThick);
+
+    const updated: Part = { ...shelf, posY: targetPosY };
+    this.projectService.updatePart(updated);
+  }
+
+  distributeModuleShelvesEqually() {
+    const current = this.selectedPart();
+    if (!current || !current.groupId) return;
+
+    const allParts = this.currentParts();
+    const moduleParts = allParts.filter(p => p.groupId === current.groupId);
+    if (moduleParts.length === 0) return;
+
+    const currentBounds = this.joineryEngine.getPartBounds(current);
+
+    const isShelfRole = (p: Part): boolean => {
+      if (p.componentRole === 'shelf') return true;
+      if (
+        p.componentRole === 'top' ||
+        p.componentRole === 'bottom' ||
+        p.componentRole === 'countertop' ||
+        p.componentRole === 'backsplash' ||
+        p.componentRole === 'plinth' ||
+        p.componentRole === 'side_left' ||
+        p.componentRole === 'side_right' ||
+        p.componentRole === 'back' ||
+        p.componentRole === 'door'
+      ) {
+        return false;
+      }
+      const n = (p.name || '').toLowerCase();
+      return (
+        n.includes('repisa') ||
+        n.includes('entrepaño') ||
+        n.includes('entrepano') ||
+        n.includes('estante') ||
+        n.includes('balda') ||
+        n.includes('shelf')
+      );
+    };
+
+    const shelves = moduleParts
+      .filter(p => isShelfRole(p))
+      .filter(p => {
+        const b = this.joineryEngine.getPartBounds(p);
+        const overlapX = Math.max(0, Math.min(currentBounds.maxX, b.maxX) - Math.max(currentBounds.minX, b.minX));
+        return overlapX > 15;
+      })
+      .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0));
+
+    if (shelves.length === 0) return;
+
+    let floorTopY = 0;
+    let roofBottomY = Infinity;
+
+    const firstShelfBounds = this.joineryEngine.getPartBounds(shelves[0]);
+    const lastShelfBounds = this.joineryEngine.getPartBounds(shelves[shelves.length - 1]);
+
+    for (const o of moduleParts) {
+      if (shelves.some(s => s.id === o.id)) continue;
+      const oBounds = this.joineryEngine.getPartBounds(o);
+      const overlapX = Math.max(0, Math.min(currentBounds.maxX, oBounds.maxX) - Math.max(currentBounds.minX, oBounds.minX));
+      const overlapZ = Math.max(0, Math.min(currentBounds.maxZ, oBounds.maxZ) - Math.max(currentBounds.minZ, oBounds.minZ));
+      if (overlapX > 15 && overlapZ > 15) {
+        if (oBounds.maxY <= firstShelfBounds.minY + 1 && oBounds.maxY > floorTopY) {
+          floorTopY = oBounds.maxY;
+        }
+        if (oBounds.minY >= lastShelfBounds.maxY - 1 && oBounds.minY < roofBottomY) {
+          roofBottomY = oBounds.minY;
+        }
+      }
+    }
+
+    if (floorTopY === 0) {
+      const bottomPart = moduleParts.find(p => p.componentRole === 'bottom');
+      if (bottomPart) floorTopY = this.joineryEngine.getPartBounds(bottomPart).maxY;
+    }
+    if (roofBottomY === Infinity) {
+      const topPart = moduleParts.find(p => p.componentRole === 'top' || p.componentRole === 'tie');
+      if (topPart) {
+        roofBottomY = this.joineryEngine.getPartBounds(topPart).minY;
+      } else {
+        const sides = moduleParts.filter(p => p.orientation === 'vertical_yz');
+        if (sides.length > 0) {
+          roofBottomY = Math.max(...sides.map(s => this.joineryEngine.getPartBounds(s).maxY));
+        }
+      }
+    }
+
+    if (roofBottomY === Infinity || roofBottomY <= floorTopY) return;
+
+    const totalHeight = roofBottomY - floorTopY;
+    const totalShelvesThickness = shelves.reduce(
+      (acc, s) => acc + this.joineryEngine.getPartBounds(s).sy,
+      0
+    );
+    const freeHeight = totalHeight - totalShelvesThickness;
+    const numBays = shelves.length + 1;
+    const gap = freeHeight / numBays;
+
+    if (gap < 20) return;
+
+    const updatesList: { partId: string; updates: Partial<Part> }[] = [];
+    let currentY = floorTopY;
+
+    for (const shelf of shelves) {
+      const sThick = this.joineryEngine.getPartBounds(shelf).sy;
+      currentY += gap;
+      const newPosY = Math.round(currentY + sThick / 2);
+      updatesList.push({
+        partId: shelf.id,
+        updates: { posY: newPosY }
+      });
+      currentY += sThick;
+    }
+
+    this.projectService.updateMultipleParts(updatesList);
   }
 
   // --- ACCIONES DE LIENZO Y PLANTILLAS ---

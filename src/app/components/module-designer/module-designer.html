@@ -3674,8 +3674,101 @@
                 </div>
               }
 
-              <!-- 6. LUZ LIBRE (ESPACIO INTERIOR ÚTIL) -->
-              @if (clearanceInfo(); as clr) {
+              <!-- 6. LUZ LIBRE (ESPACIO INTERIOR ÚTIL) O POSICIÓN DE REPISA INTERNA -->
+              @if (isInternalShelfSelected() && effectiveClearanceInfo(); as clr) {
+                <div class="bg-white border border-emerald-200/90 rounded-md p-2.5 space-y-2.5 shadow-2xs">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.clearanceVert" [size]="14" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                      <span>Posición de Repisa (Luz Interna)</span>
+                    </span>
+                    <span class="text-[9px] uppercase font-mono font-medium px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Eje Y Riel
+                    </span>
+                  </div>
+
+                  <!-- Campos numéricos Luz Inferior y Luz Superior -->
+                  <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="p-2 bg-emerald-50/40 rounded-md border border-emerald-100 flex flex-col justify-between">
+                      <label class="text-[10px] text-zinc-600 font-medium flex items-center gap-1">
+                        <hugeicons-icon [icon]="icons.arrowDown" [size]="11" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                        <span>Luz Inferior</span>
+                      </label>
+                      <div class="relative mt-1 flex items-center">
+                        <input
+                          type="number"
+                          min="20"
+                          step="5"
+                          [value]="clr.bottomClearance ?? ''"
+                          (change)="onShelfBottomClearanceInput($event)"
+                          (keydown.enter)="onShelfBottomClearanceInput($event)"
+                          class="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-xs font-mono font-semibold text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 pr-7"
+                          placeholder="0"
+                        />
+                        <span class="absolute right-2 text-[10px] font-mono text-zinc-400 pointer-events-none">mm</span>
+                      </div>
+                      <p class="text-[9px] text-zinc-500 truncate mt-1">hacia {{ clr.bottomNeighborName || 'piso' }}</p>
+                    </div>
+
+                    <div class="p-2 bg-emerald-50/40 rounded-md border border-emerald-100 flex flex-col justify-between">
+                      <label class="text-[10px] text-zinc-600 font-medium flex items-center gap-1">
+                        <hugeicons-icon [icon]="icons.arrowUp" [size]="11" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                        <span>Luz Superior</span>
+                      </label>
+                      <div class="relative mt-1 flex items-center">
+                        <input
+                          type="number"
+                          min="20"
+                          step="5"
+                          [value]="clr.topClearance ?? ''"
+                          (change)="onShelfTopClearanceInput($event)"
+                          (keydown.enter)="onShelfTopClearanceInput($event)"
+                          class="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-xs font-mono font-semibold text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 pr-7"
+                          placeholder="0"
+                        />
+                        <span class="absolute right-2 text-[10px] font-mono text-zinc-400 pointer-events-none">mm</span>
+                      </div>
+                      <p class="text-[9px] text-zinc-500 truncate mt-1">hacia {{ clr.topNeighborName || 'techo' }}</p>
+                    </div>
+                  </div>
+
+                  <!-- Botones de Acción Rápida -->
+                  <div class="grid grid-cols-2 gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      (click)="centerShelfInBay()"
+                      class="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-zinc-50 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-zinc-700 border border-zinc-200 text-[11px] font-medium transition-colors shadow-2xs cursor-pointer"
+                      title="Coloca la repisa exactamente a la mitad entre las piezas adyacentes"
+                    >
+                      <hugeicons-icon [icon]="icons.centerVertical" [size]="12" [strokeWidth]="2" class="shrink-0 text-emerald-600"></hugeicons-icon>
+                      <span class="truncate">Centrar en este hueco</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      (click)="distributeModuleShelvesEqually()"
+                      class="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-zinc-50 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-zinc-700 border border-zinc-200 text-[11px] font-medium transition-colors shadow-2xs cursor-pointer"
+                      title="Iguala todos los vanos entre repisas del módulo con un clic"
+                    >
+                      <hugeicons-icon [icon]="icons.distributeVertical" [size]="12" [strokeWidth]="2" class="shrink-0 text-emerald-600"></hugeicons-icon>
+                      <span class="truncate">Distribuir Repisas</span>
+                    </button>
+                  </div>
+
+                  @if (clr.leftClearance !== null || clr.rightClearance !== null) {
+                    <div class="grid grid-cols-2 gap-1.5 text-xs pt-1 border-t border-zinc-100">
+                      <div class="p-1 bg-zinc-50 rounded border border-zinc-200 flex items-center justify-between text-[10px]">
+                        <span class="text-zinc-500">Izq:</span>
+                        <span class="font-mono font-semibold text-zinc-800">{{ clr.leftClearance ?? 0 }} mm</span>
+                      </div>
+                      <div class="p-1 bg-zinc-50 rounded border border-zinc-200 flex items-center justify-between text-[10px]">
+                        <span class="text-zinc-500">Der:</span>
+                        <span class="font-mono font-semibold text-zinc-800">{{ clr.rightClearance ?? 0 }} mm</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else if (effectiveClearanceInfo(); as clr) {
                 @if (clr.topClearance !== null || clr.bottomClearance !== null || clr.leftClearance !== null || clr.rightClearance !== null) {
                   <div class="bg-white border border-zinc-200/90 rounded-md p-2.5 space-y-2 shadow-2xs">
                     <div class="flex items-center justify-between">

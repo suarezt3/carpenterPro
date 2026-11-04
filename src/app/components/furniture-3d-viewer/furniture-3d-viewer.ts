@@ -61,7 +61,7 @@ import {
   ApplianceItem
 } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
-import { PartGeometryService } from '../../services/part-geometry.service';
+import { PartGeometryService, PartWorldAABB } from '../../services/part-geometry.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
@@ -723,6 +723,27 @@ export class Furniture3dViewerComponent implements OnDestroy {
   // Scene Groups
   private furnitureGroup = new THREE.Group();
   private dimensionGroup = new THREE.Group();
+  private internalClearanceGroup = new THREE.Group();
+  private readonly internalClearanceLineMat: THREE.LineDashedMaterial = (() => {
+    const mat = new THREE.LineDashedMaterial({
+      color: 0x10b981,
+      dashSize: 14,
+      gapSize: 7,
+      linewidth: 2,
+      depthTest: false
+    });
+    mat.userData = { isShared: true };
+    return mat;
+  })();
+  private readonly internalClearanceTickMat: THREE.LineBasicMaterial = (() => {
+    const mat = new THREE.LineBasicMaterial({
+      color: 0x10b981,
+      linewidth: 2,
+      depthTest: false
+    });
+    mat.userData = { isShared: true };
+    return mat;
+  })();
   private gizmoGroup = new THREE.Group();
   private measureGroup = new THREE.Group();
   private magneticSnapGroup = new THREE.Group();
@@ -1116,6 +1137,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     // 7. Add Groups
     this.scene.add(this.furnitureGroup);
     this.scene.add(this.dimensionGroup);
+    this.internalClearanceGroup.renderOrder = 999;
+    this.scene.add(this.internalClearanceGroup);
     this.scene.add(this.gizmoGroup);
     this.scene.add(this.measureGroup);
     this.scene.add(this.magneticSnapGroup);
@@ -1813,15 +1836,32 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (showDims) {
         this.renderPieceDimensions(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
       }
+      const clr = this.computeClearanceInfo(s.part, parts);
+      this.clearanceCalculated.emit(clr);
+
       if (this.showClearances()) {
-        this.renderClearanceDimensions(s.part, parts);
+        if (s.part.groupId && (this.isInternalShelf(s.part) || this.isInternalDivider(s.part))) {
+          this.renderModuleInternalClearances(s.part.groupId, s.part);
+        } else {
+          this.disposeGroup(this.internalClearanceGroup);
+          this.renderClearanceDimensions(s.part, parts);
+        }
       } else {
-        this.clearanceCalculated.emit(null);
+        this.disposeGroup(this.internalClearanceGroup);
       }
       if (this.activeTool() === 'move' || this.activeTool() === 'select') {
         this.buildGizmo(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
       }
+    } else if (selectedDataList.length > 1) {
+      const groupIds = Array.from(new Set(selectedDataList.map(s => s.part.groupId).filter(Boolean))) as string[];
+      if (groupIds.length === 1 && this.showClearances()) {
+        this.renderModuleInternalClearances(groupIds[0]);
+      } else {
+        this.disposeGroup(this.internalClearanceGroup);
+      }
+      this.clearanceCalculated.emit(null);
     } else {
+      this.disposeGroup(this.internalClearanceGroup);
       this.clearanceCalculated.emit(null);
     }
   }
@@ -3412,17 +3452,33 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (this.show3dDimensions()) {
         this.renderPieceDimensions(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
       }
+      const clr = this.computeClearanceInfo(s.part, this.parts());
+      this.clearanceCalculated.emit(clr);
+
       if (this.showClearances()) {
-        this.renderClearanceDimensions(s.part, this.parts());
+        if (s.part.groupId && (this.isInternalShelf(s.part) || this.isInternalDivider(s.part))) {
+          this.renderModuleInternalClearances(s.part.groupId, s.part);
+        } else {
+          this.disposeGroup(this.internalClearanceGroup);
+          this.renderClearanceDimensions(s.part, this.parts());
+        }
       } else {
-        this.clearanceCalculated.emit(null);
+        this.disposeGroup(this.internalClearanceGroup);
       }
       if (this.activeTool() === 'move' || this.activeTool() === 'select') {
         this.buildGizmo(s.part, s.px, s.py, s.pz, s.sx, s.sy, s.sz);
       }
-    } else {
+    } else if (selectedDataList.length > 1) {
+      const groupIds = Array.from(new Set(selectedDataList.map(s => s.part.groupId).filter(Boolean))) as string[];
+      if (groupIds.length === 1 && this.showClearances()) {
+        this.renderModuleInternalClearances(groupIds[0]);
+      } else {
+        this.disposeGroup(this.internalClearanceGroup);
+      }
       this.clearanceCalculated.emit(null);
-      // Group selection: translation arrows removed to eliminate visual clutter (moved via direct mouse drag)
+    } else {
+      this.disposeGroup(this.internalClearanceGroup);
+      this.clearanceCalculated.emit(null);
     }
     this.requestRender(8);
   }
@@ -4736,6 +4792,542 @@ private createHandleMesh(
     };
   }
 
+  isInternalShelf(part: Part): boolean {
+    if (!part?.groupId) return false;
+    const role = part.componentRole;
+    if (role === 'shelf') return true;
+    if (
+      role === 'top' ||
+      role === 'bottom' ||
+      role === 'countertop' ||
+      role === 'backsplash' ||
+      role === 'plinth' ||
+      role === 'side_left' ||
+      role === 'side_right' ||
+      role === 'back' ||
+      role === 'door'
+    ) {
+      return false;
+    }
+    const name = (part.name || '').toLowerCase();
+    if (
+      name.includes('repisa') ||
+      name.includes('entrepaño') ||
+      name.includes('entrepano') ||
+      name.includes('estante') ||
+      name.includes('balda') ||
+      name.includes('shelf')
+    ) {
+      return true;
+    }
+    if (
+      part.orientation === 'horizontal' &&
+      (role === 'drawer_box' || name.includes('cajón') || name.includes('cajon'))
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  isInternalDivider(part: Part): boolean {
+    if (!part?.groupId) return false;
+    const role = part.componentRole;
+    if (role === 'divider') return true;
+    if (
+      role === 'side_left' ||
+      role === 'side_right' ||
+      role === 'top' ||
+      role === 'bottom' ||
+      role === 'back' ||
+      role === 'door' ||
+      role === 'countertop' ||
+      role === 'backsplash'
+    ) {
+      return false;
+    }
+    const name = (part.name || '').toLowerCase();
+    if (name.includes('divisor') || name.includes('separador') || name.includes('tabique')) {
+      return true;
+    }
+    if (
+      part.orientation === 'vertical_yz' &&
+      !name.includes('lateral') &&
+      !name.includes('costado') &&
+      !name.includes('zócalo') &&
+      !name.includes('zocalo')
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  getShelfVerticalLimits(part: Part): {
+    minAllowedY: number;
+    maxAllowedY: number;
+    belowTopY: number;
+    aboveBottomY: number;
+    centerSnapY: number;
+  } {
+    const minGap = 40; // mm espacio libre mínimo para evitar colisión
+    const initBounds = this.getPartBounds(part);
+    const halfThick = initBounds.sy / 2;
+
+    const groupParts = this.parts().filter(p => p.groupId === part.groupId && p.id !== part.id);
+
+    let belowTopY = 0; // fallback al nivel del suelo Y=0
+    let aboveBottomY = Infinity;
+
+    for (const o of groupParts) {
+      const oBounds = this.getPartBounds(o);
+      const overlapX = Math.max(0, Math.min(initBounds.maxX, oBounds.maxX) - Math.max(initBounds.minX, oBounds.minX));
+      const overlapZ = Math.max(0, Math.min(initBounds.maxZ, oBounds.maxZ) - Math.max(initBounds.minZ, oBounds.minZ));
+
+      if (overlapX > 15 && overlapZ > 15) {
+        if (oBounds.minY >= initBounds.maxY - 1 && oBounds.minY < aboveBottomY) {
+          aboveBottomY = oBounds.minY;
+        }
+        if (oBounds.maxY <= initBounds.minY + 1 && oBounds.maxY > belowTopY) {
+          belowTopY = oBounds.maxY;
+        }
+      }
+    }
+
+    if (aboveBottomY === Infinity) {
+      const topPart = groupParts.find(p => p.componentRole === 'top' || p.componentRole === 'tie');
+      if (topPart) {
+        aboveBottomY = this.getPartBounds(topPart).minY;
+      } else {
+        const sides = groupParts.filter(p => p.orientation === 'vertical_yz');
+        if (sides.length > 0) {
+          aboveBottomY = Math.max(...sides.map(s => this.getPartBounds(s).maxY));
+        } else {
+          aboveBottomY = (part.posY ?? 0) + 1200;
+        }
+      }
+    }
+
+    if (belowTopY === 0) {
+      const bottomPart = groupParts.find(p => p.componentRole === 'bottom');
+      if (bottomPart) {
+        belowTopY = this.getPartBounds(bottomPart).maxY;
+      }
+    }
+
+    let minAllowedY = belowTopY + minGap + halfThick;
+    let maxAllowedY = aboveBottomY - minGap - halfThick;
+
+    if (minAllowedY > maxAllowedY) {
+      const tightMid = (belowTopY + aboveBottomY) / 2;
+      minAllowedY = tightMid - 5;
+      maxAllowedY = tightMid + 5;
+    }
+
+    const centerSnapY = Math.round((belowTopY + aboveBottomY) / 2);
+
+    return {
+      minAllowedY: Math.round(minAllowedY),
+      maxAllowedY: Math.round(maxAllowedY),
+      belowTopY: Math.round(belowTopY),
+      aboveBottomY: Math.round(aboveBottomY),
+      centerSnapY
+    };
+  }
+
+  getDividerHorizontalLimits(part: Part): {
+    minAllowedX: number;
+    maxAllowedX: number;
+    leftMaxX: number;
+    rightMinX: number;
+    centerSnapX: number;
+  } {
+    const minGap = 40;
+    const initBounds = this.getPartBounds(part);
+    const halfThickX = initBounds.sx / 2;
+
+    const groupParts = this.parts().filter(p => p.groupId === part.groupId && p.id !== part.id);
+
+    let leftMaxX = -Infinity;
+    let rightMinX = Infinity;
+
+    for (const o of groupParts) {
+      const oBounds = this.getPartBounds(o);
+      const overlapY = Math.max(0, Math.min(initBounds.maxY, oBounds.maxY) - Math.max(initBounds.minY, oBounds.minY));
+      const overlapZ = Math.max(0, Math.min(initBounds.maxZ, oBounds.maxZ) - Math.max(initBounds.minZ, oBounds.minZ));
+
+      if (overlapY > 15 && overlapZ > 15) {
+        if (oBounds.maxX <= initBounds.minX + 1 && oBounds.maxX > leftMaxX) {
+          leftMaxX = oBounds.maxX;
+        }
+        if (oBounds.minX >= initBounds.maxX - 1 && oBounds.minX < rightMinX) {
+          rightMinX = oBounds.minX;
+        }
+      }
+    }
+
+    if (leftMaxX === -Infinity) {
+      const sLeft = groupParts.find(p => p.componentRole === 'side_left');
+      leftMaxX = sLeft ? this.getPartBounds(sLeft).maxX : (part.posX ?? 0) - 500;
+    }
+    if (rightMinX === Infinity) {
+      const sRight = groupParts.find(p => p.componentRole === 'side_right');
+      rightMinX = sRight ? this.getPartBounds(sRight).minX : (part.posX ?? 0) + 500;
+    }
+
+    let minAllowedX = leftMaxX + minGap + halfThickX;
+    let maxAllowedX = rightMinX - minGap - halfThickX;
+
+    if (minAllowedX > maxAllowedX) {
+      const tightMid = (leftMaxX + rightMinX) / 2;
+      minAllowedX = tightMid - 5;
+      maxAllowedX = tightMid + 5;
+    }
+
+    const centerSnapX = Math.round((leftMaxX + rightMinX) / 2);
+
+    return {
+      minAllowedX: Math.round(minAllowedX),
+      maxAllowedX: Math.round(maxAllowedX),
+      leftMaxX: Math.round(leftMaxX),
+      rightMinX: Math.round(rightMinX),
+      centerSnapX
+    };
+  }
+
+  private createInternalClearanceBadge(text: string, isWide = false): THREE.Sprite {
+    const w = isWide ? 420 : 280;
+    const h = 80;
+    const mat = this.getCachedBadgeMaterial(`clearance_${text}`, w, h, (ctx) => {
+      ctx.fillStyle = 'rgba(6, 78, 59, 0.95)'; // emerald-900 glass
+      ctx.strokeStyle = '#10b981'; // emerald-500
+      ctx.lineWidth = 3.5;
+      const r = 16;
+      ctx.beginPath();
+      ctx.moveTo(r, 4);
+      ctx.lineTo(w - r, 4);
+      ctx.quadraticCurveTo(w - 4, 4, w - 4, r);
+      ctx.lineTo(w - 4, h - r);
+      ctx.quadraticCurveTo(w - 4, h - 4, w - r, h - 4);
+      ctx.lineTo(r, h - 4);
+      ctx.quadraticCurveTo(4, h - 4, 4, h - r);
+      ctx.lineTo(4, r);
+      ctx.quadraticCurveTo(4, 4, r, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ecfdf5'; // emerald-50
+      ctx.font = isWide
+        ? 'bold 22px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace'
+        : 'bold 28px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, w / 2, h / 2 + 1);
+    });
+
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(isWide ? 190 : 130, 36, 1);
+    sprite.renderOrder = 1000;
+    return sprite;
+  }
+
+  renderModuleInternalClearances(
+    groupId: string,
+    selectedOrDraggingPart?: Part,
+    overridePosY?: number
+  ) {
+    this.disposeGroup(this.internalClearanceGroup);
+    if (!this.showClearances()) return;
+
+    const moduleParts = this.parts().filter(
+      p => p.groupId === groupId && !this.hiddenPartIds().has(p.id)
+    );
+    if (moduleParts.length < 2) return;
+
+    // 1. Piso / Base Inferior (excluyendo repisas internas)
+    const bottomPart =
+      moduleParts.find(p => p.componentRole === 'bottom') ||
+      moduleParts
+        .filter(p => p.orientation === 'horizontal' && !this.isInternalShelf(p) && p.componentRole !== 'top' && p.componentRole !== 'countertop')
+        .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0))[0];
+    const floorTopY = bottomPart ? this.getPartBounds(bottomPart).maxY : 0;
+
+    // 2. Techo / Tapa Superior (excluyendo repisas internas y zócalos)
+    const topPart =
+      moduleParts.find(p => p.componentRole === 'top') ||
+      moduleParts
+        .filter(p => p.orientation === 'horizontal' && !this.isInternalShelf(p) && p.componentRole !== 'bottom' && p.componentRole !== 'plinth')
+        .sort((a, b) => (b.posY ?? 0) - (a.posY ?? 0))[0];
+    let roofBottomY = topPart && topPart.id !== bottomPart?.id ? this.getPartBounds(topPart).minY : Infinity;
+    if (roofBottomY === Infinity) {
+      const ties = moduleParts.filter(p => p.componentRole === 'tie');
+      if (ties.length > 0) {
+        roofBottomY = Math.min(...ties.map(t => this.getPartBounds(t).minY));
+      } else {
+        const sides = moduleParts.filter(p => p.orientation === 'vertical_yz');
+        if (sides.length > 0) {
+          roofBottomY = Math.max(...sides.map(s => this.getPartBounds(s).maxY));
+        }
+      }
+    }
+
+    // 3. Laterales Izquierdo y Derecho
+    const sides = moduleParts.filter(p => p.orientation === 'vertical_yz');
+    let leftInnerX: number | null = null;
+    let rightInnerX: number | null = null;
+    if (sides.length >= 2) {
+      const sortedSides = [...sides].sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
+      leftInnerX = this.getPartBounds(sortedSides[0]).maxX;
+      rightInnerX = this.getPartBounds(sortedSides[sortedSides.length - 1]).minX;
+    } else {
+      const sLeft = moduleParts.find(p => p.componentRole === 'side_left');
+      const sRight = moduleParts.find(p => p.componentRole === 'side_right');
+      if (sLeft) leftInnerX = this.getPartBounds(sLeft).maxX;
+      if (sRight) rightInnerX = this.getPartBounds(sRight).minX;
+    }
+
+    // 4. Repisas / Entrepaños Interiores
+    const allShelves = moduleParts.filter(p => {
+      if (bottomPart && p.id === bottomPart.id) return false;
+      if (topPart && p.id === topPart.id) return false;
+      return this.isInternalShelf(p);
+    });
+
+    // 5. Agrupación por columnas (bahías)
+    const columns: Array<{
+      refX: number;
+      frontZ: number;
+      shelfBoundsList: Array<{ part: Part; bounds: PartWorldAABB }>;
+    }> = [];
+
+    const isDraggingOrSelectedShelf = selectedOrDraggingPart && this.isInternalShelf(selectedOrDraggingPart);
+
+    if (isDraggingOrSelectedShelf) {
+      const activeRefBounds = this.getPartBounds(selectedOrDraggingPart);
+      const columnShelves = allShelves.filter(s => {
+        const b = this.getPartBounds(s);
+        const overlapX = Math.max(0, Math.min(activeRefBounds.maxX, b.maxX) - Math.max(activeRefBounds.minX, b.minX));
+        return overlapX > 15;
+      });
+      const sList = columnShelves.map(s => {
+        if (s.id === selectedOrDraggingPart.id && overridePosY !== undefined) {
+          return {
+            part: s,
+            bounds: this.getPartBounds(s, {
+              x: s.posX ?? 0,
+              y: overridePosY,
+              z: s.posZ ?? 0
+            })
+          };
+        }
+        return { part: s, bounds: this.getPartBounds(s) };
+      });
+      sList.sort((a, b) => a.bounds.minY - b.bounds.minY);
+      const refX = sList.length > 0 ? sList[0].bounds.px : (selectedOrDraggingPart.posX ?? 0);
+      const frontZ = sList.length > 0 ? Math.max(...sList.map(s => s.bounds.maxZ)) : (selectedOrDraggingPart.posZ ?? 0);
+      columns.push({ refX, frontZ, shelfBoundsList: sList });
+    } else {
+      const remainingShelves = [...allShelves];
+      while (remainingShelves.length > 0) {
+        const first = remainingShelves.shift()!;
+        const firstBounds = this.getPartBounds(first);
+        const colList = [first];
+        for (let i = remainingShelves.length - 1; i >= 0; i--) {
+          const cand = remainingShelves[i];
+          const candBounds = this.getPartBounds(cand);
+          const overlapX = Math.max(0, Math.min(firstBounds.maxX, candBounds.maxX) - Math.max(firstBounds.minX, candBounds.minX));
+          if (overlapX > 15) {
+            colList.push(cand);
+            remainingShelves.splice(i, 1);
+          }
+        }
+        const sList = colList.map(s => ({ part: s, bounds: this.getPartBounds(s) }));
+        sList.sort((a, b) => a.bounds.minY - b.bounds.minY);
+        const refX = sList[0].bounds.px;
+        const frontZ = Math.max(...sList.map(s => s.bounds.maxZ));
+        columns.push({ refX, frontZ, shelfBoundsList: sList });
+      }
+
+      if (columns.length === 0) {
+        let refX = 0;
+        let frontZ = 0;
+        if (leftInnerX !== null && rightInnerX !== null) {
+          refX = (leftInnerX + rightInnerX) / 2;
+          frontZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
+        } else {
+          refX = bottomPart?.posX ?? 0;
+          frontZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
+        }
+        columns.push({ refX, frontZ, shelfBoundsList: [] });
+      }
+    }
+
+    const maxModuleZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
+
+    // 6. Dibujo 3D de Cotas Verticales Limpias con Flechas y Sprites por columna
+    for (const col of columns) {
+      const refX = col.refX;
+      const refZ = Math.max(col.frontZ, maxModuleZ) + 16;
+      const shelfBoundsList = col.shelfBoundsList;
+
+      interface VerticalBay {
+        yBottom: number;
+        yTop: number;
+        distance: number;
+      }
+      const bays: VerticalBay[] = [];
+
+      if (shelfBoundsList.length === 0) {
+        if (roofBottomY !== Infinity && roofBottomY > floorTopY) {
+          bays.push({
+            yBottom: floorTopY,
+            yTop: roofBottomY,
+            distance: Math.round(roofBottomY - floorTopY)
+          });
+        }
+      } else {
+        bays.push({
+          yBottom: floorTopY,
+          yTop: shelfBoundsList[0].bounds.minY,
+          distance: Math.round(shelfBoundsList[0].bounds.minY - floorTopY)
+        });
+
+        for (let i = 0; i < shelfBoundsList.length - 1; i++) {
+          const yB = shelfBoundsList[i].bounds.maxY;
+          const yT = shelfBoundsList[i + 1].bounds.minY;
+          bays.push({
+            yBottom: yB,
+            yTop: yT,
+            distance: Math.round(yT - yB)
+          });
+        }
+
+        if (roofBottomY !== Infinity && roofBottomY > shelfBoundsList[shelfBoundsList.length - 1].bounds.maxY) {
+          const lastY = shelfBoundsList[shelfBoundsList.length - 1].bounds.maxY;
+          bays.push({
+            yBottom: lastY,
+            yTop: roofBottomY,
+            distance: Math.round(roofBottomY - lastY)
+          });
+        }
+      }
+
+      for (const bay of bays) {
+        if (bay.distance < 10) continue;
+
+        const p1 = new THREE.Vector3(refX, bay.yBottom, refZ);
+        const p2 = new THREE.Vector3(refX, bay.yTop, refZ);
+        const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+        const dashedLine = new THREE.Line(geo, this.internalClearanceLineMat);
+        dashedLine.computeLineDistances();
+        this.internalClearanceGroup.add(dashedLine);
+
+        const tickW = 16;
+        const arrowH = 8;
+        const arrowW = 6;
+
+        // LineSegments con pares de vértices limpios (sin diagonales espurias)
+        const tBotPts = [
+          new THREE.Vector3(refX - tickW, bay.yBottom, refZ),
+          new THREE.Vector3(refX + tickW, bay.yBottom, refZ),
+          new THREE.Vector3(refX - arrowW, bay.yBottom + arrowH, refZ),
+          new THREE.Vector3(refX, bay.yBottom, refZ),
+          new THREE.Vector3(refX + arrowW, bay.yBottom + arrowH, refZ),
+          new THREE.Vector3(refX, bay.yBottom, refZ)
+        ];
+        const tBot = new THREE.LineSegments(
+          new THREE.BufferGeometry().setFromPoints(tBotPts),
+          this.internalClearanceTickMat
+        );
+
+        const tTopPts = [
+          new THREE.Vector3(refX - tickW, bay.yTop, refZ),
+          new THREE.Vector3(refX + tickW, bay.yTop, refZ),
+          new THREE.Vector3(refX - arrowW, bay.yTop - arrowH, refZ),
+          new THREE.Vector3(refX, bay.yTop, refZ),
+          new THREE.Vector3(refX + arrowW, bay.yTop - arrowH, refZ),
+          new THREE.Vector3(refX, bay.yTop, refZ)
+        ];
+        const tTop = new THREE.LineSegments(
+          new THREE.BufferGeometry().setFromPoints(tTopPts),
+          this.internalClearanceTickMat
+        );
+        this.internalClearanceGroup.add(tBot, tTop);
+
+        const sprite = this.createInternalClearanceBadge(`↕ Luz: ${bay.distance} mm`, false);
+        const midY = (bay.yBottom + bay.yTop) / 2;
+        sprite.position.set(refX, midY, refZ + 10);
+        this.internalClearanceGroup.add(sprite);
+      }
+    }
+
+    // 7. Cota Horizontal de Luz Interna (Ancho Útil) y Profundidad Útil
+    if (leftInnerX !== null && rightInnerX !== null) {
+      const innerWidth = Math.round(rightInnerX - leftInnerX);
+      if (innerWidth > 40) {
+        const backPiece = moduleParts.find(p => p.componentRole === 'back' || (p.name || '').toLowerCase().includes('fondo'));
+        let depthText = '';
+        const backZ = backPiece
+          ? this.getPartBounds(backPiece).maxZ
+          : Math.min(...moduleParts.map(p => this.getPartBounds(p).minZ));
+        const maxZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
+        const innerDepth = Math.round(maxZ - backZ);
+        if (innerDepth > 40) {
+          depthText = ` (Prof: ${innerDepth} mm)`;
+        }
+
+        const refZ = maxZ + 16;
+        const yLine = floorTopY + 28;
+        const pLeft = new THREE.Vector3(leftInnerX, yLine, refZ);
+        const pRight = new THREE.Vector3(rightInnerX, yLine, refZ);
+        const horizGeo = new THREE.BufferGeometry().setFromPoints([pLeft, pRight]);
+        const horizLine = new THREE.Line(horizGeo, this.internalClearanceLineMat);
+        horizLine.computeLineDistances();
+        this.internalClearanceGroup.add(horizLine);
+
+        const tickH = 14;
+        const arrowW = 6;
+        const arrowH = 8;
+        const tLPts = [
+          new THREE.Vector3(leftInnerX, yLine - tickH, refZ),
+          new THREE.Vector3(leftInnerX, yLine + tickH, refZ),
+          new THREE.Vector3(leftInnerX + arrowH, yLine - arrowW, refZ),
+          new THREE.Vector3(leftInnerX, yLine, refZ),
+          new THREE.Vector3(leftInnerX + arrowH, yLine + arrowW, refZ),
+          new THREE.Vector3(leftInnerX, yLine, refZ)
+        ];
+        const tL = new THREE.LineSegments(
+          new THREE.BufferGeometry().setFromPoints(tLPts),
+          this.internalClearanceTickMat
+        );
+
+        const tRPts = [
+          new THREE.Vector3(rightInnerX, yLine - tickH, refZ),
+          new THREE.Vector3(rightInnerX, yLine + tickH, refZ),
+          new THREE.Vector3(rightInnerX - arrowH, yLine - arrowW, refZ),
+          new THREE.Vector3(rightInnerX, yLine, refZ),
+          new THREE.Vector3(rightInnerX - arrowH, yLine + arrowW, refZ),
+          new THREE.Vector3(rightInnerX, yLine, refZ)
+        ];
+        const tR = new THREE.LineSegments(
+          new THREE.BufferGeometry().setFromPoints(tRPts),
+          this.internalClearanceTickMat
+        );
+        this.internalClearanceGroup.add(tL, tR);
+
+        const midX = (leftInnerX + rightInnerX) / 2;
+        const horizBadge = this.createInternalClearanceBadge(`↔ Luz int: ${innerWidth} mm${depthText}`, true);
+        horizBadge.position.set(midX, yLine + 22, refZ + 10);
+        this.internalClearanceGroup.add(horizBadge);
+      }
+    }
+
+    // 8. Sincronizar clearanceInfo al inspector si hay una pieza seleccionada y no se está arrastrando en vivo
+    if (selectedOrDraggingPart && overridePosY === undefined) {
+      const clr = this.computeClearanceInfo(selectedOrDraggingPart, this.parts());
+      this.clearanceCalculated.emit(clr);
+    }
+  }
+
   // Draw 3D Technical Clearance Lines (Luz Libre)
   private renderClearanceDimensions(part: Part, allParts: Part[]) {
     const clr = this.computeClearanceInfo(part, allParts);
@@ -4853,6 +5445,9 @@ private createHandleMesh(
 
   toggleClearances() {
     this.showClearances.update(v => !v);
+    if (!this.showClearances()) {
+      this.disposeGroup(this.internalClearanceGroup);
+    }
     this.buildFurnitureScene(
       this.parts(),
       this.activeSelectedIds(),
@@ -5549,7 +6144,7 @@ private createHandleMesh(
               this.partSelected.emit(hitPart);
             } else if (hitPart.groupId) {
               const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
-              if (isDoubleClickSamePart || isAlreadySingleIsolated) {
+              if (isDoubleClickSamePart || isAlreadySingleIsolated || this.isInternalShelf(hitPart) || this.isInternalDivider(hitPart)) {
                 partsToSelect = [hitPart];
               } else {
                 partsToSelect = groupParts.length > 0 ? groupParts : [hitPart];
@@ -5601,7 +6196,24 @@ private createHandleMesh(
             const camDir = new THREE.Vector3();
             this.camera.getWorldDirection(camDir);
             const hitPoint = intersects[0].point.clone();
-            this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hitPoint);
+
+            if (this.isInternalShelf(hitPart) && !e.altKey) {
+              const absY = Math.abs(camDir.y);
+              if (absY > 0.85) {
+                this.camera.getWorldDirection(camDir);
+                this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hitPoint);
+              } else {
+                camDir.y = 0;
+                camDir.normalize();
+                const coplanarPt = new THREE.Vector3(hitPart.posX ?? 0, hitPart.posY ?? 0, hitPart.posZ ?? 0);
+                this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), coplanarPt);
+              }
+            } else if (this.isInternalDivider(hitPart) && !e.altKey) {
+              const coplanarPt = new THREE.Vector3(hitPart.posX ?? 0, hitPart.posY ?? 0, hitPart.posZ ?? 0);
+              this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), coplanarPt);
+            } else {
+              this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hitPoint);
+            }
 
             const intersectPoint = new THREE.Vector3();
             if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
@@ -6313,11 +6925,31 @@ private createHandleMesh(
                 this.clearLegSnapGuides();
                 this.clearPartSnapGuides();
               }
+              if (this.isInternalShelf(part) && !e.altKey) {
+                targetPos.x = part.posX ?? 0;
+              } else if (this.isInternalDivider(part) && !e.altKey) {
+                const limits = this.getDividerHorizontalLimits(part);
+                if (Math.abs(targetPos.x - limits.centerSnapX) <= 15) {
+                  targetPos.x = limits.centerSnapX;
+                }
+                targetPos.x = Math.max(limits.minAllowedX, Math.min(limits.maxAllowedX, targetPos.x));
+              }
               updates.posX = Math.round(targetPos.x);
             } else if (hit.axis === 'y') {
               const steppedDelta = Math.round(deltaWorld.y / snap) * snap;
               targetPos.y = Math.max(minPosY, targetPos.y + steppedDelta);
-              if (this.isMagneticSnap()) {
+              if (this.isInternalShelf(part) && !e.altKey) {
+                const limits = this.getShelfVerticalLimits(part);
+                if (Math.abs(targetPos.y - limits.centerSnapY) <= 15) {
+                  targetPos.y = limits.centerSnapY;
+                }
+                targetPos.y = Math.max(limits.minAllowedY, Math.min(limits.maxAllowedY, targetPos.y));
+                if (part.groupId) {
+                  this.renderModuleInternalClearances(part.groupId, part, targetPos.y);
+                }
+              } else if (this.isInternalDivider(part) && !e.altKey) {
+                targetPos.y = part.posY ?? minPosY;
+              } else if (this.isMagneticSnap()) {
                 const yDir: 'up' | 'down' | 'any' = steppedDelta > 1 ? 'up' : steppedDelta < -1 ? 'down' : 'any';
                 let isLegSnapped = false;
                 let isPartSnapped = false;
@@ -6358,7 +6990,9 @@ private createHandleMesh(
             } else if (hit.axis === 'z') {
               const steppedDelta = Math.round(deltaWorld.z / snap) * snap;
               targetPos.z += steppedDelta;
-              if (this.isMagneticSnap()) {
+              if ((this.isInternalShelf(part) || this.isInternalDivider(part)) && !e.altKey) {
+                targetPos.z = part.posZ ?? 0;
+              } else if (this.isMagneticSnap()) {
                 const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'z', 38);
                 targetPos.z = snapRes.pos.z;
                 if (snapRes.isSnapped && snapRes.snappedPart) {
@@ -6531,8 +7165,17 @@ private createHandleMesh(
         this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         this.raycaster.setFromCamera(this.mouse, this.camera);
 
-        if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
-          const deltaWorld = this.scratchDeltaWorld.subVectors(this.scratchCurrentIntersection, this.dragPlaneIntersectionStart);
+        const hasPlaneHit = !!this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection);
+        const isInternalRailPiece = !!(
+          this.dragInitialPart &&
+          (this.isInternalShelf(this.dragInitialPart) || this.isInternalDivider(this.dragInitialPart)) &&
+          !e.altKey
+        );
+
+        if (hasPlaneHit || isInternalRailPiece) {
+          const deltaWorld = hasPlaneHit
+            ? this.scratchDeltaWorld.subVectors(this.scratchCurrentIntersection, this.dragPlaneIntersectionStart)
+            : this.scratchDeltaWorld.set(0, 0, 0);
           const snap = 1; // 1 mm CAD precision
           const dx = Math.round(deltaWorld.x / snap) * snap;
           const dy = Math.round(deltaWorld.y / snap) * snap;
@@ -6716,6 +7359,91 @@ private createHandleMesh(
           } else if (this.dragInitialPart) {
             // Arrastre de Pieza Individual con bloqueo estricto de suelo (minY >= 0) e imán entre piezas y muros
             const part = this.dragInitialPart;
+            const isShelf = this.isInternalShelf(part);
+            const isDivider = this.isInternalDivider(part);
+
+            if (isShelf && !e.altKey) {
+              let candY = part.posY ?? 0;
+              if (hasPlaneHit) {
+                const deltaY = this.scratchCurrentIntersection.y - this.dragPlaneIntersectionStart.y;
+                candY = (part.posY ?? 0) + deltaY;
+              } else {
+                const dyFallback = -(e.clientY - this.dragStartPointer.y) * 1.5;
+                candY = (part.posY ?? 0) + dyFallback;
+              }
+
+              const limits = this.getShelfVerticalLimits(part);
+              const step = e.shiftKey ? 1 : 5;
+              if (Math.abs(candY - limits.centerSnapY) <= 15) {
+                candY = limits.centerSnapY;
+              } else {
+                candY = Math.round(candY / step) * step;
+              }
+              candY = Math.max(limits.minAllowedY, Math.min(limits.maxAllowedY, candY));
+
+              const targetPos = {
+                x: part.posX ?? 0,
+                y: Math.round(candY),
+                z: part.posZ ?? 0
+              };
+
+              const updates: Partial<Part> = {
+                posX: targetPos.x,
+                posY: targetPos.y,
+                posZ: targetPos.z
+              };
+
+              this.clearPartSnapGuides();
+              this.clearLegSnapGuides();
+              this.clearWallSnapGuides();
+
+              this.previewPartUpdatesInPlace([{ part, updates }]);
+              this.renderModuleInternalClearances(part.groupId!, part, targetPos.y);
+              this.requestRender(2);
+              return;
+            }
+
+            if (isDivider && !e.altKey) {
+              let candX = part.posX ?? 0;
+              if (hasPlaneHit) {
+                const deltaX = this.scratchCurrentIntersection.x - this.dragPlaneIntersectionStart.x;
+                candX = (part.posX ?? 0) + deltaX;
+              } else {
+                const dxFallback = (e.clientX - this.dragStartPointer.x) * 1.5;
+                candX = (part.posX ?? 0) + dxFallback;
+              }
+
+              const limits = this.getDividerHorizontalLimits(part);
+              const step = e.shiftKey ? 1 : 5;
+              if (Math.abs(candX - limits.centerSnapX) <= 15) {
+                candX = limits.centerSnapX;
+              } else {
+                candX = Math.round(candX / step) * step;
+              }
+              candX = Math.max(limits.minAllowedX, Math.min(limits.maxAllowedX, candX));
+
+              const targetPos = {
+                x: Math.round(candX),
+                y: part.posY ?? 0,
+                z: part.posZ ?? 0
+              };
+
+              const updates: Partial<Part> = {
+                posX: targetPos.x,
+                posY: targetPos.y,
+                posZ: targetPos.z
+              };
+
+              this.clearPartSnapGuides();
+              this.clearLegSnapGuides();
+              this.clearWallSnapGuides();
+
+              this.previewPartUpdatesInPlace([{ part, updates }]);
+              this.renderModuleInternalClearances(part.groupId!);
+              this.requestRender(2);
+              return;
+            }
+
             const initBounds = this.getPartBounds(part);
             const minPosY = initBounds.sy / 2;
 
@@ -7032,6 +7760,15 @@ private createHandleMesh(
       for (const child of this.dimensionGroup.children) {
         child.position.add(singleMovedDelta);
       }
+      if (partUpdates.length === 1 && !this.isInternalShelf(partUpdates[0].part)) {
+        this.internalClearanceGroup.position.add(singleMovedDelta);
+      }
+    } else if (partUpdates.length > 1 && this.internalClearanceGroup.children.length > 0) {
+      const first = partUpdates[0];
+      const dx = (first.updates.posX ?? first.part.posX ?? 0) - (first.part.posX ?? 0);
+      const dy = (first.updates.posY ?? first.part.posY ?? 0) - (first.part.posY ?? 0);
+      const dz = (first.updates.posZ ?? first.part.posZ ?? 0) - (first.part.posZ ?? 0);
+      this.internalClearanceGroup.position.set(dx, dy, dz);
     }
 
     if (primaryAppUpdate) {
@@ -7128,6 +7865,7 @@ private createHandleMesh(
     this.liveDragPartUpdates.clear();
     this.liveDragApplianceUpdates.clear();
     this.liveDragPrimaryApplianceUpdate = null;
+    this.internalClearanceGroup.position.set(0, 0, 0);
 
     this.ngZone.run(() => {
       if (primaryApp) {
@@ -7138,6 +7876,13 @@ private createHandleMesh(
         this.partModified.emit(partUpdatesList[0]);
       } else if (partUpdatesList.length === 1) {
         this.partModified.emit(partUpdatesList[0]);
+      }
+      if (partUpdatesList.length === 1) {
+        const singlePart = partUpdatesList[0].part;
+        const updatedPart: Part = { ...singlePart, ...partUpdatesList[0].updates };
+        const updatedParts = this.parts().map(p => p.id === updatedPart.id ? updatedPart : p);
+        const clr = this.computeClearanceInfo(updatedPart, updatedParts);
+        this.clearanceCalculated.emit(clr);
       }
       if (appUpdatesList.length > 0) {
         this.multipleAppliancesModified.emit({ updates: appUpdatesList });
@@ -11863,6 +12608,7 @@ private applyMagneticSnapToPosition(
 
     this.disposeGroup(this.furnitureGroup);
     this.disposeGroup(this.dimensionGroup);
+    this.disposeGroup(this.internalClearanceGroup);
     this.disposeGroup(this.gizmoGroup);
     this.disposeGroup(this.drillGroup);
     this.disposeGroup(this.roomGroup);
