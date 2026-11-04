@@ -90,7 +90,7 @@ import { CabinetGeneratorService } from '../../services/cabinet-generator.servic
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
 import { TemplatesModalComponent } from '../templates-modal/templates-modal';
 import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templates-catalog.service';
-import { MELAMINE_FAMILIES } from '../../data/melamine-catalog.data';
+import { MELAMINE_FAMILIES, MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
@@ -532,15 +532,58 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   readonly currentParts = this.projectService.partsList;
   readonly defaultBoardThickness = computed(() => this.project().settings?.defaultBoardThickness || 15);
 
+  // Combina los materiales del proyecto con el catálogo maestro MELAMINE_MATERIALS_CATALOG y mesones predeterminados
+  readonly allAvailableMaterials = computed<Material[]>(() => {
+    const projectMats = this.project()?.materials || [];
+    const matMap = new Map<string, Material>();
+    for (const m of projectMats) {
+      if (m && m.id) {
+        matMap.set(m.id, m);
+      }
+    }
+    for (const m of MELAMINE_MATERIALS_CATALOG) {
+      if (m && m.id && !matMap.has(m.id)) {
+        matMap.set(m.id, m);
+      }
+    }
+    for (const m of DEFAULT_COUNTERTOP_MATERIALS) {
+      if (m && m.id && !matMap.has(m.id)) {
+        matMap.set(m.id, m);
+      }
+    }
+    return Array.from(matMap.values());
+  });
+
+  /**
+   * Determina estrictamente si un material corresponde a un mesón / cubierta / superficie pétrea.
+   * Excluye tableros de melamina y fondos MDF de 3 mm.
+   */
+  isCountertopOrStoneMaterial(mat: Material | null | undefined): boolean {
+    return isCountertopMaterial(mat);
+  }
+
+  // 1. Catálogo exclusivo para Muebles, Cajones, Puertas, Cascos y Piezas de Melamina/MDF
+  readonly melamineBoardMaterials = computed<Material[]>(() => {
+    return this.allAvailableMaterials().filter(m => !this.isCountertopOrStoneMaterial(m));
+  });
+
+  // 2. Catálogo exclusivo para Mesones / Cubiertas (Piedras, Mármoles, Cuarzos, Granitos, Terrazzo, Madera Maciza)
+  readonly countertopMaterials = computed<Material[]>(() => {
+    const list = this.allAvailableMaterials().filter(m => this.isCountertopOrStoneMaterial(m));
+    if (list.length > 0) return list;
+    return DEFAULT_COUNTERTOP_MATERIALS;
+  });
+
   // Filtros y buscador reactivo de materiales de melamina y mesones
   readonly melamineFamilies = MELAMINE_FAMILIES;
+  readonly melamineBoardFamilies = MELAMINE_FAMILIES.filter(f => f.id !== 'stone_countertop');
   readonly materialSearchQuery = signal<string>('');
   readonly materialSelectedFamily = signal<string>('all');
 
   readonly filteredMaterials = computed(() => {
     const query = normalizeSearchText(this.materialSearchQuery());
     const family = this.materialSelectedFamily();
-    return this.materials().filter(m => {
+    return this.melamineBoardMaterials().filter(m => {
       const matchesFamily = family === 'all' || m.family === family;
       const matchesQuery = !query ||
         normalizeSearchText(m.name).includes(query) ||
@@ -552,13 +595,11 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
   readonly filteredCountertopMaterials = computed(() => {
     const query = normalizeSearchText(this.materialSearchQuery());
-    const family = this.materialSelectedFamily();
     return this.countertopMaterials().filter(m => {
-      const matchesFamily = family === 'all' || family === 'stone_countertop' || m.family === family;
       const matchesQuery = !query ||
         normalizeSearchText(m.name).includes(query) ||
         normalizeSearchText(m.brand).includes(query);
-      return matchesFamily && matchesQuery;
+      return matchesQuery;
     });
   });
 
@@ -732,14 +773,23 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   isPartCountertop(part: Part): boolean {
     if (part.componentRole === 'countertop' || part.componentRole === 'backsplash') return true;
     if (part.materialId) {
-      const mat = this.materials().find(m => m.id === part.materialId)
-        || this.countertopMaterials().find(m => m.id === part.materialId);
-      if (mat && isCountertopMaterial(mat)) return true;
+      const mat = this.allAvailableMaterials().find(m => m.id === part.materialId)
+        || this.materials().find(m => m.id === part.materialId);
+      if (mat && this.isCountertopOrStoneMaterial(mat)) return true;
     }
     if (part.groupId && this.isCountertopGroup(part.groupId)) return true;
     const uName = (part.name || '').toUpperCase();
     return uName.includes('MESÓN') || uName.includes('MESON') || uName.includes('SALPICADERO');
   }
+
+  /**
+   * Determina si la pieza individual actualmente seleccionada corresponde a un mesón / cubierta.
+   */
+  readonly isSelectedPartCountertop = computed<boolean>(() => {
+    const sel = this.selectedPart();
+    if (!sel) return false;
+    return this.isPartCountertop(sel);
+  });
 
   /**
    * Piezas de melamina / mobiliario seleccionadas (excluye mesones y salpicaderos).
@@ -1949,6 +1999,10 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
    * y su orientación de rotación en el espacio 3D.
    */
   onCabinetUpdated(event: { groupId: string; config: ParametricCabinetConfig }) {
+    if (this.isCountertopGroup(event.groupId) || this.isSelectedGroupCountertop()) {
+      console.warn('Blocked attempt to update countertop as a parametric cabinet:', event.groupId);
+      return;
+    }
     const groupParts = this.currentParts().filter(p => p.groupId === event.groupId);
     let oldMinX = Infinity, oldMaxX = -Infinity;
     let oldMinY = Infinity;
@@ -2064,7 +2118,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   readonly selectedPartMaterial = computed<Material | null>(() => {
     const sel = this.selectedPart();
     if (!sel) return null;
-    return this.materials().find(m => m.id === sel.materialId) || null;
+    return this.allAvailableMaterials().find(m => m.id === sel.materialId) || this.materials().find(m => m.id === sel.materialId) || null;
   });
 
   readonly selectedPartsList = computed<Part[]>(() => {
@@ -2582,12 +2636,19 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   onMaterialChange(matId: string) {
-    const mat = this.materials().find(m => m.id === matId) || this.countertopMaterials().find(m => m.id === matId);
+    const isCountertop = this.isSelectedPartCountertop() || this.isSelectedGroupCountertop();
+    const mat = isCountertop
+      ? this.countertopMaterials().find(m => m.id === matId)
+      : this.melamineBoardMaterials().find(m => m.id === matId);
     if (!mat) return;
 
-    if (this.isSelectedGroupCountertop()) {
+    if (!this.materials().some(m => m.id === mat.id)) {
+      this.projectService.addMaterial(mat);
+    }
+
+    if (isCountertop) {
       const gId = this.activeSelectedGroupId() || this.selectedPart()?.groupId;
-      if (gId) {
+      if (gId && this.isCountertopGroup(gId)) {
         this.projectService.changeGroupMaterial(gId, mat.id, 'all');
         this.countertopMaterialId.set(mat.id);
         this.showToast(`🪨 Mesón y salpicaderos actualizados a "${mat.name}"`);
@@ -2597,7 +2658,9 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
     this.updateSelectedPart({
       materialId: mat.id,
-      materialName: mat.name
+      materialName: mat.name,
+      colorHex: mat.colorHex,
+      grain: mat.hasGrain ? (this.selectedPart()?.grain === 'none' ? 'length' : this.selectedPart()?.grain) : 'none'
     });
   }
 
@@ -2827,9 +2890,11 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const parts = this.selectedMelamineParts();
     if (parts.length === 0) return;
     const ids = parts.map(p => p.id);
-    const mat = this.materials().find(m => m.id === materialId)
-      || this.projectService.materialsList().find(m => m.id === materialId);
+    const mat = this.melamineBoardMaterials().find(m => m.id === materialId);
     if (!mat) return;
+    if (!this.materials().some(m => m.id === mat.id)) {
+      this.projectService.addMaterial(mat);
+    }
     this.projectService.changeMultiplePartsMaterial(ids, materialId);
     this.showToast(`🎨 Melamina "${mat.name}" aplicada a ${ids.length} pieza(s)`);
   }
@@ -2841,9 +2906,11 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const parts = this.selectedCountertopParts();
     if (parts.length === 0) return;
     const ids = parts.map(p => p.id);
-    const mat = this.countertopMaterials().find(m => m.id === materialId)
-      || this.projectService.materialsList().find(m => m.id === materialId);
+    const mat = this.countertopMaterials().find(m => m.id === materialId);
     if (!mat) return;
+    if (!this.materials().some(m => m.id === mat.id)) {
+      this.projectService.addMaterial(mat);
+    }
     this.projectService.changeMultiplePartsMaterial(ids, materialId);
     this.showToast(`🏛️ Acabado "${mat.name}" aplicado a ${ids.length} tramo(s) de mesón`);
   }
@@ -4557,22 +4624,17 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   readonly specialCutX = signal<number>(150);
   readonly specialCutY = signal<number>(150);
 
-  readonly countertopMaterials = computed(() => {
-    const fromProject = this.materials().filter(m => isCountertopMaterial(m));
-    if (fromProject.length > 0) return fromProject;
-    return DEFAULT_COUNTERTOP_MATERIALS;
-  });
 
   readonly selectedCountertopMaterial = computed(() => {
+    const sel = this.selectedPart();
+    if (sel?.materialId) {
+      const found = this.countertopMaterials().find(m => m.id === sel.materialId);
+      if (found) return found;
+    }
     const stats = this.selectedGroupStats();
     const gMatId = stats?.materialId;
     if (gMatId) {
       const found = this.countertopMaterials().find(m => m.id === gMatId);
-      if (found) return found;
-    }
-    const sel = this.selectedPart();
-    if (sel?.materialId) {
-      const found = this.countertopMaterials().find(m => m.id === sel.materialId);
       if (found) return found;
     }
     const id = this.countertopMaterialId();
@@ -4632,7 +4694,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     materialId: string
   ) {
     const count = this.projectService.applyGlobalMaterialByRole(target, materialId);
-    const mat = this.materials().find(m => m.id === materialId);
+    const mat = this.allAvailableMaterials().find(m => m.id === materialId) || this.materials().find(m => m.id === materialId) || this.countertopMaterials().find(m => m.id === materialId);
     const targetNames: Record<typeof target, string> = {
       fronts: 'Puertas y Frentes',
       carcass: 'Estructura Interna',
@@ -4870,20 +4932,175 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.showToast(`✨ Línea activa: ${labelMap[env]}`);
   }
 
+  readonly isParametricCabinetGroup = computed<boolean>(() => {
+    const gid = this.activeSelectedGroupId();
+    if (!gid) return false;
+    if (this.isSelectedGroupCountertop() || this.isCountertopGroup(gid)) return false;
+
+    const grp = this.groups().find(g => g.id === gid);
+    if (grp?.isCountertop) return false;
+
+    const parts = this.currentParts().filter(p => p.groupId === gid);
+    if (parts.length <= 1) return false;
+    if (parts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash')) return false;
+
+    // Aislamiento estricto de piezas sueltas y tableros libres
+    if (parts.every(p => p.componentRole === 'free' || !p.componentRole)) {
+      return false;
+    }
+
+    if (grp?.parametricConfig) {
+      const modType = grp.parametricConfig.moduleType;
+      if (modType === 'custom' && parts.every(p => p.componentRole === 'free')) {
+        return false;
+      }
+      return true;
+    }
+
+    return parts.some(p =>
+      p.componentRole === 'side_left' ||
+      p.componentRole === 'side_right' ||
+      p.componentRole === 'door' ||
+      p.componentRole === 'drawer_front' ||
+      p.componentRole === 'drawer_box' ||
+      p.componentRole === 'shelf'
+    );
+  });
+
   readonly activeGroupParametricConfig = computed<ParametricCabinetConfig | null>(() => {
+    if (!this.isParametricCabinetGroup()) return null;
     const gid = this.activeSelectedGroupId();
     if (!gid) return null;
     const grp = this.groups().find(g => g.id === gid);
     if (!grp) return null;
-    if (grp.parametricConfig) return grp.parametricConfig;
     const parts = this.currentParts().filter(p => p.groupId === gid);
     if (parts.length === 0) return null;
     return this.cabinetGen.reconstructConfigFromParts(parts, grp);
   });
 
+  isWallOrHangingCabinet(pCfg: ParametricCabinetConfig | null): boolean {
+    if (!pCfg) return false;
+    const modType = (pCfg.moduleType || '').toLowerCase();
+    const cat = (pCfg.category || '').toLowerCase();
+    const name = (pCfg.name || '').toLowerCase();
+
+    return modType === 'wall_cabinet' ||
+           cat === 'kitchen_wall' ||
+           cat === 'bathroom_wall' ||
+           cat.includes('wall') ||
+           name.includes('alacena') ||
+           name.includes('aéreo') ||
+           name.includes('aereo') ||
+           name.includes('colgante') ||
+           name.includes('botiquín') ||
+           name.includes('botiquin') ||
+           (pCfg.elevationY !== undefined && pCfg.elevationY >= 1000) ||
+           (pCfg.posY !== undefined && pCfg.posY >= 1200);
+  }
+
+  isDrawerCabinet(pCfg: ParametricCabinetConfig | null): boolean {
+    if (!pCfg) return false;
+    if (this.isWallOrHangingCabinet(pCfg)) return false;
+    const modType = (pCfg.moduleType || '').toLowerCase();
+    const cat = (pCfg.category || '').toLowerCase();
+    return modType === 'drawer_unit' || cat === 'drawers' || cat === 'cajones' ||
+      ((pCfg.drawersCount || 0) > 0 && (!pCfg.doorOpening || pCfg.doorOpening === 'none'));
+  }
+
+  isClosetCabinet(pCfg: ParametricCabinetConfig | null): boolean {
+    if (!pCfg) return false;
+    const modType = (pCfg.moduleType || '').toLowerCase();
+    const cat = (pCfg.category || '').toLowerCase();
+    const env = (pCfg.environmentLine || '').toLowerCase();
+    const name = (pCfg.name || '').toLowerCase();
+
+    return modType === 'closet' ||
+           cat.includes('closet') ||
+           env === 'closet' ||
+           name.includes('closet') ||
+           name.includes('ropero') ||
+           name.includes('armario') ||
+           name.includes('colgador');
+  }
+
+  isSinkOrVanityCabinet(pCfg: ParametricCabinetConfig | null): boolean {
+    if (!pCfg) return false;
+    if (this.isWallOrHangingCabinet(pCfg)) return false;
+
+    const modType = (pCfg.moduleType || '').toLowerCase();
+    const cat = (pCfg.category || '').toLowerCase();
+    const env = (pCfg.environmentLine || '').toLowerCase();
+    const name = (pCfg.name || '').toLowerCase();
+    const code = (pCfg.code || '').toLowerCase();
+
+    if (modType === 'closet' || cat.includes('closet') || env === 'closet') return false;
+    if (modType === 'bookshelf' || cat.includes('bookshelf')) return false;
+    if (cat.includes('office') || cat.includes('desk') || env === 'living_office') return false;
+    if (cat.includes('living') || cat.includes('tv')) return false;
+    if (cat.includes('oven') || name.includes('horno') || code.includes('horno')) return false;
+    if (cat.includes('island') || name.includes('isla')) return false;
+
+    const isBathroomBase = (modType === 'vanity' || cat.includes('vanity') || env === 'bathroom' || name.includes('vanit') || name.includes('lavamanos'));
+    const isSinkBase = (cat === 'sink_base' || cat.includes('sink') || name.includes('lavaplatos') || name.includes('fregadero') || code.includes('sink') || code.includes('lav'));
+
+    return isBathroomBase || isSinkBase;
+  }
+
+  isSiphonCutoutApplicable(pCfg: ParametricCabinetConfig | null): boolean {
+    return this.isSinkOrVanityCabinet(pCfg);
+  }
+
+  isHangingRodsApplicable(pCfg: ParametricCabinetConfig | null): boolean {
+    return this.isClosetCabinet(pCfg) && !this.isDrawerCabinet(pCfg);
+  }
+
+  isFloorBaseApplicable(pCfg: ParametricCabinetConfig | null): boolean {
+    return !this.isWallOrHangingCabinet(pCfg);
+  }
+
+  isTopStructureApplicable(pCfg: ParametricCabinetConfig | null): boolean {
+    return !this.isWallOrHangingCabinet(pCfg) && !this.isClosetCabinet(pCfg);
+  }
+
+  canSwitchCabinetFrontType(pCfg: ParametricCabinetConfig | null): boolean {
+    if (!pCfg) return false;
+    if (this.isWallOrHangingCabinet(pCfg)) return false;
+    if (this.isClosetCabinet(pCfg)) return false;
+    const cat = (pCfg.category || '').toLowerCase();
+    if (cat.includes('oven') || cat === 'sink_base') return false;
+    return true;
+  }
+
+  switchToCabinetMode(mode: 'doors' | 'drawers') {
+    const current = this.activeGroupParametricConfig();
+    if (!current) return;
+    if (mode === 'drawers') {
+      this.updateActiveGroupParametricConfig({
+        moduleType: 'drawer_unit',
+        category: 'drawers',
+        drawersCount: 3,
+        doorOpening: 'none',
+        shelvesCount: 0
+      });
+      this.showToast('🗄️ Modo cambiado a Cajonera (3 Gavetas)');
+    } else {
+      this.updateActiveGroupParametricConfig({
+        moduleType: 'base_cabinet',
+        category: 'kitchen_base',
+        drawersCount: 0,
+        doorOpening: 'left',
+        shelvesCount: 1
+      });
+      this.showToast('🚪 Modo cambiado a Puertas y Repisas');
+    }
+  }
+
   updateActiveGroupParametricConfig(partial: Partial<ParametricCabinetConfig>) {
+    if (!this.isParametricCabinetGroup()) return;
     const gid = this.activeSelectedGroupId();
     if (!gid) return;
+    if (this.isSelectedGroupCountertop() || this.isCountertopGroup(gid)) return;
+
     const parts = this.currentParts().filter(p => p.groupId === gid);
     if (parts.length === 0) return;
     const grp = this.groups().find(g => g.id === gid) || {
@@ -4891,7 +5108,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       name: parts[0]?.groupName || 'Módulo',
       type: 'assembly' as const
     };
-    const currentCfg = grp.parametricConfig || this.cabinetGen.reconstructConfigFromParts(parts, grp);
+    const currentCfg = this.cabinetGen.reconstructConfigFromParts(parts, grp);
     const updatedCfg: ParametricCabinetConfig = {
       ...currentCfg,
       ...partial

@@ -290,8 +290,15 @@ export interface Material {
 
 export function isStoneMaterial(mat: Material | null | undefined): boolean {
   if (!mat) return false;
-  const nameLower = (mat.name || '').toLowerCase();
-  if (nameLower.includes('melamina') || nameLower.includes('mdf') || nameLower.includes('durolac')) return false;
+  const nameLower = (mat.name || '').toLowerCase().trim();
+  if (
+    (nameLower.startsWith('melamina') || nameLower.startsWith('mdf') || nameLower.startsWith('durolac') || mat.category === 'mdf' || mat.family === 'mdf_back') &&
+    !nameLower.includes('(mesón)') &&
+    !nameLower.includes('(meson)') &&
+    mat.category !== 'countertop'
+  ) {
+    return false;
+  }
   if (mat.category === 'stone') return true;
   if (mat.textureType === 'stone') return true;
   const idLower = (mat.id || '').toLowerCase();
@@ -305,18 +312,66 @@ export function isStoneMaterial(mat: Material | null | undefined): boolean {
     nameLower.includes('dekton') ||
     nameLower.includes('silestone') ||
     nameLower.includes('neolith') ||
-    nameLower.includes('sinterizada')
+    nameLower.includes('sinterizada') ||
+    nameLower.includes('piedra') ||
+    nameLower.includes('terrazzo') ||
+    nameLower.includes('terrazo')
   );
 }
 
 export function isCountertopMaterial(mat: Material | null | undefined): boolean {
   if (!mat) return false;
+  const nameLower = (mat.name || '').toLowerCase().trim();
+  const idLower = (mat.id || '').toLowerCase();
+
+  // Excluir tableros de melamina estándar o fondos MDF salvo que explícitamente se especifique categoría countertop o sufijo (Mesón)
+  if (
+    (nameLower.startsWith('melamina') || nameLower.startsWith('mdf') || nameLower.startsWith('durolac') || mat.category === 'mdf' || mat.family === 'mdf_back') &&
+    !nameLower.includes('(mesón)') &&
+    !nameLower.includes('(meson)') &&
+    mat.category !== 'countertop'
+  ) {
+    return false;
+  }
+
   if (mat.category === 'countertop' || mat.category === 'stone') return true;
+  if (mat.family === 'stone_countertop') return true;
+  if (mat.textureType === 'stone' || idLower.startsWith('mat_stone_')) return true;
+
+  if (
+    nameLower.includes('(mesón)') ||
+    nameLower.includes('(meson)') ||
+    nameLower.includes('mesón') ||
+    nameLower.includes('meson')
+  ) {
+    return true;
+  }
+
+  if (
+    nameLower.includes('cuarzo') ||
+    nameLower.includes('mármol') ||
+    nameLower.includes('marmol') ||
+    nameLower.includes('granito') ||
+    nameLower.includes('sinterizada') ||
+    nameLower.includes('piedra') ||
+    nameLower.includes('terrazzo') ||
+    nameLower.includes('terrazo') ||
+    nameLower.includes('dekton') ||
+    nameLower.includes('silestone') ||
+    nameLower.includes('neolith')
+  ) {
+    return true;
+  }
+
+  if (nameLower.includes('alistonado') || (nameLower.includes('macizo') && (mat.thickness || 0) >= 30)) {
+    return true;
+  }
+
   return isStoneMaterial(mat);
 }
 
 export function isBoardMaterial(mat: Material | null | undefined): boolean {
-  return !isStoneMaterial(mat);
+  return !isCountertopMaterial(mat);
 }
 
 /**

@@ -768,7 +768,11 @@ export class CabinetGeneratorService {
       name: groupName,
       type: 'assembly',
       isOpen: false,
-      parametricConfig: config
+      parametricConfig: {
+        ...config,
+        drawersCount: 0,
+        hangingRodsCount: (config.moduleType === 'closet' || config.category === 'closet' || config.environmentLine === 'closet') ? (config.hangingRodsCount || 0) : 0
+      }
     };
 
     return { module, parts, group };
@@ -1355,9 +1359,17 @@ export class CabinetGeneratorService {
     const group: PartGroup = {
       id: groupId,
       name: groupName,
-      type: 'assembly',
+      type: 'drawer',
       isOpen: false,
-      parametricConfig: config
+      parametricConfig: {
+        ...config,
+        moduleType: 'drawer_unit',
+        category: 'drawers',
+        drawersCount,
+        shelvesCount: 0,
+        doorOpening: 'none',
+        hangingRodsCount: 0
+      }
     };
 
     return { module, parts, group };
@@ -1367,6 +1379,8 @@ export class CabinetGeneratorService {
    * Reconstruye una configuración paramétrica a partir de las piezas existentes de un grupo
    */
   reconstructConfigFromParts(parts: Part[], group: PartGroup): ParametricCabinetConfig {
+    const isCt = group.isCountertop || parts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
+
     const normalizeConfig = (raw: Partial<ParametricCabinetConfig>): ParametricCabinetConfig => {
       const safeWidth = Math.max(200, Number(raw.width) || 600);
       const safeHeight = Math.max(200, Number(raw.height) || 800);
@@ -1374,7 +1388,58 @@ export class CabinetGeneratorService {
       const safeStructT = Math.max(9, Math.min(22, Number(raw.structureThickness) || 15));
       const safeDoorT = Math.max(9, Math.min(22, Number(raw.doorThickness) || safeStructT));
       const safeBackT = Math.max(3, Number(raw.backThickness) || 3);
-      const safeShelvesCount = Math.max(0, Math.min(8, Math.floor(Number(raw.shelvesCount) || 0)));
+
+      const isWallType = raw.moduleType === 'wall_cabinet' ||
+        raw.category === 'kitchen_wall' ||
+        raw.category === 'bathroom_wall' ||
+        (raw.name && (
+          raw.name.toLowerCase().includes('alacena') ||
+          raw.name.toLowerCase().includes('aéreo') ||
+          raw.name.toLowerCase().includes('aereo') ||
+          raw.name.toLowerCase().includes('colgante') ||
+          raw.name.toLowerCase().includes('botiquín') ||
+          raw.name.toLowerCase().includes('botiquin')
+        ));
+      const isDrawerType = raw.moduleType === 'drawer_unit' || raw.category === 'drawers' || raw.category === 'cajones';
+      const isClosetType = raw.moduleType === 'closet' ||
+        raw.category === 'closet' ||
+        raw.environmentLine === 'closet' ||
+        (raw.name && (
+          raw.name.toLowerCase().includes('closet') ||
+          raw.name.toLowerCase().includes('ropero') ||
+          raw.name.toLowerCase().includes('armario') ||
+          raw.name.toLowerCase().includes('colgador')
+        ));
+      const isBathroomOrSink = !isWallType && !isClosetType && (
+        raw.moduleType === 'vanity' ||
+        raw.category === 'vanity' ||
+        raw.category === 'sink_base' ||
+        raw.environmentLine === 'bathroom' ||
+        (raw.name && (
+          raw.name.toLowerCase().includes('vanit') ||
+          raw.name.toLowerCase().includes('lavamanos') ||
+          raw.name.toLowerCase().includes('lavaplatos') ||
+          raw.name.toLowerCase().includes('fregadero')
+        )) ||
+        (raw.code && (raw.code.toLowerCase().includes('sink') || raw.code.toLowerCase().includes('lav')))
+      ) && !(
+        raw.name && (raw.name.toLowerCase().includes('horno') || raw.name.toLowerCase().includes('isla'))
+      );
+
+      let resolvedDrawersCount = 0;
+      if (isWallType) {
+        resolvedDrawersCount = 0;
+      } else if (isDrawerType) {
+        resolvedDrawersCount = Math.max(1, Math.min(6, Math.floor(Number(raw.drawersCount) || 3)));
+      } else if (raw.drawersCount !== undefined && Number(raw.drawersCount) > 0) {
+        resolvedDrawersCount = Math.min(6, Math.floor(Number(raw.drawersCount)));
+      } else {
+        resolvedDrawersCount = 0;
+      }
+
+      const safeShelvesCount = isDrawerType
+        ? 0
+        : Math.max(0, Math.min(8, Math.floor(Number(raw.shelvesCount) || 0)));
       const innerH = Math.max(100, safeHeight - (2 * safeStructT));
 
       let validOffsets: number[] = [];
@@ -1397,11 +1462,21 @@ export class CabinetGeneratorService {
         }
       }
 
+      const safeDoorOpening = isDrawerType ? 'none' : (raw.doorOpening || 'none');
+      const safeHangingRodsCount: 0 | 1 | 2 = isClosetType
+        ? (raw.hangingRodsCount === 1 ? 1 : raw.hangingRodsCount === 2 ? 2 : 0)
+        : 0;
+
+      const safeSiphonCutout = (isBathroomOrSink && raw.siphonCutout?.enabled)
+        ? { enabled: true, width: Number(raw.siphonCutout.width) || 200, depth: Number(raw.siphonCutout.depth) || 250 }
+        : { enabled: false, width: 200, depth: 250 };
+
       return {
         name: raw.name || group.name || 'Módulo Paramétrico',
         code: raw.code || ('MOD_' + group.id.slice(-4)),
         moduleType: raw.moduleType || 'base_cabinet',
         category: raw.category || 'kitchen_base',
+        environmentLine: raw.environmentLine,
         width: safeWidth,
         height: safeHeight,
         depth: safeDepth,
@@ -1413,7 +1488,7 @@ export class CabinetGeneratorService {
         shelvesCount: safeShelvesCount,
         shelfDistribution: raw.shelfDistribution === 'manual' ? 'manual' : 'uniform',
         shelfManualOffsets: validOffsets,
-        doorOpening: raw.doorOpening || 'none',
+        doorOpening: safeDoorOpening,
         hasHandle: raw.hasHandle !== undefined ? Boolean(raw.hasHandle) : true,
         handleType: raw.handleType || 'bar_modern',
         handleFinish: raw.handleFinish || 'brushed_steel',
@@ -1425,24 +1500,88 @@ export class CabinetGeneratorService {
         posX: Number.isFinite(Number(raw.posX)) ? Number(raw.posX) : 0,
         posY: Number.isFinite(Number(raw.posY)) ? Number(raw.posY) : undefined,
         posZ: Number.isFinite(Number(raw.posZ)) ? Number(raw.posZ) : 0,
-        drawersCount: Math.max(1, Math.min(6, Math.floor(Number(raw.drawersCount) || 3))),
+        drawersCount: resolvedDrawersCount,
         drawerSlideType: raw.drawerSlideType || 'telescopic',
         drawerFrontType: raw.drawerFrontType || 'overlay',
-        hasPlinth: raw.hasPlinth !== undefined ? Boolean(raw.hasPlinth) : true,
-        plinthHeight: Number(raw.plinthHeight) || 70
+        hasPlinth: isWallType ? false : (raw.hasPlinth !== undefined ? Boolean(raw.hasPlinth) : true),
+        plinthHeight: isWallType ? 0 : (Number(raw.plinthHeight) || 70),
+        topTieStrips: isWallType ? false : Boolean(raw.topTieStrips),
+        hasTopCover: isWallType ? true : (raw.hasTopCover !== undefined ? Boolean(raw.hasTopCover) : true),
+        hangingRodsCount: safeHangingRodsCount,
+        siphonCutout: safeSiphonCutout
       };
     };
 
+    if (isCt) {
+      return normalizeConfig({
+        name: group.name || 'Mesón Monolítico',
+        code: 'MES_' + group.id.slice(-4),
+        moduleType: 'custom',
+        category: 'custom',
+        drawersCount: 0,
+        shelvesCount: 0,
+        doorOpening: 'none',
+        hangingRodsCount: 0,
+        hasPlinth: false,
+        topTieStrips: false,
+        hasTopCover: true
+      });
+    }
+
+    const drawerFronts = parts.filter(p => p.componentRole === 'drawer_front');
+    const drawerBoxes = parts.filter(p => p.componentRole === 'drawer_box');
+    const doorParts = parts.filter(p => p.componentRole === 'door');
+    const shelfParts = parts.filter(p => p.componentRole === 'shelf');
+    const backPart = parts.find(p => p.componentRole === 'back');
+    const rodParts = parts.filter(p => p.name.includes('Tubo Colgador') || p.notes?.includes('colgado') || p.materialId === 'hw_rod_chrome');
+    const actualRodCount: 0 | 1 | 2 = rodParts.length >= 2 ? 2 : (rodParts.length === 1 ? 1 : 0);
+    const actualDrawerCount = drawerFronts.length > 0
+      ? drawerFronts.length
+      : (drawerBoxes.length > 0 ? Math.max(1, Math.round(drawerBoxes.length / 5)) : 0);
+
     if (group.parametricConfig) {
-      return normalizeConfig(group.parametricConfig);
+      const cfg = normalizeConfig(group.parametricConfig);
+
+      // Regla de Oro: Coherencia física 1:1 con las piezas reales en 3D y Despiece
+      // 1. Cajones: si en 3D no hay piezas físicas de cajón, drawersCount DEBE ser 0 (incluso en drawer_unit).
+      // Si hay piezas físicas de cajón, drawersCount DEBE reflejar exactamente la cantidad física.
+      const isWall = cfg.moduleType === 'wall_cabinet' || cfg.category === 'kitchen_wall' || cfg.category === 'bathroom_wall';
+      if (actualDrawerCount === 0 || isWall) {
+        cfg.drawersCount = 0;
+      } else {
+        cfg.drawersCount = actualDrawerCount;
+      }
+
+      // 2. Puertas: si en 3D no hay puertas físicas, doorOpening DEBE ser 'none'.
+      if (doorParts.length === 0) {
+        cfg.doorOpening = 'none';
+      } else if (doorParts.length === 1 && (cfg.doorOpening === 'none' || cfg.doorOpening === 'double')) {
+        cfg.doorOpening = 'left';
+      } else if (doorParts.length >= 2 && cfg.doorOpening !== 'double') {
+        cfg.doorOpening = 'double';
+      }
+
+      // 3. Repisas: en cajonera pura es 0. En muebles de puertas/repisas, refleja la cantidad física real en 3D.
+      if (cfg.moduleType === 'drawer_unit' || cfg.category === 'drawers' || cfg.category === 'cajones') {
+        cfg.shelvesCount = 0;
+      } else {
+        cfg.shelvesCount = Math.min(8, shelfParts.length);
+      }
+
+      // 4. Barras Colgador: en muebles que no son closet o que no tienen tubos en 3D, es 0.
+      const isCloset = cfg.moduleType === 'closet' || cfg.category === 'closet' || cfg.environmentLine === 'closet' ||
+        (cfg.name && (cfg.name.toLowerCase().includes('closet') || cfg.name.toLowerCase().includes('ropero') || cfg.name.toLowerCase().includes('armario') || cfg.name.toLowerCase().includes('colgador')));
+      if (!isCloset || actualRodCount === 0) {
+        cfg.hangingRodsCount = 0;
+      } else {
+        cfg.hangingRodsCount = actualRodCount;
+      }
+
+      return cfg;
     }
 
     const sidePart = parts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || parts[0];
     const topOrBottom = parts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
-    const doorParts = parts.filter(p => p.componentRole === 'door');
-    const drawerFronts = parts.filter(p => p.componentRole === 'drawer_front');
-    const shelfParts = parts.filter(p => p.componentRole === 'shelf');
-    const backPart = parts.find(p => p.componentRole === 'back');
 
     const t = Number(sidePart?.thickness) || 15;
     const sideLocal = sidePart ? this.partGeometry.getLocalDimensions(sidePart) : null;
@@ -1460,8 +1599,8 @@ export class CabinetGeneratorService {
     const depth = carcassDepth + (doorParts.length > 0 || drawerFronts.length > 0 ? doorT : 0);
 
     // Caso de módulo con cajones (Cajonera)
-    if (drawerFronts.length > 0 || parts.some(p => p.componentRole === 'drawer_box')) {
-      const drawersCount = drawerFronts.length || 3;
+    if (drawerFronts.length > 0 || drawerBoxes.length > 0) {
+      const drawersCount = actualDrawerCount;
       const frontPart = drawerFronts[0];
       const hw = frontPart?.hardwareConfig;
       const plinthPart = parts.find(p => p.componentRole === 'plinth');
@@ -1501,7 +1640,7 @@ export class CabinetGeneratorService {
     }
 
     let doorOpening: ParametricCabinetConfig['doorOpening'] = 'none';
-    if (doorParts.length === 2) {
+    if (doorParts.length >= 2) {
       doorOpening = 'double';
     } else if (doorParts.length === 1) {
       const hw = doorParts[0].hardwareConfig;
@@ -1515,12 +1654,14 @@ export class CabinetGeneratorService {
     }
 
     const shelvesCount = Math.max(0, Math.min(8, Math.floor(Number(shelfParts.length) || 0)));
+    const hangingRodsCount: 0 | 1 | 2 = actualRodCount;
+    const isWallByPosition = parts[0]?.name.toLowerCase().includes('alacena') || (sidePart?.posY !== undefined && sidePart.posY > 1000);
 
     return normalizeConfig({
       name: group.name,
       code: 'MOD_' + group.id.slice(-4),
-      moduleType: 'base_cabinet',
-      category: 'kitchen_base',
+      moduleType: isWallByPosition ? 'wall_cabinet' : 'base_cabinet',
+      category: isWallByPosition ? 'kitchen_wall' : 'kitchen_base',
       width,
       height,
       depth,
@@ -1532,6 +1673,8 @@ export class CabinetGeneratorService {
       shelvesCount,
       shelfDistribution: 'uniform',
       doorOpening,
+      drawersCount: 0,
+      hangingRodsCount,
       hasHandle: doorParts[0]?.hardwareConfig?.handleType !== 'none',
       handleType: doorParts[0]?.hardwareConfig?.handleType || 'bar_modern',
       handleFinish: doorParts[0]?.hardwareConfig?.handleFinish || 'brushed_steel',
@@ -2775,7 +2918,11 @@ export class CabinetGeneratorService {
       name: groupName,
       type: 'assembly',
       isOpen: false,
-      parametricConfig: config
+      parametricConfig: {
+        ...config,
+        drawersCount: 0,
+        hangingRodsCount: 0
+      }
     };
 
     return { module, parts, group };

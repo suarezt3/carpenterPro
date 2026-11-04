@@ -960,6 +960,17 @@ export class ProjectStorageService {
     newConfig?: ParametricCabinetConfig,
     newModule?: FurnitureModule
   ) {
+    const currentProj = this.currentProject();
+    if (!currentProj) return;
+
+    const group = (currentProj.groups || []).find(g => g.id === groupId);
+    const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
+    const isCt = group?.isCountertop || groupParts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
+    if (isCt) {
+      console.warn('Blocked attempt to convert/update countertop group into parametric cabinet:', groupId);
+      return;
+    }
+
     this.updateProject(p => {
       const nextParts = [
         ...p.parts.filter(pt => pt.groupId !== groupId),
@@ -975,6 +986,7 @@ export class ProjectStorageService {
         groups: (p.groups || []).map(g => g.id === groupId ? {
           ...g,
           name: newName || g.name,
+          ...(newConfig ? { type: (newConfig.moduleType === 'drawer_unit' ? ('drawer' as const) : ('assembly' as const)) } : {}),
           parametricConfig: newConfig || g.parametricConfig
         } : g),
         parts: nextParts
@@ -1548,12 +1560,14 @@ export class ProjectStorageService {
 
   changeGroupMaterial(groupId: string, materialId: string, target: 'all' | 'structure' | 'doors' = 'all') {
     const mat = this.materialsList().find(m => m.id === materialId)
-      || DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId);
+      || DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId)
+      || MELAMINE_MATERIALS_CATALOG.find(m => m.id === materialId);
     if (!mat) return;
     const isStoneMat = isCountertopMaterial(mat);
 
     this.updateProject(p => ({
       ...p,
+      materials: p.materials.some(m => m.id === mat.id) ? p.materials : [...p.materials, mat],
       groups: (p.groups || []).map(g => {
         if (g.id !== groupId || !g.parametricConfig || isStoneMat) return g;
         return {
@@ -1569,12 +1583,12 @@ export class ProjectStorageService {
           }
         };
       }),
-      ...p,
       parts: p.parts.map(pt => {
         if (pt.groupId !== groupId) return pt;
 
         const isCountertopUnit = pt.componentRole === 'countertop' || pt.componentRole === 'backsplash';
         if (isCountertopUnit) {
+          if (!isStoneMat) return pt;
           return {
             ...pt,
             materialId: mat.id,
@@ -1585,6 +1599,9 @@ export class ProjectStorageService {
             edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' }
           };
         }
+
+        // Si el material seleccionado es de mesón/piedra, NO alterar las piezas de mueble/melamina
+        if (isStoneMat) return pt;
 
         const isDoor = pt.componentRole === 'door' || pt.componentRole === 'drawer_front';
         const isBack = pt.componentRole === 'back' && pt.thickness <= 6;
@@ -2090,12 +2107,14 @@ export class ProjectStorageService {
    */
   changeMultiplePartsMaterial(partIds: string[], materialId: string) {
     const mat = this.materialsList().find(m => m.id === materialId)
-      || DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId);
+      || DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId)
+      || MELAMINE_MATERIALS_CATALOG.find(m => m.id === materialId);
     if (!mat) return;
     const isTargetMatCountertop = isCountertopMaterial(mat);
 
     this.updateProject(p => ({
       ...p,
+      materials: p.materials.some(m => m.id === mat.id) ? p.materials : [...p.materials, mat],
       groups: (p.groups || []).map(g => {
         const hasPart = p.parts.some(pt => pt.groupId === g.id && partIds.includes(pt.id));
         if (!hasPart || !g.parametricConfig || isTargetMatCountertop) return g;
@@ -2125,7 +2144,9 @@ export class ProjectStorageService {
           return {
             ...part,
             materialId: mat.id,
-            materialName: mat.name
+            materialName: mat.name,
+            colorHex: mat.colorHex,
+            grain: mat.hasGrain ? (part.grain === 'none' ? 'length' : part.grain) : 'none'
           };
         }
         return part;
@@ -3160,15 +3181,17 @@ export class ProjectStorageService {
     target: 'fronts' | 'carcass' | 'plinths' | 'countertop',
     materialId: string
   ): number {
-    const project = this.currentProject();
-    const mat = project.materials.find(m => m.id === materialId);
+    const mat = this.materialsList().find(m => m.id === materialId)
+      || DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId)
+      || MELAMINE_MATERIALS_CATALOG.find(m => m.id === materialId);
     if (!mat) return 0;
 
     let updatedCount = 0;
-    const isStone = mat.textureType === 'stone';
+    const isStone = isCountertopMaterial(mat);
 
     this.updateProject(p => ({
       ...p,
+      materials: p.materials.some(m => m.id === mat.id) ? p.materials : [...p.materials, mat],
       parts: p.parts.map(part => {
         const role = part.componentRole || 'free';
         const nameLow = (part.name || '').toLowerCase();
