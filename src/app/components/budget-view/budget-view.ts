@@ -17,9 +17,11 @@ import {
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService, formatCurrencyValue } from '../../services/project-storage.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
+import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { ThemeService } from '../../services/theme.service';
-import { HardwareItem, Material } from '../../models/melamine.models';
+import { HardwareItem, Material, isStoneMaterial } from '../../models/melamine.models';
+import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 
 /**
  * Vista de Presupuesto Financiero y Cotización Comercial de Carpintería.
@@ -38,6 +40,7 @@ export class BudgetViewComponent {
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly optimizer = inject(CutOptimizerService);
+  private readonly hardwareCatalog = inject(HardwareCatalogService);
   private readonly fb = inject(FormBuilder);
 
   // Registro local de iconos vectoriales de Hugeicons
@@ -61,7 +64,11 @@ export class BudgetViewComponent {
   readonly project = this.projectService.currentProject;
   readonly materials = this.projectService.materialsList;
   readonly hardware = this.projectService.hardwareList;
+  readonly groups = this.projectService.groupsList;
   readonly settings = this.projectService.projectSettings;
+
+  // IDs de herrajes automáticos que el usuario ha decidido eliminar manualmente
+  readonly excludedAutoHardwareIds = signal<Set<string>>(new Set());
 
   // Estado de modales y vista de cotización formal imprimible
   readonly showAddHardwareModal = signal<boolean>(false);
@@ -139,41 +146,65 @@ export class BudgetViewComponent {
   });
 
   /**
+   * Herrajes calculados automáticamente en base a las partes móviles del proyecto (bisagras, correderas, pistones, rieles, tubos).
+   */
+  readonly autoHardware = computed<HardwareItem[]>(() => {
+    return this.hardwareCatalog.computeRequiredHardwareList(this.projectService.partsList());
+  });
+
+  /**
+   * Lista completa reactiva de herrajes: combina los calculados automáticamente con los personalizados/manuales.
+   */
+  readonly allHardware = computed<HardwareItem[]>(() => {
+    const autoItems = this.autoHardware();
+    const manualItems = this.hardware();
+    const excluded = this.excludedAutoHardwareIds();
+    const map = new Map<string, HardwareItem>();
+
+    for (const it of autoItems) {
+      if (!excluded.has(it.id)) {
+        map.set(it.id, { ...it });
+      }
+    }
+    for (const it of manualItems) {
+      map.set(it.id, { ...it });
+    }
+    return Array.from(map.values());
+  });
+
+  /**
    * Costo total de herrajes, correderas, bisagras y tornillería.
    */
   readonly hardwareCostTotal = computed(() => {
-    return this.hardware().reduce((sum, h) => sum + (h.quantity * h.unitCost), 0);
+    return this.allHardware().reduce((sum, h) => sum + (h.quantity * h.unitCost), 0);
   });
 
   /**
    * Electrodomésticos y equipamiento 3D incluidos en la cotización.
    */
   readonly appliances = computed(() => this.projectService.appliancesList());
-  readonly appliancesBudgetList = computed(() => this.appliances().filter(a => a.includeInBudget));
+  readonly appliancesBudgetList = computed(() => this.appliances().filter(a => a.includeInBudget !== false));
   readonly appliancesCostTotal = computed(() => {
     return this.appliancesBudgetList().reduce((sum, a) => sum + (Number(a.price) || 0), 0);
   });
 
   /**
-   * Desglose de mesones y salpicaderos de Piedra / Cuarzo / Granito / Mármol cotizados por m²
+   * Desglose de mesones y superficies de Piedra / Cuarzo / Granito / Mármol cotizados por m²
    * (excluidos del optimizador de corte de melamina).
    */
   readonly stoneCountertopsBreakdown = computed(() => {
     const parts = this.projectService.partsList();
     const mats = this.materials();
     const stoneParts = parts.filter(p => {
-      if (p.excludeFromCutlist) return true;
-      if (p.componentRole === 'countertop' || p.componentRole === 'backsplash') {
-        const m = mats.find(mat => mat.id === p.materialId);
-        return m?.textureType === 'stone';
-      }
-      return false;
+      const m = mats.find(mat => mat.id === p.materialId) || ({ id: p.materialId, name: p.materialName } as Material);
+      return isStoneMaterial(m);
     });
 
     const items = stoneParts.map(part => {
-      const mat = mats.find(m => m.id === part.materialId) || mats[0];
+      const mat = mats.find(m => m.id === part.materialId) ||
+                  MELAMINE_MATERIALS_CATALOG.find(m => m.id === part.materialId || m.name.toLowerCase() === (part.materialName || '').toLowerCase());
       const sheetAreaM2 = Math.max(1, ((mat?.sheetLength || 3000) * (mat?.sheetWidth || 1600)) / 1_000_000);
-      const costPerM2 = Math.round((mat?.sheetCost || 1200000) / sheetAreaM2);
+      const costPerM2 = Math.round((mat?.sheetCost || 1350000) / sheetAreaM2);
       const areaM2 = Math.round(((part.length * part.width * (part.quantity || 1)) / 1_000_000) * 100) / 100;
       const linearMeters = Math.round(((part.length * (part.quantity || 1)) / 1000) * 100) / 100;
       const subtotal = Math.round(areaM2 * costPerM2);
@@ -333,12 +364,37 @@ export class BudgetViewComponent {
   }
 
   /**
+   * Módulos calculados a partir de project.groups (con fallback a project.modules para proyectos legados)
+   * para presentar en la cotización comercial formal para el cliente.
+   */
+  readonly clientModules = computed(() => {
+    const grps = this.groups();
+    if (grps && grps.length > 0) {
+      return grps.map(g => {
+        const parts = this.projectService.partsList().filter(p => p.groupId === g.id || p.moduleId === g.id);
+        const w = g.parametricConfig?.width || (parts.length > 0 ? Math.max(...parts.map(p => p.length)) : 600);
+        const h = g.parametricConfig?.height || (parts.length > 0 ? Math.max(...parts.map(p => p.width)) : 720);
+        const d = g.parametricConfig?.depth || 300;
+        return {
+          id: g.id,
+          name: g.name,
+          width: w,
+          height: h,
+          depth: d,
+          boardThickness: g.parametricConfig?.structureThickness || this.settings().defaultBoardThickness || 15
+        };
+      });
+    }
+    return this.project().modules || [];
+  });
+
+  /**
    * Espesor(es) reales de melamina usados por las piezas de un módulo (ej. "15mm" o "15 / 18mm"),
    * para que la cotización formal muestre lo mismo que el modelador y el optimizador.
    */
   getModuleBoardThicknessLabel(moduleId: string, fallback: number): string {
     const parts = this.projectService.partsList().filter(p =>
-      p.moduleId === moduleId &&
+      (p.moduleId === moduleId || p.groupId === moduleId) &&
       (p.thickness || 0) > 8 &&
       p.componentRole !== 'back' &&
       p.componentRole !== 'countertop' &&
@@ -364,7 +420,7 @@ export class BudgetViewComponent {
   }
 
   async deleteHardwareItem(itemId: string) {
-    const item = this.hardware().find(h => h.id === itemId);
+    const item = this.allHardware().find(h => h.id === itemId);
     const itemName = item ? `"${item.name}"` : 'este herraje';
     const confirmed = await this.confirmService.ask({
       title: '¿Eliminar herraje del presupuesto?',
@@ -375,6 +431,11 @@ export class BudgetViewComponent {
     });
     if (confirmed) {
       this.projectService.deleteHardware(itemId);
+      this.excludedAutoHardwareIds.update(set => {
+        const next = new Set(set);
+        next.add(itemId);
+        return next;
+      });
     }
   }
 

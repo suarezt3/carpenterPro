@@ -293,7 +293,7 @@
               </tr>
             </thead>
             <tbody [class]="themeService.isClassic() ? 'divide-y divide-zinc-100 text-zinc-700' : 'divide-y divide-zinc-800 text-zinc-200'">
-              @for (h of hardware(); track h.id) {
+              @for (h of allHardware(); track h.id) {
                 <tr [class]="themeService.isClassic() ? 'hover:bg-zinc-50/80' : 'hover:bg-zinc-800/40'">
                   <td [class]="themeService.isClassic() ? 'py-2 px-3 font-medium text-zinc-900' : 'py-2 px-3 font-medium text-white'">{{ h.name }}</td>
                   <td [class]="themeService.isClassic() ? 'py-2 px-2 text-zinc-500 text-[11px]' : 'py-2 px-2 text-zinc-400 text-[11px]'">{{ h.unit }}</td>
@@ -388,7 +388,7 @@
                     <td class="py-2.5 px-2 text-center">
                       <input
                         type="checkbox"
-                        [checked]="app.includeInBudget"
+                        [checked]="app.includeInBudget !== false"
                         (change)="onApplianceIncludeChange(app.id, $event)"
                         class="w-3.5 h-3.5 accent-zinc-900 rounded cursor-pointer"
                         title="Incluir este electrodoméstico en el presupuesto" />
@@ -402,8 +402,8 @@
                         aria-label="Precio unitario de electrodoméstico"
                         [class]="themeService.isClassic() ? 'w-28 px-1.5 py-0.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 text-right font-mono tabular-nums focus:border-zinc-900' : 'w-28 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-right font-mono tabular-nums focus:border-zinc-400'" />
                     </td>
-                    <td class="py-2.5 px-3 text-right font-mono tabular-nums font-bold whitespace-nowrap" [class.text-zinc-900]="app.includeInBudget" [class.text-zinc-400]="!app.includeInBudget">
-                      {{ app.includeInBudget ? format(app.price) : 'Excluido' }}
+                    <td class="py-2.5 px-3 text-right font-mono tabular-nums font-bold whitespace-nowrap" [class.text-zinc-900]="app.includeInBudget !== false" [class.text-zinc-400]="app.includeInBudget === false">
+                      {{ app.includeInBudget !== false ? format(app.price) : 'Excluido' }}
                     </td>
                   </tr>
                 }
@@ -565,7 +565,7 @@
         </div>
         <div class="sm:text-right">
           <p class="font-medium text-zinc-500 uppercase tracking-wider text-[11px]">Resumen Técnico:</p>
-          <p class="text-zinc-800 font-mono tabular-nums">{{ project().modules.length }} módulos incluidos ({{ project().parts.length }} piezas)</p>
+          <p class="text-zinc-800 font-mono tabular-nums">{{ clientModules().length }} módulos incluidos ({{ project().parts.length }} piezas)</p>
           <p class="text-zinc-600">Correderas telescópicas y bisagras de cierre suave</p>
         </div>
       </div>
@@ -574,7 +574,7 @@
       <div class="py-4 border-b border-zinc-200">
         <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-3">Detalle de Muebles a Fabricar:</h4>
         <div class="space-y-2">
-          @for (mod of project().modules; track mod.id) {
+          @for (mod of clientModules(); track mod.id) {
             <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-md flex items-center justify-between text-xs">
               <div>
                 <span class="font-semibold text-zinc-900">{{ mod.name }}</span>

@@ -26,9 +26,11 @@ import {
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { JoineryEngineService } from './joinery-engine.service';
+import { PartGeometryService } from './part-geometry.service';
 import { CutOptimizerService } from './cut-optimizer.service';
 import { SupabaseService, CloudProjectRecord } from './supabase.service';
 import { FurnitureTemplate } from './templates-catalog.service';
+import { MELAMINE_MATERIALS_CATALOG } from '../data/melamine-catalog.data';
 
 const STORAGE_KEY = 'melamipro_current_project';
 const PROJECTS_LIST_KEY = 'melamipro_saved_projects_meta';
@@ -89,6 +91,7 @@ export function cleanMaterialName(name: string): string {
 export class ProjectStorageService {
   private cabinetGen = inject(CabinetGeneratorService);
   private joineryEngine = inject(JoineryEngineService);
+  private partGeometry = inject(PartGeometryService);
   private cutOptimizer = inject(CutOptimizerService);
   readonly supabase = inject(SupabaseService);
   private autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -400,6 +403,10 @@ export class ProjectStorageService {
                 parsed.materials[existingIdx].name = cleanMaterialName(parsed.materials[existingIdx].name);
                 if (dm.category) parsed.materials[existingIdx].category = dm.category;
                 if (dm.textureType) parsed.materials[existingIdx].textureType = dm.textureType;
+                if (dm.family) parsed.materials[existingIdx].family = dm.family;
+                if (dm.familyLabel) parsed.materials[existingIdx].familyLabel = dm.familyLabel;
+                if (dm.brand) parsed.materials[existingIdx].brand = dm.brand;
+                if (dm.thicknessSpecs) parsed.materials[existingIdx].thicknessSpecs = dm.thicknessSpecs;
               }
             }
             for (const ctMat of DEFAULT_COUNTERTOP_MATERIALS) {
@@ -448,263 +455,11 @@ export class ProjectStorageService {
   }
 
   /**
-   * Crea el proyecto de referencia inicial con el catálogo base de melaminas y piezas de muestra.
+   * Crea el proyecto de referencia inicial desacoplado con el catálogo maestro de melaminas y piezas de muestra.
    */
   createDemoProject(): Project {
-    const matRoble: Material = {
-      id: 'mat_roble_18',
-      name: 'Melamina Roble Nebraska',
-      thickness: 15,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 175000,
-      hasGrain: true,
-      colorHex: '#b48a60',
-      textureType: 'wood'
-    };
-
-    const matNogal: Material = {
-      id: 'mat_nogal_18',
-      name: 'Melamina Nogal Terracota',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 210000,
-      hasGrain: true,
-      colorHex: '#5c3a21',
-      textureType: 'wood'
-    };
-
-    const matRobleMiel: Material = {
-      id: 'mat_roblemiel_18',
-      name: 'Melamina Roble Miel Cálido',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 205000,
-      hasGrain: true,
-      colorHex: '#c29b68',
-      textureType: 'wood'
-    };
-
-    const matTeca: Material = {
-      id: 'mat_teca_18',
-      name: 'Melamina Teca Natural',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 215000,
-      hasGrain: true,
-      colorHex: '#8b5a2b',
-      textureType: 'wood'
-    };
-
-    const matFresno: Material = {
-      id: 'mat_fresno_18',
-      name: 'Melamina Fresno Nórdico Claro',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 198000,
-      hasGrain: true,
-      colorHex: '#d9c5a5',
-      textureType: 'wood'
-    };
-
-    const matCalacatta: Material = {
-      id: 'mat_calacatta_18',
-      name: 'Melamina Mármol Calacatta Blanco',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 245000,
-      hasGrain: false,
-      colorHex: '#f5f5f7',
-      textureType: 'stone'
-    };
-
-    const matGranito: Material = {
-      id: 'mat_granito_18',
-      name: 'Melamina Granito Negro Absoluto',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 240000,
-      hasGrain: false,
-      colorHex: '#262626',
-      textureType: 'stone'
-    };
-
-    const matBlanco: Material = {
-      id: 'mat_blanco_18',
-      name: 'Melamina Blanco Frost Mate',
-      thickness: 15,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 135000,
-      hasGrain: false,
-      colorHex: '#f8fafc',
-      textureType: 'solid'
-    };
-
-    const matGrafito: Material = {
-      id: 'mat_grafito_18',
-      name: 'Melamina Negro Grafito Antihuella',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 185000,
-      hasGrain: false,
-      colorHex: '#1e293b',
-      textureType: 'solid'
-    };
-
-    const matSalvia: Material = {
-      id: 'mat_salvia_18',
-      name: 'Melamina Verde Salvia Mate',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 190000,
-      hasGrain: false,
-      colorHex: '#4a5d4e',
-      textureType: 'solid'
-    };
-
-    const matTerracota: Material = {
-      id: 'mat_terracota_18',
-      name: 'Melamina Terracota / Barro Cálido',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 190000,
-      hasGrain: false,
-      colorHex: '#9c533e',
-      textureType: 'solid'
-    };
-
-    const matAntracita: Material = {
-      id: 'mat_antracita_18',
-      name: 'Melamina Gris Antracita',
-      thickness: 18,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 165000,
-      hasGrain: false,
-      colorHex: '#334155',
-      textureType: 'solid'
-    };
-
-    const matGris15: Material = {
-      id: 'mat_gris_15',
-      name: 'Melamina Gris Perla',
-      thickness: 15,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 130000,
-      hasGrain: false,
-      colorHex: '#9ca3af',
-      textureType: 'solid'
-    };
-
-    const matMdfFondo: Material = {
-      id: 'mat_mdf_3',
-      name: 'MDF Durolac Blanco',
-      thickness: 3,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 45000,
-      hasGrain: false,
-      colorHex: '#e5e5e5',
-      textureType: 'solid'
-    };
-
-    const matMesonCarrara: Material = {
-      id: 'mat_stone_carrara_30',
-      name: 'Piedra Mármol Carrara Pulido (Mesón)',
-      thickness: 30,
-      sheetLength: 3000,
-      sheetWidth: 1600,
-      sheetCost: 1450000,
-      hasGrain: false,
-      colorHex: '#f8fafc',
-      textureType: 'stone',
-      category: 'countertop'
-    };
-
-    const matMesonCuarzoBlanco: Material = {
-      id: 'mat_stone_quartz_polar_20',
-      name: 'Cuarzo Blanco Polar Silestone (Mesón)',
-      thickness: 20,
-      sheetLength: 3000,
-      sheetWidth: 1600,
-      sheetCost: 1320000,
-      hasGrain: false,
-      colorHex: '#f1f5f9',
-      textureType: 'stone',
-      category: 'countertop'
-    };
-
-    const matMesonGranitoNegro: Material = {
-      id: 'mat_stone_granite_black_30',
-      name: 'Granito Negro San Gabriel (Mesón)',
-      thickness: 30,
-      sheetLength: 2800,
-      sheetWidth: 1600,
-      sheetCost: 1180000,
-      hasGrain: false,
-      colorHex: '#1e293b',
-      textureType: 'stone',
-      category: 'countertop'
-    };
-
-    const matMesonDektonGris: Material = {
-      id: 'mat_stone_dekton_gray_20',
-      name: 'Piedra Sinterizada Gris Dekton (Mesón)',
-      thickness: 20,
-      sheetLength: 3200,
-      sheetWidth: 1440,
-      sheetCost: 1680000,
-      hasGrain: false,
-      colorHex: '#64748b',
-      textureType: 'stone',
-      category: 'countertop'
-    };
-
-    const matMesonMaderaRoble: Material = {
-      id: 'mat_wood_butcher_36',
-      name: 'Madera Roble Macizo Alistonado (Mesón)',
-      thickness: 36,
-      sheetLength: 2440,
-      sheetWidth: 1220,
-      sheetCost: 620000,
-      hasGrain: true,
-      colorHex: '#b47b48',
-      textureType: 'wood',
-      category: 'countertop'
-    };
-
-    const defaultMaterials = [
-      matRoble,
-      matNogal,
-      matRobleMiel,
-      matTeca,
-      matFresno,
-      matCalacatta,
-      matGranito,
-      matBlanco,
-      matGrafito,
-      matSalvia,
-      matTerracota,
-      matAntracita,
-      matGris15,
-      matMdfFondo,
-      matMesonCarrara,
-      matMesonCuarzoBlanco,
-      matMesonGranitoNegro,
-      matMesonDektonGris,
-      matMesonMaderaRoble
-    ];
+    const defaultMaterials: Material[] = [...MELAMINE_MATERIALS_CATALOG];
+    const matRoble = defaultMaterials.find(m => m.id === 'mat_roble_18') || defaultMaterials[0];
 
     const initialParts: Part[] = [
       {
@@ -1171,27 +926,10 @@ export class ProjectStorageService {
   // ACCIONES DE MÓDULOS Y PLANTILLAS
   // ==========================================
 
-  addModule(module: FurnitureModule) {
-    const partsRes = this.cabinetGen.generatePartsForModule(module, this.currentProject().materials);
-    this.updateProject(p => ({
-      ...p,
-      modules: [...p.modules, module],
-      parts: [...p.parts, ...partsRes.parts],
-      hardware: [...p.hardware, ...partsRes.hardware]
-    }));
-  }
-
-  updateModule(module: FurnitureModule) {
-    const current = this.currentProject();
-    const partsRes = this.cabinetGen.generatePartsForModule(module, current.materials);
-    const otherParts = current.parts.filter(p => p.moduleId !== module.id);
-    const otherModules = current.modules.map(m => m.id === module.id ? module : m);
-
-    this.updateProject(p => ({
-      ...p,
-      modules: otherModules,
-      parts: [...otherParts, ...partsRes.parts]
-    }));
+  private filterOrphanModules(modules: FurnitureModule[], remainingParts: Part[]): FurnitureModule[] {
+    if (!modules || modules.length === 0) return [];
+    const usedModuleIds = new Set(remainingParts.map(pt => pt.moduleId).filter(Boolean));
+    return modules.filter(m => usedModuleIds.has(m.id));
   }
 
   addParametricCabinet(cabinet: { module: FurnitureModule; parts: Part[]; group: PartGroup }) {
@@ -1203,27 +941,33 @@ export class ProjectStorageService {
     }));
   }
 
-  updateParametricCabinet(groupId: string, newParts: Part[], newName?: string, newConfig?: ParametricCabinetConfig) {
-    this.updateProject(p => ({
-      ...p,
-      groups: (p.groups || []).map(g => g.id === groupId ? {
-        ...g,
-        name: newName || g.name,
-        parametricConfig: newConfig || g.parametricConfig
-      } : g),
-      parts: [
+  updateParametricCabinet(
+    groupId: string,
+    newParts: Part[],
+    newName?: string,
+    newConfig?: ParametricCabinetConfig,
+    newModule?: FurnitureModule
+  ) {
+    this.updateProject(p => {
+      const nextParts = [
         ...p.parts.filter(pt => pt.groupId !== groupId),
         ...newParts
-      ]
-    }));
-  }
-
-  deleteModule(moduleId: string) {
-    this.updateProject(p => ({
-      ...p,
-      modules: p.modules.filter(m => m.id !== moduleId),
-      parts: p.parts.filter(pt => pt.moduleId !== moduleId)
-    }));
+      ];
+      let nextModules = this.filterOrphanModules(p.modules || [], nextParts);
+      if (newModule && !nextModules.some(m => m.id === newModule.id)) {
+        nextModules = [...nextModules, newModule];
+      }
+      return {
+        ...p,
+        modules: nextModules,
+        groups: (p.groups || []).map(g => g.id === groupId ? {
+          ...g,
+          name: newName || g.name,
+          parametricConfig: newConfig || g.parametricConfig
+        } : g),
+        parts: nextParts
+      };
+    });
   }
 
   clearFurniture() {
@@ -1625,11 +1369,20 @@ export class ProjectStorageService {
     this.updateProject(p => {
       const remainingParts = p.parts.filter(pt => pt.id !== partId);
       const usedGroupIds = new Set(remainingParts.map(pt => pt.groupId).filter(Boolean));
+      const removedGroupIds = new Set(
+        (p.groups || []).filter(g => !usedGroupIds.has(g.id)).map(g => g.id)
+      );
       const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
+      const filteredModules = this.filterOrphanModules(p.modules || [], remainingParts);
+      const remainingAppliances = (p.appliances || []).filter(
+        a => !(a.groupId && removedGroupIds.has(a.groupId))
+      );
       return {
         ...p,
+        modules: filteredModules,
         parts: remainingParts,
-        groups: filteredGroups
+        groups: filteredGroups,
+        appliances: remainingAppliances
       };
     });
   }
@@ -1639,11 +1392,20 @@ export class ProjectStorageService {
     this.updateProject(p => {
       const remainingParts = p.parts.filter(pt => !idsSet.has(pt.id));
       const usedGroupIds = new Set(remainingParts.map(pt => pt.groupId).filter(Boolean));
+      const removedGroupIds = new Set(
+        (p.groups || []).filter(g => !usedGroupIds.has(g.id)).map(g => g.id)
+      );
       const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
+      const filteredModules = this.filterOrphanModules(p.modules || [], remainingParts);
+      const remainingAppliances = (p.appliances || []).filter(
+        a => !(a.groupId && removedGroupIds.has(a.groupId))
+      );
       return {
         ...p,
+        modules: filteredModules,
         parts: remainingParts,
-        groups: filteredGroups
+        groups: filteredGroups,
+        appliances: remainingAppliances
       };
     });
   }
@@ -1654,10 +1416,17 @@ export class ProjectStorageService {
     this.updateProject(p => {
       const remainingParts = p.parts.filter(pt => !partIdsSet.has(pt.id));
       const usedGroupIds = new Set(remainingParts.map(pt => pt.groupId).filter(Boolean));
+      const removedGroupIds = new Set(
+        (p.groups || []).filter(g => !usedGroupIds.has(g.id)).map(g => g.id)
+      );
       const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
-      const remainingAppliances = (p.appliances || []).filter(a => !appIdsSet.has(a.id));
+      const filteredModules = this.filterOrphanModules(p.modules || [], remainingParts);
+      const remainingAppliances = (p.appliances || []).filter(
+        a => !appIdsSet.has(a.id) && !(a.groupId && removedGroupIds.has(a.groupId))
+      );
       return {
         ...p,
+        modules: filteredModules,
         parts: remainingParts,
         groups: filteredGroups,
         appliances: remainingAppliances
@@ -1769,8 +1538,25 @@ export class ProjectStorageService {
     const mat = this.materialsList().find(m => m.id === materialId)
       || DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId);
     if (!mat) return;
+    const isStoneMat = isCountertopMaterial(mat);
 
     this.updateProject(p => ({
+      ...p,
+      groups: (p.groups || []).map(g => {
+        if (g.id !== groupId || !g.parametricConfig || isStoneMat) return g;
+        return {
+          ...g,
+          parametricConfig: {
+            ...g.parametricConfig,
+            structureMaterialId: (target === 'all' || target === 'structure')
+              ? mat.id
+              : g.parametricConfig.structureMaterialId,
+            doorMaterialId: (target === 'all' || target === 'doors')
+              ? mat.id
+              : g.parametricConfig.doorMaterialId
+          }
+        };
+      }),
       ...p,
       parts: p.parts.map(pt => {
         if (pt.groupId !== groupId) return pt;
@@ -1811,9 +1597,11 @@ export class ProjectStorageService {
       const currentGroups = (p.groups || []).filter(g => g.id !== groupId);
       let updatedParts = p.parts;
       let updatedAppliances = p.appliances || [];
+      let updatedModules = p.modules || [];
       if (deleteParts) {
         updatedParts = p.parts.filter(pt => pt.groupId !== groupId);
         updatedAppliances = updatedAppliances.filter(a => a.groupId !== groupId);
+        updatedModules = this.filterOrphanModules(updatedModules, updatedParts);
       } else {
         updatedParts = p.parts.map(pt => {
           if (pt.groupId === groupId) {
@@ -1835,6 +1623,7 @@ export class ProjectStorageService {
       }
       return {
         ...p,
+        modules: updatedModules,
         groups: currentGroups,
         parts: updatedParts,
         appliances: updatedAppliances
@@ -1867,7 +1656,7 @@ export class ProjectStorageService {
       if (groupParts.length > 0 && deltaY < 0) {
         let grpMinY = Infinity;
         for (const gp of groupParts) {
-          const b = this.joineryEngine.getPartBounds(gp);
+          const b = this.partGeometry.getWorldAABB(gp);
           if (b.minY < grpMinY) grpMinY = b.minY;
         }
         if (grpMinY !== Infinity) {
@@ -1902,15 +1691,15 @@ export class ProjectStorageService {
     const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
     if (groupParts.length === 0) return null;
 
-    let grpMinY = Infinity;
-    let grpMaxY = -Infinity;
+    let grpMinX = Infinity;
+    let grpMaxX = -Infinity;
     for (const gp of groupParts) {
-      const b = this.joineryEngine.getPartBounds(gp);
-      if (b.minY < grpMinY) grpMinY = b.minY;
-      if (b.maxY > grpMaxY) grpMaxY = b.maxY;
+      const b = this.partGeometry.getWorldAABB(gp);
+      if (b.minX < grpMinX) grpMinX = b.minX;
+      if (b.maxX > grpMaxX) grpMaxX = b.maxX;
     }
-    const groupHeight = grpMaxY > grpMinY ? grpMaxY - grpMinY : 180;
-    const deltaY = Math.round(groupHeight + 15);
+    const groupWidth = grpMaxX > grpMinX ? grpMaxX - grpMinX : 600;
+    const deltaX = Math.round(groupWidth + 40);
 
     const existingGroups = currentProj.groups || [];
     let nextName = `${group.name} (Copia)`;
@@ -1938,13 +1727,30 @@ export class ProjectStorageService {
     }
     nextName = groupCandidate;
 
+    const sourceModuleId = groupParts.find(pt => pt.moduleId)?.moduleId;
+    const sourceModule = sourceModuleId
+      ? (currentProj.modules || []).find(m => m.id === sourceModuleId)
+      : undefined;
+    const newModuleId = sourceModule ? `module_copy_${crypto.randomUUID().slice(0, 8)}` : undefined;
+    const newModule: FurnitureModule | undefined = sourceModule && newModuleId
+      ? { ...sourceModule, id: newModuleId, name: nextName }
+      : undefined;
+
     const newGroupId = 'grp_' + crypto.randomUUID().slice(0, 8);
     const newGroup: PartGroup = {
       ...group,
       id: newGroupId,
       name: nextName,
       isOpen: false,
-      slideExtension: 0
+      slideExtension: 0,
+      parametricConfig: group.parametricConfig
+        ? {
+            ...group.parametricConfig,
+            id: newModuleId || group.parametricConfig.id,
+            name: nextName,
+            posX: Math.round(((group.parametricConfig.posX ?? 0) + deltaX) * 10) / 10
+          }
+        : undefined
     };
 
     const existingPartNames = currentProj.parts.map(p => p.name.trim().toLowerCase());
@@ -1972,9 +1778,11 @@ export class ProjectStorageService {
         ...pt,
         id: newId,
         name: pCandidate,
+        moduleId: newModuleId ?? pt.moduleId,
+        moduleName: newModule ? nextName : pt.moduleName,
         groupId: newGroupId,
         groupName: nextName,
-        posY: Math.round(((pt.posY ?? 0) + deltaY) * 10) / 10
+        posX: Math.round(((pt.posX ?? 0) + deltaX) * 10) / 10
       };
     });
 
@@ -1987,7 +1795,7 @@ export class ProjectStorageService {
         groupId: newGroupId,
         position: {
           ...app.position,
-          y: Math.round(((app.position.y ?? 0) + deltaY) * 10) / 10
+          x: Math.round(((app.position.x ?? 0) + deltaX) * 10) / 10
         }
       };
     });
@@ -1995,6 +1803,7 @@ export class ProjectStorageService {
     this.updateProject(p => {
       return {
         ...p,
+        modules: newModule ? [...(p.modules || []), newModule] : p.modules,
         groups: [...(p.groups || []), newGroup],
         parts: [...p.parts, ...newParts],
         appliances: [...(p.appliances || []), ...newAppliances]
@@ -2275,6 +2084,18 @@ export class ProjectStorageService {
 
     this.updateProject(p => ({
       ...p,
+      groups: (p.groups || []).map(g => {
+        const hasPart = p.parts.some(pt => pt.groupId === g.id && partIds.includes(pt.id));
+        if (!hasPart || !g.parametricConfig || isTargetMatCountertop) return g;
+        return {
+          ...g,
+          parametricConfig: {
+            ...g.parametricConfig,
+            structureMaterialId: mat.id,
+            doorMaterialId: mat.id
+          }
+        };
+      }),
       parts: p.parts.map(part => {
         if (partIds.includes(part.id)) {
           const isCtPart = part.componentRole === 'countertop' || part.componentRole === 'backsplash' ||
@@ -2387,9 +2208,9 @@ export class ProjectStorageService {
       this.updateParametricCabinet(groupId, updatedParts, group.name, nextCfg);
 
       if (facing === 'right') {
-        this.rotateGroupRigidly(groupId, -90);
-      } else if (facing === 'left') {
         this.rotateGroupRigidly(groupId, 90);
+      } else if (facing === 'left') {
+        this.rotateGroupRigidly(groupId, -90);
       } else if (facing === 'back') {
         this.rotateGroupRigidly(groupId, 180);
       }
@@ -3465,14 +3286,10 @@ export class ProjectStorageService {
   }): Part[] {
     const project = this.currentProject();
     const defaultStone = DEFAULT_COUNTERTOP_MATERIALS[0];
-    let mat =
+    const mat =
       project.materials.find(m => m.id === options.materialId && isCountertopMaterial(m)) ||
       project.materials.find(m => isCountertopMaterial(m)) ||
       defaultStone;
-
-    if (!project.materials.some(m => m.id === mat.id)) {
-      project.materials.push(mat);
-    }
 
     const thick = Number(options.thickness) || mat.thickness || 30;
     const splashH = Number(options.backsplashHeight) || 75;
@@ -3934,6 +3751,7 @@ export class ProjectStorageService {
     if (newParts.length > 0) {
       this.updateProject(p => ({
         ...p,
+        materials: p.materials.some(m => m.id === mat.id) ? p.materials : [...p.materials, mat],
         parts: [...p.parts, ...newParts],
         groups: [
           ...(p.groups || []),
@@ -3946,7 +3764,7 @@ export class ProjectStorageService {
             isOpen: false
           }
         ]
-      }));
+      }), true);
     }
 
     return newParts;

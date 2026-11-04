@@ -1,5 +1,6 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { Part, DrillHole, CollisionRecord } from '../models/melamine.models';
+import { PartGeometryService } from './part-geometry.service';
 
 export interface Part3DBounds {
   part: Part;
@@ -27,6 +28,8 @@ export interface JoineryAnalysis {
   providedIn: 'root'
 })
 export class JoineryEngineService {
+  private readonly partGeometry = inject(PartGeometryService);
+
   // Caché en memoria WeakMap para evitar recalcular trigonometría Euler y AABB en piezas inmutadas
   private readonly boundsCache = new WeakMap<Part, { sig: string; bounds: Part3DBounds }>();
 
@@ -36,130 +39,39 @@ export class JoineryEngineService {
 
   /**
    * Calcula las dimensiones locales (sx, sy, sz) antes de aplicar rotaciones Euler (rotationX/Y/Z).
-   * Útil para construir el BoxGeometry(sx, sy, sz) en el visor 3D cuando el mesh aplica rotation.set(...) encima.
+   * Delega directamente en PartGeometryService como fuente única de verdad.
    */
   getPartLocalDimensions(part: Part): { sx: number; sy: number; sz: number } {
-    const t = part.thickness || 15;
-    const L = part.length;
-    const W = part.width;
-
-    let sx = L;
-    let sy = t;
-    let sz = W;
-
-    const orient = part.orientation || 'horizontal';
-    if (orient === 'vertical_yz') {
-      const isPlinth =
-        part.componentRole === 'plinth' ||
-        part.name.toUpperCase().includes('ZOCALO') ||
-        part.name.toUpperCase().includes('ZÓCALO');
-
-      const isCabinetSide =
-        !isPlinth &&
-        (part.componentRole === 'side_left' ||
-          part.componentRole === 'side_right' ||
-          part.componentRole === 'divider' ||
-          part.componentRole === 'door' ||
-          part.componentRole === 'back' ||
-          (part.name.toUpperCase().includes('LATERAL') &&
-            !part.name.toUpperCase().includes('CAJ') &&
-            part.componentRole !== 'drawer_box' &&
-            part.componentRole !== 'drawer_lateral'));
-
-      const isDrawerBoxSide =
-        !isPlinth &&
-        !isCabinetSide &&
-        (part.componentRole === 'drawer_box' ||
-          part.componentRole === 'drawer_lateral' ||
-          (part.name.toUpperCase().includes('LATERAL') && part.name.toUpperCase().includes('CAJ')));
-
-      const isBacksplash =
-        part.componentRole === 'backsplash' ||
-        part.name.toUpperCase().includes('SALPICADERO');
-
-      if (isBacksplash) {
-        sx = t;
-        sy = Math.min(L, W);
-        sz = Math.max(L, W);
-      } else if ((isPlinth || isDrawerBoxSide) && L > W) {
-        sx = t;
-        sy = W;
-        sz = L;
-      } else {
-        sx = t;
-        sy = L;
-        sz = W;
-      }
-    } else if (orient === 'vertical_xy') {
-      sx = L;
-      sy = W;
-      sz = t;
-    }
-
-    return { sx, sy, sz };
+    const localDims = this.partGeometry.getLocalDimensions(part);
+    return { sx: localDims.sx, sy: localDims.sy, sz: localDims.sz };
   }
 
   /**
    * Calcula la caja envolvente 3D exacta (sx, sy, sz y límites min/max) de una pieza en el espacio mundial,
    * incluyendo cualquier rotación personalizada (rotationX, rotationY, rotationZ).
-   * Es la única fuente de verdad compartida entre el motor de uniones, el almacenamiento y el visor 3D.
    */
   getPartBounds(part: Part): Part3DBounds {
-    const geomSig = `${part.length}|${part.width}|${part.thickness ?? 15}|${part.posX ?? 0}|${part.posY ?? ''}|${part.posZ ?? 0}|${part.orientation || 'h'}|${part.rotationX || 0}|${part.rotationY || 0}|${part.rotationZ || 0}|${part.componentRole || ''}|${part.name}`;
+    const geomSig = `${part.length}|${part.width}|${part.thickness ?? 15}|${part.posX ?? 0}|${part.posY ?? ''}|${part.posZ ?? 0}|${part.orientation || 'h'}|${part.rotationX || 0}|${part.rotationY || 0}|${part.rotationZ || 0}|${part.componentRole || ''}|${part.shapeType || ''}|${part.radius || 0}|${part.diameter || 0}|${part.name}`;
     const cached = this.boundsCache.get(part);
     if (cached && cached.sig === geomSig) {
       return cached.bounds;
     }
 
-    let { sx, sy, sz } = this.getPartLocalDimensions(part);
-
-    const rx = ((part.rotationX || 0) * Math.PI) / 180;
-    const ry = ((part.rotationY || 0) * Math.PI) / 180;
-    const rz = ((part.rotationZ || 0) * Math.PI) / 180;
-
-    if (Math.abs(rx) > 1e-4 || Math.abs(ry) > 1e-4 || Math.abs(rz) > 1e-4) {
-      const cx = Math.cos(rx), srx = Math.sin(rx);
-      const cy = Math.cos(ry), sry = Math.sin(ry);
-      const cz = Math.cos(rz), srz = Math.sin(rz);
-
-      // Matriz de rotación Euler 'XYZ' de Three.js
-      const m00 = cy * cz;
-      const m01 = -cy * srz;
-      const m02 = sry;
-      const m10 = srx * sry * cz + cx * srz;
-      const m11 = -srx * sry * srz + cx * cz;
-      const m12 = -srx * cy;
-      const m20 = -cx * sry * cz + srx * srz;
-      const m21 = cx * sry * srz + srx * cz;
-      const m22 = cx * cy;
-
-      const wsx = Math.abs(m00) * sx + Math.abs(m01) * sy + Math.abs(m02) * sz;
-      const wsy = Math.abs(m10) * sx + Math.abs(m11) * sy + Math.abs(m12) * sz;
-      const wsz = Math.abs(m20) * sx + Math.abs(m21) * sy + Math.abs(m22) * sz;
-
-      sx = Math.round(wsx * 100) / 100;
-      sy = Math.round(wsy * 100) / 100;
-      sz = Math.round(wsz * 100) / 100;
-    }
-
-    const px = part.posX ?? 0;
-    const py = part.posY ?? (sy / 2);
-    const pz = part.posZ ?? 0;
-
+    const aabb = this.partGeometry.getWorldAABB(part);
     const bounds: Part3DBounds = {
       part,
-      minX: px - sx / 2,
-      maxX: px + sx / 2,
-      minY: py - sy / 2,
-      maxY: py + sy / 2,
-      minZ: pz - sz / 2,
-      maxZ: pz + sz / 2,
-      sx,
-      sy,
-      sz,
-      px,
-      py,
-      pz
+      minX: aabb.minX,
+      maxX: aabb.maxX,
+      minY: aabb.minY,
+      maxY: aabb.maxY,
+      minZ: aabb.minZ,
+      maxZ: aabb.maxZ,
+      sx: Math.round(aabb.sx * 100) / 100,
+      sy: Math.round(aabb.sy * 100) / 100,
+      sz: Math.round(aabb.sz * 100) / 100,
+      px: aabb.px,
+      py: aabb.py,
+      pz: aabb.pz
     };
     this.boundsCache.set(part, { sig: geomSig, bounds });
     return bounds;
@@ -209,7 +121,7 @@ export class JoineryEngineService {
     return dz >= 0 ? 'front' : 'back';
   }
 
-  // --- COLLISION DETECTION ENGINE (Sweep-and-Prune Spatial AABB Optimization) ---
+  // --- COLLISION DETECTION ENGINE (Sweep-and-Prune Broadphase + OBB & 2D Polygon SAT Narrowphase) ---
   detectCollisions(parts: Part[]): CollisionRecord[] {
     if (!parts || parts.length < 2) return [];
     const boundsList = parts.map(p => this.getPartBounds(p));
@@ -220,7 +132,7 @@ export class JoineryEngineService {
     const collisions: CollisionRecord[] = [];
     if (boundsList.length < 2) return collisions;
 
-    const tolerance = 0.8; // mm tolerance to ignore ideal flush contacts
+    const tolerance = 1.5; // mm tolerance to ignore flush assembly contacts and kerf tolerances
     // Ordenar copias de referencias por minX para poda espacial Sweep-and-Prune O(N log N)
     const sorted = [...boundsList].sort((a, b) => a.minX - b.minX);
 
@@ -284,7 +196,12 @@ export class JoineryEngineService {
             continue;
           }
 
-          const vol = overlapX * overlapY * overlapZ;
+          // Fase estrecha OBB SAT 3D + Polígonos 2D (elimina falsos positivos en piezas rotadas a 45° o con chaflán/destaje)
+          const obbCheck = this.partGeometry.arePartsCollidingOBB(b1.part, b2.part, tolerance);
+          if (!obbCheck.colliding) {
+            continue;
+          }
+
           collisions.push({
             partAId: b1.part.id,
             partAName: b1.part.name,
@@ -293,7 +210,7 @@ export class JoineryEngineService {
             overlapX: Math.round(overlapX * 10) / 10,
             overlapY: Math.round(overlapY * 10) / 10,
             overlapZ: Math.round(overlapZ * 10) / 10,
-            overlapVolumeMm3: Math.round(vol)
+            overlapVolumeMm3: obbCheck.overlapVolume
           });
         }
       }
@@ -316,7 +233,10 @@ export class JoineryEngineService {
     let signature = '';
     for (let i = 0; i < parts.length; i++) {
       const p = parts[i];
-      signature += `${p.id}:${p.name}:${p.length}x${p.width}x${p.thickness ?? 15}@${p.posX ?? 0},${p.posY ?? ''},${p.posZ ?? 0}:${p.orientation || 'h'}:${p.rotationX || 0},${p.rotationY || 0},${p.rotationZ || 0}:${p.componentRole || ''}:${p.groupId || ''}:${p.moduleId || ''}:${p.excludeFromCutlist ? 1 : 0}:${p.hardwareConfig?.openingDirection || ''}:${p.hardwareConfig?.movableType || ''};`;
+      const cutSig = p.cornerCutConfig
+        ? `${p.cornerCutConfig.type},${p.cornerCutConfig.corner},${p.cornerCutConfig.cutX},${p.cornerCutConfig.cutY}`
+        : '';
+      signature += `${p.id}:${p.name}:${p.length}x${p.width}x${p.thickness ?? 15}@${p.posX ?? 0},${p.posY ?? ''},${p.posZ ?? 0}:${p.orientation || 'h'}:${p.rotationX || 0},${p.rotationY || 0},${p.rotationZ || 0}:${p.componentRole || ''}:${p.groupId || ''}:${p.moduleId || ''}:${p.excludeFromCutlist ? 1 : 0}:${p.hardwareConfig?.openingDirection || ''}:${p.hardwareConfig?.movableType || ''}:${cutSig}:${p.contourPoints?.length || 0};`;
     }
 
     if (this.lastJoineryResult && this.lastJoinerySignature === signature) {

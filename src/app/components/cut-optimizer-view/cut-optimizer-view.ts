@@ -12,6 +12,7 @@ import {
   Layers01Icon,
   Note01Icon,
   PrinterIcon,
+  ScissorsIcon,
   Settings01Icon,
   ViewIcon
 } from '@hugeicons/core-free-icons';
@@ -52,7 +53,8 @@ export class CutOptimizerViewComponent {
     list: CheckListIcon,
     settings: Settings01Icon,
     swap: ArrowDataTransferHorizontalIcon,
-    alert: Alert02Icon
+    alert: Alert02Icon,
+    sawCut: ScissorsIcon
   };
 
   // Signals sincronizados con el estado global del proyecto
@@ -60,6 +62,15 @@ export class CutOptimizerViewComponent {
   readonly parts = this.projectService.partsList;
   readonly materials = this.projectService.materialsList;
   readonly settings = this.projectService.projectSettings;
+  readonly subtractEdgeBanding = computed(() => !!this.settings().subtractEdgeBandingFromCut);
+
+  toggleSubtractEdgeBanding() {
+    const cur = this.subtractEdgeBanding();
+    this.projectService.updateSettings({
+      ...this.settings(),
+      subtractEdgeBandingFromCut: !cur
+    });
+  }
 
   // Estado local del visor de tableros, zoom y menú de exportación
   readonly selectedSheetIndex = signal<number>(0);

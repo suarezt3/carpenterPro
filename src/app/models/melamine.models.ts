@@ -35,7 +35,12 @@ export type SpecialCutPresetType =
   | 'chamfer_corner'
   | 'diagonal_side'
   | 'notch_l'
-  | 'rounded_corners';
+  | 'rounded_corners'
+  | 'u_siphon_cutout';
+
+export type CutCornerType = SpecialCutPresetType;
+
+export type EnvironmentLine = 'kitchen' | 'closet' | 'bathroom' | 'living_office';
 
 export interface PartCornerCutConfig {
   type: SpecialCutPresetType;
@@ -59,7 +64,6 @@ export type HandleType =
   | 'bar_black' 
   | 'knob_round' 
   | 'knob_square' 
-  | 'profile_gola' 
   | 'cup_vintage' 
   | 'none';
 
@@ -74,6 +78,8 @@ export type HingeType =
   | 'straight'       // Bisagra Recta (Parche / Solapada total)
   | 'half_cranked'   // Bisagra Semicodo (Semiparche / Semisolapada)
   | 'full_cranked'   // Bisagra Codo (Interior / Embutida)
+  | 'corner_45'      // Bisagra Angular 45° (Esquineros pentagonales)
+  | 'corner_165'     // Bisagra Gran Apertura 165° (Rincón ciego)
   | 'gas_piston'     // Pistón Elevable a Gas (Alacenas)
   | 'none';
 
@@ -139,7 +145,7 @@ export interface ParametricCabinetConfig {
   code: string; // ej. "MALT1PU001"
   name: string; // ej. "Módulo Alto 1 Puerta (MAL-1P)"
   moduleType: 'wall_cabinet' | 'base_cabinet' | 'tall_cabinet' | 'closet' | 'vanity' | 'bookshelf' | 'drawer_unit' | 'custom';
-  category?: 'kitchen_base' | 'kitchen_wall' | 'oven_base' | 'sink_base' | 'corner_base' | 'oven_tower' | 'drawers' | 'cajones' | 'closet' | 'vanity' | 'bookshelf' | 'custom';
+  category?: 'kitchen_base' | 'kitchen_wall' | 'oven_base' | 'sink_base' | 'corner_base' | 'blind_corner_base' | 'oven_tower' | 'drawers' | 'cajones' | 'closet' | 'vanity' | 'bathroom_wall' | 'bookshelf' | 'living_low' | 'office_desk' | 'custom' | string;
   width: number; // Ancho exterior X (ej. 600 mm)
   height: number; // Altura exterior Y (ej. 800 mm)
   depth: number; // Profundidad exterior Z (ej. 320 mm)
@@ -151,6 +157,7 @@ export interface ParametricCabinetConfig {
   shelfDistribution?: 'uniform' | 'manual';
   shelfManualOffsets?: number[]; // Alturas desde la base interior en mm
   doorOpening: 'left' | 'right' | 'top' | 'bottom' | 'double' | 'none'; // Izquierda, Derecha, Doble, Elevable superior, Abatible, Ninguna
+  doorType?: 'none' | 'single_left' | 'single_right' | 'double' | string;
   hasHandle?: boolean;
   hasBackPanel?: boolean;
   structureMaterialId: string;
@@ -163,13 +170,19 @@ export interface ParametricCabinetConfig {
   posX?: number;
   posY?: number; // Elevación sobre el piso
   posZ?: number;
-  // Propiedades paramétricas específicas de cajoneras
+  // Propiedades paramétricas específicas de cajoneras y multi-ambiente
   drawersCount?: number; // Número de gavetas (2, 3, 4, 5, 6)
   drawerSlideType?: 'telescopic' | 'soft_close' | 'telescopic_35' | 'undermount';
   drawerFrontType?: 'overlay' | 'inset';
   hasPlinth?: boolean;
   plinthHeight?: number;
   hasTopCover?: boolean;
+  topTieStrips?: boolean;
+  elevationY?: number;
+  environmentLine?: EnvironmentLine;
+  siphonCutout?: { enabled: boolean; width: number; depth: number };
+  hangingRodsCount?: 0 | 1 | 2;
+  cornerReturnWidth?: number;
 }
 
 export interface Part {
@@ -245,6 +258,16 @@ export interface MaterialSheetSpec {
   sheetCost?: number;   // Precio por tablero entero en este espesor
 }
 
+export type MelamineFamily =
+  | 'wood_light'
+  | 'wood_medium'
+  | 'wood_dark'
+  | 'solid_matte'
+  | 'high_gloss'
+  | 'textile_linen'
+  | 'stone_countertop'
+  | 'mdf_back';
+
 export interface Material {
   id: string;
   name: string;
@@ -254,7 +277,10 @@ export interface Material {
   sheetCost: number;   // Precio por tablero entero
   hasGrain: boolean;   // Si tiene textura de veta
   colorHex: string;
-  textureType?: 'wood' | 'solid' | 'metal' | 'stone';
+  textureType?: 'wood' | 'solid' | 'metal' | 'stone' | 'gloss' | 'linen' | 'wpc';
+  family?: MelamineFamily;
+  familyLabel?: string;
+  brand?: string;
   /** Medidas y precio del tablero cuando el mismo acabado se usa en otro espesor (clave = espesor en mm). */
   thicknessSpecs?: Record<string, MaterialSheetSpec>;
   /** Solo en variantes generadas por el optimizador: id del material base del catálogo. */
@@ -262,24 +288,76 @@ export interface Material {
   category?: 'board' | 'countertop' | 'mdf' | 'stone';
 }
 
-export function isCountertopMaterial(mat: Material | null | undefined): boolean {
+export function isStoneMaterial(mat: Material | null | undefined): boolean {
   if (!mat) return false;
-  if (mat.category === 'countertop') return true;
   const nameLower = (mat.name || '').toLowerCase();
+  if (nameLower.includes('melamina') || nameLower.includes('mdf') || nameLower.includes('durolac')) return false;
+  if (mat.category === 'stone') return true;
+  if (mat.textureType === 'stone') return true;
   const idLower = (mat.id || '').toLowerCase();
-  if (nameLower.includes('melamina')) return false;
+  if (idLower.startsWith('mat_stone_')) return true;
+  if (mat.family === 'stone_countertop' && !nameLower.includes('madera') && !nameLower.includes('roble')) return true;
   return (
-    nameLower.includes('mesón') ||
-    nameLower.includes('meson') ||
-    nameLower.includes('encimera') ||
-    idLower.startsWith('mat_stone_') ||
-    idLower.startsWith('mat_wood_butcher_') ||
-    mat.category === 'stone'
+    nameLower.includes('cuarzo') ||
+    nameLower.includes('mármol') ||
+    nameLower.includes('marmol') ||
+    nameLower.includes('granito') ||
+    nameLower.includes('dekton') ||
+    nameLower.includes('silestone') ||
+    nameLower.includes('neolith') ||
+    nameLower.includes('sinterizada')
   );
 }
 
+export function isCountertopMaterial(mat: Material | null | undefined): boolean {
+  if (!mat) return false;
+  if (mat.category === 'countertop' || mat.category === 'stone') return true;
+  return isStoneMaterial(mat);
+}
+
 export function isBoardMaterial(mat: Material | null | undefined): boolean {
-  return !isCountertopMaterial(mat);
+  return !isStoneMaterial(mat);
+}
+
+/**
+ * Descuenta automáticamente de las dimensiones nominales de la pieza el espesor
+ * de los tapacantos en L1, L2, A1, A2 según el estándar de carpintería:
+ * - A1 y A2 están en los extremos del ancho, por lo que su espesor descuenta del largo (Length).
+ * - L1 y L2 están en los extremos del largo, por lo que su espesor descuenta del ancho (Width).
+ */
+export function computePartCutDimensions(
+  part: Part,
+  subtractEdgeBanding = false,
+  thinThickness = 0.45,
+  thickThickness = 2.0
+): { cutLength: number; cutWidth: number; deductLength: number; deductWidth: number } {
+  if (!subtractEdgeBanding && !part.deductEdgeBanding) {
+    return {
+      cutLength: part.length,
+      cutWidth: part.width,
+      deductLength: 0,
+      deductWidth: 0
+    };
+  }
+
+  const getThickness = (type: EdgeBandingType): number => {
+    if (type === 'thin') return thinThickness;
+    if (type === 'thick') return thickThickness;
+    return 0;
+  };
+
+  const deductL = getThickness(part.edges.a1) + getThickness(part.edges.a2);
+  const deductW = getThickness(part.edges.l1) + getThickness(part.edges.l2);
+
+  const cutLength = Math.max(1, Math.round((part.length - deductL) * 100) / 100);
+  const cutWidth = Math.max(1, Math.round((part.width - deductW) * 100) / 100);
+
+  return {
+    cutLength,
+    cutWidth,
+    deductLength: Math.round(deductL * 100) / 100,
+    deductWidth: Math.round(deductW * 100) / 100
+  };
 }
 
 export const DEFAULT_COUNTERTOP_MATERIALS: Material[] = [
@@ -293,6 +371,9 @@ export const DEFAULT_COUNTERTOP_MATERIALS: Material[] = [
     hasGrain: false,
     colorHex: '#f8fafc',
     textureType: 'stone',
+    family: 'stone_countertop',
+    familyLabel: 'Piedras y Mesones',
+    brand: 'Natural Stone Selection',
     category: 'countertop'
   },
   {
@@ -305,6 +386,9 @@ export const DEFAULT_COUNTERTOP_MATERIALS: Material[] = [
     hasGrain: false,
     colorHex: '#f1f5f9',
     textureType: 'stone',
+    family: 'stone_countertop',
+    familyLabel: 'Piedras y Mesones',
+    brand: 'Cosentino Silestone',
     category: 'countertop'
   },
   {
@@ -317,6 +401,9 @@ export const DEFAULT_COUNTERTOP_MATERIALS: Material[] = [
     hasGrain: false,
     colorHex: '#1e293b',
     textureType: 'stone',
+    family: 'stone_countertop',
+    familyLabel: 'Piedras y Mesones',
+    brand: 'Granitos Naturales Pro',
     category: 'countertop'
   },
   {
@@ -329,6 +416,9 @@ export const DEFAULT_COUNTERTOP_MATERIALS: Material[] = [
     hasGrain: false,
     colorHex: '#64748b',
     textureType: 'stone',
+    family: 'stone_countertop',
+    familyLabel: 'Piedras y Mesones',
+    brand: 'Cosentino Dekton',
     category: 'countertop'
   },
   {
@@ -341,6 +431,9 @@ export const DEFAULT_COUNTERTOP_MATERIALS: Material[] = [
     hasGrain: true,
     colorHex: '#b47b48',
     textureType: 'wood',
+    family: 'stone_countertop',
+    familyLabel: 'Piedras y Mesones',
+    brand: 'Maderas Finas Macizas',
     category: 'countertop'
   }
 ];
@@ -365,6 +458,7 @@ export interface ProjectSettings {
   thickEdgeCostPerMeter: number;
   optimizationPreference: 'guillotine_length' | 'guillotine_width' | 'best_fit';
   currency: string;
+  subtractEdgeBandingFromCut?: boolean; // Opción de descontar espesor de tapacantos de la medida de corte
 }
 
 export interface CutLine {
@@ -381,10 +475,14 @@ export interface PlacedPart {
   copyIndex: number;
   x: number;
   y: number;
-  length: number; // dimensión a lo largo de X del tablero
-  width: number;  // dimensión a lo largo de Y del tablero
+  length: number; // dimensión de corte a lo largo de X del tablero
+  width: number;  // dimensión de corte a lo largo de Y del tablero
   rotated: boolean;
   tag: string;
+  nominalLength?: number;
+  nominalWidth?: number;
+  cutLength?: number;
+  cutWidth?: number;
 }
 
 export interface LeftoverScrap {
@@ -504,16 +602,24 @@ export type FloorMaterialType =
   | 'concrete_arena' 
   | 'concrete_white' 
   | 'tile_dark'
+  | 'porcelain_rectified_white'
+  | 'porcelain_rectified_gray'
+  | 'microcement_light'
+  | 'microcement_warm'
   // Maderas y Laminados
   | 'wood_light' 
   | 'wood_guayacan' 
   | 'wood_walnut' 
   | 'wood_haya'
+  | 'spc_herringbone_honey'
+  | 'spc_herringbone_nordic'
+  | 'spc_plank_oak'
   // Mármoles y Piedras
   | 'marble_white' 
   | 'marble_calacatta_gold' 
   | 'travertine_beige' 
-  | 'stone_slate_black';
+  | 'stone_slate_black'
+  | 'terrazzo_veneciano';
 
 export type WallMaterialType = 
   // Ladrillos
@@ -523,17 +629,26 @@ export type WallMaterialType =
   | 'subway_tile_white' 
   | 'subway_tile_emerald' 
   | 'subway_tile_black'
+  | 'subway_tile_navy'
+  | 'hydraulic_tile_patchwork'
+  | 'hydraulic_tile_geo'
   // Mármoles, Cuarzo y Salpicaderos
   | 'marble_wall_calacatta' 
   | 'kitchen_backsplash_quartz' 
   | 'kitchen_backsplash_mosaic'
-  // Revestimientos Continuos y Listones
+  // Revestimientos Continuos, Pinturas y Listones
   | 'vertical_slats_wood' 
+  | 'wpc_slats_walnut'
+  | 'wpc_slats_black'
   | 'concrete_smooth' 
-  | 'plaster_warm';
+  | 'microcement_wall'
+  | 'plaster_warm'
+  | 'paint_warm_white'
+  | 'paint_sage_green'
+  | 'paint_charcoal';
 
-export type FloorFinishCategory = 'all' | 'cement' | 'wood' | 'marble';
-export type WallFinishCategory = 'all' | 'brick' | 'tile' | 'marble' | 'panel';
+export type FloorFinishCategory = 'all' | 'cement' | 'wood' | 'marble' | 'spc';
+export type WallFinishCategory = 'all' | 'brick' | 'tile' | 'marble' | 'panel' | 'paint' | 'hydraulic';
 
 export interface FinishCatalogItem<T> {
   id: T;
@@ -543,7 +658,6 @@ export interface FinishCatalogItem<T> {
   category: string;
   tag: string;
   swatchBg: string;
-  swatchIcon?: string;
   description: string;
 }
 
@@ -552,8 +666,8 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
   {
     id: 'concrete_gray',
     name: 'Porcelanato Gris Cemento',
-    brand: 'Corona Porcelatech®',
-    format: '60×60 cm Rectificado',
+    brand: 'Corona Porcelatech',
+    format: '60x60 cm Rectificado',
     category: 'cement',
     tag: 'Porcelanato Satinado',
     swatchBg: '#a6adb4',
@@ -562,8 +676,8 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
   {
     id: 'concrete_arena',
     name: 'Porcelanato Arena Cálido',
-    brand: 'Corona Porcelatech®',
-    format: '60×60 cm Rectificado',
+    brand: 'Corona Porcelatech',
+    format: '60x60 cm Rectificado',
     category: 'cement',
     tag: 'Porcelanato Sedoso',
     swatchBg: '#c8bead',
@@ -573,7 +687,7 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
     id: 'concrete_white',
     name: 'Porcelanato Blanco Pulido',
     brand: 'Corona Porcelatech Pro',
-    format: '60×120 cm Gran Formato',
+    format: '60x120 cm Gran Formato',
     category: 'cement',
     tag: 'Porcelanato Luminoso',
     swatchBg: '#e5e7eb',
@@ -582,20 +696,60 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
   {
     id: 'tile_dark',
     name: 'Porcelanato Grafito Antracita',
-    brand: 'Corona Porcelatech ARD®',
-    format: '60×60 cm Rectificado',
+    brand: 'Corona Porcelatech ARD',
+    format: '60x60 cm Rectificado',
     category: 'cement',
     tag: 'Porcelanato Pro',
     swatchBg: '#272b30',
     description: 'Porcelanato técnico antracita oscuro de alto tráfico',
   },
+  {
+    id: 'porcelain_rectified_white',
+    name: 'Porcelanato Rectificado Blanco Nieve',
+    brand: 'Corona Gran Formato',
+    format: '80x80 cm Rectificado',
+    category: 'cement',
+    tag: 'Rectificado Delgado',
+    swatchBg: '#f8fafc',
+    description: 'Porcelanato rectificado de bordes vivos y junta milimétrica ultra pulido',
+  },
+  {
+    id: 'porcelain_rectified_gray',
+    name: 'Porcelanato Rectificado Titanio Mate',
+    brand: 'Corona Gran Formato',
+    format: '80x80 cm Rectificado',
+    category: 'cement',
+    tag: 'Gris Arquitectónico',
+    swatchBg: '#64748b',
+    description: 'Porcelanato rectificado gris medio de acabado satinado antideslizante',
+  },
+  {
+    id: 'microcement_light',
+    name: 'Microcemento Continuo Gris Plata',
+    brand: 'Topciment Microdeck',
+    format: 'Superficie Continua',
+    category: 'cement',
+    tag: 'Sin Juntas',
+    swatchBg: '#cbd5e1',
+    description: 'Pavimento continuo artesanal sin juntas de dilatación visuales',
+  },
+  {
+    id: 'microcement_warm',
+    name: 'Microcemento Continuo Arena Marfil',
+    brand: 'Topciment Microdeck',
+    format: 'Superficie Continua',
+    category: 'cement',
+    tag: 'Tono Cálido',
+    swatchBg: '#d6cdbd',
+    description: 'Revestimiento mineral continuo color arena cálida sellado satinado',
+  },
 
-  // Maderas y Laminados
+  // Maderas, Duelas y Laminados SPC
   {
     id: 'wood_light',
     name: 'Roble Nórdico Natural',
     brand: 'Holztek SPC',
-    format: '20×120 cm Duela',
+    format: '20x120 cm Duela',
     category: 'wood',
     tag: 'Impermeable',
     swatchBg: '#d8c29d',
@@ -605,7 +759,7 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
     id: 'wood_guayacan',
     name: 'Guayacán Hobo Miel',
     brand: 'Corona Madera',
-    format: '20×120 cm Duela',
+    format: '20x120 cm Duela',
     category: 'wood',
     tag: 'Vetas Cálidas',
     swatchBg: '#c19a6b',
@@ -615,7 +769,7 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
     id: 'wood_walnut',
     name: 'Nogal Americano Clásico',
     brand: 'Holztek SPC',
-    format: '20×120 cm Duela',
+    format: '20x120 cm Duela',
     category: 'wood',
     tag: 'Elegancia',
     swatchBg: '#5c4033',
@@ -625,11 +779,41 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
     id: 'wood_haya',
     name: 'Haya Clara Escandinava',
     brand: 'Holztek',
-    format: '20×120 cm Duela',
+    format: '20x120 cm Duela',
     category: 'wood',
     tag: 'Minimalista',
     swatchBg: '#e6d7c3',
     description: 'Madera sutilmente blanqueada y limpia',
+  },
+  {
+    id: 'spc_plank_oak',
+    name: 'Piso SPC Tablón Roble Kendal',
+    brand: 'Decora SPC Pro',
+    format: '22x150 cm Tablón Gran Formato',
+    category: 'spc',
+    tag: 'Núcleo Rígido',
+    swatchBg: '#bca17c',
+    description: 'Piso vinílico de núcleo rígido mineral 100% resistente al agua',
+  },
+  {
+    id: 'spc_herringbone_honey',
+    name: 'Piso SPC Espina de Pescado Miel',
+    brand: 'Decora SPC Herringbone',
+    format: '12x60 cm Espina de Pescado',
+    category: 'spc',
+    tag: 'Herringbone Clásico',
+    swatchBg: '#c59d64',
+    description: 'Patrón clásico en espina de pescado a 90 grados con microbisel en 4 caras',
+  },
+  {
+    id: 'spc_herringbone_nordic',
+    name: 'Piso SPC Espina de Pescado Nórdico',
+    brand: 'Decora SPC Herringbone',
+    format: '12x60 cm Espina de Pescado',
+    category: 'spc',
+    tag: 'Herringbone Glacial',
+    swatchBg: '#dfd2bc',
+    description: 'Duelas anguladas en espina de pescado tono roble blanqueado de tendencia',
   },
 
   // Mármoles y Piedras
@@ -637,7 +821,7 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
     id: 'marble_white',
     name: 'Carrara Blanco Puro',
     brand: 'Corona Rectificado',
-    format: '60×120 cm',
+    format: '60x120 cm',
     category: 'marble',
     tag: 'Brillo Espejo',
     swatchBg: '#f8f9fa',
@@ -647,7 +831,7 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
     id: 'marble_calacatta_gold',
     name: 'Madrid Oro Calacatta',
     brand: 'Corona Rect. Pulido',
-    format: '60×120 cm',
+    format: '60x120 cm',
     category: 'marble',
     tag: 'Gold Luxury',
     swatchBg: '#faf7f0',
@@ -657,7 +841,7 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
     id: 'travertine_beige',
     name: 'Travertino Clásico Romano',
     brand: 'Corona Estructurado',
-    format: '60×60 cm',
+    format: '60x60 cm',
     category: 'marble',
     tag: 'Textura Piedra',
     swatchBg: '#ded4c3',
@@ -667,11 +851,21 @@ export const FLOOR_FINISHES_CATALOG: FinishCatalogItem<FloorMaterialType>[] = [
     id: 'stone_slate_black',
     name: 'Pizarra Negra Alpina',
     brand: 'Corona Estructurado',
-    format: '60×60 cm',
+    format: '60x60 cm',
     category: 'marble',
     tag: 'Relieve Hendido',
     swatchBg: '#1e2227',
     description: 'Piedra volcánica oscura con relieve hendido',
+  },
+  {
+    id: 'terrazzo_veneciano',
+    name: 'Terrazzo Veneciano Marfil',
+    brand: 'Agglotech Porcelánico',
+    format: '60x60 cm Rectificado',
+    category: 'marble',
+    tag: 'Piedra Sembrada',
+    swatchBg: '#eee8dc',
+    description: 'Pavimento porcelánico tipo terrazo veneciano con microáridos multicolores',
   },
 ];
 
@@ -681,22 +875,20 @@ export const WALL_FINISHES_CATALOG: FinishCatalogItem<WallMaterialType>[] = [
     id: 'brick_clay',
     name: 'Ladrillo Arcilla Rústico',
     brand: 'Caravista Rústico',
-    format: '24×6 cm con Llaga',
+    format: '24x6 cm con Llaga',
     category: 'brick',
     tag: 'Industrial Loft',
     swatchBg: '#b85d38',
-    swatchIcon: '🧱',
     description: 'Ladrillo visto cocido con mortero gris claro',
   },
   {
     id: 'brick_white',
     name: 'Ladrillo Blanco Loft',
     brand: 'Loft Decapado',
-    format: '24×6 cm con Llaga',
+    format: '24x6 cm con Llaga',
     category: 'brick',
     tag: 'Nórdico Loft',
     swatchBg: '#eeebe6',
-    swatchIcon: '🧱',
     description: 'Ladrillo pintado blanco desgastado con relieve',
   },
 
@@ -705,18 +897,17 @@ export const WALL_FINISHES_CATALOG: FinishCatalogItem<WallMaterialType>[] = [
     id: 'subway_tile_white',
     name: 'Azulejo Metro Blanco',
     brand: 'Corona Revestimientos',
-    format: '10×20 cm Biselado',
+    format: '10x20 cm Biselado',
     category: 'tile',
     tag: 'Clásico Cocina',
     swatchBg: '#f8f9fa',
-    swatchIcon: '✨',
     description: 'Subway tile biselado brillante con junta gris',
   },
   {
     id: 'subway_tile_emerald',
     name: 'Azulejo Verde Esmeralda',
     brand: 'Cerámica Artesanal',
-    format: '10×20 cm Vitrificado',
+    format: '10x20 cm Vitrificado',
     category: 'tile',
     tag: 'Esmalte Joya',
     swatchBg: '#0c5037',
@@ -726,11 +917,41 @@ export const WALL_FINISHES_CATALOG: FinishCatalogItem<WallMaterialType>[] = [
     id: 'subway_tile_black',
     name: 'Metro Carbón Mate',
     brand: 'Corona Pro',
-    format: '10×20 cm Biselado',
+    format: '10x20 cm Biselado',
     category: 'tile',
     tag: 'Contemporáneo',
     swatchBg: '#212529',
     description: 'Subway negro satinado con relieve biselado',
+  },
+  {
+    id: 'subway_tile_navy',
+    name: 'Metro Azul Naval Vitrificado',
+    brand: 'Corona Esmaltado',
+    format: '10x20 cm Biselado',
+    category: 'tile',
+    tag: 'Profundo Satinado',
+    swatchBg: '#1b324f',
+    description: 'Azulejo metro biselado azul marino con esmalte cerámico de alto brillo',
+  },
+  {
+    id: 'hydraulic_tile_patchwork',
+    name: 'Enchape Hidráulico Patchwork Baño',
+    brand: 'Mosaicos del Sur',
+    format: '20x20 cm Decorado',
+    category: 'hydraulic',
+    tag: 'Mosaico Tradicional',
+    swatchBg: '#8fa2b4',
+    description: 'Baldosa hidráulica decorativa con patrones geométricos y florales tradicionales',
+  },
+  {
+    id: 'hydraulic_tile_geo',
+    name: 'Enchape Hidráulico Geométrico Gris',
+    brand: 'Mosaicos del Sur',
+    format: '20x20 cm Monocromo',
+    category: 'hydraulic',
+    tag: 'Geométrico Gris',
+    swatchBg: '#5a626a',
+    description: 'Composición de rombos y estrellas geométricas en tonos grafito y blanco hueso',
   },
 
   // Mármoles, Cuarzo y Salpicaderos
@@ -738,7 +959,7 @@ export const WALL_FINISHES_CATALOG: FinishCatalogItem<WallMaterialType>[] = [
     id: 'marble_wall_calacatta',
     name: 'Mármol Calacatta Continuo',
     brand: 'Corona Gran Formato',
-    format: '120×260 cm Bookmatch',
+    format: '120x260 cm Bookmatch',
     category: 'marble',
     tag: 'Sin Juntas',
     swatchBg: '#faf9f6',
@@ -758,44 +979,103 @@ export const WALL_FINISHES_CATALOG: FinishCatalogItem<WallMaterialType>[] = [
     id: 'kitchen_backsplash_mosaic',
     name: 'Mosaico Hexagonal Sandalo',
     brand: 'Corona Decorativo',
-    format: 'Hexágono 15×15 cm',
+    format: 'Hexágono 15x15 cm',
     category: 'marble',
     tag: 'Geométrico',
     swatchBg: '#e2d9cc',
     description: 'Geometría hexagonal moderna para salpicadero',
   },
 
-  // Paneles y Revestimientos
+  // Paneles de Listones WPC y Fonoabsorbentes
   {
     id: 'vertical_slats_wood',
-    name: 'Listones Acústicos Roble',
+    name: 'Listones Acústicos Roble Natural',
     brand: 'Palillería Nórdica',
-    format: 'Listones 25×12 mm',
+    format: 'Listones 25x12 mm',
     category: 'panel',
     tag: 'Tendencia Cocina',
     swatchBg: '#c8a97e',
-    swatchIcon: '🥢',
-    description: 'Fondo negro fonoabsorbente con palillería roble',
+    description: 'Fondo negro fonoabsorbente con palillería roble natural',
+  },
+  {
+    id: 'wpc_slats_walnut',
+    name: 'Panel Listones WPC Nogal Oscuro',
+    brand: 'WPC Deco Wall',
+    format: 'Panel 16x290 cm',
+    category: 'panel',
+    tag: 'WPC Compuesto',
+    swatchBg: '#593e2b',
+    description: 'Listones ranurados de madera compuesta WPC resistentes a la humedad y hongos',
+  },
+  {
+    id: 'wpc_slats_black',
+    name: 'Panel Listones WPC Negro Mate',
+    brand: 'WPC Deco Wall',
+    format: 'Panel 16x290 cm',
+    category: 'panel',
+    tag: 'Arquitectónico Negro',
+    swatchBg: '#1e2022',
+    description: 'Palillería contemporánea negra mate de ranura profunda para muros de acento',
   },
   {
     id: 'concrete_smooth',
     name: 'Cemento Visto Encofrado',
     brand: 'Hormigón Arquitectónico',
-    format: 'Paneles 120×60 cm',
+    format: 'Paneles 120x60 cm',
     category: 'panel',
     tag: 'Brutalista',
     swatchBg: '#c5cbd0',
     description: 'Hormigón visto con marcas de encofrado',
   },
   {
+    id: 'microcement_wall',
+    name: 'Microcemento Vertical Satinado',
+    brand: 'Topciment Microfino',
+    format: 'Pared Continua',
+    category: 'panel',
+    tag: 'Efecto Estuco',
+    swatchBg: '#d1d5db',
+    description: 'Acabado continuo mineral de aguas suaves y sellado hidrófugo',
+  },
+  {
     id: 'plaster_warm',
     name: 'Yeso Liso Cálido',
     brand: 'Pintura Lavable Cocina',
     format: 'Pared Continua',
-    category: 'panel',
+    category: 'paint',
     tag: 'Neutral Mate',
     swatchBg: '#f4f1ea',
     description: 'Pintura satinada lavable blanca rota sin textura',
+  },
+  {
+    id: 'paint_warm_white',
+    name: 'Pintura Blanco Cálido Lino',
+    brand: 'Pintuco Viniltex',
+    format: 'Pared Lisa',
+    category: 'paint',
+    tag: 'Mate Seda',
+    swatchBg: '#f9f8f4',
+    description: 'Pintura arquitectónica lavable blanco roto de alto cubrimiento',
+  },
+  {
+    id: 'paint_sage_green',
+    name: 'Pintura Verde Salvia Nórdico',
+    brand: 'Pintuco Viniltex',
+    format: 'Pared Lisa',
+    category: 'paint',
+    tag: 'Tendencia Mate',
+    swatchBg: '#526657',
+    description: 'Pintura ecológica mate aterciopelada verde salvia calmante',
+  },
+  {
+    id: 'paint_charcoal',
+    name: 'Pintura Carbón Antracita Profundo',
+    brand: 'Pintuco Viniltex',
+    format: 'Pared Lisa',
+    category: 'paint',
+    tag: 'Acento Oscuro',
+    swatchBg: '#282c34',
+    description: 'Pintura mate profunda para contrastes y fondos de estanterías',
   },
 ];
 
@@ -1105,7 +1385,16 @@ export type ApplianceType =
   | 'dining_table'
   | 'pendant_lamp'
   | 'window_frame'
-  | 'door_frame';
+  | 'door_frame'
+  | 'washbasin_vessel'
+  | 'washbasin_undermount'
+  | 'bathroom_mirror_led'
+  | 'toilet'
+  | 'closet_rod'
+  | 'bed'
+  | 'tv'
+  | 'desktop_workspace'
+  | 'office_chair';
 
 export type ApplianceFinish = 
   | 'stainless_steel' 
@@ -1152,7 +1441,7 @@ export interface AppliancePreset {
   id: string;
   type: ApplianceType;
   name: string;
-  category: 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs' | 'seating' | 'lighting' | 'architecture';
+  category: 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs' | 'seating' | 'lighting' | 'architecture' | 'bathroom' | 'bedroom' | 'electronics' | 'office';
   categoryLabel: string;
   brand: string;
   modelCode: string;
@@ -1172,6 +1461,7 @@ export interface AppliancePreset {
   description: string;
   recommendedHeights?: number[];
   standardWidths?: number[];
+  environmentLines?: EnvironmentLine[];
 }
 
 export const APPLIANCE_FINISH_OPTIONS: { id: ApplianceFinish; label: string; color: string; metallic: number; roughness: number }[] = [
@@ -1207,7 +1497,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 4200000,
     icon: 'kitchen',
     description: 'Refrigerador de gran formato con dispensador frontal, doble puerta batiente y gaveta congelador inferior.',
-    standardWidths: [850, 910, 950]
+    standardWidths: [850, 910, 950],
+    environmentLines: ['kitchen']
   },
   {
     id: 'preset_fridge_bottom_mount',
@@ -1231,7 +1522,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 2850000,
     icon: 'kitchen',
     description: 'Nevera vertical europea con refrigerador superior a nivel visual y congelador en la parte baja.',
-    standardWidths: [600, 700, 750]
+    standardWidths: [600, 700, 750],
+    environmentLines: ['kitchen']
   },
   {
     id: 'preset_fridge_compact',
@@ -1255,7 +1547,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 1650000,
     icon: 'kitchen',
     description: 'Nevera clásica de 2 puertas compacta, idónea para cocinas medianas o apartamentos modernos.',
-    standardWidths: [550, 600, 650]
+    standardWidths: [550, 600, 650],
+    environmentLines: ['kitchen', 'living_office']
   },
 
   // 2. HORNOS
@@ -1281,7 +1574,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 1950000,
     icon: 'microwave',
     description: 'Horno multifunción con panel touch LED, tirador tubular horizontal y puerta de triple vidrio ahumado.',
-    standardWidths: [595, 600]
+    standardWidths: [595, 600],
+    environmentLines: ['kitchen']
   },
   {
     id: 'preset_oven_tower_75cm',
@@ -1305,7 +1599,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 3400000,
     icon: 'microwave',
     description: 'Horno empotrable extra ancho para torre de hornos o bajo encimera con convección forzada.',
-    standardWidths: [750, 900]
+    standardWidths: [750, 900],
+    environmentLines: ['kitchen']
   },
 
   // 3. ESTUFAS Y ANAFES (CUBIERTAS DE COCCIÓN)
@@ -1331,7 +1626,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 1780000,
     icon: 'mode_heat',
     description: 'Placa de inducción extraplana con 4 zonas concéntricas de cocción y controles táctiles frontales.',
-    standardWidths: [590, 600]
+    standardWidths: [590, 600],
+    environmentLines: ['kitchen']
   },
   {
     id: 'preset_cooktop_gas_5burners',
@@ -1355,7 +1651,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 1250000,
     icon: 'mode_heat',
     description: 'Cubierta de empotrar en acero inoxidable con 5 quemadores italianos, parrilas de hierro fundido y quemador Wok.',
-    standardWidths: [750, 860, 900]
+    standardWidths: [750, 860, 900],
+    environmentLines: ['kitchen']
   },
   {
     id: 'preset_cooktop_domino_compact',
@@ -1379,7 +1676,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 790000,
     icon: 'mode_heat',
     description: 'Cubierta modular compacta de 2 puestos en cristal templado negro para islas o cocinas pequeñas.',
-    standardWidths: [300]
+    standardWidths: [300],
+    environmentLines: ['kitchen']
   },
 
   // 4. CAMPANAS EXTRACTORAS
@@ -1405,7 +1703,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 1450000,
     icon: 'air',
     description: 'Campana extractora de pared con ducto telescópico, iluminación LED, filtros de aluminio y botonera táctil.',
-    standardWidths: [750, 900]
+    standardWidths: [750, 900],
+    environmentLines: ['kitchen']
   },
   {
     id: 'preset_hood_pyramidal_60cm',
@@ -1429,7 +1728,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 850000,
     icon: 'air',
     description: 'Campana con forma piramidal de 60cm, de alta potencia y fácil desmontaje de rejillas filtrantes.',
-    standardWidths: [600]
+    standardWidths: [600],
+    environmentLines: ['kitchen']
   },
   {
     id: 'preset_hood_telescopic_built_in',
@@ -1453,7 +1753,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 920000,
     icon: 'air',
     description: 'Campana retráctil que se oculta dentro del mueble aéreo superior con frente extraíble de acero.',
-    standardWidths: [600]
+    standardWidths: [600],
+    environmentLines: ['kitchen']
   },
 
   // 5. FREGADEROS / LAVAPLATOS
@@ -1479,7 +1780,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 650000,
     icon: 'wash',
     description: 'Poceta profunda con zona de escurridor acanalado, grifo monomando cuello de cisne y canastilla antirreboce.',
-    standardWidths: [780, 800, 860]
+    standardWidths: [780, 800, 860],
+    environmentLines: ['kitchen']
   },
   {
     id: 'preset_sink_double_bowl',
@@ -1503,7 +1805,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 890000,
     icon: 'wash',
     description: 'Doble cubeta de acero inoxidable satinado calibre 18 para lavado y enjuague simultáneo con grifería giratoria.',
-    standardWidths: [800, 840, 900]
+    standardWidths: [800, 840, 900],
+    environmentLines: ['kitchen']
   },
   {
     id: 'preset_sink_compact_square',
@@ -1527,7 +1830,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 580000,
     icon: 'wash',
     description: 'Diseño minimalista con radio 10mm en esquinas, desagüe oculto y grifo de diseño elegante.',
-    standardWidths: [450, 500, 550]
+    standardWidths: [450, 500, 550],
+    environmentLines: ['kitchen']
   },
 
   // 6. MICROONDAS
@@ -1553,7 +1857,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 1100000,
     icon: 'microwave',
     description: 'Horno microondas con marco de integración en acero o cristal negro a juego con la torre de hornos.',
-    standardWidths: [595]
+    standardWidths: [595],
+    environmentLines: ['kitchen', 'living_office']
   },
   {
     id: 'preset_micro_countertop',
@@ -1577,7 +1882,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 550000,
     icon: 'microwave',
     description: 'Microondas portátil compacto para instalar sobre encimera o en nicho abierto de alacena.',
-    standardWidths: [485, 520]
+    standardWidths: [485, 520],
+    environmentLines: ['kitchen', 'living_office']
   },
 
   // 7. CAFETERAS ESPRESSO DE COCINA
@@ -1603,7 +1909,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 2850000,
     icon: 'coffee',
     description: 'Cafetera espresso italiana sobre encimera con doble salida de café, portafiltro profesional, manómetro analógico, lanceta de vapor inox y bandeja calientatazas superior.',
-    standardWidths: [380]
+    standardWidths: [380],
+    environmentLines: ['kitchen', 'living_office']
   },
   {
     id: 'preset_espresso_compact',
@@ -1627,7 +1934,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 1250000,
     icon: 'coffee',
     description: 'Cafetera espresso slim para mesada de cocina con vaporizador de leche, panel frontal con pulsadores LED y bandeja de goteo en inox.',
-    standardWidths: [260]
+    standardWidths: [260],
+    environmentLines: ['kitchen', 'living_office']
   },
   {
     id: 'preset_espresso_retro_red',
@@ -1651,7 +1959,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 1980000,
     icon: 'coffee',
     description: 'Cafetera espresso estilo retro de sobremesa con reloj termómetro central, detalles cromados y chasis carmesí de colección.',
-    standardWidths: [320]
+    standardWidths: [320],
+    environmentLines: ['kitchen', 'living_office']
   },
 
   // 8. ACCESORIOS Y PATAS DE MESA Y MOBILIARIO
@@ -1677,7 +1986,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 180000,
     icon: 'table_bar',
     description: 'Juego de 4 patas metálicas estilo horquilla (Hairpin) de triple varilla maciza con inclinación estética y pletina triangular de anclaje para mesas de comedor y escritorios.',
-    standardWidths: [800, 900, 1000]
+    standardWidths: [800, 900, 1000],
+    environmentLines: ['kitchen', 'living_office', 'closet', 'bathroom']
   },
   {
     id: 'preset_legs_cylindrical_inox_set',
@@ -1701,7 +2011,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 140000,
     icon: 'table_bar',
     description: 'Juego de 4 patas tubulares de acero inoxidable Ø60mm con base roscada niveladora regulable (+25mm) y pletina de montaje reforzada.',
-    standardWidths: [800, 900, 1000]
+    standardWidths: [800, 900, 1000],
+    environmentLines: ['kitchen', 'living_office', 'closet', 'bathroom']
   },
   {
     id: 'preset_legs_scandinavian_wood_set',
@@ -1725,7 +2036,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 165000,
     icon: 'table_bar',
     description: 'Juego de 4 patas cónicas de madera maciza estilo nórdico escandinavo con ángulo de inclinación 10°, placa metálica de fijación y regatón dorado latón.',
-    standardWidths: [800, 900, 1000]
+    standardWidths: [800, 900, 1000],
+    environmentLines: ['kitchen', 'living_office', 'closet', 'bathroom']
   },
   {
     id: 'preset_legs_hairpin_single',
@@ -1749,7 +2061,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 45000,
     icon: 'table_bar',
     description: 'Pata individual estilo horquilla hairpin de varilla de acero electroestático para ubicar libremente en esquinas o centros.',
-    standardWidths: [120]
+    standardWidths: [120],
+    environmentLines: ['kitchen', 'living_office', 'closet', 'bathroom']
   },
   {
     id: 'preset_legs_cylindrical_single',
@@ -1773,7 +2086,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 35000,
     icon: 'table_bar',
     description: 'Pata individual cilíndrica de acero inoxidable con nivelador roscado para soporte perimetral o patas de refuerzo central.',
-    standardWidths: [100]
+    standardWidths: [100],
+    environmentLines: ['kitchen', 'living_office', 'closet', 'bathroom']
   },
   {
     id: 'preset_legs_scandinavian_single',
@@ -1797,7 +2111,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 42000,
     icon: 'table_bar',
     description: 'Pata individual cónica de madera torneada con casquillo dorado para muebles escandinavos, mesas auxiliares o cómodas.',
-    standardWidths: [90]
+    standardWidths: [90],
+    environmentLines: ['kitchen', 'living_office', 'closet', 'bathroom']
   },
   {
     id: 'preset_legs_coffee_hairpin_set',
@@ -1821,7 +2136,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 120000,
     icon: 'table_bar',
     description: 'Juego de 4 patas horquilla bajas de 40cm ideales para mesas ratonas de living, mesas de centro y muebles bajos de TV.',
-    standardWidths: [600]
+    standardWidths: [600],
+    environmentLines: ['kitchen', 'living_office', 'closet', 'bathroom']
   },
 
   // 9. INTERIORISMO: SILLAS, BUTACOS DE BARRA Y MESAS
@@ -1847,7 +2163,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 320000,
     icon: 'chair',
     description: 'Taburete alto ergonómico para isla de cocina o barra desayunadora con patas inclinadas en madera de roble, aro reposapiés metálico y asiento con respaldo bajo.',
-    standardWidths: [420, 440, 480]
+    standardWidths: [420, 440, 480],
+    environmentLines: ['kitchen', 'living_office']
   },
   {
     id: 'preset_stool_industrial_loft',
@@ -1871,7 +2188,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 280000,
     icon: 'chair',
     description: 'Taburete de barra estilo industrial con estructura tubular en acero negro mate, reposapiés perimetral y asiento contorneado.',
-    standardWidths: [400, 420]
+    standardWidths: [400, 420],
+    environmentLines: ['kitchen', 'living_office']
   },
   {
     id: 'preset_chair_dining_nordic',
@@ -1895,7 +2213,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 240000,
     icon: 'chair',
     description: 'Silla de comedor ergonómica con carcasa curva envolvente, cojín de asiento integrado y patas cónicas con tensores.',
-    standardWidths: [460, 480]
+    standardWidths: [460, 480],
+    environmentLines: ['kitchen', 'living_office']
   },
   {
     id: 'preset_table_dining_modern',
@@ -1919,7 +2238,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 1450000,
     icon: 'table_restaurant',
     description: 'Mesa de comedor principal con cubierta biselada y bastidor arquitectónico de patas inclinadas para integrar junto a la cocina.',
-    standardWidths: [1400, 1600, 1800, 2000]
+    standardWidths: [1400, 1600, 1800, 2000],
+    environmentLines: ['kitchen', 'living_office']
   },
 
   // 10. ILUMINACIÓN ARQUITECTÓNICA Y LÁMPARAS COLGANTES
@@ -1946,7 +2266,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     icon: 'light',
     description: 'Riel de techo con 3 pantallas colgantes cilíndricas/cónicas, detalles en latón dorado y emisión de luz cálida 3D sobre la isla o mesa.',
     recommendedHeights: [1950, 2050, 2150],
-    standardWidths: [800, 900, 1100]
+    standardWidths: [800, 900, 1100],
+    environmentLines: ['kitchen', 'living_office', 'closet', 'bathroom']
   },
   {
     id: 'preset_lamp_pendant_dome',
@@ -1971,7 +2292,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     icon: 'light',
     description: 'Lámpara colgante de domo semiesférico con difusor interior cálido y fuente de iluminación puntual 3D.',
     recommendedHeights: [1950, 2050],
-    standardWidths: [320, 380, 450]
+    standardWidths: [320, 380, 450],
+    environmentLines: ['kitchen', 'living_office', 'closet', 'bathroom']
   },
 
   // 11. ARQUITECTURA: VENTANAS Y PUERTAS DE PASO
@@ -1998,7 +2320,8 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     icon: 'window',
     description: 'Ventana arquitectónica de aluminio con doble hoja de cristal templado translúcido, parteluz central y alféizar para ubicar sobre el lavaplatos.',
     recommendedHeights: [1050, 1100],
-    standardWidths: [900, 1200, 1500, 1800]
+    standardWidths: [900, 1200, 1500, 1800],
+    environmentLines: ['kitchen', 'bathroom', 'closet', 'living_office']
   },
   {
     id: 'preset_door_interior_90',
@@ -2022,6 +2345,452 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
     defaultPrice: 820000,
     icon: 'door_front',
     description: 'Puerta de acceso a la cocina/comedor con marco perimetral, hoja entablerada moderna y manija de acero inoxidable.',
-    standardWidths: [800, 900, 1000]
+    standardWidths: [800, 900, 1000],
+    environmentLines: ['kitchen', 'bathroom', 'closet', 'living_office']
+  },
+
+  // ==========================================
+  // 12. LÍNEA BAÑO: LAVAMANOS, ESPEJOS LED Y SANITARIOS
+  // ==========================================
+  {
+    id: 'preset_sink_vessel_round',
+    type: 'washbasin_vessel',
+    name: 'Lavamanos Vessel Cerámico Redondo 40cm',
+    category: 'bathroom',
+    categoryLabel: 'Baño y Sanitario',
+    brand: 'Corona Aqua Pro',
+    modelCode: 'VSS-RND-40',
+    defaultWidth: 400,
+    defaultDepth: 400,
+    defaultHeight: 150,
+    minWidth: 350,
+    maxWidth: 500,
+    minDepth: 350,
+    maxDepth: 500,
+    minHeight: 120,
+    maxHeight: 180,
+    defaultMountType: 'countertop',
+    defaultFinish: 'white_gloss',
+    defaultPrice: 380000,
+    icon: 'wash',
+    description: 'Lavamanos de sobreponer tipo vessel circular con grifo monomando alto y desagüe clicker cromado.',
+    standardWidths: [400],
+    environmentLines: ['bathroom']
+  },
+  {
+    id: 'preset_sink_vessel_rectangular',
+    type: 'washbasin_vessel',
+    name: 'Lavamanos Vessel Rectangular Slim 50x38cm',
+    category: 'bathroom',
+    categoryLabel: 'Baño y Sanitario',
+    brand: 'Corona Arquitectura',
+    modelCode: 'VSS-REC-50',
+    defaultWidth: 500,
+    defaultDepth: 380,
+    defaultHeight: 130,
+    minWidth: 420,
+    maxWidth: 600,
+    minDepth: 340,
+    maxDepth: 450,
+    minHeight: 110,
+    maxHeight: 160,
+    defaultMountType: 'countertop',
+    defaultFinish: 'black_matte',
+    defaultPrice: 420000,
+    icon: 'wash',
+    description: 'Lavamanos contemporáneo de bordes rectos ultra delgados para mueble de baño vanitory suspendido.',
+    standardWidths: [500],
+    environmentLines: ['bathroom']
+  },
+  {
+    id: 'preset_sink_undermount_basin',
+    type: 'washbasin_undermount',
+    name: 'Lavamanos Bajo Mesón Empotrable 48x36cm',
+    category: 'bathroom',
+    categoryLabel: 'Baño y Sanitario',
+    brand: 'Kohler / Corona',
+    modelCode: 'UND-4836-WH',
+    defaultWidth: 480,
+    defaultDepth: 360,
+    defaultHeight: 180,
+    minWidth: 400,
+    maxWidth: 580,
+    minDepth: 300,
+    maxDepth: 420,
+    minHeight: 150,
+    maxHeight: 220,
+    defaultMountType: 'countertop',
+    defaultFinish: 'white_gloss',
+    defaultPrice: 310000,
+    icon: 'wash',
+    description: 'Poceta cerámica esmaltada para instalación bajo cubierta continua de cuarzo o granito.',
+    standardWidths: [480],
+    environmentLines: ['bathroom']
+  },
+  {
+    id: 'preset_mirror_led_rect',
+    type: 'bathroom_mirror_led',
+    name: 'Espejo Baño LED Rectangular con Halo Luz 80x70cm',
+    category: 'bathroom',
+    categoryLabel: 'Baño y Sanitario',
+    brand: 'Lumina Mirror Pro',
+    modelCode: 'MIR-LED-8070',
+    defaultWidth: 800,
+    defaultDepth: 45,
+    defaultHeight: 700,
+    minWidth: 500,
+    maxWidth: 1200,
+    minDepth: 35,
+    maxDepth: 70,
+    minHeight: 500,
+    maxHeight: 1000,
+    defaultMountType: 'wall',
+    defaultFinish: 'black_matte',
+    defaultPrice: 520000,
+    icon: 'light',
+    description: 'Espejo biselado con marco posterior emissive retroiluminado antiempañante (cero pointlights).',
+    recommendedHeights: [1300, 1400],
+    standardWidths: [600, 800, 1000],
+    environmentLines: ['bathroom', 'closet']
+  },
+  {
+    id: 'preset_mirror_led_round',
+    type: 'bathroom_mirror_led',
+    name: 'Espejo LED Circular Orgánico Diametro 75cm',
+    category: 'bathroom',
+    categoryLabel: 'Baño y Sanitario',
+    brand: 'Lumina Mirror Pro',
+    modelCode: 'MIR-RND-75',
+    defaultWidth: 750,
+    defaultDepth: 45,
+    defaultHeight: 750,
+    minWidth: 550,
+    maxWidth: 950,
+    minDepth: 35,
+    maxDepth: 60,
+    minHeight: 550,
+    maxHeight: 950,
+    defaultMountType: 'wall',
+    defaultFinish: 'gold_brass',
+    defaultPrice: 480000,
+    icon: 'light',
+    description: 'Espejo circular decorativo con perfil dorado y aro emissive perimetral difuso.',
+    recommendedHeights: [1350],
+    standardWidths: [750],
+    environmentLines: ['bathroom', 'closet']
+  },
+  {
+    id: 'preset_toilet_dual_flush',
+    type: 'toilet',
+    name: 'Sanitario One-Piece Doble Descarga Ecológico',
+    category: 'bathroom',
+    categoryLabel: 'Baño y Sanitario',
+    brand: 'Corona Sanitario Pro',
+    modelCode: 'TLT-DUO-ONE',
+    defaultWidth: 380,
+    defaultDepth: 680,
+    defaultHeight: 750,
+    minWidth: 350,
+    maxWidth: 420,
+    minDepth: 640,
+    maxDepth: 740,
+    minHeight: 700,
+    maxHeight: 820,
+    defaultMountType: 'floor',
+    defaultFinish: 'white_gloss',
+    defaultPrice: 690000,
+    icon: 'wash',
+    description: 'Inodoro de alta eficiencia de una sola pieza con sifón oculto, asiento de caída suave y botones dual flush.',
+    standardWidths: [380],
+    environmentLines: ['bathroom']
+  },
+
+  // ==========================================
+  // 13. LÍNEA CLOSET Y DORMITORIO: BARRAS COLGADORAS Y CAMAS
+  // ==========================================
+  {
+    id: 'preset_closet_rod_chrome',
+    type: 'closet_rod',
+    name: 'Tubo Colgador de Ropa Ovalado Cromado 80cm',
+    category: 'bedroom',
+    categoryLabel: 'Closet y Dormitorio',
+    brand: 'MelamiPro Hardware',
+    modelCode: 'ROD-OVL-CR',
+    defaultWidth: 800,
+    defaultDepth: 40,
+    defaultHeight: 70,
+    minWidth: 400,
+    maxWidth: 1200,
+    minDepth: 30,
+    maxDepth: 50,
+    minHeight: 50,
+    maxHeight: 100,
+    defaultMountType: 'built_in',
+    defaultFinish: 'stainless_steel',
+    defaultPrice: 48000,
+    icon: 'closetDoor',
+    description: 'Barra ovalada cromada para colgar ganchos con soportes laterales atornillables para módulo de armario.',
+    standardWidths: [600, 800, 900, 1000],
+    environmentLines: ['closet']
+  },
+  {
+    id: 'preset_closet_rod_black',
+    type: 'closet_rod',
+    name: 'Tubo Colgador de Ropa Negro Mate Premium 80cm',
+    category: 'bedroom',
+    categoryLabel: 'Closet y Dormitorio',
+    brand: 'MelamiPro Hardware',
+    modelCode: 'ROD-OVL-BK',
+    defaultWidth: 800,
+    defaultDepth: 40,
+    defaultHeight: 70,
+    minWidth: 400,
+    maxWidth: 1200,
+    minDepth: 30,
+    maxDepth: 50,
+    minHeight: 50,
+    maxHeight: 100,
+    defaultMountType: 'built_in',
+    defaultFinish: 'black_matte',
+    defaultPrice: 55000,
+    icon: 'closetDoor',
+    description: 'Barra ovalada negra satinada para vestidores y closets modernos con perfil de goma silenciosa antideslizante.',
+    standardWidths: [600, 800, 900, 1000],
+    environmentLines: ['closet']
+  },
+  {
+    id: 'preset_bed_single',
+    type: 'bed',
+    name: 'Cama Individual Sencilla (Referencia 100x190cm)',
+    category: 'bedroom',
+    categoryLabel: 'Closet y Dormitorio',
+    brand: 'Referencia Espacial Pro',
+    modelCode: 'BED-SNGL-100',
+    defaultWidth: 1000,
+    defaultDepth: 1900,
+    defaultHeight: 900,
+    minWidth: 900,
+    maxWidth: 1100,
+    minDepth: 1850,
+    maxDepth: 2000,
+    minHeight: 800,
+    maxHeight: 1100,
+    defaultMountType: 'floor',
+    defaultFinish: 'natural_wood',
+    defaultPrice: 950000,
+    icon: 'bedDouble',
+    description: 'Cama de referencia espacial individual con somier de madera, colchón, almohada y cabecero tapizado.',
+    standardWidths: [1000],
+    environmentLines: ['closet']
+  },
+  {
+    id: 'preset_bed_double',
+    type: 'bed',
+    name: 'Cama Matrimonial Doble (Referencia 140x190cm)',
+    category: 'bedroom',
+    categoryLabel: 'Closet y Dormitorio',
+    brand: 'Referencia Espacial Pro',
+    modelCode: 'BED-DBL-140',
+    defaultWidth: 1400,
+    defaultDepth: 1900,
+    defaultHeight: 950,
+    minWidth: 1350,
+    maxWidth: 1500,
+    minDepth: 1850,
+    maxDepth: 2000,
+    minHeight: 850,
+    maxHeight: 1150,
+    defaultMountType: 'floor',
+    defaultFinish: 'natural_wood',
+    defaultPrice: 1250000,
+    icon: 'bedDouble',
+    description: 'Cama matrimonial doble con bastidor perimetral, dos almohadas de plumón y acolchado nórdico.',
+    standardWidths: [1400],
+    environmentLines: ['closet']
+  },
+  {
+    id: 'preset_bed_queen',
+    type: 'bed',
+    name: 'Cama Queen Size (Referencia 160x200cm)',
+    category: 'bedroom',
+    categoryLabel: 'Closet y Dormitorio',
+    brand: 'Referencia Espacial Pro',
+    modelCode: 'BED-QN-160',
+    defaultWidth: 1600,
+    defaultDepth: 2000,
+    defaultHeight: 1000,
+    minWidth: 1550,
+    maxWidth: 1750,
+    minDepth: 1950,
+    maxDepth: 2100,
+    minHeight: 880,
+    maxHeight: 1200,
+    defaultMountType: 'floor',
+    defaultFinish: 'black_matte',
+    defaultPrice: 1550000,
+    icon: 'bedDouble',
+    description: 'Cama Queen para dimensionar dormitorios principales y verificar circulaciones perimetrales con closet.',
+    standardWidths: [1600],
+    environmentLines: ['closet']
+  },
+  {
+    id: 'preset_bed_king',
+    type: 'bed',
+    name: 'Cama King Size (Referencia 200x200cm)',
+    category: 'bedroom',
+    categoryLabel: 'Closet y Dormitorio',
+    brand: 'Referencia Espacial Pro',
+    modelCode: 'BED-KNG-200',
+    defaultWidth: 2000,
+    defaultDepth: 2000,
+    defaultHeight: 1050,
+    minWidth: 1900,
+    maxWidth: 2200,
+    minDepth: 1950,
+    maxDepth: 2150,
+    minHeight: 900,
+    maxHeight: 1300,
+    defaultMountType: 'floor',
+    defaultFinish: 'natural_wood',
+    defaultPrice: 1950000,
+    icon: 'bedDouble',
+    description: 'Cama King Size de gran envergadura con cabecero ancho acolchado y base tapizada.',
+    standardWidths: [2000],
+    environmentLines: ['closet']
+  },
+
+  // ==========================================
+  // 14. LÍNEA HOGAR Y ESTUDIO: SMART TVS, WORKSPACES Y SILLAS
+  // ==========================================
+  {
+    id: 'preset_tv_50',
+    type: 'tv',
+    name: 'Smart TV 50" Slim 4K UHD con Pantalla Emissive',
+    category: 'electronics',
+    categoryLabel: 'TV y Entretenimiento',
+    brand: 'Samsung / LG',
+    modelCode: 'TV-50-4K',
+    defaultWidth: 1120,
+    defaultDepth: 80,
+    defaultHeight: 680,
+    minWidth: 1050,
+    maxWidth: 1200,
+    minDepth: 40,
+    maxDepth: 220,
+    minHeight: 620,
+    maxHeight: 740,
+    defaultMountType: 'wall',
+    defaultFinish: 'black_matte',
+    defaultPrice: 1850000,
+    icon: 'tv',
+    description: 'Televisor inteligente de 50 pulgadas con marco ultra fino, peana desmontable y pantalla emissive de alto contraste.',
+    recommendedHeights: [1100, 1200],
+    standardWidths: [1120],
+    environmentLines: ['living_office', 'closet']
+  },
+  {
+    id: 'preset_tv_65',
+    type: 'tv',
+    name: 'Smart TV 65" Frameless OLED Pantalla Emissive',
+    category: 'electronics',
+    categoryLabel: 'TV y Entretenimiento',
+    brand: 'LG OLED / Sony',
+    modelCode: 'TV-65-OLED',
+    defaultWidth: 1450,
+    defaultDepth: 80,
+    defaultHeight: 860,
+    minWidth: 1400,
+    maxWidth: 1550,
+    minDepth: 40,
+    maxDepth: 260,
+    minHeight: 800,
+    maxHeight: 920,
+    defaultMountType: 'wall',
+    defaultFinish: 'black_matte',
+    defaultPrice: 3800000,
+    icon: 'tv',
+    description: 'Pantalla OLED de 65 pulgadas sin bisel diseñada para centrar sobre consolas y paneles de TV flotantes.',
+    recommendedHeights: [1150, 1250],
+    standardWidths: [1450],
+    environmentLines: ['living_office', 'closet']
+  },
+  {
+    id: 'preset_tv_75',
+    type: 'tv',
+    name: 'Smart TV 75" Cinema Screen 4K HDR',
+    category: 'electronics',
+    categoryLabel: 'TV y Entretenimiento',
+    brand: 'Samsung Neo QLED',
+    modelCode: 'TV-75-QLED',
+    defaultWidth: 1680,
+    defaultDepth: 90,
+    defaultHeight: 980,
+    minWidth: 1600,
+    maxWidth: 1800,
+    minDepth: 50,
+    maxDepth: 300,
+    minHeight: 920,
+    maxHeight: 1050,
+    defaultMountType: 'wall',
+    defaultFinish: 'black_matte',
+    defaultPrice: 5600000,
+    icon: 'tv',
+    description: 'Televisor de gran formato para salas principales y centros de entretenimiento de pared a pared.',
+    recommendedHeights: [1200],
+    standardWidths: [1680],
+    environmentLines: ['living_office']
+  },
+  {
+    id: 'preset_workspace_desktop',
+    type: 'desktop_workspace',
+    name: 'Estación de Trabajo Monitor Curvo + Laptop Slim',
+    category: 'office',
+    categoryLabel: 'Estudio y Oficina',
+    brand: 'Dell / Apple Workspace',
+    modelCode: 'WS-CURVE-LT',
+    defaultWidth: 850,
+    defaultDepth: 450,
+    defaultHeight: 420,
+    minWidth: 700,
+    maxWidth: 1100,
+    minDepth: 350,
+    maxDepth: 550,
+    minHeight: 380,
+    maxHeight: 500,
+    defaultMountType: 'countertop',
+    defaultFinish: 'black_matte',
+    defaultPrice: 3200000,
+    icon: 'computer',
+    description: 'Kit de oficina completo para escritorio con monitor panorámico curvo, soporte ergonómico, teclado, mousepad y laptop slim abierta.',
+    standardWidths: [850],
+    environmentLines: ['living_office']
+  },
+  {
+    id: 'preset_office_chair_ergo',
+    type: 'office_chair',
+    name: 'Silla Ergonómica Ejecutiva con Ruedas y Brazos 3D',
+    category: 'office',
+    categoryLabel: 'Estudio y Oficina',
+    brand: 'Herman Miller Style',
+    modelCode: 'CHR-AER-ERG',
+    defaultWidth: 650,
+    defaultDepth: 650,
+    defaultHeight: 1050,
+    minWidth: 600,
+    maxWidth: 720,
+    minDepth: 600,
+    maxDepth: 720,
+    minHeight: 950,
+    maxHeight: 1200,
+    defaultMountType: 'floor',
+    defaultFinish: 'black_matte',
+    defaultPrice: 850000,
+    icon: 'chair',
+    description: 'Silla ergonómica de oficina con base estrella de 5 puntas sobre ruedas, pistón de gas, soporte lumbar activo y malla transpirable.',
+    standardWidths: [650],
+    environmentLines: ['living_office']
   }
 ];
+
+export const APPLIANCE_PRESETS = APPLIANCES_CATALOG_PRESETS;
+

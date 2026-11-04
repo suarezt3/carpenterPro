@@ -1,14 +1,16 @@
 import { Injectable, inject } from '@angular/core';
 import { Project, Part, DrillHole } from '../models/melamine.models';
 import { JoineryEngineService, Part3DBounds } from './joinery-engine.service';
+import { PartGeometryService } from './part-geometry.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DxfExporterService {
   private joineryEngine = inject(JoineryEngineService);
+  private partGeometry = inject(PartGeometryService);
 
-  // Generates and triggers browser download of standard AutoCAD DXF R12/2000 file
+  // Generates and triggers browser download of standard AutoCAD DXF AC1015 (AutoCAD 2000+) file
   exportProjectToDxf(project: Project) {
     const dxfContent = this.generateDxfString(project);
     const blob = new Blob([dxfContent], { type: 'application/dxf;charset=utf-8;' });
@@ -21,7 +23,7 @@ export class DxfExporterService {
     URL.revokeObjectURL(url);
   }
 
-  // Builds standardized ASCII DXF text structure with layers, lines, circles and texts
+  // Builds standardized ASCII DXF text structure with layers, closed LWPOLYLINE, circles and texts
   generateDxfString(project: Project): string {
     const joinery = this.joineryEngine.calculateJoinery(project.parts);
     const parts = project.parts;
@@ -31,7 +33,7 @@ export class DxfExporterService {
     lines.push('0', 'SECTION');
     lines.push('2', 'HEADER');
     lines.push('9', '$ACADVER');
-    lines.push('1', 'AC1009'); // AutoCAD R12 (most universal format for CNC seccionadoras)
+    lines.push('1', 'AC1015'); // AutoCAD 2000 (Universal format for CNC seccionadoras and routers with LWPOLYLINE support)
     lines.push('9', '$INSUNITS');
     lines.push('70', '4'); // 4 = Millimeters
     lines.push('0', 'ENDSEC');
@@ -83,29 +85,55 @@ export class DxfExporterService {
       const pX = currentX;
       const pY = currentY;
 
-      // 1. Draw Piece Cut Boundary (4 Lines) on Layer PIEZAS_CONTORNO
-      this.addDxfLine(lines, 'PIEZAS_CONTORNO', pX, pY, pX + L, pY);
-      this.addDxfLine(lines, 'PIEZAS_CONTORNO', pX + L, pY, pX + L, pY + W);
-      this.addDxfLine(lines, 'PIEZAS_CONTORNO', pX + L, pY + W, pX, pY + W);
-      this.addDxfLine(lines, 'PIEZAS_CONTORNO', pX, pY + W, pX, pY);
+      // 1. Draw Real Piece Cut Boundary (Closed LWPOLYLINE or CIRCLE) on Layer PIEZAS_CONTORNO
+      if (part.shapeType === 'circle') {
+        const diam = part.diameter || part.width;
+        const radius = diam / 2;
+        this.addDxfCircle(lines, 'PIEZAS_CONTORNO', pX + radius, pY + radius, radius);
+      } else {
+        let contour: { x: number; y: number }[] = [];
+        if (part.cornerCutConfig && part.cornerCutConfig.type !== 'none') {
+          contour = this.partGeometry.buildCornerCutContour(L, W, part.cornerCutConfig);
+        } else if (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) {
+          contour = part.contourPoints;
+        } else if (part.contourPoints && part.contourPoints.length >= 3) {
+          contour = part.contourPoints;
+        } else {
+          contour = [
+            { x: 0, y: 0 },
+            { x: L, y: 0 },
+            { x: L, y: W },
+            { x: 0, y: W }
+          ];
+        }
+
+        const worldPoints = contour.map(pt => ({
+          x: pX + pt.x,
+          y: pY + pt.y
+        }));
+
+        this.addDxfPolyline(lines, 'PIEZAS_CONTORNO', worldPoints, true);
+      }
 
       // 2. Draw Edge Banding Indicators on Layer TAPACANTOS (offset lines)
-      const edgeOffset = 8;
-      if (part.edges.l1 !== 'none') {
-        // Top edge (Y = pY + W)
-        this.addDxfLine(lines, 'TAPACANTOS', pX, pY + W - edgeOffset, pX + L, pY + W - edgeOffset);
-      }
-      if (part.edges.l2 !== 'none') {
-        // Bottom edge (Y = pY)
-        this.addDxfLine(lines, 'TAPACANTOS', pX, pY + edgeOffset, pX + L, pY + edgeOffset);
-      }
-      if (part.edges.a1 !== 'none') {
-        // Left edge (X = pX)
-        this.addDxfLine(lines, 'TAPACANTOS', pX + edgeOffset, pY, pX + edgeOffset, pY + W);
-      }
-      if (part.edges.a2 !== 'none') {
-        // Right edge (X = pX + L)
-        this.addDxfLine(lines, 'TAPACANTOS', pX + L - edgeOffset, pY, pX + L - edgeOffset, pY + W);
+      if (part.shapeType !== 'circle' && part.edges) {
+        const edgeOffset = Math.min(8, Math.min(L, W) * 0.15);
+        if (part.edges.l1 && part.edges.l1 !== 'none') {
+          // Top edge (Y = pY + W)
+          this.addDxfLine(lines, 'TAPACANTOS', pX, pY + W - edgeOffset, pX + L, pY + W - edgeOffset);
+        }
+        if (part.edges.l2 && part.edges.l2 !== 'none') {
+          // Bottom edge (Y = pY)
+          this.addDxfLine(lines, 'TAPACANTOS', pX, pY + edgeOffset, pX + L, pY + edgeOffset);
+        }
+        if (part.edges.a1 && part.edges.a1 !== 'none') {
+          // Left edge (X = pX)
+          this.addDxfLine(lines, 'TAPACANTOS', pX + edgeOffset, pY, pX + edgeOffset, pY + W);
+        }
+        if (part.edges.a2 && part.edges.a2 !== 'none') {
+          // Right edge (X = pX + L)
+          this.addDxfLine(lines, 'TAPACANTOS', pX + L - edgeOffset, pY, pX + L - edgeOffset, pY + W);
+        }
       }
 
       // 3. Draw Drill Holes (Mecanizados) on Layer MECANIZADOS_PERFORACIONES
@@ -142,6 +170,19 @@ export class DxfExporterService {
     lines.push('70', '0');
     lines.push('62', colorNumber.toString()); // Color
     lines.push('6', 'CONTINUOUS');
+  }
+
+  private addDxfPolyline(lines: string[], layer: string, points: { x: number; y: number }[], closed = true) {
+    lines.push('0', 'LWPOLYLINE');
+    lines.push('8', layer);
+    lines.push('100', 'AcDbEntity');
+    lines.push('100', 'AcDbPolyline');
+    lines.push('90', points.length.toString());
+    lines.push('70', closed ? '1' : '0');
+    for (const pt of points) {
+      lines.push('10', pt.x.toFixed(3));
+      lines.push('20', pt.y.toFixed(3));
+    }
   }
 
   private addDxfLine(lines: string[], layer: string, x1: number, y1: number, x2: number, y2: number) {
@@ -185,6 +226,7 @@ export class DxfExporterService {
     L: number,
     W: number
   ) {
+    if (part.shapeType === 'circle') return;
     const orient = part.orientation || 'horizontal';
 
     for (const h of holes) {

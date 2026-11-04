@@ -18,6 +18,9 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   ArrowUp01Icon,
+  BathIcon,
+  Bookshelf01Icon,
+  Cabinet01Icon,
   Cancel01Icon,
   CheckListIcon,
   CheckmarkCircle02Icon,
@@ -31,8 +34,13 @@ import {
   Settings01Icon,
   Tag01Icon,
   Tick02Icon,
-  ViewIcon
+  ViewIcon,
+  Wardrobe01Icon,
+  LayoutLinearIcon,
+  LayoutLIcon,
+  LayoutUIcon
 } from '@hugeicons/core-free-icons';
+import { RouteReuseLifecycleAware } from '../../strategies/designer-route-reuse.strategy';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import {
   ComponentRole,
@@ -69,22 +77,33 @@ import {
   PartCornerCutConfig,
   SpecialCutPresetType,
   isCountertopMaterial,
-  DEFAULT_COUNTERTOP_MATERIALS
+  DEFAULT_COUNTERTOP_MATERIALS,
+  EnvironmentLine
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
+import { PartGeometryService } from '../../services/part-geometry.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { CabinetGeneratorService } from '../../services/cabinet-generator.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
-import { ComponentOptionsModalComponent } from '../component-options-modal/component-options-modal';
 import { TemplatesModalComponent } from '../templates-modal/templates-modal';
 import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templates-catalog.service';
+import { MELAMINE_FAMILIES } from '../../data/melamine-catalog.data';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
   paths.map((d, idx) => ['path', { d, key: `md_${idx}` }]) as unknown as HugeIconDef;
+
+function normalizeSearchText(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
 
 /**
  * Componente principal de diseño y modelado 3D (Modo Módulo y Modo Habitación 3D).
@@ -99,7 +118,6 @@ const cadSvg = (paths: string[]): HugeIconDef =>
     HugeiconsIconComponent,
     Furniture3dViewerComponent,
     TechnicalSheetModalComponent,
-    ComponentOptionsModalComponent,
     TemplatesModalComponent
   ],
   templateUrl: './module-designer.html',
@@ -108,15 +126,36 @@ const cadSvg = (paths: string[]): HugeIconDef =>
     '(window:keydown)': 'handleGlobalKeyDown($event)'
   }
 })
-export class ModuleDesignerComponent {
+export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   readonly projectService = inject(ProjectStorageService);
+  private isRouteAttached = true;
+
+  onRouteDetach(): void {
+    this.isRouteAttached = false;
+    this.viewer3d()?.pauseRendering();
+  }
+
+  onRouteAttach(): void {
+    this.isRouteAttached = true;
+    const viewer = this.viewer3d();
+    if (viewer) {
+      viewer.resumeRendering();
+    } else {
+      setTimeout(() => this.viewer3d()?.resumeRendering(), 0);
+    }
+  }
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly joineryEngine = inject(JoineryEngineService);
+  private readonly partGeometry = inject(PartGeometryService);
   private readonly dxfExporter = inject(DxfExporterService);
   private readonly cabinetGen = inject(CabinetGeneratorService);
   private readonly templatesCatalog = inject(TemplatesCatalogService);
   private readonly destroyRef = inject(DestroyRef);
   readonly hardwareCatalog = inject(HardwareCatalogService);
+
+  readonly layoutLinearIcon = LayoutLinearIcon;
+  readonly layoutLIcon = LayoutLIcon;
+  readonly layoutUIcon = LayoutUIcon;
 
   // Registro centralizado de iconos vectoriales para las barras flotantes, el panel derecho y los modales
   readonly icons = {
@@ -360,6 +399,45 @@ export class ModuleDesignerComponent {
     ]),
     performanceBolt: cadSvg([
       'M13 2L4 14H11L9 22L20 10H13L13 2Z'
+    ]),
+    kitchen: Cabinet01Icon,
+    closetDoor: Wardrobe01Icon,
+    vanity: BathIcon,
+    shelves: Bookshelf01Icon,
+    mirror: cadSvg([
+      'M4 4H20V20H4V4Z',
+      'M7 7L17 17',
+      'M7 11L13 17',
+      'M11 7L17 13'
+    ]),
+    toilet: cadSvg([
+      'M7 4H17V10H7V4Z',
+      'M8 10V15A4 4 0 0 0 12 19A4 4 0 0 0 16 15V10',
+      'M10 20H14'
+    ]),
+    hanger: cadSvg([
+      'M12 4A2 2 0 0 1 14 6C14 7 13 8 12 8L4 14H20L12 8',
+      'M4 14V16H20V14'
+    ]),
+    bed: cadSvg([
+      'M3 8V19',
+      'M21 8V19',
+      'M3 13H21',
+      'M5 8H19A2 2 0 0 1 21 10V13H3V10A2 2 0 0 1 5 8Z',
+      'M6 10H10V12H6V10Z',
+      'M14 10H18V12H14V10Z'
+    ]),
+    tv: cadSvg([
+      'M3 6H21V17H3V6Z',
+      'M8 20L10 17',
+      'M16 20L14 17',
+      'M8 20H16'
+    ]),
+    computer: cadSvg([
+      'M4 5H20V15H4V5Z',
+      'M2 18H22',
+      'M10 15V18',
+      'M14 15V18'
     ])
   };
 
@@ -373,7 +451,26 @@ export class ModuleDesignerComponent {
         return this.icons.appliance;
       case 'sink':
       case 'wash':
+      case 'washbasin_vessel':
+      case 'washbasin_undermount':
         return this.icons.sink;
+      case 'mirror':
+      case 'bathroom_mirror_led':
+        return this.icons.mirror;
+      case 'toilet':
+      case 'clean':
+        return this.icons.toilet;
+      case 'hanger':
+      case 'closet_rod':
+        return this.icons.hanger;
+      case 'bed':
+        return this.icons.bed;
+      case 'tv':
+        return this.icons.tv;
+      case 'computer':
+      case 'laptop':
+      case 'desktop_workspace':
+        return this.icons.computer;
       case 'hood':
       case 'air':
         return this.icons.hood;
@@ -392,6 +489,7 @@ export class ModuleDesignerComponent {
       case 'bar_stool':
       case 'dining_chair':
       case 'chair':
+      case 'office_chair':
         return this.icons.chair;
       case 'pendant_lamp':
       case 'light':
@@ -434,25 +532,51 @@ export class ModuleDesignerComponent {
   readonly currentParts = this.projectService.partsList;
   readonly defaultBoardThickness = computed(() => this.project().settings?.defaultBoardThickness || 15);
 
-  // Estado del Modal de Opciones de Componente Paramétrico
+  // Filtros y buscador reactivo de materiales de melamina y mesones
+  readonly melamineFamilies = MELAMINE_FAMILIES;
+  readonly materialSearchQuery = signal<string>('');
+  readonly materialSelectedFamily = signal<string>('all');
+
+  readonly filteredMaterials = computed(() => {
+    const query = normalizeSearchText(this.materialSearchQuery());
+    const family = this.materialSelectedFamily();
+    return this.materials().filter(m => {
+      const matchesFamily = family === 'all' || m.family === family;
+      const matchesQuery = !query ||
+        normalizeSearchText(m.name).includes(query) ||
+        normalizeSearchText(m.brand).includes(query) ||
+        normalizeSearchText(m.familyLabel).includes(query);
+      return matchesFamily && matchesQuery;
+    });
+  });
+
+  readonly filteredCountertopMaterials = computed(() => {
+    const query = normalizeSearchText(this.materialSearchQuery());
+    const family = this.materialSelectedFamily();
+    return this.countertopMaterials().filter(m => {
+      const matchesFamily = family === 'all' || family === 'stone_countertop' || m.family === family;
+      const matchesQuery = !query ||
+        normalizeSearchText(m.name).includes(query) ||
+        normalizeSearchText(m.brand).includes(query);
+      return matchesFamily && matchesQuery;
+    });
+  });
+
+  clearMaterialFilters(): void {
+    this.materialSearchQuery.set('');
+    this.materialSelectedFamily.set('all');
+  }
+
+  // Configuración paramétrica seleccionada
   readonly selectedParametricConfig = signal<ParametricCabinetConfig | null>(null);
-  readonly showComponentOptionsModal = signal<boolean>(false);
 
   /**
-   * Abre el modal de configuración paramétrica precargando los valores de una plantilla.
+   * Inserta directamente el módulo paramétrico en la escena 3D sin fricción de modal redundante.
    */
   onConfigureParametric(template: FurnitureTemplate) {
     if (template.parametricConfig) {
-      this.selectedParametricConfig.set(template.parametricConfig as ParametricCabinetConfig);
-    } else {
-      this.selectedParametricConfig.set(null);
+      this.onCabinetSubmitted(template.parametricConfig as ParametricCabinetConfig);
     }
-    this.showComponentOptionsModal.set(true);
-  }
-
-  openCabinetOptionsModal() {
-    this.selectedParametricConfig.set(null);
-    this.showComponentOptionsModal.set(true);
   }
 
   /**
@@ -1014,6 +1138,8 @@ export class ModuleDesignerComponent {
    * - H / Alt+H: Ocultar selección o mostrar todas las piezas ocultas
    */
   handleGlobalKeyDown(e: KeyboardEvent) {
+    if (!this.isRouteAttached) return;
+
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
       return;
@@ -1144,12 +1270,37 @@ export class ModuleDesignerComponent {
   });
   readonly appliancesCatalog = APPLIANCES_CATALOG_PRESETS;
   readonly applianceFinishOptions = APPLIANCE_FINISH_OPTIONS;
-  readonly activeApplianceCategory = signal<'all' | 'cold' | 'cooking' | 'extraction' | 'washing' | 'microwave' | 'coffee' | 'legs' | 'seating' | 'lighting' | 'architecture'>('all');
+  readonly activeApplianceCategory = signal<
+    | 'all'
+    | 'cold'
+    | 'cooking'
+    | 'extraction'
+    | 'washing'
+    | 'microwave'
+    | 'coffee'
+    | 'legs'
+    | 'seating'
+    | 'lighting'
+    | 'architecture'
+    | 'bathroom'
+    | 'bedroom'
+    | 'electronics'
+    | 'office'
+  >('all');
+  readonly applianceFilterByEnvironment = signal<boolean>(true);
 
   readonly filteredAppliances = computed(() => {
     const cat = this.activeApplianceCategory();
-    if (cat === 'all') return this.appliancesCatalog;
-    return this.appliancesCatalog.filter(a => a.category === cat);
+    const env = this.selectedEnvironmentLine();
+    const byEnv = this.applianceFilterByEnvironment();
+
+    let list = this.appliancesCatalog;
+    // Si el filtrado por ambiente está activo y estamos en 'all', mostrar contextualmente los equipos de la línea activa
+    if (byEnv && env && cat === 'all') {
+      list = list.filter(a => !a.environmentLines || a.environmentLines.length === 0 || a.environmentLines.includes(env));
+    }
+    if (cat === 'all') return list;
+    return list.filter(a => a.category === cat);
   });
 
   getApplianceIcon(type: ApplianceType): string {
@@ -1162,6 +1313,15 @@ export class ModuleDesignerComponent {
       case 'coffee_maker': return 'coffee';
       case 'table_leg':
       case 'table_legs_set': return 'table_bar';
+      case 'washbasin_vessel':
+      case 'washbasin_undermount': return 'wash';
+      case 'bathroom_mirror_led': return 'mirror';
+      case 'toilet': return 'clean';
+      case 'closet_rod': return 'hanger';
+      case 'bed': return 'bed';
+      case 'tv': return 'tv';
+      case 'desktop_workspace': return 'computer';
+      case 'office_chair': return 'chair';
       case 'oven':
       default: return 'microwave';
     }
@@ -1174,6 +1334,12 @@ export class ModuleDesignerComponent {
   addApplianceFromPreset(preset: AppliancePreset) {
     const config = this.roomConfig();
     const selPart = this.selectedPart();
+    const walls = getResolvedRoomWalls(config);
+    const mainWall = walls.find(w => w.id === 'main') || walls[0];
+    const wallInnerZ = mainWall
+      ? (mainWall.posZ + mainWall.thickness / 2)
+      : (-(config.floorDepth || 5000) / 2 + (config.wallThickness || 150));
+
     let posX = 0;
     let posY = 0;
     let posZ = 0;
@@ -1218,11 +1384,11 @@ export class ModuleDesignerComponent {
           }
         }
         posY = highestY > 0 ? highestY : 880;
-        posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+        posZ = Math.round(wallInnerZ + (targetDepth / 2));
       }
     } else if (preset.defaultMountType === 'floor') {
       posY = 0;
-      posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+      posZ = Math.round(wallInnerZ + (targetDepth / 2));
     } else if (preset.defaultMountType === 'countertop') {
       if (selPart && (selPart.orientation === 'horizontal' || !selPart.orientation)) {
         posX = selPart.posX || 0;
@@ -1238,7 +1404,7 @@ export class ModuleDesignerComponent {
           }
         }
         posY = highestY > 0 ? highestY : 880;
-        posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+        posZ = Math.round(wallInnerZ + (targetDepth / 2));
       }
     } else if (preset.defaultMountType === 'wall') {
       if (preset.type === 'pendant_lamp') {
@@ -1246,14 +1412,20 @@ export class ModuleDesignerComponent {
         posZ = 650;
       } else if (preset.type === 'window_frame') {
         posY = 1050;
-        posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+        posZ = Math.round(wallInnerZ + (targetDepth / 2));
       } else {
         posY = preset.type === 'hood' ? 1500 : 1200;
-        posZ = (config.wallOffsetZ || 0) + (config.wallThickness || 150) / 2 + (preset.defaultDepth / 2);
+        posZ = Math.round(wallInnerZ + (targetDepth / 2));
       }
     } else if (preset.defaultMountType === 'built_in') {
-      posY = 800;
-      posZ = preset.defaultDepth / 2;
+      if (selPart) {
+        posX = selPart.posX || 0;
+        posY = (selPart.posY || 0) + (selPart.thickness || 18) / 2;
+        posZ = selPart.posZ || 0;
+      } else {
+        posY = 800;
+        posZ = Math.round(wallInnerZ + (targetDepth / 2));
+      }
     }
 
     const newApp: ApplianceItem = {
@@ -1686,9 +1858,9 @@ export class ModuleDesignerComponent {
     this.projectService.updateParametricCabinet(event.groupId, updatedParts, finalConfig.name, finalConfig);
 
     if (facing === 'right') {
-      this.projectService.rotateGroupRigidly(event.groupId, -90);
-    } else if (facing === 'left') {
       this.projectService.rotateGroupRigidly(event.groupId, 90);
+    } else if (facing === 'left') {
+      this.projectService.rotateGroupRigidly(event.groupId, -90);
     } else if (facing === 'back') {
       this.projectService.rotateGroupRigidly(event.groupId, 180);
     }
@@ -2350,19 +2522,23 @@ export class ModuleDesignerComponent {
     const sel = this.selectedPart();
     if (!sel) return;
 
-    const groupId = this.activeSelectedGroupId();
-    if (!groupId) {
-      this.updateSelectedPart({ orientation });
-      return;
+    const updatedPart: Part = {
+      ...sel,
+      orientation
+    };
+
+    // Asegurar que al cambiar de horizontal a vertical, si la pieza penetra el piso, se apoye en Y = 0
+    const bounds = this.partGeometry.getWorldAABB(updatedPart);
+    let newPosY = updatedPart.posY ?? 0;
+    if (bounds.minY < 0) {
+      newPosY = Math.round((newPosY - bounds.minY) * 10) / 10;
     }
 
-    if (orientation === 'vertical_xy') {
-      this.setGroupFaceDirection('front');
-    } else if (orientation === 'vertical_yz') {
-      this.setGroupFaceDirection('right');
-    } else {
-      this.rotateSelectedGroup(90);
-    }
+    this.updateSelectedPart({
+      orientation,
+      posY: newPosY
+    });
+    this.showToast(`📐 Orientación: ${orientation === 'horizontal' ? 'Horizontal (H)' : orientation === 'vertical_yz' ? 'Lateral YZ (L)' : 'Frontal XY (F)'}`);
   }
 
   rotateSelectedPart90(axis: 'x' | 'y' | 'z' = 'y') {
@@ -3819,8 +3995,9 @@ export class ModuleDesignerComponent {
     this.showRoomSettingsModal.set(false);
   }
 
-  updateRoomConfig(updates: Partial<RoomConfiguration>) {
-    this.projectService.updateRoomConfig(updates);
+  updateRoomConfig(updates: Partial<RoomConfiguration> & { recordHistory?: boolean }) {
+    const { recordHistory, ...rest } = updates;
+    this.projectService.updateRoomConfig(rest, recordHistory ?? true);
   }
 
   setRoomLayout(layout: RoomLayoutType) {
@@ -4552,6 +4729,62 @@ export class ModuleDesignerComponent {
     }
   }
 
+  readonly selectedEnvironmentLine = signal<EnvironmentLine>('kitchen');
+
+  setEnvironmentLine(env: EnvironmentLine) {
+    this.selectedEnvironmentLine.set(env);
+    const labelMap: Record<EnvironmentLine, string> = {
+      kitchen: 'Cocinas',
+      closet: 'Closets y Dormitorios',
+      bathroom: 'Muebles de Baño',
+      living_office: 'Hogar y Estudio'
+    };
+    this.showToast(`✨ Línea activa: ${labelMap[env]}`);
+  }
+
+  readonly activeGroupParametricConfig = computed<ParametricCabinetConfig | null>(() => {
+    const gid = this.activeSelectedGroupId();
+    if (!gid) return null;
+    const grp = this.groups().find(g => g.id === gid);
+    if (!grp) return null;
+    if (grp.parametricConfig) return grp.parametricConfig;
+    const parts = this.currentParts().filter(p => p.groupId === gid);
+    if (parts.length === 0) return null;
+    return this.cabinetGen.reconstructConfigFromParts(parts, grp);
+  });
+
+  updateActiveGroupParametricConfig(partial: Partial<ParametricCabinetConfig>) {
+    const gid = this.activeSelectedGroupId();
+    if (!gid) return;
+    const parts = this.currentParts().filter(p => p.groupId === gid);
+    if (parts.length === 0) return;
+    const grp = this.groups().find(g => g.id === gid) || {
+      id: gid,
+      name: parts[0]?.groupName || 'Módulo',
+      type: 'assembly' as const
+    };
+    const currentCfg = grp.parametricConfig || this.cabinetGen.reconstructConfigFromParts(parts, grp);
+    const updatedCfg: ParametricCabinetConfig = {
+      ...currentCfg,
+      ...partial
+    };
+    this.onCabinetUpdated({ groupId: gid, config: updatedCfg });
+  }
+
+  duplicateActiveGroupToSide() {
+    this.duplicateSelectedGroup();
+  }
+
+  addFreeBoard() {
+    this.onPartCreatedFromViewer({
+      name: `Tablero Libre ${this.currentParts().length + 1}`,
+      length: 600,
+      width: 400,
+      orientation: 'horizontal'
+    });
+    this.showToast('📄 Tablero libre añadido al lienzo 3D');
+  }
+
   applySpecialCutToSelectedPart(type: SpecialCutPresetType) {
     const sel = this.selectedPart();
     if (!sel) return;
@@ -4567,7 +4800,8 @@ export class ModuleDesignerComponent {
       chamfer_corner: `Chaflán (${cfg.cutX}×${cfg.cutY}mm) aplicado`,
       diagonal_side: `Corte Diagonal (${cfg.cutX}mm) aplicado`,
       notch_l: `Destaje en L (${cfg.cutX}×${cfg.cutY}mm) aplicado`,
-      rounded_corners: `Esquinas redondeadas (R=${cfg.cutX}mm) aplicadas`
+      rounded_corners: `Esquinas redondeadas (R=${cfg.cutX}mm) aplicadas`,
+      u_siphon_cutout: `Corte Sifón en U (${cfg.cutX}×${cfg.cutY}mm) aplicado`
     };
     this.showToast(`📐 ${labelMap[type]} en "${sel.name}"`);
   }

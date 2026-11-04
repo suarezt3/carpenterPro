@@ -10,6 +10,7 @@ import {
 })
 export class Appliance3dBuilderService {
   private readonly materialCache = new Map<string, THREE.Material>();
+  private readonly geometryCache = new Map<string, THREE.BufferGeometry>();
 
   private getCachedMaterial<T extends THREE.Material>(key: string, factory: () => T): T {
     let mat = this.materialCache.get(key) as T;
@@ -19,6 +20,16 @@ export class Appliance3dBuilderService {
       this.materialCache.set(key, mat);
     }
     return mat;
+  }
+
+  getCachedGeometry<T extends THREE.BufferGeometry>(key: string, factory: () => T): T {
+    let geo = this.geometryCache.get(key) as T;
+    if (!geo) {
+      geo = factory();
+      geo.userData = { ...(geo.userData || {}), isShared: true };
+      this.geometryCache.set(key, geo);
+    }
+    return geo;
   }
 
   /**
@@ -101,17 +112,51 @@ export class Appliance3dBuilderService {
       case 'door_frame':
         this.buildDoorFrame(group, w, h, d, bodyMat, accentMat, chromeMat);
         break;
+      case 'washbasin_vessel':
+        this.buildWashbasinVessel(group, appliance, w, h, d, bodyMat, chromeMat);
+        break;
+      case 'washbasin_undermount':
+        this.buildWashbasinUndermount(group, appliance, w, h, d, bodyMat, chromeMat);
+        break;
+      case 'bathroom_mirror_led':
+        this.buildBathroomMirrorLed(group, appliance, w, h, d, bodyMat);
+        break;
+      case 'toilet':
+        this.buildToilet(group, appliance, w, h, d, bodyMat, chromeMat);
+        break;
+      case 'closet_rod':
+        this.buildClosetRod(group, appliance, w, h, d, bodyMat, chromeMat);
+        break;
+      case 'bed':
+        this.buildBed(group, appliance, w, h, d, bodyMat, accentMat);
+        break;
+      case 'tv':
+        this.buildSmartTv(group, appliance, w, h, d, bodyMat);
+        break;
+      case 'desktop_workspace':
+        this.buildDesktopWorkspace(group, appliance, w, h, d, bodyMat, accentMat, chromeMat);
+        break;
+      case 'office_chair':
+        this.buildOfficeChair(group, appliance, w, h, d, bodyMat, accentMat, chromeMat);
+        break;
       default:
         this.buildGenericBox(group, w, h, d, bodyMat);
     }
 
-    // Comprehensive transparent raycast hit box enclosing the entire parametric envelope
-    const hitGeo = new THREE.BoxGeometry(w, h, d);
-    const hitMat = new THREE.MeshBasicMaterial({
-      visible: false,
-      transparent: true,
-      opacity: 0
-    });
+    // Comprehensive transparent raycast hit box enclosing the entire parametric envelope (cached for GPU pooling)
+    const hitGeo = this.getCachedGeometry(
+      `hitbox_${Math.round(w)}_${Math.round(h)}_${Math.round(d)}`,
+      () => new THREE.BoxGeometry(w, h, d)
+    );
+    const hitMat = this.getCachedMaterial(
+      'appliance_hitbox_mat',
+      () =>
+        new THREE.MeshBasicMaterial({
+          visible: false,
+          transparent: true,
+          opacity: 0
+        })
+    );
     const hitMesh = new THREE.Mesh(hitGeo, hitMat);
     hitMesh.position.set(0, h / 2, 0);
     hitMesh.userData = { isApplianceHitBox: true, applianceId: appliance.id, appliance };
@@ -540,11 +585,11 @@ export class Appliance3dBuilderService {
     const filterW = (w - 60) / 2;
     const filterD = d - 80;
     const filterGeo = new THREE.BoxGeometry(filterW, 4, filterD);
-    const filterMat = new THREE.MeshStandardMaterial({
+    const filterMat = this.getCachedMaterial('appliance_grease_filter', () => new THREE.MeshStandardMaterial({
       color: 0x9ca3af,
       metalness: 0.8,
       roughness: 0.4
-    });
+    }));
 
     const filterLeft = new THREE.Mesh(filterGeo, filterMat);
     filterLeft.position.set(-filterW / 2 - 5, -2, 0);
@@ -1171,7 +1216,7 @@ export class Appliance3dBuilderService {
     group.add(gaugeRim);
 
     const gaugeFaceGeo = new THREE.CylinderGeometry(gaugeR * 0.85, gaugeR * 0.85, 6.2, 24);
-    const gaugeFaceMat = new THREE.MeshStandardMaterial({ color: 0xfefefe, roughness: 0.2 });
+    const gaugeFaceMat = this.getCachedMaterial('appliance_gauge_face', () => new THREE.MeshStandardMaterial({ color: 0xfefefe, roughness: 0.2 }));
     const gaugeFace = new THREE.Mesh(gaugeFaceGeo, gaugeFaceMat);
     gaugeFace.rotation.x = Math.PI / 2;
     gaugeFace.position.set(0, h - faciaH / 2 - 8, headPosZ + headD / 2 + faciaThick + 3.2);
@@ -1231,7 +1276,7 @@ export class Appliance3dBuilderService {
     // Portafilter Handle (Ergonomic handle angled forward-right)
     const handleLen = 85;
     const handleGeo = new THREE.CylinderGeometry(8, 10, handleLen, 16);
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.6 });
+    const handleMat = this.getCachedMaterial('appliance_handle_mat', () => new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.6 }));
     const handle = new THREE.Mesh(handleGeo, handleMat);
     handle.rotation.x = Math.PI / 2;
     handle.rotation.y = -0.3; // slightly angled to the right for natural barista grip
@@ -1304,7 +1349,7 @@ export class Appliance3dBuilderService {
     group.add(railRight);
 
     // 7. Ceramic Espresso Cups on Drip Tray (under spouts)
-    const cupMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15 });
+    const cupMat = this.getCachedMaterial('appliance_cup_mat', () => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15 }));
     const cupOffsets = [{ x: -14 }, { x: 14 }];
     for (const co of cupOffsets) {
       // Cup body
@@ -1644,7 +1689,7 @@ export class Appliance3dBuilderService {
     legContainer.add(ferrule);
 
     // Regatón protector de suelo en fieltro negro
-    const feltMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 });
+    const feltMat = this.getCachedMaterial('appliance_felt_mat', () => new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 }));
     const feltGeo = new THREE.CylinderGeometry(botR * 0.92, botR * 0.92, feltH, 24);
     const felt = new THREE.Mesh(feltGeo, feltMat);
     felt.position.set(0, -woodH - ferruleH - feltH / 2, 0);
@@ -1677,11 +1722,11 @@ export class Appliance3dBuilderService {
   ) {
     const seatHeight = Math.round(h * 0.78);
     const backHeight = h - seatHeight;
-    const cushionMat = new THREE.MeshStandardMaterial({
+    const cushionMat = this.getCachedMaterial('appliance_barstool_cushion', () => new THREE.MeshStandardMaterial({
       color: 0x334155,
       roughness: 0.75,
       metalness: 0.05
-    });
+    }));
 
     // 4 Patas inclinadas desde la base del asiento hasta el suelo
     const topSpreadX = w * 0.28;
@@ -1761,15 +1806,15 @@ export class Appliance3dBuilderService {
   ) {
     const seatH = Math.round(h * 0.54);
     const backH = h - seatH;
-    const shellMat = new THREE.MeshStandardMaterial({
+    const shellMat = this.getCachedMaterial('appliance_chair_shell', () => new THREE.MeshStandardMaterial({
       color: 0xf1f5f9,
       roughness: 0.45,
       metalness: 0.05
-    });
-    const padMat = new THREE.MeshStandardMaterial({
+    }));
+    const padMat = this.getCachedMaterial('appliance_chair_pad', () => new THREE.MeshStandardMaterial({
       color: 0x94a3b8,
       roughness: 0.8
-    });
+    }));
 
     // 4 Patas cónicas nórdicas
     const upAxis = new THREE.Vector3(0, 1, 0);
@@ -1863,22 +1908,25 @@ export class Appliance3dBuilderService {
     chromeMat: THREE.Material
   ) {
     const isTrio = w >= 600 || appliance.id.includes('trio') || appliance.name.toLowerCase().includes('triple');
-    const warmBulbMat = new THREE.MeshStandardMaterial({
+    const warmBulbMat = this.getCachedMaterial('appliance_lamp_warm_bulb', () => new THREE.MeshStandardMaterial({
       color: 0xfff7ed,
       emissive: 0xffd27d,
-      emissiveIntensity: 1.6,
+      emissiveIntensity: 1.8,
       roughness: 0.2
-    });
-    const brassMat = new THREE.MeshStandardMaterial({
+    }));
+    const brassMat = this.getCachedMaterial('appliance_lamp_brass', () => new THREE.MeshStandardMaterial({
       color: 0xd4af37,
       metalness: 0.88,
       roughness: 0.24
-    });
+    }));
 
     if (isTrio) {
       // Florón rectangular de techo
       const canopyH = 26;
-      const canopyGeo = new THREE.BoxGeometry(w * 0.82, canopyH, Math.min(110, d * 0.55));
+      const canopyGeo = this.getCachedGeometry(
+        `canopy_box_${Math.round(w * 0.82)}_${canopyH}_${Math.round(Math.min(110, d * 0.55))}`,
+        () => new THREE.BoxGeometry(w * 0.82, canopyH, Math.min(110, d * 0.55))
+      );
       const canopy = new THREE.Mesh(canopyGeo, bodyMat);
       canopy.position.set(0, h - canopyH / 2, 0);
       group.add(canopy);
@@ -1890,57 +1938,83 @@ export class Appliance3dBuilderService {
 
       for (const ox of offsetsX) {
         // Cable tensor
-        const cord = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, cordLen, 10), accentMat);
+        const cord = new THREE.Mesh(
+          this.getCachedGeometry(`cord_cyl_${Math.round(cordLen)}`, () => new THREE.CylinderGeometry(2.5, 2.5, cordLen, 10)),
+          accentMat
+        );
         cord.position.set(ox, h - canopyH - cordLen / 2, 0);
         group.add(cord);
 
         // Casquillo superior de latón
-        const socket = new THREE.Mesh(new THREE.CylinderGeometry(16, 20, 36, 16), brassMat);
+        const socket = new THREE.Mesh(
+          this.getCachedGeometry('socket_brass_cyl', () => new THREE.CylinderGeometry(16, 20, 36, 16)),
+          brassMat
+        );
         socket.position.set(ox, shadeH + 16, 0);
         group.add(socket);
 
         // Pantalla cónica/cilíndrica
-        const shade = new THREE.Mesh(new THREE.CylinderGeometry(shadeR * 0.65, shadeR, shadeH, 28), bodyMat);
+        const shade = new THREE.Mesh(
+          this.getCachedGeometry(
+            `shade_cyl_${Math.round(shadeR)}_${Math.round(shadeH)}`,
+            () => new THREE.CylinderGeometry(shadeR * 0.65, shadeR, shadeH, 28)
+          ),
+          bodyMat
+        );
         shade.position.set(ox, shadeH / 2, 0);
         group.add(shade);
 
-        // Difusor emisivo inferior
-        const bulb = new THREE.Mesh(new THREE.SphereGeometry(shadeR * 0.42, 16, 16), warmBulbMat);
+        // Difusor emisivo inferior (costo cero en shaders vs luces dinámicas)
+        const bulb = new THREE.Mesh(
+          this.getCachedGeometry(`bulb_sph_${Math.round(shadeR * 0.42)}`, () => new THREE.SphereGeometry(shadeR * 0.42, 16, 16)),
+          warmBulbMat
+        );
         bulb.position.set(ox, 18, 0);
         group.add(bulb);
       }
     } else {
       // Lámpara domo individual
       const canopyH = 28;
-      const canopy = new THREE.Mesh(new THREE.CylinderGeometry(65, 65, canopyH, 24), bodyMat);
+      const canopy = new THREE.Mesh(
+        this.getCachedGeometry('canopy_domo_cyl', () => new THREE.CylinderGeometry(65, 65, canopyH, 24)),
+        bodyMat
+      );
       canopy.position.set(0, h - canopyH / 2, 0);
       group.add(canopy);
 
       const domeR = Math.min(w, d) * 0.48;
       const cordLen = Math.max(120, h - canopyH - domeR);
-      const cord = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, cordLen, 10), accentMat);
+      const cord = new THREE.Mesh(
+        this.getCachedGeometry(`cord_domo_${Math.round(cordLen)}`, () => new THREE.CylinderGeometry(3, 3, cordLen, 10)),
+        accentMat
+      );
       cord.position.set(0, h - canopyH - cordLen / 2, 0);
       group.add(cord);
 
-      const socket = new THREE.Mesh(new THREE.CylinderGeometry(18, 24, 42, 18), brassMat);
+      const socket = new THREE.Mesh(
+        this.getCachedGeometry('socket_domo_brass', () => new THREE.CylinderGeometry(18, 24, 42, 18)),
+        brassMat
+      );
       socket.position.set(0, domeR + 18, 0);
       group.add(socket);
 
-      const domeGeo = new THREE.SphereGeometry(domeR, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.52);
+      const domeGeo = this.getCachedGeometry(
+        `dome_sph_${Math.round(domeR)}`,
+        () => new THREE.SphereGeometry(domeR, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.52)
+      );
       const dome = new THREE.Mesh(domeGeo, bodyMat);
       dome.position.set(0, 10, 0);
       group.add(dome);
 
-      const diffuser = new THREE.Mesh(new THREE.CircleGeometry(domeR * 0.92, 28), warmBulbMat);
+      // Difusor emisivo de brillo cálido a costo cero en GPU
+      const diffuser = new THREE.Mesh(
+        this.getCachedGeometry(`diffuser_cir_${Math.round(domeR * 0.92)}`, () => new THREE.CircleGeometry(domeR * 0.92, 28)),
+        warmBulbMat
+      );
       diffuser.rotation.x = Math.PI / 2;
       diffuser.position.set(0, 12, 0);
       group.add(diffuser);
     }
-
-    // Luz 3D real cálida hacia el mesón/isla
-    const light = new THREE.PointLight(0xffdfa0, 0.85, 2600, 1.5);
-    light.position.set(0, -15, 0);
-    group.add(light);
   }
 
   private buildWindowFrame(
@@ -1952,7 +2026,7 @@ export class Appliance3dBuilderService {
     chromeMat: THREE.Material
   ) {
     const frameThick = 45;
-    const glassMat = new THREE.MeshStandardMaterial({
+    const glassMat = this.getCachedMaterial('appliance_window_glass', () => new THREE.MeshStandardMaterial({
       color: 0xe0f2fe,
       emissive: 0xbae6fd,
       emissiveIntensity: 0.22,
@@ -1960,7 +2034,7 @@ export class Appliance3dBuilderService {
       metalness: 0.15,
       transparent: true,
       opacity: 0.52
-    });
+    }));
 
     // Marco perimetral exterior
     const topBar = new THREE.Mesh(new THREE.BoxGeometry(w, frameThick, d), frameMat);
@@ -2045,5 +2119,872 @@ export class Appliance3dBuilderService {
     leverB.position.set(handleX - 45, handleY, -38);
     group.add(leverB);
   }
+
+  // =========================================================================
+  // --- 16. LAVAMANOS DE SOBREPONER TIPO VESSEL ---
+  // =========================================================================
+
+  private buildWashbasinVessel(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const isBlack = appliance.finish === 'black_matte';
+    const ceramicMat = this.getCachedMaterial(`basin_ceramic_${appliance.finish}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isBlack ? 0x181a1c : 0xfcfdfd,
+        roughness: isBlack ? 0.45 : 0.12,
+        metalness: 0.05
+      })
+    );
+    const drainDarkMat = this.getCachedMaterial('basin_drain_cup', () =>
+      new THREE.MeshStandardMaterial({ color: 0x111315, roughness: 0.6, metalness: 0.4 })
+    );
+
+    const isRound = Math.abs(w - d) < 40;
+    const basinH = h * 0.72; // Altura de la cubeta sobre la encimera
+    const faucetH = h; // Altura total con grifo monomando alto
+
+    if (isRound) {
+      // Lavamanos circular / bowl
+      const radiusTop = Math.min(w, d) * 0.44;
+      const radiusBot = radiusTop * 0.65;
+      const wallT = 12;
+
+      // Cuerpo cónico exterior del bowl
+      const outerGeo = this.getCachedGeometry(
+        `vessel_round_outer_${Math.round(w)}_${Math.round(basinH)}`,
+        () => new THREE.CylinderGeometry(radiusTop, radiusBot, basinH, 24)
+      );
+      const outerMesh = new THREE.Mesh(outerGeo, ceramicMat);
+      outerMesh.position.set(0, basinH / 2, 0);
+      group.add(outerMesh);
+
+      // Cavidad interior hueca
+      const innerGeo = this.getCachedGeometry(
+        `vessel_round_inner_${Math.round(w)}_${Math.round(basinH)}`,
+        () => new THREE.CylinderGeometry(radiusTop - wallT, radiusBot * 0.75, basinH - 8, 24)
+      );
+      const innerMesh = new THREE.Mesh(innerGeo, drainDarkMat);
+      innerMesh.position.set(0, basinH / 2 + 5, 0);
+      group.add(innerMesh);
+
+      // Desagüe click-clack cromado
+      const drainGeo = this.getCachedGeometry('basin_clicker_stopper', () => new THREE.CylinderGeometry(28, 28, 3, 16));
+      const drainMesh = new THREE.Mesh(drainGeo, chromeMat);
+      drainMesh.position.set(0, 9, 0);
+      group.add(drainMesh);
+    } else {
+      // Lavamanos rectangular con cantos redondeados
+      const wallT = 14;
+      const baseGeo = this.getCachedGeometry(
+        `vessel_rect_base_${Math.round(w)}_${Math.round(d)}_${Math.round(basinH)}`,
+        () => new THREE.BoxGeometry(w * 0.92, basinH, d * 0.88)
+      );
+      const baseMesh = new THREE.Mesh(baseGeo, ceramicMat);
+      baseMesh.position.set(0, basinH / 2, 0);
+      group.add(baseMesh);
+
+      const cavityGeo = this.getCachedGeometry(
+        `vessel_rect_cav_${Math.round(w)}_${Math.round(d)}_${Math.round(basinH)}`,
+        () => new THREE.BoxGeometry(w * 0.92 - wallT * 2, basinH - 8, d * 0.88 - wallT * 2)
+      );
+      const cavityMesh = new THREE.Mesh(cavityGeo, drainDarkMat);
+      cavityMesh.position.set(0, basinH / 2 + 5, 0);
+      group.add(cavityMesh);
+
+      const drainGeo = this.getCachedGeometry('basin_clicker_stopper', () => new THREE.CylinderGeometry(28, 28, 3, 16));
+      const drainMesh = new THREE.Mesh(drainGeo, chromeMat);
+      drainMesh.position.set(0, 9, 0);
+      group.add(drainMesh);
+    }
+
+    // Grifería monomando alta sobreponer
+    const faucetZ = -d / 2 + 35;
+    const faucetGeo = this.getCachedGeometry('vessel_faucet_stem', () => new THREE.CylinderGeometry(14, 16, faucetH, 16));
+    const faucetMesh = new THREE.Mesh(faucetGeo, chromeMat);
+    faucetMesh.position.set(0, faucetH / 2, faucetZ);
+    group.add(faucetMesh);
+
+    const spoutGeo = this.getCachedGeometry('vessel_faucet_spout', () => new THREE.BoxGeometry(16, 12, 100));
+    const spoutMesh = new THREE.Mesh(spoutGeo, chromeMat);
+    spoutMesh.position.set(0, faucetH - 12, faucetZ + 45);
+    spoutMesh.rotation.x = -0.12;
+    group.add(spoutMesh);
+
+    const leverGeo = this.getCachedGeometry('vessel_faucet_lever', () => new THREE.BoxGeometry(10, 4, 45));
+    const leverMesh = new THREE.Mesh(leverGeo, chromeMat);
+    leverMesh.position.set(0, faucetH + 3, faucetZ + 8);
+    group.add(leverMesh);
+  }
+
+  // =========================================================================
+  // --- 17. LAVAMANOS DE SUBMONTAR / INCRUSTAR ---
+  // =========================================================================
+
+  private buildWashbasinUndermount(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const isBlack = appliance.finish === 'black_matte';
+    const ceramicMat = this.getCachedMaterial(`basin_undermount_mat_${appliance.finish}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isBlack ? 0x181a1c : 0xfcfdfd,
+        roughness: isBlack ? 0.45 : 0.12,
+        metalness: 0.05
+      })
+    );
+    const darkMat = this.getCachedMaterial('basin_drain_cup', () =>
+      new THREE.MeshStandardMaterial({ color: 0x111315, roughness: 0.6, metalness: 0.4 })
+    );
+
+    const rimThick = 8;
+    const rearDeckD = 75;
+    const frontRimD = 28;
+    const sideRimW = 28;
+    const innerW = w - sideRimW * 2;
+    const innerD = d - rearDeckD - frontRimD;
+    const centerZ = (-d / 2 + rearDeckD + (d / 2 - frontRimD)) / 2;
+
+    // Borde perimetral exterior
+    const rearRim = new THREE.Mesh(
+      this.getCachedGeometry(`ubasin_rear_${Math.round(w)}_${rearDeckD}`, () => new THREE.BoxGeometry(w, rimThick, rearDeckD)),
+      ceramicMat
+    );
+    rearRim.position.set(0, h - rimThick / 2, -d / 2 + rearDeckD / 2);
+    group.add(rearRim);
+
+    const frontRim = new THREE.Mesh(
+      this.getCachedGeometry(`ubasin_front_${Math.round(w)}_${frontRimD}`, () => new THREE.BoxGeometry(w, rimThick, frontRimD)),
+      ceramicMat
+    );
+    frontRim.position.set(0, h - rimThick / 2, d / 2 - frontRimD / 2);
+    group.add(frontRim);
+
+    const leftRim = new THREE.Mesh(
+      this.getCachedGeometry(`ubasin_side_${sideRimW}_${Math.round(innerD)}`, () => new THREE.BoxGeometry(sideRimW, rimThick, innerD)),
+      ceramicMat
+    );
+    leftRim.position.set(-w / 2 + sideRimW / 2, h - rimThick / 2, centerZ);
+    group.add(leftRim);
+
+    const rightRim = new THREE.Mesh(
+      this.getCachedGeometry(`ubasin_side_${sideRimW}_${Math.round(innerD)}`, () => new THREE.BoxGeometry(sideRimW, rimThick, innerD)),
+      ceramicMat
+    );
+    rightRim.position.set(w / 2 - sideRimW / 2, h - rimThick / 2, centerZ);
+    group.add(rightRim);
+
+    // Cavidad hueca profunda
+    this.buildHollowBasinCavity(
+      group,
+      0,
+      centerZ,
+      innerW,
+      innerD,
+      h,
+      ceramicMat,
+      ceramicMat,
+      chromeMat,
+      darkMat,
+      false
+    );
+
+    // Grifería monomando apoyada sobre el deck posterior
+    const faucetGroup = this.buildGooseneckFaucet(0, h, -d / 2 + rearDeckD / 2, w * 0.8, d * 0.8, chromeMat);
+    group.add(faucetGroup);
+  }
+
+  // =========================================================================
+  // --- 18. ESPEJO LED FLOTANTE CON HALO EMISSIVE (0 POINTLIGHT) ---
+  // =========================================================================
+
+  private buildBathroomMirrorLed(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material
+  ) {
+    const isRound = (appliance.modelCode || '').toUpperCase().includes('RND') || (appliance.name || '').toUpperCase().includes('REDONDO');
+    const chassisD = Math.max(16, d * 0.6);
+    const glassD = 4;
+
+    // Material de halo LED perimetral cálido/neutro (100% emissive, CERO PointLight)
+    const ledGlowMat = this.getCachedMaterial('mirror_led_halo', () =>
+      new THREE.MeshBasicMaterial({
+        color: 0xfffae6,
+        transparent: true,
+        opacity: 0.88
+      })
+    );
+
+    // Material de espejo de alta reflectancia
+    const mirrorGlassMat = this.getCachedMaterial('mirror_glass_reflective', () =>
+      new THREE.MeshStandardMaterial({
+        color: 0xedf2f7,
+        metalness: 0.95,
+        roughness: 0.04
+      })
+    );
+
+    // Botón táctil sensor frontal
+    const touchSensorMat = this.getCachedMaterial('mirror_touch_led', () =>
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+
+    if (isRound) {
+      const radius = Math.min(w, h) * 0.48;
+      // 1. Halo LED posterior (disco ligeramente mayor con glow emissive)
+      const haloGeo = this.getCachedGeometry(
+        `mirror_halo_rnd_${Math.round(radius)}`,
+        () => new THREE.CylinderGeometry(radius + 12, radius + 12, 4, 32)
+      );
+      const haloMesh = new THREE.Mesh(haloGeo, ledGlowMat);
+      haloMesh.rotation.x = Math.PI / 2;
+      haloMesh.position.set(0, h / 2, -chassisD / 2);
+      group.add(haloMesh);
+
+      // 2. Chasis interior
+      const chassisGeo = this.getCachedGeometry(
+        `mirror_chassis_rnd_${Math.round(radius)}`,
+        () => new THREE.CylinderGeometry(radius - 10, radius - 10, chassisD, 24)
+      );
+      const chassisMesh = new THREE.Mesh(chassisGeo, bodyMat);
+      chassisMesh.rotation.x = Math.PI / 2;
+      chassisMesh.position.set(0, h / 2, 0);
+      group.add(chassisMesh);
+
+      // 3. Cristal de espejo frontal
+      const glassGeo = this.getCachedGeometry(
+        `mirror_glass_rnd_${Math.round(radius)}`,
+        () => new THREE.CylinderGeometry(radius, radius, glassD, 32)
+      );
+      const glassMesh = new THREE.Mesh(glassGeo, mirrorGlassMat);
+      glassMesh.rotation.x = Math.PI / 2;
+      glassMesh.position.set(0, h / 2, d / 2 - glassD / 2);
+      group.add(glassMesh);
+
+      // Sensor táctil
+      const sensorGeo = this.getCachedGeometry('mirror_touch_dot', () => new THREE.RingGeometry(6, 12, 16));
+      const sensorMesh = new THREE.Mesh(sensorGeo, touchSensorMat);
+      sensorMesh.position.set(0, h * 0.22, d / 2 + 0.5);
+      group.add(sensorMesh);
+    } else {
+      // Espejo rectangular
+      // 1. Halo LED perimetral posterior
+      const haloGeo = this.getCachedGeometry(
+        `mirror_halo_rect_${Math.round(w)}_${Math.round(h)}`,
+        () => new THREE.BoxGeometry(w + 16, h + 16, 4)
+      );
+      const haloMesh = new THREE.Mesh(haloGeo, ledGlowMat);
+      haloMesh.position.set(0, h / 2, -chassisD / 2);
+      group.add(haloMesh);
+
+      // 2. Chasis de aluminio
+      const chassisGeo = this.getCachedGeometry(
+        `mirror_chassis_rect_${Math.round(w)}_${Math.round(h)}`,
+        () => new THREE.BoxGeometry(w - 20, h - 20, chassisD)
+      );
+      const chassisMesh = new THREE.Mesh(chassisGeo, bodyMat);
+      chassisMesh.position.set(0, h / 2, 0);
+      group.add(chassisMesh);
+
+      // 3. Cristal de espejo frontal
+      const glassGeo = this.getCachedGeometry(
+        `mirror_glass_rect_${Math.round(w)}_${Math.round(h)}`,
+        () => new THREE.BoxGeometry(w, h, glassD)
+      );
+      const glassMesh = new THREE.Mesh(glassGeo, mirrorGlassMat);
+      glassMesh.position.set(0, h / 2, d / 2 - glassD / 2);
+      group.add(glassMesh);
+
+      // Sensor táctil iluminado
+      const sensorGeo = this.getCachedGeometry('mirror_touch_ring', () => new THREE.RingGeometry(8, 14, 16));
+      const sensorMesh = new THREE.Mesh(sensorGeo, touchSensorMat);
+      sensorMesh.position.set(0, h * 0.18, d / 2 + 0.5);
+      group.add(sensorMesh);
+    }
+  }
+
+  // =========================================================================
+  // --- 19. INODORO / SANITARIO ONE-PIECE LOW-POLY ---
+  // =========================================================================
+
+  private buildToilet(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const isBlack = appliance.finish === 'black_matte';
+    const ceramicMat = this.getCachedMaterial(`toilet_ceramic_${appliance.finish}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isBlack ? 0x181a1c : 0xfcfdfd,
+        roughness: isBlack ? 0.40 : 0.10,
+        metalness: 0.05
+      })
+    );
+    const darkWaterMat = this.getCachedMaterial('toilet_water_trap', () =>
+      new THREE.MeshStandardMaterial({
+        color: 0x0ea5e9,
+        roughness: 0.1,
+        metalness: 0.1,
+        transparent: true,
+        opacity: 0.75
+      })
+    );
+
+    const tankW = Math.min(w * 0.96, 380);
+    const tankD = Math.min(d * 0.32, 210);
+    const tankH = h * 0.48;
+    const bowlH = h * 0.52; // Altura de asiento ~400-420 mm
+    const bowlW = w * 0.88;
+    const bowlD = d - tankD;
+
+    // 1. Tanque de agua posterior (Cisterna)
+    const tankGeo = this.getCachedGeometry(
+      `toilet_tank_${Math.round(tankW)}_${Math.round(tankH)}_${Math.round(tankD)}`,
+      () => new THREE.BoxGeometry(tankW, tankH, tankD)
+    );
+    const tankMesh = new THREE.Mesh(tankGeo, ceramicMat);
+    tankMesh.position.set(0, bowlH + tankH / 2, -d / 2 + tankD / 2);
+    group.add(tankMesh);
+
+    // Tapa de cisterna
+    const tankLidGeo = this.getCachedGeometry(
+      `toilet_tank_lid_${Math.round(tankW)}_${Math.round(tankD)}`,
+      () => new THREE.BoxGeometry(tankW + 8, 16, tankD + 8)
+    );
+    const tankLidMesh = new THREE.Mesh(tankLidGeo, ceramicMat);
+    tankLidMesh.position.set(0, bowlH + tankH + 8, -d / 2 + tankD / 2);
+    group.add(tankLidMesh);
+
+    // Botón de doble descarga dual-flush cromado
+    const flushBtnGeo = this.getCachedGeometry('toilet_flush_btn', () => new THREE.CylinderGeometry(18, 18, 4, 16));
+    const flushBtnMesh = new THREE.Mesh(flushBtnGeo, chromeMat);
+    flushBtnMesh.position.set(0, bowlH + tankH + 18, -d / 2 + tankD / 2);
+    group.add(flushBtnMesh);
+
+    // 2. Pedestal / Base del inodoro
+    const baseGeo = this.getCachedGeometry(
+      `toilet_base_${Math.round(bowlW * 0.75)}_${Math.round(bowlH * 0.75)}_${Math.round(bowlD * 0.8)}`,
+      () => new THREE.BoxGeometry(bowlW * 0.75, bowlH * 0.75, bowlD * 0.8)
+    );
+    const baseMesh = new THREE.Mesh(baseGeo, ceramicMat);
+    baseMesh.position.set(0, (bowlH * 0.75) / 2, -d / 2 + tankD + (bowlD * 0.8) / 2 - 10);
+    group.add(baseMesh);
+
+    // 3. Taza superior contorneada
+    const bowlGeo = this.getCachedGeometry(
+      `toilet_bowl_top_${Math.round(bowlW)}_${Math.round(bowlH * 0.35)}_${Math.round(bowlD)}`,
+      () => new THREE.CylinderGeometry(bowlW * 0.48, bowlW * 0.40, bowlH * 0.35, 20)
+    );
+    const bowlMesh = new THREE.Mesh(bowlGeo, ceramicMat);
+    bowlMesh.position.set(0, bowlH - (bowlH * 0.35) / 2, -d / 2 + tankD + bowlD / 2);
+    group.add(bowlMesh);
+
+    // Interior de taza con agua / trampa
+    const waterGeo = this.getCachedGeometry(
+      `toilet_water_${Math.round(bowlW * 0.35)}`,
+      () => new THREE.CylinderGeometry(bowlW * 0.32, bowlW * 0.28, 4, 16)
+    );
+    const waterMesh = new THREE.Mesh(waterGeo, darkWaterMat);
+    waterMesh.position.set(0, bowlH - 30, -d / 2 + tankD + bowlD / 2 + 10);
+    group.add(waterMesh);
+
+    // 4. Asiento y tapa abatible
+    const seatGeo = this.getCachedGeometry(
+      `toilet_seat_${Math.round(bowlW * 0.9)}_${Math.round(bowlD * 0.95)}`,
+      () => new THREE.BoxGeometry(bowlW * 0.9, 14, bowlD * 0.95)
+    );
+    const seatMesh = new THREE.Mesh(seatGeo, ceramicMat);
+    seatMesh.position.set(0, bowlH + 7, -d / 2 + tankD + (bowlD * 0.95) / 2);
+    group.add(seatMesh);
+
+    // Bisagras cromadas del asiento
+    for (const hx of [-55, 55]) {
+      const hingeGeo = this.getCachedGeometry('toilet_hinge', () => new THREE.CylinderGeometry(7, 7, 18, 12));
+      const hingeMesh = new THREE.Mesh(hingeGeo, chromeMat);
+      hingeMesh.rotation.z = Math.PI / 2;
+      hingeMesh.position.set(hx, bowlH + 10, -d / 2 + tankD + 5);
+      group.add(hingeMesh);
+    }
+  }
+
+  // =========================================================================
+  // --- 20. TUBO COLGADOR PARA CLOSET ---
+  // =========================================================================
+
+  private buildClosetRod(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const isBlack = appliance.finish === 'black_matte';
+    const rodMat = isBlack ? bodyMat : chromeMat;
+    const rodRadius = Math.min(14, h * 0.22);
+    const rodLen = Math.max(100, w - 16);
+
+    // 1. Barra horizontal principal
+    const rodGeo = this.getCachedGeometry(
+      `closet_rod_tube_${Math.round(rodLen)}_${Math.round(rodRadius)}`,
+      () => new THREE.CylinderGeometry(rodRadius, rodRadius, rodLen, 16)
+    );
+    const rodMesh = new THREE.Mesh(rodGeo, rodMat);
+    rodMesh.rotation.z = Math.PI / 2;
+    rodMesh.position.set(0, h / 2, 0);
+    group.add(rodMesh);
+
+    // 2. Bridas laterales de anclaje a las paredes del closet
+    const flangeR = rodRadius + 12;
+    const flangeT = 8;
+    for (const fx of [-w / 2 + flangeT / 2, w / 2 - flangeT / 2]) {
+      const flangeGeo = this.getCachedGeometry(
+        `closet_rod_flange_${Math.round(flangeR)}`,
+        () => new THREE.CylinderGeometry(flangeR, flangeR, flangeT, 16)
+      );
+      const flangeMesh = new THREE.Mesh(flangeGeo, rodMat);
+      flangeMesh.rotation.z = Math.PI / 2;
+      flangeMesh.position.set(fx, h / 2, 0);
+      group.add(flangeMesh);
+    }
+
+    // 3. Ganchos de ropa low-poly colgantes estilizados
+    const hangerCount = Math.min(6, Math.max(2, Math.floor(w / 180)));
+    const step = rodLen / (hangerCount + 1);
+    const hangerMat = this.getCachedMaterial('closet_hanger_mat', () =>
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.5, roughness: 0.3 })
+    );
+
+    for (let i = 1; i <= hangerCount; i++) {
+      const hx = -rodLen / 2 + step * i;
+      const hangerGeo = this.getCachedGeometry('closet_hanger_poly', () => new THREE.BoxGeometry(4, 85, 140));
+      const hangerMesh = new THREE.Mesh(hangerGeo, hangerMat);
+      hangerMesh.position.set(hx, h / 2 - 45, 0);
+      group.add(hangerMesh);
+    }
+  }
+
+  // =========================================================================
+  // --- 21. CAMA DE REFERENCIA ESPACIAL ---
+  // =========================================================================
+
+  private buildBed(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material
+  ) {
+    const isDark = appliance.finish === 'black_matte';
+    const frameH = 260; // Altura del bastidor / largueros
+    const mattressH = 240; // Altura de colchón
+    const headboardT = 75; // Espesor de cabecero
+    const headboardH = h; // Altura cabecero
+
+    const fabricMat = this.getCachedMaterial(`bed_fabric_${appliance.finish}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isDark ? 0x24272c : 0xe2e8f0,
+        roughness: 0.85,
+        metalness: 0.05
+      })
+    );
+    const duvetMat = this.getCachedMaterial(`bed_duvet_${appliance.finish}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isDark ? 0x334155 : 0xcbd5e1,
+        roughness: 0.90,
+        metalness: 0.04
+      })
+    );
+    const pillowMat = this.getCachedMaterial('bed_pillow_white', () =>
+      new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        roughness: 0.90,
+        metalness: 0.02
+      })
+    );
+
+    // 1. Cabecero arquitectónico vertical (en -Z)
+    const headboardGeo = this.getCachedGeometry(
+      `bed_headboard_${Math.round(w)}_${Math.round(headboardH)}`,
+      () => new THREE.BoxGeometry(w, headboardH, headboardT)
+    );
+    const headboardMesh = new THREE.Mesh(headboardGeo, bodyMat);
+    headboardMesh.position.set(0, headboardH / 2, -d / 2 + headboardT / 2);
+    group.add(headboardMesh);
+
+    // 2. Bastidor perimetral / Largueros de la cama
+    const frameD = d - headboardT;
+    const frameCenterZ = -d / 2 + headboardT + frameD / 2;
+    const frameGeo = this.getCachedGeometry(
+      `bed_frame_${Math.round(w)}_${Math.round(frameD)}`,
+      () => new THREE.BoxGeometry(w, frameH, frameD)
+    );
+    const frameMesh = new THREE.Mesh(frameGeo, bodyMat);
+    frameMesh.position.set(0, frameH / 2, frameCenterZ);
+    group.add(frameMesh);
+
+    // 4 patas estilizadas en las esquinas
+    const legH = 80;
+    const legW = 50;
+    for (const lx of [-w / 2 + legW / 2 + 10, w / 2 - legW / 2 - 10]) {
+      for (const lz of [frameCenterZ - frameD / 2 + 30, frameCenterZ + frameD / 2 - 30]) {
+        const legGeo = this.getCachedGeometry('bed_leg_wood', () => new THREE.BoxGeometry(legW, legH, legW));
+        const legMesh = new THREE.Mesh(legGeo, accentMat);
+        legMesh.position.set(lx, legH / 2, lz);
+        group.add(legMesh);
+      }
+    }
+
+    // 3. Colchón
+    const mattressW = w - 40;
+    const mattressD = frameD - 30;
+    const mattressGeo = this.getCachedGeometry(
+      `bed_mattress_${Math.round(mattressW)}_${Math.round(mattressD)}`,
+      () => new THREE.BoxGeometry(mattressW, mattressH, mattressD)
+    );
+    const mattressMesh = new THREE.Mesh(mattressGeo, fabricMat);
+    mattressMesh.position.set(0, frameH + mattressH / 2 - 20, frameCenterZ);
+    group.add(mattressMesh);
+
+    // 4. Edredón / Cubrecama con pliegue frontal
+    const duvetD = mattressD * 0.70;
+    const duvetGeo = this.getCachedGeometry(
+      `bed_duvet_${Math.round(mattressW + 8)}_${Math.round(duvetD)}`,
+      () => new THREE.BoxGeometry(mattressW + 8, 28, duvetD)
+    );
+    const duvetMesh = new THREE.Mesh(duvetGeo, duvetMat);
+    duvetMesh.position.set(0, frameH + mattressH - 10, frameCenterZ + (mattressD - duvetD) / 2);
+    group.add(duvetMesh);
+
+    // 5. Almohadas
+    const pillowCount = w >= 1300 ? 2 : 1;
+    const pillowW = pillowCount === 2 ? (mattressW - 80) / 2 : mattressW * 0.65;
+    const pillowD = 380;
+    const pillowH = 110;
+    const pillowZ = frameCenterZ - mattressD / 2 + pillowD / 2 + 30;
+    const pillowY = frameH + mattressH + pillowH / 2 - 25;
+
+    if (pillowCount === 2) {
+      for (const px of [-mattressW / 4, mattressW / 4]) {
+        const pGeo = this.getCachedGeometry(
+          `bed_pillow_${Math.round(pillowW)}`,
+          () => new THREE.BoxGeometry(pillowW, pillowH, pillowD)
+        );
+        const pMesh = new THREE.Mesh(pGeo, pillowMat);
+        pMesh.position.set(px, pillowY, pillowZ);
+        pMesh.rotation.x = 0.15;
+        group.add(pMesh);
+      }
+    } else {
+      const pGeo = this.getCachedGeometry(
+        `bed_pillow_single_${Math.round(pillowW)}`,
+        () => new THREE.BoxGeometry(pillowW, pillowH, pillowD)
+      );
+      const pMesh = new THREE.Mesh(pGeo, pillowMat);
+      pMesh.position.set(0, pillowY, pillowZ);
+      pMesh.rotation.x = 0.15;
+      group.add(pMesh);
+    }
+  }
+
+  // =========================================================================
+  // --- 22. SMART TV EXTRA-PLANO CON PANTALLA EMISSIVE (0 POINTLIGHT) ---
+  // =========================================================================
+
+  private buildSmartTv(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material
+  ) {
+    const bezelT = 12; // Bisel frontal ultra-delgado
+    const tvDepth = Math.min(45, d * 0.45);
+    const isWallMount = appliance.mountType === 'wall';
+
+    // Pantalla emisiva negra de alto contraste (CERO PointLight)
+    const tvScreenMat = this.getCachedMaterial('tv_oled_screen_emissive', () =>
+      new THREE.MeshStandardMaterial({
+        color: 0x05070a,
+        roughness: 0.10,
+        metalness: 0.15,
+        emissive: 0x0c1322,
+        emissiveIntensity: 0.35
+      })
+    );
+
+    // 1. Chasis exterior / marco
+    const frameGeo = this.getCachedGeometry(
+      `tv_frame_${Math.round(w)}_${Math.round(h)}`,
+      () => new THREE.BoxGeometry(w, h, tvDepth)
+    );
+    const frameMesh = new THREE.Mesh(frameGeo, bodyMat);
+    frameMesh.position.set(0, h / 2, 0);
+    group.add(frameMesh);
+
+    // 2. Pantalla frontal empotrada
+    const screenGeo = this.getCachedGeometry(
+      `tv_screen_${Math.round(w - bezelT * 2)}_${Math.round(h - bezelT * 2)}`,
+      () => new THREE.PlaneGeometry(w - bezelT * 2, h - bezelT * 2)
+    );
+    const screenMesh = new THREE.Mesh(screenGeo, tvScreenMat);
+    screenMesh.position.set(0, h / 2, tvDepth / 2 + 0.6);
+    group.add(screenMesh);
+
+    // 3. LED piloto de encendido en el borde inferior
+    const ledDotMat = this.getCachedMaterial('tv_power_led', () => new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+    const ledGeo = this.getCachedGeometry('tv_power_dot', () => new THREE.CircleGeometry(2.5, 8));
+    const ledMesh = new THREE.Mesh(ledGeo, ledDotMat);
+    ledMesh.position.set(0, bezelT / 2, tvDepth / 2 + 0.7);
+    group.add(ledMesh);
+
+    // 4. Soporte / Patas de sobremesa si no es empotrado a la pared
+    if (!isWallMount) {
+      const legMat = this.getCachedMaterial('tv_leg_metal', () =>
+        new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.3, metalness: 0.8 })
+      );
+      const legDist = w * 0.36;
+      for (const lx of [-legDist, legDist]) {
+        const footGeo = this.getCachedGeometry('tv_foot_bar', () => new THREE.BoxGeometry(16, 25, 180));
+        const footMesh = new THREE.Mesh(footGeo, legMat);
+        footMesh.position.set(lx, 12, 10);
+        group.add(footMesh);
+      }
+    }
+  }
+
+  // =========================================================================
+  // --- 23. PUESTO DE TRABAJO: MONITOR CURVO + LAPTOP SLIM ---
+  // =========================================================================
+
+  private buildDesktopWorkspace(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const isDark = appliance.finish === 'black_matte';
+    const monitorW = Math.min(w * 0.75, 680);
+    const monitorH = monitorW * 0.45;
+    const standH = h * 0.55;
+
+    const screenMat = this.getCachedMaterial('workspace_screen_glow', () =>
+      new THREE.MeshStandardMaterial({
+        color: 0x0b1120,
+        roughness: 0.12,
+        metalness: 0.10,
+        emissive: 0x1e293b,
+        emissiveIntensity: 0.40
+      })
+    );
+    const metalStandMat = this.getCachedMaterial(`workspace_stand_mat_${isDark ? 'dark' : 'light'}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isDark ? 0x27272a : 0xd1d5db,
+        roughness: 0.25,
+        metalness: 0.85
+      })
+    );
+
+    // 1. Base del soporte del monitor
+    const baseGeo = this.getCachedGeometry('workspace_monitor_base', () => new THREE.BoxGeometry(220, 8, 160));
+    const baseMesh = new THREE.Mesh(baseGeo, metalStandMat);
+    baseMesh.position.set(0, 4, -d * 0.22);
+    group.add(baseMesh);
+
+    // Brazo vertical del soporte
+    const armGeo = this.getCachedGeometry(
+      `workspace_monitor_arm_${Math.round(standH)}`,
+      () => new THREE.BoxGeometry(32, standH, 20)
+    );
+    const armMesh = new THREE.Mesh(armGeo, metalStandMat);
+    armMesh.position.set(0, standH / 2, -d * 0.22);
+    group.add(armMesh);
+
+    // Panel del monitor panorámico
+    const monPanelGeo = this.getCachedGeometry(
+      `workspace_monitor_panel_${Math.round(monitorW)}_${Math.round(monitorH)}`,
+      () => new THREE.BoxGeometry(monitorW, monitorH, 22)
+    );
+    const monPanelMesh = new THREE.Mesh(monPanelGeo, bodyMat);
+    monPanelMesh.position.set(0, standH + 20, -d * 0.22 + 10);
+    group.add(monPanelMesh);
+
+    // Pantalla activa del monitor
+    const monScreenGeo = this.getCachedGeometry(
+      `workspace_screen_disp_${Math.round(monitorW - 16)}_${Math.round(monitorH - 16)}`,
+      () => new THREE.PlaneGeometry(monitorW - 16, monitorH - 16)
+    );
+    const monScreenMesh = new THREE.Mesh(monScreenGeo, screenMat);
+    monScreenMesh.position.set(0, standH + 20, -d * 0.22 + 21.5);
+    group.add(monScreenMesh);
+
+    // 2. Teclado slim en la superficie del escritorio
+    const kbGeo = this.getCachedGeometry('workspace_keyboard_slim', () => new THREE.BoxGeometry(380, 10, 130));
+    const kbMesh = new THREE.Mesh(kbGeo, metalStandMat);
+    kbMesh.position.set(-60, 5, d * 0.15);
+    group.add(kbMesh);
+
+    // Mouse ergonómico
+    const mouseGeo = this.getCachedGeometry('workspace_mouse_ergo', () => new THREE.BoxGeometry(65, 18, 105));
+    const mouseMesh = new THREE.Mesh(mouseGeo, bodyMat);
+    mouseMesh.position.set(180, 9, d * 0.15);
+    group.add(mouseMesh);
+
+    // 3. Laptop abierta estilizada a un lado
+    const laptopW = 280;
+    const laptopD = 190;
+    const laptopX = -w / 2 + laptopW / 2 + 25;
+    const laptopBaseGeo = this.getCachedGeometry('workspace_laptop_base', () => new THREE.BoxGeometry(laptopW, 10, laptopD));
+    const laptopBaseMesh = new THREE.Mesh(laptopBaseGeo, metalStandMat);
+    laptopBaseMesh.position.set(laptopX, 5, 0);
+    group.add(laptopBaseMesh);
+
+    // Tapa de pantalla abierta inclinada
+    const laptopScreenGeo = this.getCachedGeometry('workspace_laptop_screen', () => new THREE.BoxGeometry(laptopW, 170, 8));
+    const laptopScreenMesh = new THREE.Mesh(laptopScreenGeo, screenMat);
+    laptopScreenMesh.rotation.x = -0.22;
+    laptopScreenMesh.position.set(laptopX, 85, -laptopD / 2 + 10);
+    group.add(laptopScreenMesh);
+  }
+
+  // =========================================================================
+  // --- 24. SILLA ERGONÓMICA DE OFICINA ---
+  // =========================================================================
+
+  private buildOfficeChair(
+    group: THREE.Group,
+    appliance: ApplianceItem,
+    w: number,
+    h: number,
+    d: number,
+    bodyMat: THREE.Material,
+    accentMat: THREE.Material,
+    chromeMat: THREE.Material
+  ) {
+    const isDark = appliance.finish === 'black_matte';
+    const meshBackMat = this.getCachedMaterial(`office_chair_mesh_${appliance.finish}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isDark ? 0x1e2022 : 0x475569,
+        roughness: 0.70,
+        metalness: 0.15
+      })
+    );
+    const cushionMat = this.getCachedMaterial(`office_chair_cushion_${appliance.finish}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: isDark ? 0x111315 : 0x334155,
+        roughness: 0.85,
+        metalness: 0.05
+      })
+    );
+
+    const seatY = Math.min(480, h * 0.45); // Altura de asiento
+    const starRadius = Math.min(270, Math.min(w, d) * 0.44);
+
+    // 1. Estrella de 5 radios / base con ruedas
+    const centerHubGeo = this.getCachedGeometry('chair_hub', () => new THREE.CylinderGeometry(28, 35, 30, 16));
+    const centerHub = new THREE.Mesh(centerHubGeo, bodyMat);
+    centerHub.position.set(0, 80, 0);
+    group.add(centerHub);
+
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * Math.PI * 2) / 5;
+      const legArmGeo = this.getCachedGeometry(
+        `chair_leg_arm_${Math.round(starRadius)}`,
+        () => new THREE.BoxGeometry(26, 18, starRadius)
+      );
+      const legArm = new THREE.Mesh(legArmGeo, bodyMat);
+      legArm.position.set((Math.sin(angle) * starRadius) / 2, 70, (Math.cos(angle) * starRadius) / 2);
+      legArm.rotation.y = angle;
+      group.add(legArm);
+
+      // Rueda doble en el extremo
+      const wheelGeo = this.getCachedGeometry('chair_caster_wheel', () => new THREE.CylinderGeometry(20, 20, 18, 12));
+      const wheelMesh = new THREE.Mesh(wheelGeo, bodyMat);
+      wheelMesh.rotation.z = Math.PI / 2;
+      wheelMesh.position.set(Math.sin(angle) * starRadius, 25, Math.cos(angle) * starRadius);
+      group.add(wheelMesh);
+    }
+
+    // 2. Pistón de gas telescópico
+    const pistonH = seatY - 95;
+    const pistonGeo = this.getCachedGeometry(
+      `chair_gas_piston_${Math.round(pistonH)}`,
+      () => new THREE.CylinderGeometry(16, 20, pistonH, 16)
+    );
+    const pistonMesh = new THREE.Mesh(pistonGeo, chromeMat);
+    pistonMesh.position.set(0, 95 + pistonH / 2, 0);
+    group.add(pistonMesh);
+
+    // 3. Asiento ergonómico con caída delantera
+    const seatW = Math.min(w * 0.82, 480);
+    const seatD = Math.min(d * 0.82, 470);
+    const seatGeo = this.getCachedGeometry(
+      `chair_seat_cushion_${Math.round(seatW)}_${Math.round(seatD)}`,
+      () => new THREE.BoxGeometry(seatW, 55, seatD)
+    );
+    const seatMesh = new THREE.Mesh(seatGeo, cushionMat);
+    seatMesh.position.set(0, seatY, 0);
+    group.add(seatMesh);
+
+    // 4. Respaldo ergonómico con soporte lumbar
+    const backH = h - seatY;
+    const backGeo = this.getCachedGeometry(
+      `chair_mesh_back_${Math.round(seatW * 0.9)}_${Math.round(backH)}`,
+      () => new THREE.BoxGeometry(seatW * 0.9, backH * 0.9, 24)
+    );
+    const backMesh = new THREE.Mesh(backGeo, meshBackMat);
+    backMesh.position.set(0, seatY + (backH * 0.9) / 2 + 10, -seatD / 2 + 15);
+    backMesh.rotation.x = -0.08;
+    group.add(backMesh);
+
+    // Soporte columna lumbar posterior
+    const spineGeo = this.getCachedGeometry(
+      `chair_spine_${Math.round(backH * 0.7)}`,
+      () => new THREE.BoxGeometry(40, backH * 0.7, 18)
+    );
+    const spineMesh = new THREE.Mesh(spineGeo, bodyMat);
+    spineMesh.position.set(0, seatY + (backH * 0.7) / 2, -seatD / 2 - 2);
+    group.add(spineMesh);
+
+    // 5. Apoyabrazos 3D T-arm
+    for (const ax of [-seatW / 2 - 15, seatW / 2 + 15]) {
+      const armPostGeo = this.getCachedGeometry('chair_arm_post', () => new THREE.BoxGeometry(20, 180, 26));
+      const armPost = new THREE.Mesh(armPostGeo, bodyMat);
+      armPost.position.set(ax, seatY + 80, 0);
+      group.add(armPost);
+
+      const armPadGeo = this.getCachedGeometry('chair_arm_pad', () => new THREE.BoxGeometry(60, 22, 210));
+      const armPad = new THREE.Mesh(armPadGeo, bodyMat);
+      armPad.position.set(ax, seatY + 175, 20);
+      group.add(armPad);
+    }
+  }
 }
+
 

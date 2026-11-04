@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>CarpenterPro - Diagnóstico Técnico Integral y Plan Maestro</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 14mm 16mm 14mm;
+    }
+    
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #1e293b;
+      background: #ffffff;
+      line-height: 1.5;
+      font-size: 9pt;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Header Banner */
+    .doc-header {
+      border-bottom: 2.5px solid #0284c7;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .brand-title {
+      font-size: 19pt;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      margin: 0 0 3px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-title span.badge {
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 8.5pt;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 5px;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      font-size: 10.5pt;
+      color: #475569;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .meta-box {
+      text-align: right;
+      font-size: 7.8pt;
+      color: #64748b;
+      line-height: 1.4;
+    }
+
+    .meta-box strong {
+      color: #1e293b;
+    }
+
+    /* Headings */
+    h1 {
+      font-size: 14pt;
+      font-weight: 800;
+      color: #0f172a;
+      border-bottom: 1.5px solid #e2e8f0;
+      padding-bottom: 5px;
+      margin-top: 22px;
+      margin-bottom: 10px;
+      page-break-after: avoid;
+    }
+
+    h2 {
+      font-size: 12pt;
+      font-weight: 700;
+      color: #0369a1;
+      margin-top: 18px;
+      margin-bottom: 8px;
+      page-break-after: avoid;
+      border-left: 3.5px solid #0284c7;
+      padding-left: 8px;
+    }
+
+    h3 {
+      font-size: 10.2pt;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    h4 {
+      font-size: 9.2pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 10px;
+      margin-bottom: 4px;
+      page-break-after: avoid;
+    }
+
+    p {
+      margin: 0 0 7px 0;
+      text-align: justify;
+    }
+
+    /* Lists */
+    ul, ol {
+      margin: 0 0 8px 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin-bottom: 3px;
+    }
+
+    /* Callouts */
+    .callout {
+      border-radius: 6px;
+      padding: 9px 12px;
+      margin: 12px 0;
+      page-break-inside: avoid;
+    }
+
+    .callout-important {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      color: #1e40af;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      font-size: 9pt;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+
+    .callout p {
+      margin: 0;
+      font-size: 8.8pt;
+      color: #1e3a8a;
+      line-height: 1.4;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px 0;
+      font-size: 8.2pt;
+      page-break-inside: auto;
+    }
+
+    tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+
+    thead {
+      display: table-header-group;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 8.2pt;
+    }
+
+    td {
+      padding: 6px 8px;
+      border: 1px solid #e2e8f0;
+      vertical-align: top;
+      line-height: 1.35;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    /* Code & Badges */
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 7.8pt;
+      background: #f1f5f9;
+      color: #0369a1;
+      padding: 1px 4px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 7.8pt;
+      line-height: 1.35;
+      margin: 8px 0;
+      page-break-inside: avoid;
+    }
+
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      border: none;
+    }
+
+    .badge-file {
+      display: inline-block;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 7.3pt;
+      color: #0369a1;
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      padding: 1px 4px;
+      border-radius: 3px;
+      word-break: break-all;
+    }
+
+    .badge-tag {
+      display: inline-block;
+      font-size: 7.2pt;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .badge-tag.new { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-tag.modify { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .badge-tag.delete { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    /* Visual Diagram Cards */
+    .diagram-container {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 12px 0;
+      page-break-inside: avoid;
+    }
+
+    .diagram-title {
+      font-weight: 700;
+      font-size: 8.5pt;
+      color: #334155;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .flow-horizontal {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .flow-col {
+      flex: 1;
+      background: #ffffff;
+      border: 1.5px solid #0284c7;
+      border-radius: 5px;
+      padding: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .flow-col-header {
+      font-weight: 700;
+      font-size: 8.2pt;
+      color: #0369a1;
+      border-bottom: 1px solid #e0f2fe;
+      padding-bottom: 3px;
+      margin-bottom: 5px;
+    }
+
+    .flow-col-item {
+      font-size: 7.5pt;
+      color: #334155;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      padding: 3px 5px;
+      margin-bottom: 3px;
+      line-height: 1.25;
+    }
+
+    .flow-arrow-h {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0284c7;
+      font-weight: 800;
+      font-size: 13pt;
+    }
+
+    .timeline-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .timeline-step {
+      display: flex;
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid #0284c7;
+      border-radius: 4px;
+      padding: 5px 9px;
+      font-size: 8pt;
+      gap: 8px;
+    }
+
+    .step-num {
+      font-weight: 800;
+      color: #0284c7;
+      font-size: 7.8pt;
+      white-space: nowrap;
+    }
+
+    .step-desc {
+      color: #1e293b;
+      font-weight: 600;
+    }
+
+    .timeline-arrow {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 8pt;
+      line-height: 1;
+      margin: -2px 0;
+    }
+
+    /* Change Item Card */
+    .change-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      page-break-inside: avoid;
+    }
+
+    .change-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .change-title {
+      font-weight: 700;
+      font-size: 8.8pt;
+      color: #0f172a;
+    }
+
+    .change-body {
+      font-size: 8.2pt;
+      color: #334155;
+      line-height: 1.4;
+    }
+
+    .change-body ul {
+      margin: 4px 0 0 0;
+      padding-left: 16px;
+    }
+
+    .change-body li {
+      margin-bottom: 2px;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid #e2e8f0;
+      margin: 16px 0;
+    }
+
+    /* Print Footer */
+    .doc-footer {
+      border-top: 1px solid #cbd5e1;
+      padding-top: 5px;
+      margin-top: 18px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 7.2pt;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Encabezado de Documento Ejecutivo -->
+  <div class="doc-header">
+    <div>
+      <div class="brand-title">
+        CarpenterPro <span class="badge">Master Plan 2026</span>
+      </div>
+      <div class="brand-subtitle">
+        Diagnóstico Técnico Integral + Plan Maestro de Refactorización y Evolución Multi-Ambiente
+      </div>
+    </div>
+    <div class="meta-box">
+      <strong>Commit Base:</strong> f9a4dad (Clean, idéntico a 39d341e)<br>
+      <strong>Stack Oficial:</strong> Angular Moderno + Supabase + Tailwind + Hugeicons<br>
+      <strong>Alcance Auditado:</strong> 15 Comp. / 12 Serv. / 2 Modelos / 2 Utils / 1 Datos<br>
+      <strong>Fecha de Emisión:</strong> 3 de Noviembre de 2026
+    </div>
+  </div>
+
+  <!-- Objetivo Estratégico -->
+  <h2>Objetivo Estratégico</h2>
+  <p>
+    Transformar <strong>CarpenterPro</strong> desde un enfoque experimental de modelado libre en malla 3D hacia la <strong>plataforma más ágil, intuitiva, predecible y visualmente atractiva para el diseño paramétrico de mobiliario modular en melamina y carpintería</strong> (<strong>Cocinas</strong>, <strong>Closets y Dormitorios</strong>, <strong>Muebles de Baño</strong> y <strong>Hogar / Estudio</strong>), garantizando:
+  </p>
+  <ul>
+    <li><strong>100% Edición Paramétrica sin Errores Geométricos:</strong> Redimensionado exacto por bordes/esquinas y desde el inspector, rotaciones <code>90°</code> y <code>45°</code> sin deformar espesores ni invertir ejes, y cortes técnicos controlados desde el panel de propiedades.</li>
+    <li><strong>Performance-First (60 FPS en PCs de bajos recursos):</strong> Ejecución fuera de <code>NgZone</code>, cero asignaciones en <code>pointermove</code>, pooling de geometrías/materiales, texturas procedurales con caché LRU + <code>.dispose()</code> y preservación instantánea del contexto WebGL entre pestañas.</li>
+    <li><strong>Arquitectura Angular Estricta:</strong> Separación obligatoria en 3 archivos por componente (<code>.ts</code>, <code>.html</code>, <code>.css</code>), <code>standalone: true</code>, <code>ChangeDetectionStrategy.OnPush</code>, Signals (<code>signal</code>, <code>computed</code>, <code>input</code>, <code>output</code>), flujo nativo (<code>@if</code>, <code>@for ... track</code>), <code>Hugeicons</code> exclusivo y cero <code>any</code>.</li>
+  </ul>
+
+  <div class="callout callout-important">
+    <div class="callout-title">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+      Alcance de este entregable (Solo Lectura)
+    </div>
+    <p>
+      Esta auditoría se ejecutó íntegramente sobre el estado limpio actual del repositorio (<code>commit f9a4dad</code>, idéntico a <code>39d341e</code>) inspeccionando los <strong>15 componentes</strong>, <strong>12 servicios</strong>, <strong>2 modelos</strong>, <strong>2 utilidades</strong> y <strong>1 catálogo de datos</strong> en <code>src/</code>. No se ha modificado ningún archivo de código fuente hasta contar con la aprobación del plan.
+    </p>
+  </div>
+
+  <hr>
+
+  <!-- Decisiones que Requieren Revisión -->
+  <h2>Decisiones que Requieren tu Revisión (User Review Required & Open Questions)</h2>
+  <p>Antes de iniciar la <strong>Fase 1</strong>, confirma por favor estos 4 puntos de diseño:</p>
+  <ol>
+    <li>
+      <strong>Retiro Definitivo del Modelado Libre sobre Lienzo (<code>push_pull</code>, <code>draw_rect</code>, <code>draw_circle</code>, <code>draw_freehand</code>):</strong><br>
+      Se eliminarán de la barra de herramientas del visor 3D las herramientas de extrusión manual <em>Empujar/Tirar</em> y dibujo a mano alzada, conservando únicamente:
+      <ul>
+        <li>Inserción limpia de <strong>Módulos Paramétricos</strong>, <strong>Tablero Libre Paramétrico</strong> (<code>Largo × Ancho × Espesor</code>), <strong>Mesones 3D</strong> y <strong>Equipos 3D</strong>.</li>
+        <li>Estiramiento directo e intuitivo desde <strong>aristas y esquinas</strong> de piezas/módulos en el visor 3D.</li>
+        <li><strong>Cortes Especiales Paramétricos</strong> (<code>Chaflán</code>, <code>Destaje en L</code>, <code>Curvo</code> y nuevo <code>Resaque en U para Sifón</code>) configurados desde el inspector derecho con previsualización 3D exacta.</li>
+      </ul>
+    </li>
+    <li>
+      <strong>Módulo Esquinero de Cocina (<code>90×90 cm</code>):</strong><br>
+      El <code>Módulo Esquinero Diagonal 45°</code> actual tiene 7 defectos geométricos simultáneos. En la <strong>Fase 1</strong> lo ocultaremos temporalmente para que no genere solapamientos, y en la <strong>Fase 3</strong> lo reintroduciremos reconstruido desde cero como un <strong>Módulo Esquinero Pentagonal en L (<code>900×900 mm</code>, profundidad de línea <code>580 mm</code>, frente chaflanado real a <code>45°</code>)</strong> junto con la variante de <strong>Esquinero Recto Ciego</strong>. ¿Estás de acuerdo con este flujo?
+    </li>
+    <li>
+      <strong>Descuento Opcional de Tapacanto en Despiece y Optimizador 2D (<code>subtractEdgeBandingFromCut</code>):</strong><br>
+      Proponemos agregar en la configuración del proyecto un interruptor (desactivado por defecto para no alterar proyectos existentes) que permita elegir si el <strong>Despiece</strong> y el <strong>Optimizador 2D</strong> descuentan automáticamente el espesor del tapacanto (<code>0.45 mm</code> delgado / <code>2.0 mm</code> grueso) mostrando tanto la <em>Medida Nominal Final</em> como la <em>Medida Real de Corte</em>.
+    </li>
+    <li>
+      <strong>Estandarización de Notificaciones y Modales (<code>ngx-sonner</code> + <code>@angular/cdk/dialog</code>):</strong><br>
+      Actualmente <code>package.json</code> incluye <code>@angular/cdk</code> pero no tiene instalado <code>ngx-sonner</code> (usa un sistema propio de toasts y diálogo de confirmación con Signals). ¿Deseas que en la <strong>Fase 1</strong> instalemos <code>ngx-sonner</code> y migremos los diálogos de confirmación a <code>@angular/cdk/dialog</code> para alinear el 100% del proyecto con tu regla global de stack?
+    </li>
+  </ol>
+
+  <hr>
+
+  <!-- 1. Lista de Errores e Inconsistencias Críticas -->
+  <h1>1. Lista de Errores e Inconsistencias Críticas Encontradas en <code>src/</code></h1>
+
+  <!-- 1.1 Geometría 3D -->
+  <h3>1.1 Errores Geométricos 3D, Estiramiento Vertical, Orientación (H, L, F) y Pivotes</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25px;">#</th>
+        <th style="width: 24%;">Problema Detectado</th>
+        <th style="width: 27%;">Archivo y Líneas Exactas</th>
+        <th>Causa Raíz Técnica</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1</strong></td>
+        <td><strong>Al estirar una pieza vertical o rotada, la pieza gira 90° de golpe y se estira en sentido contrario</strong> <em>(bug reportado en tus capturas previas)</em></td>
+        <td>
+          <span class="badge-file">furniture-3d-viewer.ts</span><br>
+          <code>#L1884-L1960</code>, <code>#L2151-L2163</code>, <code>#L7311-L7335</code>, <code>#L10070-L10111</code>
+        </td>
+        <td>
+          Tres fallos combinados: <strong>(a)</strong> <code>getPartStretchAxesConfig</code> ignora <code>rotationX/Y/Z</code> (además tiene una condición muerta contradictoria en <code>#L1943</code>), mapeando el tirador al eje sin rotar; <strong>(b)</strong> <code>previewPartUpdatesInPlace</code> construye <code>BoxGeometry</code> usando el <strong>AABB mundial ya rotado</strong> y se lo asigna a un <code>mesh</code> que <strong>conserva <code>mesh.rotation.y</code></strong>, aplicando doble rotación instantánea; <strong>(c)</strong> <code>getPartBounds</code> usa comparaciones dinámicas <code>L > W</code> que intercambian <code>sx/sy/sz</code> a mitad del arrastre.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>2</strong></td>
+        <td><strong>Piezas verticales (<code>L</code> / <code>F</code>) con cortes especiales se convierten en bloques macizos gigantes</strong></td>
+        <td>
+          <span class="badge-file">furniture-3d-viewer.ts#L1494-L1557</span><br>
+          <span class="badge-file">module-designer.ts#L2349-L2366</span>
+        </td>
+        <td>
+          <code>ExtrudeGeometry</code> construye siempre el perfil en XY con <code>depth: localDims.sy</code> (<code>#L1551</code>) y ejecuta <code>rotateX(Math.PI / 2)</code>. En tableros verticales (<code>vertical_yz</code> o <code>vertical_xy</code>), <code>localDims.sy</code> es la altura (<code>720–2100 mm</code>) en vez de <code>part.thickness</code> (<code>15–18 mm</code>). Además, <code>setPartOrientation</code> no reajusta <code>posY</code> para apoyar la pieza en el piso y secuestra <code>H/L/F</code> cuando hay un grupo seleccionado (<code>H</code> rota el grupo 90°).
+        </td>
+      </tr>
+      <tr>
+        <td><strong>3</strong></td>
+        <td><strong>Inversión frontal/trasera (<code>+Z</code> vs <code>-Z</code>) en todos los Cortes Especiales</strong></td>
+        <td>
+          <span class="badge-file">cabinet-generator.service.ts#L2621-L2685</span><br>
+          <span class="badge-file">furniture-3d-viewer.ts#L1508-L1555</span>
+        </td>
+        <td>
+          <code>buildCornerCutContour</code> define <code>y = 0</code> como frente (<code>+Z</code>), pero <code>rotateX(+Math.PI / 2)</code> transforma <code>(x, y, z)</code> en <code>(x, -z, +y)</code>, enviando <code>y = 0</code> a <code>z' = -W/2</code> (esquina trasera <code>-Z</code>).
+        </td>
+      </tr>
+      <tr>
+        <td><strong>4</strong></td>
+        <td><strong>6 implementaciones divergentes de <code>(L, W, t) &lt;-&gt; (sx, sy, sz)</code></strong></td>
+        <td>
+          <span class="badge-file">joinery-engine.service.ts#L51-L143</span><br>
+          <span class="badge-file">furniture-3d-viewer.ts</span> <code>#L1884</code>, <code>#L3438</code>, <code>#L5442</code>, <code>#L8677</code>, <code>#L10040</code>
+        </td>
+        <td>
+          No existe un único servicio canónico que separe las dimensiones locales de malla <code>(localSx, localSy, localSz)</code> del AABB/OBB mundial. <code>JoineryEngineService.detectCollisionsFromBounds</code> reporta falsos solapamientos en cualquier pieza a <code>45°</code> y los highlights/cotas se desfasan.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>5</strong></td>
+        <td><strong><code>Módulo Esquinero Diagonal 45°</code> roto en 7 puntos simultáneos</strong></td>
+        <td>
+          <span class="badge-file">cabinet-generator.service.ts#L1834-L2085</span><br>
+          <span class="badge-file">templates-catalog.service.ts#L371</span><br>
+          <span class="badge-file">furniture-3d-viewer.ts#L1681-L1757</span>
+        </td>
+        <td>
+          (1) Chaflán recortado atrás por bug #3; (2) puerta a 45° atravesando pisos y tapas intactos; (3) corte a 32.7° contra puerta a 45°; (4) falta costado de retorno frontal-izquierdo y segundo fondo de pentágono 900×900; (5) zócalos rectangulares sobresaliendo; (6) herrajes flotando a 20 cm en el aire por recibir dimensiones de AABB rotado; (7) doble rotación de herrajes en puertas giradas 90°.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>6</strong></td>
+        <td><strong>Cajones de muebles rotados se abren hacia el costado equivocado al reconstruir escena</strong></td>
+        <td>
+          <span class="badge-file">furniture-3d-viewer.ts</span><br>
+          <code>#L895</code>, <code>#L1797-L1800</code>, <code>#L5051</code>
+        </td>
+        <td>
+          <code>updateExplodedOffsets</code> suma fijo <code>targetPos.z += curOpen * 280</code> ignorando <code>item.slideAxis</code> (<code>'x' | 'z'</code>) e <code>item.slideDir</code> (<code>±1</code>), contradiciendo <code>maxSlide = 320</code>.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 1.2 Estado de Módulos -->
+  <h3>1.2 Estado de Módulos, Sincronización de Grupos e Historial <code>Undo/Redo</code></h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25px;">#</th>
+        <th style="width: 24%;">Problema Detectado</th>
+        <th style="width: 27%;">Archivo y Líneas Exactas</th>
+        <th>Causa Raíz Técnica</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>7</strong></td>
+        <td><strong>Módulos orientados a pared Izquierda/Derecha se voltean 180° al redimensionarse y crean 3 snapshots de Undo</strong></td>
+        <td>
+          <span class="badge-file">project-storage.service.ts#L2058-L2064</span><br>
+          <span class="badge-file">project-storage.service.ts#L2389-L2395</span><br>
+          <span class="badge-file">module-designer.ts#L1688-L1694</span>
+        </td>
+        <td>
+          <code>rotateGroupRigidly</code> define <code>+90°</code> como <code>'front' -> 'right'</code>, pero <code>resizeGroupStructure</code> y <code>onCabinetUpdated</code> pasan <code>-90°</code> para <code>'right'</code> y <code>+90°</code> para <code>'left'</code>, invirtiendo el mueble y grabando 3 entradas separadas en el historial.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>8</strong></td>
+        <td><strong><code>generateParametricCabinet</code> ignora <code>hasPlinth</code>, <code>plinthHeight</code> y <code>hasTopCover</code></strong></td>
+        <td>
+          <span class="badge-file">cabinet-generator.service.ts#L593-L1075</span>
+        </td>
+        <td>
+          Todos los módulos bajos estándar, closets, columnas y vanities nacen sin zócalo (con puertas raspando <code>Y = 0</code>) y con cubierta maciza obligatoria (sin opción de tiras/amarres superiores para mesón).
+        </td>
+      </tr>
+      <tr>
+        <td><strong>9</strong></td>
+        <td><strong>Materiales revertidos al editar medidas + equipos desfasados al mover/redimensionar su módulo</strong></td>
+        <td>
+          <span class="badge-file">project-storage.service.ts#L1768-L1807</span><br>
+          <span class="badge-file">project-storage.service.ts#L1863-L1893</span><br>
+          <span class="badge-file">project-storage.service.ts#L2381-L2418</span>
+        </td>
+        <td>
+          Cambiar materiales por grupo o rol global no actualiza <code>group.parametricConfig</code>. Además, <code>moveGroup</code> no mueve los <code>appliances</code> vinculados con <code>groupId</code>, y <code>resizeGroupStructure</code> corrompe el centroide al mezclar piezas en <code>(0,0,0)</code> con equipos en <code>(oldCx, oldCz)</code>.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>10</strong></td>
+        <td><strong><code>duplicateGroup</code> apila muebles en el aire + borrado grupal dispara N snapshots de Undo</strong></td>
+        <td>
+          <span class="badge-file">project-storage.service.ts#L1913</span><br>
+          <span class="badge-file">furniture-3d-viewer.ts#L8635-L8643</span><br>
+          <span class="badge-file">furniture-3d-viewer.ts#L9961-L9970</span>
+        </td>
+        <td>
+          Duplicar un closet de <code>2100 mm</code> suma <code>deltaY = groupHeight + 15</code>, dejándolo flotando a 2.11 m en lugar de adosarlo al costado (<code>+X</code>). Al borrar un módulo se invoca <code>partDeleted</code> en bucle creando 10–20 snapshots.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>11</strong></td>
+        <td><strong>Desincronización estructural entre <code>project.modules</code> y <code>project.groups</code></strong></td>
+        <td>
+          <span class="badge-file">project-storage.service.ts#L1206-L1219</span><br>
+          <span class="badge-file">project-storage.service.ts#L1809-L1843</span><br>
+          <span class="badge-file">parts-list.ts#L244</span>, <span class="badge-file">budget-view.html#L568</span>
+        </td>
+        <td>
+          <code>updateParametricCabinet</code> regenera <code>moduleId</code> sin actualizar <code>project.modules</code>, y <code>deleteGroup</code> nunca borra entradas de <code>project.modules</code>, dejando módulos fantasma en Despiece, Etiquetas, Presupuesto y Supabase.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>12</strong></td>
+        <td><strong>Inconsistencias en Plantillas, <code>ComponentOptionsModal</code> y Tirador <code>profile_gola</code> fantasma</strong></td>
+        <td>
+          <span class="badge-file">component-options-modal.ts#L90</span><br>
+          <span class="badge-file">templates-catalog.service.ts#L691-L966</span><br>
+          <span class="badge-file">module-designer.html#L353</span>
+        </td>
+        <td>
+          <code>ComponentOptionsModal</code> fuerza todo mueble a <code>wall_cabinet</code> flotando a 1450 mm; el catálogo tiene 0 plantillas para sala TV y oficina; y la UI ofrece Perfil Gola cuyo render 3D fue retirado en <code>furniture-3d-viewer.ts#L3668</code>.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 1.3 Habitación 3D y GPU -->
+  <h3>1.3 Habitación 3D, Persistencia entre Pestañas y Rendimiento GPU</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25px;">#</th>
+        <th style="width: 24%;">Problema Detectado</th>
+        <th style="width: 27%;">Archivo y Líneas Exactas</th>
+        <th>Causa Raíz Técnica</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>13</strong></td>
+        <td><strong>Destrucción total del contexto WebGL al cambiar de pestaña</strong></td>
+        <td>
+          <span class="badge-file">app.html#L19</span><br>
+          <span class="badge-file">app.config.ts#L9-L11</span><br>
+          <span class="badge-file">module-designer.ts#L952</span>
+        </td>
+        <td>
+          <code>&lt;router-outlet&gt;</code> destruye <code>ModuleDesignerComponent</code> y <code>Furniture3dViewerComponent</code> al ir a Despiece, Optimizador 2D, Presupuesto o Etiquetas, obligando a recompilar shaders/texturas al volver y perdiendo cámara, piezas ocultas y capas.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>14</strong></td>
+        <td><strong>Equipos aparecen en medio del cuarto (<code>Z = +75 mm</code>) + arrastre de muros en píxeles sin Undo</strong></td>
+        <td>
+          <span class="badge-file">module-designer.ts#L1221-L1252</span><br>
+          <span class="badge-file">furniture-3d-viewer.ts#L6230-L6331</span><br>
+          <span class="badge-file">project-storage.service.ts#L3120-L3189</span>
+        </td>
+        <td>
+          Los equipos usan el legacy <code>wallOffsetZ + wallThickness/2</code> (<code>0 + 75 mm</code>) en lugar de la cara interior real (<code>Z ≈ -2350 mm</code>). Muros se arrastran en píxeles reconstruyendo mallas en cada frame con <code>recordHistory = false</code>.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>15</strong></td>
+        <td><strong>Fugas de VRAM en texturas, reconstrucción masiva de Equipos 3D y PointLight por lámpara</strong></td>
+        <td>
+          <span class="badge-file">procedural-textures.ts#L185-L235</span><br>
+          <span class="badge-file">furniture-3d-viewer.ts#L951-L960</span><br>
+          <span class="badge-file">appliance-3d-builder.service.ts#L1941</span>
+        </td>
+        <td>
+          Canvases de <code>1024×1024</code> (8 MB c/u) sin caché LRU ni <code>.dispose()</code>; selección de pieza destruye y reconstruye todos los equipos; lámparas agregan <code>PointLight</code> reales penalizando GPUs; y cotas recrea 4 canvases sin caché duplicando sprites.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 1.4 Integridad Despiece / Optimizador / Presupuesto / DXF / Supabase -->
+  <h3>1.4 Integridad con Despiece, Optimizador 2D, Presupuesto, DXF y Supabase</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25px;">#</th>
+        <th style="width: 24%;">Problema Detectado</th>
+        <th style="width: 27%;">Archivo y Líneas Exactas</th>
+        <th>Causa Raíz Técnica</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>16</strong></td>
+        <td><strong>Herrajes huérfanos (0 llamadas), mezcla de USD con COP y trampa de doble cobro</strong></td>
+        <td>
+          <span class="badge-file">hardware-catalog.service.ts#L69-L285</span><br>
+          <span class="badge-file">cut-optimizer.service.ts#L131</span><br>
+          <span class="badge-file">budget-view.ts#L196-L202</span>
+        </td>
+        <td>
+          <code>computeRequiredHardwareList</code> nunca se invoca, tiene costos en USD (<code>$2.20</code>, <code>$5.50</code>) mientras el proyecto cotiza en COP, e incluye ítems de <code>ApplianceItem</code> que duplicarían el costo de electrodomésticos en Presupuesto.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>17</strong></td>
+        <td><strong>Mesones en melamina quedan con costo $0 y fuera de corte; piedras entran a Etiquetas y DXF</strong></td>
+        <td>
+          <span class="badge-file">cut-optimizer.service.ts#L91-L99</span><br>
+          <span class="badge-file">budget-view.ts#L164-L171</span><br>
+          <span class="badge-file">dxf-exporter.service.ts#L71-L91</span>
+        </td>
+        <td>
+          <code>getCuttableParts</code> excluye todo <code>countertop</code>, pero el desglose de piedra solo suma material piedra: mesones o barras de melamina quedan sin cortar y sin cobrar. Además, DXF exporta 4 líneas ignorando contornos con destajes.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>18</strong></td>
+        <td><strong>Brecha RLS en SQL de SupabaseService y residuos de estilo (any, emojis, &lt;svg&gt;)</strong></td>
+        <td>
+          <span class="badge-file">supabase.service.ts#L64-L75</span><br>
+          <span class="badge-file">melamine.models.ts#L688-L777</span><br>
+          <span class="badge-file">module-designer.html#L5569</span>
+        </td>
+        <td>
+          Políticas SQL documentadas tienen <code>OR user_id IS NULL</code> en SELECT/UPDATE/DELETE. Quedan 4 emojis en acabados de muro, 3 <code>&lt;svg&gt;</code> inline y 5 <code>: any</code> residuales.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- 2. Eliminación y Refactorización -->
+  <h1>2. Qué Funcionalidades y Código Debemos Eliminar o Refactorizar</h1>
+
+  <h3>2.1 Limpieza Quirúrgica de Herramientas CAD de Modelado Libre</h3>
+  <ul>
+    <li>
+      <strong>Eliminar de <code>ToolMode</code> (<code>furniture-3d-viewer.ts#L416</code>) y de la barra inferior (<code>furniture-3d-viewer.html#L1649-L1765</code>):</strong>
+      <ul>
+        <li><code>push_pull</code> (<code>isPushPulling</code>, <code>pushPullData</code>, <code>updatePushPullHover</code>, <code>renderPushPullFaceHighlight</code> en <code>#L5402-L5505</code> y <code>#L7808-L7925</code>).</li>
+        <li><code>draw_rect</code>, <code>draw_circle</code> y <code>draw_freehand</code> (estados de dibujo sobre plano XZ, previsualizaciones temporales y salto a push_pull en <code>#L6364-L6453</code> y <code>#L7500-L7639</code>).</li>
+      </ul>
+    </li>
+    <li>
+      <strong>Conservar y perfeccionar el motor paramétrico de piezas:</strong>
+      <ul>
+        <li>Mantener el estiramiento limpio desde <strong>bordes y esquinas</strong> (<code>handle</code> y <code>corner_handle</code>) gobernado por un único servicio matemático (<code>PartGeometryService</code>) que opere en el sistema local y proyecte cualquier rotación <code>rotationX/Y/Z</code>.</li>
+        <li>Mantener <code>ExtrudeGeometry</code> <strong>exclusivamente</strong> para dos usos paramétricos controlados: (1) <strong>Cortes Especiales del Inspector</strong> (Chaflán, Destaje L, Curvo, Resaque en U para Sifón) y (2) <strong>Perforaciones automáticas de mesones</strong> (lavaplatos, lavamanos, estufas), extruyendo siempre con <code>depth: part.thickness</code> y rotación canónica (H, L, F).</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>2.2 Eliminación Verificada de Código Muerto y Duplicado</h3>
+  <ul>
+    <li><strong><code>cabinet-generator.service.ts#L17-L585</code>:</strong> Eliminar únicamente <code>generatePartsForModule</code> y <code>getStandardSlideLength</code> (~569 líneas muertas v1), preservando intactos <code>generateParametricCabinet</code> (<code>#L593-L1075</code>) y <code>generateParametricDrawerUnit</code> (<code>#L1077-L1592</code>).</li>
+    <li><strong><code>project-storage.service.ts</code>:</strong> Eliminar únicamente <code>addModule</code> (<code>#L1174-L1182</code>), <code>updateModule</code> (<code>#L1184-L1195</code>) y <code>deleteModule</code> (<code>#L1221-L1227</code>), y extraer los materiales base de <code>createDemoProject()</code> a un catálogo limpio <code>MELAMINE_MATERIALS_CATALOG</code>.</li>
+    <li><strong><code>furniture-3d-viewer.ts</code>:</strong> Eliminar <code>getWoodMaterial</code> duplicado (<code>#L4585-L4629</code>), <code>rotateMultipleParts90</code> sin uso (<code>#L8752-L8877</code>) y <code>getPartBounds</code> privado duplicado (<code>#L10040-L10150</code>).</li>
+    <li><strong>Componentes y modales redundantes:</strong> Eliminar <code>ComponentOptionsModalComponent</code> (<code>src/app/components/component-options-modal/</code>), el dropdown muerto <code>showTemplatesDropdown</code> (<code>module-designer.ts#L1482</code>) y el modal duplicado <code>showRoomSettingsModal</code>, consolidando la configuración de Habitación 3D en el inspector contextual.</li>
+  </ul>
+
+  <hr>
+
+  <!-- 3. Nuevas Funcionalidades y Catálogos -->
+  <h1>3. Qué Nuevas Funcionalidades y Catálogos Debemos Integrar</h1>
+
+  <!-- Diagrama de Arquitectura -->
+  <div class="diagram-container">
+    <div class="diagram-title">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+      Arquitectura de Flujo Integral (UX Enterprise -> Núcleo Paramétrico -> Trazabilidad Industrial)
+    </div>
+    <div class="flow-horizontal">
+      <div class="flow-col">
+        <div class="flow-col-header">1. UX/UI Enterprise (3 Zonas Limpias)</div>
+        <div class="flow-col-item"><strong>Barra Superior Multi-Ambiente</strong><br>Cocina · Closet · Baño · Hogar / Estudio</div>
+        <div class="flow-col-item"><strong>Dock 3D Minimalista</strong><br>Seleccionar, Rotar 90°, Imán, Cota, Abrir, 60 FPS</div>
+        <div class="flow-col-item"><strong>Inspector Contextual Derecho</strong><br>Módulo Simple + Acordeón Avanzado de Pieza</div>
+      </div>
+      <div class="flow-arrow-h">&rarr;</div>
+      <div class="flow-col">
+        <div class="flow-col-header">2. Núcleo Paramétrico & Escena 3D</div>
+        <div class="flow-col-item"><strong>PartGeometryService</strong><br>Dimensiones locales vs OBB mundial exacto</div>
+        <div class="flow-col-item"><strong>CabinetGeneratorService v3</strong><br>4 Líneas + Zócalos + Sifón U + Esquinero 45°</div>
+        <div class="flow-col-item"><strong>Habitación 3D Persistente</strong><br>Imán a muros + RouteReuseStrategy WebGL</div>
+        <div class="flow-col-item"><strong>Catálogos Pro</strong><br>35+ Melaminas/Piedras + Pisos/WPC + Low-Poly</div>
+      </div>
+      <div class="flow-arrow-h">&rarr;</div>
+      <div class="flow-col">
+        <div class="flow-col-header">3. Trazabilidad Industrial Sincronizada</div>
+        <div class="flow-col-item"><strong>2. Despiece</strong><br>Filtros dinámicos por PartGroup + Veta</div>
+        <div class="flow-col-item"><strong>3. Optimizador 2D</strong><br>Tableros vs Piedras + Descuento Tapacanto</div>
+        <div class="flow-col-item"><strong>4. Presupuesto COP</strong><br>Herrajes automáticos sin doble cobro</div>
+        <div class="flow-col-item"><strong>5. Etiquetas + DXF</strong><br>Polilíneas cerradas y RLS endurecido</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>3.1 Reenfoque UX/UI Enterprise Cero Fricción (Pilar 2.1)</h3>
+  <ul>
+    <li><strong>Selector Superior de Ambiente + Acciones Primarias:</strong> Pestañas rápidas (<em>Cocinas</em>, <em>Closets y Dormitorios</em>, <em>Muebles de Baño</em>, <em>Hogar y Estudio</em>) y botones directos <code>+ Módulo</code>, <code>+ Mesón / Cubierta</code>, <code>+ Equipo 3D</code>, <code>+ Tablero Libre</code> y <code>Habitación 3D</code>.</li>
+    <li><strong>Dock Flotante Compacto en Visor 3D (6 herramientas esenciales):</strong> <code>Seleccionar / Mover (V)</code>, <code>Rotar 90° (R)</code>, <code>Imán Inteligente</code>, <code>Cinta Métrica (T)</code>, <code>Abrir / Cerrar Frentes</code> y <code>Vistas / Modo Rendimiento</code>.</li>
+    <li><strong>Inspector Contextual en 2 Niveles:</strong>
+      <ul>
+        <li><strong>Vista Simple por Defecto (al tocar un mueble):</strong> Ancho, Alto, Profundidad, Zócalo vs Flotante (<code>elevationY</code>), Puertas/Cajones/Entrepaños, Material de Casco y Frente, y botón <strong>"Duplicar al Lado"</strong> (<code>+X</code>).</li>
+        <li><strong>Acordeón "Edición Avanzada de Pieza":</strong> Tapacantos <code>L1/L2/A1/A2</code>, dirección de veta, orientación <code>H/L/F</code> sin hundirse en el piso y <code>Cortes Especiales</code>.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>3.2 Arquitectura Multi-Ambiente en 4 Líneas (Pilar 2.2)</h3>
+  <ul>
+    <li><strong>Cocinas:</strong> Bajos estándar (con amarres superiores y zócalo retranqueado), cajoneras (2–4 gavetas con cubiertero), bajo lavaplatos, bajo horno, <strong>Esquinero Pentagonal en L <code>900×900</code> a <code>45°</code> real</strong>, esquinero recto ciego, alacenas superiores batientes y elevables con pistón, sobre-campana, sobre-nevera, torre de hornos/microondas, islas centrales y mesones 3D (recto, en L, en U y cascada).</li>
+    <li><strong>Closets y Dormitorios:</strong> Cuerpos de closet (abiertos, puertas batientes y correderas con riel), torres organizadoras centrales, maleteros superiores, módulos de colgado simple y doble (<strong>con tubo colgador cromado/negro mate integrado</strong>), <strong>zapateros inclinados/extraíbles</strong>, <strong>pantaloneros extraíbles</strong>, mesas de noche y cabeceros modulares/alistonados.</li>
+    <li><strong>Muebles de Baño:</strong> Vanities flotantes (<code>elevationY = 450 mm</code>) y a piso con patas/zócalo, bajo lavamanos con <strong>resaque paramétrico en U para sifón</strong> en tapa y gaveta superior, columnas auxiliares altas y gabinetes superiores con puerta espejo.</li>
+    <li><strong>Hogar y Estudio:</strong> Centros de entretenimiento y paneles de TV alistonados con consola flotante, bibliotecas modulares con nichos asimétricos, escritorios (rectos, en L y con cajonera pedestal) y aparadores/buffets.</li>
+  </ul>
+
+  <h3>3.3 Habitación 3D Escenográfica y Persistente (Pilar 3)</h3>
+  <ul>
+    <li><strong>Persistencia WebGL Total (<code>RouteReuseStrategy</code>):</strong> Cambiar entre <em>1. Diseñador 3D</em>, <em>2. Despiece</em>, <em>3. Optimizador 2D</em>, <em>4. Presupuesto</em> y <em>5. Etiquetas</em> en &lt; 16 ms conservando intactos el <code>WebGLRenderer</code>, la cámara orbital, las capas visibles y la habitación.</li>
+    <li><strong>Imán Inteligente Muro-Módulo y Módulo-Módulo:</strong> Adherencia magnética de la espalda del mueble contra la cara interior real de <code>getResolvedRoomWalls</code>, auto-orientación de <code>facingDirection</code>, acople lateral exacto entre módulos contiguos y altura automática (<code>0 mm</code> bajos/closets, <code>450 mm</code> vanities flotantes, <code>1450 mm</code> alacenas).</li>
+    <li><strong>Edición de Muros con Raycast XZ + Undo/Redo:</strong> Arrastre geométrico exacto sobre el plano <code>Y = 0</code> sin reconstruir mallas en cada <code>pointermove</code> y registrando 1 snapshot limpio al soltar.</li>
+  </ul>
+
+  <h3>3.4 Repotenciación Masiva de Catálogos Performance-First (Pilar 4)</h3>
+  <ul>
+    <li><strong>Melaminas y Tableros (35+ referencias categorizadas con veta orientada según <code>part.grain</code>):</strong> Maderas Claras (Roble Kendal, Miel, Nórdico, Haya Natural, Fresno Blanco, Roble Santana), Maderas Medias (Caramelo, Roble Rústico, Teca Ártico, Nogal Amazónico, Cedro, Parota), Maderas Oscuras (Wengué, Nogal Terracota, Tabaco, Ébano, Roble Moro, Cenizo Oscuro), Unicolores Mate / Satinados (Blanco Nieve, Blanco Cálido, Arena, Gris Humo, Taupe, Grafito, Negro Mate, Verde Salvia, Azul Naval, Terracota Suave), Alto Brillo HG, Textiles/Linos (Lino Cancún, Lino Oscuro, Textil Cuerda, Cuero Visón) y Piedras/Mármoles/Cuarzos (Blanco Estelar, Calacatta Oro, Carrara, Negro San Gabriel, Pietra, Terrazzo).</li>
+    <li><strong>Acabados Arquitectónicos (512×512 estándar / 256×256 modo bajo consumo con caché LRU):</strong> Porcelanatos rectificados, pisos SPC/laminados (tablón y espina de pescado), microcemento, pinturas, cerámica Subway, enchapes hidráulicos y <strong>paneles de listones WPC / acústicos</strong>.</li>
+    <li><strong>Catálogo Expandido de Equipos 3D Low-Poly (con pooling estático y 0 luces dinámicas):</strong> Lavaplatos de 1 y 2 pocetas huecas con grifería, lavamanos Vessel e incrustar con griferías monomando, espejos LED con shader <code>emissive</code>, sanitarios, camas espaciales (Sencilla, Doble, Queen, King), Smart TVs (50", 65", 75"), monitor + laptop, silla ergonómica y tubos colgadores.</li>
+  </ul>
+
+  <hr>
+
+  <!-- Cambios Propuestos Desglosados por Componente -->
+  <h1>Cambios Propuestos por Componente y Servicio (Proposed Changes)</h1>
+
+  <h3>Capa Geométrica y Modelo de Datos</h3>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag new">NEW</span>
+      <span class="change-title">part-geometry.service.ts</span>
+    </div>
+    <div class="change-body">
+      Única fuente de verdad matemática (sin estado mutable de UI y compatible con ejecución fuera de <code>NgZone</code>) para:
+      <ul>
+        <li><code>getLocalDimensions(part: Part)</code>: mapeo determinista <code>(length, width, thickness, orientation) -> (localSx, localSy, localSz)</code> <strong>sin</strong> inversiones dinámicas <code>L > W</code> ni dependencia de <code>rotationY</code>.</li>
+        <li><code>getWorldOBB(part: Part)</code> y <code>getWorldAABB(part: Part)</code>: cálculo exacto de caja orientada (SAT en XZ para ángulos de 45° y 90°) y límites mundiales.</li>
+        <li><code>getStretchAxesInWorld(part: Part)</code>: proyecta los vectores unitarios locales de largo y ancho rotados por Euler para que estirar cualquier pieza vertical o rotada jamás invierta ejes ni rote la malla.</li>
+        <li><code>buildExtrudedBoardGeometry(part: Part, cutouts)</code>: extruye siempre el contorno 2D con <code>depth = part.thickness</code>, invierte correctamente <code>y -> -z</code> para que <code>front_left/front_right</code> recorten en <code>+Z</code> y aplica la rotación canónica según orientación (<code>horizontal</code>, <code>vertical_yz</code>, <code>vertical_xy</code>).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">melamine.models.ts</span>
+    </div>
+    <div class="change-body">
+      <ul>
+        <li>Extender <code>ParametricCabinetConfig</code> con <code>environmentLine: 'kitchen' | 'closet' | 'bathroom' | 'living_office'</code>, <code>elevationY?: number</code>, <code>hasTopCover?: boolean</code>, <code>topTieStrips?: boolean</code>, <code>siphonCutout?: { enabled: boolean; width: number; depth: number }</code> y <code>hangingRodsCount?: 0 | 1 | 2</code>.</li>
+        <li>Ampliar <code>CutCornerType</code> con <code>'u_siphon_cutout'</code>.</li>
+        <li>Retirar los 4 emojis en <code>WALL_FINISHES_CATALOG</code> y agregar categorización extendida de materiales, pisos, enchapes y listones WPC.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag new">NEW</span>
+      <span class="change-title">melamine-catalog.data.ts</span>
+    </div>
+    <div class="change-body">
+      Catálogo tipado <code>MELAMINE_MATERIALS_CATALOG</code> con las 35+ referencias de tableros (Maderas Claras/Medias/Oscuras, Unicolores Mate, Alto Brillo, Textiles/Linos y Piedras/Cuarzos) con costos base realistas en <strong>COP</strong>, desacoplado de <code>createDemoProject()</code>.
+    </div>
+  </div>
+
+  <h3>Servicios de Generación, Estado, Texturas y Equipos 3D</h3>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">cabinet-generator.service.ts</span>
+    </div>
+    <div class="change-body">
+      <ul>
+        <li>Eliminar código muerto v1 (<code>#L17-L585</code>).</li>
+        <li>Incorporar soporte completo de <code>hasPlinth</code>, <code>plinthHeight</code>, <code>elevationY</code>, <code>hasTopCover</code>, <code>topTieStrips</code> y <code>siphonCutout</code> en <code>generateParametricCabinet</code> y <code>generateParametricDrawerUnit</code>.</li>
+        <li>Corregir el signo de eje frontal en <code>buildCornerCutContour</code> e implementar <code>u_siphon_cutout</code>.</li>
+        <li>Reconstruir <code>corner_base</code> como <strong>Esquinero Pentagonal en L 900×900 mm</strong> con chaflán exacto a 45° y agregar generadores especializados para Closets, Baño y Hogar/Estudio.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">project-storage.service.ts</span>
+    </div>
+    <div class="change-body">
+      <ul>
+        <li>Eliminar métodos v1 huérfanos (<code>addModule</code>, <code>updateModule</code>, <code>deleteModule</code>).</li>
+        <li>Unificar mutaciones compuestas (<code>resizeGroupStructure</code>, edición paramétrica con rotación, borrado grupal) en <strong>1 único <code>pushSnapshot()</code></strong> corrigiendo el signo ±90° de <code>facingDirection</code> (<code>'right' -> +90</code>, <code>'left' -> -90</code>).</li>
+        <li>Sincronizar <code>group.parametricConfig</code> al cambiar materiales y trasladar/rotar solidariamente los <code>ApplianceItem</code> vinculados por <code>groupId</code>.</li>
+        <li>Cambiar <code>duplicateGroup</code> para adosar en <code>+X</code> manteniendo la misma base <code>Y</code>, y unificar conteos/filtros de módulos sobre <code>project.groups</code>.</li>
+        <li>Habilitar <code>recordHistory = true</code> en cambios de Habitación 3D y corregir la mutación in-place en <code>generateSmartCountertop</code>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">joinery-engine.service.ts</span>
+    </div>
+    <div class="change-body">
+      Delegar dimensiones locales y detección de colisiones OBB/polígono 2D a <code>PartGeometryService</code> para erradicar falsos solapamientos en piezas a 45° y tableros con destajes.
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">procedural-textures.ts</span>
+    </div>
+    <div class="change-body">
+      Unificar todo el pipeline de texturas (maderas con dirección de veta, linos textiles, alto brillo, piedras, porcelanatos y listones WPC) en <code>512×512</code> (<code>256×256</code> en modo bajo consumo) con caché LRU acotada y liberación <code>.dispose()</code>.
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">appliance-3d-builder.service.ts</span>
+    </div>
+    <div class="change-body">
+      Implementar caché compartida de <code>BufferGeometry</code> y <code>MeshStandardMaterial</code>, reemplazar todos los <code>PointLight</code> por materiales <code>emissive</code> de costo cero en shaders e incorporar los modelos Low-Poly de Baño, Closet y Hogar/Estudio.
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">templates-catalog.service.ts</span>
+    </div>
+    <div class="change-body">
+      Migrar el 100% del catálogo a definiciones paramétricas vivas organizadas en las 4 líneas de diseño (Cocinas, Closets/Dormitorios, Baños y Hogar/Estudio).
+    </div>
+  </div>
+
+  <h3>Visor 3D, Diseñador Modular y Navegación Persistente</h3>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag new">NEW</span>
+      <span class="change-title">designer-route-reuse.strategy.ts</span>
+    </div>
+    <div class="change-body">
+      Estrategia <code>RouteReuseStrategy</code> registrada en <code>app.config.ts</code> que conserva en memoria la vista del Diseñador 3D y pausa su bucle <code>requestAnimationFrame</code> mientras el usuario consulta Despiece, Optimizador 2D, Presupuesto o Etiquetas.
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">furniture-3d-viewer.ts, .html, .css</span>
+    </div>
+    <div class="change-body">
+      <ul>
+        <li>Retirar <code>push_pull</code>, <code>draw_rect</code>, <code>draw_circle</code>, <code>draw_freehand</code> y helpers duplicados (<code>getPartBounds</code>, <code>getWoodMaterial</code>, <code>rotateMultipleParts90</code>).</li>
+        <li>Corregir <code>previewPartUpdatesInPlace</code> para actualizar geometrías con <code>localDims</code> manteniendo intacta la rotación del mesh.</li>
+        <li>Construir <code>doorPivot</code>, <code>createHandleMesh</code> y <code>createHingesMesh</code> en coordenadas locales de puerta (soportando 0°, 45°, 90°, 180° sin desfasar herrajes) y respetar <code>slideAxis/slideDir</code> en <code>updateExplodedOffsets</code>.</li>
+        <li>Actualizar diferencialmente <code>appliancesGroup</code> por ID (sin <code>disposeGroup</code> global al seleccionar) y reemplazar el arrastre de muros por Raycast XZ con imán magnético Muro-Módulo.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag delete">DELETE</span>
+      <span class="change-title">component-options-modal.ts, .html, .css</span>
+    </div>
+    <div class="change-body">
+      Se retira este modal obsoleto que forzaba <code>wall_cabinet</code> a <code>Y = 1450 mm</code>, unificando toda creación/edición en el generador paramétrico multi-ambiente y el inspector derecho.
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">module-designer.ts, .html, .css</span>
+    </div>
+    <div class="change-body">
+      <ul>
+        <li>Reorganizar la interfaz en las <strong>3 zonas limpias</strong> extrayendo subcomponentes dedicados con sus 3 archivos estrictos (<code>.ts</code>, <code>.html</code>, <code>.css</code>).</li>
+        <li>Corregir <code>setPartOrientation</code> (H, L, F) para rotar sin deformar espesores ni hundir piezas bajo el suelo, eliminar <code>profile_gola</code>, reemplazar los 3 <code>&lt;svg&gt;</code> por iconos de Hugeicons y posicionar nuevos equipos sobre los muros reales.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Trazabilidad hacia Despiece, Optimizador 2D, Presupuesto, Etiquetas, DXF y Supabase</h3>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">parts-list.ts, .html</span>
+    </div>
+    <div class="change-body">
+      Poblar el selector dinámico de módulos directamente desde <code>project.groups</code>, separar visualmente cubiertas de piedra (m²) de tableros laminados y respetar <code>includeInBudget</code> en subtotales de equipos.
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">cut-optimizer.service.ts & cut-optimizer-view.ts</span>
+    </div>
+    <div class="change-body">
+      Clasificar piezas cortables por tipo real de material en lugar de bloquear todo mesón, corregir el costo fallback a COP e integrar el cálculo opcional <code>subtractEdgeBandingFromCut</code>.
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">hardware-catalog.service.ts & budget-view.ts</span>
+    </div>
+    <div class="change-body">
+      Actualizar precios unitarios de herrajes a COP, ampliar cómputo automático para bisagras 45°/165°, rieles correderos, tubos colgadores y pistones, conectándolo a Presupuesto sin duplicar electrodomésticos.
+    </div>
+  </div>
+
+  <div class="change-card">
+    <div class="change-header">
+      <span class="badge-tag modify">MODIFY</span>
+      <span class="change-title">labels-view.ts, dxf-exporter.service.ts, technical-sheet-modal.ts & supabase.service.ts</span>
+    </div>
+    <div class="change-body">
+      Filtrar etiquetas por <code>project.groups</code> excluyendo piedras; exportar contornos reales como <code>LWPOLYLINE</code> cerrada y círculos como <code>CIRCLE</code> en DXF; resolver <code>colorHex</code> real en Ficha Técnica; y endurecer políticas RLS (<code>auth.uid() = user_id</code> sin <code>OR user_id IS NULL</code>).
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 4. Hoja de Ruta de Ejecución -->
+  <h1>4. Hoja de Ruta de Ejecución Dividida en Fases Numeradas</h1>
+
+  <div class="diagram-container">
+    <div class="diagram-title">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+      Secuencia Estratégica de Entrega
+    </div>
+    <div class="timeline-steps">
+      <div class="timeline-step">
+        <span class="step-num">FASE 1</span>
+        <span class="step-desc">Saneamiento Matemático 3D, Retiro de CAD Libre y Limpieza de Código Muerto</span>
+      </div>
+      <div class="timeline-arrow">&darr;</div>
+      <div class="timeline-step">
+        <span class="step-num">FASE 2</span>
+        <span class="step-desc">Persistencia WebGL Instantánea, Optimización GPU y Habitación 3D Magnética</span>
+      </div>
+      <div class="timeline-arrow">&darr;</div>
+      <div class="timeline-step">
+        <span class="step-num">FASE 3</span>
+        <span class="step-desc">Rediseño UX/UI Enterprise y Motor Paramétrico Multi-Ambiente (4 Líneas)</span>
+      </div>
+      <div class="timeline-arrow">&darr;</div>
+      <div class="timeline-step">
+        <span class="step-num">FASE 4</span>
+        <span class="step-desc">Repotenciación Masiva de Catálogos (Melaminas, Pisos/Muros y Equipos Low-Poly)</span>
+      </div>
+      <div class="timeline-arrow">&darr;</div>
+      <div class="timeline-step">
+        <span class="step-num">FASE 5</span>
+        <span class="step-desc">Integridad Total con Despiece, Optimizador 2D, Presupuesto COP, DXF y RLS</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>FASE 1: Estabilización Geométrica 3D, Limpieza de CAD Libre y Eliminación de Código Muerto</h3>
+  <p><strong>Objetivo:</strong> Dejar el visor 3D y la manipulación de piezas/módulos 100% libres de deformaciones, giros inesperados, solapamientos falsos y código obsoleto.</p>
+  <p><strong>Entregables verificables:</strong></p>
+  <ol>
+    <li>Creación de <code>PartGeometryService</code> y corrección definitiva del estiramiento de piezas verticales/rotadas (<code>previewPartUpdatesInPlace</code> + <code>getPartStretchAxesConfig</code>), orientaciones <code>H / L / F</code> (<code>ExtrudeGeometry</code> extruyendo siempre por <code>part.thickness</code>) e inversión <code>Z</code> en Cortes Especiales.</li>
+    <li>Corrección de giros <code>±90°</code> de grupos, sincronización de materiales y equipos en <code>group.parametricConfig</code>, duplicación lateral <code>+X</code>, apertura de cajones rotados y operaciones atómicas de 1 snapshot en <code>Undo/Redo</code>.</li>
+    <li>Eliminación limpia de <code>push_pull</code>, <code>draw_rect</code>, <code>draw_circle</code>, <code>draw_freehand</code>, <code>ComponentOptionsModalComponent</code>, código v1 muerto en <code>CabinetGeneratorService</code>/<code>ProjectStorageService</code>, <code>profile_gola</code>, emojis, <code>&lt;svg&gt;</code> inline y tipos <code>any</code>. Ocultación preventiva del Esquinero 45° roto hasta su reconstrucción en Fase 3.</li>
+  </ol>
+
+  <h3>FASE 2: Escenario Habitación 3D Estable, Persistencia entre Pestañas y Rendimiento GPU</h3>
+  <p><strong>Objetivo:</strong> Lograr cambio instantáneo entre pestañas sin perder cámara ni escena WebGL, optimización de VRAM para PCs modestos y una Habitación 3D magnética e intuitiva.</p>
+  <p><strong>Entregables verificables:</strong></p>
+  <ol>
+    <li><code>DesignerRouteReuseStrategy</code> activa: navegar entre Diseñador 3D, Despiece, Optimizador 2D, Presupuesto y Etiquetas sin destruir <code>WebGLRenderer</code>.</li>
+    <li>Unificación de <code>procedural-textures.ts</code> (512×512 / 256×256 low-spec respetando <code>part.grain</code>) con caché LRU + <code>.dispose()</code> y actualización diferencial de <code>appliancesGroup</code> sin reconstrucción global.</li>
+    <li>Arrastre de muros por Raycast XZ con Undo/Redo, posicionamiento exacto de equipos sobre muros reales e <strong>Imán Magnético Inteligente Muro-Módulo y Módulo-Módulo</strong>.</li>
+  </ol>
+
+  <h3>FASE 3: Reenfoque UX/UI Enterprise y Motor Paramétrico Multi-Ambiente (4 Líneas)</h3>
+  <p><strong>Objetivo:</strong> Simplificar radicalmente la experiencia de usuario y habilitar la creación paramétrica completa para Cocinas, Closets/Dormitorios, Baños y Hogar/Estudio.</p>
+  <p><strong>Entregables verificables:</strong></p>
+  <ol>
+    <li>Nueva arquitectura visual de <strong>3 zonas limpias</strong> (Barra Superior Multi-Ambiente, Dock 3D de 6 herramientas e Inspector Contextual Simple + Avanzado) dividida en subcomponentes modulares de 3 archivos (<code>.ts</code>, <code>.html</code>, <code>.css</code>).</li>
+    <li>Soporte universal de <code>hasPlinth</code>, <code>elevationY</code>, <code>hasTopCover</code>, <code>topTieStrips</code> y <code>u_siphon_cutout</code> en <code>CabinetGeneratorService</code>.</li>
+    <li>Lanzamiento de generadores y plantillas paramétricas de las <strong>4 líneas</strong>: Cocinas (incluyendo el nuevo <strong>Esquinero Pentagonal en L 900×900 a 45° real</strong>), Closets y Dormitorios (cuerpos, maleteros, zapateros, pantaloneros, mesas de noche, cabeceros), Muebles de Baño (vanities flotantes/piso con resaque sifón, columnas, botiquín espejo) y Hogar/Estudio (centros TV, paneles WPC, bibliotecas, escritorios).</li>
+  </ol>
+
+  <h3>FASE 4: Repotenciación Masiva de Catálogos (Melaminas, Acabados Arquitectónicos y Equipos 3D Low-Poly)</h3>
+  <p><strong>Objetivo:</strong> Elevar el atractivo visual de los proyectos con catálogos comerciales ricos y equipamiento 3D ligero para todos los ambientes.</p>
+  <p><strong>Entregables verificables:</strong></p>
+  <ol>
+    <li>Integración de <code>MELAMINE_MATERIALS_CATALOG</code> (35+ tableros y piedras organizados por familia con buscador y filtros visuales) + ampliación de <code>FLOOR_FINISHES_CATALOG</code> y <code>WALL_FINISHES_CATALOG</code> (porcelanatos, SPC espina de pescado, enchapes de baño y listones WPC/acústicos).</li>
+    <li>Refactorización de <code>Appliance3dBuilderService</code> (pooling de geometrías/materiales y <code>emissive</code> en vez de <code>PointLight</code>) e incorporación de lavamanos Vessel/incrustar con griferías, espejos LED, sanitarios, tubos colgadores cromados/negros, camas de referencia, TVs y set de escritorio.</li>
+  </ol>
+
+  <h3>FASE 5: Integridad End-to-End con Despiece, Optimizador 2D, Presupuesto, Etiquetas, DXF y Supabase</h3>
+  <p><strong>Objetivo:</strong> Garantizar precisión industrial 100% libre de errores desde el diseño 3D hasta el taller de corte y la cotización al cliente.</p>
+  <p><strong>Entregables verificables:</strong></p>
+  <ol>
+    <li>Sincronización total de filtros y conteos sobre <code>project.groups</code>, clasificación automática Tablero Laminado vs Piedra por m² y toggle opcional <code>subtractEdgeBandingFromCut</code>.</li>
+    <li>Integración reactiva de herrajes automáticos en <strong>COP</strong> (sin doble cobro de equipos) en <em>4. Presupuesto</em>, exportación DXF con <code>LWPOLYLINE</code> para piezas con cortes especiales, color real en Ficha Técnica y endurecimiento de políticas RLS en <code>SupabaseService</code>.</li>
+  </ol>
+
+  <hr>
+
+  <!-- Plan de Verificación Integral -->
+  <h1>Plan de Verificación Integral (Verification Plan)</h1>
+
+  <h3>Pruebas Automatizadas (al cierre de cada Fase)</h3>
+  <p>Ejecución obligatoria en cada entrega de fase:</p>
+  <pre><code>npx ng test --watch=false
+npx ng build --configuration=development</code></pre>
+
+  <ul>
+    <li><strong><code>part-geometry.service.spec.ts</code>:</strong> invarianza de espesor (<code>15 mm</code> / <code>18 mm</code>) al alternar entre H, L y F; estiramiento de piezas verticales y rotadas (<code>0°</code>, <code>45°</code>, <code>90°</code>, <code>180°</code>) sin inversión de ejes; cortes front_left/front_right en <code>+Z</code>; y detección OBB a 45° con 0 falsas colisiones.</li>
+    <li><strong><code>cabinet-generator.service.spec.ts</code>:</strong> generación sin solapamientos (<code>detectCollisions().length === 0</code>) para todos los módulos de las 4 líneas (incluyendo el nuevo Esquinero Pentagonal 900×900 a 45°, vanities con <code>u_siphon_cutout</code> y closets con cajoneras/tubos).</li>
+    <li><strong><code>cut-optimizer.service.spec.ts</code> y <code>budget-calculation.spec.ts</code>:</strong> inclusión de cubiertas en melamina, separación de piedras en m², descuento opcional de tapacanto y cómputo de herrajes en COP sin duplicar electrodomésticos.</li>
+  </ul>
+
+  <h3>Verificación Manual Guiada en Navegador</h3>
+  <ol>
+    <li><strong>Prueba de Piezas y Orientación (Fase 1):</strong> Insertar un tablero libre, ponerlo vertical (<code>L</code> y <code>F</code>), rotarlo 90°, aplicarle un <em>Destaje L</em> en Frente Derecho y estirarlo desde su borde inferior hacia el suelo verificando que mantiene sus 15 mm de espesor sin girar ni invertirse.</li>
+    <li><strong>Prueba de Escena y Rendimiento (Fase 2):</strong> Configurar una habitación con piso laminado y muro WPC, adosar muebles con imán a paredes en L, cambiar entre <em>Diseñador 3D -> Despiece -> Optimizador 2D -> Presupuesto -> Diseñador 3D</em> comprobando retorno instantáneo con la misma cámara y 60 FPS estables.</li>
+    <li><strong>Prueba Multi-Ambiente Completa (Fases 3, 4 y 5):</strong> Crear un proyecto de Cocina en L, un Closet completo y un Vanity de baño flotante con lavamanos Vessel y espejo LED; verificar 0 solapamientos en el visor 3D y validar que Despiece, Optimizador 2D, Presupuesto y exportación DXF reflejen cada pieza, tablero, herraje y equipo con exactitud milimétrica.</li>
+  </ol>
+
+  <!-- Pie de Página -->
+  <div class="doc-footer">
+    <span>CarpenterPro · Documento Técnico de Arquitectura e Implementación Paramétrica</span>
+    <span>Documento Oficial Generado Automáticamente</span>
+  </div>
+
+</body>
+</html>

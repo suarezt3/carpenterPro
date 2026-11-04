@@ -60,19 +60,19 @@ DROP POLICY IF EXISTS "projects_insert_policy" ON public.projects;
 DROP POLICY IF EXISTS "projects_update_policy" ON public.projects;
 DROP POLICY IF EXISTS "projects_delete_policy" ON public.projects;
 
--- Políticas compatibles con proyectos propios (auth.uid() = user_id) y modo taller local (user_id IS NULL)
+-- Políticas seguras y estrictas de Row Level Security (RLS) exigiendo auth.uid() = user_id
 CREATE POLICY "projects_select_policy" ON public.projects
-  FOR SELECT USING (auth.uid() = user_id OR user_id IS NULL);
+  FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "projects_insert_policy" ON public.projects
-  FOR INSERT WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "projects_update_policy" ON public.projects
-  FOR UPDATE USING (auth.uid() = user_id OR user_id IS NULL)
-  WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+  FOR UPDATE USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "projects_delete_policy" ON public.projects
-  FOR DELETE USING (auth.uid() = user_id OR user_id IS NULL);
+  FOR DELETE USING (auth.uid() = user_id);
 `;
 
 @Injectable({
@@ -294,9 +294,9 @@ export class SupabaseService {
       name: project.name || 'Sin Título',
       client_name: project.clientName || '',
       updated_at: new Date().toISOString(),
-      modules_count: project.modules ? project.modules.length : 0,
+      modules_count: (project.groups && project.groups.length > 0) ? project.groups.length : (project.modules ? project.modules.length : 0),
       parts_count: project.parts ? project.parts.reduce((acc, p) => acc + (p.quantity || 1), 0) : 0,
-      ...(userId ? { user_id: userId } : {}),
+      user_id: userId || null,
       data: project
     };
 

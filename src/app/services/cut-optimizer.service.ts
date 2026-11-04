@@ -9,7 +9,9 @@ import {
   PlacedPart,
   PlacedSheet,
   ProjectSettings,
-  isCountertopMaterial
+  isCountertopMaterial,
+  isStoneMaterial,
+  computePartCutDimensions
 } from '../models/melamine.models';
 
 interface FreeRect {
@@ -25,6 +27,8 @@ interface ExpandedPartItem {
   length: number;
   width: number;
   grain: 'length' | 'width' | 'none';
+  nominalLength?: number;
+  nominalWidth?: number;
 }
 
 @Injectable({
@@ -88,13 +92,12 @@ export class CutOptimizerService {
     };
   }
 
-  /** Piezas que realmente pasan por la sierra (excluye mesones de piedra/cuarzo, salpicaderos y piezas marcadas). */
+  /** Piezas que realmente pasan por la sierra (excluye piezas con excludeFromCutlist y mesones/superficies de piedra/cuarzo/mármol). */
   getCuttableParts(rawParts: Part[], materials: Material[]): Part[] {
     return rawParts.filter(p => {
       if (p.excludeFromCutlist) return false;
-      if (p.componentRole === 'countertop' || p.componentRole === 'backsplash') return false;
-      const mat = materials.find(m => m.id === p.materialId);
-      if (mat && isCountertopMaterial(mat)) return false;
+      const mat = materials.find(m => m.id === p.materialId) || ({ id: p.materialId, name: p.materialName } as Material);
+      if (isStoneMaterial(mat)) return false;
       return true;
     });
   }
@@ -128,7 +131,7 @@ export class CutOptimizerService {
       thickness: 15,
       sheetLength: 2440,
       sheetWidth: 1830,
-      sheetCost: 45,
+      sheetCost: 185000,
       hasGrain: false,
       colorHex: '#d4a373'
     };
@@ -191,13 +194,21 @@ export class CutOptimizerService {
 
       for (const part of matParts) {
         totalPartsCount += part.quantity;
+        const dims = computePartCutDimensions(
+          part,
+          !!settings.subtractEdgeBandingFromCut,
+          settings.thinEdgeThickness,
+          settings.thickEdgeThickness
+        );
         for (let i = 0; i < part.quantity; i++) {
           itemsToPlace.push({
             part,
             copyIndex: i + 1,
-            length: part.length,
-            width: part.width,
-            grain: part.grain
+            length: dims.cutLength,
+            width: dims.cutWidth,
+            grain: part.grain,
+            nominalLength: part.length,
+            nominalWidth: part.width
           });
         }
       }
@@ -353,7 +364,11 @@ export class CutOptimizerService {
           length: placedL,
           width: placedW,
           rotated: bestOrientation.rotated,
-          tag: `P${placedParts.length + 1}`
+          tag: `P${placedParts.length + 1}`,
+          nominalLength: item.nominalLength ?? item.part.length,
+          nominalWidth: item.nominalWidth ?? item.part.width,
+          cutLength: item.length,
+          cutWidth: item.width
         });
 
         // Remover el rectángulo usado

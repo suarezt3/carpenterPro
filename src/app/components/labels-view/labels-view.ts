@@ -7,7 +7,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { ThemeService } from '../../services/theme.service';
-import { Part } from '../../models/melamine.models';
+import { Part, isStoneMaterial } from '../../models/melamine.models';
 
 /**
  * Representa una etiqueta individual expandida por unidad física a cortar.
@@ -46,7 +46,7 @@ export class LabelsViewComponent {
   // Signals conectados al estado global del proyecto
   readonly project = this.projectService.currentProject;
   readonly parts = this.projectService.partsList;
-  readonly modules = this.projectService.modulesList;
+  readonly groups = this.projectService.groupsList;
   readonly materials = this.projectService.materialsList;
 
   // Filtros reactivos por módulo y material
@@ -57,14 +57,19 @@ export class LabelsViewComponent {
   /**
    * Expande la lista de piezas en etiquetas individuales según la cantidad de cada ítem.
    * Genera un `trackId` estrictamente único para el bucle `@for` de Angular.
+   * Excluye automáticamente piezas de piedra, cuarzo y mármol (que no se cortan con sierra en taller).
    */
   readonly flatLabels = computed<FlatPartLabel[]>(() => {
-    let list = this.parts();
+    const mats = this.materials();
+    let list = this.parts().filter(p => {
+      const mat = mats.find(m => m.id === p.materialId) || ({ id: p.materialId, name: p.materialName } as import('../../models/melamine.models').Material);
+      return !isStoneMaterial(mat);
+    });
     const mod = this.selectedModuleFilter();
     const mat = this.selectedMaterialFilter();
 
     if (mod !== 'all') {
-      list = list.filter(p => p.moduleId === mod);
+      list = list.filter(p => p.groupId === mod || p.moduleId === mod);
     }
     if (mat !== 'all') {
       list = list.filter(p => p.materialId === mat);

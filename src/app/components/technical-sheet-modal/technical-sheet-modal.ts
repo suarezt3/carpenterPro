@@ -19,7 +19,8 @@ import {
   Sun01Icon,
   ViewIcon
 } from '@hugeicons/core-free-icons';
-import { Project, DrillHole } from '../../models/melamine.models';
+import { Project, Part, DrillHole } from '../../models/melamine.models';
+import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 
@@ -90,6 +91,27 @@ export class TechnicalSheetModalComponent {
   readonly showDimensions = signal<boolean>(true);
   readonly showDrills = signal<boolean>(true);
   readonly isBlueprintDark = signal<boolean>(false);
+
+  /**
+   * Resuelve el color hexadecimal real de una pieza consultando el proyecto y el catálogo unificado MELAMINE_MATERIALS_CATALOG.
+   */
+  resolvePartColorHex(part: Part): string {
+    if (part.colorHex && part.colorHex !== '#d4d4d8') {
+      return part.colorHex;
+    }
+    const projMats = this.project().materials || [];
+    const projMat = projMats.find(m => m.id === part.materialId);
+    if (projMat?.colorHex) {
+      return projMat.colorHex;
+    }
+    const catMat = MELAMINE_MATERIALS_CATALOG.find(
+      m => m.id === part.materialId || m.name.toLowerCase() === (part.materialName || '').toLowerCase()
+    );
+    if (catMat?.colorHex) {
+      return catMat.colorHex;
+    }
+    return '#d4d4d8';
+  }
 
   /**
    * Calcula en tiempo real todas las perforaciones y colisiones del proyecto usando JoineryEngineService.
@@ -186,7 +208,7 @@ export class TechnicalSheetModalComponent {
         w: b.sx,
         h: b.sy,
         thickness: p.thickness || 18,
-        colorHex: p.colorHex || '#d4d4d8',
+        colorHex: this.resolvePartColorHex(p),
         isFrontFacing: p.orientation === 'vertical_xy'
       };
     });
@@ -210,7 +232,7 @@ export class TechnicalSheetModalComponent {
         w: b.sz,
         h: b.sy,
         thickness: p.thickness || 18,
-        colorHex: p.colorHex || '#d4d4d8',
+        colorHex: this.resolvePartColorHex(p),
         isFrontFacing: false
       };
     });
@@ -234,7 +256,7 @@ export class TechnicalSheetModalComponent {
         w: b.sx,
         h: b.sz,
         thickness: p.thickness || 18,
-        colorHex: p.colorHex || '#d4d4d8',
+        colorHex: this.resolvePartColorHex(p),
         isFrontFacing: false
       };
     });

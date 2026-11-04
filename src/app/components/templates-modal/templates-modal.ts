@@ -11,7 +11,7 @@ import {
   effect,
   untracked
 } from '@angular/core';
-import { HugeiconsIconComponent } from '@hugeicons/angular';
+import { HugeiconsIconComponent, IconSvgObject } from '@hugeicons/angular';
 import {
   Add01Icon,
   Archive01Icon,
@@ -47,7 +47,7 @@ import {
 import { ThemeService } from '../../services/theme.service';
 import { TemplatesCatalogService, FurnitureTemplate } from '../../services/templates-catalog.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
-import { Material, ParametricCabinetConfig, HandleType, HandleFinish } from '../../models/melamine.models';
+import { Material, ParametricCabinetConfig, HandleType, HandleFinish, EnvironmentLine } from '../../models/melamine.models';
 
 export type ModuleCategoryPreset =
   | 'kitchen_base'
@@ -114,7 +114,7 @@ export class TemplatesModalComponent {
   /**
    * Mapea el nombre de ícono de una categoría o plantilla del catálogo a su vector de Hugeicons.
    */
-  getCatalogIcon(iconName?: string): any {
+  getCatalogIcon(iconName?: string): IconSvgObject {
     switch (iconName) {
       case 'countertops':
         return this.icons.countertop;
@@ -150,6 +150,7 @@ export class TemplatesModalComponent {
   }
 
   isOpen = input<boolean>(false);
+  environmentLine = input<EnvironmentLine | undefined>(undefined);
   materials = input<Material[]>([]);
   editingGroupId = input<string | null>(null);
   editingConfig = input<ParametricCabinetConfig | null>(null);
@@ -478,9 +479,11 @@ export class TemplatesModalComponent {
   filteredTemplates = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
     const cat = this.activeCategory();
+    const env = this.environmentLine();
 
     return this.catalogService.templates.filter(t => {
-      const matchCat = cat === 'all' || t.category === cat;
+      const matchEnv = !env || cat !== 'all' || t.environmentLine === env;
+      const matchCat = cat === 'all' ? matchEnv : t.category === cat;
       if (!matchCat) return false;
       if (!q) return true;
       const inName = t.name.toLowerCase().includes(q);
@@ -509,7 +512,16 @@ export class TemplatesModalComponent {
         });
       } else if (open && !groupId) {
         untracked(() => {
-          if (this.wasEditingGroup || (this.structureThickness() !== 15 && this.structureThickness() !== 18)) {
+          const env = this.environmentLine();
+          if (env === 'kitchen') {
+            this.selectPreset('kitchen_base');
+          } else if (env === 'closet') {
+            this.selectPreset('closet');
+          } else if (env === 'bathroom') {
+            this.selectPreset('vanity');
+          } else if (env === 'living_office') {
+            this.selectPreset('bookshelf');
+          } else if (this.wasEditingGroup || (this.structureThickness() !== 15 && this.structureThickness() !== 18)) {
             this.wasEditingGroup = false;
             const p = this.activePreset();
             const isSpec = p === 'oven_base' || p === 'sink_base' || p === 'corner_base' || p === 'oven_tower';

@@ -13,7 +13,7 @@ import {
   Tag01Icon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
-import { EdgeBandingType, GrainDirection, Part } from '../../models/melamine.models';
+import { EdgeBandingType, GrainDirection, Part, isStoneMaterial, computePartCutDimensions } from '../../models/melamine.models';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { ThemeService } from '../../services/theme.service';
 
@@ -112,12 +112,48 @@ export class PartsListComponent {
   readonly project = this.projectService.currentProject;
   readonly parts = this.projectService.partsList;
   readonly materials = this.projectService.materialsList;
-  readonly modules = this.projectService.modulesList;
+  readonly groups = this.projectService.groupsList;
   readonly appliances = this.projectService.appliancesList;
+  readonly settings = this.projectService.projectSettings;
+  readonly subtractEdgeBanding = computed(() => !!this.settings().subtractEdgeBandingFromCut);
+
+  isStonePart(part: Part): boolean {
+    const mat = this.materials().find(m => m.id === part.materialId) || ({ id: part.materialId, name: part.materialName } as import('../../models/melamine.models').Material);
+    return isStoneMaterial(mat);
+  }
+
+  getPartCutDims(part: Part) {
+    const set = this.settings();
+    return computePartCutDimensions(
+      part,
+      this.subtractEdgeBanding(),
+      set.thinEdgeThickness,
+      set.thickEdgeThickness
+    );
+  }
+
+  toggleSubtractEdgeBanding() {
+    const cur = this.subtractEdgeBanding();
+    this.projectService.updateSettings({
+      ...this.settings(),
+      subtractEdgeBandingFromCut: !cur
+    });
+  }
+
+  readonly appliancesBudgetList = computed(() =>
+    this.appliances().filter(a => a.includeInBudget !== false)
+  );
 
   readonly totalAppliancesCost = computed(() =>
-    this.appliances().reduce((sum, a) => sum + (Number(a.price) || 0), 0)
+    this.appliancesBudgetList().reduce((sum, a) => sum + (Number(a.price) || 0), 0)
   );
+
+  toggleApplianceBudget(applianceId: string, event: Event) {
+    const target = event.target as HTMLInputElement | null;
+    this.projectService.updateAppliance(applianceId, {
+      includeInBudget: target ? target.checked : true
+    });
+  }
 
   // Pestaña activa: despiece de melamina vs equipamiento 3D
   readonly activeTab = signal<'melamine' | 'appliances'>('melamine');
@@ -202,9 +238,9 @@ export class PartsListComponent {
 
       const currentMod = this.filterModuleId();
       if (currentMod !== 'all') {
-        const mods = this.modules();
-        const modExists = mods.some(m => m.id === currentMod);
-        if (!modExists) {
+        const grps = this.groups();
+        const grpExists = grps.some(m => m.id === currentMod);
+        if (!grpExists) {
           untracked(() => {
             this.filterModuleId.set('all');
           });
@@ -233,7 +269,7 @@ export class PartsListComponent {
   });
 
   /**
-   * Filtra las piezas según el módulo, material y texto buscado.
+   * Filtra las piezas según el módulo/grupo, material y texto buscado.
    */
   readonly filteredParts = computed(() => {
     let list = this.parts();
@@ -242,7 +278,7 @@ export class PartsListComponent {
     const q = this.searchQuery().toLowerCase().trim();
 
     if (mod !== 'all') {
-      list = list.filter(p => p.moduleId === mod);
+      list = list.filter(p => p.groupId === mod || p.moduleId === mod);
     }
     if (mat !== 'all') {
       list = list.filter(p => p.materialId === mat);
@@ -260,8 +296,20 @@ export class PartsListComponent {
     return list;
   });
 
+  /** Separación visual de tableros de melamina vs mesones de piedra/cuarzo */
+  readonly melamineParts = computed(() => this.filteredParts().filter(p => !this.isStonePart(p)));
+  readonly stoneParts = computed(() => this.filteredParts().filter(p => this.isStonePart(p)));
+
   readonly totalPartsCount = computed(() => {
     return this.filteredParts().reduce((sum, p) => sum + p.quantity, 0);
+  });
+
+  readonly melaminePartsCount = computed(() => {
+    return this.melamineParts().reduce((sum, p) => sum + p.quantity, 0);
+  });
+
+  readonly stonePartsCount = computed(() => {
+    return this.stoneParts().reduce((sum, p) => sum + p.quantity, 0);
   });
 
   readonly totalAreaM2 = computed(() => {
@@ -269,15 +317,25 @@ export class PartsListComponent {
     return (totalMm2 / 1_000_000).toFixed(2);
   });
 
+  readonly melamineAreaM2 = computed(() => {
+    const totalMm2 = this.melamineParts().reduce((sum, p) => sum + (p.length * p.width * p.quantity), 0);
+    return (totalMm2 / 1_000_000).toFixed(2);
+  });
+
+  readonly stoneAreaM2 = computed(() => {
+    const totalMm2 = this.stoneParts().reduce((sum, p) => sum + (p.length * p.width * p.quantity), 0);
+    return (totalMm2 / 1_000_000).toFixed(2);
+  });
+
   /**
    * Calcula los metros lineales totales de tapacanto delgado (0.45mm) y grueso (2.0mm)
-   * de las piezas filtradas actualmente.
+   * únicamente para piezas de melamina.
    */
   readonly totalEdgeMeters = computed(() => {
     let thinMeters = 0;
     let thickMeters = 0;
 
-    for (const p of this.filteredParts()) {
+    for (const p of this.melamineParts()) {
       const q = p.quantity;
       const lM = (p.length / 1000) * q;
       const wM = (p.width / 1000) * q;
@@ -347,8 +405,8 @@ export class PartsListComponent {
     const val = this.partForm.value;
     const mats = this.materials();
     const selMat = mats.find(m => m.id === val.materialId) || mats[0];
-    const mods = this.modules();
-    const selMod = mods.find(m => m.id === val.moduleId);
+    const grps = this.groups();
+    const selGrp = grps.find(g => g.id === val.moduleId);
 
     const thickness = Number(val.thickness) || this.projectService.currentProject().settings.defaultBoardThickness || 15;
 
@@ -361,7 +419,9 @@ export class PartsListComponent {
       id: 'part_' + crypto.randomUUID().slice(0, 8),
       name: String(val.name || 'Pieza').trim(),
       moduleId: val.moduleId || undefined,
-      moduleName: selMod ? selMod.name : undefined,
+      moduleName: selGrp ? selGrp.name : undefined,
+      groupId: val.moduleId || undefined,
+      groupName: selGrp ? selGrp.name : undefined,
       materialId: selMat.id,
       materialName: selMat.name,
       length: Number(val.length),

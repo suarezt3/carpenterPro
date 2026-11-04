@@ -1,590 +1,20 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import {
   FurnitureModule,
-  HardwareItem,
   Material,
   Part,
   ParametricCabinetConfig,
   PartGroup,
   PartCornerCutConfig
 } from '../models/melamine.models';
+import { PartGeometryService } from './part-geometry.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CabinetGeneratorService {
+  private readonly partGeometry = inject(PartGeometryService);
 
-  generatePartsForModule(module: FurnitureModule, materials: Material[]): { parts: Part[], hardware: HardwareItem[] } {
-    const parts: Part[] = [];
-    const hardware: HardwareItem[] = [];
-
-    const mainMat = materials.find(m => m.id === module.materialId) || materials[0];
-    const backMat = materials.find(m => m.id === module.backMaterialId) || materials.find(m => m.thickness <= 6) || mainMat;
-
-    const t = module.boardThickness; // 18 o 15 mm
-    const w = module.width;
-    const h = module.height;
-    const d = module.depth;
-
-    const plinth = module.hasPlinth ? module.plinthHeight : 0;
-    const carcassHeight = h - plinth;
-    const innerWidth = w - (2 * t);
-    const innerDepth = d;
-
-    const thinEdge = module.defaultThinEdge ? 'thin' : 'none';
-    const doorEdge = module.defaultThickDoors ? 'thick' : thinEdge;
-
-    if (module.type === 'base_cabinet') {
-      // 1. Laterales (2 unidades)
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Lateral (Bajo)',
-        length: carcassHeight,
-        width: innerDepth,
-        thickness: t,
-        quantity: 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: thinEdge }, // Canto frontal L1 y base a2
-        notes: 'Laterales izq. y der.'
-      });
-
-      // 2. Piso (1 unidad)
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Piso Inferior',
-        length: innerWidth,
-        width: innerDepth,
-        thickness: t,
-        quantity: 1,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' }, // Canto frontal
-        notes: 'Piso estructural'
-      });
-
-      // 3. Fajas / Amarres superiores (2 unidades de 100mm de ancho para fijar cubierta)
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Amarres Sup. (Fajas)',
-        length: innerWidth,
-        width: 100,
-        thickness: t,
-        quantity: 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-        notes: 'Amarre frontal y trasero'
-      });
-
-      // 4. Zócalo si aplica
-      if (module.hasPlinth) {
-        parts.push({
-          id: crypto.randomUUID(),
-          moduleId: module.id,
-          moduleName: module.name,
-          name: 'Zócalo Frontal',
-          length: innerWidth,
-          width: plinth,
-          thickness: t,
-          quantity: 1,
-          materialId: mainMat.id,
-          materialName: mainMat.name,
-          grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: thinEdge, l2: thinEdge, a1: 'none', a2: 'none' },
-          notes: 'Zócalo de piso'
-        });
-      }
-
-      // 5. Repisas ajustables
-      if (module.shelvesCount > 0) {
-        parts.push({
-          id: crypto.randomUUID(),
-          moduleId: module.id,
-          moduleName: module.name,
-          name: 'Repisa Regulable',
-          length: innerWidth - 2, // 2mm de holgura para colocación
-          width: innerDepth - 20, // 20mm de retroceso para no chocar con puerta
-          thickness: t,
-          quantity: module.shelvesCount,
-          materialId: mainMat.id,
-          materialName: mainMat.name,
-          grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-          notes: 'Con retroceso frontal'
-        });
-
-        hardware.push({
-          id: crypto.randomUUID(),
-          name: 'Soportes de repisa (pitones metálicos)',
-          category: 'support',
-          unit: 'und',
-          quantity: module.shelvesCount * 4,
-          unitCost: 0.20
-        });
-      }
-
-      // 6. Fondo (Back panel)
-      if (module.backType !== 'none') {
-        const backW = module.backType === 'groove' ? innerWidth + 14 : w - 4;
-        const backH = module.backType === 'groove' ? carcassHeight - t + 7 : carcassHeight - 4;
-        parts.push({
-          id: crypto.randomUUID(),
-          moduleId: module.id,
-          moduleName: module.name,
-          name: 'Fondo Trasero',
-          length: backH,
-          width: backW,
-          thickness: backMat.thickness,
-          quantity: 1,
-          materialId: backMat.id,
-          materialName: backMat.name,
-          grain: backMat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          notes: module.backType === 'groove' ? 'Ranurado a 15mm' : 'Sobrepuesto con clavos/tornillos'
-        });
-      }
-
-      // Tornillos estructurales 4x50
-      hardware.push({
-        id: crypto.randomUUID(),
-        name: 'Tornillos Spax 4x50mm (Carcasa)',
-        category: 'screw',
-        unit: 'und',
-        quantity: 16,
-        unitCost: 0.08
-      });
-
-    } else if (module.type === 'wall_cabinet') {
-      // Alacena / Mueble aéreo
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Lateral (Alacena)',
-        length: h,
-        width: d,
-        thickness: t,
-        quantity: 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: thinEdge, a2: thinEdge },
-        notes: 'Laterales colgados'
-      });
-
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Piso / Techo',
-        length: innerWidth,
-        width: d,
-        thickness: t,
-        quantity: 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-        notes: 'Superior e inferior'
-      });
-
-      if (module.shelvesCount > 0) {
-        parts.push({
-          id: crypto.randomUUID(),
-          moduleId: module.id,
-          moduleName: module.name,
-          name: 'Repisa Regulable',
-          length: innerWidth - 2,
-          width: d - 15,
-          thickness: t,
-          quantity: module.shelvesCount,
-          materialId: mainMat.id,
-          materialName: mainMat.name,
-          grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-          notes: 'Repisa móvil'
-        });
-
-        hardware.push({
-          id: crypto.randomUUID(),
-          name: 'Soportes de repisa niquelados',
-          category: 'support',
-          unit: 'und',
-          quantity: module.shelvesCount * 4,
-          unitCost: 0.20
-        });
-      }
-
-      if (module.backType !== 'none') {
-        const backW = module.backType === 'groove' ? innerWidth + 14 : w - 4;
-        const backH = module.backType === 'groove' ? h - (2 * t) + 14 : h - 4;
-        parts.push({
-          id: crypto.randomUUID(),
-          moduleId: module.id,
-          moduleName: module.name,
-          name: 'Fondo Trasero',
-          length: backH,
-          width: backW,
-          thickness: backMat.thickness,
-          quantity: 1,
-          materialId: backMat.id,
-          materialName: backMat.name,
-          grain: backMat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          notes: 'Fondo Alacena'
-        });
-      }
-
-      hardware.push({
-        id: crypto.randomUUID(),
-        name: 'Colgadores ocultos para alacena (par)',
-        category: 'accessory',
-        unit: 'par',
-        quantity: 1,
-        unitCost: 4.50
-      });
-
-    } else if (module.type === 'tall_cabinet') {
-      // Ropero / Columna alta
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Lateral Columna',
-        length: carcassHeight,
-        width: d,
-        thickness: t,
-        quantity: 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: thinEdge, a2: thinEdge },
-        notes: 'Laterales altos'
-      });
-
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Piso / Techo',
-        length: innerWidth,
-        width: d,
-        thickness: t,
-        quantity: 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-        notes: 'Bases'
-      });
-
-      if (module.hasPlinth) {
-        parts.push({
-          id: crypto.randomUUID(),
-          moduleId: module.id,
-          moduleName: module.name,
-          name: 'Zócalos (Frontal y Trasero)',
-          length: innerWidth,
-          width: plinth,
-          thickness: t,
-          quantity: 2,
-          materialId: mainMat.id,
-          materialName: mainMat.name,
-          grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-          notes: 'Zócalos'
-        });
-      }
-
-      if (module.shelvesCount > 0) {
-        parts.push({
-          id: crypto.randomUUID(),
-          moduleId: module.id,
-          moduleName: module.name,
-          name: 'Estantes / Divisiones',
-          length: innerWidth,
-          width: d - 20,
-          thickness: t,
-          quantity: module.shelvesCount,
-          materialId: mainMat.id,
-          materialName: mainMat.name,
-          grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-          notes: 'División horizontal'
-        });
-      }
-
-      if (module.backType !== 'none') {
-        parts.push({
-          id: crypto.randomUUID(),
-          moduleId: module.id,
-          moduleName: module.name,
-          name: 'Fondo Alto',
-          length: carcassHeight - 4,
-          width: w - 4,
-          thickness: backMat.thickness,
-          quantity: 1,
-          materialId: backMat.id,
-          materialName: backMat.name,
-          grain: backMat.hasGrain ? 'length' : 'none',
-          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          notes: 'Fondo ropero'
-        });
-      }
-    } else if (module.type === 'drawer_unit') {
-      // Cajonera dedicada
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Lateral Cajonera',
-        length: carcassHeight,
-        width: d,
-        thickness: t,
-        quantity: 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: thinEdge },
-        notes: 'Laterales cajonera'
-      });
-
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Piso Inferior',
-        length: innerWidth,
-        width: d,
-        thickness: t,
-        quantity: 1,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-        notes: 'Piso'
-      });
-
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Amarres Superiores',
-        length: innerWidth,
-        width: 100,
-        thickness: t,
-        quantity: 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-        notes: 'Amarres superiores'
-      });
-
-      if (module.hasPlinth) {
-        parts.push({
-          id: crypto.randomUUID(),
-          moduleId: module.id,
-          moduleName: module.name,
-          name: 'Zócalo Frontal',
-          length: innerWidth,
-          width: plinth,
-          thickness: t,
-          quantity: 1,
-          materialId: mainMat.id,
-          materialName: mainMat.name,
-          grain: mainMat.hasGrain ? 'length' : 'none',
-          edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-          notes: 'Zócalo'
-        });
-      }
-    }
-
-    // --- PUERTAS (si doorsCount > 0) ---
-    if (module.doorsCount > 0) {
-      const doorHeight = carcassHeight - 4; // 2mm luz superior, 2mm luz inferior
-      let doorWidth = 0;
-
-      if (module.doorsCount === 1) {
-        doorWidth = w - 4; // 2mm luz en cada lado
-      } else if (module.doorsCount === 2) {
-        doorWidth = Math.floor((w - 6) / 2); // 2mm izq, 2mm der, 2mm centro
-      }
-
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: module.doorsCount === 1 ? 'Puerta Frontal' : 'Puerta (Par)',
-        length: doorHeight,
-        width: doorWidth,
-        thickness: t,
-        quantity: module.doorsCount,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: doorEdge, l2: doorEdge, a1: doorEdge, a2: doorEdge }, // Tapacanto en los 4 bordes
-        notes: 'Puerta con cazoleta de 35mm a 100mm de extremos'
-      });
-
-      // Bisagras: 2 por puerta (3 si altura > 950mm)
-      const hingesPerDoor = doorHeight > 950 ? 3 : 2;
-      hardware.push({
-        id: crypto.randomUUID(),
-        name: 'Bisagra cierre suave 35mm (Codo 0)',
-        category: 'hinge',
-        unit: 'und',
-        quantity: module.doorsCount * hingesPerDoor,
-        unitCost: 1.80
-      });
-
-      // Tiradores
-      hardware.push({
-        id: crypto.randomUUID(),
-        name: 'Tirador / Jalador para puerta',
-        category: 'handle',
-        unit: 'und',
-        quantity: module.doorsCount,
-        unitCost: 2.20
-      });
-    }
-
-    // --- CAJONES (si drawersCount > 0) ---
-    if (module.drawersCount > 0) {
-      const n = module.drawersCount;
-      const frontHeight = Math.floor((carcassHeight - (n * 3) - 2) / n);
-      const frontWidth = w - 4; // cubriendo laterales con 2mm luz exterior
-
-      // 1. Frentes de cajón vistos
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Frente de Cajón',
-        length: frontWidth,
-        width: frontHeight,
-        thickness: t,
-        quantity: n,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: doorEdge, l2: doorEdge, a1: doorEdge, a2: doorEdge },
-        notes: 'Frente visto con 4 cantos enchapados'
-      });
-
-      // 2. Laterales de cajón (caja interior)
-      // Largo según corredera estándar (ej. si fondo es 500, corredera es 450)
-      const slideLength = this.getStandardSlideLength(d);
-      const boxHeight = Math.min(Math.floor(frontHeight * 0.70), 200);
-
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Lateral de Cajón Interior',
-        length: slideLength,
-        width: boxHeight,
-        thickness: t,
-        quantity: n * 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-        notes: `Cajón para corredera ${slideLength}mm`
-      });
-
-      // 3. Testeras (Frente y Contrafrente interior de la caja)
-      // Luz estándar para correderas telescópicas: 26mm total (13mm cada lado)
-      // Medida testera = innerWidth - 26mm - (2 * t)
-      const boxBackWidth = innerWidth - 26 - (2 * t);
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Cabecera/Trasera de Cajón',
-        length: boxBackWidth,
-        width: boxHeight,
-        thickness: t,
-        quantity: n * 2,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: thinEdge, l2: 'none', a1: 'none', a2: 'none' },
-        notes: 'Descuento telescópico 26mm'
-      });
-
-      // 4. Fondos de cajón (MDF 3mm ranurado o clavado)
-      parts.push({
-        id: crypto.randomUUID(),
-        moduleId: module.id,
-        moduleName: module.name,
-        name: 'Fondo de Cajón',
-        length: slideLength,
-        width: boxBackWidth + (2 * t),
-        thickness: backMat.thickness,
-        quantity: n,
-        materialId: backMat.id,
-        materialName: backMat.name,
-        grain: backMat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-        notes: 'Fondo MDF cajón'
-      });
-
-      // Herrajes de cajones:
-      hardware.push({
-        id: crypto.randomUUID(),
-        name: `Correderas telescópicas pesadas ${slideLength}mm (par)`,
-        category: 'slide',
-        unit: 'par',
-        quantity: n,
-        unitCost: 5.50
-      });
-
-      hardware.push({
-        id: crypto.randomUUID(),
-        name: 'Tiradores / Jaladores de cajón',
-        category: 'handle',
-        unit: 'und',
-        quantity: n,
-        unitCost: 2.20
-      });
-
-      hardware.push({
-        id: crypto.randomUUID(),
-        name: 'Tornillos 3.5x15mm para correderas (bolsa x50)',
-        category: 'screw',
-        unit: 'caja',
-        quantity: 1,
-        unitCost: 2.00
-      });
-    }
-
-    return { parts, hardware };
-  }
-
-  private getStandardSlideLength(cabinetDepth: number): number {
-    const standardSizes = [250, 300, 350, 400, 450, 500, 550, 600];
-    const available = cabinetDepth - 40; // Mínimo 40mm de seguridad
-    let best = 250;
-    for (const size of standardSizes) {
-      if (size <= available) {
-        best = size;
-      }
-    }
-    return best;
-  }
-
-  /**
   /**
    * Generates a fully parametric furniture module (Kitchen Base, Wall Cabinet, Closet,
    * Vanity, Bookshelf, or Custom) with exact joinery calculations, door configurations
@@ -594,7 +24,7 @@ export class CabinetGeneratorService {
     config: ParametricCabinetConfig, 
     materials: Material[]
   ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
-    if (config.category === 'oven_base' || config.category === 'sink_base' || config.category === 'corner_base' || config.category === 'oven_tower') {
+    if (config.category === 'oven_base' || config.category === 'sink_base' || config.category === 'corner_base' || config.category === 'blind_corner_base' || config.category === 'oven_tower') {
       return this.generateSpecializedKitchenModule(config, materials);
     }
     if (config.moduleType === 'drawer_unit' || config.category === 'drawers' || config.category === 'cajones' || (config.drawersCount && config.drawersCount > 0 && config.moduleType !== 'wall_cabinet')) {
@@ -627,17 +57,24 @@ export class CabinetGeneratorService {
     const innerHeight = Math.max(50, h - (2 * t));
 
     // Coordinate centers
+    const hasPlinth = config.hasPlinth === true || (config.moduleType === 'base_cabinet' && config.hasPlinth !== false);
+    const plinthH = hasPlinth ? (Number(config.plinthHeight) || 80) : 0;
+    const sideH = Math.max(100, h - plinthH);
+
+    // Coordinate centers
     const posX = config.posX ?? 0;
     
     // Default elevation (posY):
     let posY = config.posY;
     if (posY === undefined) {
-      if (config.moduleType === 'wall_cabinet') {
+      if (config.elevationY !== undefined) {
+        posY = config.elevationY + (h / 2);
+      } else if (config.moduleType === 'wall_cabinet') {
         posY = 1450 + (h / 2); // Alacena elevada
       } else if (config.moduleType === 'vanity') {
-        posY = 250 + (h / 2); // Mueble suspendido baño
+        posY = 450 + (h / 2); // Vanity flotante (base a 450 mm del suelo)
       } else {
-        posY = h / 2; // Apoyado en el suelo
+        posY = h / 2; // Apoyado en el suelo (0 mm de elevación base)
       }
     }
     const posZ = config.posZ ?? 0;
@@ -645,6 +82,9 @@ export class CabinetGeneratorService {
     const carcassCenterZ = hasDoor ? posZ - (doorT / 2) : posZ;
     const carcassBackZ = carcassCenterZ - (carcassDepth / 2);
     const carcassFrontZ = carcassCenterZ + (carcassDepth / 2);
+    const bottomOfCarcassY = posY - (h / 2) + plinthH;
+    const sideCenterY = bottomOfCarcassY + (sideH / 2);
+    const topY = bottomOfCarcassY + sideH - (t / 2);
     const parts: Part[] = [];
 
     // 1. Lateral Izquierdo
@@ -655,7 +95,7 @@ export class CabinetGeneratorService {
       moduleName: groupName,
       groupId,
       groupName,
-      length: h,
+      length: sideH,
       width: carcassDepth,
       thickness: t,
       quantity: 1,
@@ -664,7 +104,7 @@ export class CabinetGeneratorService {
       grain: mainMat.hasGrain ? 'length' : 'none',
       edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
       posX: posX - (w / 2) + (t / 2),
-      posY,
+      posY: sideCenterY,
       posZ: carcassCenterZ,
       orientation: 'vertical_yz',
       componentRole: 'side_left',
@@ -679,7 +119,7 @@ export class CabinetGeneratorService {
       moduleName: groupName,
       groupId,
       groupName,
-      length: h,
+      length: sideH,
       width: carcassDepth,
       thickness: t,
       quantity: 1,
@@ -688,36 +128,94 @@ export class CabinetGeneratorService {
       grain: mainMat.hasGrain ? 'length' : 'none',
       edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'none' },
       posX: posX + (w / 2) - (t / 2),
-      posY,
+      posY: sideCenterY,
       posZ: carcassCenterZ,
       orientation: 'vertical_yz',
       componentRole: 'side_right',
       notes: 'Lateral exterior derecho'
     });
 
-    // 3. Techo Superior
-    parts.push({
-      id: `${moduleId}_techo_${Date.now()}`,
-      name: 'Techo Superior',
-      moduleId,
-      moduleName: groupName,
-      groupId,
-      groupName,
-      length: innerWidth,
-      width: carcassDepth,
-      thickness: t,
-      quantity: 1,
-      materialId: mainMat.id,
-      materialName: mainMat.name,
-      grain: mainMat.hasGrain ? 'length' : 'none',
-      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-      posX,
-      posY: posY + (h / 2) - (t / 2),
-      posZ: carcassCenterZ,
-      orientation: 'horizontal',
-      componentRole: 'top',
-      notes: 'Tapa superior estructural'
-    });
+    // 3. Techo Superior o Amarres Superiores (Tie Strips para muebles bajos con mesón)
+    const topTieStrips = config.topTieStrips === true || (config.moduleType === 'base_cabinet' && config.hasTopCover === false);
+    if (topTieStrips) {
+      const tieWidth = 90;
+      parts.push({
+        id: `${moduleId}_tirante_front_${Date.now()}`,
+        name: 'Amarre Superior Frontal',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: tieWidth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: topY,
+        posZ: carcassFrontZ - (tieWidth / 2),
+        orientation: 'horizontal',
+        componentRole: 'tie',
+        notes: 'Amarre frontal superior para mesón'
+      });
+      parts.push({
+        id: `${moduleId}_tirante_back_${Date.now()}`,
+        name: 'Amarre Superior Trasero',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: tieWidth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: topY,
+        posZ: carcassBackZ + (tieWidth / 2),
+        orientation: 'horizontal',
+        componentRole: 'tie',
+        notes: 'Amarre trasero superior para mesón'
+      });
+    } else if (config.hasTopCover !== false) {
+      const topPart: Part = {
+        id: `${moduleId}_techo_${Date.now()}`,
+        name: 'Techo Superior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: carcassDepth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: topY,
+        posZ: carcassCenterZ,
+        orientation: 'horizontal',
+        componentRole: 'top',
+        notes: 'Tapa superior estructural'
+      };
+      if (config.siphonCutout?.enabled) {
+        topPart.cornerCutConfig = {
+          type: 'u_siphon_cutout',
+          corner: 'back_left',
+          cutX: config.siphonCutout.width || 200,
+          cutY: config.siphonCutout.depth || 250
+        };
+      }
+      parts.push(topPart);
+    }
 
     // 4. Piso / Base Inferior
     parts.push({
@@ -736,19 +234,220 @@ export class CabinetGeneratorService {
       grain: mainMat.hasGrain ? 'length' : 'none',
       edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
       posX,
-      posY: posY - (h / 2) + (t / 2),
+      posY: bottomOfCarcassY + (t / 2),
       posZ: carcassCenterZ,
       orientation: 'horizontal',
       componentRole: 'bottom',
       notes: 'Base inferior estructural'
     });
 
+    // 4.1 Zócalos perimetrales retranqueados
+    if (hasPlinth && plinthH > 0) {
+      const recess = 25;
+      const plinthOuterW = Math.max(50, w - (2 * recess));
+      const plinthOuterD = Math.max(50, carcassDepth - (2 * recess));
+      const plinthInnerD = Math.max(50, plinthOuterD - (2 * t));
+      const plinthCenterY = posY - (h / 2) + (plinthH / 2);
+
+      parts.push({
+        id: `${moduleId}_zocalo_f_${Date.now()}`,
+        name: 'Zócalo Frontal',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthOuterW,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: plinthCenterY,
+        posZ: carcassFrontZ - recess - (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo frontal perimetral'
+      });
+      parts.push({
+        id: `${moduleId}_zocalo_t_${Date.now()}`,
+        name: 'Zócalo Trasero',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthOuterW,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: plinthCenterY,
+        posZ: carcassBackZ + recess + (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo trasero perimetral'
+      });
+      parts.push({
+        id: `${moduleId}_zocalo_li_${Date.now()}`,
+        name: 'Zócalo Lateral Izquierdo',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthInnerD,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX - (w / 2) + recess + (t / 2),
+        posY: plinthCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'plinth',
+        notes: 'Zócalo lateral izquierdo perimetral'
+      });
+      parts.push({
+        id: `${moduleId}_zocalo_ld_${Date.now()}`,
+        name: 'Zócalo Lateral Derecho',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: plinthInnerD,
+        width: plinthH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX + (w / 2) - recess - (t / 2),
+        posY: plinthCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'plinth',
+        notes: 'Zócalo lateral derecho perimetral'
+      });
+    }
+
+    // 4.2 Tubos de colgado (Hanging Rods para closets)
+    const rodsCount = config.hangingRodsCount ?? 0;
+    if (rodsCount === 1) {
+      parts.push({
+        id: `${moduleId}_tubo_colgador_${Date.now()}`,
+        name: 'Tubo Colgador Cromado',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: 25,
+        thickness: 25,
+        quantity: 1,
+        materialId: 'hw_rod_chrome',
+        materialName: 'Tubo Oval Cromado',
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: topY - (t / 2) - 80,
+        posZ: carcassCenterZ,
+        orientation: 'horizontal',
+        componentRole: 'free',
+        shapeType: 'circle',
+        diameter: 25,
+        colorHex: '#94a3b8',
+        notes: 'Tubo de colgado simple para perchas'
+      });
+    } else if (rodsCount === 2) {
+      const midShelfY = bottomOfCarcassY + (sideH / 2);
+      parts.push({
+        id: `${moduleId}_repisa_colgado_${Date.now()}`,
+        name: 'Entrepaño Divisor Colgado',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: Math.max(50, innerWidth - 2),
+        width: Math.max(50, carcassDepth - (hasDoor ? 20 : 10)),
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: midShelfY,
+        posZ: carcassCenterZ,
+        orientation: 'horizontal',
+        componentRole: 'shelf',
+        notes: 'Divisor de colgado doble'
+      });
+      parts.push({
+        id: `${moduleId}_tubo_sup_${Date.now()}`,
+        name: 'Tubo Colgador Superior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: 25,
+        thickness: 25,
+        quantity: 1,
+        materialId: 'hw_rod_chrome',
+        materialName: 'Tubo Oval Cromado',
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: topY - (t / 2) - 70,
+        posZ: carcassCenterZ,
+        orientation: 'horizontal',
+        componentRole: 'free',
+        shapeType: 'circle',
+        diameter: 25,
+        colorHex: '#94a3b8',
+        notes: 'Tubo de colgado nivel superior'
+      });
+      parts.push({
+        id: `${moduleId}_tubo_inf_${Date.now()}`,
+        name: 'Tubo Colgador Inferior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: 25,
+        thickness: 25,
+        quantity: 1,
+        materialId: 'hw_rod_chrome',
+        materialName: 'Tubo Oval Cromado',
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: midShelfY - 70,
+        posZ: carcassCenterZ,
+        orientation: 'horizontal',
+        componentRole: 'free',
+        shapeType: 'circle',
+        diameter: 25,
+        colorHex: '#94a3b8',
+        notes: 'Tubo de colgado nivel inferior'
+      });
+    }
+
     // 5. Repisas / Entrepaños Interiores
     const includeBack = config.backType !== 'none' && config.hasBackPanel !== false;
     const shelves = config.shelvesCount ?? 0;
     if (shelves > 0) {
-      const bottomY = posY - (h / 2) + t;
-      const topY = posY + (h / 2) - t;
+      const bottomY = bottomOfCarcassY + t;
       const innerAvailableH = Math.max(50, topY - bottomY);
       
       // Technical clearances: 20mm behind door facade and 22mm ahead of rear carcass/back groove
@@ -826,8 +525,8 @@ export class CabinetGeneratorService {
         ? Math.max(50, innerWidth - 2) 
         : Math.max(50, w - 4);
       const backHeight = isGroove 
-        ? Math.max(50, innerHeight - 2) 
-        : Math.max(50, h - 4);
+        ? Math.max(50, sideH - 2) 
+        : Math.max(50, sideH - 4);
 
       parts.push({
         id: `${moduleId}_fondo_${Date.now()}`,
@@ -845,13 +544,13 @@ export class CabinetGeneratorService {
         grain: 'none',
         edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
         posX,
-        posY,
+        posY: sideCenterY,
         posZ: backPosZ,
         orientation: 'vertical_xy',
         componentRole: 'back',
         notes: isGroove 
-          ? `Fondo MDF ranurado a 15mm (medida corte con espigas: ${innerWidth + 14}x${innerHeight + 14} mm)`
-          : `Fondo MDF sobrepuesto clavado al dorso (${w - 4}x${h - 4} mm)`
+          ? `Fondo MDF ranurado a 15mm`
+          : `Fondo MDF sobrepuesto clavado al dorso`
       });
     }
 
@@ -861,6 +560,7 @@ export class CabinetGeneratorService {
     const hType = hasHandle ? (config.handleType || 'bar_modern') : 'none';
     const hFinish = config.handleFinish || 'brushed_steel';
     const isGasLift = doorOpening === 'top';
+    const doorH = Math.max(80, sideH - gap);
 
     if (doorOpening === 'left' || doorOpening === 'right') {
       // 1 Puerta completa (Abre Izquierda o Derecha)
@@ -872,7 +572,7 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: w - gap,
-        width: h - gap,
+        width: doorH,
         thickness: doorT,
         quantity: 1,
         materialId: doorMat.id,
@@ -880,7 +580,7 @@ export class CabinetGeneratorService {
         grain: doorMat.hasGrain ? 'length' : 'none',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
         posX,
-        posY,
+        posY: sideCenterY,
         posZ: doorPosZ,
         orientation: 'vertical_xy',
         componentRole: 'door',
@@ -911,7 +611,7 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: doorW,
-        width: h - gap,
+        width: doorH,
         thickness: doorT,
         quantity: 1,
         materialId: doorMat.id,
@@ -919,7 +619,7 @@ export class CabinetGeneratorService {
         grain: doorMat.hasGrain ? 'length' : 'none',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
         posX: leftDoorX,
-        posY,
+        posY: sideCenterY,
         posZ: doorPosZ,
         orientation: 'vertical_xy',
         componentRole: 'door',
@@ -945,7 +645,7 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: doorW,
-        width: h - gap,
+        width: doorH,
         thickness: doorT,
         quantity: 1,
         materialId: doorMat.id,
@@ -953,7 +653,7 @@ export class CabinetGeneratorService {
         grain: doorMat.hasGrain ? 'length' : 'none',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
         posX: rightDoorX,
-        posY,
+        posY: sideCenterY,
         posZ: doorPosZ,
         orientation: 'vertical_xy',
         componentRole: 'door',
@@ -979,7 +679,7 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: w - gap,
-        width: h - gap,
+        width: doorH,
         thickness: doorT,
         quantity: 1,
         materialId: doorMat.id,
@@ -987,7 +687,7 @@ export class CabinetGeneratorService {
         grain: doorMat.hasGrain ? 'length' : 'none',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
         posX,
-        posY,
+        posY: sideCenterY,
         posZ: doorPosZ,
         orientation: 'vertical_xy',
         componentRole: 'door',
@@ -1013,7 +713,7 @@ export class CabinetGeneratorService {
         groupId,
         groupName,
         length: w - gap,
-        width: h - gap,
+        width: doorH,
         thickness: doorT,
         quantity: 1,
         materialId: doorMat.id,
@@ -1021,7 +721,7 @@ export class CabinetGeneratorService {
         grain: doorMat.hasGrain ? 'length' : 'none',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
         posX,
-        posY,
+        posY: sideCenterY,
         posZ: doorPosZ,
         orientation: 'vertical_xy',
         componentRole: 'door',
@@ -1111,9 +811,10 @@ export class CabinetGeneratorService {
     const hType = hasHandle ? (config.handleType || 'bar_modern') : 'none';
     const hFinish = config.handleFinish || 'brushed_steel';
 
-    // Coordenadas del centro
+    // Coordenadas del centro con soporte para altura libre flotante (elevationY)
+    const elevationY = Number.isFinite(Number(config.elevationY)) ? Number(config.elevationY) : 0;
     const posX = Number.isFinite(Number(config.posX)) ? Number(config.posX) : 0;
-    const posY = Number.isFinite(Number(config.posY)) ? Number(config.posY) : (h / 2);
+    const posY = Number.isFinite(Number(config.posY)) ? Number(config.posY) : (elevationY + (h / 2));
     const posZ = Number.isFinite(Number(config.posZ)) ? Number(config.posZ) : 0;
 
     // Medidas del casco (carcass)
@@ -1123,34 +824,93 @@ export class CabinetGeneratorService {
     const carcassBackZ = carcassCenterZ - (carcassDepth / 2);
 
     const innerWidth = Math.max(50, w - (2 * t));
-    const sideH = Math.max(100, h - t - plinthH);
+    const useTopTies = config.topTieStrips === true || config.hasTopCover === false;
+    const sideH = useTopTies ? Math.max(100, h - plinthH) : Math.max(100, h - t - plinthH);
     const sideCenterY = posY - (h / 2) + plinthH + (sideH / 2);
+    const topY = posY - (h / 2) + plinthH + sideH - (t / 2);
 
     const parts: Part[] = [];
 
-    // 1. Cubierta Superior / Tapa (cubre todo el ancho y fondo del mueble)
-    parts.push({
-      id: `${moduleId}_tapa_${Date.now()}`,
-      name: 'Cubierta Superior',
-      moduleId,
-      moduleName: groupName,
-      groupId,
-      groupName,
-      length: w,
-      width: d,
-      thickness: t,
-      quantity: 1,
-      materialId: mainMat.id,
-      materialName: mainMat.name,
-      grain: mainMat.hasGrain ? 'length' : 'none',
-      edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-      posX,
-      posY: posY + (h / 2) - (t / 2),
-      posZ,
-      orientation: 'horizontal',
-      componentRole: 'top',
-      notes: 'Cubierta superior del mueble'
-    });
+    // 1. Cubierta Superior / Amarres de Mesón
+    if (useTopTies) {
+      const tieWidth = 90;
+      parts.push({
+        id: `${moduleId}_tirante_front_${Date.now()}`,
+        name: 'Amarre Frontal Superior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: tieWidth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: topY,
+        posZ: carcassFrontZ - (tieWidth / 2),
+        orientation: 'horizontal',
+        componentRole: 'tie',
+        notes: 'Amarre frontal superior de cajonera para mesón'
+      });
+      parts.push({
+        id: `${moduleId}_tirante_back_${Date.now()}`,
+        name: 'Amarre Trasero Superior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: tieWidth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: topY,
+        posZ: carcassBackZ + (tieWidth / 2),
+        orientation: 'horizontal',
+        componentRole: 'tie',
+        notes: 'Amarre trasero superior de cajonera para mesón'
+      });
+    } else {
+      const topPart: Part = {
+        id: `${moduleId}_tapa_${Date.now()}`,
+        name: 'Cubierta Superior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: w,
+        width: d,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX,
+        posY: posY + (h / 2) - (t / 2),
+        posZ,
+        orientation: 'horizontal',
+        componentRole: 'top',
+        notes: 'Cubierta superior del mueble'
+      };
+      if (config.siphonCutout?.enabled) {
+        topPart.cornerCutConfig = {
+          type: 'u_siphon_cutout',
+          corner: 'back_left',
+          cutX: config.siphonCutout.width || 200,
+          cutY: config.siphonCutout.depth || 250
+        };
+      }
+      parts.push(topPart);
+    }
 
     // 2. Lateral Izquierdo
     parts.push({
@@ -1534,7 +1294,8 @@ export class CabinetGeneratorService {
       });
 
       // Fondo MDF de Caja
-      parts.push({
+      const isTopDrawer = (i === drawersCount - 1);
+      const drawerBottomPart: Part = {
         id: `${moduleId}_caj_${drawerIdx}_fondo_${drawerUid}`,
         name: `${drawerLabel} - Fondo MDF`,
         moduleId,
@@ -1554,8 +1315,19 @@ export class CabinetGeneratorService {
         posZ: boxFrontZ - (slideLength / 2),
         orientation: 'horizontal',
         componentRole: 'drawer_box',
-        notes: `Fondo de cajón MDF ${backT}mm`
-      });
+        notes: (isTopDrawer && config.siphonCutout?.enabled)
+          ? `Fondo de cajón MDF ${backT}mm con destaje en U para sifón`
+          : `Fondo de cajón MDF ${backT}mm`
+      };
+      if (isTopDrawer && config.siphonCutout?.enabled) {
+        drawerBottomPart.cornerCutConfig = {
+          type: 'u_siphon_cutout',
+          corner: 'back_left',
+          cutX: Math.min(boxInnerWidth - 40, config.siphonCutout.width || 180),
+          cutY: Math.min(slideLength - (2 * boxWallT) - 20, config.siphonCutout.depth || 180)
+        };
+      }
+      parts.push(drawerBottomPart);
     }
 
     const module: FurnitureModule = {
@@ -1673,15 +1445,19 @@ export class CabinetGeneratorService {
     const backPart = parts.find(p => p.componentRole === 'back');
 
     const t = Number(sidePart?.thickness) || 15;
-    const rawSideLen = Number(sidePart?.length) || 800;
-    const rawSideWid = Number(sidePart?.width) || 300;
-    const height = sidePart ? (rawSideLen > rawSideWid ? rawSideLen : rawSideWid) : 800;
-    const innerWidth = Number(topOrBottom?.length) || 570;
+    const sideLocal = sidePart ? this.partGeometry.getLocalDimensions(sidePart) : null;
+    const height = sideLocal ? sideLocal.sy : 800;
+    const innerWidth = topOrBottom
+      ? Number(sidePart?.orientation === 'vertical_xy' ? topOrBottom.width : topOrBottom.length) || 570
+      : 570;
     const width = innerWidth + (2 * t);
     const doorT = doorParts.length > 0
       ? (Number(doorParts[0]?.thickness) || t)
       : (drawerFronts.length > 0 ? (Number(drawerFronts[0]?.thickness) || t) : t);
-    const depth = (sidePart ? (rawSideLen > rawSideWid ? rawSideWid : rawSideLen) : 300) + (doorParts.length > 0 || drawerFronts.length > 0 ? doorT : 0);
+    const carcassDepth = sidePart && sideLocal
+      ? (sidePart.orientation === 'vertical_xy' ? sideLocal.sx : sideLocal.sz)
+      : 300;
+    const depth = carcassDepth + (doorParts.length > 0 || drawerFronts.length > 0 ? doorT : 0);
 
     // Caso de módulo con cajones (Cajonera)
     if (drawerFronts.length > 0 || parts.some(p => p.componentRole === 'drawer_box')) {
@@ -1830,8 +1606,8 @@ export class CabinetGeneratorService {
 
     const parts: Part[] = [];
 
-    // 1. Zócalo perimetral común (4 lados)
-    if (hasPlinth && plinthH > 0) {
+    // 1. Zócalo perimetral común (4 lados) para módulos rectangulares (corner_base genera su propio zócalo esquinero)
+    if (hasPlinth && plinthH > 0 && config.category !== 'corner_base') {
       const recess = 25;
       const plinthOuterW = Math.max(50, w - (2 * recess));
       const plinthOuterD = Math.max(50, carcassDepth - (2 * recess));
@@ -1928,21 +1704,25 @@ export class CabinetGeneratorService {
     }
 
     if (config.category === 'corner_base') {
-      // MÓDULO ESQUINERO DIAGONAL 45° (900x900)
-      const cutX = Math.round(w * 0.38);
-      const cutY = Math.round(carcassDepth * 0.38);
+      // MÓDULO ESQUINERO EN L PENTAGONAL (900x900 mm con retornos de 580 mm)
+      const returnD = Math.min(580, Math.max(300, w - 100));
+      const cutX = Math.max(100, w - returnD);
+      const cutY = Math.max(100, carcassDepth - returnD);
+
       const cornerConfig: PartCornerCutConfig = {
         type: 'chamfer_corner',
         corner: 'front_right',
-        cutX,
-        cutY
+        cutX: Math.max(50, cutX - t),
+        cutY: Math.max(50, cutY - t)
       };
-      const contour = this.buildCornerCutContour(innerWidth, carcassDepth, cornerConfig);
+      const innerCornerW = Math.max(50, w - (2 * t));
+      const innerCornerD = Math.max(50, carcassDepth - (2 * t));
+      const contour = this.buildCornerCutContour(innerCornerW, innerCornerD, cornerConfig);
 
-      // Laterales
+      // 1. Costado Izquierdo (apoyo a pared izquierda)
       parts.push({
         id: `${moduleId}_lat_izq_${Date.now()}`,
-        name: 'Lateral Izquierdo Esquinero',
+        name: 'Lateral Izquierdo Apoyo a Pared',
         moduleId,
         moduleName: groupName,
         groupId,
@@ -1960,19 +1740,43 @@ export class CabinetGeneratorService {
         posZ: carcassCenterZ,
         orientation: 'vertical_yz',
         componentRole: 'side_left',
-        notes: 'Costado profundo esquinero'
+        notes: 'Costado profundo apoyo a pared'
       });
 
-      const rightSideDepth = Math.max(250, carcassDepth - cutY);
+      // 2. Respaldo Trasero Estructural (apoyo a pared trasera)
       parts.push({
-        id: `${moduleId}_lat_der_${Date.now()}`,
-        name: 'Lateral Derecho Corto (Encuentro 45°)',
+        id: `${moduleId}_respaldo_tras_${Date.now()}`,
+        name: 'Respaldo Trasero Apoyo a Pared',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: Math.max(50, w - (2 * t)),
+        width: sideH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+        posX,
+        posY: sideCenterY,
+        posZ: carcassBackZ + (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'back',
+        notes: 'Respaldo estructural macizo apoyo a pared'
+      });
+
+      // 3. Costado Retorno Derecho (conecta con mueble contiguo de 580mm)
+      parts.push({
+        id: `${moduleId}_lat_der_ret_${Date.now()}`,
+        name: 'Costado Retorno Derecho (580mm)',
         moduleId,
         moduleName: groupName,
         groupId,
         groupName,
         length: sideH,
-        width: rightSideDepth,
+        width: returnD,
         thickness: t,
         quantity: 1,
         materialId: mainMat.id,
@@ -1981,18 +1785,61 @@ export class CabinetGeneratorService {
         edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
         posX: posX + (w / 2) - (t / 2),
         posY: sideCenterY,
-        posZ: carcassBackZ + (rightSideDepth / 2),
+        posZ: carcassBackZ + (returnD / 2),
         orientation: 'vertical_yz',
         componentRole: 'side_right',
-        notes: 'Costado lateral para encuentro a 45°'
+        notes: 'Costado de retorno hacia hilera derecha'
       });
 
-      // Piso, Techo y Entrepaño con chaflán diagonal 45°
-      const levels = [
-        { role: 'bottom' as const, name: 'Piso Esquinero Chaflanado 45°', y: bottomOfCarcassY + (t / 2) },
-        { role: 'shelf' as const, name: 'Entrepaño Interior Esquinero 45°', y: bottomOfCarcassY + (sideH / 2) },
-        { role: 'top' as const, name: 'Tapa Superior Esquinera 45°', y: bottomOfCarcassY + sideH - (t / 2) }
+      // 4. Costado Retorno Frontal Izquierdo (conecta con hilera frontal)
+      const frontReturnL = Math.max(50, returnD - t);
+      parts.push({
+        id: `${moduleId}_lat_front_ret_${Date.now()}`,
+        name: 'Costado Retorno Frontal (580mm)',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: frontReturnL,
+        width: sideH,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+        posX: posX - (w / 2) + t + (frontReturnL / 2),
+        posY: sideCenterY,
+        posZ: carcassFrontZ - (t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'side_left',
+        notes: 'Costado de retorno hacia hilera frontal'
+      });
+
+      // 5. Piso, Techo y Entrepaño con chaflán diagonal 45°
+      const levels: { role: 'bottom' | 'shelf' | 'top'; name: string; y: number }[] = [
+        { role: 'bottom', name: 'Piso Esquinero Pentagonal 45°', y: bottomOfCarcassY + (t / 2) }
       ];
+      const shelvesCount = config.shelvesCount !== undefined ? config.shelvesCount : 1;
+      if (shelvesCount > 0) {
+        const spacing = sideH / (shelvesCount + 1);
+        for (let s = 1; s <= shelvesCount; s++) {
+          levels.push({
+            role: 'shelf',
+            name: shelvesCount === 1 ? 'Entrepaño Interior Esquinero 45°' : `Entrepaño ${s} Esquinero 45°`,
+            y: bottomOfCarcassY + (spacing * s)
+          });
+        }
+      }
+      const hasTopCover = config.hasTopCover !== false;
+      const topTieStrips = config.topTieStrips === true;
+      if (hasTopCover || topTieStrips) {
+        levels.push({
+          role: 'top',
+          name: topTieStrips ? 'Amarres Superiores Pentagonales 45°' : 'Tapa Superior Esquinera 45°',
+          y: bottomOfCarcassY + sideH - (t / 2)
+        });
+      }
       for (const lv of levels) {
         parts.push({
           id: `${moduleId}_${lv.role}_45_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
@@ -2001,8 +1848,8 @@ export class CabinetGeneratorService {
           moduleName: groupName,
           groupId,
           groupName,
-          length: innerWidth,
-          width: carcassDepth,
+          length: innerCornerW,
+          width: innerCornerD,
           thickness: t,
           quantity: 1,
           materialId: mainMat.id,
@@ -2017,20 +1864,318 @@ export class CabinetGeneratorService {
           shapeType: 'freehand',
           contourPoints: contour,
           cornerCutConfig: cornerConfig,
-          notes: `Corte diagonal 45° (${cutX}x${cutY} mm)`
+          notes: `Pentagonal con chaflán 45° (${cutX}x${cutY} mm)`
         });
       }
 
-      // Puerta diagonal en chaflán
-      const diagDoorW = Math.max(240, Math.round(Math.hypot(cutX, cutY) - 8));
+      // 6. Puerta Diagonal Frontal a 45°
+      const openLeftX = posX - (w / 2) + returnD;
+      const openLeftZ = carcassFrontZ;
+      const openRightX = posX + (w / 2) - t;
+      const openRightZ = carcassBackZ + returnD;
+
+      const openMidX = (openLeftX + openRightX) / 2;
+      const openMidZ = (openLeftZ + openRightZ) / 2;
+      const openSpan = Math.hypot(openRightX - openLeftX, openLeftZ - openRightZ);
+
+      // Puerta con holgura perimetral milimétrica para evitar roce con costados de retorno
+      const cornerDoorGap = Math.max(gap, 4);
+      const diagDoorW = Math.max(240, Math.round(openSpan - (cornerDoorGap * 2)));
+      const diagNormal = Math.SQRT1_2;
+      const doorCenterX = openMidX + ((doorT / 2 + 1) * diagNormal);
+      const doorCenterZ = openMidZ + ((doorT / 2 + 1) * diagNormal);
+
+      const hasCornerDoor = config.doorOpening !== 'none';
+      if (hasCornerDoor) {
+        parts.push({
+          id: `${moduleId}_puerta_diag_${Date.now()}`,
+          name: 'Puerta Esquinera Diagonal 45°',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: diagDoorW,
+          width: sideH - gap,
+          thickness: doorT,
+          quantity: 1,
+          materialId: doorMat.id,
+          materialName: doorMat.name,
+          grain: doorMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX: doorCenterX,
+          posY: sideCenterY,
+          posZ: doorCenterZ,
+          rotationY: 45,
+          orientation: 'vertical_xy',
+          componentRole: 'door',
+          hardwareConfig: {
+            isMovable: true,
+            movableType: 'door',
+            openingDirection: 'left',
+            hingeType: 'straight',
+            handleType: hType,
+            handleFinish: hFinish,
+            handlePosition: 'vertical',
+            isOpen: false
+          },
+          notes: 'Puerta esquinera con bisagra angular 45°'
+        });
+      }
+
+      // 7. Zócalos perimetrales alineados con la huella pentagonal a 45°
+      if (hasPlinth && plinthH > 0) {
+        const recess = 25;
+        const plinthCenterY = posY - (h / 2) + (plinthH / 2);
+
+        // Zócalo diagonal 45° centrado bajo la puerta y retranqueado
+        const plinthRecess = 24;
+        const zDiagCenterX = doorCenterX - (plinthRecess * diagNormal);
+        const zDiagCenterZ = doorCenterZ - (plinthRecess * diagNormal);
+        const zDiagL = Math.max(100, Math.round(openSpan - 60));
+
+        // Extensión máxima de la caja del zócalo diagonal en los ejes X y Z
+        const hxWorld = ((zDiagL + t) * diagNormal) / 2;
+        const diagMinX = zDiagCenterX - hxWorld;
+        const diagMinZ = zDiagCenterZ - hxWorld;
+
+        // Zócalos de retorno ajustados milimétricamente para conectar al ras sin solapar la caja diagonal
+        const zFrontStartX = posX - (w / 2) + recess;
+        const zFrontEndX = Math.min(openLeftX, Math.floor(diagMinX - 1));
+        const zFrontW = Math.max(50, zFrontEndX - zFrontStartX);
+
+        parts.push({
+          id: `${moduleId}_zocalo_ret_f_${Date.now()}`,
+          name: 'Zócalo Retorno Frontal',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: zFrontW,
+          width: plinthH,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: zFrontStartX + (zFrontW / 2),
+          posY: plinthCenterY,
+          posZ: carcassFrontZ - recess - (t / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'plinth',
+          notes: 'Zócalo frontal esquinero retranqueado'
+        });
+
+        // Zócalo retorno derecho alineado simétricamente
+        const zRightStartZ = carcassBackZ + recess;
+        const zRightEndZ = Math.min(openRightZ, Math.floor(diagMinZ - 1));
+        const zRightD = Math.max(50, zRightEndZ - zRightStartZ);
+
+        parts.push({
+          id: `${moduleId}_zocalo_ret_d_${Date.now()}`,
+          name: 'Zócalo Retorno Derecho',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: zRightD,
+          width: plinthH,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: posX + (w / 2) - recess - (t / 2),
+          posY: plinthCenterY,
+          posZ: zRightStartZ + (zRightD / 2),
+          orientation: 'vertical_yz',
+          componentRole: 'plinth',
+          notes: 'Zócalo derecho esquinero retranqueado'
+        });
+
+        parts.push({
+          id: `${moduleId}_zocalo_diag_${Date.now()}`,
+          name: 'Zócalo Diagonal 45°',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: zDiagL,
+          width: plinthH,
+          thickness: t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          grain: 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: zDiagCenterX,
+          posY: plinthCenterY,
+          posZ: zDiagCenterZ,
+          rotationY: 45,
+          orientation: 'vertical_xy',
+          componentRole: 'plinth',
+          notes: 'Zócalo chaflanado a 45° bajo la puerta'
+        });
+      }
+    } else if (config.category === 'blind_corner_base') {
+      // MÓDULO BAJO ESQUINERO RECTO CIEGO (1000x580 mm con Panel Ciego de 450 mm + Puerta Batiente)
+      const blindW = Math.min(500, Math.max(350, Number(config.cornerReturnWidth) || 450));
+      const accessDoorW = Math.max(250, w - blindW - (gap * 2));
+
+      // Laterales estándar
       parts.push({
-        id: `${moduleId}_puerta_diag_${Date.now()}`,
-        name: 'Puerta Esquinera Diagonal 45°',
+        id: `${moduleId}_lat_izq_${Date.now()}`,
+        name: 'Lateral Izquierdo',
         moduleId,
         moduleName: groupName,
         groupId,
         groupName,
-        length: diagDoorW,
+        length: sideH,
+        width: carcassDepth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+        posX: posX - (w / 2) + (t / 2),
+        posY: sideCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'side_left',
+        notes: 'Costado izquierdo de módulo ciego'
+      });
+      parts.push({
+        id: `${moduleId}_lat_der_${Date.now()}`,
+        name: 'Lateral Derecho',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: sideH,
+        width: carcassDepth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+        posX: posX + (w / 2) - (t / 2),
+        posY: sideCenterY,
+        posZ: carcassCenterZ,
+        orientation: 'vertical_yz',
+        componentRole: 'side_right',
+        notes: 'Costado derecho fondo de rincón'
+      });
+
+      // Piso inferior
+      parts.push({
+        id: `${moduleId}_piso_${Date.now()}`,
+        name: 'Piso Inferior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: carcassDepth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: bottomOfCarcassY + (t / 2),
+        posZ: carcassCenterZ,
+        orientation: 'horizontal',
+        componentRole: 'bottom',
+        notes: 'Base inferior estructural'
+      });
+
+      // Amarres superiores
+      const tieWidth = 90;
+      parts.push({
+        id: `${moduleId}_amarre_f_${Date.now()}`,
+        name: 'Amarre Frontal Superior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: tieWidth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: bottomOfCarcassY + sideH - (t / 2),
+        posZ: carcassFrontZ - (tieWidth / 2),
+        orientation: 'horizontal',
+        componentRole: 'tie',
+        notes: 'Amarre frontal superior'
+      });
+      parts.push({
+        id: `${moduleId}_amarre_t_${Date.now()}`,
+        name: 'Amarre Trasero Superior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: innerWidth,
+        width: tieWidth,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX,
+        posY: bottomOfCarcassY + sideH - (t / 2),
+        posZ: carcassBackZ + (tieWidth / 2),
+        orientation: 'horizontal',
+        componentRole: 'tie',
+        notes: 'Amarre trasero superior'
+      });
+
+      // Fondo trasero MDF
+      if (config.hasBackPanel !== false) {
+        parts.push({
+          id: `${moduleId}_fondo_ciego_${Date.now()}`,
+          name: 'Fondo Trasero Ranurado',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: Math.max(50, innerWidth - 2),
+          width: Math.max(50, sideH - 2),
+          thickness: backT,
+          quantity: 1,
+          materialId: backMat.id,
+          materialName: backMat.name,
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX,
+          posY: sideCenterY,
+          posZ: carcassBackZ + 15 + (backT / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'back',
+          notes: `Fondo MDF ${backT}mm`
+        });
+      }
+
+      // Panel Ciego Fijo (450 mm en el costado derecho)
+      const blindPosX = posX + (w / 2) - (blindW / 2);
+      parts.push({
+        id: `${moduleId}_panel_ciego_${Date.now()}`,
+        name: 'Panel Ciego Fijo de Rincón',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: blindW,
         width: sideH - gap,
         thickness: doorT,
         quantity: 1,
@@ -2038,10 +2183,34 @@ export class CabinetGeneratorService {
         materialName: doorMat.name,
         grain: doorMat.hasGrain ? 'length' : 'none',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-        posX: posX + (innerWidth / 2) - (cutX / 2),
+        posX: blindPosX,
         posY: sideCenterY,
-        posZ: carcassFrontZ - (cutY / 2),
-        rotationY: 45,
+        posZ: doorPosZ,
+        orientation: 'vertical_xy',
+        componentRole: 'door',
+        notes: 'Panel ciego fijo de rincón para encuentro de mueble perpendicular'
+      });
+
+      // Puerta Batiente de Acceso (lado izquierdo)
+      const doorPosX = posX - (w / 2) + (accessDoorW / 2) + gap;
+      parts.push({
+        id: `${moduleId}_puerta_acceso_${Date.now()}`,
+        name: 'Puerta de Acceso a Rincón',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: accessDoorW,
+        width: sideH - gap,
+        thickness: doorT,
+        quantity: 1,
+        materialId: doorMat.id,
+        materialName: doorMat.name,
+        grain: doorMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        posX: doorPosX,
+        posY: sideCenterY,
+        posZ: doorPosZ,
         orientation: 'vertical_xy',
         componentRole: 'door',
         hardwareConfig: {
@@ -2054,34 +2223,32 @@ export class CabinetGeneratorService {
           handlePosition: 'vertical',
           isOpen: false
         },
-        notes: 'Puerta esquinera con bisagra angular 45°'
+        notes: 'Puerta abatible para acceso al rincón ciego'
       });
 
-      // Fondo trasero esquinero MDF
-      if (config.hasBackPanel !== false) {
-        parts.push({
-          id: `${moduleId}_fondo_esq_${Date.now()}`,
-          name: 'Fondo Trasero Ranurado Esquinero',
-          moduleId,
-          moduleName: groupName,
-          groupId,
-          groupName,
-          length: Math.max(50, innerWidth - 2),
-          width: Math.max(50, sideH - (2 * t)),
-          thickness: backT,
-          quantity: 1,
-          materialId: backMat.id,
-          materialName: backMat.name,
-          grain: 'none',
-          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-          posX,
-          posY: sideCenterY,
-          posZ: carcassBackZ + 15 + (backT / 2),
-          orientation: 'vertical_xy',
-          componentRole: 'back',
-          notes: `Fondo MDF ${backT}mm módulo esquinero`
-        });
-      }
+      // Listón vertical estructural de cierre tras panel ciego
+      parts.push({
+        id: `${moduleId}_liston_cierre_${Date.now()}`,
+        name: 'Listón de Cierre Interior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: Math.max(50, sideH - (2 * t)),
+        width: 70,
+        thickness: t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: posX + (w / 2) - blindW - (t / 2),
+        posY: sideCenterY,
+        posZ: carcassFrontZ - 35,
+        orientation: 'vertical_yz',
+        componentRole: 'tie',
+        notes: 'Listón vertical para fijación de panel ciego y tope de puerta'
+      });
     } else {
       // Laterales estándar para oven_base, sink_base y oven_tower
       parts.push({
@@ -2623,176 +2790,7 @@ export class CabinetGeneratorService {
     width: number,
     config: PartCornerCutConfig
   ): { x: number; y: number }[] {
-    const L = Math.max(50, Number(length) || 600);
-    const W = Math.max(50, Number(width) || 600);
-    const cx = Math.max(15, Math.min(L * 0.75, Number(config.cutX) || 150));
-    const cy = Math.max(15, Math.min(W * 0.75, Number(config.cutY) || 150));
-    const corner = config.corner || 'front_right';
-
-    // Nota sobre sistema de coordenadas de contourPoints en Furniture3dViewer:
-    // x: 0 (izquierda) -> L (derecha)
-    // y: 0 (frente / +Z) -> W (fondo / -Z)
-    if (config.type === 'chamfer_corner') {
-      if (corner === 'front_right') {
-        return [
-          { x: 0, y: 0 },
-          { x: L - cx, y: 0 },
-          { x: L, y: cy },
-          { x: L, y: W },
-          { x: 0, y: W }
-        ];
-      }
-      if (corner === 'front_left') {
-        return [
-          { x: cx, y: 0 },
-          { x: L, y: 0 },
-          { x: L, y: W },
-          { x: 0, y: W },
-          { x: 0, y: cy }
-        ];
-      }
-      if (corner === 'back_right') {
-        return [
-          { x: 0, y: 0 },
-          { x: L, y: 0 },
-          { x: L, y: W - cy },
-          { x: L - cx, y: W },
-          { x: 0, y: W }
-        ];
-      }
-      if (corner === 'back_left') {
-        return [
-          { x: 0, y: 0 },
-          { x: L, y: 0 },
-          { x: L, y: W },
-          { x: cx, y: W },
-          { x: 0, y: W - cy }
-        ];
-      }
-      if (corner === 'both_front') {
-        return [
-          { x: cx, y: 0 },
-          { x: L - cx, y: 0 },
-          { x: L, y: cy },
-          { x: L, y: W },
-          { x: 0, y: W },
-          { x: 0, y: cy }
-        ];
-      }
-      // 'all'
-      return [
-        { x: cx, y: 0 },
-        { x: L - cx, y: 0 },
-        { x: L, y: cy },
-        { x: L, y: W - cy },
-        { x: L - cx, y: W },
-        { x: cx, y: W },
-        { x: 0, y: W - cy },
-        { x: 0, y: cy }
-      ];
-    }
-
-    if (config.type === 'diagonal_side') {
-      // Corte en trapecio: recorta cx en el frente derecho o izquierdo a lo largo de todo el fondo W
-      if (corner === 'front_left' || corner === 'back_left') {
-        return [
-          { x: cx, y: 0 },
-          { x: L, y: 0 },
-          { x: L, y: W },
-          { x: 0, y: W }
-        ];
-      }
-      return [
-        { x: 0, y: 0 },
-        { x: L - cx, y: 0 },
-        { x: L, y: W },
-        { x: 0, y: W }
-      ];
-    }
-
-    if (config.type === 'notch_l') {
-      // Destaje en esquina en L (salva-columna o ducto)
-      if (corner === 'front_right') {
-        return [
-          { x: 0, y: 0 },
-          { x: L - cx, y: 0 },
-          { x: L - cx, y: cy },
-          { x: L, y: cy },
-          { x: L, y: W },
-          { x: 0, y: W }
-        ];
-      }
-      if (corner === 'front_left') {
-        return [
-          { x: cx, y: 0 },
-          { x: L, y: 0 },
-          { x: L, y: W },
-          { x: 0, y: W },
-          { x: 0, y: cy },
-          { x: cx, y: cy }
-        ];
-      }
-      if (corner === 'back_left') {
-        return [
-          { x: 0, y: 0 },
-          { x: L, y: 0 },
-          { x: L, y: W },
-          { x: cx, y: W },
-          { x: cx, y: W - cy },
-          { x: 0, y: W - cy }
-        ];
-      }
-      // back_right (típico columna en esquina de pared)
-      return [
-        { x: 0, y: 0 },
-        { x: L, y: 0 },
-        { x: L, y: W - cy },
-        { x: L - cx, y: W - cy },
-        { x: L - cx, y: W },
-        { x: 0, y: W }
-      ];
-    }
-
-    if (config.type === 'rounded_corners') {
-      const r = Math.max(15, Math.min(L * 0.45, W * 0.45, cx));
-      const steps = 6;
-      const pts: { x: number; y: number }[] = [];
-      const addArc = (centerX: number, centerY: number, startAngle: number, endAngle: number) => {
-        for (let i = 0; i <= steps; i++) {
-          const a = startAngle + ((endAngle - startAngle) * i) / steps;
-          pts.push({
-            x: Math.round((centerX + Math.cos(a) * r) * 10) / 10,
-            y: Math.round((centerY + Math.sin(a) * r) * 10) / 10
-          });
-        }
-      };
-
-      const roundFL = corner === 'front_left' || corner === 'both_front' || corner === 'all';
-      const roundFR = corner === 'front_right' || corner === 'both_front' || corner === 'all';
-      const roundBR = corner === 'back_right' || corner === 'all';
-      const roundBL = corner === 'back_left' || corner === 'all';
-
-      if (roundFL) addArc(r, r, Math.PI, Math.PI * 1.5);
-      else pts.push({ x: 0, y: 0 });
-
-      if (roundFR) addArc(L - r, r, Math.PI * 1.5, Math.PI * 2);
-      else pts.push({ x: L, y: 0 });
-
-      if (roundBR) addArc(L - r, W - r, 0, Math.PI * 0.5);
-      else pts.push({ x: L, y: W });
-
-      if (roundBL) addArc(r, W - r, Math.PI * 0.5, Math.PI);
-      else pts.push({ x: 0, y: W });
-
-      return pts;
-    }
-
-    return [
-      { x: 0, y: 0 },
-      { x: L, y: 0 },
-      { x: L, y: W },
-      { x: 0, y: W }
-    ];
+    return this.partGeometry.buildCornerCutContour(length, width, config);
   }
 }
 

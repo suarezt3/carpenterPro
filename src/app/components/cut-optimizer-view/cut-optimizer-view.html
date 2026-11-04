@@ -18,6 +18,20 @@
 
       <!-- Botones de Acción: Imprimir y Descargar (PNG / PDF) -->
       <div class="flex items-center gap-2 print:hidden shrink-0">
+        <!-- Botón Descuento de Tapacantos -->
+        <button
+          type="button"
+          (click)="toggleSubtractEdgeBanding()"
+          [class]="subtractEdgeBanding()
+            ? 'px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-xs cursor-pointer border border-emerald-600'
+            : (themeService.isClassic()
+                ? 'px-3 py-1.5 bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer'
+                : 'px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-md flex items-center gap-1.5 transition cursor-pointer')"
+          title="Descontar el espesor real de tapacantos (0.45mm / 2.0mm) de las dimensiones de corte">
+          <hugeicons-icon [icon]="icons.sawCut" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+          <span>{{ subtractEdgeBanding() ? 'Descuento Canto: ACTIVO' : 'Descontar Canto' }}</span>
+        </button>
+
         <!-- Botón Imprimir Diagrama -->
         <button
           type="button"
@@ -574,7 +588,14 @@
                     <span class="font-semibold text-white">{{ hp.part.name }}</span>
                     <span class="text-zinc-400"> ({{ hp.part.moduleName || hp.part.groupName || 'Manual' }})</span>
                   </div>
-                  <span class="font-mono tabular-nums text-emerald-400 font-semibold">{{ hp.length }} × {{ hp.width }} × {{ hp.part.thickness }} mm</span>
+                  @if (subtractEdgeBanding() && (hp.nominalLength || hp.nominalWidth)) {
+                    <div class="flex items-center gap-1.5 font-mono tabular-nums">
+                      <span class="text-emerald-400 font-semibold" title="Medida real de corte en sierra">Corte: {{ hp.length }} × {{ hp.width }} × {{ hp.part.thickness }}mm</span>
+                      <span class="text-zinc-400 text-[11px] line-through" title="Medida nominal terminada">Nom: {{ hp.nominalLength || hp.part.length }} × {{ hp.nominalWidth || hp.part.width }}mm</span>
+                    </div>
+                  } @else {
+                    <span class="font-mono tabular-nums text-emerald-400 font-semibold">{{ hp.length }} × {{ hp.width }} × {{ hp.part.thickness }} mm</span>
+                  }
                 </div>
                 <div class="flex items-center gap-3 text-[11px] font-mono tabular-nums text-zinc-300">
                   <span>Veta: <strong class="text-white">{{ hp.part.grain === 'length' ? 'Longitudinal' : hp.part.grain === 'width' ? 'Transversal' : 'Libre' }}</strong></span>
@@ -618,7 +639,14 @@
                         <div [class]="themeService.isClassic() ? 'font-medium text-zinc-900 truncate max-w-36' : 'font-medium text-white truncate max-w-36'" [title]="p.part.name">{{ p.part.name }}</div>
                         <div [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 truncate max-w-36' : 'text-[10px] text-zinc-500 truncate max-w-36'">{{ p.part.moduleName || p.part.groupName || 'Manual' }}</div>
                       </td>
-                      <td class="py-2 px-2.5 text-right font-mono tabular-nums whitespace-nowrap">{{ p.length }} × {{ p.width }}</td>
+                      <td class="py-2 px-2.5 text-right font-mono tabular-nums whitespace-nowrap">
+                        @if (subtractEdgeBanding() && (p.nominalLength || p.nominalWidth)) {
+                          <div class="text-emerald-700 dark:text-emerald-400 font-semibold font-mono">{{ p.length }} × {{ p.width }}</div>
+                          <div class="text-[9px] text-zinc-400 font-normal line-through">{{ p.nominalLength || p.part.length }} × {{ p.nominalWidth || p.part.width }} nom.</div>
+                        } @else {
+                          {{ p.length }} × {{ p.width }}
+                        }
+                      </td>
                       <td class="py-2 px-2 text-center">
                         @if (p.rotated) {
                           <span class="px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-800 text-[10px] font-mono font-medium">90°</span>

@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { Part, Material, ParametricCabinetConfig } from '../models/melamine.models';
+import { Part, Material, ParametricCabinetConfig, EnvironmentLine } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 
 export interface FurnitureTemplate {
@@ -7,6 +7,7 @@ export interface FurnitureTemplate {
   name: string;
   category: 'cajones' | 'cocina' | 'closets' | 'bano' | 'sala_tv' | 'oficina';
   categoryLabel: string;
+  environmentLine: EnvironmentLine;
   dimensions: { width: number; height: number; depth: number };
   description: string;
   icon: string;
@@ -33,220 +34,115 @@ export class TemplatesCatalogService {
     return { id: def.id, name: def.name, thickness: def.thickness };
   }
 
-  /**
-   * Generates a complete 5-piece internal drawer box with 1 external front plate.
-   * STRICT JOINERY RULE: Only the front exterior plate is assigned `drawer_front` and hardware.
-   * Internal parts (sides, back, inner-front, bottom) have `drawer_box` role and NO hardware,
-   * preventing duplicate handles and slides.
-   */
-  private generateDrawerBoxParts(
-    drawerIdPrefix: string,
-    drawerName: string,
-    frontWidth: number,
-    frontHeight: number,
-    carcassInnerWidth: number,
-    availableDepth: number,
-    posX: number,
-    posY: number,
-    posZ: number,
-    matFront: { id: string; name: string; thickness: number },
-    matBody: { id: string; name: string; thickness: number },
-    matBottom: { id: string; name: string; thickness: number },
-    t = 18
-  ): Part[] {
-    const standardLengths = [250, 300, 350, 400, 450, 500, 550, 600];
-    const targetDepth = availableDepth - 35;
-    const slideLength = standardLengths.filter(l => l <= targetDepth).pop() || 400;
-    const boxHeight = Math.max(90, Math.min(Math.floor(frontHeight * 0.70), 180));
-    const boxClearancePerSide = 12.7; // 1/2" side clearance for telescopic slides
-    const boxOuterWidth = carcassInnerWidth - (boxClearancePerSide * 2);
-    const boxInnerWidth = boxOuterWidth - (t * 2);
-    const uid = crypto.randomUUID().slice(0, 6);
-
-    return [
-      // 1. Frente Exterior Decorativo (Front Facade)
-      {
-        id: `${drawerIdPrefix}_frente_${uid}`,
-        name: `${drawerName} - Frente`,
-        length: frontWidth,
-        width: frontHeight,
-        thickness: t,
-        quantity: 1,
-        materialId: matFront.id,
-        materialName: matFront.name,
-        grain: 'length',
-        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-        posX,
-        posY,
-        posZ,
-        orientation: 'vertical_xy',
-        componentRole: 'drawer_front',
-        hardwareConfig: {
-          isMovable: true,
-          movableType: 'drawer',
-          slideType: 'telescopic',
+  readonly templates: FurnitureTemplate[] = [
+    // ==========================================
+    // 1. LÍNEA COCINAS (KITCHEN)
+    // ==========================================
+    {
+      id: 'modulo_bajo_cocina_1_puerta',
+      name: 'Módulo Bajo Cocina (1 Puerta y Repisa)',
+      category: 'cocina',
+      categoryLabel: 'Cocinas',
+      environmentLine: 'kitchen',
+      dimensions: { width: 600, height: 860, depth: 580 },
+      description: 'Módulo bajo estándar de cocina 600mm con zócalo de 80mm, puerta batiente, tirador metálico y repisa regulable.',
+      icon: 'countertops',
+      badge: 'Cocina Estándar',
+      partsCount: 9,
+      previewColor: { top: '#334155', body: '#ffffff', front: '#f8fafc', accent: '#0284c7' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'MBC600',
+        name: 'Módulo Bajo Cocina 1P',
+        moduleType: 'base_cabinet',
+        category: 'kitchen_base',
+        environmentLine: 'kitchen',
+        width: 600,
+        height: 860,
+        depth: 580,
+        structureThickness: 15,
+        doorThickness: 15,
+        doorOpening: 'left',
+        shelvesCount: 1,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel',
+        hasBackPanel: true,
+        backType: 'groove',
+        hasPlinth: true,
+        plinthHeight: 80,
+        topTieStrips: true,
+        hasTopCover: false,
+        facadeGap: 3
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'MBC600',
+          name: 'Módulo Bajo Cocina 1P',
+          moduleType: 'base_cabinet',
+          category: 'kitchen_base',
+          environmentLine: 'kitchen',
+          width: 600,
+          height: 860,
+          depth: 580,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 1,
+          doorOpening: 'left',
+          hasHandle: true,
           handleType: 'bar_modern',
           handleFinish: 'brushed_steel',
-          handlePosition: 'horizontal'
-        }
-      },
-      // 2. Lateral Izquierdo de Cajón
-      {
-        id: `${drawerIdPrefix}_lat_izq_${uid}`,
-        name: `${drawerName} - Lateral Izquierdo`,
-        length: slideLength,
-        width: boxHeight,
-        thickness: t,
-        quantity: 1,
-        materialId: matBody.id,
-        materialName: matBody.name,
-        grain: 'length',
-        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: posX - (boxOuterWidth / 2) + (t / 2),
-        posY: posY - ((frontHeight - boxHeight) * 0.15),
-        posZ: posZ - (t / 2) - (slideLength / 2),
-        orientation: 'vertical_yz',
-        componentRole: 'drawer_box',
-        hardwareConfig: {
-          isMovable: false,
-          movableType: 'none',
-          slideType: 'none',
-          handleType: 'none'
-        }
-      },
-      // 3. Lateral Derecho de Cajón
-      {
-        id: `${drawerIdPrefix}_lat_der_${uid}`,
-        name: `${drawerName} - Lateral Derecho`,
-        length: slideLength,
-        width: boxHeight,
-        thickness: t,
-        quantity: 1,
-        materialId: matBody.id,
-        materialName: matBody.name,
-        grain: 'length',
-        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: posX + (boxOuterWidth / 2) - (t / 2),
-        posY: posY - ((frontHeight - boxHeight) * 0.15),
-        posZ: posZ - (t / 2) - (slideLength / 2),
-        orientation: 'vertical_yz',
-        componentRole: 'drawer_box',
-        hardwareConfig: {
-          isMovable: false,
-          movableType: 'none',
-          slideType: 'none',
-          handleType: 'none'
-        }
-      },
-      // 4. Trasera Interior de Cajón
-      {
-        id: `${drawerIdPrefix}_trasera_${uid}`,
-        name: `${drawerName} - Trasera Interior`,
-        length: boxInnerWidth,
-        width: boxHeight,
-        thickness: t,
-        quantity: 1,
-        materialId: matBody.id,
-        materialName: matBody.name,
-        grain: 'length',
-        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX,
-        posY: posY - ((frontHeight - boxHeight) * 0.15),
-        posZ: posZ - t - slideLength + (t / 2),
-        orientation: 'vertical_xy',
-        componentRole: 'drawer_box',
-        hardwareConfig: {
-          isMovable: false,
-          movableType: 'none',
-          slideType: 'none',
-          handleType: 'none'
-        }
-      },
-      // 5. Contrafrente / Frente Interior de Cajón
-      {
-        id: `${drawerIdPrefix}_frente_int_${uid}`,
-        name: `${drawerName} - Contrafrente Interior`,
-        length: boxInnerWidth,
-        width: boxHeight,
-        thickness: t,
-        quantity: 1,
-        materialId: matBody.id,
-        materialName: matBody.name,
-        grain: 'length',
-        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX,
-        posY: posY - ((frontHeight - boxHeight) * 0.15),
-        posZ: posZ - t - (t / 2),
-        orientation: 'vertical_xy',
-        componentRole: 'drawer_box',
-        hardwareConfig: {
-          isMovable: false,
-          movableType: 'none',
-          slideType: 'none',
-          handleType: 'none'
-        }
-      },
-      // 6. Fondo de Cajón (Tablero MDF)
-      {
-        id: `${drawerIdPrefix}_fondo_${uid}`,
-        name: `${drawerName} - Fondo MDF`,
-        length: boxOuterWidth - 10,
-        width: slideLength - 10,
-        thickness: 6,
-        quantity: 1,
-        materialId: matBottom.id,
-        materialName: matBottom.name,
-        grain: 'none',
-        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-        posX,
-        posY: posY - (boxHeight / 2) + 8,
-        posZ: posZ - (t / 2) - (slideLength / 2),
-        orientation: 'horizontal',
-        componentRole: 'drawer_box',
-        hardwareConfig: {
-          isMovable: false,
-          movableType: 'none',
-          slideType: 'none',
-          handleType: 'none'
-        }
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          hasPlinth: true,
+          plinthHeight: 80,
+          topTieStrips: true,
+          hasTopCover: false,
+          hasBackPanel: true,
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 430,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
       }
-    ];
-  }
+    },
 
-  /**
-   * The catalog is restricted to the 2 refined initial templates requested by the user:
-   * 1. Cajonera de 3 Cajones (3 gavetas con despiece de 5 piezas, 1 tirador por frente, correderas en costados)
-   * 2. Módulo Bajo de Cocina con 1 Puerta y Repisa (módulo estándar de 600mm)
-   */
-  readonly templates: FurnitureTemplate[] = [
-    // --- 1. CAJONERA DE 3 CAJONES ---
     {
       id: 'cajonera_3_cajones',
-      name: 'Cajonera de 3 Cajones',
+      name: 'Cajonera de 3 Gavetas para Cocina',
       category: 'cajones',
       categoryLabel: 'Cajoneras',
-      dimensions: { width: 600, height: 750, depth: 500 },
-      description: 'Cajonera independiente de 3 gavetas con correderas telescópicas en costados, cajas interiores de 5 piezas y tiradores centrados.',
+      environmentLine: 'kitchen',
+      dimensions: { width: 600, height: 860, depth: 580 },
+      description: 'Cajonera de 3 gavetas con correderas telescópicas, amarres estructurales para mesón y zócalo retranqueado.',
       icon: 'table_rows',
       badge: '3 Cajones',
-      partsCount: 27, // 9 piezas de mueble (tapa, 2 lados, piso, fondo, 4 zócalos) + (6 piezas x 3 gavetas) = 27 piezas
+      partsCount: 27,
       previewColor: { top: '#b45309', body: '#f8fafc', front: '#f1f5f9', accent: '#64748b' },
       isParametric: true,
       parametricConfig: {
-        category: 'drawers',
+        code: 'CAJ3P',
+        name: 'Cajonera 3 Gavetas Cocina',
         moduleType: 'drawer_unit',
-        name: 'Cajonera de 3 Cajones',
+        category: 'drawers',
+        environmentLine: 'kitchen',
         width: 600,
-        height: 750,
-        depth: 500,
+        height: 860,
+        depth: 580,
         structureThickness: 15,
         doorThickness: 15,
         drawersCount: 3,
         drawerSlideType: 'telescopic',
         drawerFrontType: 'overlay',
         hasPlinth: true,
-        plinthHeight: 70,
-        hasTopCover: true,
+        plinthHeight: 80,
+        topTieStrips: true,
+        hasTopCover: false,
         hasBackPanel: true,
         backType: 'groove',
         hasHandle: true,
@@ -258,12 +154,13 @@ export class TemplatesCatalogService {
         const matBody = this.getMaterial(mats, 'blanco');
         const cfg: ParametricCabinetConfig = {
           code: 'CAJ3P',
-          category: 'drawers',
+          name: 'Cajonera 3 Gavetas Cocina',
           moduleType: 'drawer_unit',
-          name: 'Cajonera de 3 Cajones',
+          category: 'drawers',
+          environmentLine: 'kitchen',
           width: 600,
-          height: 750,
-          depth: 500,
+          height: 860,
+          depth: 580,
           structureThickness: matBody.thickness || 15,
           doorThickness: 15,
           backThickness: 3,
@@ -278,753 +175,14 @@ export class TemplatesCatalogService {
           drawerSlideType: 'telescopic',
           drawerFrontType: 'overlay',
           hasPlinth: true,
-          plinthHeight: 70,
-          hasTopCover: true,
+          plinthHeight: 80,
+          topTieStrips: true,
+          hasTopCover: false,
           hasBackPanel: true,
           hasHandle: true,
           handleType: 'bar_modern',
           handleFinish: 'brushed_steel',
           handlePosition: 'horizontal',
-          posX: offsetX,
-          posY: 375,
-          posZ: 0
-        };
-        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
-      }
-    },
-
-    // --- 2. MÓDULO BAJO DE COCINA CON 1 PUERTA Y REPISA ---
-    {
-      id: 'modulo_bajo_cocina_1_puerta',
-      name: 'Módulo Bajo Cocina (1 Puerta y Repisa)',
-      category: 'cocina',
-      categoryLabel: 'Cocina',
-      dimensions: { width: 600, height: 850, depth: 600 },
-      description: 'Módulo estándar bajo de cocina de 600mm con zócalo de 100mm, puerta batiente con tirador metálico, bisagras de cazoleta de Ø35mm y repisa regulable.',
-      icon: 'countertops',
-      badge: 'Cocina Estándar',
-      partsCount: 9,
-      previewColor: { top: '#334155', body: '#ffffff', front: '#f8fafc', accent: '#0284c7' },
-      isParametric: true,
-      parametricConfig: {
-        category: 'kitchen_base',
-        moduleType: 'base_cabinet',
-        name: 'Módulo Bajo Cocina (1 Puerta y Repisa)',
-        width: 600,
-        height: 850,
-        depth: 600,
-        structureThickness: 15,
-        doorThickness: 15,
-        doorOpening: 'left',
-        shelvesCount: 1,
-        hasHandle: true,
-        handleType: 'bar_modern',
-        hasBackPanel: true,
-        hasPlinth: true,
-        plinthHeight: 100
-      },
-      generateParts: (mats, offsetX = 0) => {
-        const matBody = this.getMaterial(mats, 'blanco');
-        const matDoor = this.getMaterial(mats, 'blanco');
-        const matBottom = this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_6', name: 'MDF 6mm', thickness: 6 };
-        const t = matBody.thickness || 15;
-        const width = 600;
-        const height = 850;
-        const depth = 600;
-        const zocaloH = 100;
-        const carcassDepth = depth - 20; // 580 mm
-        const carcassInnerWidth = width - (2 * t); // 564 mm
-        const carcassHeight = height - zocaloH; // 750 mm
-
-        return [
-          // Lateral Izquierdo
-          {
-            id: 'coc1_lat_izq_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Izquierdo',
-            length: carcassHeight,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX - (width / 2) + (t / 2),
-            posY: zocaloH + (carcassHeight / 2),
-            posZ: 0,
-            orientation: 'vertical_yz',
-            componentRole: 'side_left'
-          },
-          // Lateral Derecho
-          {
-            id: 'coc1_lat_der_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Derecho',
-            length: carcassHeight,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX + (width / 2) - (t / 2),
-            posY: zocaloH + (carcassHeight / 2),
-            posZ: 0,
-            orientation: 'vertical_yz',
-            componentRole: 'side_right'
-          },
-          // Piso Inferior
-          {
-            id: 'coc1_piso_' + crypto.randomUUID().slice(0, 6),
-            name: 'Piso Inferior',
-            length: carcassInnerWidth,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: zocaloH + (t / 2),
-            posZ: 0,
-            orientation: 'horizontal',
-            componentRole: 'bottom'
-          },
-          // Zócalo Frontal
-          {
-            id: 'coc1_zocalo_' + crypto.randomUUID().slice(0, 6),
-            name: 'Zócalo Frontal',
-            length: carcassInnerWidth,
-            width: zocaloH,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: zocaloH / 2,
-            posZ: (carcassDepth / 2) - 30,
-            orientation: 'vertical_xy',
-            componentRole: 'plinth'
-          },
-          // Faja Superior Delantera (Travesaño de amarre)
-          {
-            id: 'coc1_faja_del_' + crypto.randomUUID().slice(0, 6),
-            name: 'Faja Amarre Delantera',
-            length: carcassInnerWidth,
-            width: 80,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: height - (t / 2),
-            posZ: (carcassDepth / 2) - 40,
-            orientation: 'horizontal',
-            componentRole: 'top'
-          },
-          // Faja Superior Trasera (Travesaño de amarre)
-          {
-            id: 'coc1_faja_tras_' + crypto.randomUUID().slice(0, 6),
-            name: 'Faja Amarre Trasera',
-            length: carcassInnerWidth,
-            width: 80,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: height - (t / 2),
-            posZ: - (carcassDepth / 2) + 40,
-            orientation: 'horizontal',
-            componentRole: 'top'
-          },
-          // Repisa Intermedia Regulable
-          {
-            id: 'coc1_repisa_' + crypto.randomUUID().slice(0, 6),
-            name: 'Repisa Regulable',
-            length: carcassInnerWidth - 2, // 562 mm (holgura técnica)
-            width: carcassDepth - 30, // 550 mm
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: zocaloH + (carcassHeight / 2),
-            posZ: 0,
-            orientation: 'horizontal',
-            componentRole: 'shelf'
-          },
-          // Fondo Trasera MDF
-          {
-            id: 'coc1_fondo_mdf_' + crypto.randomUUID().slice(0, 6),
-            name: 'Fondo Trasera MDF',
-            length: carcassInnerWidth,
-            width: carcassHeight - t,
-            thickness: 6,
-            quantity: 1,
-            materialId: matBottom.id,
-            materialName: matBottom.name,
-            grain: 'none',
-            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: zocaloH + t + ((carcassHeight - t) / 2),
-            posZ: - (carcassDepth / 2) + 5,
-            orientation: 'vertical_xy',
-            componentRole: 'back'
-          },
-          // Puerta Batiente Frontal (con 2 bisagras cazoleta Ø35mm y tirador vertical)
-          {
-            id: 'coc1_puerta_' + crypto.randomUUID().slice(0, 6),
-            name: 'Puerta Batiente',
-            length: width - 4, // 596 mm
-            width: carcassHeight - 4, // 746 mm
-            thickness: t,
-            quantity: 1,
-            materialId: matDoor.id,
-            materialName: matDoor.name,
-            grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX,
-            posY: zocaloH + (carcassHeight / 2),
-            posZ: (carcassDepth / 2) + (t / 2),
-            orientation: 'vertical_xy',
-            componentRole: 'door',
-            hardwareConfig: {
-              isMovable: true,
-              movableType: 'door',
-              openingDirection: 'left',
-              hingeType: 'straight',
-              handleType: 'bar_modern',
-              handleFinish: 'brushed_steel',
-              handlePosition: 'vertical'
-            }
-          }
-        ];
-      }
-    },
-
-    // --- 3. MÓDULO ALTO DE COCINA 1 PUERTA (PARAMÉTRICO MELAMINA PRO) ---
-    {
-      id: 'modulo_alto_cocina_1_puerta',
-      name: 'Módulo Alto Cocina 1P (MAL1PU001)',
-      category: 'cocina',
-      categoryLabel: 'Cocinas',
-      dimensions: { width: 600, height: 800, depth: 320 },
-      description: 'Alacena superior de cocina 1 puerta batiente o elevable (pistón a gas). Medidas, repisas, espesores y sentido de apertura totalmente configurables.',
-      icon: 'kitchen',
-      badge: 'Alacena Dinámica',
-      partsCount: 7,
-      previewColor: { top: '#cbd5e1', body: '#ffffff', front: '#e2e8f0', accent: '#4f46e5' },
-      isParametric: true,
-      parametricConfig: {
-        code: 'MAL1PU001',
-        name: 'Módulo Alto 1 Puerta (MAL-1P)',
-        moduleType: 'wall_cabinet',
-        width: 600,
-        height: 800,
-        depth: 320,
-        structureThickness: 15,
-        doorThickness: 15,
-        backThickness: 3,
-        shelvesCount: 1,
-        doorOpening: 'left',
-        facadeGap: 3
-      },
-      generateParts: (mats, offsetX = 0) => {
-        const matBody = this.getMaterial(mats, 'blanco');
-        const matDoor = this.getMaterial(mats, 'roble') || matBody;
-        const matBottom = this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_3', name: 'MDF 3mm', thickness: 3 };
-        const t = matBody.thickness || 15;
-        const w = 600;
-        const h = 800;
-        const d = 320;
-        const doorT = 15;
-        const carcassDepth = d - doorT;
-        const innerW = w - (2 * t);
-        const posY = 1450 + (h / 2);
-        const carcassCenterZ = -(doorT / 2);
-
-        return [
-          {
-            id: 'alt1_lat_izq_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Izquierdo',
-            length: h,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX - (w / 2) + (t / 2),
-            posY,
-            posZ: carcassCenterZ,
-            orientation: 'vertical_yz',
-            componentRole: 'side_left'
-          },
-          {
-            id: 'alt1_lat_der_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Derecho',
-            length: h,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX + (w / 2) - (t / 2),
-            posY,
-            posZ: carcassCenterZ,
-            orientation: 'vertical_yz',
-            componentRole: 'side_right'
-          },
-          {
-            id: 'alt1_techo_' + crypto.randomUUID().slice(0, 6),
-            name: 'Techo Superior',
-            length: innerW,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: posY + (h / 2) - (t / 2),
-            posZ: carcassCenterZ,
-            orientation: 'horizontal',
-            componentRole: 'top'
-          },
-          {
-            id: 'alt1_base_' + crypto.randomUUID().slice(0, 6),
-            name: 'Piso Inferior',
-            length: innerW,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: posY - (h / 2) + (t / 2),
-            posZ: carcassCenterZ,
-            orientation: 'horizontal',
-            componentRole: 'bottom'
-          },
-          {
-            id: 'alt1_repisa_' + crypto.randomUUID().slice(0, 6),
-            name: 'Repisa Central',
-            length: innerW - 2,
-            width: carcassDepth - 15,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY,
-            posZ: carcassCenterZ - 7.5,
-            orientation: 'horizontal',
-            componentRole: 'shelf'
-          },
-          {
-            id: 'alt1_fondo_' + crypto.randomUUID().slice(0, 6),
-            name: 'Fondo MDF 3mm',
-            length: w - 4,
-            width: h - 4,
-            thickness: 3,
-            quantity: 1,
-            materialId: matBottom.id,
-            materialName: matBottom.name,
-            grain: 'none',
-            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY,
-            posZ: - (d / 2) + 1.5,
-            orientation: 'vertical_xy',
-            componentRole: 'back'
-          },
-          {
-            id: 'alt1_puerta_' + crypto.randomUUID().slice(0, 6),
-            name: 'Puerta Frontal (Alacena)',
-            length: w - 3,
-            width: h - 3,
-            thickness: doorT,
-            quantity: 1,
-            materialId: matDoor.id,
-            materialName: matDoor.name,
-            grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX,
-            posY,
-            posZ: (d / 2) - (doorT / 2),
-            orientation: 'vertical_xy',
-            componentRole: 'door',
-            hardwareConfig: {
-              isMovable: true,
-              movableType: 'door',
-              openingDirection: 'left',
-              hingeType: 'straight',
-              handleType: 'bar_modern',
-              handleFinish: 'brushed_steel',
-              handlePosition: 'vertical'
-            }
-          }
-        ];
-      }
-    },
-
-    // --- 4. MÓDULO CLOSET ROPERO 1 PUERTA ---
-    {
-      id: 'closet_ropero_1_puerta',
-      name: 'Módulo Closet Ropero (1 Puerta y Repisas)',
-      category: 'closets',
-      categoryLabel: 'Closets',
-      dimensions: { width: 500, height: 1900, depth: 550 },
-      description: 'Módulo vertical para armario o closet con puerta completa, 3 repisas interiores de guardado y zócalo de piso.',
-      icon: 'door_sliding',
-      badge: 'Ropero 1P',
-      partsCount: 9,
-      previewColor: { top: '#e2e8f0', body: '#ffffff', front: '#cbd5e1', accent: '#059669' },
-      generateParts: (mats, offsetX = 0) => {
-        const matBody = this.getMaterial(mats, 'blanco');
-        const matDoor = this.getMaterial(mats, 'roble') || matBody;
-        const matBottom = this.getMaterial(mats, 'mdf') || { id: 'mat_mdf_3', name: 'MDF 3mm', thickness: 3 };
-        const t = matBody.thickness || 15;
-        const w = 500;
-        const h = 1900;
-        const d = 550;
-        const zocalo = 80;
-        const carcassH = h - zocalo;
-        const innerW = w - (2 * t);
-        const carcassDepth = d - 20;
-
-        return [
-          {
-            id: 'clo1_lat_izq_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Izquierdo Closet',
-            length: carcassH,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX - (w / 2) + (t / 2),
-            posY: zocalo + (carcassH / 2),
-            posZ: 0,
-            orientation: 'vertical_yz',
-            componentRole: 'side_left'
-          },
-          {
-            id: 'clo1_lat_der_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Derecho Closet',
-            length: carcassH,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
-            posX: offsetX + (w / 2) - (t / 2),
-            posY: zocalo + (carcassH / 2),
-            posZ: 0,
-            orientation: 'vertical_yz',
-            componentRole: 'side_right'
-          },
-          {
-            id: 'clo1_techo_' + crypto.randomUUID().slice(0, 6),
-            name: 'Techo Closet',
-            length: innerW,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: h - (t / 2),
-            posZ: 0,
-            orientation: 'horizontal',
-            componentRole: 'top'
-          },
-          {
-            id: 'clo1_piso_' + crypto.randomUUID().slice(0, 6),
-            name: 'Piso Closet',
-            length: innerW,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: zocalo + (t / 2),
-            posZ: 0,
-            orientation: 'horizontal',
-            componentRole: 'bottom'
-          },
-          {
-            id: 'clo1_zocalo_' + crypto.randomUUID().slice(0, 6),
-            name: 'Zócalo Frontal',
-            length: innerW,
-            width: zocalo,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: zocalo / 2,
-            posZ: (carcassDepth / 2) - (t / 2),
-            orientation: 'vertical_xy',
-            componentRole: 'plinth'
-          },
-          {
-            id: 'clo1_fondo_' + crypto.randomUUID().slice(0, 6),
-            name: 'Fondo Trasero MDF',
-            length: w - 4,
-            width: carcassH - 4,
-            thickness: 3,
-            quantity: 1,
-            materialId: matBottom.id,
-            materialName: matBottom.name,
-            grain: 'none',
-            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: zocalo + (carcassH / 2),
-            posZ: - (carcassDepth / 2) + 1.5,
-            orientation: 'vertical_xy',
-            componentRole: 'back'
-          },
-          {
-            id: 'clo1_puerta_' + crypto.randomUUID().slice(0, 6),
-            name: 'Puerta Closet (1900)',
-            length: w - 4,
-            width: carcassH - 4,
-            thickness: t,
-            quantity: 1,
-            materialId: matDoor.id,
-            materialName: matDoor.name,
-            grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX,
-            posY: zocalo + (carcassH / 2),
-            posZ: (carcassDepth / 2) + (t / 2),
-            orientation: 'vertical_xy',
-            componentRole: 'door',
-            hardwareConfig: {
-              isMovable: true,
-              movableType: 'door',
-              openingDirection: 'left',
-              hingeType: 'straight',
-              handleType: 'bar_modern',
-              handleFinish: 'black',
-              handlePosition: 'vertical'
-            }
-          }
-        ];
-      }
-    },
-
-    // --- 5. VANITORY FLOTANTE DE BAÑO 1 PUERTA ---
-    {
-      id: 'vanitory_bano_1_puerta',
-      name: 'Vanitory Flotante Baño (1 Puerta)',
-      category: 'bano',
-      categoryLabel: 'Baños',
-      dimensions: { width: 500, height: 500, depth: 400 },
-      description: 'Mueble suspendido para baño con puerta frontal abatible, espacio libre inferior y paso para desagüe.',
-      icon: 'bathtub',
-      badge: 'Baño Suspendido',
-      partsCount: 6,
-      previewColor: { top: '#0f766e', body: '#ffffff', front: '#ccfbf1', accent: '#0d9488' },
-      generateParts: (mats, offsetX = 0) => {
-        const matBody = this.getMaterial(mats, 'blanco');
-        const matDoor = this.getMaterial(mats, 'blanco');
-        const t = matBody.thickness || 15;
-        const w = 500;
-        const h = 500;
-        const d = 400;
-        const elev = 350; // Suspendido a 350mm del suelo
-        const innerW = w - (2 * t);
-        const carcassDepth = d - 20;
-
-        return [
-          {
-            id: 'van1_lat_izq_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Izquierdo Vanitory',
-            length: h,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thick', l2: 'none', a1: 'thick', a2: 'thick' },
-            posX: offsetX - (w / 2) + (t / 2),
-            posY: elev + (h / 2),
-            posZ: 0,
-            orientation: 'vertical_yz',
-            componentRole: 'side_left'
-          },
-          {
-            id: 'van1_lat_der_' + crypto.randomUUID().slice(0, 6),
-            name: 'Lateral Derecho Vanitory',
-            length: h,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thick', l2: 'none', a1: 'thick', a2: 'thick' },
-            posX: offsetX + (w / 2) - (t / 2),
-            posY: elev + (h / 2),
-            posZ: 0,
-            orientation: 'vertical_yz',
-            componentRole: 'side_right'
-          },
-          {
-            id: 'van1_piso_' + crypto.randomUUID().slice(0, 6),
-            name: 'Piso Vanitory',
-            length: innerW,
-            width: carcassDepth,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thick', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: elev + (t / 2),
-            posZ: 0,
-            orientation: 'horizontal',
-            componentRole: 'bottom'
-          },
-          {
-            id: 'van1_amarre_' + crypto.randomUUID().slice(0, 6),
-            name: 'Amarre Trasero Pared',
-            length: innerW,
-            width: 100,
-            thickness: t,
-            quantity: 1,
-            materialId: matBody.id,
-            materialName: matBody.name,
-            grain: 'length',
-            edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-            posX: offsetX,
-            posY: elev + h - 50,
-            posZ: - (carcassDepth / 2) + (t / 2),
-            orientation: 'vertical_xy',
-            componentRole: 'tie'
-          },
-          {
-            id: 'van1_puerta_' + crypto.randomUUID().slice(0, 6),
-            name: 'Puerta Vanitory',
-            length: w - 4,
-            width: h - 4,
-            thickness: t,
-            quantity: 1,
-            materialId: matDoor.id,
-            materialName: matDoor.name,
-            grain: 'length',
-            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-            posX: offsetX,
-            posY: elev + (h / 2),
-            posZ: (carcassDepth / 2) + (t / 2),
-            orientation: 'vertical_xy',
-            componentRole: 'door',
-            hardwareConfig: {
-              isMovable: true,
-              movableType: 'door',
-              openingDirection: 'left',
-              hingeType: 'straight',
-              handleType: 'bar_modern',
-              handleFinish: 'chrome',
-              handlePosition: 'vertical'
-            }
-          }
-        ];
-      }
-    },
-
-    // --- ESPECIALIZADOS DE COCINA REAL (CLICK-CUISINE PRO) ---
-    {
-      id: 'modulo_bajo_horno_60',
-      name: 'Módulo Bajo para Horno Empotrado 60cm',
-      category: 'cocina',
-      categoryLabel: 'Cocinas',
-      dimensions: { width: 600, height: 860, depth: 580 },
-      description: 'Módulo bajo técnico con nicho ventilado de 595mm para horno empotrable, amarres superiores para estufa/inducción y gaveta abatible inferior para bandejas.',
-      icon: 'microwave',
-      badge: 'Nicho Horno 60cm',
-      partsCount: 9,
-      previewColor: { top: '#1e293b', body: '#f8fafc', front: '#e2e8f0', accent: '#f97316' },
-      isParametric: true,
-      parametricConfig: {
-        code: 'MBH600',
-        name: 'Módulo Bajo Horno 60cm',
-        moduleType: 'base_cabinet',
-        category: 'oven_base',
-        width: 600,
-        height: 860,
-        depth: 580,
-        structureThickness: 15,
-        doorThickness: 15,
-        backThickness: 3,
-        backType: 'none',
-        shelvesCount: 1,
-        doorOpening: 'bottom',
-        hasPlinth: true,
-        plinthHeight: 80,
-        hasHandle: true,
-        handleType: 'bar_modern',
-        handleFinish: 'brushed_steel',
-        facadeGap: 3
-      },
-      generateParts: (mats, offsetX = 0) => {
-        const matBody = this.getMaterial(mats, 'blanco');
-        const cfg: ParametricCabinetConfig = {
-          code: 'MBH600',
-          name: 'Módulo Bajo Horno 60cm',
-          moduleType: 'base_cabinet',
-          category: 'oven_base',
-          width: 600,
-          height: 860,
-          depth: 580,
-          structureThickness: matBody.thickness || 15,
-          doorThickness: 15,
-          backThickness: 3,
-          backType: 'none',
-          shelvesCount: 1,
-          doorOpening: 'bottom',
-          structureMaterialId: matBody.id,
-          doorMaterialId: matBody.id,
-          backMaterialId: matBody.id,
-          hasPlinth: true,
-          plinthHeight: 80,
-          hasHandle: true,
-          handleType: 'bar_modern',
-          handleFinish: 'brushed_steel',
-          facadeGap: 3,
           posX: offsetX,
           posY: 430,
           posZ: 0
@@ -1038,8 +196,9 @@ export class TemplatesCatalogService {
       name: 'Módulo Bajo Lavaplatos 2 Puertas 80cm',
       category: 'cocina',
       categoryLabel: 'Cocinas',
+      environmentLine: 'kitchen',
       dimensions: { width: 800, height: 860, depth: 580 },
-      description: 'Módulo húmedo bajo mesada sin tapa maciza superior (con fajas estructurales frontal y trasera) y respaldo libre para caída del pozo del lavaplatos y sifón.',
+      description: 'Módulo húmedo bajo mesada sin tapa maciza con fajas estructurales y respaldo libre para pozo y sifón.',
       icon: 'wash',
       badge: 'Zona Húmeda 80cm',
       partsCount: 9,
@@ -1050,6 +209,7 @@ export class TemplatesCatalogService {
         name: 'Módulo Bajo Lavaplatos 80cm',
         moduleType: 'base_cabinet',
         category: 'sink_base',
+        environmentLine: 'kitchen',
         width: 800,
         height: 860,
         depth: 580,
@@ -1073,6 +233,7 @@ export class TemplatesCatalogService {
           name: 'Módulo Bajo Lavaplatos 80cm',
           moduleType: 'base_cabinet',
           category: 'sink_base',
+          environmentLine: 'kitchen',
           width: 800,
           height: 860,
           depth: 580,
@@ -1100,28 +261,99 @@ export class TemplatesCatalogService {
     },
 
     {
+      id: 'modulo_bajo_horno_60',
+      name: 'Módulo Bajo para Horno Empotrado 60cm',
+      category: 'cocina',
+      categoryLabel: 'Cocinas',
+      environmentLine: 'kitchen',
+      dimensions: { width: 600, height: 860, depth: 580 },
+      description: 'Módulo bajo técnico con nicho ventilado de 595mm para horno y gaveta inferior para bandejas.',
+      icon: 'kitchen',
+      badge: 'Nicho Horno 60cm',
+      partsCount: 9,
+      previewColor: { top: '#1e293b', body: '#f8fafc', front: '#e2e8f0', accent: '#f97316' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'MBH600',
+        name: 'Módulo Bajo Horno 60cm',
+        moduleType: 'base_cabinet',
+        category: 'oven_base',
+        environmentLine: 'kitchen',
+        width: 600,
+        height: 860,
+        depth: 580,
+        structureThickness: 15,
+        doorThickness: 15,
+        backThickness: 3,
+        backType: 'none',
+        shelvesCount: 1,
+        doorOpening: 'bottom',
+        hasPlinth: true,
+        plinthHeight: 80,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel',
+        facadeGap: 3
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'MBH600',
+          name: 'Módulo Bajo Horno 60cm',
+          moduleType: 'base_cabinet',
+          category: 'oven_base',
+          environmentLine: 'kitchen',
+          width: 600,
+          height: 860,
+          depth: 580,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'none',
+          shelvesCount: 1,
+          doorOpening: 'bottom',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          hasPlinth: true,
+          plinthHeight: 80,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 430,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
       id: 'modulo_bajo_esquinero_45',
       name: 'Módulo Bajo Esquinero Diagonal 45° (90x90cm)',
       category: 'cocina',
       categoryLabel: 'Cocinas',
+      environmentLine: 'kitchen',
       dimensions: { width: 900, height: 860, depth: 900 },
-      description: 'Módulo esquinero en chaflán a 45° con piso, entrepaño y tapa superior recortados poligonalmente para cocinas en L o en U.',
-      icon: 'rounded_corner',
-      badge: 'Esquinero 45°',
-      partsCount: 8,
+      description: 'Módulo esquinero pentagonal con chaflán diagonal a 45°, retornos de 580mm, puerta a 45° y zócalo perimetral alineado.',
+      icon: 'kitchen',
+      badge: 'Esquinero L 45°',
+      partsCount: 10,
       previewColor: { top: '#4f46e5', body: '#f8fafc', front: '#e0e7ff', accent: '#6366f1' },
       isParametric: true,
       parametricConfig: {
         code: 'MBE900',
-        name: 'Módulo Esquinero Diagonal 45°',
+        name: 'Módulo Esquinero Pentagonal 45°',
         moduleType: 'base_cabinet',
         category: 'corner_base',
+        environmentLine: 'kitchen',
         width: 900,
         height: 860,
         depth: 900,
         structureThickness: 15,
         doorThickness: 15,
-        backThickness: 3,
+        backThickness: 15,
         backType: 'none',
         shelvesCount: 1,
         doorOpening: 'left',
@@ -1136,15 +368,16 @@ export class TemplatesCatalogService {
         const matBody = this.getMaterial(mats, 'blanco');
         const cfg: ParametricCabinetConfig = {
           code: 'MBE900',
-          name: 'Módulo Esquinero Diagonal 45°',
+          name: 'Módulo Esquinero Pentagonal 45°',
           moduleType: 'base_cabinet',
           category: 'corner_base',
+          environmentLine: 'kitchen',
           width: 900,
           height: 860,
           depth: 900,
           structureThickness: matBody.thickness || 15,
           doorThickness: 15,
-          backThickness: 3,
+          backThickness: 15,
           backType: 'none',
           shelvesCount: 1,
           doorOpening: 'left',
@@ -1166,12 +399,154 @@ export class TemplatesCatalogService {
     },
 
     {
+      id: 'modulo_bajo_esquinero_ciego_100',
+      name: 'Módulo Bajo Esquinero Recto Ciego 100cm',
+      category: 'cocina',
+      categoryLabel: 'Cocinas',
+      environmentLine: 'kitchen',
+      dimensions: { width: 1000, height: 860, depth: 580 },
+      description: 'Módulo recto de rincón con panel ciego de 450mm, puerta batiente de acceso y listón de cierre interior.',
+      icon: 'kitchen',
+      badge: 'Rincón Recto 100cm',
+      partsCount: 10,
+      previewColor: { top: '#0f766e', body: '#ffffff', front: '#ccfbf1', accent: '#14b8a6' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'MRC1000',
+        name: 'Módulo Recto Ciego 100cm',
+        moduleType: 'base_cabinet',
+        category: 'blind_corner_base',
+        environmentLine: 'kitchen',
+        width: 1000,
+        height: 860,
+        depth: 580,
+        structureThickness: 15,
+        doorThickness: 15,
+        backThickness: 3,
+        backType: 'groove',
+        shelvesCount: 0,
+        doorOpening: 'left',
+        cornerReturnWidth: 450,
+        hasPlinth: true,
+        plinthHeight: 80,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel',
+        facadeGap: 3
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'MRC1000',
+          name: 'Módulo Recto Ciego 100cm',
+          moduleType: 'base_cabinet',
+          category: 'blind_corner_base',
+          environmentLine: 'kitchen',
+          width: 1000,
+          height: 860,
+          depth: 580,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 0,
+          doorOpening: 'left',
+          cornerReturnWidth: 450,
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          hasPlinth: true,
+          plinthHeight: 80,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 430,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'modulo_alto_cocina_1_puerta',
+      name: 'Módulo Alto Alacena 1 Puerta (60x80cm)',
+      category: 'cocina',
+      categoryLabel: 'Cocinas',
+      environmentLine: 'kitchen',
+      dimensions: { width: 600, height: 800, depth: 320 },
+      description: 'Alacena superior de cocina 1 puerta batiente, repisa regulable y fondo ranurado.',
+      icon: 'kitchen',
+      badge: 'Alacena Aérea',
+      partsCount: 7,
+      previewColor: { top: '#cbd5e1', body: '#ffffff', front: '#e2e8f0', accent: '#4f46e5' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'MAL600',
+        name: 'Módulo Alto Cocina 1P',
+        moduleType: 'wall_cabinet',
+        category: 'kitchen_wall',
+        environmentLine: 'kitchen',
+        width: 600,
+        height: 800,
+        depth: 320,
+        structureThickness: 15,
+        doorThickness: 15,
+        backThickness: 3,
+        backType: 'groove',
+        shelvesCount: 1,
+        doorOpening: 'left',
+        elevationY: 1450,
+        hasPlinth: false,
+        hasTopCover: true,
+        hasBackPanel: true,
+        facadeGap: 3
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'MAL600',
+          name: 'Módulo Alto Cocina 1P',
+          moduleType: 'wall_cabinet',
+          category: 'kitchen_wall',
+          environmentLine: 'kitchen',
+          width: 600,
+          height: 800,
+          depth: 320,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 1,
+          doorOpening: 'left',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          elevationY: 1450,
+          hasPlinth: false,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 1850,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
       id: 'torre_hornos_microondas_60',
       name: 'Torre Columna de Horno y Microondas 60x215cm',
       category: 'cocina',
       categoryLabel: 'Cocinas',
+      environmentLine: 'kitchen',
       dimensions: { width: 600, height: 2150, depth: 580 },
-      description: 'Columna alta ergonómica con puerta inferior de despensa, nicho central para horno de 60cm, nicho para microondas empotrado y alacena superior elevable.',
+      description: 'Columna alta con despensa inferior, nichos técnicos de encastre para horno y microondas, y alacena superior.',
       icon: 'kitchen',
       badge: 'Torre de Hornos',
       partsCount: 11,
@@ -1182,6 +557,7 @@ export class TemplatesCatalogService {
         name: 'Torre Horno + Microondas 60cm',
         moduleType: 'tall_cabinet',
         category: 'oven_tower',
+        environmentLine: 'kitchen',
         width: 600,
         height: 2150,
         depth: 580,
@@ -1205,6 +581,7 @@ export class TemplatesCatalogService {
           name: 'Torre Horno + Microondas 60cm',
           moduleType: 'tall_cabinet',
           category: 'oven_tower',
+          environmentLine: 'kitchen',
           width: 600,
           height: 2150,
           depth: 580,
@@ -1229,6 +606,1280 @@ export class TemplatesCatalogService {
         };
         return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
       }
+    },
+
+    // ==========================================
+    // 2. LÍNEA CLOSETS Y DORMITORIOS (CLOSET)
+    // ==========================================
+    {
+      id: 'closet_ropero_1_barra',
+      name: 'Ropero Armario 2 Puertas con Barra Colgador',
+      category: 'closets',
+      categoryLabel: 'Closets y Armarios',
+      environmentLine: 'closet',
+      dimensions: { width: 800, height: 2100, depth: 550 },
+      description: 'Armario de 2 puertas con barra de colgar oval cromada de 25mm, maletero superior y zócalo de 80mm.',
+      icon: 'door_sliding',
+      badge: 'Colgado + Maletero',
+      partsCount: 10,
+      previewColor: { top: '#475569', body: '#ffffff', front: '#f1f5f9', accent: '#3b82f6' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'CLO800',
+        name: 'Ropero 2 Puertas 1 Barra',
+        moduleType: 'tall_cabinet',
+        category: 'closet_module',
+        environmentLine: 'closet',
+        width: 800,
+        height: 2100,
+        depth: 550,
+        structureThickness: 15,
+        doorThickness: 15,
+        doorOpening: 'double',
+        hangingRodsCount: 1,
+        shelvesCount: 1,
+        hasPlinth: true,
+        plinthHeight: 80,
+        hasTopCover: true,
+        hasBackPanel: true,
+        backType: 'groove'
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'CLO800',
+          name: 'Ropero 2 Puertas 1 Barra',
+          moduleType: 'tall_cabinet',
+          category: 'closet_module',
+          environmentLine: 'closet',
+          width: 800,
+          height: 2100,
+          depth: 550,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          doorOpening: 'double',
+          hangingRodsCount: 1,
+          shelvesCount: 1,
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          hasPlinth: true,
+          plinthHeight: 80,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 1050,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'closet_armario_2_barras',
+      name: 'Armario Doble Colgado 2 Barras (Camisas y Pantalones)',
+      category: 'closets',
+      categoryLabel: 'Closets y Armarios',
+      environmentLine: 'closet',
+      dimensions: { width: 900, height: 2200, depth: 600 },
+      description: 'Armario vertical optimizado con dos barras de colgado superpuestas separadas por entrepaño intermedio.',
+      icon: 'door_sliding',
+      badge: 'Doble Colgado',
+      partsCount: 11,
+      previewColor: { top: '#1e293b', body: '#ffffff', front: '#f8fafc', accent: '#6366f1' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'CLO2B900',
+        name: 'Armario Doble Colgado',
+        moduleType: 'tall_cabinet',
+        category: 'closet_module',
+        environmentLine: 'closet',
+        width: 900,
+        height: 2200,
+        depth: 600,
+        structureThickness: 15,
+        doorThickness: 15,
+        doorOpening: 'double',
+        hangingRodsCount: 2,
+        shelvesCount: 0,
+        hasPlinth: true,
+        plinthHeight: 80,
+        hasTopCover: true,
+        hasBackPanel: true
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'CLO2B900',
+          name: 'Armario Doble Colgado',
+          moduleType: 'tall_cabinet',
+          category: 'closet_module',
+          environmentLine: 'closet',
+          width: 900,
+          height: 2200,
+          depth: 600,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          doorOpening: 'double',
+          hangingRodsCount: 2,
+          shelvesCount: 0,
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          hasPlinth: true,
+          plinthHeight: 80,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 1100,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'closet_organizador_repisas',
+      name: 'Módulo Organizador de Ropa con Repisas',
+      category: 'closets',
+      categoryLabel: 'Closets y Armarios',
+      environmentLine: 'closet',
+      dimensions: { width: 600, height: 2000, depth: 450 },
+      description: 'Módulo abierto para vestidor o interior de closet con 4 entrepaños regulables y zócalo.',
+      icon: 'door_sliding',
+      badge: 'Torre Repisas',
+      partsCount: 9,
+      previewColor: { top: '#cbd5e1', body: '#ffffff', front: '#ffffff', accent: '#10b981' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'CLOR600',
+        name: 'Organizador 4 Repisas',
+        moduleType: 'tall_cabinet',
+        category: 'closet_module',
+        environmentLine: 'closet',
+        width: 600,
+        height: 2000,
+        depth: 450,
+        structureThickness: 15,
+        doorThickness: 15,
+        doorOpening: 'none',
+        shelvesCount: 4,
+        hasPlinth: true,
+        plinthHeight: 70,
+        hasTopCover: true,
+        hasBackPanel: true
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'CLOR600',
+          name: 'Organizador 4 Repisas',
+          moduleType: 'tall_cabinet',
+          category: 'closet_module',
+          environmentLine: 'closet',
+          width: 600,
+          height: 2000,
+          depth: 450,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          doorOpening: 'none',
+          shelvesCount: 4,
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          handleType: 'none',
+          handleFinish: 'brushed_steel',
+          hasPlinth: true,
+          plinthHeight: 70,
+          hasTopCover: true,
+          hasBackPanel: true,
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 1000,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'closet_cajonera_4_gavetas',
+      name: 'Cajonera para Closet de 4 Gavetas',
+      category: 'cajones',
+      categoryLabel: 'Cajoneras',
+      environmentLine: 'closet',
+      dimensions: { width: 600, height: 850, depth: 500 },
+      description: 'Cajonera de 4 gavetas para interior de placard con correderas telescópicas y tiradores horizontales.',
+      icon: 'table_rows',
+      badge: '4 Gavetas',
+      partsCount: 33,
+      previewColor: { top: '#64748b', body: '#ffffff', front: '#f8fafc', accent: '#06b6d4' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'CAJ4CLO',
+        name: 'Cajonera Closet 4 Gavetas',
+        moduleType: 'drawer_unit',
+        category: 'drawers',
+        environmentLine: 'closet',
+        width: 600,
+        height: 850,
+        depth: 500,
+        structureThickness: 15,
+        doorThickness: 15,
+        drawersCount: 4,
+        drawerSlideType: 'telescopic',
+        drawerFrontType: 'overlay',
+        hasPlinth: true,
+        plinthHeight: 70,
+        hasTopCover: true,
+        hasBackPanel: true
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'CAJ4CLO',
+          name: 'Cajonera Closet 4 Gavetas',
+          moduleType: 'drawer_unit',
+          category: 'drawers',
+          environmentLine: 'closet',
+          width: 600,
+          height: 850,
+          depth: 500,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 0,
+          doorOpening: 'none',
+          drawersCount: 4,
+          drawerSlideType: 'telescopic',
+          drawerFrontType: 'overlay',
+          hasPlinth: true,
+          plinthHeight: 70,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          handlePosition: 'horizontal',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 425,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    // ==========================================
+    // 3. LÍNEA MUEBLES DE BAÑO (BATHROOM)
+    // ==========================================
+    {
+      id: 'vanitory_flotante_1_puerta',
+      name: 'Vanitory Flotante Suspendido 1 Puerta (Corte Sifón)',
+      category: 'bano',
+      categoryLabel: 'Baños',
+      environmentLine: 'bathroom',
+      dimensions: { width: 600, height: 500, depth: 460 },
+      description: 'Mueble de baño suspendido a 350mm del suelo con corte en U para paso del sifón y tapa superior maciza.',
+      icon: 'bathtub',
+      badge: 'Flotante + Sifón U',
+      partsCount: 6,
+      previewColor: { top: '#0284c7', body: '#ffffff', front: '#f0fdf4', accent: '#10b981' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'VANF600',
+        name: 'Vanitory Flotante 1P Sifón',
+        moduleType: 'base_cabinet',
+        category: 'vanity_cabinet',
+        environmentLine: 'bathroom',
+        width: 600,
+        height: 500,
+        depth: 460,
+        structureThickness: 15,
+        doorThickness: 15,
+        doorOpening: 'left',
+        elevationY: 350,
+        hasPlinth: false,
+        hasTopCover: true,
+        topTieStrips: false,
+        hasBackPanel: false,
+        siphonCutout: { enabled: true, width: 180, depth: 220 }
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'VANF600',
+          name: 'Vanitory Flotante 1P Sifón',
+          moduleType: 'base_cabinet',
+          category: 'vanity_cabinet',
+          environmentLine: 'bathroom',
+          width: 600,
+          height: 500,
+          depth: 460,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'none',
+          doorOpening: 'left',
+          shelvesCount: 0,
+          elevationY: 350,
+          hasPlinth: false,
+          hasTopCover: true,
+          topTieStrips: false,
+          hasBackPanel: false,
+          siphonCutout: { enabled: true, width: 180, depth: 220 },
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 600,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'vanitory_flotante_2_cajones_sifon',
+      name: 'Vanitory Flotante 2 Gavetas (Corte Sifón en Gaveta)',
+      category: 'bano',
+      categoryLabel: 'Baños',
+      environmentLine: 'bathroom',
+      dimensions: { width: 800, height: 520, depth: 480 },
+      description: 'Vanitory suspendido de 2 gavetas con destaje en U en el fondo del primer cajón para salvar el desagüe del lavamanos.',
+      icon: 'bathtub',
+      badge: '2 Cajones Sifón U',
+      partsCount: 19,
+      previewColor: { top: '#0369a1', body: '#ffffff', front: '#f8fafc', accent: '#38bdf8' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'VANF800C',
+        name: 'Vanitory Flotante 2 Cajones',
+        moduleType: 'drawer_unit',
+        category: 'drawers',
+        environmentLine: 'bathroom',
+        width: 800,
+        height: 520,
+        depth: 480,
+        structureThickness: 15,
+        doorThickness: 15,
+        drawersCount: 2,
+        drawerSlideType: 'telescopic',
+        drawerFrontType: 'overlay',
+        elevationY: 350,
+        hasPlinth: false,
+        topTieStrips: true,
+        hasTopCover: false,
+        hasBackPanel: false,
+        siphonCutout: { enabled: true, width: 180, depth: 200 }
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'VANF800C',
+          name: 'Vanitory Flotante 2 Cajones',
+          moduleType: 'drawer_unit',
+          category: 'drawers',
+          environmentLine: 'bathroom',
+          width: 800,
+          height: 520,
+          depth: 480,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'none',
+          shelvesCount: 0,
+          doorOpening: 'none',
+          drawersCount: 2,
+          drawerSlideType: 'telescopic',
+          drawerFrontType: 'overlay',
+          elevationY: 350,
+          hasPlinth: false,
+          topTieStrips: true,
+          hasTopCover: false,
+          hasBackPanel: false,
+          siphonCutout: { enabled: true, width: 180, depth: 200 },
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          handlePosition: 'horizontal',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 610,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'gabinete_bano_espejo',
+      name: 'Botiquín / Gabinete Aéreo de Baño (60x70cm)',
+      category: 'bano',
+      categoryLabel: 'Baños',
+      environmentLine: 'bathroom',
+      dimensions: { width: 600, height: 700, depth: 160 },
+      description: 'Gabinete colgante de poca profundidad para sobreponer en muro de lavamanos con 2 repisas interiores.',
+      icon: 'bathtub',
+      badge: 'Botiquín Aéreo',
+      partsCount: 8,
+      previewColor: { top: '#e2e8f0', body: '#ffffff', front: '#f1f5f9', accent: '#0ea5e9' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'BOT600',
+        name: 'Gabinete Aéreo Baño',
+        moduleType: 'wall_cabinet',
+        category: 'bathroom_wall',
+        environmentLine: 'bathroom',
+        width: 600,
+        height: 700,
+        depth: 160,
+        structureThickness: 15,
+        doorThickness: 15,
+        doorOpening: 'left',
+        shelvesCount: 2,
+        elevationY: 1300,
+        hasPlinth: false,
+        hasTopCover: true,
+        hasBackPanel: true
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'BOT600',
+          name: 'Gabinete Aéreo Baño',
+          moduleType: 'wall_cabinet',
+          category: 'bathroom_wall',
+          environmentLine: 'bathroom',
+          width: 600,
+          height: 700,
+          depth: 160,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          doorOpening: 'left',
+          shelvesCount: 2,
+          elevationY: 1300,
+          hasPlinth: false,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 1650,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    // ==========================================
+    // 4. LÍNEA HOGAR Y ESTUDIO (LIVING & OFFICE)
+    // ==========================================
+    {
+      id: 'rack_tv_flotante_living',
+      name: 'Rack Bajo Suspendido para TV (160x38cm)',
+      category: 'sala_tv',
+      categoryLabel: 'Hogar y Estudio',
+      environmentLine: 'living_office',
+      dimensions: { width: 1600, height: 380, depth: 360 },
+      description: 'Mueble flotante horizontal bajo para salón o sala de entretenimiento con puertas dobles y paso de cables.',
+      icon: 'shelves',
+      badge: 'Rack TV Flotante',
+      partsCount: 8,
+      previewColor: { top: '#78350f', body: '#1e293b', front: '#334155', accent: '#f59e0b' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'RTV1600',
+        name: 'Rack TV Flotante 160cm',
+        moduleType: 'base_cabinet',
+        category: 'living_low',
+        environmentLine: 'living_office',
+        width: 1600,
+        height: 380,
+        depth: 360,
+        structureThickness: 18,
+        doorThickness: 18,
+        doorOpening: 'double',
+        shelvesCount: 0,
+        elevationY: 280,
+        hasPlinth: false,
+        hasTopCover: true,
+        hasBackPanel: true
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'RTV1600',
+          name: 'Rack TV Flotante 160cm',
+          moduleType: 'base_cabinet',
+          category: 'living_low',
+          environmentLine: 'living_office',
+          width: 1600,
+          height: 380,
+          depth: 360,
+          structureThickness: matBody.thickness || 18,
+          doorThickness: 18,
+          backThickness: 3,
+          backType: 'groove',
+          doorOpening: 'double',
+          shelvesCount: 0,
+          elevationY: 280,
+          hasPlinth: false,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 470,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'escritorio_home_office',
+      name: 'Escritorio de Estudio y Home Office (120x75cm)',
+      category: 'oficina',
+      categoryLabel: 'Hogar y Estudio',
+      environmentLine: 'living_office',
+      dimensions: { width: 1200, height: 750, depth: 600 },
+      description: 'Mesa de trabajo ergonómica con cubierta maciza amplia de 1200x600mm y faldón de refuerzo estructural.',
+      icon: 'shelves',
+      badge: 'Escritorio Home Office',
+      partsCount: 5,
+      previewColor: { top: '#b45309', body: '#ffffff', front: '#f8fafc', accent: '#d97706' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'ESC1200',
+        name: 'Escritorio Home Office',
+        moduleType: 'base_cabinet',
+        category: 'office_desk',
+        environmentLine: 'living_office',
+        width: 1200,
+        height: 750,
+        depth: 600,
+        structureThickness: 18,
+        doorThickness: 18,
+        doorOpening: 'none',
+        shelvesCount: 0,
+        hasPlinth: false,
+        elevationY: 0,
+        hasTopCover: true,
+        hasBackPanel: true
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'ESC1200',
+          name: 'Escritorio Home Office',
+          moduleType: 'base_cabinet',
+          category: 'office_desk',
+          environmentLine: 'living_office',
+          width: 1200,
+          height: 750,
+          depth: 600,
+          structureThickness: matBody.thickness || 18,
+          doorThickness: 18,
+          backThickness: 18,
+          backType: 'overlay',
+          doorOpening: 'none',
+          shelvesCount: 0,
+          hasPlinth: false,
+          elevationY: 0,
+          hasTopCover: true,
+          hasBackPanel: true,
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 375,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'librero_estudio_repisas',
+      name: 'Estantería / Librero Vertical 4 Repisas (80x180cm)',
+      category: 'oficina',
+      categoryLabel: 'Hogar y Estudio',
+      environmentLine: 'living_office',
+      dimensions: { width: 800, height: 1800, depth: 300 },
+      description: 'Librero vertical para libros, archivadores y objetos decorativos con 4 entrepaños interiores.',
+      icon: 'shelves',
+      badge: 'Librero Estudio',
+      partsCount: 9,
+      previewColor: { top: '#475569', body: '#ffffff', front: '#f8fafc', accent: '#2563eb' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'LIB800',
+        name: 'Librero Vertical 4 Repisas',
+        moduleType: 'tall_cabinet',
+        category: 'bookshelf',
+        environmentLine: 'living_office',
+        width: 800,
+        height: 1800,
+        depth: 300,
+        structureThickness: 15,
+        doorThickness: 15,
+        doorOpening: 'none',
+        shelvesCount: 4,
+        hasPlinth: true,
+        plinthHeight: 70,
+        hasTopCover: true,
+        hasBackPanel: true
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'LIB800',
+          name: 'Librero Vertical 4 Repisas',
+          moduleType: 'tall_cabinet',
+          category: 'bookshelf',
+          environmentLine: 'living_office',
+          width: 800,
+          height: 1800,
+          depth: 300,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          doorOpening: 'none',
+          shelvesCount: 4,
+          hasPlinth: true,
+          plinthHeight: 70,
+          hasTopCover: true,
+          hasBackPanel: true,
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 900,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    // --- LÍNEA 1 COCINAS (COMPLEMENTARIAS) ---
+    {
+      id: 'alacena_elevable_piston_80',
+      name: 'Alacena Superior Elevable con Pistón Gas (80x40cm)',
+      category: 'cocina',
+      categoryLabel: 'Cocinas',
+      environmentLine: 'kitchen',
+      dimensions: { width: 800, height: 400, depth: 320 },
+      description: 'Alacena aérea horizontal con puerta elevable mediante pistón de gas a 1450mm de elevación.',
+      icon: 'kitchen',
+      badge: 'Pistón Gas',
+      partsCount: 6,
+      previewColor: { top: '#cbd5e1', body: '#ffffff', front: '#e2e8f0', accent: '#6366f1' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'MALP800',
+        name: 'Alacena Elevable Pistón 80cm',
+        moduleType: 'wall_cabinet',
+        category: 'kitchen_wall',
+        environmentLine: 'kitchen',
+        width: 800,
+        height: 400,
+        depth: 320,
+        structureThickness: 15,
+        doorThickness: 15,
+        backThickness: 3,
+        backType: 'groove',
+        shelvesCount: 0,
+        doorOpening: 'top',
+        elevationY: 1450,
+        hasPlinth: false,
+        hasTopCover: true,
+        hasBackPanel: true,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel',
+        facadeGap: 3
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'MALP800',
+          name: 'Alacena Elevable Pistón 80cm',
+          moduleType: 'wall_cabinet',
+          category: 'kitchen_wall',
+          environmentLine: 'kitchen',
+          width: 800,
+          height: 400,
+          depth: 320,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 0,
+          doorOpening: 'top',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          elevationY: 1450,
+          hasPlinth: false,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 1650,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'alacena_sobre_nevera_90',
+      name: 'Alacena Sobre-Nevera (90x40x60cm)',
+      category: 'cocina',
+      categoryLabel: 'Cocinas',
+      environmentLine: 'kitchen',
+      dimensions: { width: 900, height: 400, depth: 600 },
+      description: 'Módulo alto profundo para ubicar sobre el refrigerador con puerta elevable de pistón gas.',
+      icon: 'kitchen',
+      badge: 'Sobre-Nevera',
+      partsCount: 6,
+      previewColor: { top: '#cbd5e1', body: '#ffffff', front: '#e2e8f0', accent: '#0284c7' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'MSN900',
+        name: 'Alacena Sobre-Nevera 90cm',
+        moduleType: 'wall_cabinet',
+        category: 'kitchen_wall',
+        environmentLine: 'kitchen',
+        width: 900,
+        height: 400,
+        depth: 600,
+        structureThickness: 15,
+        doorThickness: 15,
+        backThickness: 3,
+        backType: 'groove',
+        shelvesCount: 0,
+        doorOpening: 'top',
+        elevationY: 1850,
+        hasPlinth: false,
+        hasTopCover: true,
+        hasBackPanel: true,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel',
+        facadeGap: 3
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'MSN900',
+          name: 'Alacena Sobre-Nevera 90cm',
+          moduleType: 'wall_cabinet',
+          category: 'kitchen_wall',
+          environmentLine: 'kitchen',
+          width: 900,
+          height: 400,
+          depth: 600,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 0,
+          doorOpening: 'top',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          elevationY: 1850,
+          hasPlinth: false,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 2050,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    // --- LÍNEA 2 CLOSETS (COMPLEMENTARIAS) ---
+    {
+      id: 'closet_zapatero_inclinado',
+      name: 'Módulo Zapatero con Repisas (60x120cm)',
+      category: 'closets',
+      categoryLabel: 'Closets',
+      environmentLine: 'closet',
+      dimensions: { width: 600, height: 1200, depth: 400 },
+      description: 'Módulo organizador de calzado con 4 entrepaños interiores abiertos y zócalo inferior.',
+      icon: 'shelves',
+      badge: 'Zapatero',
+      partsCount: 9,
+      previewColor: { top: '#475569', body: '#ffffff', front: '#f8fafc', accent: '#6366f1' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'CZAP600',
+        name: 'Módulo Zapatero 4 Repisas',
+        moduleType: 'closet',
+        category: 'closet',
+        environmentLine: 'closet',
+        width: 600,
+        height: 1200,
+        depth: 400,
+        structureThickness: 15,
+        doorThickness: 15,
+        doorOpening: 'none',
+        shelvesCount: 4,
+        hasPlinth: true,
+        plinthHeight: 70,
+        hasTopCover: true,
+        hasBackPanel: true
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'CZAP600',
+          name: 'Módulo Zapatero 4 Repisas',
+          moduleType: 'closet',
+          category: 'closet',
+          environmentLine: 'closet',
+          width: 600,
+          height: 1200,
+          depth: 400,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          doorOpening: 'none',
+          shelvesCount: 4,
+          hasPlinth: true,
+          plinthHeight: 70,
+          hasTopCover: true,
+          hasBackPanel: true,
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 600,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'mesa_noche_2_cajones',
+      name: 'Mesa de Noche 2 Gavetas (45x50x40cm)',
+      category: 'closets',
+      categoryLabel: 'Closets',
+      environmentLine: 'closet',
+      dimensions: { width: 450, height: 500, depth: 400 },
+      description: 'Mesa de noche compacta con 2 gavetas sobre correderas telescópicas y zócalo inferior.',
+      icon: 'shelves',
+      badge: 'Mesa de Noche',
+      partsCount: 14,
+      previewColor: { top: '#3b82f6', body: '#ffffff', front: '#e0e7ff', accent: '#6366f1' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'MDN450',
+        name: 'Mesa de Noche 2 Cajones',
+        moduleType: 'drawer_unit',
+        category: 'drawers',
+        environmentLine: 'closet',
+        width: 450,
+        height: 500,
+        depth: 400,
+        structureThickness: 15,
+        doorThickness: 15,
+        drawersCount: 2,
+        shelvesCount: 0,
+        doorOpening: 'none',
+        hasPlinth: true,
+        plinthHeight: 60,
+        hasTopCover: true,
+        hasBackPanel: true,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel'
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'MDN450',
+          name: 'Mesa de Noche 2 Cajones',
+          moduleType: 'drawer_unit',
+          category: 'drawers',
+          environmentLine: 'closet',
+          width: 450,
+          height: 500,
+          depth: 400,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          drawersCount: 2,
+          shelvesCount: 0,
+          doorOpening: 'none',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          hasPlinth: true,
+          plinthHeight: 60,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 250,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    // --- LÍNEA 3 BAÑOS (COMPLEMENTARIAS) ---
+    {
+      id: 'vanitory_piso_2_puertas',
+      name: 'Vanitory a Piso con Zócalo y Sifón U (80x85cm)',
+      category: 'bano',
+      categoryLabel: 'Baños',
+      environmentLine: 'bathroom',
+      dimensions: { width: 800, height: 850, depth: 480 },
+      description: 'Mueble de baño a piso con zócalo de 80mm, 2 puertas batientes y tapa con destaje en U para sifón.',
+      icon: 'bathtub',
+      badge: 'A Piso Sifón',
+      partsCount: 10,
+      previewColor: { top: '#0ea5e9', body: '#ffffff', front: '#f0f9ff', accent: '#0284c7' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'VBP800',
+        name: 'Vanitory Piso 2 Puertas Sifón U',
+        moduleType: 'base_cabinet',
+        category: 'vanity',
+        environmentLine: 'bathroom',
+        width: 800,
+        height: 850,
+        depth: 480,
+        structureThickness: 15,
+        doorThickness: 15,
+        doorOpening: 'double',
+        shelvesCount: 1,
+        hasPlinth: true,
+        plinthHeight: 80,
+        hasTopCover: true,
+        hasBackPanel: true,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel',
+        siphonCutout: { enabled: true, width: 200, depth: 220 }
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'VBP800',
+          name: 'Vanitory Piso 2 Puertas Sifón U',
+          moduleType: 'base_cabinet',
+          category: 'vanity',
+          environmentLine: 'bathroom',
+          width: 800,
+          height: 850,
+          depth: 480,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 1,
+          doorOpening: 'double',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          hasPlinth: true,
+          plinthHeight: 80,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          siphonCutout: { enabled: true, width: 200, depth: 220 },
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 425,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'columna_auxiliar_bano',
+      name: 'Columna Auxiliar Alta de Baño (35x150cm)',
+      category: 'bano',
+      categoryLabel: 'Baños',
+      environmentLine: 'bathroom',
+      dimensions: { width: 350, height: 1500, depth: 300 },
+      description: 'Columna flotante para toallas y productos de aseo con puerta batiente y 3 entrepaños.',
+      icon: 'bathtub',
+      badge: 'Columna Flotante',
+      partsCount: 8,
+      previewColor: { top: '#0ea5e9', body: '#ffffff', front: '#f0f9ff', accent: '#0284c7' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'CAB350',
+        name: 'Columna Auxiliar Baño 35cm',
+        moduleType: 'tall_cabinet',
+        category: 'bathroom_wall',
+        environmentLine: 'bathroom',
+        width: 350,
+        height: 1500,
+        depth: 300,
+        structureThickness: 15,
+        doorThickness: 15,
+        backThickness: 3,
+        backType: 'groove',
+        shelvesCount: 3,
+        doorOpening: 'left',
+        elevationY: 300,
+        hasPlinth: false,
+        hasTopCover: true,
+        hasBackPanel: true,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel'
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'CAB350',
+          name: 'Columna Auxiliar Baño 35cm',
+          moduleType: 'tall_cabinet',
+          category: 'bathroom_wall',
+          environmentLine: 'bathroom',
+          width: 350,
+          height: 1500,
+          depth: 300,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 3,
+          doorOpening: 'left',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          elevationY: 300,
+          hasPlinth: false,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 1050,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    // --- LÍNEA 4 HOGAR Y ESTUDIO (COMPLEMENTARIAS) ---
+    {
+      id: 'panel_tv_consola_flotante',
+      name: 'Panel TV con Consola Flotante (160x40x35cm)',
+      category: 'sala_tv',
+      categoryLabel: 'Living',
+      environmentLine: 'living_office',
+      dimensions: { width: 1600, height: 400, depth: 350 },
+      description: 'Consola multimedia flotante para living y centro de entretenimiento con puerta doble abatible.',
+      icon: 'shelves',
+      badge: 'Consola Flotante',
+      partsCount: 9,
+      previewColor: { top: '#10b981', body: '#ffffff', front: '#ecfdf5', accent: '#059669' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'PTV1600',
+        name: 'Consola Flotante TV 160cm',
+        moduleType: 'base_cabinet',
+        category: 'living_low',
+        environmentLine: 'living_office',
+        width: 1600,
+        height: 400,
+        depth: 350,
+        structureThickness: 15,
+        doorThickness: 15,
+        backThickness: 3,
+        backType: 'groove',
+        shelvesCount: 1,
+        doorOpening: 'double',
+        elevationY: 350,
+        hasPlinth: false,
+        hasTopCover: true,
+        hasBackPanel: true,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel'
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'PTV1600',
+          name: 'Consola Flotante TV 160cm',
+          moduleType: 'base_cabinet',
+          category: 'living_low',
+          environmentLine: 'living_office',
+          width: 1600,
+          height: 400,
+          depth: 350,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 1,
+          doorOpening: 'double',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          elevationY: 350,
+          hasPlinth: false,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 550,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
+    },
+
+    {
+      id: 'aparador_buffet_living',
+      name: 'Aparador Buffet de Sala (140x80cm)',
+      category: 'sala_tv',
+      categoryLabel: 'Living',
+      environmentLine: 'living_office',
+      dimensions: { width: 1400, height: 800, depth: 400 },
+      description: 'Aparador buffet moderno con 2 puertas dobles, entrepaño interior y zócalo perimetral.',
+      icon: 'shelves',
+      badge: 'Buffet Sala',
+      partsCount: 11,
+      previewColor: { top: '#10b981', body: '#ffffff', front: '#ecfdf5', accent: '#059669' },
+      isParametric: true,
+      parametricConfig: {
+        code: 'ABF1400',
+        name: 'Aparador Buffet Sala 140cm',
+        moduleType: 'base_cabinet',
+        category: 'living_low',
+        environmentLine: 'living_office',
+        width: 1400,
+        height: 800,
+        depth: 400,
+        structureThickness: 15,
+        doorThickness: 15,
+        backThickness: 3,
+        backType: 'groove',
+        shelvesCount: 1,
+        doorOpening: 'double',
+        hasPlinth: true,
+        plinthHeight: 70,
+        hasTopCover: true,
+        hasBackPanel: true,
+        hasHandle: true,
+        handleType: 'bar_modern',
+        handleFinish: 'brushed_steel'
+      },
+      generateParts: (mats, offsetX = 0) => {
+        const matBody = this.getMaterial(mats, 'blanco');
+        const cfg: ParametricCabinetConfig = {
+          code: 'ABF1400',
+          name: 'Aparador Buffet Sala 140cm',
+          moduleType: 'base_cabinet',
+          category: 'living_low',
+          environmentLine: 'living_office',
+          width: 1400,
+          height: 800,
+          depth: 400,
+          structureThickness: matBody.thickness || 15,
+          doorThickness: 15,
+          backThickness: 3,
+          backType: 'groove',
+          shelvesCount: 1,
+          doorOpening: 'double',
+          structureMaterialId: matBody.id,
+          doorMaterialId: matBody.id,
+          backMaterialId: matBody.id,
+          hasPlinth: true,
+          plinthHeight: 70,
+          hasTopCover: true,
+          hasBackPanel: true,
+          hasHandle: true,
+          handleType: 'bar_modern',
+          handleFinish: 'brushed_steel',
+          facadeGap: 3,
+          posX: offsetX,
+          posY: 400,
+          posZ: 0
+        };
+        return this.cabinetGen.generateParametricCabinet(cfg, mats).parts;
+      }
     }
   ];
 
@@ -1238,8 +1889,14 @@ export class TemplatesCatalogService {
       { id: 'cocina', label: 'Cocinas', icon: 'kitchen', count: this.templates.filter(t => t.category === 'cocina').length },
       { id: 'closets', label: 'Closets y Armarios', icon: 'door_sliding', count: this.templates.filter(t => t.category === 'closets').length },
       { id: 'bano', label: 'Baños', icon: 'bathtub', count: this.templates.filter(t => t.category === 'bano').length },
-      { id: 'cajones', label: 'Cajoneras y Gavetas', icon: 'table_rows', count: this.templates.filter(t => t.category === 'cajones').length }
+      { id: 'cajones', label: 'Cajoneras y Gavetas', icon: 'table_rows', count: this.templates.filter(t => t.category === 'cajones').length },
+      { id: 'sala_tv', label: 'Racks TV y Living', icon: 'shelves', count: this.templates.filter(t => t.category === 'sala_tv').length },
+      { id: 'oficina', label: 'Home Office y Estudio', icon: 'shelves', count: this.templates.filter(t => t.category === 'oficina').length }
     ];
+  }
+
+  getTemplatesByEnvironment(env: EnvironmentLine): FurnitureTemplate[] {
+    return this.templates.filter(t => t.environmentLine === env);
   }
 
   getTemplateById(id: string): FurnitureTemplate | undefined {

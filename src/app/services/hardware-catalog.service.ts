@@ -66,7 +66,7 @@ export class HardwareCatalogService {
       style: 'hairpin',
       height: 720,
       description: 'Acero macizo electroestático de 12mm con pletina de 3 orificios y regatón de goma.',
-      unitCost: 12.00,
+      unitCost: 48000,
       icon: 'table_bar',
       finish: 'Negro Mate',
       material: 'Acero'
@@ -77,7 +77,7 @@ export class HardwareCatalogService {
       style: 'hairpin',
       height: 400,
       description: 'Ideal para mesas de centro, mesas ratonas y muebles de TV modernos.',
-      unitCost: 9.00,
+      unitCost: 36000,
       icon: 'table_bar',
       finish: 'Negro Mate',
       material: 'Acero'
@@ -88,7 +88,7 @@ export class HardwareCatalogService {
       style: 'cylindrical_inox',
       height: 720,
       description: 'Tubo de acero inoxidable cepillado con base roscada niveladora (+25mm) y brida superior.',
-      unitCost: 9.50,
+      unitCost: 38000,
       icon: 'table_bar',
       finish: 'Inox Satinado',
       material: 'Acero Inox'
@@ -99,7 +99,7 @@ export class HardwareCatalogService {
       style: 'cylindrical_inox',
       height: 100,
       description: 'Pata niveladora para zócalos de muebles bajos de cocina y alacenas.',
-      unitCost: 4.50,
+      unitCost: 18000,
       icon: 'table_bar',
       finish: 'Inox Satinado',
       material: 'Acero Inox'
@@ -110,7 +110,7 @@ export class HardwareCatalogService {
       style: 'scandinavian_wood',
       height: 720,
       description: 'Madera de haya maciza torneada con placa metálica inclinada 10° y casquillo de latón dorado.',
-      unitCost: 11.50,
+      unitCost: 46000,
       icon: 'table_bar',
       finish: 'Madera Natural + Oro',
       material: 'Madera Maciza'
@@ -121,7 +121,7 @@ export class HardwareCatalogService {
       style: 'scandinavian_wood',
       height: 400,
       description: 'Pata baja escandinava para mesas auxiliares, mesitas de noche y muebles nórdicos.',
-      unitCost: 8.50,
+      unitCost: 34000,
       icon: 'table_bar',
       finish: 'Madera Natural + Oro',
       material: 'Madera Maciza'
@@ -136,7 +136,7 @@ export class HardwareCatalogService {
       description: 'Diseño moderno cilíndrico contemporáneo con doble pie de fijación (160mm C-C).',
       defaultLength: 160,
       supportedFinishes: ['brushed_steel', 'black', 'gold', 'chrome'],
-      unitCost: 3.50,
+      unitCost: 14500,
       icon: 'maximize'
     },
     {
@@ -146,7 +146,7 @@ export class HardwareCatalogService {
       description: 'Barra rectangular minimalista acabado negro mate electroestático (192mm C-C).',
       defaultLength: 192,
       supportedFinishes: ['black', 'brushed_steel', 'gold'],
-      unitCost: 4.20,
+      unitCost: 16800,
       icon: 'linear_scale'
     },
     {
@@ -156,7 +156,7 @@ export class HardwareCatalogService {
       description: 'Pomo circular macizo Ø28mm con vástago cónico para puertas y cajones.',
       defaultLength: 28,
       supportedFinishes: ['brushed_steel', 'black', 'gold', 'chrome'],
-      unitCost: 2.10,
+      unitCost: 8500,
       icon: 'radio_button_checked'
     },
     {
@@ -166,7 +166,7 @@ export class HardwareCatalogService {
       description: 'Pomo cúbico 24×24mm de líneas puras para muebles modernos y minimalistas.',
       defaultLength: 24,
       supportedFinishes: ['black', 'brushed_steel', 'gold'],
-      unitCost: 2.40,
+      unitCost: 9600,
       icon: 'crop_square'
     },
     {
@@ -176,7 +176,7 @@ export class HardwareCatalogService {
       description: 'Tirador estilo concha tradicional para cajones clásicos o provenzales.',
       defaultLength: 96,
       supportedFinishes: ['black', 'brushed_steel', 'gold'],
-      unitCost: 3.20,
+      unitCost: 12800,
       icon: 'archive'
     },
     {
@@ -198,7 +198,7 @@ export class HardwareCatalogService {
       cupDiameter: 35,
       openingAngle: '110°',
       description: 'Cubre completamente el lateral del mueble (18mm de cobertura). Uso universal.',
-      unitCost: 1.80,
+      unitCost: 8500,
       icon: 'meeting_room'
     },
     {
@@ -207,7 +207,7 @@ export class HardwareCatalogService {
       cupDiameter: 35,
       openingAngle: '110°',
       description: 'Para dos puertas que comparten un mismo tabique central divisorio (9mm cobertura).',
-      unitCost: 1.90,
+      unitCost: 8800,
       icon: 'door_front'
     },
     {
@@ -216,8 +216,26 @@ export class HardwareCatalogService {
       cupDiameter: 35,
       openingAngle: '110°',
       description: 'Para puertas que cierran dentro del vano / marco del mueble (enrasadas).',
-      unitCost: 2.10,
+      unitCost: 9200,
       icon: 'sensor_door'
+    },
+    {
+      id: 'corner_45',
+      name: 'Bisagra Angular 45° (Esquineros)',
+      cupDiameter: 35,
+      openingAngle: '45°',
+      description: 'Para muebles esquineros pentagonales y módulos en chaflán.',
+      unitCost: 14500,
+      icon: 'meeting_room'
+    },
+    {
+      id: 'corner_165',
+      name: 'Bisagra Gran Apertura 165° (Rincón Ciego)',
+      cupDiameter: 35,
+      openingAngle: '165°',
+      description: 'Articulada de gran ángulo para acceso completo a esquinas ciegas.',
+      unitCost: 18500,
+      icon: 'door_front'
     },
     {
       id: 'gas_piston',
@@ -225,7 +243,7 @@ export class HardwareCatalogService {
       cupDiameter: 35,
       openingAngle: '90° Basculante',
       description: 'Brazo hidráulico de elevación para puertas basculantes superiores de alacena.',
-      unitCost: 4.50,
+      unitCost: 18000,
       icon: 'vertical_align_top'
     },
     {
@@ -246,7 +264,7 @@ export class HardwareCatalogService {
       extensionType: 'Extensión Total (35-45kg)',
       loadCapacityKg: 45,
       description: 'Extracción total con rodamientos de bolas de acero templado. Holgura requerida 12.7mm por lado.',
-      unitCost: 5.50,
+      unitCost: 24000,
       icon: 'view_week'
     },
     {
@@ -255,7 +273,7 @@ export class HardwareCatalogService {
       extensionType: 'Extensión Total con Freno Hidráulico',
       loadCapacityKg: 40,
       description: 'Pistón amortiguador hidráulico integrado para cierre silencioso y suave antipellizco.',
-      unitCost: 8.90,
+      unitCost: 35600,
       icon: 'motion_photos_paused'
     },
     {
@@ -264,7 +282,7 @@ export class HardwareCatalogService {
       extensionType: 'Extensión Total Oculta Sincronizada',
       loadCapacityKg: 40,
       description: 'Montaje invisible bajo el fondo del cajón con regulación 3D y gatillos de desacople rápido.',
-      unitCost: 14.50,
+      unitCost: 58000,
       icon: 'layers'
     },
     {
@@ -273,7 +291,7 @@ export class HardwareCatalogService {
       extensionType: 'Extensión Total (25kg)',
       loadCapacityKg: 25,
       description: 'Perfil compacto de 35mm para cajones medianos o de baja profundidad. Holgura 12.5mm.',
-      unitCost: 3.90,
+      unitCost: 18000,
       icon: 'linear_scale'
     },
     {
@@ -372,34 +390,74 @@ export class HardwareCatalogService {
     }
   }
 
-  // Genera lista consolidada de herrajes requeridos para presupuesto y compra
-  computeRequiredHardwareList(parts: Part[], appliances: ApplianceItem[] = []): HardwareItem[] {
+  // Genera lista consolidada de herrajes requeridos para presupuesto y compra en COP
+  computeRequiredHardwareList(parts: Part[], _appliances: ApplianceItem[] = []): HardwareItem[] {
     let hingesStraight = 0;
+    let hinges45 = 0;
+    let hinges165 = 0;
     let hingesGas = 0;
     let drawersCount = 0;
     let handlesCount = 0;
+    let slidingDoorsCount = 0;
+    let hangingRodsCount = 0;
 
     for (const part of parts) {
+      const n = (part.name || '').toLowerCase();
+      const notes = (part.notes || '').toLowerCase();
+      const mod = (part.moduleName || part.groupName || '').toLowerCase();
+      const qty = Number(part.quantity) || 1;
+
+      // 1. Tubo Colgador Ovalado (Closets / Armarios)
+      const isRod = (part.shapeType === 'circle' && (n.includes('tubo') || n.includes('colgador') || n.includes('barra'))) ||
+                    notes.includes('colgador') || notes.includes('tubo') || n.includes('colgador');
+      if (isRod) {
+        hangingRodsCount += qty;
+        continue;
+      }
+
       const detected = this.detectMovableType(part);
       const hw = part.hardwareConfig || this.getDefaultHardwareConfig(part);
 
+      // 2. Puertas correderas de Closet
+      const isSlidingDoor = (detected.movableType === 'door' || part.componentRole === 'door') &&
+        (n.includes('corrediz') || notes.includes('corrediz') || notes.includes('riel') || mod.includes('closet'));
+
+      if (isSlidingDoor) {
+        slidingDoorsCount += qty;
+        if (hw.handleType && hw.handleType !== 'none') {
+          handlesCount += qty;
+        }
+        continue;
+      }
+
       if (detected.movableType === 'door') {
         const height = Math.max(part.length, part.width);
-        const hingesNeeded = height > 1600 ? 4 : (height > 900 ? 3 : 2);
+        const hingesNeeded = (height > 1600 ? 4 : (height > 900 ? 3 : 2)) * qty;
 
-        if (hw.hingeType === 'gas_piston') {
-          hingesGas += 2;
+        // Bisagras angulares de 45° (esquineros pentagonales)
+        const is45 = hw.hingeType === 'corner_45' || n.includes('45°') || notes.includes('45°') || part.rotationY === 45 || n.includes('diagonal');
+        // Bisagras angulares de 165° (rincón ciego)
+        const is165 = hw.hingeType === 'corner_165' || n.includes('165°') || notes.includes('165°') || n.includes('acceso a rincón') || notes.includes('rincón') || notes.includes('ciego') || n.includes('ciego');
+        // Pistones neumáticos elevables (alacenas)
+        const isLiftUp = hw.hingeType === 'gas_piston' || detected.direction === 'top' || n.includes('basculante') || n.includes('elevable') || n.includes('alacena');
+
+        if (isLiftUp) {
+          hingesGas += (2 * qty);
+        } else if (is45) {
+          hinges45 += hingesNeeded;
+        } else if (is165) {
+          hinges165 += hingesNeeded;
         } else if (hw.hingeType !== 'none') {
           hingesStraight += hingesNeeded;
         }
 
         if (hw.handleType && hw.handleType !== 'none') {
-          handlesCount++;
+          handlesCount += qty;
         }
       } else if (detected.movableType === 'drawer') {
-        drawersCount++;
+        drawersCount += qty;
         if (hw.handleType && hw.handleType !== 'none') {
-          handlesCount++;
+          handlesCount += qty;
         }
       }
     }
@@ -413,32 +471,81 @@ export class HardwareCatalogService {
         category: 'hinge',
         unit: 'und',
         quantity: hingesStraight,
-        unitCost: 1.80,
+        unitCost: 8500,
         notes: 'Incluye base de regulación y tornillos 3.5×15mm'
+      });
+    }
+
+    if (hinges45 > 0) {
+      items.push({
+        id: 'hw_bisagra_45',
+        name: 'Bisagra Angular 45° para Mueble Esquinero Pentagonal',
+        category: 'hinge',
+        unit: 'und',
+        quantity: hinges45,
+        unitCost: 14500,
+        notes: 'Ángulo negativo/positivo para puertas en chaflán a 45°'
+      });
+    }
+
+    if (hinges165 > 0) {
+      items.push({
+        id: 'hw_bisagra_165',
+        name: 'Bisagra Gran Apertura 165° para Rincón Ciego',
+        category: 'hinge',
+        unit: 'und',
+        quantity: hinges165,
+        unitCost: 18500,
+        notes: 'Brazo articulado zero-protrusion para acceso total a esquinas ciegas'
       });
     }
 
     if (hingesGas > 0) {
       items.push({
         id: 'hw_piston_gas',
-        name: 'Brazo Pistón a Gas 100N para Alacena',
+        name: 'Brazo Pistón Neumático a Gas 100N para Alacena',
         category: 'accessory',
         unit: 'und',
         quantity: hingesGas,
-        unitCost: 4.50,
-        notes: 'Fuerza 100N con fijaciones para marco y puerta'
+        unitCost: 18000,
+        notes: 'Fuerza 100N con fijaciones para marco y puerta elevable'
       });
     }
 
     if (drawersCount > 0) {
       items.push({
         id: 'hw_correderas',
-        name: 'Corredera Telescópica 45mm H45 Cierre Suave',
+        name: 'Corredera Telescópica 45mm H45 Cierre Suave (Par)',
         category: 'slide',
         unit: 'par',
         quantity: drawersCount,
-        unitCost: 6.50,
-        notes: 'Capacidad 35kg por cajón'
+        unitCost: 24000,
+        notes: 'Capacidad 40kg por cajón con rodamientos y freno hidráulico'
+      });
+    }
+
+    if (slidingDoorsCount > 0) {
+      const closetSlidingKits = Math.max(1, Math.ceil(slidingDoorsCount / 2));
+      items.push({
+        id: 'hw_kit_closet',
+        name: 'Kit Sistema Corredizo Closet (Rieles Sup/Inf + Rodamientos)',
+        category: 'slide',
+        unit: 'kit',
+        quantity: closetSlidingKits,
+        unitCost: 75000,
+        notes: 'Perfiles de aluminio superior e inferior con carros de rodamiento ajustables'
+      });
+    }
+
+    if (hangingRodsCount > 0) {
+      items.push({
+        id: 'hw_tubo_colgador',
+        name: 'Tubo Colgador Ovalado Cromado con Soportes Laterales',
+        category: 'accessory',
+        unit: 'und',
+        quantity: hangingRodsCount,
+        unitCost: 28000,
+        notes: 'Tubo de acero cromado ovalado reforzado con bridas atornillables'
       });
     }
 
@@ -449,60 +556,9 @@ export class HardwareCatalogService {
         category: 'handle',
         unit: 'und',
         quantity: handlesCount,
-        unitCost: 3.50,
+        unitCost: 12500,
         notes: 'Incluye tornillos pasantes M4'
       });
-    }
-
-    // Patas de mesa y soportes presentes en electrodomésticos / accesorios
-    for (const app of appliances) {
-      if (app.type === 'table_legs_set') {
-        const isHairpin = app.name.toLowerCase().includes('horquilla') || app.name.toLowerCase().includes('hairpin');
-        const isWood = app.name.toLowerCase().includes('madera') || app.name.toLowerCase().includes('nórdica') || app.name.toLowerCase().includes('cónica');
-        const isLow = app.height <= 450;
-        
-        let legName = 'Juego de 4 Patas Cilíndricas Inox Regulables 72cm';
-        let unitCost = 35.00;
-        if (isHairpin) {
-          legName = isLow ? 'Juego de 4 Patas Horquilla Hairpin 40cm (Mesa Centro)' : 'Juego de 4 Patas Horquilla Hairpin 72cm';
-          unitCost = isLow ? 30.00 : 45.00;
-        } else if (isWood) {
-          legName = isLow ? 'Juego de 4 Patas Cónicas Madera Nórdica 40cm' : 'Juego de 4 Patas Cónicas Madera Nórdica 72cm';
-          unitCost = isLow ? 32.00 : 42.00;
-        }
-
-        items.push({
-          id: `hw_set_${app.id}`,
-          name: legName,
-          category: 'support',
-          unit: 'juego (4 uds)',
-          quantity: 1,
-          unitCost,
-          notes: `Accesorios para mesa (${app.width}×${app.depth}×${app.height}mm)`
-        });
-      } else if (app.type === 'table_leg') {
-        const isHairpin = app.name.toLowerCase().includes('horquilla') || app.name.toLowerCase().includes('hairpin');
-        const isWood = app.name.toLowerCase().includes('madera') || app.name.toLowerCase().includes('nórdica');
-        let legName = 'Pata Cilíndrica Inox Regulable Ø60mm';
-        let unitCost = 9.00;
-        if (isHairpin) {
-          legName = 'Pata Horquilla Industrial Hairpin 72cm';
-          unitCost = 11.50;
-        } else if (isWood) {
-          legName = 'Pata Cónica Madera Nórdica con Regatón';
-          unitCost = 10.50;
-        }
-
-        items.push({
-          id: `hw_leg_${app.id}`,
-          name: legName,
-          category: 'support',
-          unit: 'und',
-          quantity: 1,
-          unitCost,
-          notes: `Pata individual de soporte (${app.height}mm)`
-        });
-      }
     }
 
     return items;

@@ -22,8 +22,8 @@
         aria-label="Filtrar etiquetas por módulo"
         [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-700 focus:outline-hidden focus:border-zinc-900 cursor-pointer font-medium' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-zinc-200 focus:outline-hidden focus:border-zinc-500 cursor-pointer font-medium'">
         <option value="all">Todos los Módulos</option>
-        @for (m of modules(); track m.id) {
-          <option [value]="m.id">{{ m.name }}</option>
+        @for (g of groups(); track g.id) {
+          <option [value]="g.id">{{ g.name }}</option>
         }
       </select>
 

@@ -1,29 +1,125 @@
 import * as THREE from 'three';
-import { FloorMaterialType, WallMaterialType } from '../models/melamine.models';
+import { FloorMaterialType, WallMaterialType, GrainDirection } from '../models/melamine.models';
+
+export type MelamineTextureType = 'wood' | 'stone' | 'linen' | 'gloss' | 'wpc' | 'solid';
+
+interface CachedEntry {
+  map: THREE.CanvasTexture;
+  bump?: THREE.CanvasTexture;
+  lastUsed: number;
+}
 
 /**
- * Motor generador de texturas procedurales arquitectónicas de alta fidelidad.
- * Basado en las colecciones de fabricantes líderes como Corona y Holztek.
- * Crea mapas difusos (color) y de relieve (bump) en memoria usando HTML5 Canvas.
- * Cero dependencias de conexiones externas, sin CORS y con renderizado instantáneo.
+ * Caché LRU acotada para texturas WebGL procedurales.
+ * Libera explícitamente la memoria VRAM invocando .dispose() sobre las texturas
+ * cuando se supera la capacidad máxima predeterminada (64 texturas concurrentes).
+ */
+class TextureLRUCache {
+  private cache = new Map<string, CachedEntry>();
+  private readonly maxCapacity: number;
+
+  constructor(maxCapacity = 64) {
+    this.maxCapacity = maxCapacity;
+  }
+
+  get(key: string): { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture } | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    entry.lastUsed = Date.now();
+    return { map: entry.map, bump: entry.bump };
+  }
+
+  set(key: string, textures: { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture }): void {
+    if (this.cache.has(key)) {
+      const existing = this.cache.get(key)!;
+      existing.lastUsed = Date.now();
+      return;
+    }
+
+    if (this.cache.size >= this.maxCapacity) {
+      this.evictOldest();
+    }
+
+    textures.map.userData = { ...(textures.map.userData || {}), isShared: true };
+    if (textures.bump) {
+      textures.bump.userData = { ...(textures.bump.userData || {}), isShared: true };
+    }
+
+    this.cache.set(key, {
+      map: textures.map,
+      bump: textures.bump,
+      lastUsed: Date.now()
+    });
+  }
+
+  clear(): void {
+    for (const [, entry] of this.cache.entries()) {
+      entry.map.dispose();
+      if (entry.bump) entry.bump.dispose();
+    }
+    this.cache.clear();
+  }
+
+  private evictOldest(): void {
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.lastUsed < oldestTime) {
+        oldestTime = entry.lastUsed;
+        oldestKey = key;
+      }
+    }
+
+    if (oldestKey) {
+      const entry = this.cache.get(oldestKey);
+      if (entry) {
+        entry.map.dispose();
+        if (entry.bump) entry.bump.dispose();
+      }
+      this.cache.delete(oldestKey);
+    }
+  }
+}
+
+/**
+ * Motor generador de texturas procedurales arquitectónicas de alto rendimiento (Fase 2).
+ * Unifica la resolución a 512×512 estándar y 256×256 para modo bajo consumo,
+ * erradicando fugas de memoria VRAM mediante una caché LRU acotada con .dispose() explícito.
  */
 export class ProceduralTextureFactory {
-  private static canvasCache = new Map<string, { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture }>();
-  private static repeatCache = new Map<string, { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture }>();
+  private static readonly lruCache = new TextureLRUCache(64);
+  private static lowSpecMode = false;
+
+  static setLowSpecMode(enabled: boolean): void {
+    this.lowSpecMode = enabled;
+  }
+
+  static getResolution(lowSpec?: boolean): number {
+    const isLow = lowSpec ?? this.lowSpecMode;
+    return isLow ? 256 : 512;
+  }
+
+  static clearCache(): void {
+    this.lruCache.clear();
+  }
 
   // ==========================================
-  // PISOS ARQUITECTÓNICOS
+  // PISOS ARQUITECTÓNICOS (512x512 / 256x256)
   // ==========================================
   static getFloorMaterial(
     type: FloorMaterialType,
     widthMm = 5000,
-    depthMm = 5000
+    depthMm = 5000,
+    lowSpec?: boolean
   ): THREE.MeshStandardMaterial {
-    const baseKey = `floor_${type}`;
+    const resolution = this.getResolution(lowSpec);
     const repeatX = Math.max(1, Math.round(widthMm / 1000));
     const repeatY = Math.max(1, Math.round(depthMm / 1000));
-    const configured = this.getOrCreateRepeatedTextures(baseKey, repeatX, repeatY, () =>
-      this.generateFloorTextures(type)
+    const cacheKey = `floor_${type}_${resolution}_${repeatX}_${repeatY}`;
+
+    const configured = this.getOrCreateRepeatedTextures(cacheKey, repeatX, repeatY, () =>
+      this.generateFloorTextures(type, resolution)
     );
 
     const mat = new THREE.MeshStandardMaterial({
@@ -37,49 +133,76 @@ export class ProceduralTextureFactory {
       mat.bumpScale = 0.015;
     }
 
-    // Ajuste físico según tipo de material
     switch (type) {
       case 'marble_white':
-        mat.roughness = 0.16; // Pulido brillante espejo
+        mat.roughness = 0.16;
         mat.metalness = 0.08;
         if (mat.bumpMap) mat.bumpScale = 0.005;
         break;
       case 'marble_calacatta_gold':
-        mat.roughness = 0.14; // Ultra pulido rectificado
+        mat.roughness = 0.14;
         mat.metalness = 0.09;
         if (mat.bumpMap) mat.bumpScale = 0.006;
         break;
       case 'travertine_beige':
-        mat.roughness = 0.48; // Piedra calcárea satinada
+        mat.roughness = 0.48;
         mat.metalness = 0.02;
         if (mat.bumpMap) mat.bumpScale = 0.025;
         break;
       case 'stone_slate_black':
-        mat.roughness = 0.58; // Pizarra hendida mate
+        mat.roughness = 0.58;
         mat.metalness = 0.04;
         if (mat.bumpMap) mat.bumpScale = 0.045;
+        break;
+      case 'terrazzo_veneciano':
+        mat.roughness = 0.22;
+        mat.metalness = 0.05;
+        if (mat.bumpMap) mat.bumpScale = 0.008;
         break;
       case 'wood_light':
       case 'wood_guayacan':
       case 'wood_walnut':
       case 'wood_haya':
-        mat.roughness = 0.40; // Duelas satinadas
+      case 'spc_plank_oak':
+        mat.roughness = 0.40;
         mat.metalness = 0.02;
         if (mat.bumpMap) mat.bumpScale = 0.022;
         break;
+      case 'spc_herringbone_honey':
+      case 'spc_herringbone_nordic':
+        mat.roughness = 0.36;
+        mat.metalness = 0.02;
+        if (mat.bumpMap) mat.bumpScale = 0.024;
+        break;
       case 'concrete_gray':
       case 'concrete_arena':
-        mat.roughness = 0.62; // Cemento mate pulido
+        mat.roughness = 0.62;
         mat.metalness = 0.02;
         if (mat.bumpMap) mat.bumpScale = 0.028;
         break;
       case 'concrete_white':
-        mat.roughness = 0.55; // Cemento blanco luminoso
+        mat.roughness = 0.55;
         mat.metalness = 0.03;
         if (mat.bumpMap) mat.bumpScale = 0.02;
         break;
+      case 'porcelain_rectified_white':
+        mat.roughness = 0.12;
+        mat.metalness = 0.06;
+        if (mat.bumpMap) mat.bumpScale = 0.004;
+        break;
+      case 'porcelain_rectified_gray':
+        mat.roughness = 0.25;
+        mat.metalness = 0.05;
+        if (mat.bumpMap) mat.bumpScale = 0.008;
+        break;
+      case 'microcement_light':
+      case 'microcement_warm':
+        mat.roughness = 0.50;
+        mat.metalness = 0.02;
+        if (mat.bumpMap) mat.bumpScale = 0.015;
+        break;
       case 'tile_dark':
-        mat.roughness = 0.28; // Porcelanato oscuro semibrillo
+        mat.roughness = 0.28;
         mat.metalness = 0.05;
         if (mat.bumpMap) mat.bumpScale = 0.025;
         break;
@@ -89,16 +212,15 @@ export class ProceduralTextureFactory {
   }
 
   // ==========================================
-  // PAREDES ARQUITECTÓNICAS
+  // PAREDES ARQUITECTÓNICAS (512x512 / 256x256)
   // ==========================================
   static getWallMaterial(
     type: WallMaterialType,
     lengthMm = 3600,
-    heightMm = 2600
+    heightMm = 2600,
+    lowSpec?: boolean
   ): THREE.MeshStandardMaterial {
-    const baseKey = `wall_${type}`;
-
-    // Repetición proporcional a la longitud y altura del muro
+    const resolution = this.getResolution(lowSpec);
     let repeatX = 1;
     let repeatY = 1;
     let roughness = 0.4;
@@ -108,21 +230,28 @@ export class ProceduralTextureFactory {
     switch (type) {
       case 'brick_clay':
       case 'brick_white':
-        // Ladrillos caravista estándar 24x6 cm aprox
         repeatX = Math.max(1, Math.round(lengthMm / 900));
         repeatY = Math.max(1, Math.round(heightMm / 900));
-        roughness = 0.80; // Arcilla mate rugosa
+        roughness = 0.80;
         metalness = 0.01;
         bumpScale = 0.06;
         break;
       case 'subway_tile_white':
       case 'subway_tile_emerald':
       case 'subway_tile_black':
-        // Azulejos metro 10x20 cm
+      case 'subway_tile_navy':
         repeatX = Math.max(1, Math.round(lengthMm / 1000) * 2);
         repeatY = Math.max(1, Math.round(heightMm / 1000) * 3);
-        roughness = type === 'subway_tile_black' ? 0.35 : 0.15; // Cerámica esmaltada
+        roughness = type === 'subway_tile_black' ? 0.35 : (type === 'subway_tile_navy' ? 0.18 : 0.15);
         bumpScale = 0.035;
+        break;
+      case 'hydraulic_tile_patchwork':
+      case 'hydraulic_tile_geo':
+        repeatX = Math.max(1, Math.round(lengthMm / 600));
+        repeatY = Math.max(1, Math.round(heightMm / 600));
+        roughness = 0.35;
+        metalness = 0.02;
+        bumpScale = 0.025;
         break;
       case 'marble_wall_calacatta':
         repeatX = Math.max(1, Math.round(lengthMm / 2000));
@@ -145,18 +274,24 @@ export class ProceduralTextureFactory {
         bumpScale = 0.04;
         break;
       case 'vertical_slats_wood':
+      case 'wpc_slats_walnut':
+      case 'wpc_slats_black':
         repeatX = Math.max(1, Math.round(lengthMm / 500));
         repeatY = Math.max(1, Math.round(heightMm / 1200));
         roughness = 0.45;
         bumpScale = 0.05;
         break;
       case 'concrete_smooth':
+      case 'microcement_wall':
         repeatX = Math.max(1, Math.round(lengthMm / 1800));
         repeatY = Math.max(1, Math.round(heightMm / 1800));
-        roughness = 0.7;
+        roughness = 0.65;
         bumpScale = 0.02;
         break;
       case 'plaster_warm':
+      case 'paint_warm_white':
+      case 'paint_sage_green':
+      case 'paint_charcoal':
         repeatX = Math.max(1, Math.round(lengthMm / 1200));
         repeatY = Math.max(1, Math.round(heightMm / 1200));
         roughness = 0.85;
@@ -164,8 +299,9 @@ export class ProceduralTextureFactory {
         break;
     }
 
-    const configured = this.getOrCreateRepeatedTextures(baseKey, repeatX, repeatY, () =>
-      this.generateWallTextures(type)
+    const cacheKey = `wall_${type}_${resolution}_${repeatX}_${repeatY}`;
+    const configured = this.getOrCreateRepeatedTextures(cacheKey, repeatX, repeatY, () =>
+      this.generateWallTextures(type, resolution)
     );
 
     const mat = new THREE.MeshStandardMaterial({
@@ -182,33 +318,260 @@ export class ProceduralTextureFactory {
     return mat;
   }
 
+  // ==========================================
+  // TABLEROS DE MELAMINA, CUBIERTAS Y MUEBLE
+  // Pipeline unificado: Maderas con veta, Linos textiles, Alto brillo,
+  // Piedras, Porcelanatos y Listones WPC
+  // ==========================================
+  static getBoardTexture(
+    colorHex: string,
+    type: string = 'wood',
+    grain: GrainDirection = 'length',
+    lowSpec?: boolean
+  ): THREE.CanvasTexture {
+    const resolution = this.getResolution(lowSpec);
+    const normalizedType = this.normalizeBoardType(type);
+    const key = `board_${normalizedType}_${grain}_${colorHex.toLowerCase()}_${resolution}`;
+
+    const cached = this.lruCache.get(key);
+    if (cached) {
+      return cached.map;
+    }
+
+    if (typeof document === 'undefined') {
+      const fallback = new THREE.CanvasTexture({} as HTMLCanvasElement);
+      this.lruCache.set(key, { map: fallback });
+      return fallback;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = resolution;
+    canvas.height = resolution;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      const fallback = new THREE.CanvasTexture(canvas);
+      this.lruCache.set(key, { map: fallback });
+      return fallback;
+    }
+
+    ctx.fillStyle = colorHex;
+    ctx.fillRect(0, 0, resolution, resolution);
+
+    switch (normalizedType) {
+      case 'wood':
+        this.renderWoodBoardTexture(ctx, resolution, grain);
+        break;
+      case 'linen':
+        this.renderLinenTextileTexture(ctx, resolution);
+        break;
+      case 'gloss':
+        this.renderHighGlossTexture(ctx, resolution);
+        break;
+      case 'stone':
+        this.renderStoneBoardTexture(ctx, resolution, colorHex);
+        break;
+      case 'wpc':
+        this.renderWpcSlatsTexture(ctx, resolution, grain);
+        break;
+      default:
+        this.renderSubtleNoiseTexture(ctx, resolution);
+        break;
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 2);
+    tex.userData = { isShared: true };
+    this.lruCache.set(key, { map: tex });
+    return tex;
+  }
+
+  private static normalizeBoardType(rawType: string): MelamineTextureType {
+    const lower = (rawType || '').toLowerCase();
+    if (lower.includes('linen') || lower.includes('textil') || lower.includes('lino') || lower.includes('tela')) {
+      return 'linen';
+    }
+    if (lower.includes('gloss') || lower.includes('brillo') || lower.includes('espejo') || lower.includes('shine')) {
+      return 'gloss';
+    }
+    if (lower.includes('wpc') || lower.includes('slat') || lower.includes('alistonado') || lower.includes('ranurado')) {
+      return 'wpc';
+    }
+    if (lower.includes('stone') || lower.includes('piedra') || lower.includes('marmol') || lower.includes('granito') || lower.includes('cuarzo') || lower.includes('dekton')) {
+      return 'stone';
+    }
+    if (lower.includes('wood') || lower.includes('madera') || lower.includes('roble') || lower.includes('nogal') || lower.includes('cedro') || lower.includes('teca')) {
+      return 'wood';
+    }
+    return 'solid';
+  }
+
+  // 1. Textura de Madera respetando la dirección de veta (part.grain)
+  private static renderWoodBoardTexture(
+    ctx: CanvasRenderingContext2D,
+    size: number,
+    grain: GrainDirection
+  ): void {
+    if (grain === 'none') {
+      this.renderSubtleNoiseTexture(ctx, size);
+      return;
+    }
+
+    const isAlongWidth = grain === 'width'; // Veta transversal (eje Y)
+    const step = size / (size >= 512 ? 48 : 28);
+
+    ctx.save();
+    if (isAlongWidth) {
+      // Rotar 90 grados para orientar la veta a lo largo del ancho
+      ctx.translate(size / 2, size / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.translate(-size / 2, -size / 2);
+    }
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.055)';
+    for (let i = 0; i < size; i += step) {
+      const lineThickness = 1.2 + (Math.sin(i * 0.2) + 1) * 0.8;
+      ctx.fillRect(0, i, size, lineThickness);
+    }
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
+    for (let i = step / 2; i < size; i += step * 1.5) {
+      ctx.fillRect(0, i, size, 1);
+    }
+
+    // Ondulación sutil de anillos anuales
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.04)';
+    ctx.lineWidth = 1.2;
+    for (let j = 0; j < 6; j++) {
+      const yPos = (j / 6) * size;
+      ctx.beginPath();
+      ctx.moveTo(0, yPos);
+      ctx.bezierCurveTo(size * 0.3, yPos + 12, size * 0.7, yPos - 12, size, yPos);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  // 2. Lino Textil (Urdimbre y trama cruzada)
+  private static renderLinenTextileTexture(ctx: CanvasRenderingContext2D, size: number): void {
+    const step = size >= 512 ? 6 : 4;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+    for (let x = 0; x < size; x += step) {
+      ctx.fillRect(x, 0, step / 2, size);
+    }
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    for (let y = 0; y < size; y += step) {
+      ctx.fillRect(0, y, size, step / 2);
+    }
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+    for (let x = 0; x < size; x += step) {
+      for (let y = 0; y < size; y += step) {
+        if ((x + y) % (step * 2) === 0) {
+          ctx.fillRect(x, y, step / 2, step / 2);
+        }
+      }
+    }
+  }
+
+  // 3. Alto Brillo (Reflejo especular satinado con degradado suave)
+  private static renderHighGlossTexture(ctx: CanvasRenderingContext2D, size: number): void {
+    const grad = ctx.createLinearGradient(0, 0, size, size);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
+    grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.01)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.08)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  // 4. Piedras y Mármoles (vetas orgánicas para mesones de granito/cuarzo)
+  private static renderStoneBoardTexture(
+    ctx: CanvasRenderingContext2D,
+    size: number,
+    colorHex: string
+  ): void {
+    const isDark = colorHex.toLowerCase() === '#1e293b' || colorHex.toLowerCase() === '#262626' || colorHex.toLowerCase() === '#111827';
+    ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
+    ctx.lineWidth = 1.8;
+
+    ctx.beginPath();
+    ctx.moveTo(size * 0.05, size * 0.12);
+    ctx.bezierCurveTo(size * 0.35, size * 0.42, size * 0.65, size * 0.18, size * 0.95, size * 0.75);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(size * 0.12, size * 0.65);
+    ctx.bezierCurveTo(size * 0.45, size * 0.82, size * 0.75, size * 0.55, size * 0.92, size * 0.95);
+    ctx.stroke();
+
+    // Micropartículas de cuarzo reflectantes
+    ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.05)';
+    for (let i = 0; i < 40; i++) {
+      const px = Math.random() * size;
+      const py = Math.random() * size;
+      ctx.fillRect(px, py, 2, 2);
+    }
+  }
+
+  // 5. Listones WPC / Paneles acústicos
+  private static renderWpcSlatsTexture(
+    ctx: CanvasRenderingContext2D,
+    size: number,
+    grain: GrainDirection
+  ): void {
+    const isAlongWidth = grain === 'width';
+    const slatCount = size >= 512 ? 16 : 8;
+    const slatW = size / slatCount;
+    const grooveW = slatW * 0.28;
+
+    ctx.save();
+    if (isAlongWidth) {
+      ctx.translate(size / 2, size / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.translate(-size / 2, -size / 2);
+    }
+
+    for (let i = 0; i < slatCount; i++) {
+      const x = i * slatW;
+      // Ranura oscura
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillRect(x + slatW - grooveW, 0, grooveW, size);
+
+      // Relieve luz del listón
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.fillRect(x, 0, 2, size);
+    }
+
+    ctx.restore();
+  }
+
+  // 6. Micro-ruido difuso
+  private static renderSubtleNoiseTexture(ctx: CanvasRenderingContext2D, size: number): void {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.025)';
+    for (let y = 0; y < size; y += 4) {
+      ctx.fillRect(0, y, size, 1);
+    }
+  }
+
   private static getOrCreateRepeatedTextures(
-    baseKey: string,
+    cacheKey: string,
     repeatX: number,
     repeatY: number,
     generator: () => { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture }
   ): { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture } {
-    const repeatKey = `${baseKey}_${repeatX}_${repeatY}`;
-    const existingRepeat = this.repeatCache.get(repeatKey);
-    if (existingRepeat) {
-      existingRepeat.map.needsUpdate = true;
-      if (existingRepeat.bump) {
-        existingRepeat.bump.needsUpdate = true;
-      }
-      return existingRepeat;
+    const existing = this.lruCache.get(cacheKey);
+    if (existing) {
+      return existing;
     }
 
-    let baseTextures = this.canvasCache.get(baseKey);
-    if (!baseTextures) {
-      baseTextures = generator();
-      this.canvasCache.set(baseKey, baseTextures);
-    }
-
+    const baseTextures = generator();
     const mapClone = baseTextures.map.clone();
     mapClone.wrapS = THREE.RepeatWrapping;
     mapClone.wrapT = THREE.RepeatWrapping;
     mapClone.repeat.set(repeatX, repeatY);
     mapClone.needsUpdate = true;
+    mapClone.userData = { isShared: true };
 
     let bumpClone: THREE.CanvasTexture | undefined;
     if (baseTextures.bump) {
@@ -217,27 +580,41 @@ export class ProceduralTextureFactory {
       bumpClone.wrapT = THREE.RepeatWrapping;
       bumpClone.repeat.set(repeatX, repeatY);
       bumpClone.needsUpdate = true;
+      bumpClone.userData = { isShared: true };
     }
 
     const configured = { map: mapClone, bump: bumpClone };
-    this.repeatCache.set(repeatKey, configured);
+    this.lruCache.set(cacheKey, configured);
     return configured;
   }
 
   // ==========================================
-  // GENERADORES DE PISO
+  // GENERADORES DE PISO (512x512 / 256x256)
   // ==========================================
-  private static generateFloorTextures(type: FloorMaterialType): { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture } {
-    const size = 1024;
+  private static generateFloorTextures(
+    type: FloorMaterialType,
+    size: number
+  ): { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture } {
+    if (typeof document === 'undefined') {
+      const dummy = new THREE.CanvasTexture({} as HTMLCanvasElement);
+      return { map: dummy };
+    }
+
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
 
     const bumpCanvas = document.createElement('canvas');
     bumpCanvas.width = size;
     bumpCanvas.height = size;
-    const bumpCtx = bumpCanvas.getContext('2d')!;
+    const bumpCtx = bumpCanvas.getContext('2d');
+
+    if (!ctx || !bumpCtx) {
+      const dummyMap = new THREE.CanvasTexture(canvas);
+      const dummyBump = new THREE.CanvasTexture(bumpCanvas);
+      return { map: dummyMap, bump: dummyBump };
+    }
 
     switch (type) {
       case 'wood_light':
@@ -252,6 +629,15 @@ export class ProceduralTextureFactory {
       case 'wood_haya':
         this.drawWoodPlanks(ctx, bumpCtx, size, 'haya');
         break;
+      case 'spc_plank_oak':
+        this.drawWoodPlanks(ctx, bumpCtx, size, 'light');
+        break;
+      case 'spc_herringbone_honey':
+        this.drawHerringboneSPC(ctx, bumpCtx, size, 'honey');
+        break;
+      case 'spc_herringbone_nordic':
+        this.drawHerringboneSPC(ctx, bumpCtx, size, 'nordic');
+        break;
       case 'marble_white':
         this.drawMarble(ctx, bumpCtx, size, 'carrara');
         break;
@@ -264,6 +650,9 @@ export class ProceduralTextureFactory {
       case 'stone_slate_black':
         this.drawSlateStone(ctx, bumpCtx, size);
         break;
+      case 'terrazzo_veneciano':
+        this.drawTerrazzoFloor(ctx, bumpCtx, size);
+        break;
       case 'concrete_gray':
         this.drawConcrete(ctx, bumpCtx, size, 'gray');
         break;
@@ -272,6 +661,18 @@ export class ProceduralTextureFactory {
         break;
       case 'concrete_white':
         this.drawConcrete(ctx, bumpCtx, size, 'white');
+        break;
+      case 'porcelain_rectified_white':
+        this.drawRectifiedPorcelain(ctx, bumpCtx, size, 'white');
+        break;
+      case 'porcelain_rectified_gray':
+        this.drawRectifiedPorcelain(ctx, bumpCtx, size, 'gray');
+        break;
+      case 'microcement_light':
+        this.drawMicrocement(ctx, bumpCtx, size, 'light');
+        break;
+      case 'microcement_warm':
+        this.drawMicrocement(ctx, bumpCtx, size, 'warm');
         break;
       case 'tile_dark':
         this.drawFloorTiles(ctx, bumpCtx, size);
@@ -285,19 +686,32 @@ export class ProceduralTextureFactory {
   }
 
   // ==========================================
-  // GENERADORES DE PARED
+  // GENERADORES DE PARED (512x512 / 256x256)
   // ==========================================
-  private static generateWallTextures(type: WallMaterialType): { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture } {
-    const size = 1024;
+  private static generateWallTextures(
+    type: WallMaterialType,
+    size: number
+  ): { map: THREE.CanvasTexture; bump?: THREE.CanvasTexture } {
+    if (typeof document === 'undefined') {
+      const dummy = new THREE.CanvasTexture({} as HTMLCanvasElement);
+      return { map: dummy };
+    }
+
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
 
     const bumpCanvas = document.createElement('canvas');
     bumpCanvas.width = size;
     bumpCanvas.height = size;
-    const bumpCtx = bumpCanvas.getContext('2d')!;
+    const bumpCtx = bumpCanvas.getContext('2d');
+
+    if (!ctx || !bumpCtx) {
+      const dummyMap = new THREE.CanvasTexture(canvas);
+      const dummyBump = new THREE.CanvasTexture(bumpCanvas);
+      return { map: dummyMap, bump: dummyBump };
+    }
 
     switch (type) {
       case 'brick_clay':
@@ -315,6 +729,15 @@ export class ProceduralTextureFactory {
       case 'subway_tile_black':
         this.drawSubwayTiles(ctx, bumpCtx, size, 'black');
         break;
+      case 'subway_tile_navy':
+        this.drawSubwayTiles(ctx, bumpCtx, size, 'navy');
+        break;
+      case 'hydraulic_tile_patchwork':
+        this.drawHydraulicTiles(ctx, bumpCtx, size, 'patchwork');
+        break;
+      case 'hydraulic_tile_geo':
+        this.drawHydraulicTiles(ctx, bumpCtx, size, 'geo');
+        break;
       case 'marble_wall_calacatta':
         this.drawMarble(ctx, bumpCtx, size, 'calacatta_gold', true);
         break;
@@ -325,13 +748,31 @@ export class ProceduralTextureFactory {
         this.drawHexMosaic(ctx, bumpCtx, size);
         break;
       case 'vertical_slats_wood':
-        this.drawWoodSlats(ctx, bumpCtx, size);
+        this.drawWoodSlats(ctx, bumpCtx, size, 'natural');
+        break;
+      case 'wpc_slats_walnut':
+        this.drawWoodSlats(ctx, bumpCtx, size, 'walnut');
+        break;
+      case 'wpc_slats_black':
+        this.drawWoodSlats(ctx, bumpCtx, size, 'black');
         break;
       case 'concrete_smooth':
         this.drawSmoothConcreteWall(ctx, bumpCtx, size);
         break;
+      case 'microcement_wall':
+        this.drawMicrocementWall(ctx, bumpCtx, size);
+        break;
       case 'plaster_warm':
         this.drawWarmPlaster(ctx, bumpCtx, size);
+        break;
+      case 'paint_warm_white':
+        this.drawPaintWall(ctx, bumpCtx, size, '#f9f8f4');
+        break;
+      case 'paint_sage_green':
+        this.drawPaintWall(ctx, bumpCtx, size, '#526657');
+        break;
+      case 'paint_charcoal':
+        this.drawPaintWall(ctx, bumpCtx, size, '#282c34');
         break;
     }
 
@@ -342,17 +783,16 @@ export class ProceduralTextureFactory {
   }
 
   // ==========================================
-  // DIBUJADO DETALLADO DE PATRONES EN CANVAS
+  // PATRONES GRÁFICOS INTERNOS
   // ==========================================
 
-  // 1. Duelas de madera con veta y biseles (Holztek y Corona Madera)
   private static drawWoodPlanks(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
     size: number,
     variety: 'light' | 'guayacan' | 'walnut' | 'haya'
   ) {
-    const plankCount = 8;
+    const plankCount = size >= 512 ? 8 : 4;
     const plankH = size / plankCount;
 
     let baseColors: string[];
@@ -361,25 +801,25 @@ export class ProceduralTextureFactory {
     let jointColor: string;
 
     switch (variety) {
-      case 'light': // Roble Nórdico
+      case 'light':
         baseColors = ['#d8c29d', '#e0cdab', '#cfb992', '#e5d5b7', '#cbb38a'];
         bgColor = '#d4bfa0';
         veinColor = 'rgba(120, 85, 45, 0.12)';
         jointColor = 'rgba(70, 45, 25, 0.35)';
         break;
-      case 'guayacan': // Corona Guayacán Miel
+      case 'guayacan':
         baseColors = ['#c19a6b', '#cb9d64', '#b68953', '#d4a872', '#ad7d49'];
         bgColor = '#bd8e55';
         veinColor = 'rgba(90, 50, 15, 0.20)';
         jointColor = 'rgba(50, 25, 5, 0.45)';
         break;
-      case 'walnut': // Nogal Americano
+      case 'walnut':
         baseColors = ['#5c4033', '#4d3326', '#664a3d', '#3d261a', '#543b2b'];
         bgColor = '#4a3224';
         veinColor = 'rgba(20, 10, 5, 0.25)';
         jointColor = 'rgba(10, 5, 0, 0.6)';
         break;
-      case 'haya': // Haya Clara
+      case 'haya':
         baseColors = ['#e8ddd0', '#ede3d8', '#dfd2c2', '#f2e9df', '#dacbba'];
         bgColor = '#e5d8c8';
         veinColor = 'rgba(140, 115, 85, 0.10)';
@@ -399,30 +839,26 @@ export class ProceduralTextureFactory {
       ctx.fillStyle = color;
       ctx.fillRect(0, y, size, plankH);
 
-      // Micro-vetas longitudinales
       ctx.strokeStyle = veinColor;
-      ctx.lineWidth = 1.4;
-      for (let j = 0; j < 12; j++) {
-        const lineY = y + (j / 12) * plankH;
+      ctx.lineWidth = 1.2;
+      for (let j = 0; j < (size >= 512 ? 10 : 6); j++) {
+        const lineY = y + (j / 10) * plankH;
         ctx.beginPath();
         ctx.moveTo(0, lineY);
         ctx.bezierCurveTo(
-          size * 0.33, lineY + (Math.sin(i * 3 + j) * 5),
-          size * 0.66, lineY - (Math.sin(i * 2 + j) * 5),
+          size * 0.33, lineY + (Math.sin(i * 3 + j) * 4),
+          size * 0.66, lineY - (Math.sin(i * 2 + j) * 4),
           size, lineY
         );
         ctx.stroke();
       }
 
-      // Juntas horizontales entre duelas
       ctx.fillStyle = jointColor;
       ctx.fillRect(0, y + plankH - 2, size, 2);
 
-      // Relieve junta en bump
       bumpCtx.fillStyle = '#202020';
-      bumpCtx.fillRect(0, y + plankH - 3, size, 3);
+      bumpCtx.fillRect(0, y + plankH - 2, size, 2);
 
-      // Juntas verticales escalonadas (stagger)
       const splits = [(i * 0.43) % 1, ((i * 0.43) % 1 + 0.5) % 1];
       for (const split of splits) {
         const splitX = split * size;
@@ -430,12 +866,11 @@ export class ProceduralTextureFactory {
         ctx.fillRect(splitX, y, 2, plankH);
 
         bumpCtx.fillStyle = '#202020';
-        bumpCtx.fillRect(splitX - 1, y, 3, plankH);
+        bumpCtx.fillRect(splitX - 1, y, 2, plankH);
       }
     }
   }
 
-  // 2. Mármoles pulidos (Carrara Blanco y Madrid Oro Calacatta)
   private static drawMarble(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
@@ -445,7 +880,6 @@ export class ProceduralTextureFactory {
   ) {
     const isGold = variety === 'calacatta_gold';
 
-    // Base porcelánica blanca
     ctx.fillStyle = isGold ? '#faf8f2' : '#f8f9fa';
     ctx.fillRect(0, 0, size, size);
 
@@ -465,7 +899,6 @@ export class ProceduralTextureFactory {
     bumpCtx.fillStyle = '#909090';
     bumpCtx.fillRect(0, 0, size, size);
 
-    // Función de trazo de veta orgánica
     const drawVein = (
       startX: number,
       startY: number,
@@ -484,43 +917,40 @@ export class ProceduralTextureFactory {
       ctx.beginPath();
       ctx.moveTo(startX, startY);
 
-      const midX1 = (startX * 2 + endX) / 3 + (Math.sin(startX) * 70);
-      const midY1 = (startY * 2 + endY) / 3 + (Math.cos(startY) * 50);
-      const midX2 = (startX + endX * 2) / 3 + (Math.cos(endX) * 70);
-      const midY2 = (startY + endY * 2) / 3 + (Math.sin(endY) * 50);
+      const midX1 = (startX * 2 + endX) / 3 + (Math.sin(startX) * 50);
+      const midY1 = (startY * 2 + endY) / 3 + (Math.cos(startY) * 40);
+      const midX2 = (startX + endX * 2) / 3 + (Math.cos(endX) * 50);
+      const midY2 = (startY + endY * 2) / 3 + (Math.sin(endY) * 40);
 
       ctx.bezierCurveTo(midX1, midY1, midX2, midY2, endX, endY);
       ctx.stroke();
 
-      // Ramificación fina
       if (width > 2.5) {
         ctx.lineWidth = width * 0.45;
         ctx.beginPath();
         ctx.moveTo(midX1, midY1);
-        ctx.lineTo(midX1 + (Math.sin(midY1) * 90), midY1 + (Math.cos(midX1) * 80));
+        ctx.lineTo(midX1 + (Math.sin(midY1) * 60), midY1 + (Math.cos(midX1) * 50));
         ctx.stroke();
       }
     };
 
-    // Vetas maestras
-    drawVein(0, size * 0.15, size, size * 0.85, 4.5, 0.28, isGold);
-    drawVein(size * 0.2, 0, size * 0.85, size * 0.7, 3.2, 0.22, false);
+    drawVein(0, size * 0.15, size, size * 0.85, 3.8, 0.28, isGold);
+    drawVein(size * 0.2, 0, size * 0.85, size * 0.7, 2.6, 0.22, false);
     if (isGold) {
-      drawVein(0, size * 0.55, size * 0.75, size, 3.8, 0.35, true); // Veta dorada dominante
-      drawVein(size * 0.45, 0, size, size * 0.45, 2.0, 0.25, true);
+      drawVein(0, size * 0.55, size * 0.75, size, 3.2, 0.35, true);
+      drawVein(size * 0.45, 0, size, size * 0.45, 1.8, 0.25, true);
     } else {
-      drawVein(0, size * 0.75, size * 0.6, size, 2.5, 0.20, false);
+      drawVein(0, size * 0.75, size * 0.6, size, 2.2, 0.20, false);
     }
 
-    // Si no es un muro continuo, dibujar juntas de baldosas gran formato
     if (!isSeamlessWall) {
       const gridCount = 2;
       const step = size / gridCount;
       ctx.strokeStyle = isGold ? 'rgba(210, 195, 175, 0.5)' : 'rgba(180, 185, 190, 0.4)';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.2;
 
       bumpCtx.strokeStyle = '#303030';
-      bumpCtx.lineWidth = 2.5;
+      bumpCtx.lineWidth = 2.0;
 
       for (let i = 1; i < gridCount; i++) {
         ctx.beginPath();
@@ -546,7 +976,6 @@ export class ProceduralTextureFactory {
     }
   }
 
-  // 3. Travertino Romano Clásico (Piedra calcárea)
   private static drawTravertine(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
@@ -558,19 +987,18 @@ export class ProceduralTextureFactory {
     bumpCtx.fillStyle = '#808080';
     bumpCtx.fillRect(0, 0, size, size);
 
-    // Bandas sedimentarias horizontales sutiles
     for (let y = 0; y < size; y += 4) {
       const tone = Math.sin(y * 0.04) * 8 + Math.cos(y * 0.08) * 4;
       ctx.fillStyle = `rgba(185, 170, 145, ${0.12 + (tone > 0 ? 0.08 : 0)})`;
       ctx.fillRect(0, y, size, 3);
     }
 
-    // Poros y pequeñas cavidades minerales
-    for (let p = 0; p < 350; p++) {
+    const poresCount = size >= 512 ? 200 : 90;
+    for (let p = 0; p < poresCount; p++) {
       const px = Math.random() * size;
       const py = Math.random() * size;
-      const pw = 4 + Math.random() * 12;
-      const ph = 1.5 + Math.random() * 3;
+      const pw = 3 + Math.random() * 8;
+      const ph = 1.2 + Math.random() * 2.5;
       ctx.fillStyle = 'rgba(120, 105, 85, 0.25)';
       ctx.fillRect(px, py, pw, ph);
 
@@ -578,17 +1006,15 @@ export class ProceduralTextureFactory {
       bumpCtx.fillRect(px, py, pw, ph);
     }
 
-    // Juntas rectificadas
     ctx.strokeStyle = 'rgba(120, 105, 85, 0.4)';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.strokeRect(0, 0, size, size);
 
     bumpCtx.strokeStyle = '#202020';
-    bumpCtx.lineWidth = 3;
+    bumpCtx.lineWidth = 2.5;
     bumpCtx.strokeRect(0, 0, size, size);
   }
 
-  // 4. Pizarra Negra Hendida (Corona Estructurado)
   private static drawSlateStone(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
@@ -600,36 +1026,21 @@ export class ProceduralTextureFactory {
     bumpCtx.fillStyle = '#808080';
     bumpCtx.fillRect(0, 0, size, size);
 
-    // Capas laminadas de lajas
     for (let y = 0; y < size; y += 8) {
       const shade = Math.sin(y * 0.02) * 12;
       ctx.fillStyle = `rgb(${30 + shade}, ${34 + shade}, ${39 + shade})`;
       ctx.fillRect(0, y, size, 8);
 
-      // Relieve escalonado en bump
       const bumpVal = 100 + shade * 3;
       bumpCtx.fillStyle = `rgb(${bumpVal}, ${bumpVal}, ${bumpVal})`;
       bumpCtx.fillRect(0, y, size, 8);
     }
 
-    // Grano fino
-    const imgData = ctx.getImageData(0, 0, size, size);
-    const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const n = (Math.random() - 0.5) * 14;
-      data[i] = Math.max(0, Math.min(255, data[i] + n));
-      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + n));
-      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + n));
-    }
-    ctx.putImageData(imgData, 0, 0);
-
-    // Juntas perimetrales
     bumpCtx.fillStyle = '#101010';
-    bumpCtx.fillRect(0, 0, size, 3);
-    bumpCtx.fillRect(0, 0, 3, size);
+    bumpCtx.fillRect(0, 0, size, 2);
+    bumpCtx.fillRect(0, 0, 2, size);
   }
 
-  // 5. Concretos pulidos (Corona Porcelatech Concrete & Boss Arena)
   private static drawConcrete(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
@@ -655,38 +1066,22 @@ export class ProceduralTextureFactory {
     bumpCtx.fillStyle = '#808080';
     bumpCtx.fillRect(0, 0, size, size);
 
-    // Textura de granos y micro-áridos
-    const imgData = ctx.getImageData(0, 0, size, size);
-    const bumpData = bumpCtx.getImageData(0, 0, size, size);
-    const data = imgData.data;
-    const bdata = bumpData.data;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const noise = (Math.random() - 0.5) * 20;
-      data[i] = Math.min(255, Math.max(0, data[i] + noise));
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
-
-      const bVal = 128 + noise * 1.5;
-      bdata[i] = bVal;
-      bdata[i + 1] = bVal;
-      bdata[i + 2] = bVal;
+    // Micro-puntos de áridos
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+    const dotCount = size >= 512 ? 300 : 150;
+    for (let i = 0; i < dotCount; i++) {
+      ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
     }
 
-    ctx.putImageData(imgData, 0, 0);
-    bumpCtx.putImageData(bumpData, 0, 0);
-
-    // Juntas de dilatación del piso de concreto
     ctx.strokeStyle = variety === 'white' ? 'rgba(160, 165, 170, 0.45)' : 'rgba(70, 75, 80, 0.45)';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     bumpCtx.strokeStyle = '#202020';
-    bumpCtx.lineWidth = 3;
+    bumpCtx.lineWidth = 2.5;
 
     ctx.strokeRect(0, 0, size, size);
     bumpCtx.strokeRect(0, 0, size, size);
   }
 
-  // 6. Baldosas oscuras tipo grafito (Corona ARD Pro)
   private static drawFloorTiles(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
@@ -698,7 +1093,7 @@ export class ProceduralTextureFactory {
     bumpCtx.fillStyle = '#808080';
     bumpCtx.fillRect(0, 0, size, size);
 
-    const tiles = 4;
+    const tiles = size >= 512 ? 4 : 2;
     const tileSize = size / tiles;
 
     for (let y = 0; y < tiles; y++) {
@@ -710,21 +1105,18 @@ export class ProceduralTextureFactory {
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.fillRect(x * tileSize + 2, y * tileSize + 2, tileSize - 4, tileSize - 4);
 
-        // Relieve baldosa sobresaliente
         bumpCtx.fillStyle = '#a0a0a0';
         bumpCtx.fillRect(x * tileSize + 2, y * tileSize + 2, tileSize - 4, tileSize - 4);
       }
     }
 
-    // Fraguas oscuras
     bumpCtx.fillStyle = '#101010';
     for (let i = 0; i <= tiles; i++) {
-      bumpCtx.fillRect(i * tileSize - 2, 0, 4, size);
-      bumpCtx.fillRect(0, i * tileSize - 2, size, 4);
+      bumpCtx.fillRect(i * tileSize - 1.5, 0, 3, size);
+      bumpCtx.fillRect(0, i * tileSize - 1.5, size, 3);
     }
   }
 
-  // 7. Ladrillo a la vista (Arcilla rústica o Blanco loft decapado)
   private static drawBrickWall(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
@@ -732,17 +1124,16 @@ export class ProceduralTextureFactory {
     variety: 'clay' | 'white'
   ) {
     const isClay = variety === 'clay';
-    const rows = 12;
-    const cols = 4;
+    const rows = size >= 512 ? 10 : 6;
+    const cols = size >= 512 ? 4 : 2;
     const rowH = size / rows;
     const colW = size / cols;
-    const mortar = 6;
+    const mortar = 4;
 
-    // Mortero de junta (gris claro)
     ctx.fillStyle = isClay ? '#c4beb5' : '#dad6cf';
     ctx.fillRect(0, 0, size, size);
 
-    bumpCtx.fillStyle = '#252525'; // Mortero hundido
+    bumpCtx.fillStyle = '#252525';
     bumpCtx.fillRect(0, 0, size, size);
 
     for (let r = 0; r < rows; r++) {
@@ -758,7 +1149,6 @@ export class ProceduralTextureFactory {
 
         if (bx + bw < 0 || bx > size) continue;
 
-        // Color del ladrillo individual con variaciones auténticas
         const seed = Math.sin(r * 11 + c * 7);
         if (isClay) {
           const red = Math.round(180 + seed * 25);
@@ -766,42 +1156,30 @@ export class ProceduralTextureFactory {
           const blue = Math.round(50 + seed * 14);
           ctx.fillStyle = `rgb(${red}, ${green}, ${blue})`;
         } else {
-          // Ladrillo blanco decapado
           const lum = Math.round(230 + seed * 15);
           ctx.fillStyle = `rgb(${lum}, ${lum - 2}, ${lum - 6})`;
         }
 
         ctx.fillRect(bx, by, bw, bh);
 
-        // Textura porosa y rugosa del ladrillo cocido
-        for (let p = 0; p < 8; p++) {
-          const px = bx + Math.random() * bw;
-          const py = by + Math.random() * bh;
-          ctx.fillStyle = isClay ? 'rgba(70, 30, 15, 0.25)' : 'rgba(160, 155, 150, 0.2)';
-          ctx.fillRect(px, py, 4, 3);
-        }
-
-        // Relieve en bumpMap (el ladrillo sobresale del mortero)
         bumpCtx.fillStyle = '#b5b5b5';
         bumpCtx.fillRect(bx + 1, by + 1, bw - 2, bh - 2);
       }
     }
   }
 
-  // 8. Azulejo Subway Tile (Metro Blanco, Esmeralda, Negro Carbón)
   private static drawSubwayTiles(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
     size: number,
-    variety: 'white' | 'emerald' | 'black'
+    variety: 'white' | 'emerald' | 'black' | 'navy'
   ) {
-    const rows = 8;
-    const cols = 4;
+    const rows = size >= 512 ? 8 : 4;
+    const cols = size >= 512 ? 4 : 2;
     const tileH = size / rows;
     const tileW = size / cols;
-    const grout = 4;
+    const grout = 3;
 
-    // Color de junta (frague)
     let groutColor: string;
     switch (variety) {
       case 'white':
@@ -813,12 +1191,15 @@ export class ProceduralTextureFactory {
       case 'black':
         groutColor = '#1a1d20';
         break;
+      case 'navy':
+        groutColor = '#243242';
+        break;
     }
 
     ctx.fillStyle = groutColor;
     ctx.fillRect(0, 0, size, size);
 
-    bumpCtx.fillStyle = '#202020'; // Fragua hundida
+    bumpCtx.fillStyle = '#202020';
     bumpCtx.fillRect(0, 0, size, size);
 
     for (let r = 0; r < rows; r++) {
@@ -834,41 +1215,34 @@ export class ProceduralTextureFactory {
 
         if (tx + tw < 0 || tx > size) continue;
 
-        // Tono cerámico según variedad
         if (variety === 'white') {
           const lum = 245 + Math.round((Math.sin(r * 5 + c * 3) * 5));
           ctx.fillStyle = `rgb(${lum}, ${lum}, ${lum + 2})`;
         } else if (variety === 'emerald') {
           const g = 80 + Math.round((Math.sin(r * 5 + c * 3) * 12));
           ctx.fillStyle = `rgb(12, ${g}, 55)`;
+        } else if (variety === 'navy') {
+          const b = 75 + Math.round((Math.sin(r * 5 + c * 3) * 8));
+          ctx.fillStyle = `rgb(27, 50, ${b})`;
         } else {
-          // Negro Carbón
           const dark = 30 + Math.round((Math.sin(r * 5 + c * 3) * 4));
           ctx.fillStyle = `rgb(${dark}, ${dark + 2}, ${dark + 4})`;
         }
 
         ctx.fillRect(tx, ty, tw, th);
 
-        // Bisel cerámico (reflejo de luz superior/izquierda)
         ctx.fillStyle = variety === 'white'
           ? 'rgba(255, 255, 255, 0.45)'
           : 'rgba(255, 255, 255, 0.15)';
-        ctx.fillRect(tx, ty, tw, 3);
-        ctx.fillRect(tx, ty, 3, th);
+        ctx.fillRect(tx, ty, tw, 2);
+        ctx.fillRect(tx, ty, 2, th);
 
-        // Sombra inferior y derecha del bisel
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
-        ctx.fillRect(tx, ty + th - 3, tw, 3);
-        ctx.fillRect(tx + tw - 3, ty, 3, th);
-
-        // Bump: baldosa biselada elevada
         bumpCtx.fillStyle = '#b8b8b8';
-        bumpCtx.fillRect(tx + 2, ty + 2, tw - 4, th - 4);
+        bumpCtx.fillRect(tx + 1, ty + 1, tw - 2, th - 2);
       }
     }
   }
 
-  // 9. Salpicadero de Cuarzo Continuo para Cocina
   private static drawQuartzBacksplash(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
@@ -880,33 +1254,25 @@ export class ProceduralTextureFactory {
     bumpCtx.fillStyle = '#858585';
     bumpCtx.fillRect(0, 0, size, size);
 
-    // Micropartículas de cuarzo reflectantes
-    const imgData = ctx.getImageData(0, 0, size, size);
-    const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      if (Math.random() < 0.08) {
-        // Puntos brillantes minerales de sílice
-        data[i] = Math.min(255, data[i] + 35);
-        data[i + 1] = Math.min(255, data[i + 1] + 35);
-        data[i + 2] = Math.min(255, data[i + 2] + 40);
-      }
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    const flecks = size >= 512 ? 400 : 180;
+    for (let i = 0; i < flecks; i++) {
+      ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
     }
-    ctx.putImageData(imgData, 0, 0);
   }
 
-  // 10. Mosaico Hexagonal para Salpicadero de Cocina (Corona Sandalo)
   private static drawHexMosaic(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
     size: number
   ) {
-    ctx.fillStyle = '#7a7469'; // Junta gris oscuro
+    ctx.fillStyle = '#7a7469';
     ctx.fillRect(0, 0, size, size);
 
     bumpCtx.fillStyle = '#202020';
     bumpCtx.fillRect(0, 0, size, size);
 
-    const r = 40; // Radio del hexágono
+    const r = size >= 512 ? 32 : 24;
     const h = r * Math.sqrt(3);
     const stepX = r * 1.5;
     const stepY = h;
@@ -919,7 +1285,6 @@ export class ProceduralTextureFactory {
         const cx = col * stepX;
         const cy = row * stepY + (col % 2 === 1 ? h / 2 : 0);
 
-        // Color del hexágono (tonos arena porcelánica)
         const tone = Math.sin(col * 3 + row * 5) * 8;
         const red = 226 + tone;
         const green = 217 + tone;
@@ -928,7 +1293,6 @@ export class ProceduralTextureFactory {
         ctx.fillStyle = `rgb(${red}, ${green}, ${blue})`;
         bumpCtx.fillStyle = '#b0b0b0';
 
-        // Dibujar polígono hexágono
         ctx.beginPath();
         bumpCtx.beginPath();
         for (let a = 0; a < 6; a++) {
@@ -951,13 +1315,13 @@ export class ProceduralTextureFactory {
     }
   }
 
-  // 11. Listones verticales de madera (Acoustic wood slats)
   private static drawWoodSlats(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
-    size: number
+    size: number,
+    variety: 'natural' | 'walnut' | 'black' = 'natural'
   ) {
-    const slatCount = 16;
+    const slatCount = size >= 512 ? 16 : 8;
     const slatWidth = size / slatCount;
     const gap = slatWidth * 0.35;
     const woodWidth = slatWidth - gap;
@@ -968,15 +1332,25 @@ export class ProceduralTextureFactory {
     bumpCtx.fillStyle = '#101010';
     bumpCtx.fillRect(0, 0, size, size);
 
+    let slatColor = '#c8a97e';
+    let veinColor = 'rgba(100, 70, 30, 0.15)';
+    if (variety === 'walnut') {
+      slatColor = '#593e2b';
+      veinColor = 'rgba(25, 15, 10, 0.25)';
+    } else if (variety === 'black') {
+      slatColor = '#24272c';
+      veinColor = 'rgba(255, 255, 255, 0.05)';
+    }
+
     for (let i = 0; i < slatCount; i++) {
       const x = i * slatWidth;
-      ctx.fillStyle = '#c8a97e';
+      ctx.fillStyle = slatColor;
       ctx.fillRect(x, 0, woodWidth, size);
 
-      ctx.strokeStyle = 'rgba(100, 70, 30, 0.15)';
+      ctx.strokeStyle = veinColor;
       ctx.lineWidth = 1;
-      for (let v = 0; v < 4; v++) {
-        const vx = x + (v + 1) * (woodWidth / 5);
+      for (let v = 0; v < 3; v++) {
+        const vx = x + (v + 1) * (woodWidth / 4);
         ctx.beginPath();
         ctx.moveTo(vx, 0);
         ctx.lineTo(vx + (Math.sin(i + v) * 2), size);
@@ -988,7 +1362,311 @@ export class ProceduralTextureFactory {
     }
   }
 
-  // 12. Concreto arquitectónico liso
+  private static drawRectifiedPorcelain(
+    ctx: CanvasRenderingContext2D,
+    bumpCtx: CanvasRenderingContext2D,
+    size: number,
+    variant: 'white' | 'gray'
+  ) {
+    const isWhite = variant === 'white';
+    const bgBase = isWhite ? '#f8fafc' : '#64748b';
+    const groutColor = isWhite ? 'rgba(200, 210, 220, 0.65)' : 'rgba(50, 60, 75, 0.85)';
+
+    ctx.fillStyle = bgBase;
+    ctx.fillRect(0, 0, size, size);
+
+    bumpCtx.fillStyle = '#909090';
+    bumpCtx.fillRect(0, 0, size, size);
+
+    // Moteado micropulido sutil
+    const mottlingCount = size >= 512 ? 300 : 120;
+    for (let i = 0; i < mottlingCount; i++) {
+      const mx = Math.random() * size;
+      const my = Math.random() * size;
+      const alpha = Math.random() * 0.06;
+      ctx.fillStyle = isWhite ? `rgba(255, 255, 255, ${alpha})` : `rgba(0, 0, 0, ${alpha})`;
+      ctx.fillRect(mx, my, 4 + Math.random() * 8, 4 + Math.random() * 8);
+    }
+
+    // Juntas rectificadas ultra finas (2x2 baldosas gran formato de 80x80cm)
+    const half = size / 2;
+    ctx.strokeStyle = groutColor;
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(half, 0);
+    ctx.lineTo(half, size);
+    ctx.moveTo(0, half);
+    ctx.lineTo(size, half);
+    ctx.stroke();
+
+    bumpCtx.strokeStyle = '#202020';
+    bumpCtx.lineWidth = 1.5;
+    bumpCtx.beginPath();
+    bumpCtx.moveTo(half, 0);
+    bumpCtx.lineTo(half, size);
+    bumpCtx.moveTo(0, half);
+    bumpCtx.lineTo(size, half);
+    bumpCtx.stroke();
+  }
+
+  private static drawHerringboneSPC(
+    ctx: CanvasRenderingContext2D,
+    bumpCtx: CanvasRenderingContext2D,
+    size: number,
+    variant: 'honey' | 'nordic'
+  ) {
+    const isHoney = variant === 'honey';
+    const basePalette = isHoney
+      ? ['#c59d64', '#bd935a', '#cd9f66', '#b38850', '#d4a872']
+      : ['#dfd2bc', '#d6c8b1', '#e5dac5', '#cec0a8', '#ebd8c2'];
+    const jointColor = isHoney ? 'rgba(70, 45, 20, 0.45)' : 'rgba(100, 90, 75, 0.35)';
+
+    ctx.fillStyle = basePalette[0];
+    ctx.fillRect(0, 0, size, size);
+
+    bumpCtx.fillStyle = '#808080';
+    bumpCtx.fillRect(0, 0, size, size);
+
+    const cols = size >= 512 ? 8 : 4;
+    const colW = size / cols;
+    const plankH = colW * 2.2;
+
+    for (let c = -1; c <= cols + 1; c++) {
+      const x = c * colW;
+      const isAlt = (c % 2 === 0);
+      const rows = Math.ceil(size / plankH) + 2;
+
+      for (let r = -1; r <= rows; r++) {
+        const y = r * plankH + (isAlt ? plankH / 2 : 0);
+        const colIdx = Math.abs((c * 3 + r * 7) % basePalette.length);
+        const col = basePalette[colIdx];
+
+        ctx.fillStyle = col;
+        ctx.fillRect(x, y, colW, plankH);
+
+        // Vetas finas longitudinales en la duela
+        ctx.strokeStyle = isHoney ? 'rgba(80, 45, 15, 0.12)' : 'rgba(120, 100, 80, 0.08)';
+        ctx.lineWidth = 1;
+        for (let v = 1; v <= 3; v++) {
+          const vx = x + v * (colW / 4);
+          ctx.beginPath();
+          ctx.moveTo(vx, y);
+          ctx.lineTo(vx + (Math.sin(c + r + v) * 2), y + plankH);
+          ctx.stroke();
+        }
+
+        // Microbisel perimetral
+        ctx.strokeStyle = jointColor;
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(x, y, colW, plankH);
+
+        bumpCtx.strokeStyle = '#252525';
+        bumpCtx.lineWidth = 1.5;
+        bumpCtx.strokeRect(x, y, colW, plankH);
+      }
+    }
+  }
+
+  private static drawMicrocement(
+    ctx: CanvasRenderingContext2D,
+    bumpCtx: CanvasRenderingContext2D,
+    size: number,
+    variant: 'light' | 'warm'
+  ) {
+    const isWarm = variant === 'warm';
+    const baseColor = isWarm ? '#d6cdbd' : '#cbd5e1';
+
+    ctx.fillStyle = baseColor;
+    ctx.fillRect(0, 0, size, size);
+
+    bumpCtx.fillStyle = '#888888';
+    bumpCtx.fillRect(0, 0, size, size);
+
+    // Aguas y pases de llana orgánica
+    const passCount = size >= 512 ? 18 : 8;
+    for (let i = 0; i < passCount; i++) {
+      const cx = (i * 0.37 % 1) * size;
+      const cy = (i * 0.71 % 1) * size;
+      const rad = (size * 0.25) + (i * 8);
+
+      const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, rad);
+      const alpha = 0.04 + (i % 3) * 0.02;
+      grad.addColorStop(0, isWarm ? `rgba(255, 250, 240, ${alpha * 1.5})` : `rgba(255, 255, 255, ${alpha * 1.5})`);
+      grad.addColorStop(0.6, isWarm ? `rgba(180, 165, 145, ${alpha})` : `rgba(150, 160, 175, ${alpha})`);
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Microstippling de poros cerrados
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.025)';
+    const stippleCount = size >= 512 ? 400 : 150;
+    for (let j = 0; j < stippleCount; j++) {
+      const sx = Math.random() * size;
+      const sy = Math.random() * size;
+      ctx.fillRect(sx, sy, 1.5, 1.5);
+    }
+  }
+
+  private static drawTerrazzoFloor(
+    ctx: CanvasRenderingContext2D,
+    bumpCtx: CanvasRenderingContext2D,
+    size: number
+  ) {
+    ctx.fillStyle = '#eee8dc';
+    ctx.fillRect(0, 0, size, size);
+
+    bumpCtx.fillStyle = '#888888';
+    bumpCtx.fillRect(0, 0, size, size);
+
+    // Áridos y partículas pétreas multicolores
+    const chipColors = ['#c26d53', '#374151', '#9ca3af', '#b48a60', '#ffffff', '#475569'];
+    const chipCount = size >= 512 ? 420 : 180;
+
+    for (let i = 0; i < chipCount; i++) {
+      const cx = Math.random() * size;
+      const cy = Math.random() * size;
+      const r = 2 + Math.random() * 6;
+      const color = chipColors[i % chipColors.length];
+
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      const vertices = 4 + Math.floor(Math.random() * 3);
+      for (let v = 0; v < vertices; v++) {
+        const ang = (v / vertices) * Math.PI * 2;
+        const dist = r * (0.6 + Math.random() * 0.8);
+        ctx.lineTo(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Relieve tenue en el mapa de bump
+      bumpCtx.fillStyle = color === '#ffffff' ? '#b0b0b0' : '#606060';
+      bumpCtx.fillRect(cx - 1, cy - 1, 2, 2);
+    }
+
+    // Cuadrícula sutil de 60x60cm
+    ctx.strokeStyle = 'rgba(160, 150, 135, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, 0, size, size);
+    bumpCtx.strokeStyle = '#303030';
+    bumpCtx.lineWidth = 1.5;
+    bumpCtx.strokeRect(0, 0, size, size);
+  }
+
+  private static drawHydraulicTiles(
+    ctx: CanvasRenderingContext2D,
+    bumpCtx: CanvasRenderingContext2D,
+    size: number,
+    variant: 'patchwork' | 'geo'
+  ) {
+    const isPatchwork = variant === 'patchwork';
+    const grid = 2;
+    const step = size / grid;
+
+    ctx.fillStyle = isPatchwork ? '#e2e8f0' : '#475569';
+    ctx.fillRect(0, 0, size, size);
+
+    bumpCtx.fillStyle = '#808080';
+    bumpCtx.fillRect(0, 0, size, size);
+
+    for (let gx = 0; gx < grid; gx++) {
+      for (let gy = 0; gy < grid; gy++) {
+        const ox = gx * step;
+        const oy = gy * step;
+        const cx = ox + step / 2;
+        const cy = oy + step / 2;
+        const half = step / 2;
+
+        ctx.fillStyle = isPatchwork ? ((gx + gy) % 2 === 0 ? '#f1f5f9' : '#e0e7ff') : '#334155';
+        ctx.fillRect(ox + 2, oy + 2, step - 4, step - 4);
+
+        // Motivo geométrico central (estrella o rombo)
+        ctx.fillStyle = isPatchwork ? '#1e3a8a' : '#f8fafc';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - half * 0.7);
+        ctx.lineTo(cx + half * 0.7, cy);
+        ctx.lineTo(cx, cy + half * 0.7);
+        ctx.lineTo(cx - half * 0.7, cy);
+        ctx.closePath();
+        ctx.fill();
+
+        // Círculo concéntrico interno
+        ctx.fillStyle = isPatchwork ? '#d97706' : '#94a3b8';
+        ctx.beginPath();
+        ctx.arc(cx, cy, half * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Borde de baldosa
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(ox, oy, step, step);
+
+        bumpCtx.strokeStyle = '#202020';
+        bumpCtx.lineWidth = 2.5;
+        bumpCtx.strokeRect(ox, oy, step, step);
+      }
+    }
+  }
+
+  private static drawMicrocementWall(
+    ctx: CanvasRenderingContext2D,
+    bumpCtx: CanvasRenderingContext2D,
+    size: number
+  ) {
+    ctx.fillStyle = '#d1d5db';
+    ctx.fillRect(0, 0, size, size);
+
+    bumpCtx.fillStyle = '#858585';
+    bumpCtx.fillRect(0, 0, size, size);
+
+    const grad = ctx.createLinearGradient(0, 0, size, size);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0.07)');
+    grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.05)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0.04)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    const count = size >= 512 ? 220 : 90;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.025)';
+    for (let i = 0; i < count; i++) {
+      ctx.fillRect(Math.random() * size, Math.random() * size, 3, 2);
+    }
+  }
+
+  private static drawPaintWall(
+    ctx: CanvasRenderingContext2D,
+    bumpCtx: CanvasRenderingContext2D,
+    size: number,
+    colorHex: string
+  ) {
+    ctx.fillStyle = colorHex;
+    ctx.fillRect(0, 0, size, size);
+
+    bumpCtx.fillStyle = '#808080';
+    bumpCtx.fillRect(0, 0, size, size);
+
+    // Textura sutil de rodillo arquitectónico mate
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+    const dotCount = size >= 512 ? 350 : 150;
+    for (let i = 0; i < dotCount; i++) {
+      const px = Math.random() * size;
+      const py = Math.random() * size;
+      ctx.fillRect(px, py, 1.2, 1.2);
+    }
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.035)';
+    for (let j = 0; j < dotCount; j++) {
+      const qx = Math.random() * size;
+      const qy = Math.random() * size;
+      ctx.fillRect(qx, qy, 1.2, 1.2);
+    }
+  }
+
   private static drawSmoothConcreteWall(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
@@ -1000,18 +1678,13 @@ export class ProceduralTextureFactory {
     bumpCtx.fillStyle = '#808080';
     bumpCtx.fillRect(0, 0, size, size);
 
-    const imgData = ctx.getImageData(0, 0, size, size);
-    const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const noise = (Math.random() - 0.5) * 14;
-      data[i] = Math.min(255, Math.max(0, data[i] + noise));
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+    const count = size >= 512 ? 300 : 150;
+    for (let i = 0; i < count; i++) {
+      ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
     }
-    ctx.putImageData(imgData, 0, 0);
   }
 
-  // 13. Yeso / Pintura lavable satinada
   private static drawWarmPlaster(
     ctx: CanvasRenderingContext2D,
     bumpCtx: CanvasRenderingContext2D,
@@ -1023,20 +1696,10 @@ export class ProceduralTextureFactory {
     bumpCtx.fillStyle = '#888888';
     bumpCtx.fillRect(0, 0, size, size);
 
-    const imgData = ctx.getImageData(0, 0, size, size);
-    const bumpData = bumpCtx.getImageData(0, 0, size, size);
-    const data = imgData.data;
-    const bdata = bumpData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const n = (Math.random() - 0.5) * 8;
-      data[i] = Math.min(255, Math.max(0, data[i] + n));
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + n));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + n));
-      bdata[i] = 128 + n * 2;
-      bdata[i + 1] = 128 + n * 2;
-      bdata[i + 2] = 128 + n * 2;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.02)';
+    const count = size >= 512 ? 250 : 100;
+    for (let i = 0; i < count; i++) {
+      ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
     }
-    ctx.putImageData(imgData, 0, 0);
-    bumpCtx.putImageData(bumpData, 0, 0);
   }
 }

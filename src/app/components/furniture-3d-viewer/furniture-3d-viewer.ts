@@ -61,6 +61,7 @@ import {
   ApplianceItem
 } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
+import { PartGeometryService } from '../../services/part-geometry.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
@@ -79,6 +80,7 @@ interface PieceMeshData {
   isDoor?: boolean;
   isDrawer?: boolean;
   doorPivot?: THREE.Group;
+  doorBaseRotation?: THREE.Euler;
   hingeSide?: 'left' | 'right' | 'top' | 'bottom';
   doorFacing?: 'front' | 'right' | 'back' | 'left';
   doorLocalMeshPos?: THREE.Vector3;
@@ -132,6 +134,8 @@ export interface WallSnapResult {
   deltaX: number;
   deltaZ: number;
   snappedWallType?: 'main' | 'side' | 'right_side' | 'corner' | 'right_corner' | string;
+  snappedWallId?: string;
+  suggestedFacing?: 'front' | 'right' | 'back' | 'left';
   contactGuide?: {
     mainWallContact?: {
       xStart: number;
@@ -157,6 +161,15 @@ export interface WallSnapResult {
   };
 }
 
+export interface WallToWallSnapGuide {
+  xStart: number;
+  zStart: number;
+  xEnd: number;
+  zEnd: number;
+  yMin: number;
+  yMax: number;
+}
+
 @Component({
   selector: 'app-furniture-3d-viewer',
   imports: [HugeiconsIconComponent],
@@ -173,6 +186,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private readonly ngZone = inject(NgZone);
   private readonly projectStorage = inject(ProjectStorageService);
   private joineryEngine = inject(JoineryEngineService);
+  private partGeometry = inject(PartGeometryService);
   readonly hardwareCatalog = inject(HardwareCatalogService);
   private appliance3dBuilder = inject(Appliance3dBuilderService);
   private spatialGuideBuilder = inject(SpatialReferenceGuideService);
@@ -349,7 +363,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   editModuleRequested = output<string>();
   hiddenPartsChanged = output<string[]>();
   showAllRequested = output<void>();
-  roomConfigModified = output<Partial<RoomConfiguration>>();
+  roomConfigModified = output<Partial<RoomConfiguration> & { recordHistory?: boolean }>();
   wallSelected = output<string | null>();
   readonly selectedWallType = signal<string | null>(null);
   applianceSelected = output<ApplianceItem | null>();
@@ -413,7 +427,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly hiddenHardwarePartIds = signal<Set<string>>(new Set<string>());
 
   // CAD Palette & Push/Pull State
-  readonly activeTool = signal<'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect' | 'draw_circle' | 'draw_freehand'>('select');
+  readonly activeTool = signal<'select' | 'move' | 'measure' | 'rotate_90'>('select');
   readonly pushPullDelta = signal<{ axisName: string; initialVal: number; currentVal: number; delta: number } | null>(null);
   readonly hoveredFaceInfo = signal<{ partName: string; faceLabel: string; dimLabel: string } | null>(null);
   readonly showViewsDropdown = signal<boolean>(false);
@@ -759,7 +773,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private materialCache = new Map<string, THREE.Material>();
   private geometryPool = new Map<string, THREE.BufferGeometry>();
   private readonly boundVisibilityChange = () => {
-    if (typeof document !== 'undefined' && !document.hidden) {
+    if (typeof document !== 'undefined' && !document.hidden && !this.isRenderingPaused) {
       this.requestRender(12);
     }
   };
@@ -838,6 +852,39 @@ export class Furniture3dViewerComponent implements OnDestroy {
   } | null = null;
   private initialWallLength = 0;
   private initialWallHeight = 0;
+  private pendingWallUpdates: { wallId: string; updates: Partial<RoomWallInstance> } | null = null;
+  private applianceMeshMap = new Map<string, THREE.Group>();
+  private badgeSpriteCache = new Map<string, { texture: THREE.CanvasTexture; material: THREE.SpriteMaterial }>();
+  private isRenderingPaused = false;
+  private lastSnappedWallResult: WallSnapResult | null = null;
+
+  public pauseRendering(): void {
+    this.isRenderingPaused = true;
+    this.cancelActiveInteractions();
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  public resumeRendering(): void {
+    if (!this.isRenderingPaused && this.animationFrameId !== null) return;
+    this.isRenderingPaused = false;
+    this.ngZone.runOutsideAngular(() => {
+      if (typeof requestAnimationFrame !== 'undefined') {
+        requestAnimationFrame(() => {
+          if (!this.isRenderingPaused) {
+            this.onResize();
+            this.requestRender(8);
+          }
+        });
+      }
+      if (this.animationFrameId === null) {
+        this.animate();
+      }
+    });
+    this.requestRender(8);
+  }
 
   // Appliance Direct Drag & 3D Resize State
   private isApplianceDragging = false;
@@ -1429,8 +1476,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         continue;
       }
 
-      const baseBounds = this.joineryEngine.getPartBounds(part);
-      const localDims = this.joineryEngine.getPartLocalDimensions(part);
+      const baseBounds = this.partGeometry.getWorldAABB(part);
+      const localDims = this.partGeometry.getLocalDimensions(part);
       const sx = baseBounds.sx;
       const sy = baseBounds.sy;
       const sz = baseBounds.sz;
@@ -1488,72 +1535,28 @@ export class Furniture3dViewerComponent implements OnDestroy {
         }
       }
 
-      // Geometry according to shapeType: circle, freehand, countertop with cutout holes, or pooled standard box
+      // Geometry according to shapeType: circle, extruded board (cuts/cutouts), or pooled standard box
       let geometry: THREE.BufferGeometry;
       let edges: THREE.EdgesGeometry;
       if (part.shapeType === 'circle') {
         const radius = part.radius || (part.diameter ? part.diameter / 2 : Math.max(10, (part.width || 600) / 2));
         const cylHeight = (part.length && part.length > part.thickness) ? part.length : (part.thickness || 15);
-        const cylKey = `piece_cyl_${radius}_${cylHeight}`;
-        geometry = this.getSharedGeometry(cylKey, () => new THREE.CylinderGeometry(radius, radius, cylHeight, 48));
+        const orient = part.orientation || 'horizontal';
+        const cylKey = `piece_cyl_${radius}_${cylHeight}_${orient}`;
+        geometry = this.getSharedGeometry(cylKey, () => {
+          const geo = new THREE.CylinderGeometry(radius, radius, cylHeight, 48);
+          if (orient === 'horizontal') {
+            geo.rotateZ(Math.PI / 2);
+          }
+          return geo;
+        });
         edges = this.getSharedGeometry(`${cylKey}_edges`, () => new THREE.EdgesGeometry(geometry));
       } else if (
+        part.cornerCutConfig ||
         (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) ||
         overlappingCutouts.length > 0
       ) {
-        const shape = new THREE.Shape();
-        const halfSX = localDims.sx / 2;
-        const halfSZ = localDims.sz / 2;
-
-        if (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) {
-          const pts = part.contourPoints;
-          let minPtX = Infinity, maxPtX = -Infinity, minPtY = Infinity, maxPtY = -Infinity;
-          for (const pt of pts) {
-            if (pt.x < minPtX) minPtX = pt.x;
-            if (pt.x > maxPtX) maxPtX = pt.x;
-            if (pt.y < minPtY) minPtY = pt.y;
-            if (pt.y > maxPtY) maxPtY = pt.y;
-          }
-          const midX = (minPtX + maxPtX) / 2;
-          const midY = (minPtY + maxPtY) / 2;
-
-          shape.moveTo(pts[0].x - midX, pts[0].y - midY);
-          for (let i = 1; i < pts.length; i++) {
-            shape.lineTo(pts[i].x - midX, pts[i].y - midY);
-          }
-          shape.closePath();
-        } else {
-          shape.moveTo(-halfSX, -halfSZ);
-          shape.lineTo(halfSX, -halfSZ);
-          shape.lineTo(halfSX, halfSZ);
-          shape.lineTo(-halfSX, halfSZ);
-          shape.closePath();
-        }
-
-        // Perforar huecos booleanos 2D (lavaplatos / estufas de empotrar)
-        for (const hole of overlappingCutouts) {
-          const hx0 = Math.max(-halfSX + 15, hole.localX - hole.holeW / 2);
-          const hx1 = Math.min(halfSX - 15, hole.localX + hole.holeW / 2);
-          const hz0 = Math.max(-halfSZ + 15, hole.localZ - hole.holeD / 2);
-          const hz1 = Math.min(halfSZ - 15, hole.localZ + hole.holeD / 2);
-          if (hx1 - hx0 > 40 && hz1 - hz0 > 40) {
-            const holePath = new THREE.Path();
-            holePath.moveTo(hx0, hz0);
-            holePath.lineTo(hx1, hz0);
-            holePath.lineTo(hx1, hz1);
-            holePath.lineTo(hx0, hz1);
-            holePath.closePath();
-            shape.holes.push(holePath);
-          }
-        }
-
-        const extrudeGeom = new THREE.ExtrudeGeometry(shape, {
-          depth: localDims.sy,
-          bevelEnabled: false
-        });
-        extrudeGeom.rotateX(Math.PI / 2);
-        extrudeGeom.translate(0, localDims.sy / 2, 0);
-        geometry = extrudeGeom;
+        geometry = this.partGeometry.buildExtrudedBoardGeometry(part, overlappingCutouts);
         edges = new THREE.EdgesGeometry(geometry);
       } else {
         const boxKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}`;
@@ -1631,6 +1634,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
           isInternalBoxPart);
 
       let doorPivot: THREE.Group | undefined;
+      let doorBaseRotation: THREE.Euler | undefined;
       let hingeSide: 'left' | 'right' | 'top' | 'bottom' = hw.openingDirection || 'left';
       let doorFacing: 'front' | 'right' | 'back' | 'left' = 'front';
       let doorLocalMeshPos: THREE.Vector3 | undefined;
@@ -1679,68 +1683,33 @@ export class Furniture3dViewerComponent implements OnDestroy {
         }
 
         doorPivot = new THREE.Group();
-        if (doorFacing === 'front') {
-          if (hingeSide === 'top') {
-            doorPivot.position.set(px, py + sy / 2, pz + sz / 2);
-            mesh.position.set(0, -sy / 2, -sz / 2);
-          } else if (hingeSide === 'bottom') {
-            doorPivot.position.set(px, py - sy / 2, pz + sz / 2);
-            mesh.position.set(0, sy / 2, -sz / 2);
-          } else if (hingeSide === 'right') {
-            doorPivot.position.set(px + sx / 2, py, pz + sz / 2);
-            mesh.position.set(-sx / 2, 0, -sz / 2);
-          } else {
-            hingeSide = 'left';
-            doorPivot.position.set(px - sx / 2, py, pz + sz / 2);
-            mesh.position.set(sx / 2, 0, -sz / 2);
-          }
-        } else if (doorFacing === 'back') {
-          if (hingeSide === 'top') {
-            doorPivot.position.set(px, py + sy / 2, pz - sz / 2);
-            mesh.position.set(0, -sy / 2, sz / 2);
-          } else if (hingeSide === 'bottom') {
-            doorPivot.position.set(px, py - sy / 2, pz - sz / 2);
-            mesh.position.set(0, sy / 2, sz / 2);
-          } else if (hingeSide === 'right') {
-            doorPivot.position.set(px - sx / 2, py, pz - sz / 2);
-            mesh.position.set(sx / 2, 0, sz / 2);
-          } else {
-            hingeSide = 'left';
-            doorPivot.position.set(px + sx / 2, py, pz - sz / 2);
-            mesh.position.set(-sx / 2, 0, sz / 2);
-          }
-        } else if (doorFacing === 'right') {
-          if (hingeSide === 'top') {
-            doorPivot.position.set(px + sx / 2, py + sy / 2, pz);
-            mesh.position.set(-sx / 2, -sy / 2, 0);
-          } else if (hingeSide === 'bottom') {
-            doorPivot.position.set(px + sx / 2, py - sy / 2, pz);
-            mesh.position.set(-sx / 2, sy / 2, 0);
-          } else if (hingeSide === 'right') {
-            doorPivot.position.set(px + sx / 2, py, pz - sz / 2);
-            mesh.position.set(-sx / 2, 0, sz / 2);
-          } else {
-            hingeSide = 'left';
-            doorPivot.position.set(px + sx / 2, py, pz + sz / 2);
-            mesh.position.set(-sx / 2, 0, -sz / 2);
-          }
+        const doorDimX = localDims.sx;
+        const doorDimY = localDims.sy;
+        const doorDimZ = localDims.sz;
+
+        const rx = THREE.MathUtils.degToRad(part.rotationX || 0);
+        const ry = THREE.MathUtils.degToRad(part.rotationY || 0);
+        const rz = THREE.MathUtils.degToRad(part.rotationZ || 0);
+        doorBaseRotation = new THREE.Euler(rx, ry, rz, 'XYZ');
+        const doorQuat = new THREE.Quaternion().setFromEuler(doorBaseRotation);
+
+        const localHingeOffset = new THREE.Vector3();
+        if (hingeSide === 'right') {
+          localHingeOffset.set(doorDimX / 2, 0, -doorDimZ / 2);
+        } else if (hingeSide === 'top') {
+          localHingeOffset.set(0, doorDimY / 2, -doorDimZ / 2);
+        } else if (hingeSide === 'bottom') {
+          localHingeOffset.set(0, -doorDimY / 2, -doorDimZ / 2);
         } else {
-          // doorFacing === 'left'
-          if (hingeSide === 'top') {
-            doorPivot.position.set(px - sx / 2, py + sy / 2, pz);
-            mesh.position.set(sx / 2, -sy / 2, 0);
-          } else if (hingeSide === 'bottom') {
-            doorPivot.position.set(px - sx / 2, py - sy / 2, pz);
-            mesh.position.set(sx / 2, sy / 2, 0);
-          } else if (hingeSide === 'right') {
-            doorPivot.position.set(px - sx / 2, py, pz + sz / 2);
-            mesh.position.set(sx / 2, 0, -sz / 2);
-          } else {
-            hingeSide = 'left';
-            doorPivot.position.set(px - sx / 2, py, pz - sz / 2);
-            mesh.position.set(sx / 2, 0, sz / 2);
-          }
+          localHingeOffset.set(-doorDimX / 2, 0, -doorDimZ / 2);
         }
+
+        const worldHingeOffset = localHingeOffset.clone().applyQuaternion(doorQuat);
+        doorPivot.position.set(px + worldHingeOffset.x, py + worldHingeOffset.y, pz + worldHingeOffset.z);
+        doorPivot.rotation.copy(doorBaseRotation);
+
+        mesh.position.set(-localHingeOffset.x, -localHingeOffset.y, -localHingeOffset.z);
+        mesh.rotation.set(0, 0, 0);
 
         doorLocalMeshPos = mesh.position.clone();
         doorPivotOriginalPos = doorPivot.position.clone();
@@ -1748,17 +1717,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
         if (shouldRenderHardware) {
           if (vis.showHandles) {
-            handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, true, hingeSide, doorFacing);
+            handleGroup = this.createHandleMesh(part, hw, doorDimX, doorDimY, doorDimZ, true, hingeSide, doorFacing);
             if (handleGroup) mesh.add(handleGroup);
           }
 
-          hingeGroup = this.createHingesMesh(part, hw, sx, sy, sz, hingeSide, doorFacing);
+          hingeGroup = this.createHingesMesh(part, hw, doorDimX, doorDimY, doorDimZ, hingeSide, doorFacing);
           if (hingeGroup) mesh.add(hingeGroup);
         }
 
         const curOpen = this.openCurrentMap.get(part.id) || 0;
         if (curOpen > 0) {
-          this.applyDoorPivotRotation(doorPivot, hingeSide, doorFacing, curOpen);
+          this.applyDoorPivotRotation(doorPivot, hingeSide, doorFacing, curOpen, doorBaseRotation);
         }
 
         this.furnitureGroup.add(doorPivot);
@@ -1784,11 +1753,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
         if (isDrawerFront && shouldRenderHardware) {
           if (vis.showHandles) {
-            handleGroup = this.createHandleMesh(part, hw, sx, sy, sz, false, 'top', drawerFacing);
+            handleGroup = this.createHandleMesh(part, hw, localDims.sx, localDims.sy, localDims.sz, false, 'top', drawerFacing);
             if (handleGroup) mesh.add(handleGroup);
           }
 
-          slideGroup = this.createDrawerSlidesMesh(part, hw, sx, sy, sz, drawerFacing);
+          slideGroup = this.createDrawerSlidesMesh(part, hw, localDims.sx, localDims.sy, localDims.sz, drawerFacing);
           if (slideGroup) mesh.add(slideGroup);
         }
 
@@ -1815,6 +1784,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         isDoor,
         isDrawer,
         doorPivot,
+        doorBaseRotation,
         hingeSide,
         doorFacing,
         doorLocalMeshPos,
@@ -1858,23 +1828,22 @@ export class Furniture3dViewerComponent implements OnDestroy {
     doorPivot: THREE.Group,
     hingeSide: 'left' | 'right' | 'top' | 'bottom',
     doorFacing: 'front' | 'right' | 'back' | 'left',
-    cur: number
+    cur: number,
+    baseRotation?: THREE.Euler
   ) {
-    doorPivot.rotation.set(0, 0, 0);
+    if (baseRotation) {
+      doorPivot.rotation.copy(baseRotation);
+    } else {
+      doorPivot.rotation.set(0, 0, 0);
+    }
     if (hingeSide === 'left') {
-      doorPivot.rotation.y = -cur * (Math.PI / 2.05);
+      doorPivot.rotateY(-cur * (Math.PI / 2.05));
     } else if (hingeSide === 'right') {
-      doorPivot.rotation.y = cur * (Math.PI / 2.05);
+      doorPivot.rotateY(cur * (Math.PI / 2.05));
     } else if (hingeSide === 'top') {
-      if (doorFacing === 'front') doorPivot.rotation.x = -cur * (Math.PI / 2.2);
-      else if (doorFacing === 'back') doorPivot.rotation.x = cur * (Math.PI / 2.2);
-      else if (doorFacing === 'right') doorPivot.rotation.z = cur * (Math.PI / 2.2);
-      else doorPivot.rotation.z = -cur * (Math.PI / 2.2);
+      doorPivot.rotateX(-cur * (Math.PI / 2.2));
     } else if (hingeSide === 'bottom') {
-      if (doorFacing === 'front') doorPivot.rotation.x = cur * (Math.PI / 2.2);
-      else if (doorFacing === 'back') doorPivot.rotation.x = -cur * (Math.PI / 2.2);
-      else if (doorFacing === 'right') doorPivot.rotation.z = -cur * (Math.PI / 2.2);
-      else doorPivot.rotation.z = cur * (Math.PI / 2.2);
+      doorPivot.rotateX(cur * (Math.PI / 2.2));
     }
   }
   /**
@@ -1882,80 +1851,33 @@ export class Furniture3dViewerComponent implements OnDestroy {
    * ('posX' | 'posY' | 'posZ') corresponden al Largo (length), Ancho (width) y Espesor (thickness) de la pieza.
    */
   private getPartStretchAxesConfig(part: Part): PartStretchAxesConfig {
-    const orient = part.orientation || 'horizontal';
-    const L = part.length || 0;
-    const W = part.width || 0;
+    const stretchWorld = this.partGeometry.getStretchAxesInWorld(part);
 
-    if (orient === 'horizontal') {
-      return {
-        lengthAxis: 'x',
-        lengthPosAxis: 'posX',
-        widthAxis: 'z',
-        widthPosAxis: 'posZ',
-        thicknessAxis: 'y'
-      };
-    }
+    const getDominantAxis = (vec: THREE.Vector3): 'x' | 'y' | 'z' => {
+      const ax = Math.abs(vec.x);
+      const ay = Math.abs(vec.y);
+      const az = Math.abs(vec.z);
+      if (ax >= ay && ax >= az) return 'x';
+      if (ay >= ax && ay >= az) return 'y';
+      return 'z';
+    };
 
-    if (orient === 'vertical_yz') {
-      const isBacksplash = part.componentRole === 'backsplash' ||
-                            part.name.toUpperCase().includes('SALPICADERO');
-      const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
-                            part.name.toUpperCase().includes('ZOCALO') ||
-                            part.name.toUpperCase().includes('ZÓCALO'));
-      const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' ||
-                            part.componentRole === 'side_right' ||
-                            (part.name.toUpperCase().includes('LATERAL') &&
-                             !part.name.toUpperCase().includes('CAJ') &&
-                             part.componentRole !== 'drawer_box' &&
-                             part.componentRole !== 'drawer_lateral'));
-      const isDrawerLateral = !isBacksplash && !isCabinetSide && (
-        part.componentRole === 'drawer_box' ||
-        part.componentRole === 'drawer_lateral' ||
-        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
-      );
+    const lengthAxis = getDominantAxis(stretchWorld.lengthAxisWorld);
+    const widthAxis = getDominantAxis(stretchWorld.widthAxisWorld);
+    const thicknessAxis = getDominantAxis(stretchWorld.thicknessAxisWorld);
 
-      if ((isPlinth || isDrawerLateral || isBacksplash) && L > W) {
-        return {
-          lengthAxis: 'z',
-          lengthPosAxis: 'posZ',
-          widthAxis: 'y',
-          widthPosAxis: 'posY',
-          thicknessAxis: 'x'
-        };
-      }
-      return {
-        lengthAxis: 'y',
-        lengthPosAxis: 'posY',
-        widthAxis: 'z',
-        widthPosAxis: 'posZ',
-        thicknessAxis: 'x'
-      };
-    }
-
-    // orient === 'vertical_xy'
-    const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
-      !part.name.toUpperCase().includes('CAJ');
-    const isDrawerFront = part.componentRole === 'drawer_front';
-    const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
-      part.name.toUpperCase().includes('CONTRA') ||
-      part.name.toUpperCase().includes('TRASERA');
-
-    if (!isDrawerBoxHead && part.componentRole !== 'door' && ((isDoor && L > W) || (isDrawerFront && W > L))) {
-      return {
-        lengthAxis: 'y',
-        lengthPosAxis: 'posY',
-        widthAxis: 'x',
-        widthPosAxis: 'posX',
-        thicknessAxis: 'z'
-      };
-    }
+    const axisToPosProp: Record<'x' | 'y' | 'z', 'posX' | 'posY' | 'posZ'> = {
+      x: 'posX',
+      y: 'posY',
+      z: 'posZ'
+    };
 
     return {
-      lengthAxis: 'x',
-      lengthPosAxis: 'posX',
-      widthAxis: 'y',
-      widthPosAxis: 'posY',
-      thicknessAxis: 'z'
+      lengthAxis,
+      lengthPosAxis: axisToPosProp[lengthAxis],
+      widthAxis,
+      widthPosAxis: axisToPosProp[widthAxis],
+      thicknessAxis
     };
   }
 
@@ -2380,7 +2302,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
    * Ejecutado estrictamente fuera de NgZone y sin instanciar vectores en memoria (Zero-Allocation).
    */
   private onCanvasWheel(e: WheelEvent) {
-    if (!this.controls || !this.controls.enabled || !this.camera) return;
+    if (this.isRenderingPaused || !this.controls || !this.controls.enabled || !this.camera) return;
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -3001,11 +2923,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     // 3. Compact Floating Label Sprite
     const labelText = `${labelPrefix} · ${candidate.objectName}`;
-    const canvas = document.createElement('canvas');
-    canvas.width = 250;
-    canvas.height = 48;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
+    const spriteMat = this.getCachedBadgeMaterial(`snap_label_${colorCss}_${labelText}`, 250, 48, (ctx) => {
       ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
       ctx.beginPath();
       ctx.roundRect(0, 0, 250, 48, 10);
@@ -3019,9 +2937,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(labelText, 125, 24);
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+    });
     const sprite = new THREE.Sprite(spriteMat);
     sprite.position.set(0, 16, 0);
     sprite.scale.set(62, 14, 1);
@@ -3344,11 +3260,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         textColor = '#93c5fd';
       }
 
-      const canvas = document.createElement('canvas');
-      canvas.width = 200;
-      canvas.height = 48;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
+      const spriteMat = this.getCachedBadgeMaterial(`measure_${strokeColor}_${badgeText}`, 200, 48, (ctx) => {
         ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
         ctx.beginPath();
         ctx.roundRect(0, 0, 200, 48, 10);
@@ -3362,9 +3274,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(badgeText, 100, 24);
-      }
-      const texture = new THREE.CanvasTexture(canvas);
-      const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+      });
       const sprite = new THREE.Sprite(spriteMat);
       sprite.position.copy(mid);
       sprite.scale.set(60, 16, 1);
@@ -3664,9 +3574,7 @@ private createHandleMesh(
       head.position.set(0, 0, 4);
 
       group.add(stem, head);
-    } else if (handleType === 'profile_gola') {
-      // Perfil Gola retirado por solicitud del usuario
-      return group;
+
     } else if (handleType === 'cup_vintage') {
       const cupBack = new THREE.Mesh(new THREE.BoxGeometry(96, 36, 4), handleMat);
       cupBack.position.set(0, 0, -10);
@@ -3683,77 +3591,23 @@ private createHandleMesh(
     if (isDoor) {
       const margin = 45;
       const isVerticalBar = handleType === 'bar_modern' || handleType === 'bar_black';
-      if (drawerFacing === 'front') {
-        group.rotation.set(0, 0, 0);
-        if (hingeSide === 'left') {
-          group.position.set(sx / 2 - margin, 0, sz / 2 + 15);
-        } else if (hingeSide === 'right') {
-          group.position.set(-sx / 2 + margin, 0, sz / 2 + 15);
-        } else if (hingeSide === 'top') {
-          if (isVerticalBar) group.rotation.z = Math.PI / 2;
-          group.position.set(0, -sy / 2 + margin, sz / 2 + 15);
-        } else {
-          if (isVerticalBar) group.rotation.z = Math.PI / 2;
-          group.position.set(0, sy / 2 - margin, sz / 2 + 15);
-        }
-      } else if (drawerFacing === 'back') {
-        group.rotation.set(0, Math.PI, 0);
-        if (hingeSide === 'left') {
-          group.position.set(-sx / 2 + margin, 0, -sz / 2 - 15);
-        } else if (hingeSide === 'right') {
-          group.position.set(sx / 2 - margin, 0, -sz / 2 - 15);
-        } else if (hingeSide === 'top') {
-          if (isVerticalBar) group.rotateZ(Math.PI / 2);
-          group.position.set(0, -sy / 2 + margin, -sz / 2 - 15);
-        } else {
-          if (isVerticalBar) group.rotateZ(Math.PI / 2);
-          group.position.set(0, sy / 2 - margin, -sz / 2 - 15);
-        }
-      } else if (drawerFacing === 'right') {
-        group.rotation.set(0, Math.PI / 2, 0);
-        if (hingeSide === 'left') {
-          group.position.set(sx / 2 + 15, 0, -sz / 2 + margin);
-        } else if (hingeSide === 'right') {
-          group.position.set(sx / 2 + 15, 0, sz / 2 - margin);
-        } else if (hingeSide === 'top') {
-          if (isVerticalBar) group.rotateZ(Math.PI / 2);
-          group.position.set(sx / 2 + 15, -sy / 2 + margin, 0);
-        } else {
-          if (isVerticalBar) group.rotateZ(Math.PI / 2);
-          group.position.set(sx / 2 + 15, sy / 2 - margin, 0);
-        }
+      group.rotation.set(0, 0, 0);
+      if (hingeSide === 'left') {
+        group.position.set(sx / 2 - margin, 0, sz / 2 + 15);
+      } else if (hingeSide === 'right') {
+        group.position.set(-sx / 2 + margin, 0, sz / 2 + 15);
+      } else if (hingeSide === 'top') {
+        if (isVerticalBar) group.rotation.z = Math.PI / 2;
+        group.position.set(0, -sy / 2 + margin, sz / 2 + 15);
       } else {
-        group.rotation.set(0, -Math.PI / 2, 0);
-        if (hingeSide === 'left') {
-          group.position.set(-sx / 2 - 15, 0, sz / 2 - margin);
-        } else if (hingeSide === 'right') {
-          group.position.set(-sx / 2 - 15, 0, -sz / 2 + margin);
-        } else if (hingeSide === 'top') {
-          if (isVerticalBar) group.rotateZ(Math.PI / 2);
-          group.position.set(-sx / 2 - 15, -sy / 2 + margin, 0);
-        } else {
-          if (isVerticalBar) group.rotateZ(Math.PI / 2);
-          group.position.set(-sx / 2 - 15, sy / 2 - margin, 0);
-        }
+        if (isVerticalBar) group.rotation.z = Math.PI / 2;
+        group.position.set(0, sy / 2 - margin, sz / 2 + 15);
       }
     } else {
-      // Tirador de Cajón en las 4 direcciones (solo las barras verticales se giran 90° en Z)
+      // Tirador de Cajón en coordenadas locales del frente (cara frontal en +sz / 2)
       const isVerticalBar = handleType === 'bar_modern' || handleType === 'bar_black';
-      if (drawerFacing === 'front') {
-        group.position.set(0, 0, sz / 2 + 15);
-        group.rotation.set(0, 0, isVerticalBar ? Math.PI / 2 : 0);
-      } else if (drawerFacing === 'back') {
-        group.position.set(0, 0, -sz / 2 - 15);
-        group.rotation.set(0, Math.PI, isVerticalBar ? Math.PI / 2 : 0);
-      } else if (drawerFacing === 'right') {
-        group.position.set(sx / 2 + 15, 0, 0);
-        group.rotation.set(0, Math.PI / 2, 0);
-        if (isVerticalBar) group.rotateZ(Math.PI / 2);
-      } else {
-        group.position.set(-sx / 2 - 15, 0, 0);
-        group.rotation.set(0, -Math.PI / 2, 0);
-        if (isVerticalBar) group.rotateZ(Math.PI / 2);
-      }
+      group.position.set(0, 0, sz / 2 + 15);
+      group.rotation.set(0, 0, isVerticalBar ? Math.PI / 2 : 0);
     }
 
     group.traverse(child => {
@@ -3778,9 +3632,8 @@ private createHandleMesh(
     const group = new THREE.Group();
     if (hw.hingeType === 'none') return group;
 
-    const isSideFacing = doorFacing === 'right' || doorFacing === 'left';
-    const doorW = isSideFacing ? sz : sx;
-    const doorT = isSideFacing ? sx : sz;
+    const doorW = sx;
+    const doorT = sz;
 
     const hingeMat = this.getSharedMaterial(
       'hw_hinge_steel',
@@ -3841,14 +3694,6 @@ private createHandleMesh(
         singleHinge.position.set(hingeX, hy, 0);
         group.add(singleHinge);
       }
-    }
-
-    if (doorFacing === 'back') {
-      group.rotation.y = Math.PI;
-    } else if (doorFacing === 'right') {
-      group.rotation.y = Math.PI / 2;
-    } else if (doorFacing === 'left') {
-      group.rotation.y = -Math.PI / 2;
     }
 
     group.traverse(child => {
@@ -4563,18 +4408,26 @@ private createHandleMesh(
     }
 
     const texType = assignedMat?.textureType || 'solid';
+    const grain = part.grain || 'length';
+    const isLowSpec = this.isPerformanceMode();
+    const cacheKey = `piece_std_${colorHex}_${texType}_${grain}_${isLowSpec ? 'low' : 'hi'}`;
     return this.getSharedMaterial(
-      `piece_std_${colorHex}_${texType}`,
+      cacheKey,
       () => {
         let textureMap: THREE.CanvasTexture | null = null;
-        if (typeof document !== 'undefined' && (texType === 'wood' || texType === 'stone')) {
-          textureMap = this.getProceduralTexture(colorHex, texType);
+        if (typeof document !== 'undefined' && texType !== 'solid') {
+          textureMap = ProceduralTextureFactory.getBoardTexture(
+            colorHex,
+            texType,
+            grain,
+            isLowSpec
+          );
         }
         return new THREE.MeshStandardMaterial({
           color: new THREE.Color(colorHex),
           map: textureMap,
-          roughness: texType === 'wood' ? 0.65 : (texType === 'stone' ? 0.25 : 0.4),
-          metalness: texType === 'stone' ? 0.1 : 0.05
+          roughness: texType === 'wood' ? 0.65 : (texType === 'stone' ? 0.25 : (texType === 'gloss' ? 0.08 : 0.4)),
+          metalness: texType === 'stone' ? 0.1 : (texType === 'gloss' ? 0.15 : 0.05)
         });
       }
     );
@@ -4582,50 +4435,12 @@ private createHandleMesh(
 
   private textureCache = new Map<string, THREE.CanvasTexture>();
 
-  private getProceduralTexture(colorHex: string, type: 'wood' | 'stone'): THREE.CanvasTexture {
-    const key = `${type}_${colorHex}`;
-    const cached = this.textureCache.get(key);
-    if (cached) return cached;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return new THREE.CanvasTexture(canvas);
-
-    ctx.fillStyle = colorHex;
-    ctx.fillRect(0, 0, 256, 256);
-
-    if (type === 'wood') {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-      for (let i = 0; i < 256; i += 6) {
-        ctx.fillRect(0, i, 256, 1.5 + (i % 3));
-      }
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-      for (let i = 3; i < 256; i += 8) {
-        ctx.fillRect(0, i, 256, 1);
-      }
-    } else if (type === 'stone') {
-      ctx.strokeStyle = colorHex.toLowerCase() === '#262626' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(10, 30);
-      ctx.bezierCurveTo(80, 100, 160, 40, 240, 180);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(30, 150);
-      ctx.bezierCurveTo(110, 190, 180, 130, 230, 230);
-      ctx.stroke();
-    }
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(2, 2);
-    tex.userData = { ...(tex.userData || {}), isShared: true };
-    this.textureCache.set(key, tex);
-    return tex;
+  private getProceduralTexture(
+    colorHex: string,
+    type: 'wood' | 'linen' | 'gloss' | 'stone' | 'wpc' | 'subtle' = 'wood',
+    grain: 'length' | 'width' | 'none' = 'length'
+  ): THREE.CanvasTexture {
+    return ProceduralTextureFactory.getBoardTexture(colorHex, type, grain, this.isPerformanceMode());
   }
 
   // Draw 3D dimension lines and text sprites matching reference image
@@ -4725,73 +4540,86 @@ private createHandleMesh(
     this.updateAdaptiveGizmoScale();
   }
 
-  // Generates 3D billboard sprite with high-res text (cached in materialCache / textureCache to avoid per-frame allocations)
+  // Generates 3D billboard sprite with high-res text (cached in badgeSpriteCache LRU to avoid allocations and leaks)
   private createTextSprite(text: string): THREE.Sprite {
-    const cacheKey = `dim_sprite_mat_${text}`;
-    let spriteMat = this.materialCache.get(cacheKey) as THREE.SpriteMaterial | undefined;
+    const spriteMat = this.getCachedBadgeMaterial(`dim_sprite_${text}`, 256, 80, (ctx) => {
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 3;
+      const r = 16;
+      ctx.beginPath();
+      ctx.moveTo(r, 4);
+      ctx.lineTo(256 - r, 4);
+      ctx.quadraticCurveTo(256 - 4, 4, 256 - 4, r);
+      ctx.lineTo(256 - 4, 80 - r);
+      ctx.quadraticCurveTo(256 - 4, 80 - 4, 256 - r, 80 - 4);
+      ctx.lineTo(r, 80 - 4);
+      ctx.quadraticCurveTo(4, 80 - 4, 4, 80 - r);
+      ctx.lineTo(4, r);
+      ctx.quadraticCurveTo(4, 4, r, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-    if (!spriteMat) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 80;
-      const ctx = canvas.getContext('2d');
-
-      if (ctx) {
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-        ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 3;
-        const r = 16;
-        ctx.beginPath();
-        ctx.moveTo(r, 4);
-        ctx.lineTo(256 - r, 4);
-        ctx.quadraticCurveTo(256 - 4, 4, 256 - 4, r);
-        ctx.lineTo(256 - 4, 80 - r);
-        ctx.quadraticCurveTo(256 - 4, 80 - 4, 256 - r, 80 - 4);
-        ctx.lineTo(r, 80 - 4);
-        ctx.quadraticCurveTo(4, 80 - 4, 4, 80 - r);
-        ctx.lineTo(4, r);
-        ctx.quadraticCurveTo(4, 4, r, 4);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 30px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(text, 128, 42);
-      }
-
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearFilter;
-      texture.userData = { isShared: true };
-      spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
-      spriteMat.userData = { isShared: true };
-
-      if (this.textureCache.size > 300) {
-        const oldestKey = this.textureCache.keys().next().value;
-        if (oldestKey && oldestKey.startsWith('dim_')) {
-          this.textureCache.get(oldestKey)?.dispose();
-          this.textureCache.delete(oldestKey);
-        }
-      }
-      this.textureCache.set(`dim_tex_${text}`, texture);
-      this.materialCache.set(cacheKey, spriteMat);
-    }
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 30px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 128, 42);
+    });
 
     const sprite = new THREE.Sprite(spriteMat);
     sprite.scale.set(130, 42, 1);
     return sprite;
   }
 
+  private getCachedBadgeMaterial(
+    cacheKey: string,
+    width: number,
+    height: number,
+    drawFn: (ctx: CanvasRenderingContext2D) => void
+  ): THREE.SpriteMaterial {
+    const existing = this.badgeSpriteCache.get(cacheKey);
+    if (existing) {
+      this.badgeSpriteCache.delete(cacheKey);
+      this.badgeSpriteCache.set(cacheKey, existing);
+      return existing.material;
+    }
+
+    if (this.badgeSpriteCache.size >= 80) {
+      const oldestKey = this.badgeSpriteCache.keys().next().value;
+      if (oldestKey) {
+        const item = this.badgeSpriteCache.get(oldestKey);
+        item?.texture.dispose();
+        item?.material.dispose();
+        this.badgeSpriteCache.delete(oldestKey);
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      drawFn(ctx);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.userData = { isShared: true };
+    const mat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false
+    });
+    mat.userData = { isShared: true };
+    this.badgeSpriteCache.set(cacheKey, { texture, material: mat });
+    return mat;
+  }
+
   // Generates Emerald Green 3D billboard sprite for Clearance Dimensions (Luz Libre)
   private createClearanceSprite(text: string): THREE.Sprite {
-    const canvas = document.createElement('canvas');
-    canvas.width = 280;
-    canvas.height = 80;
-    const ctx = canvas.getContext('2d');
-
-    if (ctx) {
+    const mat = this.getCachedBadgeMaterial(`clearance_${text}`, 280, 80, (ctx) => {
       ctx.fillStyle = 'rgba(6, 78, 59, 0.95)'; // emerald-900 glass
       ctx.strokeStyle = '#10b981'; // emerald-500
       ctx.lineWidth = 3.5;
@@ -4815,12 +4643,9 @@ private createHandleMesh(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, 140, 42);
-    }
+    });
 
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
-    const sprite = new THREE.Sprite(spriteMat);
+    const sprite = new THREE.Sprite(mat);
     sprite.scale.set(140, 42, 1);
     return sprite;
   }
@@ -5048,7 +4873,10 @@ private createHandleMesh(
         const targetPos = item.originalPos
           .clone()
           .addScaledVector(item.explodedOffset, factor);
-        targetPos.z += curOpen * 280;
+        const axis = item.slideAxis || 'z';
+        const dir = item.slideDir || 1;
+        const maxSlide = 320;
+        targetPos[axis] += curOpen * maxSlide * dir;
         item.mesh.position.copy(targetPos);
       } else {
         const targetPos = item.originalPos
@@ -5164,7 +4992,7 @@ private createHandleMesh(
   // Pointer Down: Detect clicks on Gizmo controls vs Pieces vs Empty space vs Measurement picking
   private onPointerDown(e: PointerEvent) {
     const canvas = this.canvasRef()?.nativeElement;
-    if (!canvas || !this.camera) return;
+    if (this.isRenderingPaused || !canvas || !this.camera) return;
 
     // Close open context menu on canvas interaction
     if (this.contextMenuPos()) {
@@ -5275,80 +5103,6 @@ private createHandleMesh(
       }
     }
 
-    // 0.2. Draw 3D Rectangle Tool
-    if (this.activeTool() === 'draw_rect') {
-      const allFloorAndParts = [
-        ...(this.floorMesh ? [this.floorMesh] : []),
-        ...this.raycastablePieceMeshes
-      ];
-      const floorIntersects = this.raycaster.intersectObjects(allFloorAndParts, false);
-      if (floorIntersects.length > 0) {
-        const pt = floorIntersects[0].point;
-        const snap = 10;
-        this.rectStartPoint = new THREE.Vector3(
-          Math.round(pt.x / snap) * snap,
-          Math.round(pt.y),
-          Math.round(pt.z / snap) * snap
-        );
-        this.rectCurrentPoint = this.rectStartPoint.clone();
-        this.isDrawingRect.set(true);
-        this.controls.enabled = false;
-        canvas.style.cursor = 'crosshair';
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-    }
-
-    // 0.21. Draw 3D Circle Tool
-    if (this.activeTool() === 'draw_circle') {
-      const allFloorAndParts = [
-        ...(this.floorMesh ? [this.floorMesh] : []),
-        ...this.raycastablePieceMeshes
-      ];
-      const floorIntersects = this.raycaster.intersectObjects(allFloorAndParts, false);
-      if (floorIntersects.length > 0) {
-        const pt = floorIntersects[0].point;
-        const snap = 10;
-        this.circleCenterPoint = new THREE.Vector3(
-          Math.round(pt.x / snap) * snap,
-          Math.round(pt.y),
-          Math.round(pt.z / snap) * snap
-        );
-        this.circleCurrentPoint = this.circleCenterPoint.clone();
-        this.isDrawingCircle.set(true);
-        this.controls.enabled = false;
-        canvas.style.cursor = 'crosshair';
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-    }
-
-    // 0.22. Draw Freehand (Dibujo Libre) Tool
-    if (this.activeTool() === 'draw_freehand') {
-      const allFloorAndParts = [
-        ...(this.floorMesh ? [this.floorMesh] : []),
-        ...this.raycastablePieceMeshes
-      ];
-      const floorIntersects = this.raycaster.intersectObjects(allFloorAndParts, false);
-      if (floorIntersects.length > 0) {
-        const pt = floorIntersects[0].point;
-        this.freehandPlaneY = Math.round(pt.y);
-        this.freehandPoints = [
-          new THREE.Vector3(Math.round(pt.x), this.freehandPlaneY, Math.round(pt.z))
-        ];
-        this.isDrawingFreehand.set(true);
-        this.controls.enabled = false;
-        this.freehandStats.set({ pointCount: 1, perimeter: 0 });
-        this.renderFreehandPreview();
-        canvas.style.cursor = 'crosshair';
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-    }
-
     // 0.3. Rotate 90° Tool
     if (this.activeTool() === 'rotate_90') {
       const intersects = this.raycaster.intersectObjects(
@@ -5388,156 +5142,6 @@ private createHandleMesh(
       }
     }
 
-    // 0.5. Push/Pull (Empujar / Tirar) Tool
-    if (this.activeTool() === 'push_pull') {
-      const intersects = this.raycaster.intersectObjects(
-        this.raycastablePieceMeshes,
-        false
-      );
-      if (intersects.length > 0) {
-        const hit = intersects[0];
-        if (!hit.face) return;
-        const mesh = hit.object as THREE.Mesh;
-        const part = mesh.userData['part'] as Part;
-
-        // Si la pieza o su grupo están congelados, impedir estirarla con Empujar/Tirar
-        if (this.isPartOrGroupLocked(part)) {
-          this.ngZone.run(() => {
-            this.partsSelected.emit([part.id]);
-            this.partSelected.emit(part);
-          });
-          canvas.style.cursor = 'not-allowed';
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-
-        const faceNormal = hit.face.normal.clone();
-
-        const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
-        const worldNormal = faceNormal.clone().applyMatrix3(normalMatrix).normalize();
-
-        const absX = Math.abs(worldNormal.x);
-        const absY = Math.abs(worldNormal.y);
-        const absZ = Math.abs(worldNormal.z);
-
-        let axis: 'x' | 'y' | 'z' = 'x';
-        let dir = 1;
-        if (absY >= absX && absY >= absZ) {
-          axis = 'y';
-          dir = worldNormal.y > 0 ? 1 : -1;
-        } else if (absX >= absY && absX >= absZ) {
-          axis = 'x';
-          dir = worldNormal.x > 0 ? 1 : -1;
-        } else {
-          axis = 'z';
-          dir = worldNormal.z > 0 ? 1 : -1;
-        }
-
-        const orient = part.orientation || 'horizontal';
-        let targetDim: 'length' | 'width' | 'thickness' = 'length';
-        let posAxis: 'posX' | 'posY' | 'posZ' = 'posX';
-        let axisName = 'Largo';
-
-        if (orient === 'horizontal') {
-          if (axis === 'x') {
-            targetDim = 'length';
-            posAxis = 'posX';
-            axisName = 'Largo';
-          } else if (axis === 'z') {
-            targetDim = 'width';
-            posAxis = 'posZ';
-            axisName = 'Ancho';
-          } else {
-            targetDim = 'thickness';
-            posAxis = 'posY';
-            axisName = 'Espesor';
-          }
-        } else if (orient === 'vertical_yz') {
-          const isBacksplash = part.componentRole === 'backsplash' || part.name.toUpperCase().includes('SALPICADERO');
-          if (axis === 'y') {
-            targetDim = isBacksplash ? 'width' : 'length';
-            posAxis = 'posY';
-            axisName = 'Alto';
-          } else if (axis === 'z') {
-            targetDim = isBacksplash ? 'length' : 'width';
-            posAxis = 'posZ';
-            axisName = isBacksplash ? 'Largo' : 'Fondo';
-          } else {
-            targetDim = 'thickness';
-            posAxis = 'posX';
-            axisName = 'Espesor';
-          }
-        } else {
-          if (axis === 'x') {
-            targetDim = 'length';
-            posAxis = 'posX';
-            axisName = 'Largo';
-          } else if (axis === 'y') {
-            targetDim = 'width';
-            posAxis = 'posY';
-            axisName = 'Alto';
-          } else {
-            targetDim = 'thickness';
-            posAxis = 'posZ';
-            axisName = 'Espesor';
-          }
-        }
-
-        this.isPushPulling = true;
-        this.liveDragPartUpdates.clear();
-        this.controls.enabled = false;
-        this.ngZone.run(() => {
-          this.dragStarted.emit();
-          this.partsSelected.emit([part.id]);
-          this.partSelected.emit(part);
-        });
-
-        const initialDim = targetDim === 'thickness'
-          ? (part.thickness || 18)
-          : (targetDim === 'length' ? part.length : part.width);
-        const initialPos = (part[posAxis] ?? 0);
-
-        const axisVector = new THREE.Vector3();
-        if (axis === 'x') axisVector.set(1, 0, 0);
-        else if (axis === 'y') axisVector.set(0, 1, 0);
-        else axisVector.set(0, 0, 1);
-
-        this.pushPullData = {
-          part: { ...part },
-          targetDim,
-          posAxis,
-          dir,
-          initialDim,
-          initialPos,
-          axisVector,
-          normalVector: worldNormal,
-          faceCenter: hit.point.clone()
-        };
-
-        const camDir = new THREE.Vector3();
-        this.camera.getWorldDirection(camDir);
-        this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hit.point);
-
-        const intersectPoint = new THREE.Vector3();
-        if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
-          this.dragPlaneIntersectionStart.copy(intersectPoint);
-        }
-
-        this.pushPullDelta.set({
-          axisName,
-          initialVal: initialDim,
-          currentVal: initialDim,
-          delta: 0
-        });
-
-        canvas.style.cursor = 'grabbing';
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-    }
-
     // 0.8 Check if clicking on Wall Gizmo (Axis translation arrow, Edge stretch handle or Top Height handle)
     if (this.workspaceMode() === 'room' && this.wallGizmoHitMeshes.length > 0) {
       const wallGizmoIntersects = this.raycaster.intersectObjects(this.wallGizmoHitMeshes, true);
@@ -5567,6 +5171,13 @@ private createHandleMesh(
           this.initialWallPosZ = targetWall.posZ;
           this.initialWallLength = targetWall.length;
           this.initialWallHeight = targetWall.height;
+          this.dragPlane.set(new THREE.Vector3(0, 1, 0), 0);
+          const startHit = new THREE.Vector3();
+          if (this.raycaster.ray.intersectPlane(this.dragPlane, startHit)) {
+            this.dragPlaneIntersectionStart.copy(startHit);
+          } else {
+            this.dragPlaneIntersectionStart.set(targetWall.posX, 0, targetWall.posZ);
+          }
           this.controls.enabled = false;
           canvas.style.cursor = hitData.type === 'wall_stretch_height'
             ? 'ns-resize'
@@ -5957,6 +5568,13 @@ private createHandleMesh(
             this.dragStartPointer = { x: e.clientX, y: e.clientY };
             this.initialWallPosX = targetWall.posX;
             this.initialWallPosZ = targetWall.posZ;
+            this.dragPlane.set(new THREE.Vector3(0, 1, 0), 0);
+            const startHit = new THREE.Vector3();
+            if (this.raycaster.ray.intersectPlane(this.dragPlane, startHit)) {
+              this.dragPlaneIntersectionStart.copy(startHit);
+            } else {
+              this.dragPlaneIntersectionStart.set(targetWall.posX, 0, targetWall.posZ);
+            }
             this.controls.enabled = false;
             if (canvas) canvas.style.cursor = 'move';
           } else {
@@ -5978,7 +5596,7 @@ private createHandleMesh(
     // Pointer Move: Dragging Gizmo, Push/Pulling, Drawing Rect or Updating Hover Cursors
   private onPointerMove(e: PointerEvent) {
     const canvas = this.canvasRef()?.nativeElement;
-    if (!canvas || !this.camera) return;
+    if (this.isRenderingPaused || !canvas || !this.camera) return;
 
     // Si estamos en modo de selección múltiple por ventana (Shift + arrastre)
     if (this.isMarqueeSelecting) {
@@ -6227,13 +5845,22 @@ private createHandleMesh(
         return;
       }
 
-      const dx = (e.clientX - this.dragStartPointer.x) * 1.5;
-      const dy = (e.clientY - this.dragStartPointer.y) * 1.5;
-      const camAngle = this.controls.getAzimuthalAngle();
-      const sin = Math.sin(camAngle);
-      const cos = Math.cos(camAngle);
-      const moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
-      const moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
+      let moveX = 0;
+      let moveZ = 0;
+      if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
+        const deltaX = this.scratchCurrentIntersection.x - this.dragPlaneIntersectionStart.x;
+        const deltaZ = this.scratchCurrentIntersection.z - this.dragPlaneIntersectionStart.z;
+        moveX = Math.round(deltaX / 50) * 50;
+        moveZ = Math.round(deltaZ / 50) * 50;
+      } else {
+        const dx = (e.clientX - this.dragStartPointer.x) * 1.5;
+        const dy = (e.clientY - this.dragStartPointer.y) * 1.5;
+        const camAngle = this.controls.getAzimuthalAngle();
+        const sin = Math.sin(camAngle);
+        const cos = Math.cos(camAngle);
+        moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
+        moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
+      }
 
       let candX = this.initialWallPosX + moveX;
       let candZ = this.initialWallPosZ + moveZ;
@@ -6262,7 +5889,9 @@ private createHandleMesh(
         this.clearWallSnapGuides();
       }
 
-      this.updateSingleWall(activeWall.id, { posX: candX, posZ: candZ });
+      this.updateLiveWallTransform(activeWall.id, candX, candZ);
+      this.pendingWallUpdates = { wallId: activeWall.id, updates: { posX: candX, posZ: candZ } };
+      this.requestRender(2);
       return;
     }
 
@@ -6287,13 +5916,23 @@ private createHandleMesh(
       const floorD = cfg.floorDepth || 5000;
 
       if (hit.type === 'wall_move') {
+        let moveX = 0;
+        let moveZ = 0;
+        if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
+          const deltaX = this.scratchCurrentIntersection.x - this.dragPlaneIntersectionStart.x;
+          const deltaZ = this.scratchCurrentIntersection.z - this.dragPlaneIntersectionStart.z;
+          moveX = Math.round(deltaX / 50) * 50;
+          moveZ = Math.round(deltaZ / 50) * 50;
+        } else {
+          moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
+          moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
+        }
+
         let candX = activeWall.posX;
         let candZ = activeWall.posZ;
         if (hit.axis === 'x') {
-          const moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
           candX = this.initialWallPosX + moveX;
         } else {
-          const moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
           candZ = this.initialWallPosZ + moveZ;
         }
 
@@ -6312,7 +5951,9 @@ private createHandleMesh(
           this.clearWallSnapGuides();
         }
 
-        this.updateSingleWall(activeWall.id, { posX: candX, posZ: candZ });
+        this.updateLiveWallTransform(activeWall.id, candX, candZ);
+        this.pendingWallUpdates = { wallId: activeWall.id, updates: { posX: candX, posZ: candZ } };
+        this.requestRender(2);
       } else if (hit.type === 'wall_stretch') {
         const rotRad = -((activeWall.rotationY || 0) * (Math.PI / 180));
         const worldDx = dx * cos + dy * sin;
@@ -6321,12 +5962,27 @@ private createHandleMesh(
         const stretch = Math.round(proj / 50) * 50;
         const maxLen = Math.max(floorW, floorD);
         const nextL = Math.max(400, Math.min(maxLen, this.initialWallLength + stretch));
-        this.updateSingleWall(activeWall.id, { length: nextL });
+        const wallMesh = this.roomGroup.children.find(
+          c => c.userData?.['isWall'] && (c.userData?.['wallId'] === activeWall.id || c.userData?.['wallType'] === activeWall.id)
+        );
+        if (wallMesh && this.initialWallLength > 0) {
+          wallMesh.scale.x = nextL / this.initialWallLength;
+        }
+        this.pendingWallUpdates = { wallId: activeWall.id, updates: { length: nextL } };
+        this.requestRender(2);
       } else if (hit.type === 'wall_stretch_height') {
         const vertDy = -(e.clientY - this.dragStartPointer.y) * 2.0;
         const stretchY = Math.round(vertDy / 10) * 10;
         const nextH = Math.max(400, Math.min(4500, this.initialWallHeight + stretchY));
-        this.updateSingleWall(activeWall.id, { height: nextH });
+        const wallMesh = this.roomGroup.children.find(
+          c => c.userData?.['isWall'] && (c.userData?.['wallId'] === activeWall.id || c.userData?.['wallType'] === activeWall.id)
+        );
+        if (wallMesh && this.initialWallHeight > 0) {
+          wallMesh.scale.y = nextH / this.initialWallHeight;
+          wallMesh.position.y = nextH / 2;
+        }
+        this.pendingWallUpdates = { wallId: activeWall.id, updates: { height: nextH } };
+        this.requestRender(2);
       }
       return;
     }
@@ -6361,146 +6017,6 @@ private createHandleMesh(
       }
     }
 
-    // 0.1. Draw 3D Rectangle Live Preview
-    if (this.isDrawingRect() && this.rectStartPoint) {
-      const rect = canvas.getBoundingClientRect();
-      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      this.raycaster.setFromCamera(this.mouse, this.camera);
-
-      const drawPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.rectStartPoint.y);
-      const intersectPt = new THREE.Vector3();
-      if (this.raycaster.ray.intersectPlane(drawPlane, intersectPt)) {
-        const snap = 10;
-        this.rectCurrentPoint = new THREE.Vector3(
-          Math.round(intersectPt.x / snap) * snap,
-          this.rectStartPoint.y,
-          Math.round(intersectPt.z / snap) * snap
-        );
-
-        const L = Math.round(Math.abs(this.rectCurrentPoint.x - this.rectStartPoint.x));
-        const W = Math.round(Math.abs(this.rectCurrentPoint.z - this.rectStartPoint.z));
-        this.rectDrawDims.set({ length: L, width: W });
-        this.renderRectPreview();
-      }
-      return;
-    }
-
-    // 0.11. Draw 3D Circle Live Preview
-    if (this.isDrawingCircle() && this.circleCenterPoint) {
-      const rect = canvas.getBoundingClientRect();
-      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      this.raycaster.setFromCamera(this.mouse, this.camera);
-
-      const drawPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.circleCenterPoint.y);
-      const intersectPt = new THREE.Vector3();
-      if (this.raycaster.ray.intersectPlane(drawPlane, intersectPt)) {
-        const snap = 10;
-        this.circleCurrentPoint = new THREE.Vector3(
-          Math.round(intersectPt.x / snap) * snap,
-          this.circleCenterPoint.y,
-          Math.round(intersectPt.z / snap) * snap
-        );
-
-        const dx = this.circleCurrentPoint.x - this.circleCenterPoint.x;
-        const dz = this.circleCurrentPoint.z - this.circleCenterPoint.z;
-        const radius = Math.round(Math.sqrt(dx * dx + dz * dz));
-        const diameter = radius * 2;
-        this.circleDrawDims.set({ radius, diameter });
-        this.renderCirclePreview();
-      }
-      return;
-    }
-
-    // 0.12. Draw Freehand (Dibujo Libre) Live Preview
-    if (this.isDrawingFreehand() && this.freehandPoints.length > 0) {
-      const rect = canvas.getBoundingClientRect();
-      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      this.raycaster.setFromCamera(this.mouse, this.camera);
-
-      const drawPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.freehandPlaneY);
-      const intersectPt = new THREE.Vector3();
-      if (this.raycaster.ray.intersectPlane(drawPlane, intersectPt)) {
-        const lastPt = this.freehandPoints[this.freehandPoints.length - 1];
-        const distFromLast = Math.hypot(intersectPt.x - lastPt.x, intersectPt.z - lastPt.z);
-        // Only append if moved at least 12mm to maintain smooth sampling
-        if (distFromLast >= 12) {
-          const newPt = new THREE.Vector3(
-            Math.round(intersectPt.x),
-            this.freehandPlaneY,
-            Math.round(intersectPt.z)
-          );
-          this.freehandPoints.push(newPt);
-
-          // Calculate current perimeter
-          let perim = 0;
-          for (let i = 1; i < this.freehandPoints.length; i++) {
-            perim += Math.hypot(
-              this.freehandPoints[i].x - this.freehandPoints[i - 1].x,
-              this.freehandPoints[i].z - this.freehandPoints[i - 1].z
-            );
-          }
-          this.freehandStats.set({
-            pointCount: this.freehandPoints.length,
-            perimeter: Math.round(perim)
-          });
-          this.renderFreehandPreview();
-        }
-      }
-      return;
-    }
-
-    // 0. Push/Pull Active Dragging
-    if (this.isPushPulling && this.pushPullData) {
-      const rect = canvas.getBoundingClientRect();
-      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      this.raycaster.setFromCamera(this.mouse, this.camera);
-
-      if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
-        const data = this.pushPullData;
-        this.scratchDeltaWorld.subVectors(this.scratchCurrentIntersection, this.dragPlaneIntersectionStart);
-        const axisDisplacement = this.scratchDeltaWorld.dot(data.axisVector) * data.dir;
-        const snap = 1; // 1 mm fine CAD precision
-        const steppedDelta = Math.round(axisDisplacement / snap) * snap;
-
-        const res = this.applyMagneticSnapToStretch(
-          data.part,
-          data.targetDim,
-          data.posAxis,
-          data.dir,
-          steppedDelta
-        );
-
-        const updates: Partial<Part> = {};
-        updates[data.targetDim] = res.dim;
-        updates[data.posAxis] = res.pos;
-
-        const axisName = data.targetDim === 'thickness'
-          ? 'Espesor'
-          : (data.targetDim === 'length' ? 'Largo' : 'Ancho');
-
-        this.pushPullDelta.set({
-          axisName,
-          initialVal: data.initialDim,
-          currentVal: res.dim,
-          delta: res.dim - data.initialDim
-        });
-
-        // Update highlight plane to follow face
-        const axisChar = (data.axisVector.x !== 0 ? 'x' : (data.axisVector.y !== 0 ? 'y' : 'z')) as 'x' | 'y' | 'z';
-        this.renderPushPullFaceHighlight(
-          { ...data.part, ...updates },
-          axisChar,
-          data.dir
-        );
-
-        this.previewPartUpdatesInPlace([{ part: data.part, updates }]);
-      }
-      return;
-    }
     if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
       const rect = canvas.getBoundingClientRect();
       this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -6595,8 +6111,31 @@ private createHandleMesh(
                 }
 
                 if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
+                  this.lastSnappedWallResult = wallSnap;
+
+                  // Auto-elevación inteligente por tipo de módulo contra la pared
+                  const firstPart = this.dragInitialParts[0];
+                  const grp = this.partGroups().find(g => g.id === firstPart.groupId);
+                  const cat = grp?.parametricConfig?.category || grp?.parametricConfig?.moduleType;
+                  let autoElevation: number | null = null;
+                  if (cat === 'kitchen_wall' || cat === 'wall_cabinet') {
+                    autoElevation = 1450;
+                  } else if (cat === 'vanity') {
+                    autoElevation = 450;
+                  } else if (cat === 'kitchen_base' || cat === 'base_cabinet' || cat === 'closet' || cat === 'oven_base' || cat === 'sink_base') {
+                    autoElevation = 0;
+                  }
+
+                  if (autoElevation !== null) {
+                    const idealDy = autoElevation - initialGrpMinY;
+                    if (Math.abs(deltaY - idealDy) <= 90 || Math.abs(deltaY) < 25) {
+                      deltaY = idealDy;
+                    }
+                  }
+
                   this.renderWallSnapGuides(wallSnap);
                 } else {
+                  this.lastSnappedWallResult = null;
                   this.clearWallSnapGuides();
                 }
               } else if (hit.axis === 'y') {
@@ -7035,8 +6574,31 @@ private createHandleMesh(
                 }
 
                 if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
+                  this.lastSnappedWallResult = wallSnap;
+
+                  // Auto-elevación inteligente por tipo de módulo contra la pared
+                  const firstPart = this.dragInitialParts[0];
+                  const grp = this.partGroups().find(g => g.id === firstPart.groupId);
+                  const cat = grp?.parametricConfig?.category || grp?.parametricConfig?.moduleType;
+                  let autoElevation: number | null = null;
+                  if (cat === 'kitchen_wall' || cat === 'wall_cabinet') {
+                    autoElevation = 1450;
+                  } else if (cat === 'vanity') {
+                    autoElevation = 450;
+                  } else if (cat === 'kitchen_base' || cat === 'base_cabinet' || cat === 'closet' || cat === 'oven_base' || cat === 'sink_base') {
+                    autoElevation = 0;
+                  }
+
+                  if (autoElevation !== null) {
+                    const idealDy = autoElevation - initialGrpMinY;
+                    if (Math.abs(effDy - idealDy) <= 90 || Math.abs(effDy) < 25) {
+                      effDy = idealDy;
+                    }
+                  }
+
                   this.renderWallSnapGuides(wallSnap);
                 } else {
+                  this.lastSnappedWallResult = null;
                   this.clearWallSnapGuides();
                 }
               } else {
@@ -7196,10 +6758,6 @@ private createHandleMesh(
     this.lastHoverRaycastTime = nowPerf;
 
     // Hover cursor updates when not dragging
-    if (this.activeTool() === 'push_pull') {
-      this.updatePushPullHover(e);
-      return;
-    }
 
     const rect = canvas.getBoundingClientRect();
     this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -7327,13 +6885,30 @@ private createHandleMesh(
       const isDimensionChanged =
         entry.updates.length !== undefined ||
         entry.updates.width !== undefined ||
-        entry.updates.thickness !== undefined;
+        entry.updates.thickness !== undefined ||
+        entry.updates.orientation !== undefined;
 
-      if (isDimensionChanged && (!updatedPart.shapeType || updatedPart.shapeType === 'rectangle')) {
-        const newGeoKey = `box_${b.sx}_${b.sy}_${b.sz}`;
-        const newBoxGeo = this.getSharedGeometry(newGeoKey, () => new THREE.BoxGeometry(b.sx, b.sy, b.sz));
+      if (isDimensionChanged) {
+        const localDims = this.partGeometry.getLocalDimensions(updatedPart);
+        let newBoxGeo: THREE.BufferGeometry;
+        let newEdgesGeo: THREE.EdgesGeometry;
+
+        if (updatedPart.cornerCutConfig || (updatedPart.shapeType === 'freehand' && updatedPart.contourPoints && updatedPart.contourPoints.length >= 3)) {
+          newBoxGeo = this.partGeometry.buildExtrudedBoardGeometry(updatedPart);
+          newEdgesGeo = new THREE.EdgesGeometry(newBoxGeo);
+        } else if (updatedPart.shapeType === 'circle') {
+          const radius = updatedPart.radius || (updatedPart.diameter ? updatedPart.diameter / 2 : Math.max(10, (updatedPart.width || 600) / 2));
+          const cylHeight = (updatedPart.length && updatedPart.length > updatedPart.thickness) ? updatedPart.length : (updatedPart.thickness || 15);
+          const cylKey = `piece_cyl_${radius}_${cylHeight}`;
+          newBoxGeo = this.getSharedGeometry(cylKey, () => new THREE.CylinderGeometry(radius, radius, cylHeight, 48));
+          newEdgesGeo = this.getSharedGeometry(`${cylKey}_edges`, () => new THREE.EdgesGeometry(newBoxGeo));
+        } else {
+          const newGeoKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}`;
+          newBoxGeo = this.getSharedGeometry(newGeoKey, () => new THREE.BoxGeometry(localDims.sx, localDims.sy, localDims.sz));
+          newEdgesGeo = this.getSharedGeometry(`${newGeoKey}_edges`, () => new THREE.EdgesGeometry(newBoxGeo));
+        }
+
         item.mesh.geometry = newBoxGeo;
-        const newEdgesGeo = this.getSharedGeometry(`edges_${newGeoKey}`, () => new THREE.EdgesGeometry(newBoxGeo));
         for (const child of item.mesh.children) {
           if (child instanceof THREE.LineSegments) {
             child.geometry = newEdgesGeo;
@@ -7479,6 +7054,7 @@ private createHandleMesh(
 
   // Pointer Up: Release Dragging
   private onPointerUp(e?: PointerEvent) {
+    if (this.isRenderingPaused) return;
     // Si estábamos en modo de Selección por Ventana (Marquee Box Selection con Shift)
     if (this.isMarqueeSelecting) {
       this.isMarqueeSelecting = false;
@@ -7500,141 +7076,6 @@ private createHandleMesh(
           this.handleShiftClickSelection(e);
         }
       });
-      return;
-    }
-
-    if (this.isDrawingRect() && this.rectStartPoint && this.rectCurrentPoint) {
-      const L = Math.round(Math.abs(this.rectCurrentPoint.x - this.rectStartPoint.x));
-      const W = Math.round(Math.abs(this.rectCurrentPoint.z - this.rectStartPoint.z));
-
-      if (L >= 60 && W >= 60) {
-        const posX = Math.round((this.rectStartPoint.x + this.rectCurrentPoint.x) / 2);
-        const posZ = Math.round((this.rectStartPoint.z + this.rectCurrentPoint.z) / 2);
-        const posY = this.rectStartPoint.y + 7.5;
-
-        this.ngZone.run(() => {
-          this.partCreated.emit({
-            name: `Pieza Dibujada ${this.parts().length + 1}`,
-            length: L,
-            width: W,
-            thickness: 15,
-            posX,
-            posY,
-            posZ,
-            orientation: 'horizontal'
-          });
-
-          // Switch to Push/Pull so user can immediately pull it upwards if desired
-          this.setActiveTool('push_pull');
-        });
-      }
-
-      this.isDrawingRect.set(false);
-      this.rectStartPoint = null;
-      this.rectCurrentPoint = null;
-      this.rectDrawDims.set(null);
-      this.clearRectPreview();
-      this.controls.enabled = true;
-      const canvas = this.canvasRef()?.nativeElement;
-      if (canvas) canvas.style.cursor = 'default';
-      return;
-    }
-
-    // Pointer Up: Complete Draw 3D Circle
-    if (this.isDrawingCircle() && this.circleCenterPoint && this.circleCurrentPoint) {
-      const dx = this.circleCurrentPoint.x - this.circleCenterPoint.x;
-      const dz = this.circleCurrentPoint.z - this.circleCenterPoint.z;
-      const R = Math.round(Math.sqrt(dx * dx + dz * dz));
-
-      if (R >= 30) {
-        const diameter = R * 2;
-        const posX = Math.round(this.circleCenterPoint.x);
-        const posZ = Math.round(this.circleCenterPoint.z);
-        const posY = this.circleCenterPoint.y + 7.5;
-
-        this.ngZone.run(() => {
-          this.partCreated.emit({
-            name: `Pieza Circular ${this.parts().length + 1} (Ø${diameter})`,
-            length: diameter,
-            width: diameter,
-            thickness: 15,
-            posX,
-            posY,
-            posZ,
-            orientation: 'horizontal',
-            shapeType: 'circle',
-            radius: R,
-            diameter
-          });
-
-          // Switch to Push/Pull for immediate height extrude
-          this.setActiveTool('push_pull');
-        });
-      }
-
-      this.isDrawingCircle.set(false);
-      this.circleCenterPoint = null;
-      this.circleCurrentPoint = null;
-      this.circleDrawDims.set(null);
-      this.clearCirclePreview();
-      this.controls.enabled = true;
-      const canvas = this.canvasRef()?.nativeElement;
-      if (canvas) canvas.style.cursor = 'default';
-      return;
-    }
-
-    // Pointer Up: Complete Draw Freehand (Dibujo Libre)
-    if (this.isDrawingFreehand() && this.freehandPoints.length >= 3) {
-      const pts2D = this.freehandPoints.map(p => ({ x: p.x, y: p.z }));
-      const smoothed = this.smoothPolygonPoints(pts2D);
-
-      if (smoothed.length >= 3) {
-        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-        for (const p of smoothed) {
-          if (p.x < minX) minX = p.x;
-          if (p.x > maxX) maxX = p.x;
-          if (p.y < minZ) minZ = p.y;
-          if (p.y > maxZ) maxZ = p.y;
-        }
-
-        const length = Math.max(60, Math.round(maxX - minX));
-        const width = Math.max(60, Math.round(maxZ - minZ));
-        const centerX = Math.round((minX + maxX) / 2);
-        const centerZ = Math.round((minZ + maxZ) / 2);
-        const posY = this.freehandPlaneY + 7.5;
-
-        // Localized contour points centered at (0, 0)
-        const localContour = smoothed.map(p => ({
-          x: Math.round((p.x - centerX) * 10) / 10,
-          y: Math.round((p.y - centerZ) * 10) / 10
-        }));
-
-        this.ngZone.run(() => {
-          this.partCreated.emit({
-            name: `Pieza Libre ${this.parts().length + 1}`,
-            length,
-            width,
-            thickness: 15,
-            posX: centerX,
-            posY,
-            posZ: centerZ,
-            orientation: 'horizontal',
-            shapeType: 'freehand',
-            contourPoints: localContour
-          });
-
-          // Switch to Push/Pull for immediate height extrude
-          this.setActiveTool('push_pull');
-        });
-      }
-
-      this.isDrawingFreehand.set(false);
-      this.freehandPoints = [];
-      this.freehandStats.set(null);
-      this.clearFreehandPreview();
-      this.controls.enabled = true;
-      const canvas = this.canvasRef()?.nativeElement;
-      if (canvas) canvas.style.cursor = 'default';
       return;
     }
 
@@ -7685,6 +7126,17 @@ private createHandleMesh(
 
     if (this.isDirectPieceDrag) {
       this.commitLiveDragUpdates();
+      if (this.lastSnappedWallResult?.suggestedFacing && this.dragInitialParts.length > 0) {
+        const firstPart = this.dragInitialParts[0];
+        const gId = firstPart.groupId;
+        if (gId) {
+          const grp = this.partGroups().find(g => g.id === gId);
+          if (grp && !grp.isLocked && grp.facingDirection !== this.lastSnappedWallResult.suggestedFacing) {
+            this.projectStorage.setGroupFacingDirection(gId, this.lastSnappedWallResult.suggestedFacing);
+          }
+        }
+      }
+      this.lastSnappedWallResult = null;
       this.isDirectPieceDrag = false;
       this.directPieceDragThresholdPassed = false;
       this.dragInitialPart = null;
@@ -7697,6 +7149,22 @@ private createHandleMesh(
     }
 
     if (this.isWallDragging || this.isWallGizmoDragging) {
+      if (this.pendingWallUpdates) {
+        const { wallId, updates } = this.pendingWallUpdates;
+        const wallMesh = this.roomGroup.children.find(
+          c => c.userData?.['isWall'] && (c.userData?.['wallId'] === wallId || c.userData?.['wallType'] === wallId)
+        );
+        if (wallMesh) {
+          wallMesh.scale.set(1, 1, 1);
+        }
+        const cfg = this.roomConfig();
+        const allWalls = getResolvedRoomWalls(cfg);
+        const updatedWalls = allWalls.map(w => w.id === wallId ? { ...w, ...updates } : w);
+        this.ngZone.run(() => {
+          this.roomConfigModified.emit({ walls: updatedWalls, recordHistory: true });
+        });
+        this.pendingWallUpdates = null;
+      }
       this.isWallDragging = false;
       this.isWallGizmoDragging = false;
       this.activeWallTarget = null;
@@ -7709,6 +7177,17 @@ private createHandleMesh(
 
     if (this.isDragging) {
       this.commitLiveDragUpdates();
+      if (this.lastSnappedWallResult?.suggestedFacing && this.dragInitialParts.length > 0) {
+        const firstPart = this.dragInitialParts[0];
+        const gId = firstPart.groupId;
+        if (gId) {
+          const grp = this.partGroups().find(g => g.id === gId);
+          if (grp && !grp.isLocked && grp.facingDirection !== this.lastSnappedWallResult.suggestedFacing) {
+            this.projectStorage.setGroupFacingDirection(gId, this.lastSnappedWallResult.suggestedFacing);
+          }
+        }
+      }
+      this.lastSnappedWallResult = null;
       this.isDragging = false;
       this.activeGizmoHit = null;
       this.dragInitialPart = null;
@@ -7753,7 +7232,7 @@ private createHandleMesh(
 
   // --- CAD TOOLS & PUSH/PULL FACE RAYCASTING ---
 
-  setActiveTool(tool: 'select' | 'push_pull' | 'move' | 'measure' | 'rotate_90' | 'draw_rect' | 'draw_circle' | 'draw_freehand') {
+  setActiveTool(tool: 'select' | 'move' | 'measure' | 'rotate_90') {
     this.activeTool.set(tool);
     if (tool === 'measure') {
       this.isMeasureMode.set(true);
@@ -7762,26 +7241,6 @@ private createHandleMesh(
     } else {
       this.isMeasureMode.set(false);
       this.clearMeasure();
-    }
-    if (tool !== 'draw_rect') {
-      this.clearRectPreview();
-      this.isDrawingRect.set(false);
-      this.rectStartPoint = null;
-      this.rectCurrentPoint = null;
-      this.rectDrawDims.set(null);
-    }
-    if (tool !== 'draw_circle') {
-      this.clearCirclePreview();
-      this.isDrawingCircle.set(false);
-      this.circleCenterPoint = null;
-      this.circleCurrentPoint = null;
-      this.circleDrawDims.set(null);
-    }
-    if (tool !== 'draw_freehand') {
-      this.clearFreehandPreview();
-      this.isDrawingFreehand.set(false);
-      this.freehandPoints = [];
-      this.freehandStats.set(null);
     }
     if (tool === 'rotate_90') {
       const grp = this.currentSelectedGroup();
@@ -7800,7 +7259,7 @@ private createHandleMesh(
     this.hoveredFaceInfo.set(null);
     const canvas = this.canvasRef()?.nativeElement;
     if (canvas) {
-      canvas.style.cursor = (tool === 'draw_rect' || tool === 'draw_circle' || tool === 'draw_freehand') ? 'crosshair' : 'default';
+      canvas.style.cursor = 'default';
     }
     this.requestRender(6);
   }
@@ -9848,6 +9307,8 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
   }
 
   handleViewerKeyDown(e: KeyboardEvent) {
+    if (this.isRenderingPaused) return;
+
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
       return;
@@ -9860,12 +9321,6 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
       }
     }
 
-    // P: Empujar / Tirar (Push/Pull)
-    if (e.key === 'p' || e.key === 'P') {
-      e.preventDefault();
-      this.setActiveTool('push_pull');
-      return;
-    }
     // V o Barra Espaciadora: Herramienta Seleccionar
     if (e.key === 'v' || e.key === 'V' || e.key === ' ' || e.code === 'Space') {
       e.preventDefault();
@@ -9876,24 +9331,6 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     if (e.key === 'm' || e.key === 'M') {
       e.preventDefault();
       this.setActiveTool('move');
-      return;
-    }
-    // D: Dibujar Rectángulo 3D
-    if (e.key === 'd' || e.key === 'D') {
-      e.preventDefault();
-      this.setActiveTool('draw_rect');
-      return;
-    }
-    // C: Dibujar Círculo 3D
-    if (e.key === 'c' || e.key === 'C') {
-      e.preventDefault();
-      this.setActiveTool('draw_circle');
-      return;
-    }
-    // F: Dibujo Libre a Mano Alzada (Freehand)
-    if (e.key === 'f' || e.key === 'F') {
-      e.preventDefault();
-      this.setActiveTool('draw_freehand');
       return;
     }
     // R: Rotar 90° pieza, cajón, electrodoméstico o módulo seleccionado
@@ -10042,111 +9479,10 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     customPos?: { x: number; y: number; z: number },
     customSize?: { length?: number; width?: number }
   ) {
-    const t = part.thickness || 18;
-    const L = customSize?.length ?? part.length;
-    const W = customSize?.width ?? part.width;
-    let sx = L;
-    let sy = t;
-    let sz = W;
-
-    const orient = part.orientation || 'horizontal';
-    if (orient === 'vertical_yz') {
-      const isBacksplash = part.componentRole === 'backsplash' ||
-                            part.name.toUpperCase().includes('SALPICADERO');
-      const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
-                            part.name.toUpperCase().includes('ZOCALO') ||
-                            part.name.toUpperCase().includes('ZÓCALO'));
-      const isCabinetSide = !isBacksplash && !isPlinth && (part.componentRole === 'side_left' ||
-                            part.componentRole === 'side_right' ||
-                            (part.name.toUpperCase().includes('LATERAL') &&
-                             !part.name.toUpperCase().includes('CAJ') &&
-                             part.componentRole !== 'drawer_box' &&
-                             part.componentRole !== 'drawer_lateral'));
-      const isDrawerLateral = !isBacksplash && !isCabinetSide && (
-        part.componentRole === 'drawer_box' ||
-        part.componentRole === 'drawer_lateral' ||
-        (part.name.toUpperCase().includes('LATERAL') && (part.name.toUpperCase().includes('CAJ') || (!!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer'))))
-      );
-      if (isBacksplash) {
-        sx = t;
-        sy = Math.min(L, W);
-        sz = Math.max(L, W);
-      } else if ((isPlinth || isDrawerLateral) && L > W) {
-        sx = t;
-        sy = W;
-        sz = L;
-      } else {
-        sx = t;
-        sy = L;
-        sz = W;
-      }
-    } else if (orient === 'vertical_xy') {
-      const isDoor = (part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
-        !part.name.toUpperCase().includes('CAJ');
-      const isDrawerFront = part.componentRole === 'drawer_front';
-      const isDrawerBoxHead = part.componentRole === 'drawer_box' ||
-        part.name.toUpperCase().includes('CONTRA') ||
-        part.name.toUpperCase().includes('TRASERA');
-
-      if (isDrawerBoxHead) {
-        sx = L;
-        sy = W;
-        sz = t;
-      } else if (part.componentRole === 'door') {
-        sx = L;
-        sy = W;
-        sz = t;
-      } else if (isDoor && L > W) {
-        sx = W;
-        sy = L;
-        sz = t;
-      } else if (isDrawerFront && W > L) {
-        sx = W;
-        sy = L;
-        sz = t;
-      } else {
-        sx = L;
-        sy = W;
-        sz = t;
-      }
-    }
-
-    if (part.rotationX || part.rotationY || part.rotationZ) {
-      const rx = THREE.MathUtils.degToRad(part.rotationX || 0);
-      const ry = THREE.MathUtils.degToRad(part.rotationY || 0);
-      const rz = THREE.MathUtils.degToRad(part.rotationZ || 0);
-      const euler = new THREE.Euler(rx, ry, rz, 'XYZ');
-      const m = new THREE.Matrix4().makeRotationFromEuler(euler).elements;
-      const rSx = Math.abs(m[0]) * sx + Math.abs(m[4]) * sy + Math.abs(m[8]) * sz;
-      const rSy = Math.abs(m[1]) * sx + Math.abs(m[5]) * sy + Math.abs(m[9]) * sz;
-      const rSz = Math.abs(m[2]) * sx + Math.abs(m[6]) * sy + Math.abs(m[10]) * sz;
-      sx = Math.round(rSx * 10) / 10;
-      sy = Math.round(rSy * 10) / 10;
-      sz = Math.round(rSz * 10) / 10;
-    }
-
-    const px = customPos?.x ?? (part.posX ?? 0);
-    const py = customPos?.y ?? (part.posY ?? (sy / 2));
-    const pz = customPos?.z ?? (part.posZ ?? 0);
-
-    const hx = sx / 2;
-    const hy = sy / 2;
-    const hz = sz / 2;
-
-    return {
-      minX: px - hx,
-      maxX: px + hx,
-      minY: py - hy,
-      maxY: py + hy,
-      minZ: pz - hz,
-      maxZ: pz + hz,
-      sx,
-      sy,
-      sz,
-      px,
-      py,
-      pz
-    };
+    const targetPart: Part = customSize
+      ? { ...part, length: customSize.length ?? part.length, width: customSize.width ?? part.width }
+      : part;
+    return this.partGeometry.getWorldAABB(targetPart, customPos);
   }
 
 private applyMagneticSnapToPosition(
@@ -10281,6 +9617,25 @@ private applyMagneticSnapToPosition(
     });
   }
 
+  private updateLiveWallTransform(wallId: string, posX: number, posZ: number) {
+    const wallMesh = this.roomGroup.children.find(
+      child => child.userData?.['isWall'] && (child.userData?.['wallId'] === wallId || child.userData?.['wallType'] === wallId)
+    );
+    if (wallMesh) {
+      const dx = posX - wallMesh.position.x;
+      const dz = posZ - wallMesh.position.z;
+      wallMesh.position.x = posX;
+      wallMesh.position.z = posZ;
+
+      if (this.selectedWallType() === wallId) {
+        for (const child of this.wallGizmoGroup.children) {
+          child.position.x += dx;
+          child.position.z += dz;
+        }
+      }
+    }
+  }
+
   private calculateWallToWallSnap(
     movingWall: RoomWallInstance,
     candX: number,
@@ -10291,20 +9646,13 @@ private applyMagneticSnapToPosition(
     isSnapped: boolean;
     snappedX: number;
     snappedZ: number;
-    guide?: {
-      xStart: number;
-      zStart: number;
-      xEnd: number;
-      zEnd: number;
-      yMin: number;
-      yMax: number;
-    };
+    guide?: WallToWallSnapGuide | null;
   } {
     let bestDist = threshold;
     let snappedX = candX;
     let snappedZ = candZ;
     let isSnapped = false;
-    let snapGuide: any = null;
+    let snapGuide: WallToWallSnapGuide | null = null;
 
     const isMovingHoriz = movingWall.rotationY === 0 || movingWall.rotationY === 180;
     const movingHalfL = movingWall.length / 2;
@@ -10468,7 +9816,7 @@ private applyMagneticSnapToPosition(
     };
   }
 
-  private renderWallToWallSnapGuide(snapRes: { isSnapped: boolean; guide?: any }) {
+  private renderWallToWallSnapGuide(snapRes: { isSnapped: boolean; guide?: WallToWallSnapGuide | null }) {
     this.clearWallSnapGuides();
     if (!snapRes.isSnapped) return;
 
@@ -10544,8 +9892,22 @@ private applyMagneticSnapToPosition(
     let isSnappedZ = false;
     let minCandidateDistZ = threshold + 1;
     let minCandidateDistX = threshold + 1;
-    let contactZInfo: any = null;
-    let contactXInfo: any = null;
+    let contactZInfo: {
+      xStart: number;
+      xEnd: number;
+      yMin: number;
+      yMax: number;
+      z: number;
+    } | null = null;
+    let contactXInfo: {
+      zStart: number;
+      zEnd: number;
+      yMin: number;
+      yMax: number;
+      x: number;
+    } | null = null;
+    let snappedWallId: string | undefined = undefined;
+    let suggestedFacing: 'front' | 'right' | 'back' | 'left' | undefined = undefined;
 
     for (const wall of walls) {
       const isHoriz = wall.rotationY === 0 || wall.rotationY === 180;
@@ -10567,6 +9929,8 @@ private applyMagneticSnapToPosition(
               minCandidateDistZ = absD;
               deltaZ = frontZ - bounds.minZ;
               isSnappedZ = true;
+              snappedWallId = wall.id;
+              suggestedFacing = 'front';
               contactZInfo = {
                 xStart: Math.max(wallMinX, bounds.minX),
                 xEnd: Math.min(wallMaxX, bounds.maxX),
@@ -10586,6 +9950,8 @@ private applyMagneticSnapToPosition(
               minCandidateDistZ = absD;
               deltaZ = rearZ - bounds.maxZ;
               isSnappedZ = true;
+              snappedWallId = wall.id;
+              suggestedFacing = 'back';
               contactZInfo = {
                 xStart: Math.max(wallMinX, bounds.minX),
                 xEnd: Math.min(wallMaxX, bounds.maxX),
@@ -10611,6 +9977,8 @@ private applyMagneticSnapToPosition(
               minCandidateDistX = absD;
               deltaX = rightX - bounds.minX;
               isSnappedX = true;
+              snappedWallId = wall.id;
+              suggestedFacing = 'right';
               contactXInfo = {
                 zStart: Math.max(wallMinZ, bounds.minZ),
                 zEnd: Math.min(wallMaxZ, bounds.maxZ),
@@ -10630,6 +9998,8 @@ private applyMagneticSnapToPosition(
               minCandidateDistX = absD;
               deltaX = leftX - bounds.maxX;
               isSnappedX = true;
+              snappedWallId = wall.id;
+              suggestedFacing = 'left';
               contactXInfo = {
                 zStart: Math.max(wallMinZ, bounds.minZ),
                 zEnd: Math.min(wallMaxZ, bounds.maxZ),
@@ -10650,7 +10020,9 @@ private applyMagneticSnapToPosition(
       correctedZ: bounds.minZ + deltaZ,
       deltaX,
       deltaZ,
-      snappedWallType: (isSnappedX && isSnappedZ) ? 'corner' : isSnappedZ ? 'main' : isSnappedX ? 'side' : undefined
+      snappedWallType: (isSnappedX && isSnappedZ) ? 'corner' : isSnappedZ ? 'main' : isSnappedX ? 'side' : undefined,
+      snappedWallId,
+      suggestedFacing
     };
 
     if (isSnappedX || isSnappedZ) {
@@ -10685,8 +10057,8 @@ private applyMagneticSnapToPosition(
           obj.material.dispose();
         }
       } else if (obj instanceof THREE.Sprite) {
-        if (obj.material.map) obj.material.map.dispose();
-        if (obj.material) obj.material.dispose();
+        if (obj.material.map && !obj.material.map.userData?.['isShared']) obj.material.map.dispose();
+        if (obj.material && !obj.material.userData?.['isShared']) obj.material.dispose();
       }
       this.wallSnapGuideGroup.remove(obj);
     }
@@ -10806,17 +10178,13 @@ private applyMagneticSnapToPosition(
   }
 
   private createWallSnapBadge(text: string): THREE.Sprite {
-    const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 76;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const mat = this.getCachedBadgeMaterial(`wall_snap_${text}`, 400, 76, (ctx) => {
+      ctx.clearRect(0, 0, 400, 76);
       ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
       ctx.strokeStyle = '#06b6d4';
       ctx.lineWidth = 3.5;
       ctx.beginPath();
-      ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 18);
+      ctx.roundRect(8, 8, 400 - 16, 76 - 16, 18);
       ctx.fill();
       ctx.stroke();
 
@@ -10824,16 +10192,9 @@ private applyMagneticSnapToPosition(
       ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    const mat = new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      depthTest: false
+      ctx.fillText(text, 200, 38);
     });
+
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(300, 57, 1);
     return sprite;
@@ -10925,8 +10286,8 @@ private applyMagneticSnapToPosition(
         if (obj.geometry) obj.geometry.dispose();
         if (obj.material instanceof THREE.Material) obj.material.dispose();
       } else if (obj instanceof THREE.Sprite) {
-        if (obj.material.map) obj.material.map.dispose();
-        if (obj.material) obj.material.dispose();
+        if (obj.material.map && !obj.material.map.userData?.['isShared']) obj.material.map.dispose();
+        if (obj.material && !obj.material.userData?.['isShared']) obj.material.dispose();
       }
       this.legSnapGuideGroup.remove(obj);
     }
@@ -10982,17 +10343,13 @@ private applyMagneticSnapToPosition(
   }
 
   private createLegSnapBadge(text: string): THREE.Sprite {
-    const canvas = document.createElement('canvas');
-    canvas.width = 460;
-    canvas.height = 76;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const mat = this.getCachedBadgeMaterial(`leg_snap_${text}`, 460, 76, (ctx) => {
+      ctx.clearRect(0, 0, 460, 76);
       ctx.fillStyle = 'rgba(6, 78, 59, 0.95)';
       ctx.strokeStyle = '#10b981';
       ctx.lineWidth = 3.5;
       ctx.beginPath();
-      ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 18);
+      ctx.roundRect(8, 8, 460 - 16, 76 - 16, 18);
       ctx.fill();
       ctx.stroke();
 
@@ -11000,16 +10357,9 @@ private applyMagneticSnapToPosition(
       ctx.font = 'bold 21px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    const mat = new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      depthTest: false
+      ctx.fillText(text, 230, 38);
     });
+
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(340, 56, 1);
     return sprite;
@@ -11029,8 +10379,8 @@ private applyMagneticSnapToPosition(
         if (obj.geometry) obj.geometry.dispose();
         if (obj.material instanceof THREE.Material) obj.material.dispose();
       } else if (obj instanceof THREE.Sprite) {
-        if (obj.material.map) obj.material.map.dispose();
-        if (obj.material) obj.material.dispose();
+        if (obj.material.map && !obj.material.map.userData?.['isShared']) obj.material.map.dispose();
+        if (obj.material && !obj.material.userData?.['isShared']) obj.material.dispose();
       }
       this.magneticSnapGroup.remove(obj);
     }
@@ -11144,17 +10494,13 @@ private applyMagneticSnapToPosition(
   }
 
   private createPartSnapBadge(text: string): THREE.Sprite {
-    const canvas = document.createElement('canvas');
-    canvas.width = 460;
-    canvas.height = 76;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const mat = this.getCachedBadgeMaterial(`part_snap_${text}`, 460, 76, (ctx) => {
+      ctx.clearRect(0, 0, 460, 76);
       ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 3.5;
       ctx.beginPath();
-      ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 18);
+      ctx.roundRect(8, 8, 460 - 16, 76 - 16, 18);
       ctx.fill();
       ctx.stroke();
 
@@ -11162,16 +10508,9 @@ private applyMagneticSnapToPosition(
       ctx.font = 'bold 21px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    const mat = new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      depthTest: false
+      ctx.fillText(text, 230, 38);
     });
+
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(340, 56, 1);
     return sprite;
@@ -11651,7 +10990,7 @@ private applyMagneticSnapToPosition(
       }
 
       if (p.isDoor && p.doorPivot) {
-        this.applyDoorPivotRotation(p.doorPivot, p.hingeSide || 'left', p.doorFacing || 'front', cur);
+        this.applyDoorPivotRotation(p.doorPivot, p.hingeSide || 'left', p.doorFacing || 'front', cur, p.doorBaseRotation);
       } else if (p.isDrawer) {
         const expX = p.explodedOffset.x * (this.explodedPercent() / 100);
         const expY = p.explodedOffset.y * (this.explodedPercent() / 100);
@@ -11711,6 +11050,9 @@ private applyMagneticSnapToPosition(
   }
 
   private animate(timestamp?: number) {
+    if (this.isRenderingPaused) {
+      return;
+    }
     this.animationFrameId = requestAnimationFrame((ts) => this.animate(ts));
 
     // Pausar renderizado WebGL si la pestaña del navegador está en segundo plano
@@ -12082,24 +11424,33 @@ private applyMagneticSnapToPosition(
   private updateAppliancesScene(appls: ApplianceItem[], selectedId: string | null) {
     if (!this.scene) return;
 
-    // 1. Limpiar mallas de electrodomésticos anteriores y sus gizmos
-    this.disposeGroup(this.appliancesGroup);
+    // 1. Limpiar gizmos anteriores de electrodomésticos
     this.disposeGroup(this.applianceGizmoGroup);
     this.applianceHandleHitMeshes = [];
     const showAppls = this.layerVisibility().showAppliances;
     this.appliancesGroup.visible = showAppls;
     this.applianceGizmoGroup.visible = showAppls;
     if (!showAppls) {
+      this.disposeGroup(this.appliancesGroup);
+      this.applianceMeshMap.clear();
       this.requestRender(4);
       return;
     }
 
-    // 3. Reconstruir cada electrodoméstico
+    // 2. Retirar electrodomésticos eliminados u ocultos
+    const activeAppIds = new Set(appls.filter(a => !a.isHidden).map(a => a.id));
+    for (const [id, grp] of this.applianceMeshMap.entries()) {
+      if (!activeAppIds.has(id)) {
+        this.appliancesGroup.remove(grp);
+        this.disposeGroup(grp);
+        this.applianceMeshMap.delete(id);
+      }
+    }
+
+    // 3. Actualización diferencial por ID: sólo se reconstruye si cambian dimensiones o tipo
     for (const app of appls) {
       if (app.isHidden) continue;
-      const appGroup = this.appliance3dBuilder.buildApplianceGroup(app);
-      // Si es un lavaplatos ('sink') o estufa ('cooktop') empotrable montada sobre mesón (y >= 500mm), empotrar la cubeta/chasis hacia abajo
-      // para que solo la pestaña perimetral (8mm en lavaplatos, 14mm en estufa) sobresalga sobre la cara superior del mueble/mesón
+
       const isMountedSink = app.type === 'sink' && ((app.mountType === 'countertop' && app.position.y > 60) || app.position.y >= 350);
       const isMountedCooktop = app.type === 'cooktop' && ((app.mountType === 'countertop' && app.position.y > 60) || app.position.y >= 350);
       const visualBaseY =
@@ -12108,10 +11459,33 @@ private applyMagneticSnapToPosition(
           : isMountedCooktop
             ? app.position.y - app.height + 14
             : app.position.y;
+
+      let appGroup = this.applianceMeshMap.get(app.id);
+      const prevApp = appGroup?.userData?.['appliance'] as ApplianceItem | undefined;
+
+      const needsRebuild = !appGroup || !prevApp ||
+        prevApp.type !== app.type ||
+        prevApp.width !== app.width ||
+        prevApp.height !== app.height ||
+        prevApp.depth !== app.depth ||
+        prevApp.finish !== app.finish ||
+        prevApp.mountType !== app.mountType;
+
+      if (needsRebuild || !appGroup) {
+        if (appGroup) {
+          this.appliancesGroup.remove(appGroup);
+          this.disposeGroup(appGroup);
+        }
+        appGroup = this.appliance3dBuilder.buildApplianceGroup(app);
+        this.appliancesGroup.add(appGroup);
+        this.applianceMeshMap.set(app.id, appGroup);
+      }
+
+      if (!appGroup) continue;
+
       appGroup.position.set(app.position.x, visualBaseY, app.position.z);
       appGroup.rotation.y = THREE.MathUtils.degToRad(app.rotation || 0);
       appGroup.userData = { ...(appGroup.userData || {}), appliance: app };
-      this.appliancesGroup.add(appGroup);
 
       // Si es el electrodoméstico seleccionado (individual o en multiselección), dibujar contorno técnico, aro de suelo y tiradores 3D
       const isSelected = app.id === selectedId || this.activeSelectedApplianceIds().includes(app.id);
@@ -12391,6 +11765,13 @@ private applyMagneticSnapToPosition(
       tex.dispose();
     }
     this.textureCache.clear();
+
+    for (const b of this.badgeSpriteCache.values()) {
+      b.texture.dispose();
+      b.material.dispose();
+    }
+    this.badgeSpriteCache.clear();
+    this.applianceMeshMap.clear();
 
     if (this.controls) {
       this.controls.dispose();
