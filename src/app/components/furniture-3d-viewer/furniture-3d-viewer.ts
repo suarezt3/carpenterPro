@@ -65,6 +65,7 @@ import { PartGeometryService } from '../../services/part-geometry.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
+import { GlbModelLoaderService } from '../../services/glb-model-loader.service';
 import { SpatialReferenceGuideService } from '../../services/spatial-reference-guide.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 
@@ -189,6 +190,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private partGeometry = inject(PartGeometryService);
   readonly hardwareCatalog = inject(HardwareCatalogService);
   private appliance3dBuilder = inject(Appliance3dBuilderService);
+  private glbModelLoader = inject(GlbModelLoaderService);
   private spatialGuideBuilder = inject(SpatialReferenceGuideService);
 
   // Iconos vectoriales estilizados para la cinta de herramientas CAD y menús 3D
@@ -11469,14 +11471,19 @@ private applyMagneticSnapToPosition(
         prevApp.height !== app.height ||
         prevApp.depth !== app.depth ||
         prevApp.finish !== app.finish ||
-        prevApp.mountType !== app.mountType;
+        prevApp.mountType !== app.mountType ||
+        prevApp.glbModel !== app.glbModel ||
+        prevApp.modelRotationFix !== app.modelRotationFix ||
+        prevApp.modelOffset?.x !== app.modelOffset?.x ||
+        prevApp.modelOffset?.y !== app.modelOffset?.y ||
+        prevApp.modelOffset?.z !== app.modelOffset?.z;
 
       if (needsRebuild || !appGroup) {
         if (appGroup) {
           this.appliancesGroup.remove(appGroup);
           this.disposeGroup(appGroup);
         }
-        appGroup = this.appliance3dBuilder.buildApplianceGroup(app);
+        appGroup = this.buildApplianceGroupWithGlb(app, visualBaseY);
         this.appliancesGroup.add(appGroup);
         this.applianceMeshMap.set(app.id, appGroup);
       }
@@ -11665,6 +11672,47 @@ private applyMagneticSnapToPosition(
    * Libera recursivamente las geometrías y materiales de un grupo de Three.js en la GPU (VRAM),
    * preservando aquellos marcados como compartidos en caché (userData.isShared).
    */
+
+  /**
+   * Construye el grupo de Three.js para un electrodoméstico o mueble de referencia,
+   * utilizando el modelo .glb con caché inteligente si está configurado, o fallback procedural.
+   */
+  private buildApplianceGroupWithGlb(app: ApplianceItem, visualBaseY: number): THREE.Group {
+    if (app.glbModel) {
+      const cached = this.glbModelLoader.getCachedApplianceGroup(app);
+      if (cached) {
+        return cached;
+      }
+
+      // Placeholder procedural instantáneo mientras se descarga el .glb
+      const placeholder = this.appliance3dBuilder.buildApplianceGroup(app);
+
+      this.glbModelLoader.loadAndBuildAppliance(app).then((glbGroup) => {
+        if (!glbGroup) return;
+
+        const current = this.applianceMeshMap.get(app.id);
+        if (current && this.appliancesGroup.children.includes(current)) {
+          this.appliancesGroup.remove(current);
+          this.disposeGroup(current);
+
+          glbGroup.position.set(app.position.x, visualBaseY, app.position.z);
+          glbGroup.rotation.y = THREE.MathUtils.degToRad(app.rotation || 0);
+          glbGroup.userData = { ...(glbGroup.userData || {}), appliance: app };
+
+          this.appliancesGroup.add(glbGroup);
+          this.applianceMeshMap.set(app.id, glbGroup);
+          this.requestRender(8);
+        }
+      }).catch(() => {
+        // En caso de fallo o archivo ausente, se conserva el grupo procedural sin afectar la app
+      });
+
+      return placeholder;
+    }
+
+    return this.appliance3dBuilder.buildApplianceGroup(app);
+  }
+
   private disposeGroup(group: THREE.Group) {
     if (!group) return;
     while (group.children.length > 0) {

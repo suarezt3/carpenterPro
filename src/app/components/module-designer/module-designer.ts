@@ -1443,7 +1443,10 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       mountType: preset.defaultMountType,
       price: preset.defaultPrice,
       includeInBudget: true,
-      notes: preset.description
+      notes: preset.description,
+      glbModel: preset.glbModel,
+      modelRotationFix: preset.modelRotationFix,
+      modelOffset: preset.modelOffset
     };
 
     this.projectService.addAppliance(newApp);

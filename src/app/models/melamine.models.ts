@@ -1435,6 +1435,9 @@ export interface ApplianceItem {
   groupId?: string;    // ID del módulo/mueble padre al que está vinculado (opcional)
   isLocked?: boolean;  // Inmovilizado / congelado (no arrastrar ni mover accidentalmente)
   isHidden?: boolean;  // Oculto temporalmente en la vista 3D
+  glbModel?: string;   // Archivo o ruta del modelo .glb (ej: 'Chair.glb')
+  modelRotationFix?: number; // Ajuste angular sobre Y en grados (0, 90, 180, -90)
+  modelOffset?: { x?: number; y?: number; z?: number }; // Compensación fina de posición en mm
 }
 
 export interface AppliancePreset {
@@ -1462,6 +1465,9 @@ export interface AppliancePreset {
   recommendedHeights?: number[];
   standardWidths?: number[];
   environmentLines?: EnvironmentLine[];
+  glbModel?: string;   // Archivo o ruta del modelo .glb (ej: 'Chair.glb')
+  modelRotationFix?: number; // Ajuste angular sobre Y en grados (0, 90, 180, -90)
+  modelOffset?: { x?: number; y?: number; z?: number }; // Compensación fina de posición en mm
 }
 
 export const APPLIANCE_FINISH_OPTIONS: { id: ApplianceFinish; label: string; color: string; metallic: number; roughness: number }[] = [
@@ -2193,6 +2199,7 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
   },
   {
     id: 'preset_chair_dining_nordic',
+    glbModel: 'Chair.glb',
     type: 'dining_chair',
     name: 'Silla de Comedor Moderna Eames / Nórdica',
     category: 'seating',
@@ -2379,6 +2386,7 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
   },
   {
     id: 'preset_sink_vessel_rectangular',
+    glbModel: 'Bathroom Sink.glb',
     type: 'washbasin_vessel',
     name: 'Lavamanos Vessel Rectangular Slim 50x38cm',
     category: 'bathroom',
@@ -2481,6 +2489,7 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
   },
   {
     id: 'preset_toilet_dual_flush',
+    glbModel: 'Toilet.glb',
     type: 'toilet',
     name: 'Sanitario One-Piece Doble Descarga Ecológico',
     category: 'bathroom',
@@ -2742,6 +2751,7 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
   },
   {
     id: 'preset_workspace_desktop',
+    glbModel: 'Adjustable Desk.glb',
     type: 'desktop_workspace',
     name: 'Estación de Trabajo Monitor Curvo + Laptop Slim',
     category: 'office',
@@ -2767,6 +2777,7 @@ export const APPLIANCES_CATALOG_PRESETS: AppliancePreset[] = [
   },
   {
     id: 'preset_office_chair_ergo',
+    glbModel: 'Chair.glb',
     type: 'office_chair',
     name: 'Silla Ergonómica Ejecutiva con Ruedas y Brazos 3D',
     category: 'office',
