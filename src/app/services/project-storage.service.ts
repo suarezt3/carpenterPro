@@ -2969,10 +2969,15 @@ export class ProjectStorageService {
   }
 
   updateHardware(item: HardwareItem) {
-    this.updateProject(p => ({
-      ...p,
-      hardware: p.hardware.map(h => h.id === item.id ? item : h)
-    }));
+    this.updateProject(p => {
+      const exists = p.hardware.some(h => h.id === item.id);
+      return {
+        ...p,
+        hardware: exists
+          ? p.hardware.map(h => h.id === item.id ? item : h)
+          : [...p.hardware, item]
+      };
+    });
   }
 
   deleteHardware(itemId: string) {

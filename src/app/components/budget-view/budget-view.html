@@ -12,25 +12,78 @@
       </div>
     </div>
 
-    <!-- Selector de Moneda del Proyecto -->
-    <div [class]="themeService.isClassic() ? 'flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-md px-3 py-1.5 shrink-0' : 'flex items-center gap-2 bg-zinc-950/80 border border-zinc-800 rounded-md px-3 py-1.5 shrink-0'">
-      <span [class]="themeService.isClassic() ? 'text-xs font-medium text-zinc-600 flex items-center gap-1.5' : 'text-xs font-medium text-zinc-400 flex items-center gap-1.5'">
-        <hugeicons-icon [icon]="icons.currency" [size]="14" [strokeWidth]="2" class="text-zinc-600"></hugeicons-icon>
-        <span>Moneda:</span>
-      </span>
-      <select
-        [value]="settings().currency"
-        (change)="setCurrency($event)"
-        aria-label="Seleccionar moneda del proyecto"
-        [class]="themeService.isClassic() ? 'bg-white border border-zinc-200 rounded-md px-2.5 py-1 text-xs font-semibold text-zinc-900 focus:outline-hidden focus:border-zinc-900 cursor-pointer shadow-2xs font-mono' : 'bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1 text-xs font-semibold text-white focus:outline-hidden focus:border-zinc-400 cursor-pointer font-mono'">
-        <option value="COP">COP ($) - Pesos Colombianos</option>
-        <option value="USD">USD ($) - Dólares Americanos</option>
-        <option value="EUR">EUR (€) - Euros</option>
-        <option value="MXN">MXN ($) - Pesos Mexicanos</option>
-        <option value="PEN">PEN (S/) - Soles Peruanos</option>
-        <option value="CLP">CLP ($) - Pesos Chilenos</option>
-        <option value="ARS">ARS ($) - Pesos Argentinos</option>
-      </select>
+    <!-- Contenedor de Moneda e Indicador de Tasa de Cambio en Tiempo Real -->
+    <div class="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
+      <!-- Selector de Moneda del Proyecto -->
+      <div [class]="themeService.isClassic() ? 'flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-md px-3 py-1.5' : 'flex items-center gap-2 bg-zinc-950/80 border border-zinc-800 rounded-md px-3 py-1.5'">
+        <span [class]="themeService.isClassic() ? 'text-xs font-medium text-zinc-600 flex items-center gap-1.5' : 'text-xs font-medium text-zinc-400 flex items-center gap-1.5'">
+          <hugeicons-icon [icon]="icons.currency" [size]="14" [strokeWidth]="2" class="text-zinc-600"></hugeicons-icon>
+          <span>Moneda:</span>
+        </span>
+        <select
+          [value]="settings().currency"
+          (change)="setCurrency($event)"
+          aria-label="Seleccionar moneda del proyecto"
+          [class]="themeService.isClassic() ? 'bg-white border border-zinc-200 rounded-md px-2.5 py-1 text-xs font-semibold text-zinc-900 focus:outline-hidden focus:border-zinc-900 cursor-pointer shadow-2xs font-mono' : 'bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1 text-xs font-semibold text-white focus:outline-hidden focus:border-zinc-400 cursor-pointer font-mono'">
+          <option value="COP">COP ($) - Pesos Colombianos</option>
+          <option value="USD">USD ($) - Dólares Americanos</option>
+          <option value="EUR">EUR (€) - Euros</option>
+          <option value="MXN">MXN ($) - Pesos Mexicanos</option>
+          <option value="PEN">PEN (S/) - Soles Peruanos</option>
+          <option value="CLP">CLP ($) - Pesos Chilenos</option>
+          <option value="ARS">ARS ($) - Pesos Argentinos</option>
+        </select>
+      </div>
+
+      <!-- Pastilla / Insignia de Tasa de Cambio Actual -->
+      @if (settings().currency !== 'COP') {
+        <div [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-900 shadow-2xs' : 'flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-950/60 border border-emerald-800/80 text-xs text-emerald-300 shadow-xs'">
+          <span class="relative flex h-2 w-2 shrink-0">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">En vivo</span>
+          <span class="font-mono text-xs font-medium">
+            Tasa actual: {{ currencyExchange.getInverseRateDisplay(settings().currency) }}
+          </span>
+          <button
+            type="button"
+            (click)="refreshExchangeRates()"
+            [disabled]="currencyExchange.isRefreshing()"
+            aria-label="Actualizar tasa de cambio en vivo"
+            title="Actualizar tasa de cambio en vivo"
+            [class]="themeService.isClassic() ? 'p-1 rounded hover:bg-emerald-100 text-emerald-700 transition cursor-pointer disabled:opacity-40' : 'p-1 rounded hover:bg-emerald-900/60 text-emerald-300 transition cursor-pointer disabled:opacity-40'">
+            <hugeicons-icon
+              [icon]="icons.reload"
+              [size]="13"
+              [strokeWidth]="2.2"
+              [class.animate-spin]="currencyExchange.isRefreshing()">
+            </hugeicons-icon>
+          </button>
+        </div>
+      } @else {
+        <div [class]="themeService.isClassic() ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-xs text-zinc-600 shadow-2xs' : 'flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-800/70 border border-zinc-700 text-xs text-zinc-400 shadow-xs'">
+          <span class="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0"></span>
+          <span class="font-mono text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">Moneda Base (COP)</span>
+          <span class="text-[10px] text-zinc-400 dark:text-zinc-500 border-l border-zinc-300 dark:border-zinc-700 pl-1.5 font-mono">
+            TRM ref: {{ currencyExchange.getInverseRateDisplay('USD') }}
+          </span>
+          <button
+            type="button"
+            (click)="refreshExchangeRates()"
+            [disabled]="currencyExchange.isRefreshing()"
+            aria-label="Actualizar tasa de referencia"
+            title="Actualizar tasa de referencia"
+            [class]="themeService.isClassic() ? 'p-1 rounded hover:bg-zinc-200 text-zinc-500 transition cursor-pointer disabled:opacity-40' : 'p-1 rounded hover:bg-zinc-700 text-zinc-400 transition cursor-pointer disabled:opacity-40'">
+            <hugeicons-icon
+              [icon]="icons.reload"
+              [size]="13"
+              [strokeWidth]="2.2"
+              [class.animate-spin]="currencyExchange.isRefreshing()">
+            </hugeicons-icon>
+          </button>
+        </div>
+      }
     </div>
   </div>
 
@@ -103,7 +156,7 @@
         <span class="font-medium uppercase tracking-wider truncate text-[11px]">Precio Sugerido Venta</span>
         <hugeicons-icon [icon]="icons.star" [size]="15" [strokeWidth]="2" class="text-emerald-400 shrink-0"></hugeicons-icon>
       </div>
-      <p class="text-xl xl:text-2xl font-bold text-emerald-400 font-mono tabular-nums truncate" [title]="format(finalClientPrice())">
+      <p class="text-lg xl:text-xl 2xl:text-2xl font-bold text-emerald-400 font-mono tabular-nums tracking-tight leading-snug break-words" [title]="format(finalClientPrice())">
         {{ format(finalClientPrice()) }}
       </p>
       <p class="text-[10px] text-zinc-400 mt-0.5 font-mono tabular-nums">Con {{ project().profitMarginPercent }}% margen utilidad</p>
@@ -154,10 +207,12 @@
                   </td>
                   <td class="py-2.5 px-3 text-right">
                     <input
-                      type="number"
-                      step="500"
-                      [value]="item.material.sheetCost"
-                      (change)="onMaterialCostChange(item.material, $event)"
+                      type="text"
+                      inputmode="decimal"
+                      [value]="formatUnitPrice(item.material.sheetCost)"
+                      (focus)="onPriceFocus($event, item.material.sheetCost)"
+                      (blur)="onMaterialPriceBlur(item.material, $event)"
+                      (keydown.enter)="onPriceEnter($event)"
                       aria-label="Costo por tablero"
                       [class]="themeService.isClassic() ? 'w-28 px-2 py-1 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 text-right font-mono tabular-nums focus:border-zinc-900' : 'w-28 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-right font-mono tabular-nums focus:border-zinc-400'" />
                   </td>
@@ -308,10 +363,12 @@
                   </td>
                   <td class="py-2 px-3 text-right">
                     <input
-                      type="number"
-                      step="500"
-                      [value]="h.unitCost"
-                      (change)="onHardwareCostChange(h, $event)"
+                      type="text"
+                      inputmode="decimal"
+                      [value]="formatUnitPrice(h.unitCost)"
+                      (focus)="onPriceFocus($event, h.unitCost)"
+                      (blur)="onHardwarePriceBlur(h, $event)"
+                      (keydown.enter)="onPriceEnter($event)"
                       aria-label="Costo unitario de herraje"
                       [class]="themeService.isClassic() ? 'w-24 px-1.5 py-0.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 text-right font-mono tabular-nums focus:border-zinc-900' : 'w-24 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-right font-mono tabular-nums focus:border-zinc-400'" />
                   </td>
@@ -395,10 +452,12 @@
                     </td>
                     <td class="py-2.5 px-3 text-right">
                       <input
-                        type="number"
-                        step="10000"
-                        [value]="app.price"
-                        (change)="onAppliancePriceChange(app.id, $event)"
+                        type="text"
+                        inputmode="decimal"
+                        [value]="formatUnitPrice(app.price || 0)"
+                        (focus)="onPriceFocus($event, app.price || 0)"
+                        (blur)="onAppliancePriceBlur(app.id, $event)"
+                        (keydown.enter)="onPriceEnter($event)"
                         aria-label="Precio unitario de electrodoméstico"
                         [class]="themeService.isClassic() ? 'w-28 px-1.5 py-0.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 text-right font-mono tabular-nums focus:border-zinc-900' : 'w-28 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-right font-mono tabular-nums focus:border-zinc-400'" />
                     </td>
@@ -433,9 +492,12 @@
           </div>
           <div class="flex items-center gap-2">
             <input
-              type="number"
-              [value]="project().laborCost"
-              (change)="onLaborCostChange($event)"
+              type="text"
+              inputmode="decimal"
+              [value]="project().laborType === 'percent' ? project().laborCost + '%' : formatUnitPrice(project().laborCost)"
+              (focus)="onLaborCostFocus($event)"
+              (blur)="onLaborCostBlur($event)"
+              (keydown.enter)="onPriceEnter($event)"
               aria-label="Costo de mano de obra"
               [class]="themeService.isClassic() ? 'w-28 px-2 py-1 bg-white border border-zinc-200 rounded-md text-xs text-zinc-900 font-mono tabular-nums focus:border-zinc-900' : 'w-28 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white font-mono tabular-nums focus:border-zinc-400'" />
 

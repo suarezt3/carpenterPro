@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   Add01Icon,
+  ArrowReloadHorizontalIcon,
   Cancel01Icon,
   CheckListIcon,
   CheckmarkCircle02Icon,
@@ -16,6 +17,7 @@ import {
   Tag01Icon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService, formatCurrencyValue } from '../../services/project-storage.service';
+import { CurrencyExchangeService } from '../../services/currency-exchange.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -35,8 +37,9 @@ import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
   templateUrl: './budget-view.html',
   styleUrl: './budget-view.css'
 })
-export class BudgetViewComponent {
+export class BudgetViewComponent implements OnInit {
   readonly themeService = inject(ThemeService);
+  readonly currencyExchange = inject(CurrencyExchangeService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly optimizer = inject(CutOptimizerService);
@@ -57,8 +60,14 @@ export class BudgetViewComponent {
     close: Cancel01Icon,
     calculate: CheckListIcon,
     receipt: Note01Icon,
-    print: PrinterIcon
+    print: PrinterIcon,
+    reload: ArrowReloadHorizontalIcon
   };
+
+  ngOnInit(): void {
+    // Asegurar que las tasas de cambio de mercado estén actualizadas al entrar a Presupuesto
+    this.currencyExchange.initRates();
+  }
 
   // Signals sincronizados con el estado global del proyecto
   readonly project = this.projectService.currentProject;
@@ -440,12 +449,18 @@ export class BudgetViewComponent {
   }
 
   openAddHardware() {
+    const defaultCop = 5000;
+    const curr = (this.settings().currency || 'COP').toUpperCase();
+    const defaultCost = curr === 'COP'
+      ? defaultCop
+      : Number(this.currencyExchange.convertFromCop(defaultCop, curr).toFixed(2));
+
     this.hardwareForm.reset({
       name: '',
       category: 'accessory',
       unit: 'und',
       quantity: 1,
-      unitCost: 1.0,
+      unitCost: defaultCost,
       notes: ''
     });
     this.showAddHardwareModal.set(true);
@@ -454,6 +469,8 @@ export class BudgetViewComponent {
   saveHardware() {
     if (this.hardwareForm.invalid) return;
     const val = this.hardwareForm.value;
+    const rawCost = Number(val.unitCost) || 0;
+    const unitCostInCop = this.currencyExchange.convertToCop(rawCost, this.settings().currency);
 
     const newItem: HardwareItem = {
       id: 'hw_' + crypto.randomUUID().slice(0, 8),
@@ -461,7 +478,7 @@ export class BudgetViewComponent {
       category: val.category,
       unit: val.unit,
       quantity: Number(val.quantity),
-      unitCost: Number(val.unitCost),
+      unitCost: unitCostInCop,
       notes: val.notes
     };
 
@@ -481,8 +498,209 @@ export class BudgetViewComponent {
     }
   }
 
-  format(amount: number): string {
-    return formatCurrencyValue(amount, this.settings().currency);
+  /**
+   * Formatea cualquier monto base canónico en COP convirtiéndolo en tiempo real
+   * a la moneda activa seleccionada por el usuario (COP, USD, MXN, EUR, etc.).
+   */
+  format(amountInCop: number): string {
+    const curr = (this.settings().currency || 'COP').toUpperCase();
+    const converted = this.currencyExchange.convertFromCop(amountInCop, curr);
+    return formatCurrencyValue(converted, curr);
+  }
+
+  /**
+   * Formatea precios unitarios editables convirtiéndolos a la moneda seleccionada
+   * con separadores de miles y decimales adecuados (ej. "$ 195.000", "$ 45.88", "$ 918.50").
+   */
+  formatUnitPrice(amountInCop: number): string {
+    const curr = (this.settings().currency || 'COP').toUpperCase();
+    const converted = this.currencyExchange.convertFromCop(amountInCop, curr);
+    switch (curr) {
+      case 'COP':
+        return '$ ' + Math.round(converted).toLocaleString('es-CO');
+      case 'CLP':
+        return '$ ' + Math.round(converted).toLocaleString('es-CL');
+      case 'ARS':
+        return '$ ' + Math.round(converted).toLocaleString('es-AR');
+      case 'MXN':
+        return '$ ' + converted.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      case 'EUR':
+        return converted.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+      case 'PEN':
+        return 'S/ ' + converted.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      case 'USD':
+      default:
+        return '$ ' + converted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+  }
+
+  /**
+   * Limpia y parsea valores numéricos ingresados por el usuario, eliminando símbolos
+   * de moneda o separadores para obtener un valor numérico flotante válido.
+   * Maneja correctamente tanto notación estadounidense (1,234,567.89) como europea/latina (1.234.567,89).
+   */
+  parseCleanNumber(raw: string): number {
+    if (!raw) return 0;
+    let cleaned = raw.replace(/[^\d.,-]/g, '').trim();
+    if (!cleaned) return 0;
+
+    const lastDot = cleaned.lastIndexOf('.');
+    const lastComma = cleaned.lastIndexOf(',');
+
+    if (lastDot !== -1 && lastComma !== -1) {
+      if (lastDot > lastComma) {
+        // Formato estadounidense estándar: 1,234,567.89
+        cleaned = cleaned.replace(/,/g, '');
+      } else {
+        // Formato europeo/latino estándar: 1.234.567,89
+        cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+      }
+    } else if (lastComma !== -1) {
+      const commaCount = (cleaned.match(/,/g) || []).length;
+      if (commaCount > 1) {
+        // Múltiples comas (ej. 1,234,567) -> separadores de miles
+        cleaned = cleaned.replace(/,/g, '');
+      } else {
+        const afterComma = cleaned.substring(lastComma + 1);
+        const curr = (this.settings().currency || 'COP').toUpperCase();
+        if ((curr === 'COP' || curr === 'CLP' || curr === 'ARS') && afterComma.length === 3) {
+          cleaned = cleaned.replace(/,/g, '');
+        } else if (afterComma.length === 3 && cleaned.length > 4) {
+          cleaned = cleaned.replace(/,/g, '');
+        } else {
+          cleaned = cleaned.replace(',', '.');
+        }
+      }
+    } else if (lastDot !== -1) {
+      const dotCount = (cleaned.match(/\./g) || []).length;
+      if (dotCount > 1) {
+        // Múltiples puntos (ej. 1.234.567 o 195.000.000) -> separadores de miles
+        cleaned = cleaned.replace(/\./g, '');
+      } else {
+        const afterDot = cleaned.substring(lastDot + 1);
+        const curr = (this.settings().currency || 'COP').toUpperCase();
+        if ((curr === 'COP' || curr === 'CLP' || curr === 'ARS' || curr === 'EUR') && afterDot.length === 3) {
+          cleaned = cleaned.replace(/\./g, '');
+        } else if (afterDot.length === 3 && cleaned.length > 5) {
+          cleaned = cleaned.replace(/\./g, '');
+        }
+      }
+    }
+
+    const val = parseFloat(cleaned);
+    return isNaN(val) ? 0 : Math.max(0, val);
+  }
+
+  /**
+   * Al hacer clic o foco sobre un input de precio unitario, muestra el valor numérico
+   * crudo en la moneda activa y selecciona todo el texto para facilitar su reemplazo inmediato.
+   */
+  onPriceFocus(event: FocusEvent, amountInCop: number) {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) return;
+    const curr = (this.settings().currency || 'COP').toUpperCase();
+    const converted = this.currencyExchange.convertFromCop(amountInCop, curr);
+    const isZeroDecimal = curr === 'COP' || curr === 'CLP' || curr === 'ARS';
+    input.value = isZeroDecimal ? Math.round(converted).toString() : Number(converted.toFixed(2)).toString();
+    input.dataset['initialRaw'] = input.value;
+    setTimeout(() => {
+      if (document.activeElement === input) {
+        input.select();
+      }
+    }, 0);
+  }
+
+  onPriceEnter(event: Event) {
+    const input = event.target as HTMLInputElement | null;
+    input?.blur();
+  }
+
+  onMaterialPriceBlur(material: Material, event: FocusEvent) {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) return;
+    // Si el usuario no modificó el texto, restaurar formato sin recalcular para evitar drift de redondeo
+    if (input.dataset['initialRaw'] && input.value.trim() === input.dataset['initialRaw']) {
+      input.value = this.formatUnitPrice(material.sheetCost);
+      return;
+    }
+    const rawVal = this.parseCleanNumber(input.value);
+    const curr = (this.settings().currency || 'COP').toUpperCase();
+    const newCopCost = this.currencyExchange.convertToCop(rawVal, curr);
+    this.updateMaterialCost(material, newCopCost);
+    input.value = this.formatUnitPrice(newCopCost);
+  }
+
+  onHardwarePriceBlur(item: HardwareItem, event: FocusEvent) {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) return;
+    if (input.dataset['initialRaw'] && input.value.trim() === input.dataset['initialRaw']) {
+      input.value = this.formatUnitPrice(item.unitCost);
+      return;
+    }
+    const rawVal = this.parseCleanNumber(input.value);
+    const curr = (this.settings().currency || 'COP').toUpperCase();
+    const newCopCost = this.currencyExchange.convertToCop(rawVal, curr);
+    this.updateHardwareCost(item, newCopCost);
+    input.value = this.formatUnitPrice(newCopCost);
+  }
+
+  onAppliancePriceBlur(id: string, event: FocusEvent) {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) return;
+    if (input.dataset['initialRaw'] && input.value.trim() === input.dataset['initialRaw']) {
+      const app = this.appliances().find(a => a.id === id);
+      input.value = this.formatUnitPrice(app?.price || 0);
+      return;
+    }
+    const rawVal = this.parseCleanNumber(input.value);
+    const curr = (this.settings().currency || 'COP').toUpperCase();
+    const newCopCost = this.currencyExchange.convertToCop(rawVal, curr);
+    this.updateApplianceBudgetPrice(id, newCopCost);
+    input.value = this.formatUnitPrice(newCopCost);
+  }
+
+  onLaborCostFocus(event: FocusEvent) {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) return;
+    if (this.project().laborType === 'percent') {
+      input.value = this.project().laborCost.toString();
+    } else {
+      const curr = (this.settings().currency || 'COP').toUpperCase();
+      const converted = this.currencyExchange.convertFromCop(this.project().laborCost, curr);
+      const isZeroDecimal = curr === 'COP' || curr === 'CLP' || curr === 'ARS';
+      input.value = isZeroDecimal ? Math.round(converted).toString() : Number(converted.toFixed(2)).toString();
+    }
+    input.dataset['initialRaw'] = input.value;
+    setTimeout(() => {
+      if (document.activeElement === input) {
+        input.select();
+      }
+    }, 0);
+  }
+
+  onLaborCostBlur(event: FocusEvent) {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) return;
+    if (input.dataset['initialRaw'] && input.value.trim() === input.dataset['initialRaw']) {
+      input.value = this.project().laborType === 'percent'
+        ? `${this.project().laborCost}%`
+        : this.formatUnitPrice(this.project().laborCost);
+      return;
+    }
+    const rawVal = this.parseCleanNumber(input.value);
+    if (this.project().laborType === 'percent') {
+      this.updateLabor(rawVal, 'percent');
+      input.value = `${rawVal}%`;
+    } else {
+      const curr = (this.settings().currency || 'COP').toUpperCase();
+      const newCopCost = this.currencyExchange.convertToCop(rawVal, curr);
+      this.updateLabor(newCopCost, 'fixed');
+      input.value = this.formatUnitPrice(newCopCost);
+    }
+  }
+
+  async refreshExchangeRates(): Promise<void> {
+    await this.currencyExchange.fetchRates(true);
   }
 
   setCurrency(event: Event) {
