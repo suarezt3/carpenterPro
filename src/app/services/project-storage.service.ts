@@ -1377,14 +1377,97 @@ export class ProjectStorageService {
       candidate = `${baseClean} ${counter}`;
     }
 
-    const clone: Part = {
-      ...part,
-      id: crypto.randomUUID(),
-      name: candidate,
-      posX: (part.posX ?? 0) + 40,
-      posY: part.posY ?? 0,
-      posZ: (part.posZ ?? 0) + 20
-    };
+    const isShelf = this.partGeometry.isInternalShelf(part);
+    const isDivider = this.partGeometry.isInternalDivider(part);
+
+    let clone: Part;
+
+    if (part.groupId && isShelf) {
+      // Escenario A: Duplicación de Entrepaño / Repisa Horizontal Interna
+      // PROHIBIDO alterar posX o posZ: conservar exactamente la misma alineación lateral/frontal y rotación
+      const cavity = this.partGeometry.getModuleCavityCenter(part, currentProj.parts);
+      const vertGap = this.partGeometry.findLargestVerticalGap(part, currentProj.parts);
+
+      let cloneX = part.posX ?? 0;
+      let cloneZ = part.posZ ?? 0;
+      if (cavity) {
+        if (Math.abs((part.posX ?? 0) - cavity.x) > 1.5) {
+          cloneX = cavity.x;
+        }
+        if (Math.abs((part.posZ ?? 0) - cavity.z) > 1.5) {
+          cloneZ = cavity.z;
+        }
+      }
+
+      clone = {
+        ...part,
+        id: crypto.randomUUID(),
+        name: candidate,
+        posX: cloneX,
+        posY: vertGap.bestY,
+        posZ: cloneZ
+      };
+    } else if (part.groupId && isDivider) {
+      // Escenario B: Duplicación de Divisor Vertical Interno
+      // PROHIBIDO alterar posY o la profundidad: ubicar en el centro del hueco horizontal disponible
+      const horizGap = this.partGeometry.findLargestHorizontalGap(part, currentProj.parts);
+      const cloneX = horizGap.axis === 'x' ? horizGap.bestPos : (part.posX ?? 0);
+      const cloneZ = horizGap.axis === 'z' ? horizGap.bestPos : (part.posZ ?? 0);
+
+      clone = {
+        ...part,
+        id: crypto.randomUUID(),
+        name: candidate,
+        posX: cloneX,
+        posY: part.posY ?? 0,
+        posZ: cloneZ
+      };
+    } else if (!part.groupId) {
+      // Escenario C1: Tablero libre (no pertenece a ningún módulo)
+      // Colocar al lado (+X = anchoPieza + 20 mm) a la misma altura (mismo posY y posZ)
+      const b = this.partGeometry.getWorldAABB(part);
+      const deltaX = Math.round(b.sx + 20);
+
+      clone = {
+        ...part,
+        id: crypto.randomUUID(),
+        name: candidate,
+        groupId: undefined,
+        groupName: undefined,
+        moduleId: undefined,
+        moduleName: undefined,
+        componentRole: 'free',
+        posX: Math.round(((part.posX ?? 0) + deltaX) * 10) / 10,
+        posY: part.posY ?? 0,
+        posZ: part.posZ ?? 0
+      };
+    } else {
+      // Escenario C2: Pieza estructural externa de un módulo (lateral, techo, piso, puerta, fondo)
+      // Desvincular la copia (groupId: undefined) y colocarla fuera del módulo al lado (+X)
+      const groupParts = currentProj.parts.filter(p => p.groupId === part.groupId);
+      let moduleMaxX = -Infinity;
+      for (const gp of groupParts) {
+        const gb = this.partGeometry.getWorldAABB(gp);
+        if (gb.maxX > moduleMaxX) moduleMaxX = gb.maxX;
+      }
+      const b = this.partGeometry.getWorldAABB(part);
+      const targetX = Math.round(moduleMaxX + 20 + b.sx / 2);
+
+      clone = {
+        ...part,
+        id: crypto.randomUUID(),
+        name: candidate,
+        groupId: undefined,
+        groupName: undefined,
+        moduleId: undefined,
+        moduleName: undefined,
+        componentRole: 'free',
+        posX: targetX,
+        posY: part.posY ?? 0,
+        posZ: part.posZ ?? 0
+      };
+    }
+
     this.addPart(clone);
     return clone;
   }

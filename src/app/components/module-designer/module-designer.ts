@@ -2130,40 +2130,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
   readonly isInternalShelfSelected = computed<boolean>(() => {
     const sel = this.selectedPart();
-    if (!sel || !sel.groupId) return false;
-    const role = sel.componentRole;
-    if (role === 'shelf') return true;
-    if (
-      role === 'top' ||
-      role === 'bottom' ||
-      role === 'countertop' ||
-      role === 'backsplash' ||
-      role === 'plinth' ||
-      role === 'side_left' ||
-      role === 'side_right' ||
-      role === 'back' ||
-      role === 'door'
-    ) {
-      return false;
-    }
-    const name = (sel.name || '').toLowerCase();
-    if (
-      name.includes('repisa') ||
-      name.includes('entrepaño') ||
-      name.includes('entrepano') ||
-      name.includes('estante') ||
-      name.includes('balda') ||
-      name.includes('shelf')
-    ) {
-      return true;
-    }
-    if (
-      sel.orientation === 'horizontal' &&
-      (role === 'drawer_box' || name.includes('cajón') || name.includes('cajon'))
-    ) {
-      return true;
-    }
-    return false;
+    return !!sel && this.partGeometry.isInternalShelf(sel);
   });
 
   readonly effectiveClearanceInfo = computed<ClearanceInfo | null>(() => {

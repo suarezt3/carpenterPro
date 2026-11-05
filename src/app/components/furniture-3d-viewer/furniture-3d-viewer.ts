@@ -116,6 +116,17 @@ interface PartStretchAxesConfig {
   thicknessAxis: 'x' | 'y' | 'z';
 }
 
+export interface DimensionBadgeUserData {
+  isDimensionBadge: boolean;
+  badgeType: 'length' | 'width' | 'top_clearance' | 'bottom_clearance';
+  part: Part;
+  currentValue: number;
+  label: string;
+  referenceY?: number;
+  baseScaleX?: number;
+  baseScaleY?: number;
+}
+
 export interface ClearanceInfo {
   topClearance: number | null;
   bottomClearance: number | null;
@@ -378,6 +389,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
   // Canvas and Container refs
   canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas3d');
   containerRef = viewChild<ElementRef<HTMLDivElement>>('container3d');
+  inlineDimensionInputRef = viewChild<ElementRef<HTMLInputElement>>('inlineDimensionInput');
+  inlineEditorContainerRef = viewChild<ElementRef<HTMLDivElement>>('inlineEditorContainer');
+
+  // Inline 3D Dimension Editor state (Edición Directa al Clic sobre Cotas 3D)
+  readonly inlineDimensionEditor = signal<{
+    x: number;
+    y: number;
+    value: number;
+    propType: 'length' | 'width' | 'top_clearance' | 'bottom_clearance';
+    part: Part;
+    label: string;
+    referenceY?: number;
+    worldPos: THREE.Vector3;
+  } | null>(null);
 
   // Interactive View States
   isOpenFrentes = signal<boolean>(false);
@@ -787,6 +812,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private pieceObjectMap = new Map<string, PieceMeshData>();
   private raycastablePieceMeshes: THREE.Mesh[] = [];
   private gizmoHitMeshes: THREE.Mesh[] = [];
+  private editableDimensionSprites: THREE.Sprite[] = [];
+  private hoveredGizmoMesh: THREE.Mesh | null = null;
+  private hoveredDimensionSprite: THREE.Sprite | null = null;
+  private scratchEditorProj = new THREE.Vector3();
+  private scratchCamCheck = new THREE.Vector3();
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
   private isCameraInteracting = false;
@@ -1111,12 +1141,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.controls.addEventListener('start', () => {
         this.isCameraInteracting = true;
         this.hideDynamicEdgeHandle();
+        this.setHoveredGizmoMesh(null);
+        this.setHoveredDimensionSprite(null);
         this.updateAdaptiveCameraSpeeds();
         this.requestRender(12);
       });
       this.controls.addEventListener('change', () => {
         this.updateAdaptiveCameraSpeeds();
         this.updateAdaptiveGizmoScale();
+        if (this.inlineDimensionEditor()) {
+          this.updateInlineEditorScreenPosition();
+        }
         this.requestRender(8);
       });
       this.controls.addEventListener('end', () => {
@@ -1923,16 +1958,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
     };
   }
 
-  private getSharedGizmoMaterial(colorHex: number): THREE.MeshStandardMaterial {
-    const key = `gizmo_handle_mat_${colorHex}`;
+  private getSharedGizmoMaterial(colorHex: number, isHovered = false): THREE.MeshStandardMaterial {
+    const key = `gizmo_handle_mat_${colorHex}_${isHovered ? 'hover' : 'idle'}`;
     let mat = this.materialCache.get(key) as THREE.MeshStandardMaterial | undefined;
     if (!mat) {
+      const color = new THREE.Color(colorHex);
+      if (isHovered) {
+        color.offsetHSL(0, 0.1, 0.16);
+      }
       mat = new THREE.MeshStandardMaterial({
-        color: colorHex,
-        roughness: 0.2,
-        metalness: 0.3,
+        color,
+        roughness: 0.15,
+        metalness: 0.25,
         emissive: colorHex,
-        emissiveIntensity: 0.38,
+        emissiveIntensity: isHovered ? 0.75 : 0.38,
         depthTest: false
       });
       mat.userData = { isShared: true };
@@ -1952,19 +1991,48 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return mat;
   }
 
-  private ensureDynamicEdgeHandle(): THREE.Mesh {
+  private ensureDynamicEdgeHandle(isCorner = false, edgeAxis: 'x' | 'y' | 'z' = 'x'): THREE.Mesh {
     if (!this.dynamicEdgeHandleMesh) {
-      const handleSize = 22;
-      const geo = this.getSharedGeometry('gizmo_dynamic_edge_box_22', () => new THREE.BoxGeometry(handleSize, handleSize, handleSize));
-      const edgeGeo = this.getSharedGeometry('gizmo_dynamic_edge_outline_22', () => new THREE.EdgesGeometry(geo));
-      const mat = this.getSharedGizmoMaterial(0x06b6d4);
-      const mesh = new THREE.Mesh(geo, mat);
-      const outline = new THREE.LineSegments(edgeGeo, this.getSharedGizmoOutlineMaterial());
-      mesh.add(outline);
+      const sphereGeo = this.getSharedGeometry('gizmo_corner_sphere_cad', () => new THREE.SphereGeometry(6.5, 24, 24));
+      const mat = this.getSharedGizmoMaterial(0x06b6d4, false);
+      const mesh = new THREE.Mesh(sphereGeo, mat);
+
+      const haloGeo = this.getSharedGeometry('gizmo_corner_halo_cad', () => new THREE.TorusGeometry(8.2, 0.75, 8, 32));
+      const outlineMat = this.getSharedGizmoOutlineMaterial();
+      const halo = new THREE.Mesh(haloGeo, outlineMat);
+      halo.name = 'dynamic_handle_halo';
+      halo.raycast = () => {};
+      mesh.add(halo);
+
       mesh.renderOrder = 1000;
       mesh.visible = false;
       this.dynamicEdgeHandleMesh = mesh;
     }
+
+    const haloChild = this.dynamicEdgeHandleMesh.getObjectByName('dynamic_handle_halo') as THREE.Mesh | undefined;
+
+    if (isCorner) {
+      const sphereGeo = this.getSharedGeometry('gizmo_corner_sphere_cad', () => new THREE.SphereGeometry(6.5, 24, 24));
+      this.dynamicEdgeHandleMesh.geometry = sphereGeo;
+      this.dynamicEdgeHandleMesh.quaternion.identity();
+      if (haloChild) {
+        haloChild.geometry = this.getSharedGeometry('gizmo_corner_halo_cad', () => new THREE.TorusGeometry(8.2, 0.75, 8, 32));
+        haloChild.rotation.set(0, 0, 0);
+        haloChild.visible = true;
+      }
+    } else {
+      const capsuleGeo = this.getSharedGeometry('gizmo_handle_capsule_bar', () => new THREE.CapsuleGeometry(4.2, 18, 8, 16));
+      this.dynamicEdgeHandleMesh.geometry = capsuleGeo;
+      const targetDir = new THREE.Vector3();
+      targetDir[edgeAxis] = 1;
+      this.dynamicEdgeHandleMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetDir);
+      if (haloChild) {
+        haloChild.geometry = this.getSharedGeometry('gizmo_handle_capsule_ring', () => new THREE.TorusGeometry(4.6, 0.65, 8, 24));
+        haloChild.rotation.x = Math.PI / 2;
+        haloChild.visible = true;
+      }
+    }
+
     if (this.dynamicEdgeHandleMesh.parent !== this.gizmoGroup) {
       this.gizmoGroup.add(this.dynamicEdgeHandleMesh);
     }
@@ -1975,8 +2043,56 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.activeDynamicEdgeHit = null;
     if (this.dynamicEdgeHandleMesh && this.dynamicEdgeHandleMesh.visible) {
       this.dynamicEdgeHandleMesh.visible = false;
+      this.dynamicEdgeHandleMesh.userData['isHovered'] = false;
       this.requestRender(4);
     }
+  }
+
+  private setHoveredGizmoMesh(mesh: THREE.Mesh | null) {
+    if (this.hoveredGizmoMesh === mesh) return;
+
+    if (this.hoveredGizmoMesh) {
+      const prev = this.hoveredGizmoMesh;
+      const colorHex = (prev.userData?.['colorHex'] as number) ?? 0x2563eb;
+      prev.material = this.getSharedGizmoMaterial(colorHex, false);
+      prev.userData['isHovered'] = false;
+    }
+
+    this.hoveredGizmoMesh = mesh;
+
+    if (mesh) {
+      const colorHex = (mesh.userData?.['colorHex'] as number) ?? 0x2563eb;
+      mesh.material = this.getSharedGizmoMaterial(colorHex, true);
+      mesh.userData['isHovered'] = true;
+    }
+
+    this.updateAdaptiveGizmoScale();
+    this.requestRender(4);
+  }
+
+  private setHoveredDimensionSprite(sprite: THREE.Sprite | null) {
+    if (this.hoveredDimensionSprite === sprite) return;
+
+    if (this.hoveredDimensionSprite) {
+      this.hoveredDimensionSprite.userData['isHovered'] = false;
+      const idleMat = this.hoveredDimensionSprite.userData['idleMaterial'] as THREE.SpriteMaterial | undefined;
+      if (idleMat) {
+        this.hoveredDimensionSprite.material = idleMat;
+      }
+    }
+
+    this.hoveredDimensionSprite = sprite;
+
+    if (sprite) {
+      sprite.userData['isHovered'] = true;
+      const hoverMat = sprite.userData['hoverMaterial'] as THREE.SpriteMaterial | undefined;
+      if (hoverMat) {
+        sprite.material = hoverMat;
+      }
+    }
+
+    this.updateAdaptiveGizmoScale();
+    this.requestRender(4);
   }
 
   // Create Interactive 3D Gizmo: Edge Stretch Handles (Translation is done cleanly via direct mouse drag)
@@ -1999,11 +2115,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
     group.position.set(px, py, pz);
 
     const axesCfg = this.getPartStretchAxesConfig(part);
-    const sharedGeo = this.getSharedGeometry('gizmo_handle_box_24', () => new THREE.BoxGeometry(24, 24, 24));
-    const sharedEdgeGeo = this.getSharedGeometry('gizmo_handle_edges_24', () => new THREE.EdgesGeometry(sharedGeo));
+    const capsuleGeo = this.getSharedGeometry('gizmo_handle_capsule_bar', () => new THREE.CapsuleGeometry(4.2, 18, 8, 16));
+    const ringGeo = this.getSharedGeometry('gizmo_handle_capsule_ring', () => new THREE.TorusGeometry(4.6, 0.65, 8, 24));
+    const cornerSphereGeo = this.getSharedGeometry('gizmo_corner_sphere_cad', () => new THREE.SphereGeometry(6.5, 24, 24));
+    const cornerHaloGeo = this.getSharedGeometry('gizmo_corner_halo_cad', () => new THREE.TorusGeometry(8.2, 0.75, 8, 32));
     const outlineMat = this.getSharedGizmoOutlineMaterial();
 
-    // Edge Stretch Handles (Tiradores centrales de borde con geometría y materiales compartidos en caché)
+    // Edge Stretch Handles: Manipuladores CAD estilizados tipo cápsula/barra redondeada alineados al borde
     const createStretchHandle = (
       edgeCenterLocal: THREE.Vector3,
       offsetDir: THREE.Vector3,
@@ -2011,12 +2129,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
       handleTarget: 'length' | 'width',
       dir: number
     ) => {
-      const mat = this.getSharedGizmoMaterial(colorHex);
-      const mesh = new THREE.Mesh(sharedGeo, mat);
+      const mat = this.getSharedGizmoMaterial(colorHex, false);
+      const mesh = new THREE.Mesh(capsuleGeo, mat);
       mesh.position.copy(edgeCenterLocal).addScaledVector(offsetDir, 16);
 
-      const edge = new THREE.LineSegments(sharedEdgeGeo, outlineMat);
-      mesh.add(edge);
+      // Orientación elegante a lo largo del borde de la pieza
+      const edgeAxis = handleTarget === 'length' ? axesCfg.widthAxis : axesCfg.lengthAxis;
+      const targetDir = new THREE.Vector3();
+      targetDir[edgeAxis] = 1;
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetDir);
+
+      // Anillo collarín central de calibración CAD
+      const ring = new THREE.Mesh(ringGeo, outlineMat);
+      ring.rotation.x = Math.PI / 2;
+      ring.raycast = () => {};
+      mesh.add(ring);
 
       const hitData: GizmoHitData = {
         isGizmo: true,
@@ -2031,7 +2158,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
       mesh.userData = {
         ...hitData,
         baseLocalPos: edgeCenterLocal,
-        offsetDir
+        offsetDir,
+        colorHex,
+        edgeAxis
       };
       this.gizmoHitMeshes.push(mesh);
       return mesh;
@@ -2039,6 +2168,45 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     const halfL = (axesCfg.lengthAxis === 'x' ? sx : axesCfg.lengthAxis === 'y' ? sy : sz) * 0.5;
     const halfW = (axesCfg.widthAxis === 'x' ? sx : axesCfg.widthAxis === 'y' ? sy : sz) * 0.5;
+
+    // Corner Stretch Handles: Manipuladores CAD estilizados tipo esfera con anillo exterior para estiramiento en 2 ejes
+    const createCornerHandle = (
+      dirL: number,
+      dirW: number,
+      diagCursor: string
+    ) => {
+      const mat = this.getSharedGizmoMaterial(0x06b6d4, false); // Cyan técnico CAD
+      const mesh = new THREE.Mesh(cornerSphereGeo, mat);
+      const cornerPos = new THREE.Vector3();
+      cornerPos[axesCfg.lengthAxis] = dirL * halfL;
+      cornerPos[axesCfg.widthAxis] = dirW * halfW;
+      mesh.position.copy(cornerPos);
+
+      const halo = new THREE.Mesh(cornerHaloGeo, outlineMat);
+      halo.rotation.x = Math.PI / 2;
+      halo.raycast = () => {};
+      mesh.add(halo);
+
+      const hitData: GizmoHitData = {
+        isGizmo: true,
+        type: 'corner_handle',
+        handleTarget: 'corner',
+        dir: dirL,
+        dirW,
+        lengthAxis: axesCfg.lengthAxis,
+        widthAxis: axesCfg.widthAxis,
+        posAxisL: axesCfg.lengthPosAxis,
+        posAxisW: axesCfg.widthPosAxis,
+        cursor: diagCursor
+      };
+      mesh.userData = {
+        ...hitData,
+        baseLocalPos: cornerPos.clone(),
+        colorHex: 0x06b6d4
+      };
+      this.gizmoHitMeshes.push(mesh);
+      return mesh;
+    };
 
     const posLPlus = new THREE.Vector3();
     posLPlus[axesCfg.lengthAxis] = halfL;
@@ -2065,7 +2233,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const handleWPlus = createStretchHandle(posWPlus, dirWPlus, 0xf59e0b, 'width', 1);
     const handleWMinus = createStretchHandle(posWMinus, dirWMinus, 0xf59e0b, 'width', -1);
 
-    group.add(handleLPlus, handleLMinus, handleWPlus, handleWMinus);
+    const cornerPP = createCornerHandle(1, 1, 'nwse-resize');
+    const cornerPM = createCornerHandle(1, -1, 'nesw-resize');
+    const cornerMP = createCornerHandle(-1, 1, 'nesw-resize');
+    const cornerMM = createCornerHandle(-1, -1, 'nwse-resize');
+
+    group.add(
+      handleLPlus,
+      handleLMinus,
+      handleWPlus,
+      handleWMinus,
+      cornerPP,
+      cornerPM,
+      cornerMP,
+      cornerMM
+    );
     group.renderOrder = 999;
     this.gizmoGroup.add(group);
 
@@ -2287,13 +2469,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
-    const dynMesh = this.ensureDynamicEdgeHandle();
-    dynMesh.position.copy(this.scratchBestHitWorld);
-    dynMesh.visible = true;
-
     let hitResult: GizmoHitData;
     if (foundCorner) {
-      dynMesh.material = this.getSharedGizmoMaterial(0x06b6d4); // Cyan técnico para vértices/esquinas
+      const dynMesh = this.ensureDynamicEdgeHandle(true);
+      dynMesh.position.copy(this.scratchBestHitWorld);
+      dynMesh.visible = true;
+      dynMesh.material = this.getSharedGizmoMaterial(0x06b6d4, true); // Cyan técnico brillante para vértices/esquinas
+      dynMesh.userData['isHovered'] = true;
+      dynMesh.userData['colorHex'] = 0x06b6d4;
+
       // Calcular orientación diagonal del cursor respecto al centro de la pieza en pantalla
       this.scratchScreenA.set(b.px, b.py, b.pz).project(this.camera);
       this.scratchScreenB.copy(this.scratchBestHitWorld).project(this.camera);
@@ -2315,8 +2499,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
         cursor: diagCursor
       };
     } else {
+      const edgeTargetAxis = bestEdgeTarget === 'length' ? axesCfg.lengthAxis : axesCfg.widthAxis;
+      const dynMesh = this.ensureDynamicEdgeHandle(false, edgeTargetAxis);
+      dynMesh.position.copy(this.scratchBestHitWorld);
+      dynMesh.visible = true;
       const colorHex = bestEdgeTarget === 'length' ? 0x2563eb : 0xf59e0b;
-      dynMesh.material = this.getSharedGizmoMaterial(colorHex);
+      dynMesh.material = this.getSharedGizmoMaterial(colorHex, true);
+      dynMesh.userData['isHovered'] = true;
+      dynMesh.userData['colorHex'] = colorHex;
       hitResult = {
         isGizmo: true,
         type: 'handle',
@@ -2458,7 +2648,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (groupChild instanceof THREE.Mesh) {
         if (groupChild.visible) {
           const dist = this.camera.position.distanceTo(groupChild.position);
-          const scale = Math.max(0.06, Math.min(1.35, dist / 950));
+          const isHovered = groupChild.userData?.['isHovered'] || this.isDragging;
+          const scale = Math.max(0.06, Math.min(1.35, dist / 950)) * (isHovered ? 1.25 : 1.0);
           groupChild.scale.setScalar(scale);
         }
       } else if (groupChild instanceof THREE.Group) {
@@ -2466,7 +2657,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
           if (handle instanceof THREE.Mesh) {
             handle.getWorldPosition(this.scratchGizmoWorldPos);
             const dist = this.camera.position.distanceTo(this.scratchGizmoWorldPos);
-            const scale = Math.max(0.06, Math.min(1.4, dist / 950));
+            const isHovered = handle.userData?.['isHovered'] || (this.isDragging && this.activeGizmoHit?.handleTarget === handle.userData?.['handleTarget'] && this.activeGizmoHit?.dir === handle.userData?.['dir']);
+            const scale = Math.max(0.06, Math.min(1.4, dist / 950)) * (isHovered ? 1.25 : 1.0);
             handle.scale.setScalar(scale);
 
             const basePos = handle.userData?.['baseLocalPos'] as THREE.Vector3 | undefined;
@@ -2519,11 +2711,24 @@ export class Furniture3dViewerComponent implements OnDestroy {
           }
 
           const dist = this.camera.position.distanceTo(child.position);
-          const baseX = child.userData?.['baseScaleX'] || 130;
-          const baseY = child.userData?.['baseScaleY'] || 42;
-          const sDim = Math.max(0.10, Math.min(1.35, dist / 1150));
+          const baseX = child.userData?.['baseScaleX'] || 140;
+          const baseY = child.userData?.['baseScaleY'] || 38;
+          const isHovered = child.userData?.['isHovered'];
+          const sDim = Math.max(0.12, Math.min(1.45, dist / 1050)) * (isHovered ? 1.15 : 1.0);
           child.scale.set(baseX * sDim, baseY * sDim, 1);
         }
+      }
+    }
+
+    // 3. Escalar y mantener legibles las cotas de luz interna (internalClearanceGroup)
+    for (const child of this.internalClearanceGroup.children) {
+      if (child instanceof THREE.Sprite) {
+        const dist = this.camera.position.distanceTo(child.position);
+        const baseX = child.userData?.['baseScaleX'] || 140;
+        const baseY = child.userData?.['baseScaleY'] || 38;
+        const isHovered = child.userData?.['isHovered'];
+        const sDim = Math.max(0.12, Math.min(1.45, dist / 1050)) * (isHovered ? 1.15 : 1.0);
+        child.scale.set(baseX * sDim, baseY * sDim, 1);
       }
     }
   }
@@ -4563,14 +4768,23 @@ private createHandleMesh(
       (p1.y + p2.y) / 2 + lengthLabelOffset.y,
       (p1.z + p2.z) / 2 + lengthLabelOffset.z
     );
+    const lengthUserData: DimensionBadgeUserData = {
+      isDimensionBadge: true,
+      badgeType: 'length',
+      part,
+      currentValue: part.length,
+      label: 'Largo',
+      baseScaleX: 140,
+      baseScaleY: 38
+    };
     lengthSprite.userData = {
       ...lengthSprite.userData,
+      ...lengthUserData,
       edgeP1: p1,
       edgeP2: p2,
-      labelOffset: lengthLabelOffset,
-      baseScaleX: 130,
-      baseScaleY: 42
+      labelOffset: lengthLabelOffset
     };
+    this.editableDimensionSprites.push(lengthSprite);
     dimGroup.add(lengthSprite);
 
     // Width / Depth dimension line
@@ -4585,50 +4799,135 @@ private createHandleMesh(
     const widthLabelOffset = new THREE.Vector3(15, 20, 0);
     const widthSprite = this.createTextSprite(`${part.width} mm`);
     widthSprite.position.set(px + sx / 2 + 45, py + 20, (p3.z + p4.z) / 2);
+    const widthUserData: DimensionBadgeUserData = {
+      isDimensionBadge: true,
+      badgeType: 'width',
+      part,
+      currentValue: part.width,
+      label: 'Ancho',
+      baseScaleX: 140,
+      baseScaleY: 38
+    };
     widthSprite.userData = {
       ...widthSprite.userData,
+      ...widthUserData,
       edgeP1: p3,
       edgeP2: p4,
-      labelOffset: widthLabelOffset,
-      baseScaleX: 130,
-      baseScaleY: 42
+      labelOffset: widthLabelOffset
     };
+    this.editableDimensionSprites.push(widthSprite);
     dimGroup.add(widthSprite);
 
     this.dimensionGroup.add(dimGroup);
     this.updateAdaptiveGizmoScale();
   }
 
-  // Generates 3D billboard sprite with high-res text (cached in badgeSpriteCache LRU to avoid allocations and leaks)
-  private createTextSprite(text: string): THREE.Sprite {
-    const spriteMat = this.getCachedBadgeMaterial(`dim_sprite_${text}`, 256, 80, (ctx) => {
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-      ctx.strokeStyle = '#3b82f6';
+  /**
+   * Renderizado Nitidez Retina (High-DPI Canvas Texture) para etiquetas de cota 3D:
+   * Diseño Enterprise de Alto Contraste (#0f172a / 92% opacidad) con borde nítido,
+   * tipografía protagonista e indicador sutil de edición directa.
+   */
+  private drawEnterprisePillBadge(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    text: string,
+    borderColor: string,
+    isHovered = false,
+    showEditIndicator = true
+  ) {
+    const x = 6;
+    const y = 6;
+    const w = width - 12;
+    const h = height - 12;
+    const r = 24;
+
+    const baseBorderColor = isHovered
+      ? (borderColor === '#10b981' ? '#34d399' : '#60a5fa')
+      : borderColor;
+
+    // Fondo gris pizarra oscuro enterprise de alto contraste (#0f172a, 92-98% opacidad)
+    ctx.save();
+    ctx.fillStyle = isHovered ? 'rgba(15, 23, 42, 0.98)' : 'rgba(15, 23, 42, 0.92)';
+    ctx.strokeStyle = baseBorderColor;
+    ctx.lineWidth = isHovered ? 6 : 5; // 2.5px aparente en escala retina
+    if (isHovered) {
+      ctx.shadowColor = baseBorderColor;
+      ctx.shadowBlur = 10;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Número grande protagonista en negrita con sombra suave
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 2;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 38px "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const textCenterX = showEditIndicator ? width / 2 - 14 : width / 2;
+    ctx.fillText(text, textCenterX, height / 2 + 1);
+    ctx.restore();
+
+    // Indicador sutil de cota clicable/editable (mini icono vector de edición)
+    if (showEditIndicator) {
+      ctx.save();
+      ctx.strokeStyle = baseBorderColor;
+      ctx.fillStyle = baseBorderColor;
       ctx.lineWidth = 3;
-      const r = 16;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      const px = width - 52;
+      const py = height / 2 - 8;
       ctx.beginPath();
-      ctx.moveTo(r, 4);
-      ctx.lineTo(256 - r, 4);
-      ctx.quadraticCurveTo(256 - 4, 4, 256 - 4, r);
-      ctx.lineTo(256 - 4, 80 - r);
-      ctx.quadraticCurveTo(256 - 4, 80 - 4, 256 - r, 80 - 4);
-      ctx.lineTo(r, 80 - 4);
-      ctx.quadraticCurveTo(4, 80 - 4, 4, 80 - r);
-      ctx.lineTo(4, r);
-      ctx.quadraticCurveTo(4, 4, r, 4);
+      ctx.moveTo(px, py + 12);
+      ctx.lineTo(px + 12, py);
+      ctx.lineTo(px + 16, py + 4);
+      ctx.lineTo(px + 4, py + 16);
       ctx.closePath();
-      ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 30px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, 128, 42);
+      ctx.beginPath();
+      ctx.moveTo(px, py + 12);
+      ctx.lineTo(px - 3, py + 18);
+      ctx.lineTo(px + 4, py + 16);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Generates 3D billboard sprite with high-res text (cached in badgeSpriteCache LRU to avoid allocations and leaks)
+  private createTextSprite(text: string): THREE.Sprite {
+    const idleMat = this.getCachedBadgeMaterial(`dim_sprite_hd_${text}_idle`, 512, 136, (ctx) => {
+      this.drawEnterprisePillBadge(ctx, 512, 136, text, '#3b82f6', false, true);
+    });
+    const hoverMat = this.getCachedBadgeMaterial(`dim_sprite_hd_${text}_hover`, 512, 136, (ctx) => {
+      this.drawEnterprisePillBadge(ctx, 512, 136, text, '#3b82f6', true, true);
     });
 
-    const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(130, 42, 1);
+    const sprite = new THREE.Sprite(idleMat);
+    sprite.scale.set(140, 38, 1);
+    sprite.renderOrder = 1000;
+    sprite.userData = {
+      idleMaterial: idleMat,
+      hoverMaterial: hoverMat
+    };
     return sprite;
   }
 
@@ -4645,7 +4944,7 @@ private createHandleMesh(
       return existing.material;
     }
 
-    if (this.badgeSpriteCache.size >= 80) {
+    if (this.badgeSpriteCache.size >= 256) {
       const oldestKey = this.badgeSpriteCache.keys().next().value;
       if (oldestKey) {
         const item = this.badgeSpriteCache.get(oldestKey);
@@ -4665,6 +4964,9 @@ private createHandleMesh(
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
     texture.userData = { isShared: true };
     const mat = new THREE.SpriteMaterial({
       map: texture,
@@ -4677,35 +4979,23 @@ private createHandleMesh(
   }
 
   // Generates Emerald Green 3D billboard sprite for Clearance Dimensions (Luz Libre)
-  private createClearanceSprite(text: string): THREE.Sprite {
-    const mat = this.getCachedBadgeMaterial(`clearance_${text}`, 280, 80, (ctx) => {
-      ctx.fillStyle = 'rgba(6, 78, 59, 0.95)'; // emerald-900 glass
-      ctx.strokeStyle = '#10b981'; // emerald-500
-      ctx.lineWidth = 3.5;
-      const r = 16;
-      ctx.beginPath();
-      ctx.moveTo(r, 4);
-      ctx.lineTo(280 - r, 4);
-      ctx.quadraticCurveTo(280 - 4, 4, 280 - 4, r);
-      ctx.lineTo(280 - 4, 80 - r);
-      ctx.quadraticCurveTo(280 - 4, 80 - 4, 280 - r, 80 - 4);
-      ctx.lineTo(r, 80 - 4);
-      ctx.quadraticCurveTo(4, 80 - 4, 4, 80 - r);
-      ctx.lineTo(4, r);
-      ctx.quadraticCurveTo(4, 4, r, 4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#ecfdf5'; // emerald-50
-      ctx.font = 'bold 30px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, 140, 42);
+  private createClearanceSprite(text: string, isEditable = true): THREE.Sprite {
+    const idleMat = this.getCachedBadgeMaterial(`clearance_hd_${text}_idle_${isEditable ? 'e' : 'r'}`, 512, 136, (ctx) => {
+      this.drawEnterprisePillBadge(ctx, 512, 136, text, '#10b981', false, isEditable);
     });
+    const hoverMat = isEditable
+      ? this.getCachedBadgeMaterial(`clearance_hd_${text}_hover`, 512, 136, (ctx) => {
+          this.drawEnterprisePillBadge(ctx, 512, 136, text, '#10b981', true, true);
+        })
+      : idleMat;
 
-    const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(140, 42, 1);
+    const sprite = new THREE.Sprite(idleMat);
+    sprite.scale.set(140, 38, 1);
+    sprite.renderOrder = 1000;
+    sprite.userData = {
+      idleMaterial: idleMat,
+      hoverMaterial: hoverMat
+    };
     return sprite;
   }
 
@@ -4793,72 +5083,11 @@ private createHandleMesh(
   }
 
   isInternalShelf(part: Part): boolean {
-    if (!part?.groupId) return false;
-    const role = part.componentRole;
-    if (role === 'shelf') return true;
-    if (
-      role === 'top' ||
-      role === 'bottom' ||
-      role === 'countertop' ||
-      role === 'backsplash' ||
-      role === 'plinth' ||
-      role === 'side_left' ||
-      role === 'side_right' ||
-      role === 'back' ||
-      role === 'door'
-    ) {
-      return false;
-    }
-    const name = (part.name || '').toLowerCase();
-    if (
-      name.includes('repisa') ||
-      name.includes('entrepaño') ||
-      name.includes('entrepano') ||
-      name.includes('estante') ||
-      name.includes('balda') ||
-      name.includes('shelf')
-    ) {
-      return true;
-    }
-    if (
-      part.orientation === 'horizontal' &&
-      (role === 'drawer_box' || name.includes('cajón') || name.includes('cajon'))
-    ) {
-      return true;
-    }
-    return false;
+    return this.partGeometry.isInternalShelf(part);
   }
 
   isInternalDivider(part: Part): boolean {
-    if (!part?.groupId) return false;
-    const role = part.componentRole;
-    if (role === 'divider') return true;
-    if (
-      role === 'side_left' ||
-      role === 'side_right' ||
-      role === 'top' ||
-      role === 'bottom' ||
-      role === 'back' ||
-      role === 'door' ||
-      role === 'countertop' ||
-      role === 'backsplash'
-    ) {
-      return false;
-    }
-    const name = (part.name || '').toLowerCase();
-    if (name.includes('divisor') || name.includes('separador') || name.includes('tabique')) {
-      return true;
-    }
-    if (
-      part.orientation === 'vertical_yz' &&
-      !name.includes('lateral') &&
-      !name.includes('costado') &&
-      !name.includes('zócalo') &&
-      !name.includes('zocalo')
-    ) {
-      return true;
-    }
-    return false;
+    return this.partGeometry.isInternalDivider(part);
   }
 
   getShelfVerticalLimits(part: Part): {
@@ -4872,9 +5101,11 @@ private createHandleMesh(
     const initBounds = this.getPartBounds(part);
     const halfThick = initBounds.sy / 2;
 
-    const groupParts = this.parts().filter(p => p.groupId === part.groupId && p.id !== part.id);
+    const groupParts = part.groupId
+      ? this.parts().filter(p => p.groupId === part.groupId && p.id !== part.id)
+      : this.parts().filter(p => p.id !== part.id);
 
-    let belowTopY = 0; // fallback al nivel del suelo Y=0
+    let belowTopY = -Infinity;
     let aboveBottomY = Infinity;
 
     for (const o of groupParts) {
@@ -4906,10 +5137,12 @@ private createHandleMesh(
       }
     }
 
-    if (belowTopY === 0) {
+    if (belowTopY === -Infinity) {
       const bottomPart = groupParts.find(p => p.componentRole === 'bottom');
       if (bottomPart) {
         belowTopY = this.getPartBounds(bottomPart).maxY;
+      } else {
+        belowTopY = 0;
       }
     }
 
@@ -4993,40 +5226,25 @@ private createHandleMesh(
     };
   }
 
-  private createInternalClearanceBadge(text: string, isWide = false): THREE.Sprite {
-    const w = isWide ? 420 : 280;
-    const h = 80;
-    const mat = this.getCachedBadgeMaterial(`clearance_${text}`, w, h, (ctx) => {
-      ctx.fillStyle = 'rgba(6, 78, 59, 0.95)'; // emerald-900 glass
-      ctx.strokeStyle = '#10b981'; // emerald-500
-      ctx.lineWidth = 3.5;
-      const r = 16;
-      ctx.beginPath();
-      ctx.moveTo(r, 4);
-      ctx.lineTo(w - r, 4);
-      ctx.quadraticCurveTo(w - 4, 4, w - 4, r);
-      ctx.lineTo(w - 4, h - r);
-      ctx.quadraticCurveTo(w - 4, h - 4, w - r, h - 4);
-      ctx.lineTo(r, h - 4);
-      ctx.quadraticCurveTo(4, h - 4, 4, h - r);
-      ctx.lineTo(4, r);
-      ctx.quadraticCurveTo(4, 4, r, 4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#ecfdf5'; // emerald-50
-      ctx.font = isWide
-        ? 'bold 22px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace'
-        : 'bold 28px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, w / 2, h / 2 + 1);
+  private createInternalClearanceBadge(text: string, isWide = false, isEditable = true): THREE.Sprite {
+    const w = 512;
+    const h = 136;
+    const idleMat = this.getCachedBadgeMaterial(`internal_clr_hd_${text}_idle_${isEditable ? 'e' : 'r'}`, w, h, (ctx) => {
+      this.drawEnterprisePillBadge(ctx, w, h, text, '#10b981', false, isEditable);
     });
+    const hoverMat = isEditable
+      ? this.getCachedBadgeMaterial(`internal_clr_hd_${text}_hover`, w, h, (ctx) => {
+          this.drawEnterprisePillBadge(ctx, w, h, text, '#10b981', true, true);
+        })
+      : idleMat;
 
-    const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(isWide ? 190 : 130, 36, 1);
+    const sprite = new THREE.Sprite(idleMat);
+    sprite.scale.set(isWide ? 155 : 140, 38, 1);
     sprite.renderOrder = 1000;
+    sprite.userData = {
+      idleMaterial: idleMat,
+      hoverMaterial: hoverMat
+    };
     return sprite;
   }
 
@@ -5163,16 +5381,23 @@ private createHandleMesh(
 
     const maxModuleZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
 
-    // 6. Dibujo 3D de Cotas Verticales Limpias con Flechas y Sprites por columna
+    // 6. Dibujo 3D de Cotas Verticales Limpias con Anti-Solapamiento y Sprites HD
     for (const col of columns) {
-      const refX = col.refX;
-      const refZ = Math.max(col.frontZ, maxModuleZ) + 16;
+      const bayWidth = col.shelfBoundsList.length > 0
+        ? col.shelfBoundsList[0].bounds.sx
+        : (leftInnerX !== null && rightInnerX !== null ? Math.abs(rightInnerX - leftInnerX) : 400);
+      const lateralOffset = Math.max(35, Math.min(110, bayWidth * 0.20));
+      const refX = col.refX + lateralOffset;
+      const refZ = Math.max(col.frontZ, maxModuleZ) + 26;
       const shelfBoundsList = col.shelfBoundsList;
 
       interface VerticalBay {
         yBottom: number;
         yTop: number;
         distance: number;
+        targetPart: Part | null;
+        badgeType: 'top_clearance' | 'bottom_clearance';
+        label: string;
       }
       const bays: VerticalBay[] = [];
 
@@ -5181,32 +5406,59 @@ private createHandleMesh(
           bays.push({
             yBottom: floorTopY,
             yTop: roofBottomY,
-            distance: Math.round(roofBottomY - floorTopY)
+            distance: Math.round(roofBottomY - floorTopY),
+            targetPart: null,
+            badgeType: 'bottom_clearance',
+            label: 'Luz Libre'
           });
         }
       } else {
+        const shelf0 = shelfBoundsList[0].part;
         bays.push({
           yBottom: floorTopY,
           yTop: shelfBoundsList[0].bounds.minY,
-          distance: Math.round(shelfBoundsList[0].bounds.minY - floorTopY)
+          distance: Math.round(shelfBoundsList[0].bounds.minY - floorTopY),
+          targetPart: shelf0,
+          badgeType: 'bottom_clearance',
+          label: 'Luz Inferior'
         });
 
         for (let i = 0; i < shelfBoundsList.length - 1; i++) {
           const yB = shelfBoundsList[i].bounds.maxY;
           const yT = shelfBoundsList[i + 1].bounds.minY;
+          const lowerShelf = shelfBoundsList[i].part;
+          const upperShelf = shelfBoundsList[i + 1].part;
+
+          let targetPart = upperShelf;
+          let badgeType: 'top_clearance' | 'bottom_clearance' = 'bottom_clearance';
+          let label = 'Luz Inferior';
+
+          if (selectedOrDraggingPart && selectedOrDraggingPart.id === lowerShelf.id) {
+            targetPart = lowerShelf;
+            badgeType = 'top_clearance';
+            label = 'Luz Superior';
+          }
+
           bays.push({
             yBottom: yB,
             yTop: yT,
-            distance: Math.round(yT - yB)
+            distance: Math.round(yT - yB),
+            targetPart,
+            badgeType,
+            label
           });
         }
 
         if (roofBottomY !== Infinity && roofBottomY > shelfBoundsList[shelfBoundsList.length - 1].bounds.maxY) {
+          const lastShelf = shelfBoundsList[shelfBoundsList.length - 1].part;
           const lastY = shelfBoundsList[shelfBoundsList.length - 1].bounds.maxY;
           bays.push({
             yBottom: lastY,
             yTop: roofBottomY,
-            distance: Math.round(roofBottomY - lastY)
+            distance: Math.round(roofBottomY - lastY),
+            targetPart: lastShelf,
+            badgeType: 'top_clearance',
+            label: 'Luz Superior'
           });
         }
       }
@@ -5253,29 +5505,36 @@ private createHandleMesh(
         );
         this.internalClearanceGroup.add(tBot, tTop);
 
-        const sprite = this.createInternalClearanceBadge(`↕ Luz: ${bay.distance} mm`, false);
+        const sprite = this.createInternalClearanceBadge(`↕ ${bay.distance} mm`, false, true);
         const midY = (bay.yBottom + bay.yTop) / 2;
-        sprite.position.set(refX, midY, refZ + 10);
+        sprite.position.set(refX, midY, refZ + 12);
+        if (bay.targetPart) {
+          const badgeUserData: DimensionBadgeUserData = {
+            isDimensionBadge: true,
+            badgeType: bay.badgeType,
+            part: bay.targetPart,
+            currentValue: bay.distance,
+            label: bay.label,
+            referenceY: bay.badgeType === 'bottom_clearance' ? bay.yBottom : bay.yTop,
+            baseScaleX: 140,
+            baseScaleY: 38
+          };
+          sprite.userData = {
+            ...sprite.userData,
+            ...badgeUserData
+          };
+          this.editableDimensionSprites.push(sprite);
+        }
         this.internalClearanceGroup.add(sprite);
       }
     }
 
-    // 7. Cota Horizontal de Luz Interna (Ancho Útil) y Profundidad Útil
+    // 7. Cota Horizontal de Luz Interna (Ancho Útil) Limpia
     if (leftInnerX !== null && rightInnerX !== null) {
       const innerWidth = Math.round(rightInnerX - leftInnerX);
       if (innerWidth > 40) {
-        const backPiece = moduleParts.find(p => p.componentRole === 'back' || (p.name || '').toLowerCase().includes('fondo'));
-        let depthText = '';
-        const backZ = backPiece
-          ? this.getPartBounds(backPiece).maxZ
-          : Math.min(...moduleParts.map(p => this.getPartBounds(p).minZ));
         const maxZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
-        const innerDepth = Math.round(maxZ - backZ);
-        if (innerDepth > 40) {
-          depthText = ` (Prof: ${innerDepth} mm)`;
-        }
-
-        const refZ = maxZ + 16;
+        const refZ = maxZ + 26;
         const yLine = floorTopY + 28;
         const pLeft = new THREE.Vector3(leftInnerX, yLine, refZ);
         const pRight = new THREE.Vector3(rightInnerX, yLine, refZ);
@@ -5315,8 +5574,8 @@ private createHandleMesh(
         this.internalClearanceGroup.add(tL, tR);
 
         const midX = (leftInnerX + rightInnerX) / 2;
-        const horizBadge = this.createInternalClearanceBadge(`↔ Luz int: ${innerWidth} mm${depthText}`, true);
-        horizBadge.position.set(midX, yLine + 22, refZ + 10);
+        const horizBadge = this.createInternalClearanceBadge(`↔ ${innerWidth} mm`, true, false);
+        horizBadge.position.set(midX, yLine + 22, refZ + 12);
         this.internalClearanceGroup.add(horizBadge);
       }
     }
@@ -5342,13 +5601,14 @@ private createHandleMesh(
       depthTest: false
     });
     const tickMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2, depthTest: false });
+    const lateralOffset = Math.max(30, Math.min(100, selBounds.sx * 0.20));
 
     // Render Vertical Top Clearance Line
     if (clr.topClearance !== null && clr.topClearance > 5) {
       const topY = selBounds.maxY + clr.topClearance;
       const midY = (selBounds.maxY + topY) / 2;
-      const x = selBounds.px;
-      const z = selBounds.pz + selBounds.sz / 2 + 15;
+      const x = selBounds.px + lateralOffset;
+      const z = selBounds.pz + selBounds.sz / 2 + 28;
 
       const p1 = new THREE.Vector3(x, selBounds.maxY, z);
       const p2 = new THREE.Vector3(x, topY, z);
@@ -5369,8 +5629,23 @@ private createHandleMesh(
       ]), tickMat);
       this.dimensionGroup.add(t1, t2);
 
-      const sprite = this.createClearanceSprite(`↕ Luz: ${clr.topClearance} mm`);
+      const sprite = this.createClearanceSprite(`↕ ${clr.topClearance} mm`);
       sprite.position.set(x, midY, z + 12);
+      const badgeData: DimensionBadgeUserData = {
+        isDimensionBadge: true,
+        badgeType: 'top_clearance',
+        part,
+        currentValue: clr.topClearance,
+        label: 'Luz Superior',
+        referenceY: topY,
+        baseScaleX: 140,
+        baseScaleY: 38
+      };
+      sprite.userData = {
+        ...sprite.userData,
+        ...badgeData
+      };
+      this.editableDimensionSprites.push(sprite);
       this.dimensionGroup.add(sprite);
     }
 
@@ -5378,8 +5653,8 @@ private createHandleMesh(
     if (clr.bottomClearance !== null && clr.bottomClearance > 5) {
       const botY = selBounds.minY - clr.bottomClearance;
       const midY = (selBounds.minY + botY) / 2;
-      const x = selBounds.px;
-      const z = selBounds.pz + selBounds.sz / 2 + 15;
+      const x = selBounds.px + lateralOffset;
+      const z = selBounds.pz + selBounds.sz / 2 + 28;
 
       const p1 = new THREE.Vector3(x, botY, z);
       const p2 = new THREE.Vector3(x, selBounds.minY, z);
@@ -5399,8 +5674,23 @@ private createHandleMesh(
       ]), tickMat);
       this.dimensionGroup.add(t1, t2);
 
-      const sprite = this.createClearanceSprite(`↕ Luz: ${clr.bottomClearance} mm`);
+      const sprite = this.createClearanceSprite(`↕ ${clr.bottomClearance} mm`);
       sprite.position.set(x, midY, z + 12);
+      const badgeData: DimensionBadgeUserData = {
+        isDimensionBadge: true,
+        badgeType: 'bottom_clearance',
+        part,
+        currentValue: clr.bottomClearance,
+        label: 'Luz Inferior',
+        referenceY: botY,
+        baseScaleX: 140,
+        baseScaleY: 38
+      };
+      sprite.userData = {
+        ...sprite.userData,
+        ...badgeData
+      };
+      this.editableDimensionSprites.push(sprite);
       this.dimensionGroup.add(sprite);
     }
 
@@ -5409,7 +5699,7 @@ private createHandleMesh(
       const leftX = selBounds.minX - clr.leftClearance;
       const midX = (selBounds.minX + leftX) / 2;
       const y = selBounds.py;
-      const z = selBounds.pz + selBounds.sz / 2 + 15;
+      const z = selBounds.pz + selBounds.sz / 2 + 28;
 
       const p1 = new THREE.Vector3(leftX, y, z);
       const p2 = new THREE.Vector3(selBounds.minX, y, z);
@@ -5418,8 +5708,13 @@ private createHandleMesh(
       dashedLine.computeLineDistances();
       this.dimensionGroup.add(dashedLine);
 
-      const sprite = this.createClearanceSprite(`↔ Luz: ${clr.leftClearance} mm`);
+      const sprite = this.createClearanceSprite(`↔ ${clr.leftClearance} mm`, false);
       sprite.position.set(midX, y + 25, z + 12);
+      sprite.userData = {
+        ...sprite.userData,
+        baseScaleX: 140,
+        baseScaleY: 38
+      };
       this.dimensionGroup.add(sprite);
     }
 
@@ -5428,7 +5723,7 @@ private createHandleMesh(
       const rightX = selBounds.maxX + clr.rightClearance;
       const midX = (selBounds.maxX + rightX) / 2;
       const y = selBounds.py;
-      const z = selBounds.pz + selBounds.sz / 2 + 15;
+      const z = selBounds.pz + selBounds.sz / 2 + 28;
 
       const p1 = new THREE.Vector3(selBounds.maxX, y, z);
       const p2 = new THREE.Vector3(rightX, y, z);
@@ -5437,9 +5732,188 @@ private createHandleMesh(
       dashedLine.computeLineDistances();
       this.dimensionGroup.add(dashedLine);
 
-      const sprite = this.createClearanceSprite(`↔ Luz: ${clr.rightClearance} mm`);
+      const sprite = this.createClearanceSprite(`↔ ${clr.rightClearance} mm`, false);
       sprite.position.set(midX, y + 25, z + 12);
+      sprite.userData = {
+        ...sprite.userData,
+        baseScaleX: 140,
+        baseScaleY: 38
+      };
       this.dimensionGroup.add(sprite);
+    }
+  }
+
+  // --- INLINE 3D DIMENSION EDITOR (Edición Directa con Clic sobre Cotas 3D) ---
+
+  openInlineDimensionEditor(sprite: THREE.Sprite, data: DimensionBadgeUserData) {
+    const worldPos = new THREE.Vector3();
+    sprite.getWorldPosition(worldPos);
+    const screenPos = this.projectWorldToScreen(worldPos);
+    if (!screenPos) return;
+
+    this.ngZone.run(() => {
+      this.inlineDimensionEditor.set({
+        x: screenPos.x,
+        y: screenPos.y,
+        value: data.currentValue,
+        propType: data.badgeType,
+        part: data.part,
+        label: data.label,
+        referenceY: data.referenceY,
+        worldPos: worldPos.clone()
+      });
+    });
+
+    setTimeout(() => {
+      const input = this.inlineDimensionInputRef()?.nativeElement;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 40);
+  }
+
+  cancelInlineDimension() {
+    this.ngZone.run(() => {
+      this.inlineDimensionEditor.set(null);
+    });
+    if (this.controls) {
+      this.controls.enabled = true;
+    }
+  }
+
+  confirmInlineDimension(rawValue: string) {
+    const editor = this.inlineDimensionEditor();
+    if (!editor) return;
+
+    const cleanStr = String(rawValue || '').replace(/mm/gi, '').replace(',', '.').trim();
+    const numVal = Math.round(Number(cleanStr));
+    if (isNaN(numVal) || numVal <= 0) {
+      this.cancelInlineDimension();
+      return;
+    }
+
+    const part = editor.part;
+    const currentPart = this.parts().find(p => p.id === part.id) || part;
+
+    if (editor.propType === 'length' || editor.propType === 'width') {
+      const prop = editor.propType;
+      const updatedPart: Part = {
+        ...currentPart,
+        [prop]: numVal
+      };
+      // 1 único snapshot en Undo/Redo y persistencia en ProjectStorageService
+      this.projectStorage.updatePart(updatedPart, true);
+      this.partModified.emit({ part: updatedPart, updates: { [prop]: numVal } });
+
+      if (this.pieceObjectMap.has(currentPart.id)) {
+        this.previewPartUpdatesInPlace([{ part: currentPart, updates: { [prop]: numVal } }]);
+      } else {
+        this.disposeGroup(this.dimensionGroup);
+        if (this.show3dDimensions()) {
+          const b = this.getPartBounds(updatedPart);
+          this.renderPieceDimensions(updatedPart, b.px, b.py, b.pz, b.sx, b.sy, b.sz);
+        }
+      }
+    } else if (editor.propType === 'bottom_clearance' || editor.propType === 'top_clearance') {
+      const limits = this.getShelfVerticalLimits(currentPart);
+      const initBounds = this.getPartBounds(currentPart);
+      const halfThick = initBounds.sy / 2;
+
+      let targetPosY: number;
+      if (editor.referenceY !== undefined) {
+        if (editor.propType === 'bottom_clearance') {
+          // Distancia libre exacta respecto al borde superior de la pieza inferior
+          targetPosY = editor.referenceY + numVal + halfThick;
+        } else {
+          // Distancia libre exacta respecto al borde inferior de la pieza superior
+          targetPosY = editor.referenceY - numVal - halfThick;
+        }
+      } else {
+        if (editor.propType === 'bottom_clearance') {
+          targetPosY = limits.belowTopY + numVal + halfThick;
+        } else {
+          targetPosY = limits.aboveBottomY - numVal - halfThick;
+        }
+      }
+
+      // Clamping físico que evita colisión contra paneles adyacentes manteniendo al menos 5 mm
+      const minSafeY = limits.belowTopY + 5 + halfThick;
+      const maxSafeY = limits.aboveBottomY - 5 - halfThick;
+      const clampedPosY = minSafeY <= maxSafeY
+        ? Math.max(minSafeY, Math.min(maxSafeY, Math.round(targetPosY)))
+        : Math.round(targetPosY);
+
+      const updatedPart: Part = {
+        ...currentPart,
+        posY: clampedPosY
+      };
+
+      // 1 único snapshot en Undo/Redo y persistencia en ProjectStorageService
+      this.projectStorage.updatePart(updatedPart, true);
+      this.partModified.emit({ part: updatedPart, updates: { posY: clampedPosY } });
+
+      if (this.pieceObjectMap.has(currentPart.id)) {
+        this.previewPartUpdatesInPlace([{ part: currentPart, updates: { posY: clampedPosY } }]);
+      }
+
+      // Actualización inmediata 3D de cotas y gizmo
+      const updatedParts = this.parts().map(p => p.id === updatedPart.id ? updatedPart : p);
+      const clr = this.computeClearanceInfo(updatedPart, updatedParts);
+      this.clearanceCalculated.emit(clr);
+
+      if (this.showClearances()) {
+        if (updatedPart.groupId && (this.isInternalShelf(updatedPart) || this.isInternalDivider(updatedPart))) {
+          this.renderModuleInternalClearances(updatedPart.groupId, updatedPart);
+        } else {
+          this.disposeGroup(this.internalClearanceGroup);
+          this.renderClearanceDimensions(updatedPart, updatedParts);
+        }
+      }
+      this.buildGizmo(
+        updatedPart,
+        updatedPart.posX ?? 0,
+        clampedPosY,
+        updatedPart.posZ ?? 0,
+        initBounds.sx,
+        initBounds.sy,
+        initBounds.sz
+      );
+    }
+
+    this.cancelInlineDimension();
+    this.requestRender(16);
+  }
+
+  private projectWorldToScreen(worldPos: THREE.Vector3): { x: number; y: number } | null {
+    if (!this.camera || !this.canvasRef()?.nativeElement) return null;
+    const canvas = this.canvasRef()!.nativeElement;
+    const rect = canvas.getBoundingClientRect();
+
+    // Verificación estricta en espacio de cámara para descartar puntos detrás del plano near
+    this.scratchCamCheck.copy(worldPos).applyMatrix4(this.camera.matrixWorldInverse);
+    if (this.scratchCamCheck.z > -this.camera.near) return null;
+
+    this.scratchEditorProj.copy(worldPos).project(this.camera);
+    if (this.scratchEditorProj.z > 1) return null;
+    return {
+      x: (this.scratchEditorProj.x * 0.5 + 0.5) * rect.width,
+      y: (-this.scratchEditorProj.y * 0.5 + 0.5) * rect.height
+    };
+  }
+
+  private updateInlineEditorScreenPosition() {
+    const editor = this.inlineDimensionEditor();
+    if (!editor) return;
+    const screenPos = this.projectWorldToScreen(editor.worldPos);
+    if (!screenPos) {
+      this.cancelInlineDimension();
+      return;
+    }
+    const container = this.inlineEditorContainerRef()?.nativeElement;
+    if (container) {
+      container.style.left = `${screenPos.x}px`;
+      container.style.top = `${screenPos.y}px`;
     }
   }
 
@@ -5662,6 +6136,10 @@ private createHandleMesh(
       this.closeContextMenu();
     }
 
+    if (this.inlineDimensionEditor() && e.button !== 0) {
+      this.cancelInlineDimension();
+    }
+
     // Right-Click tracking: record down coordinates & time to distinguish stationary click from drag pan/orbit
     if (e.button === 2) {
       this.rightPointerDownPos = { x: e.clientX, y: e.clientY };
@@ -5852,6 +6330,29 @@ private createHandleMesh(
           return;
         }
       }
+    }
+
+    // 0.9 Check if clicking on an Editable 3D Dimension Badge (Clearance or Part Dimension)
+    if (e.button === 0 && this.editableDimensionSprites.length > 0) {
+      const dimIntersects = this.raycaster.intersectObjects(this.editableDimensionSprites, false);
+      if (dimIntersects.length > 0) {
+        const hitSprite = dimIntersects[0].object as THREE.Sprite;
+        const badgeData = hitSprite.userData as DimensionBadgeUserData;
+        if (badgeData && badgeData.isDimensionBadge) {
+          if (this.controls) {
+            this.controls.enabled = false;
+          }
+          this.openInlineDimensionEditor(hitSprite, badgeData);
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
+
+    // Cancel open inline dimension editor when interacting with other 3D scene elements
+    if (this.inlineDimensionEditor()) {
+      this.cancelInlineDimension();
     }
 
     // 1. Check if clicking on Gizmo stretch handle or directly on a Corner (Vertex) / Continuous Edge (Arista) of the selected piece
@@ -6146,6 +6647,18 @@ private createHandleMesh(
               const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
               if (isDoubleClickSamePart || isAlreadySingleIsolated || this.isInternalShelf(hitPart) || this.isInternalDivider(hitPart)) {
                 partsToSelect = [hitPart];
+                if (this.isInternalShelf(hitPart) && !e.altKey && !e.shiftKey) {
+                  const cavity = this.partGeometry.getModuleCavityCenter(hitPart, this.parts());
+                  if (cavity) {
+                    const isOffX = Math.abs((hitPart.posX ?? 0) - cavity.x) > 1.5;
+                    const isOffZ = Math.abs((hitPart.posZ ?? 0) - cavity.z) > 1.5;
+                    if (isOffX || isOffZ) {
+                      hitPart.posX = cavity.x;
+                      hitPart.posZ = cavity.z;
+                      this.projectStorage.updatePart({ ...hitPart, posX: cavity.x, posZ: cavity.z });
+                    }
+                  }
+                }
               } else {
                 partsToSelect = groupParts.length > 0 ? groupParts : [hitPart];
               }
@@ -6197,7 +6710,7 @@ private createHandleMesh(
             this.camera.getWorldDirection(camDir);
             const hitPoint = intersects[0].point.clone();
 
-            if (this.isInternalShelf(hitPart) && !e.altKey) {
+            if (this.isInternalShelf(hitPart) && !e.altKey && !e.shiftKey) {
               const absY = Math.abs(camDir.y);
               if (absY > 0.85) {
                 this.camera.getWorldDirection(camDir);
@@ -6208,7 +6721,7 @@ private createHandleMesh(
                 const coplanarPt = new THREE.Vector3(hitPart.posX ?? 0, hitPart.posY ?? 0, hitPart.posZ ?? 0);
                 this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), coplanarPt);
               }
-            } else if (this.isInternalDivider(hitPart) && !e.altKey) {
+            } else if (this.isInternalDivider(hitPart) && !e.altKey && !e.shiftKey) {
               const coplanarPt = new THREE.Vector3(hitPart.posX ?? 0, hitPart.posY ?? 0, hitPart.posZ ?? 0);
               this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), coplanarPt);
             } else {
@@ -6925,9 +7438,7 @@ private createHandleMesh(
                 this.clearLegSnapGuides();
                 this.clearPartSnapGuides();
               }
-              if (this.isInternalShelf(part) && !e.altKey) {
-                targetPos.x = part.posX ?? 0;
-              } else if (this.isInternalDivider(part) && !e.altKey) {
+              if (this.isInternalDivider(part) && !e.altKey && !e.shiftKey) {
                 const limits = this.getDividerHorizontalLimits(part);
                 if (Math.abs(targetPos.x - limits.centerSnapX) <= 15) {
                   targetPos.x = limits.centerSnapX;
@@ -6944,6 +7455,13 @@ private createHandleMesh(
                   targetPos.y = limits.centerSnapY;
                 }
                 targetPos.y = Math.max(limits.minAllowedY, Math.min(limits.maxAllowedY, targetPos.y));
+                const cavity = this.partGeometry.getModuleCavityCenter(part, this.parts());
+                if (cavity) {
+                  targetPos.x = cavity.x;
+                  targetPos.z = cavity.z;
+                  updates.posX = cavity.x;
+                  updates.posZ = cavity.z;
+                }
                 if (part.groupId) {
                   this.renderModuleInternalClearances(part.groupId, part, targetPos.y);
                 }
@@ -6990,9 +7508,7 @@ private createHandleMesh(
             } else if (hit.axis === 'z') {
               const steppedDelta = Math.round(deltaWorld.z / snap) * snap;
               targetPos.z += steppedDelta;
-              if ((this.isInternalShelf(part) || this.isInternalDivider(part)) && !e.altKey) {
-                targetPos.z = part.posZ ?? 0;
-              } else if (this.isMagneticSnap()) {
+              if (this.isMagneticSnap()) {
                 const snapRes = this.applyMagneticSnapToPosition(part, targetPos, 'z', 38);
                 targetPos.z = snapRes.pos.z;
                 if (snapRes.isSnapped && snapRes.snappedPart) {
@@ -7169,7 +7685,8 @@ private createHandleMesh(
         const isInternalRailPiece = !!(
           this.dragInitialPart &&
           (this.isInternalShelf(this.dragInitialPart) || this.isInternalDivider(this.dragInitialPart)) &&
-          !e.altKey
+          !e.altKey &&
+          !e.shiftKey
         );
 
         if (hasPlaneHit || isInternalRailPiece) {
@@ -7362,7 +7879,11 @@ private createHandleMesh(
             const isShelf = this.isInternalShelf(part);
             const isDivider = this.isInternalDivider(part);
 
-            if (isShelf && !e.altKey) {
+            const dxScreen = Math.abs(e.clientX - this.dragStartPointer.x);
+            const dyScreen = Math.abs(e.clientY - this.dragStartPointer.y);
+            const isEscaped = e.altKey || (e.shiftKey && dxScreen > 15) || (dxScreen > 45 && dxScreen > dyScreen * 1.8);
+
+            if (isShelf && !isEscaped) {
               let candY = part.posY ?? 0;
               if (hasPlaneHit) {
                 const deltaY = this.scratchCurrentIntersection.y - this.dragPlaneIntersectionStart.y;
@@ -7381,10 +7902,11 @@ private createHandleMesh(
               }
               candY = Math.max(limits.minAllowedY, Math.min(limits.maxAllowedY, candY));
 
+              const cavity = this.partGeometry.getModuleCavityCenter(part, this.parts());
               const targetPos = {
-                x: part.posX ?? 0,
+                x: cavity ? cavity.x : (part.posX ?? 0),
                 y: Math.round(candY),
-                z: part.posZ ?? 0
+                z: cavity ? cavity.z : (part.posZ ?? 0)
               };
 
               const updates: Partial<Part> = {
@@ -7403,7 +7925,7 @@ private createHandleMesh(
               return;
             }
 
-            if (isDivider && !e.altKey) {
+            if (isDivider && !isEscaped) {
               let candX = part.posX ?? 0;
               if (hasPlaneHit) {
                 const deltaX = this.scratchCurrentIntersection.x - this.dragPlaneIntersectionStart.x;
@@ -7561,19 +8083,37 @@ private createHandleMesh(
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
+    // Hover feedback for 3D Editable Dimension Badges
+    if (this.editableDimensionSprites.length > 0) {
+      const dimIntersects = this.raycaster.intersectObjects(this.editableDimensionSprites, false);
+      if (dimIntersects.length > 0) {
+        this.setHoveredGizmoMesh(null);
+        this.hideDynamicEdgeHandle();
+        this.setHoveredDimensionSprite(dimIntersects[0].object as THREE.Sprite);
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+    this.setHoveredDimensionSprite(null);
+
     if (this.gizmoHitMeshes.length > 0) {
       const gizmoIntersects = this.raycaster.intersectObjects(this.gizmoHitMeshes, true);
       if (gizmoIntersects.length > 0) {
         this.hideDynamicEdgeHandle();
-        const hit = gizmoIntersects[0].object.userData as GizmoHitData;
+        const hitMesh = gizmoIntersects[0].object as THREE.Mesh;
+        this.setHoveredGizmoMesh(hitMesh);
+        const hit = hitMesh.userData as GizmoHitData;
         if (hit.type === 'axis') {
           canvas.style.cursor = 'grab';
+        } else if (hit.cursor) {
+          canvas.style.cursor = hit.cursor;
         } else {
           canvas.style.cursor = hit.handleTarget === 'length' ? 'ew-resize' : 'ns-resize';
         }
         return;
       }
     }
+    this.setHoveredGizmoMesh(null);
 
     // Detección matemática de esquinas (vértices) y cualquier tramo continuo de arista de la pieza seleccionada
     const edgeOrCornerHit = this.detectSelectedPartEdgeOrCornerHover(e.clientX, e.clientY);
@@ -8066,6 +8606,9 @@ private createHandleMesh(
     this.clearWallSnapGuides();
     this.clearLegSnapGuides();
     this.clearPartSnapGuides();
+    if (this.controls && !this.inlineDimensionEditor()) {
+      this.controls.enabled = true;
+    }
   }
 
   // --- CAD TOOLS & PUSH/PULL FACE RAYCASTING ---
@@ -8908,6 +9451,18 @@ private createHandleMesh(
   selectSinglePartFromContext() {
     const part = this.contextMenuPart();
     if (!part) return;
+    if (part.groupId && this.isInternalShelf(part)) {
+      const cavity = this.partGeometry.getModuleCavityCenter(part, this.parts());
+      if (cavity) {
+        const isOffX = Math.abs((part.posX ?? 0) - cavity.x) > 1.5;
+        const isOffZ = Math.abs((part.posZ ?? 0) - cavity.z) > 1.5;
+        if (isOffX || isOffZ) {
+          part.posX = cavity.x;
+          part.posZ = cavity.z;
+          this.projectStorage.updatePart({ ...part, posX: cavity.x, posZ: cavity.z });
+        }
+      }
+    }
     this.partsSelected.emit([part.id]);
     this.partSelected.emit(part);
     this.applyMaterialToWholeGroup.set(false);
@@ -10186,6 +10741,10 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      if (this.inlineDimensionEditor()) {
+        this.cancelInlineDimension();
+        return;
+      }
       this.closeContextMenu();
       this.clearSelection();
       this.clearMeasure();
@@ -12547,6 +13106,9 @@ private applyMagneticSnapToPosition(
       group.remove(child);
       child.traverse(obj => {
         if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
+          if (this.hoveredGizmoMesh === obj) {
+            this.hoveredGizmoMesh = null;
+          }
           if (obj.geometry && !obj.geometry.userData?.['isShared']) {
             obj.geometry.dispose();
           }
@@ -12562,6 +13124,13 @@ private applyMagneticSnapToPosition(
             }
           }
         } else if (obj instanceof THREE.Sprite) {
+          if (this.hoveredDimensionSprite === obj) {
+            this.hoveredDimensionSprite = null;
+          }
+          const idx = this.editableDimensionSprites.indexOf(obj as THREE.Sprite);
+          if (idx !== -1) {
+            this.editableDimensionSprites.splice(idx, 1);
+          }
           if (obj.material.map && !obj.material.map.userData?.['isShared']) {
             obj.material.map.dispose();
           }

@@ -920,4 +920,482 @@ export class PartGeometryService {
     }
     return collisions;
   }
+
+  /**
+   * Determina si una pieza es un entrepaño o repisa interna horizontal perteneciente a un módulo.
+   */
+  isInternalShelf(part: Part): boolean {
+    if (!part?.groupId) return false;
+    const role = part.componentRole;
+    if (role === 'shelf') return true;
+    if (
+      role === 'top' ||
+      role === 'bottom' ||
+      role === 'countertop' ||
+      role === 'backsplash' ||
+      role === 'plinth' ||
+      role === 'side_left' ||
+      role === 'side_right' ||
+      role === 'back' ||
+      role === 'door' ||
+      role === 'divider' ||
+      role === 'tie'
+    ) {
+      return false;
+    }
+    const name = (part.name || '').toLowerCase();
+    if (
+      name.includes('repisa') ||
+      name.includes('entrepaño') ||
+      name.includes('entrepano') ||
+      name.includes('estante') ||
+      name.includes('balda') ||
+      name.includes('shelf')
+    ) {
+      return true;
+    }
+    if (
+      part.orientation === 'horizontal' &&
+      (role === 'drawer_box' || name.includes('cajón') || name.includes('cajon'))
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Determina si una pieza es un divisor vertical interno perteneciente a un módulo.
+   */
+  isInternalDivider(part: Part): boolean {
+    if (!part?.groupId) return false;
+    const role = part.componentRole;
+    if (role === 'divider') return true;
+    if (
+      role === 'side_left' ||
+      role === 'side_right' ||
+      role === 'top' ||
+      role === 'bottom' ||
+      role === 'back' ||
+      role === 'door' ||
+      role === 'countertop' ||
+      role === 'backsplash' ||
+      role === 'plinth' ||
+      role === 'tie' ||
+      role === 'shelf'
+    ) {
+      return false;
+    }
+    const name = (part.name || '').toLowerCase();
+    if (name.includes('divisor') || name.includes('separador') || name.includes('tabique')) {
+      return true;
+    }
+    if (
+      (part.orientation === 'vertical_yz' || part.orientation === 'vertical_xy') &&
+      !name.includes('lateral') &&
+      !name.includes('costado') &&
+      !name.includes('zócalo') &&
+      !name.includes('zocalo') &&
+      !name.includes('fondo') &&
+      !name.includes('puerta')
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Calcula el centro exacto de la cavidad interna (en X y Z) para una repisa dentro de su módulo.
+   * Respeta la orientación del módulo a 0°, 90°, 180° y 270°, y auto-detecta las caras internas de los costados o divisores adyacentes.
+   */
+  getModuleCavityCenter(part: Part, allParts: Part[]): { x: number; z: number } | null {
+    if (!part?.groupId) return null;
+    const groupParts = allParts.filter(p => p.groupId === part.groupId);
+    if (groupParts.length < 2) return null;
+
+    const partBounds = this.getWorldAABB(part);
+
+    const sLeft = groupParts.find(p => p.componentRole === 'side_left');
+    const sRight = groupParts.find(p => p.componentRole === 'side_right');
+
+    const yzSides = groupParts.filter(
+      p => p.orientation === 'vertical_yz' &&
+      p.componentRole !== 'plinth' &&
+      p.componentRole !== 'back' &&
+      p.componentRole !== 'door' &&
+      p.componentRole !== 'drawer_front' &&
+      p.componentRole !== 'drawer_lateral' &&
+      p.componentRole !== 'drawer_box' &&
+      !p.name.toLowerCase().includes('zocalo') &&
+      !p.name.toLowerCase().includes('zócalo') &&
+      !p.name.toLowerCase().includes('fondo')
+    );
+
+    const xySides = groupParts.filter(
+      p => p.orientation === 'vertical_xy' &&
+      p.componentRole !== 'plinth' &&
+      p.componentRole !== 'back' &&
+      p.componentRole !== 'door' &&
+      p.componentRole !== 'drawer_front' &&
+      p.componentRole !== 'drawer_lateral' &&
+      p.componentRole !== 'drawer_box' &&
+      !p.name.toLowerCase().includes('zocalo') &&
+      !p.name.toLowerCase().includes('zócalo') &&
+      !p.name.toLowerCase().includes('fondo')
+    );
+
+    const isRotatedWidthZ = (sLeft?.orientation === 'vertical_xy' || sRight?.orientation === 'vertical_xy')
+      || (xySides.length >= 2 && xySides.length >= yzSides.length);
+
+    if (isRotatedWidthZ) {
+      let leftMaxZ = -Infinity;
+      let rightMinZ = Infinity;
+
+      for (const p of xySides) {
+        if (p.id === part.id) continue;
+        const pb = this.getWorldAABB(p);
+        const overlapY = Math.min(partBounds.maxY, pb.maxY) - Math.max(partBounds.minY, pb.minY);
+        if (overlapY > 15 || pb.sy > 300) {
+          if (pb.maxZ <= (part.posZ ?? 0) + 15 && pb.maxZ > leftMaxZ) {
+            leftMaxZ = pb.maxZ;
+          }
+          if (pb.minZ >= (part.posZ ?? 0) - 15 && pb.minZ < rightMinZ) {
+            rightMinZ = pb.minZ;
+          }
+        }
+      }
+
+      if (leftMaxZ === -Infinity || rightMinZ === Infinity) {
+        if (sLeft && sRight && sLeft.orientation === 'vertical_xy') {
+          const bL = this.getWorldAABB(sLeft);
+          const bR = this.getWorldAABB(sRight);
+          leftMaxZ = Math.min(bL.maxZ, bR.maxZ);
+          rightMinZ = Math.max(bL.minZ, bR.minZ);
+        } else if (xySides.length >= 2) {
+          const sorted = [...xySides].sort((a, b) => (a.posZ ?? 0) - (b.posZ ?? 0));
+          leftMaxZ = this.getWorldAABB(sorted[0]).maxZ;
+          rightMinZ = this.getWorldAABB(sorted[sorted.length - 1]).minZ;
+        } else {
+          let minZ = Infinity, maxZ = -Infinity;
+          for (const gp of groupParts) {
+            const gb = this.getWorldAABB(gp);
+            if (gb.minZ < minZ) minZ = gb.minZ;
+            if (gb.maxZ > maxZ) maxZ = gb.maxZ;
+          }
+          const t = part.thickness || 18;
+          leftMaxZ = minZ + t;
+          rightMinZ = maxZ - t;
+        }
+      }
+
+      const cavityZ = Math.round(((leftMaxZ + rightMinZ) / 2) * 10) / 10;
+      const cavityX = part.posX ?? 0;
+
+      return { x: cavityX, z: cavityZ };
+    } else {
+      let leftMaxX = -Infinity;
+      let rightMinX = Infinity;
+
+      for (const p of yzSides) {
+        if (p.id === part.id) continue;
+        const pb = this.getWorldAABB(p);
+        const overlapY = Math.min(partBounds.maxY, pb.maxY) - Math.max(partBounds.minY, pb.minY);
+        if (overlapY > 15 || pb.sy > 300) {
+          if (pb.maxX <= (part.posX ?? 0) + 15 && pb.maxX > leftMaxX) {
+            leftMaxX = pb.maxX;
+          }
+          if (pb.minX >= (part.posX ?? 0) - 15 && pb.minX < rightMinX) {
+            rightMinX = pb.minX;
+          }
+        }
+      }
+
+      if (leftMaxX === -Infinity || rightMinX === Infinity) {
+        if (sLeft && sRight && sLeft.orientation === 'vertical_yz') {
+          const bL = this.getWorldAABB(sLeft);
+          const bR = this.getWorldAABB(sRight);
+          leftMaxX = Math.min(bL.maxX, bR.maxX);
+          rightMinX = Math.max(bL.minX, bR.minX);
+        } else if (yzSides.length >= 2) {
+          const sorted = [...yzSides].sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
+          leftMaxX = this.getWorldAABB(sorted[0]).maxX;
+          rightMinX = this.getWorldAABB(sorted[sorted.length - 1]).minX;
+        } else {
+          let minX = Infinity, maxX = -Infinity;
+          for (const gp of groupParts) {
+            const gb = this.getWorldAABB(gp);
+            if (gb.minX < minX) minX = gb.minX;
+            if (gb.maxX > maxX) maxX = gb.maxX;
+          }
+          const t = part.thickness || 18;
+          leftMaxX = minX + t;
+          rightMinX = maxX - t;
+        }
+      }
+
+      const cavityX = Math.round(((leftMaxX + rightMinX) / 2) * 10) / 10;
+      const cavityZ = part.posZ ?? 0;
+
+      return { x: cavityX, z: cavityZ };
+    }
+  }
+
+  /**
+   * Encuentra el vano vertical libre más grande dentro del módulo para posicionar un nuevo entrepaño en su centro exacto.
+   */
+  findLargestVerticalGap(part: Part, allParts: Part[]): { gapBottom: number; gapTop: number; bestY: number } {
+    const defaultY = (part.posY ?? 0) + 150;
+    if (!part?.groupId) {
+      return { gapBottom: part.posY ?? 0, gapTop: defaultY, bestY: defaultY };
+    }
+    const groupParts = allParts.filter(p => p.groupId === part.groupId);
+    if (groupParts.length === 0) {
+      return { gapBottom: part.posY ?? 0, gapTop: defaultY, bestY: defaultY };
+    }
+
+    const partBounds = this.getWorldAABB(part);
+
+    const columnParts = groupParts.filter(p => {
+      const pb = this.getWorldAABB(p);
+      const overlapX = Math.min(partBounds.maxX, pb.maxX) - Math.max(partBounds.minX, pb.minX);
+      const overlapZ = Math.min(partBounds.maxZ, pb.maxZ) - Math.max(partBounds.minZ, pb.minZ);
+      return overlapX > 15 && overlapZ > 15;
+    });
+
+    const bottomPart = groupParts.find(p => p.componentRole === 'bottom') ||
+      columnParts.filter(p => p.orientation === 'horizontal' && p.componentRole !== 'top' && p.componentRole !== 'tie' && !this.isInternalShelf(p))
+                 .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0))[0];
+
+    const floorTopY = bottomPart ? this.getWorldAABB(bottomPart).maxY : (partBounds.minY - 300);
+
+    const topPart = groupParts.find(p => p.componentRole === 'top' || p.componentRole === 'tie') ||
+      columnParts.filter(p => p.orientation === 'horizontal' && p.componentRole !== 'bottom' && p.componentRole !== 'plinth' && !this.isInternalShelf(p))
+                 .sort((a, b) => (b.posY ?? 0) - (a.posY ?? 0))[0];
+
+    let roofBottomY = topPart ? this.getWorldAABB(topPart).minY : Infinity;
+    if (roofBottomY === Infinity) {
+      const sides = groupParts.filter(p => p.orientation === 'vertical_yz' || p.orientation === 'vertical_xy');
+      if (sides.length > 0) {
+        roofBottomY = Math.max(...sides.map(s => this.getWorldAABB(s).maxY));
+      } else {
+        roofBottomY = partBounds.maxY + 300;
+      }
+    }
+
+    const shelvesInColumn = columnParts.filter(p => {
+      if (bottomPart && p.id === bottomPart.id) return false;
+      if (topPart && p.id === topPart.id) return false;
+      return this.isInternalShelf(p);
+    });
+
+    if (!shelvesInColumn.some(p => p.id === part.id)) {
+      shelvesInColumn.push(part);
+    }
+
+    const shelfBoundsList = shelvesInColumn
+      .map(s => this.getWorldAABB(s))
+      .sort((a, b) => a.minY - b.minY);
+
+    interface Gap {
+      bottom: number;
+      top: number;
+      height: number;
+    }
+    const gaps: Gap[] = [];
+
+    gaps.push({
+      bottom: floorTopY,
+      top: shelfBoundsList[0].minY,
+      height: shelfBoundsList[0].minY - floorTopY
+    });
+
+    for (let i = 0; i < shelfBoundsList.length - 1; i++) {
+      const b = shelfBoundsList[i].maxY;
+      const t = shelfBoundsList[i + 1].minY;
+      gaps.push({
+        bottom: b,
+        top: t,
+        height: t - b
+      });
+    }
+
+    gaps.push({
+      bottom: shelfBoundsList[shelfBoundsList.length - 1].maxY,
+      top: roofBottomY,
+      height: roofBottomY - shelfBoundsList[shelfBoundsList.length - 1].maxY
+    });
+
+    let bestGap = gaps[0];
+    for (let i = 1; i < gaps.length; i++) {
+      if (gaps[i].height >= bestGap.height) {
+        bestGap = gaps[i];
+      }
+    }
+
+    const bestY = Math.round((bestGap.bottom + bestGap.top) / 2);
+    return {
+      gapBottom: Math.round(bestGap.bottom),
+      gapTop: Math.round(bestGap.top),
+      bestY
+    };
+  }
+
+  /**
+   * Encuentra el hueco horizontal libre más grande dentro del módulo para posicionar un nuevo divisor vertical en su centro exacto.
+   */
+  findLargestHorizontalGap(part: Part, allParts: Part[]): { gapMin: number; gapMax: number; bestPos: number; axis: 'x' | 'z' } {
+    const partBounds = this.getWorldAABB(part);
+    const defaultX = (part.posX ?? 0) + 150;
+    if (!part?.groupId) {
+      return { gapMin: part.posX ?? 0, gapMax: defaultX, bestPos: defaultX, axis: 'x' };
+    }
+    const groupParts = allParts.filter(p => p.groupId === part.groupId);
+    if (groupParts.length === 0) {
+      return { gapMin: part.posX ?? 0, gapMax: defaultX, bestPos: defaultX, axis: 'x' };
+    }
+
+    const sLeft = groupParts.find(p => p.componentRole === 'side_left');
+    const sRight = groupParts.find(p => p.componentRole === 'side_right');
+
+    const isWidthZ = part.orientation === 'vertical_xy' ||
+      sLeft?.orientation === 'vertical_xy' ||
+      sRight?.orientation === 'vertical_xy';
+
+    if (isWidthZ) {
+      const xyPanels = groupParts.filter(p => {
+        if (
+          p.componentRole === 'plinth' ||
+          p.componentRole === 'back' ||
+          p.componentRole === 'door' ||
+          p.componentRole === 'drawer_front' ||
+          p.componentRole === 'drawer_lateral' ||
+          p.componentRole === 'drawer_box' ||
+          p.name.toLowerCase().includes('zocalo') ||
+          p.name.toLowerCase().includes('zócalo') ||
+          p.name.toLowerCase().includes('fondo')
+        ) return false;
+        return p.orientation === 'vertical_xy';
+      });
+
+      const dividers = xyPanels.filter(p => this.isInternalDivider(p));
+      if (!dividers.some(p => p.id === part.id)) {
+        dividers.push(part);
+      }
+      dividers.sort((a, b) => (a.posZ ?? 0) - (b.posZ ?? 0));
+
+      const sides = xyPanels.filter(p => !this.isInternalDivider(p));
+      let minBoundaryZ = -Infinity;
+      let maxBoundaryZ = Infinity;
+      if (sLeft && sRight && sLeft.orientation === 'vertical_xy') {
+        const bL = this.getWorldAABB(sLeft);
+        const bR = this.getWorldAABB(sRight);
+        minBoundaryZ = Math.min(bL.maxZ, bR.maxZ);
+        maxBoundaryZ = Math.max(bL.minZ, bR.minZ);
+      } else if (sides.length >= 2) {
+        sides.sort((a, b) => (a.posZ ?? 0) - (b.posZ ?? 0));
+        minBoundaryZ = this.getWorldAABB(sides[0]).maxZ;
+        maxBoundaryZ = this.getWorldAABB(sides[sides.length - 1]).minZ;
+      } else {
+        minBoundaryZ = (part.posZ ?? 0) - 300;
+        maxBoundaryZ = (part.posZ ?? 0) + 300;
+      }
+
+      const gaps: { min: number; max: number; size: number }[] = [];
+      const dBounds = dividers.map(d => this.getWorldAABB(d));
+
+      gaps.push({ min: minBoundaryZ, max: dBounds[0].minZ, size: dBounds[0].minZ - minBoundaryZ });
+      for (let i = 0; i < dBounds.length - 1; i++) {
+        gaps.push({
+          min: dBounds[i].maxZ,
+          max: dBounds[i + 1].minZ,
+          size: dBounds[i + 1].minZ - dBounds[i].maxZ
+        });
+      }
+      gaps.push({
+        min: dBounds[dBounds.length - 1].maxZ,
+        max: maxBoundaryZ,
+        size: maxBoundaryZ - dBounds[dBounds.length - 1].maxZ
+      });
+
+      let bestGap = gaps[0];
+      for (let i = 1; i < gaps.length; i++) {
+        if (gaps[i].size >= bestGap.size) {
+          bestGap = gaps[i];
+        }
+      }
+      return {
+        gapMin: Math.round(bestGap.min),
+        gapMax: Math.round(bestGap.max),
+        bestPos: Math.round((bestGap.min + bestGap.max) / 2),
+        axis: 'z'
+      };
+    } else {
+      const yzPanels = groupParts.filter(p => {
+        if (
+          p.componentRole === 'plinth' ||
+          p.componentRole === 'back' ||
+          p.componentRole === 'door' ||
+          p.componentRole === 'drawer_front' ||
+          p.componentRole === 'drawer_lateral' ||
+          p.componentRole === 'drawer_box' ||
+          p.name.toLowerCase().includes('zocalo') ||
+          p.name.toLowerCase().includes('zócalo') ||
+          p.name.toLowerCase().includes('fondo')
+        ) return false;
+        return p.orientation === 'vertical_yz';
+      });
+
+      const dividers = yzPanels.filter(p => this.isInternalDivider(p));
+      if (!dividers.some(p => p.id === part.id)) {
+        dividers.push(part);
+      }
+      dividers.sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
+
+      const sides = yzPanels.filter(p => !this.isInternalDivider(p));
+      let minBoundaryX = -Infinity;
+      let maxBoundaryX = Infinity;
+      if (sLeft && sRight && sLeft.orientation === 'vertical_yz') {
+        const bL = this.getWorldAABB(sLeft);
+        const bR = this.getWorldAABB(sRight);
+        minBoundaryX = Math.min(bL.maxX, bR.maxX);
+        maxBoundaryX = Math.max(bL.minX, bR.minX);
+      } else if (sides.length >= 2) {
+        sides.sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
+        minBoundaryX = this.getWorldAABB(sides[0]).maxX;
+        maxBoundaryX = this.getWorldAABB(sides[sides.length - 1]).minX;
+      } else {
+        minBoundaryX = (part.posX ?? 0) - 300;
+        maxBoundaryX = (part.posX ?? 0) + 300;
+      }
+
+      const gaps: { min: number; max: number; size: number }[] = [];
+      const dBounds = dividers.map(d => this.getWorldAABB(d));
+
+      gaps.push({ min: minBoundaryX, max: dBounds[0].minX, size: dBounds[0].minX - minBoundaryX });
+      for (let i = 0; i < dBounds.length - 1; i++) {
+        gaps.push({
+          min: dBounds[i].maxX,
+          max: dBounds[i + 1].minX,
+          size: dBounds[i + 1].minX - dBounds[i].maxX
+        });
+      }
+      gaps.push({
+        min: dBounds[dBounds.length - 1].maxX,
+        max: maxBoundaryX,
+        size: maxBoundaryX - dBounds[dBounds.length - 1].maxX
+      });
+
+      let bestGap = gaps[0];
+      for (let i = 1; i < gaps.length; i++) {
+        if (gaps[i].size >= bestGap.size) {
+          bestGap = gaps[i];
+        }
+      }
+      return {
+        gapMin: Math.round(bestGap.min),
+        gapMax: Math.round(bestGap.max),
+        bestPos: Math.round((bestGap.min + bestGap.max) / 2),
+        axis: 'x'
+      };
+    }
+  }
 }

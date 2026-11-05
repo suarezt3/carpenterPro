@@ -21,6 +21,69 @@
     </div>
   }
 
+  <!-- INLINE 3D DIMENSION / CLEARANCE EDITOR (Edición Directa al Clic sobre Cotas 3D) -->
+  @if (inlineDimensionEditor(); as editor) {
+    <div
+      #inlineEditorContainer
+      class="cad-inline-editor absolute z-50 flex items-center bg-zinc-950/95 backdrop-blur-md rounded-lg border px-2 py-1.5 gap-1.5 select-none pointer-events-auto"
+      [class.border-emerald-500]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
+      [class.border-blue-500]="editor.propType === 'length' || editor.propType === 'width'"
+      [style.left.px]="editor.x"
+      [style.top.px]="editor.y"
+      (pointerdown)="$event.stopPropagation()"
+      (mousedown)="$event.stopPropagation()"
+      (click)="$event.stopPropagation()"
+      (wheel)="$event.stopPropagation()">
+
+      <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded text-white flex items-center gap-1 shadow-xs"
+        [class.bg-emerald-600]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
+        [class.bg-blue-600]="editor.propType === 'length' || editor.propType === 'width'">
+        <hugeicons-icon [icon]="icons.edit" [size]="10" [strokeWidth]="2.5"></hugeicons-icon>
+        <span>{{ editor.label }}</span>
+      </span>
+
+      <div class="relative flex items-center">
+        <input
+          #inlineDimensionInput
+          type="number"
+          min="1"
+          max="6000"
+          step="1"
+          [value]="editor.value"
+          (keydown)="$event.stopPropagation()"
+          (keydown.enter)="confirmInlineDimension(inlineDimensionInput.value)"
+          (keydown.escape)="cancelInlineDimension()"
+          class="w-20 px-2 py-1 bg-zinc-900 text-white font-mono text-sm font-bold rounded border border-zinc-700 focus:outline-none focus:ring-2 focus:border-transparent text-center"
+          [class.focus:ring-emerald-500]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
+          [class.focus:ring-blue-500]="editor.propType === 'length' || editor.propType === 'width'"
+        />
+        <span class="ml-1 text-xs text-zinc-400 font-mono font-medium">mm</span>
+      </div>
+
+      <!-- Botón Confirmar (Check) -->
+      <button
+        type="button"
+        (click)="confirmInlineDimension(inlineDimensionInput.value)"
+        class="p-1 rounded text-white transition hover:scale-105 active:scale-95 cursor-pointer shadow-xs"
+        [class.bg-emerald-600]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
+        [class.hover:bg-emerald-500]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
+        [class.bg-blue-600]="editor.propType === 'length' || editor.propType === 'width'"
+        [class.hover:bg-blue-500]="editor.propType === 'length' || editor.propType === 'width'"
+        title="Aplicar cambio exacto (Enter)">
+        <hugeicons-icon [icon]="icons.checkCircle" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
+      </button>
+
+      <!-- Botón Cancelar (X) -->
+      <button
+        type="button"
+        (click)="cancelInlineDimension()"
+        class="p-1 rounded bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition cursor-pointer"
+        title="Cancelar (Escape)">
+        <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+      </button>
+    </div>
+  }
+
   <!-- PALETA VERTICAL IZQUIERDA DE HERRAMIENTAS CAD (ADAPTATIVA HD / FHD / 2K) -->
   <div class="cad-toolbar absolute top-2.5 left-2.5 z-30 flex flex-col items-center bg-white/95 text-zinc-700 backdrop-blur-md rounded-md border border-zinc-200/90 shadow-md pointer-events-auto transition-colors duration-200 max-h-[calc(100%-2.25rem)] overflow-y-auto scrollbar-none">
 
