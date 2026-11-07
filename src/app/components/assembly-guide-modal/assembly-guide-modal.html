@@ -1,0 +1,393 @@
+@if (isOpen()) {
+  <div
+    class="assembly-guide-backdrop fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-xs overflow-y-auto print:static print:p-0 print:m-0 print:bg-white print:overflow-visible"
+    (click)="closeModal()"
+    (keydown.escape)="closeModal()"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true">
+
+    <div
+      class="assembly-guide-card relative w-full max-w-6xl max-h-[94vh] flex flex-col bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 rounded-xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden print:static print:max-h-none print:w-full print:border-none print:shadow-none print:bg-white print:text-zinc-950 print:rounded-none"
+      (click)="$event.stopPropagation()">
+
+      <!-- BARRA SUPERIOR DE CONTROL (OCULTA EN @media print) -->
+      <header class="assembly-guide-toolbar shrink-0 px-4 sm:px-6 py-3.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/90 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <hugeicons-icon [icon]="icons.book" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm sm:text-base font-bold text-zinc-900 dark:text-white truncate">
+                {{ 'assemblyGuide.title' | t }}
+              </h2>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                RTA Manual
+              </span>
+            </div>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+              {{ project().name }} @if (project().clientName) { · {{ project().clientName }} }
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+          <!-- Selector para elegir Todos los Muebles o filtrar un mueble específico -->
+          <div class="flex items-center gap-1.5">
+            <label for="moduleGuideSelect" class="text-xs font-medium text-zinc-600 dark:text-zinc-400 hidden md:inline">
+              {{ 'assemblyGuide.filterModule' | t }}
+            </label>
+            <select
+              id="moduleGuideSelect"
+              [value]="selectedModuleId()"
+              (change)="onFilterChange($event)"
+              class="px-2.5 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md text-xs font-medium text-zinc-800 dark:text-zinc-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-2xs">
+              <option value="all">{{ 'assemblyGuide.allModules' | t }} ({{ allGuides().length }})</option>
+              @for (guide of allGuides(); track guide.moduleId) {
+                <option [value]="guide.moduleId">{{ guide.moduleName }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Botón Primario: Imprimir / Descargar Guía PDF -->
+          <button
+            type="button"
+            (click)="printGuide()"
+            class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.print" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            <span class="whitespace-nowrap">{{ 'assemblyGuide.printPdf' | t }}</span>
+          </button>
+
+          <!-- Botón Cerrar Modal -->
+          <button
+            type="button"
+            (click)="closeModal()"
+            [attr.aria-label]="'assemblyGuide.closeModal' | t"
+            class="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 rounded-md transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+          </button>
+        </div>
+      </header>
+
+      <!-- CUERPO DEL MANUAL IMPRIMIBLE -->
+      <div class="assembly-guide-body flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-10 scrollbar-thin print:p-0 print:m-0 print:space-y-8 print:overflow-visible">
+        @if (filteredGuides().length === 0) {
+          <!-- Estado Vacío -->
+          <div class="py-16 text-center space-y-3">
+            <div class="w-12 h-12 mx-auto rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-400 flex items-center justify-center">
+              <hugeicons-icon [icon]="icons.cube" [size]="24" [strokeWidth]="1.8"></hugeicons-icon>
+            </div>
+            <h3 class="text-base font-semibold text-zinc-800 dark:text-zinc-200">
+              {{ 'assemblyGuide.empty' | t }}
+            </h3>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
+              {{ 'assemblyGuide.emptyDesc' | t }}
+            </p>
+          </div>
+        } @else {
+          <!-- Iteración por cada Módulo / Mueble del Proyecto -->
+          @for (guide of filteredGuides(); track guide.moduleId; let gIdx = $index) {
+            <article class="assembly-module-document space-y-6 print:break-after-page print:space-y-6">
+
+              <!-- ENCABEZADO Y FICHA TÉCNICA GENERAL DEL MUEBLE -->
+              <section class="p-4 sm:p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 space-y-4 print:border-zinc-900 print:bg-white print:p-4 print:break-inside-avoid">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3 print:border-zinc-900">
+                  <div>
+                    <span class="text-[10px] font-mono font-bold tracking-widest text-blue-600 dark:text-blue-400 uppercase">
+                      MANUAL RTA · MUEBLE {{ gIdx + 1 }} DE {{ filteredGuides().length }}
+                    </span>
+                    <h1 class="text-xl sm:text-2xl font-black text-zinc-950 dark:text-white mt-0.5 print:text-zinc-950">
+                      {{ guide.moduleName }}
+                    </h1>
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2">
+                    <!-- Dimensiones Exteriores -->
+                    <div class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 shadow-2xs print:border-zinc-900 print:bg-white">
+                      <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
+                      <span class="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 print:text-zinc-950">
+                        {{ guide.dimensions.width }} × {{ guide.dimensions.height }} × {{ guide.dimensions.depth }} mm
+                      </span>
+                    </div>
+
+                    <!-- Total de Piezas -->
+                    <div class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 shadow-2xs print:border-zinc-900 print:bg-white">
+                      <hugeicons-icon [icon]="icons.layers" [size]="14" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
+                      <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 print:text-zinc-950">
+                        {{ guide.totalPartsCount }} {{ 'assemblyGuide.qty' | t }}
+                      </span>
+                    </div>
+
+                    <!-- Tiempo Estimado -->
+                    <div class="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 flex items-center gap-1.5 shadow-2xs print:border-zinc-900 print:bg-white print:text-zinc-950">
+                      <hugeicons-icon [icon]="icons.clock" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                      <span class="text-xs font-bold font-mono">
+                        ~{{ guide.estimatedAssemblyTimeMinutes }} {{ 'assemblyGuide.minutes' | t }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Herramientas Requeridas -->
+                <div class="space-y-1.5">
+                  <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 print:text-zinc-950">
+                    {{ 'assemblyGuide.requiredTools' | t }}
+                  </h3>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                    @for (toolKey of guide.requiredTools; track toolKey) {
+                      <div class="p-2 rounded-lg bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 shadow-2xs print:border-zinc-900 print:bg-white print:text-zinc-950">
+                        <hugeicons-icon [icon]="icons.settings" [size]="14" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+                        <span class="leading-tight">{{ toolKey | t }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </section>
+
+              <!-- DIAGRAMA GENERAL EXPLOSIVO NUMERADO (CANVAS HIGH-DPI) -->
+              <section class="space-y-2 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 bg-white dark:bg-zinc-900 shadow-xs print:border-zinc-900 print:shadow-none print:break-inside-avoid">
+                <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2 print:border-zinc-900">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                    <h3 class="text-sm sm:text-base font-bold text-zinc-900 dark:text-white print:text-zinc-950">
+                      {{ 'assemblyGuide.explodedViewTitle' | t }}
+                    </h3>
+                  </div>
+                  <span class="text-[11px] text-zinc-500 font-mono hidden sm:inline">
+                    {{ 'assemblyGuide.explodedViewSubtitle' | t }}
+                  </span>
+                </div>
+
+                <div class="relative w-full h-[320px] sm:h-[420px] lg:h-[480px] bg-white rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 print:border-zinc-900 print:h-[110mm]">
+                  <canvas
+                    #explodedCanvas
+                    class="w-full h-full block cursor-crosshair">
+                  </canvas>
+                </div>
+              </section>
+
+              <!-- TABLA DE DESPIECE VINCULADO CON CÓDIGOS P1..Pn -->
+              <section class="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-xs print:border-zinc-900 print:shadow-none print:break-inside-avoid">
+                <div class="px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between print:border-zinc-900 print:bg-zinc-100">
+                  <h3 class="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider print:text-zinc-950">
+                    {{ 'assemblyGuide.partsTableTitle' | t }} ({{ guide.pieces.length }})
+                  </h3>
+                  <span class="text-[10px] font-mono text-zinc-500">
+                    L1/L2 = Largos · A1/A2 = Anchos
+                  </span>
+                </div>
+
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs">
+                    <thead class="bg-zinc-100 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 uppercase text-[10px] font-mono border-b border-zinc-200 dark:border-zinc-800 print:border-zinc-900 print:bg-zinc-200 print:text-zinc-950">
+                      <tr>
+                        <th class="py-2 px-3 text-center w-14">{{ 'assemblyGuide.code' | t }}</th>
+                        <th class="py-2 px-3">{{ 'assemblyGuide.part' | t }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'assemblyGuide.dimensionsMm' | t }}</th>
+                        <th class="py-2 px-3 text-center">{{ 'assemblyGuide.edges' | t }}</th>
+                        <th class="py-2 px-3 text-center w-12">{{ 'assemblyGuide.qty' | t }}</th>
+                        <th class="py-2 px-3">{{ 'assemblyGuide.material' | t }}</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800 print:divide-zinc-400">
+                      @for (p of guide.pieces; track p.partId) {
+                        <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition">
+                          <!-- Código P1, P2... -->
+                          <td class="py-2 px-3 text-center">
+                            <span class="inline-block px-2 py-0.5 rounded font-mono font-black text-xs bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 print:bg-zinc-950 print:text-white">
+                              {{ p.code }}
+                            </span>
+                          </td>
+                          <!-- Nombre -->
+                          <td class="py-2 px-3 font-semibold text-zinc-900 dark:text-zinc-100 print:text-zinc-950">
+                            {{ p.translatedName }}
+                          </td>
+                          <!-- Dimensiones -->
+                          <td class="py-2 px-3 text-right font-mono font-medium text-zinc-800 dark:text-zinc-200 print:text-zinc-950">
+                            {{ p.length }} × {{ p.width }} × {{ p.thickness }}
+                          </td>
+                          <!-- Cantos -->
+                          <td class="py-2 px-3 text-center font-mono text-[10px] text-zinc-600 dark:text-zinc-400">
+                            {{ p.edges.l1 !== 'none' ? 'L1' : '-' }}/{{ p.edges.l2 !== 'none' ? 'L2' : '-' }}/{{ p.edges.a1 !== 'none' ? 'A1' : '-' }}/{{ p.edges.a2 !== 'none' ? 'A2' : '-' }}
+                          </td>
+                          <!-- Cantidad -->
+                          <td class="py-2 px-3 text-center font-mono font-bold text-zinc-900 dark:text-white print:text-zinc-950">
+                            {{ p.quantity }}
+                          </td>
+                          <!-- Material -->
+                          <td class="py-2 px-3 text-zinc-600 dark:text-zinc-400 truncate max-w-48 print:text-zinc-900">
+                            {{ p.materialName }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <!-- KIT DE TORNILLERÍA Y HERRAJES -->
+              <section class="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 bg-white dark:bg-zinc-900 shadow-xs print:border-zinc-900 print:shadow-none print:break-inside-avoid">
+                <div class="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2.5 mb-3 print:border-zinc-900">
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                  <h3 class="text-sm sm:text-base font-bold text-zinc-900 dark:text-white print:text-zinc-950">
+                    {{ 'assemblyGuide.hardwareKit' | t }}
+                  </h3>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  @for (hw of guide.hardwareKit; track hw.id) {
+                    <div class="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/40 flex items-start justify-between gap-2 print:border-zinc-900 print:bg-white">
+                      <div class="space-y-0.5">
+                        <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 leading-tight print:text-zinc-950">
+                          {{ hw.name | t }}
+                        </h4>
+                        <p class="text-[11px] font-mono font-medium text-zinc-500 dark:text-zinc-400">
+                          {{ hw.spec }}
+                        </p>
+                        @if (hw.description) {
+                          <p class="text-[10px] text-zinc-500 italic mt-0.5">
+                            {{ hw.description }}
+                          </p>
+                        }
+                      </div>
+
+                      <div class="px-2.5 py-1 rounded bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-mono font-black text-sm shrink-0 shadow-2xs print:bg-zinc-950 print:text-white">
+                        ×{{ hw.quantity }}
+                      </div>
+                    </div>
+                  }
+                </div>
+              </section>
+
+              <!-- SECUENCIA DE ARMADO ILUSTRADA PASO A PASO -->
+              <section class="space-y-4">
+                <div class="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 print:border-zinc-900">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <h3 class="text-base sm:text-lg font-black text-zinc-900 dark:text-white print:text-zinc-950">
+                    {{ 'assemblyGuide.stepsTitle' | t }}
+                  </h3>
+                </div>
+
+                <div class="space-y-6">
+                  @for (step of guide.steps; track step.stepNumber) {
+                    <div class="assembly-step-card border-2 border-zinc-300 dark:border-zinc-700 rounded-xl p-4 sm:p-5 bg-white dark:bg-zinc-900 shadow-sm space-y-4 print:border-zinc-900 print:shadow-none print:p-4 print:break-inside-avoid">
+
+                      <!-- Encabezado del Paso con Número Grande Estilo IKEA/Homecenter -->
+                      <div class="flex items-start justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3 print:border-zinc-900">
+                        <div class="flex items-center gap-3">
+                          <span class="w-10 h-10 rounded-lg bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950 flex items-center justify-center font-mono font-black text-lg shrink-0 print:bg-zinc-950 print:text-white">
+                            0{{ step.stepNumber }}
+                          </span>
+                          <div>
+                            <h4 class="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white print:text-zinc-950">
+                              {{ step.titleKey | t }}
+                            </h4>
+                            <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5 print:text-zinc-800">
+                              {{ step.descriptionKey | t }}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Contenido: Mini-Diagrama Ilustrado + Ficha de Instalación -->
+                      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                        <!-- Mini-Diagrama Técnico en Canvas (Columna 1 a 5) -->
+                        <div class="lg:col-span-5 relative w-full h-[220px] sm:h-[240px] bg-white rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden print:border-zinc-900 print:h-[65mm]">
+                          <canvas
+                            #stepCanvas
+                            [attr.data-module-id]="guide.moduleId"
+                            [attr.data-step-number]="step.stepNumber"
+                            class="w-full h-full block">
+                          </canvas>
+                        </div>
+
+                        <!-- Ficha de Montaje, Piezas, Cotas y Herrajes (Columna 6 a 12) -->
+                        <div class="lg:col-span-7 space-y-3">
+                          <!-- Piezas a instalar -->
+                          <div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">
+                              {{ 'assemblyGuide.piecesToInstall' | t }}
+                            </span>
+                            <div class="flex flex-wrap gap-1.5">
+                              @for (p of step.parts; track p.partId) {
+                                <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-800 dark:text-zinc-200 print:border-zinc-900 print:bg-zinc-100 print:text-zinc-950">
+                                  <strong class="font-mono font-black bg-zinc-900 text-white dark:bg-zinc-200 dark:text-zinc-900 px-1 rounded text-[10px]">
+                                    {{ p.code }}
+                                  </strong>
+                                  <span>{{ p.translatedName }}</span>
+                                  <span class="text-[10px] text-zinc-400 font-mono">({{ p.length }}×{{ p.width }}mm)</span>
+                                </span>
+                              }
+                            </div>
+                          </div>
+
+                          <!-- Cotas y Alturas en mm (Si aplica para repisas o rieles de corredera) -->
+                          @if (step.measurements && step.measurements.length > 0) {
+                            <div class="p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 space-y-1.5 print:bg-zinc-50 print:border-zinc-900">
+                              <span class="text-[11px] font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300 print:text-zinc-950 flex items-center gap-1.5">
+                                <hugeicons-icon [icon]="icons.ruler" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                                <span>{{ 'assemblyGuide.measurements' | t }}</span>
+                              </span>
+                              <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                @for (m of step.measurements; track m.label) {
+                                  <div class="flex items-center justify-between gap-2 px-2 py-1 rounded bg-white dark:bg-zinc-900/90 border border-blue-100 dark:border-blue-900/40 text-xs print:border-zinc-900">
+                                    <span class="text-zinc-700 dark:text-zinc-300 font-medium truncate print:text-zinc-950">{{ m.label }}</span>
+                                    <span class="font-mono font-black text-blue-700 dark:text-blue-400 print:text-zinc-950 whitespace-nowrap">
+                                      {{ m.valueMm }} mm
+                                    </span>
+                                  </div>
+                                }
+                              </div>
+                            </div>
+                          }
+
+                          <!-- Herrajes a utilizar en este paso -->
+                          @if (step.hardware.length > 0) {
+                            <div>
+                              <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">
+                                {{ 'assemblyGuide.hardwareUsed' | t }}
+                              </span>
+                              <div class="flex flex-wrap gap-2">
+                                @for (h of step.hardware; track h.id) {
+                                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs font-semibold text-amber-900 dark:text-amber-200 print:border-zinc-900 print:bg-white print:text-zinc-950">
+                                    <span>{{ h.name | t }}</span>
+                                    <strong class="font-mono font-black text-amber-700 dark:text-amber-400 print:text-zinc-950">×{{ h.quantity }}</strong>
+                                  </span>
+                                }
+                              </div>
+                            </div>
+                          }
+
+                          <!-- Consejos y Tips Profesionales de Taller -->
+                          @if (step.tips.length > 0) {
+                            <div class="space-y-1">
+                              @for (tip of step.tips; track tip) {
+                                <div class="flex items-start gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-400 print:text-zinc-800">
+                                  <hugeicons-icon [icon]="icons.check" [size]="12" [strokeWidth]="2.2" class="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5"></hugeicons-icon>
+                                  <span>{{ tip }}</span>
+                                </div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </section>
+
+              <!-- PIE DE PÁGINA EDITORIAL DEL MUEBLE -->
+              <footer class="pt-3 border-t border-zinc-200 dark:border-zinc-800 text-[10px] text-zinc-500 flex flex-col sm:flex-row items-center justify-between gap-2 print:border-zinc-900 print:pt-2">
+                <span>{{ 'assemblyGuide.qualityNote' | t }}</span>
+                <span class="font-mono font-medium">Piezo3D Studio · {{ guide.moduleName }}</span>
+              </footer>
+
+            </article>
+          }
+        }
+      </div>
+
+    </div>
+  </div>
+}

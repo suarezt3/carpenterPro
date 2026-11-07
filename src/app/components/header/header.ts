@@ -36,13 +36,15 @@ import {
   Megaphone01Icon,
   Rocket01Icon,
   Globe02Icon,
-  CubeIcon
+  CubeIcon,
+  BookOpen01Icon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 import { SketchupExporterService } from '../../services/sketchup-exporter.service';
+import { AssemblyGuideService } from '../../services/assembly-guide.service';
 import { ThemeService } from '../../services/theme.service';
 import { I18nService } from '../../services/i18n.service';
 import { AppLanguage } from '../../data/i18n-translations.data';
@@ -51,6 +53,7 @@ import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical
 import { DocumentationModalComponent } from '../documentation-modal/documentation-modal';
 import { ProjectNotesModalComponent } from '../project-notes-modal/project-notes-modal';
 import { ChangelogModalComponent } from '../changelog-modal/changelog-modal';
+import { AssemblyGuideModalComponent } from '../assembly-guide-modal/assembly-guide-modal';
 import { APP_CURRENT_VERSION } from '../../data/changelog.data';
 import { ProjectSettings, DEFAULT_ROOM_CONFIG, RoomConfiguration } from '../../models/melamine.models';
 
@@ -70,6 +73,7 @@ import { ProjectSettings, DEFAULT_ROOM_CONFIG, RoomConfiguration } from '../../m
     DocumentationModalComponent,
     ProjectNotesModalComponent,
     ChangelogModalComponent,
+    AssemblyGuideModalComponent,
     TranslatePipe
   ],
   host: {
@@ -84,6 +88,7 @@ export class HeaderComponent {
   readonly i18n = inject(I18nService);
   readonly currentLanguageIso = this.i18n.currentIso;
   private readonly projectService = inject(ProjectStorageService);
+  private readonly assemblyGuideService = inject(AssemblyGuideService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly dxfExporter = inject(DxfExporterService);
   private readonly sketchupExporter = inject(SketchupExporterService);
@@ -119,7 +124,8 @@ export class HeaderComponent {
     delete: Delete02Icon,
     megaphone: Megaphone01Icon,
     rocket: Rocket01Icon,
-    globe: Globe02Icon
+    globe: Globe02Icon,
+    book: BookOpen01Icon
   };
 
   // Versión actual de la aplicación
@@ -138,9 +144,12 @@ export class HeaderComponent {
   readonly showNewProjectModal = signal(false);
   readonly showSqlModal = signal(false);
   readonly showTechnicalSheetModal = signal(false);
+  readonly showAssemblyGuideModal = signal(false);
   readonly showDocumentationModal = signal(false);
   readonly showNotesModal = signal(false);
   readonly showChangelogModal = signal(false);
+
+  readonly canGenerateAssemblyGuide = this.assemblyGuideService.canGenerateAssemblyGuide;
 
   readonly projectsTab = signal<'cloud' | 'local'>('cloud');
   readonly sqlCopied = signal(false);
@@ -543,6 +552,15 @@ export class HeaderComponent {
 
   closeTechnicalSheet() {
     this.showTechnicalSheetModal.set(false);
+  }
+
+  openAssemblyGuide() {
+    this.closeDropdowns();
+    this.showAssemblyGuideModal.set(true);
+  }
+
+  closeAssemblyGuide() {
+    this.showAssemblyGuideModal.set(false);
   }
 
   openDocumentationModal() {

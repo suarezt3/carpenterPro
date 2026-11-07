@@ -14,13 +14,16 @@ import {
   PrinterIcon,
   ScissorsIcon,
   Settings01Icon,
-  ViewIcon
+  ViewIcon,
+  BookOpen01Icon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
+import { AssemblyGuideService } from '../../services/assembly-guide.service';
 import { ThemeService } from '../../services/theme.service';
 import { Material, OptimizationResult, PlacedPart, PlacedSheet } from '../../models/melamine.models';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { AssemblyGuideModalComponent } from '../assembly-guide-modal/assembly-guide-modal';
 
 /**
  * Vista interactiva del Optimizador de Corte 2D por Guillotina.
@@ -30,7 +33,7 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 @Component({
   selector: 'app-cut-optimizer-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HugeiconsIconComponent, TranslatePipe],
+  imports: [HugeiconsIconComponent, TranslatePipe, AssemblyGuideModalComponent],
   templateUrl: './cut-optimizer-view.html',
   styleUrl: './cut-optimizer-view.css'
 })
@@ -38,11 +41,13 @@ export class CutOptimizerViewComponent {
   readonly themeService = inject(ThemeService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly optimizer = inject(CutOptimizerService);
+  private readonly assemblyGuideService = inject(AssemblyGuideService);
 
   // Registro local de iconos vectoriales de Hugeicons
   readonly icons = {
     optimizer: Compass01Icon,
     print: PrinterIcon,
+    book: BookOpen01Icon,
     loading: Clock01Icon,
     download: Download01Icon,
     chevronDown: ArrowDown01Icon,
@@ -79,6 +84,17 @@ export class CutOptimizerViewComponent {
   readonly hoveredPart = signal<PlacedPart | null>(null);
   readonly isDownloadMenuOpen = signal<boolean>(false);
   readonly isExporting = signal<boolean>(false);
+  readonly showAssemblyGuideModal = signal<boolean>(false);
+
+  readonly canGenerateAssemblyGuide = this.assemblyGuideService.canGenerateAssemblyGuide;
+
+  openAssemblyGuideModal() {
+    this.showAssemblyGuideModal.set(true);
+  }
+
+  closeAssemblyGuideModal() {
+    this.showAssemblyGuideModal.set(false);
+  }
 
   /**
    * Calcula de forma reactiva la distribución óptima de todas las piezas en tableros

@@ -3,12 +3,15 @@ import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   PrinterIcon,
   QrCodeIcon,
-  Tag01Icon
+  Tag01Icon,
+  BookOpen01Icon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
+import { AssemblyGuideService } from '../../services/assembly-guide.service';
 import { ThemeService } from '../../services/theme.service';
 import { Part, isStoneMaterial } from '../../models/melamine.models';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { AssemblyGuideModalComponent } from '../assembly-guide-modal/assembly-guide-modal';
 
 /**
  * Representa una etiqueta individual expandida por unidad física a cortar.
@@ -19,6 +22,7 @@ export interface FlatPartLabel {
   copyIndex: number;
   totalCopies: number;
   labelId: string;
+  pieceCode?: string;
 }
 
 /**
@@ -29,20 +33,33 @@ export interface FlatPartLabel {
 @Component({
   selector: 'app-labels-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HugeiconsIconComponent, TranslatePipe],
+  imports: [HugeiconsIconComponent, TranslatePipe, AssemblyGuideModalComponent],
   templateUrl: './labels-view.html',
   styleUrl: './labels-view.css'
 })
 export class LabelsViewComponent {
   readonly themeService = inject(ThemeService);
   private readonly projectService = inject(ProjectStorageService);
+  private readonly assemblyGuideService = inject(AssemblyGuideService);
 
   // Iconos vectoriales de Hugeicons utilizados en la vista
   readonly icons = {
     qrCode: QrCodeIcon,
     print: PrinterIcon,
-    tag: Tag01Icon
+    tag: Tag01Icon,
+    book: BookOpen01Icon
   };
+
+  readonly showAssemblyGuideModal = signal<boolean>(false);
+  readonly canGenerateAssemblyGuide = this.assemblyGuideService.canGenerateAssemblyGuide;
+
+  openAssemblyGuideModal() {
+    this.showAssemblyGuideModal.set(true);
+  }
+
+  closeAssemblyGuideModal() {
+    this.showAssemblyGuideModal.set(false);
+  }
 
   // Signals conectados al estado global del proyecto
   readonly project = this.projectService.currentProject;
@@ -79,6 +96,7 @@ export class LabelsViewComponent {
     const labels: FlatPartLabel[] = [];
 
     for (const part of list) {
+      const pieceCode = this.assemblyGuideService.getPieceCodeForPart(part.id);
       const cleanCode = part.id.replace(/^(part_|desk_)/i, '').slice(-5).toUpperCase();
       for (let i = 1; i <= part.quantity; i++) {
         labels.push({
@@ -86,7 +104,8 @@ export class LabelsViewComponent {
           part,
           copyIndex: i,
           totalCopies: part.quantity,
-          labelId: `ETQ-${cleanCode}-${i}`
+          labelId: `ETQ-${cleanCode}-${i}`,
+          pieceCode: pieceCode || undefined
         });
       }
     }

@@ -126,16 +126,24 @@
   }
 
   /* Ocultar app-header cuando no contenga modales de impresión abiertos */
-  body:not(.technical-sheet-open) app-header,
-  app-header:not(:has(app-technical-sheet-modal)) {
+  body:not(.technical-sheet-open):not(.assembly-guide-open) app-header,
+  app-header:not(:has(app-technical-sheet-modal)):not(:has(app-assembly-guide-modal)) {
     display: none !important;
   }
 
-  /* Si el modal de plano técnico está abierto al imprimir, ocultar el resto de la aplicación */
+  /* Si el modal de plano técnico o guía de armado está abierto al imprimir, ocultar el resto de la aplicación */
   body.technical-sheet-open main:not(:has(app-technical-sheet-modal)),
+  body.assembly-guide-open main:not(:has(app-assembly-guide-modal)),
   body:has(app-header app-technical-sheet-modal) main,
+  body:has(app-header app-assembly-guide-modal) main,
   body.technical-sheet-open footer,
-  body:has(app-technical-sheet-modal) footer {
+  body.assembly-guide-open footer,
+  body:has(app-technical-sheet-modal) footer,
+  body:has(app-assembly-guide-modal) footer,
+  body.assembly-guide-open app-header > *:not(app-assembly-guide-modal),
+  body.assembly-guide-open app-cut-optimizer-view > *:not(app-assembly-guide-modal),
+  body.assembly-guide-open app-labels-view > *:not(app-assembly-guide-modal),
+  body.assembly-guide-open app-module-designer > *:not(app-assembly-guide-modal) {
     display: none !important;
   }
 

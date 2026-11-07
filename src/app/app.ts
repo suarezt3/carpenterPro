@@ -5,6 +5,7 @@ import { filter } from 'rxjs';
 import { HeaderComponent } from './components/header/header';
 import { ConfirmDialog } from './components/confirm-dialog/confirm-dialog';
 import { ThemeService } from './services/theme.service';
+import { AssemblyGuideService } from './services/assembly-guide.service';
 
 type MainTab = 'modules' | 'parts' | 'optimizer' | 'budget' | 'labels';
 
@@ -30,7 +31,13 @@ const TAB_TO_ROUTE: Record<MainTab, string> = {
 export class App {
   readonly themeService = inject(ThemeService);
   private readonly router = inject(Router);
+  private readonly assemblyGuideService = inject(AssemblyGuideService);
   activeTab = signal<MainTab>('modules');
+
+  /**
+   * Signal reactivo que evalúa si el proyecto actual tiene muebles armables válidos.
+   */
+  readonly canGenerateAssemblyGuide = this.assemblyGuideService.canGenerateAssemblyGuide;
 
   constructor() {
     this.router.events

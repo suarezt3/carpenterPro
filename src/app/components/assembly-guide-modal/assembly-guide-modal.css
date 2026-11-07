@@ -1,0 +1,121 @@
+/* Estilos encapsulados del componente AssemblyGuideModal */
+:host {
+  display: contents;
+}
+
+/* Animación sutil de entrada en pantalla */
+.assembly-guide-card {
+  animation: modalEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* =========================================================================
+   ESTILOS DE IMPRESIÓN LIMPIA @media print (ESTILO EDITORIAL HOMECENTER / IKEA)
+   ========================================================================= */
+@media print {
+  @page {
+    size: portrait;
+    margin: 10mm;
+  }
+
+  :host {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .assembly-guide-backdrop {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .assembly-guide-card {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    display: block !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    animation: none !important;
+  }
+
+  .assembly-guide-toolbar {
+    display: none !important;
+  }
+
+  .assembly-guide-body {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  .assembly-module-document {
+    page-break-after: always;
+    break-after: page;
+    margin-bottom: 20mm !important;
+  }
+
+  .assembly-module-document:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .assembly-step-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 6mm !important;
+    border: 1.5px solid #18181b !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  canvas {
+    max-width: 100% !important;
+    height: auto !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  table {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}

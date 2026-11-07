@@ -39,6 +39,19 @@
         }
       </select>
 
+      <!-- Botón Guía de Armado -->
+      <button
+        type="button"
+        (click)="openAssemblyGuideModal()"
+        [disabled]="!canGenerateAssemblyGuide()"
+        [class]="themeService.isClassic()
+          ? 'px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium text-xs rounded-md flex items-center gap-2 shadow-2xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'
+          : 'px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-md flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'"
+        [title]="!canGenerateAssemblyGuide() ? ('assemblyGuide.noFurnitureTooltip' | t) : ('assemblyGuide.buttonTooltip' | t)">
+        <hugeicons-icon [icon]="icons.book" [size]="16" [strokeWidth]="2" class="text-blue-500 shrink-0"></hugeicons-icon>
+        <span>{{ 'assemblyGuide.button' | t }}</span>
+      </button>
+
       <!-- Botón Imprimir -->
       <button
         type="button"
@@ -85,8 +98,11 @@
             <span class="text-[10px] font-black uppercase tracking-wider text-amber-700 truncate max-w-42">
               {{ label.part.moduleName || label.part.groupName || project().name }}
             </span>
-            <span class="font-mono text-[9px] font-bold px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-800 border border-zinc-300">
-              {{ label.labelId }} ({{ label.copyIndex }}/{{ label.totalCopies }})
+            <span class="font-mono text-[9px] font-bold px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-800 border border-zinc-300 inline-flex items-center gap-1">
+              @if (label.pieceCode) {
+                <span class="px-1 py-0.2 bg-blue-600 text-white rounded font-black text-[9px] print:bg-blue-600 print:text-white">{{ label.pieceCode }}</span>
+              }
+              <span>{{ label.labelId }} ({{ label.copyIndex }}/{{ label.totalCopies }})</span>
             </span>
           </div>
 
@@ -209,4 +225,14 @@
     }
   </div>
 
+  <!-- MODAL: GUÍA DE ARMADO PASO A PASO -->
+  @defer (when showAssemblyGuideModal()) {
+    @if (showAssemblyGuideModal()) {
+      <app-assembly-guide-modal
+        [isOpen]="showAssemblyGuideModal()"
+        [selectedModuleIdInput]="selectedModuleFilter() !== 'all' ? selectedModuleFilter() : null"
+        (modalClose)="closeAssemblyGuideModal()">
+      </app-assembly-guide-modal>
+    }
+  }
 </div>
