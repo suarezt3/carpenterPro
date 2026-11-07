@@ -647,6 +647,8 @@ export interface Project {
   appliances?: ApplianceItem[];
 }
 
+export type MelamineProject = Project;
+
 export type WorkspaceMode = 'module' | 'room';
 
 export type RoomLayoutType = 'single_wall' | 'l_shape' | 'u_shape';

@@ -85,6 +85,7 @@ import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { PartGeometryService } from '../../services/part-geometry.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
+import { SketchupExporterService } from '../../services/sketchup-exporter.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { CabinetGeneratorService } from '../../services/cabinet-generator.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
@@ -152,6 +153,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   private readonly joineryEngine = inject(JoineryEngineService);
   private readonly partGeometry = inject(PartGeometryService);
   private readonly dxfExporter = inject(DxfExporterService);
+  private readonly sketchupExporter = inject(SketchupExporterService);
   private readonly cabinetGen = inject(CabinetGeneratorService);
   private readonly templatesCatalog = inject(TemplatesCatalogService);
   private readonly destroyRef = inject(DestroyRef);
@@ -3907,6 +3909,10 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
   exportDxf() {
     this.dxfExporter.exportProjectToDxf(this.project());
+  }
+
+  exportSketchup() {
+    this.sketchupExporter.exportProjectToSketchUp(this.project());
   }
 
   // --- ACORDEÓN Y GESTIÓN DE GRUPOS ---

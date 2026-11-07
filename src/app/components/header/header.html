@@ -388,6 +388,17 @@
 
               <button
                 type="button"
+                (click)="exportSketchup(); closeDropdowns()"
+                [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-zinc-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-zinc-800 text-left transition cursor-pointer'">
+                <hugeicons-icon [icon]="icons.cube" [size]="16" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                <div class="flex flex-col">
+                  <span [class]="themeService.isClassic() ? 'font-medium text-zinc-900' : 'font-medium text-zinc-100'">{{ 'nav.exportSketchup' | t }}</span>
+                  <span [class]="themeService.isClassic() ? 'text-[10px] text-zinc-500' : 'text-[10px] text-zinc-400'">{{ 'nav.exportSketchupSubtitle' | t }}</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
                 (click)="exportJson(); closeDropdowns()"
                 [class]="themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-zinc-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-zinc-800 text-left transition cursor-pointer'">
                 <hugeicons-icon [icon]="icons.note" [size]="16" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>

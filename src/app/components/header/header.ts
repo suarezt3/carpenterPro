@@ -35,12 +35,14 @@ import {
   Tick02Icon,
   Megaphone01Icon,
   Rocket01Icon,
-  Globe02Icon
+  Globe02Icon,
+  CubeIcon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
+import { SketchupExporterService } from '../../services/sketchup-exporter.service';
 import { ThemeService } from '../../services/theme.service';
 import { I18nService } from '../../services/i18n.service';
 import { AppLanguage } from '../../data/i18n-translations.data';
@@ -84,12 +86,14 @@ export class HeaderComponent {
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly dxfExporter = inject(DxfExporterService);
+  private readonly sketchupExporter = inject(SketchupExporterService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
 
   // Registro local de iconos vectoriales de Hugeicons
   readonly icons = {
     logo3d: Compass01Icon,
+    cube: CubeIcon,
     edit: Edit02Icon,
     close: Cancel01Icon,
     check: Tick02Icon,
@@ -562,5 +566,10 @@ export class HeaderComponent {
   exportDxf() {
     this.dxfExporter.exportProjectToDxf(this.project());
     this.showToast('📐 Archivo DXF para CNC generado y descargado');
+  }
+
+  exportSketchup() {
+    this.sketchupExporter.exportProjectToSketchUp(this.project());
+    this.showToast(this.i18n.t('nav.exportSketchupToast'));
   }
 }
