@@ -13,7 +13,7 @@
         class="fixed inset-0 w-full h-full bg-transparent cursor-default border-0 outline-hidden -z-10"
         (click)="cancel()"
         tabindex="-1"
-        aria-label="Cerrar cuadro de diálogo"></button>
+        [attr.aria-label]="'common.close' | t"></button>
 
       <!-- Tarjeta del Diálogo de Confirmación -->
       <div
@@ -38,10 +38,10 @@
 
           <div class="space-y-1 min-w-0 flex-1">
             <h3 class="text-base font-bold tracking-tight leading-snug" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
-              {{ opt.title }}
+              {{ opt.title | t }}
             </h3>
             <p class="text-xs leading-relaxed whitespace-pre-line" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-300'">
-              {{ opt.message }}
+              {{ opt.message | t }}
             </p>
           </div>
         </div>
@@ -52,17 +52,17 @@
           class="px-3 py-2 rounded-md border text-[11px] flex items-center justify-between">
           <span class="flex items-center gap-1.5">
             <hugeicons-icon [icon]="icons.lock" [size]="14" [strokeWidth]="1.8" class="text-zinc-400"></hugeicons-icon>
-            <span>Confirmación de acción</span>
+            <span>{{ 'common.actionConfirmation' | t }}</span>
           </span>
           <div class="flex items-center gap-1.5 font-mono tabular-nums text-[10px]">
             <kbd
               class="px-1 py-0.2 border rounded"
               [class]="themeService.isClassic() ? 'bg-zinc-200 border-zinc-300 text-zinc-700' : 'bg-zinc-800 border-zinc-700 text-zinc-300'">Esc</kbd>
-            <span>cancelar</span>
+            <span>{{ 'common.cancelLower' | t }}</span>
             <kbd
               class="px-1 py-0.2 border rounded"
               [class]="themeService.isClassic() ? 'bg-zinc-200 border-zinc-300 text-zinc-700' : 'bg-zinc-800 border-zinc-700 text-zinc-300'">Enter</kbd>
-            <span>aceptar</span>
+            <span>{{ 'common.acceptLower' | t }}</span>
           </div>
         </div>
 
@@ -73,7 +73,7 @@
             (click)="cancel()"
             [class]="themeService.isClassic() ? 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'"
             class="px-3.5 py-2 text-xs font-medium rounded-md border transition cursor-pointer">
-            {{ opt.cancelText || 'Cancelar' }}
+            {{ opt.cancelText ? (opt.cancelText | t) : ('common.cancel' | t) }}
           </button>
 
           <button
@@ -88,7 +88,7 @@
             } @else {
               <hugeicons-icon [icon]="icons.check" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             }
-            <span>{{ opt.confirmText || 'Confirmar' }}</span>
+            <span>{{ opt.confirmText ? (opt.confirmText | t) : ('common.confirm' | t) }}</span>
           </button>
         </div>
 

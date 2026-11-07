@@ -34,13 +34,17 @@ import {
   Tag01Icon,
   Tick02Icon,
   Megaphone01Icon,
-  Rocket01Icon
+  Rocket01Icon,
+  Globe02Icon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 import { ThemeService } from '../../services/theme.service';
+import { I18nService } from '../../services/i18n.service';
+import { AppLanguage } from '../../data/i18n-translations.data';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
 import { DocumentationModalComponent } from '../documentation-modal/documentation-modal';
 import { ProjectNotesModalComponent } from '../project-notes-modal/project-notes-modal';
@@ -63,7 +67,8 @@ import { ProjectSettings, DEFAULT_ROOM_CONFIG, RoomConfiguration } from '../../m
     TechnicalSheetModalComponent,
     DocumentationModalComponent,
     ProjectNotesModalComponent,
-    ChangelogModalComponent
+    ChangelogModalComponent,
+    TranslatePipe
   ],
   host: {
     '(window:keydown)': 'handleGlobalKeyDown($event)',
@@ -74,6 +79,8 @@ import { ProjectSettings, DEFAULT_ROOM_CONFIG, RoomConfiguration } from '../../m
 })
 export class HeaderComponent {
   readonly themeService = inject(ThemeService);
+  readonly i18n = inject(I18nService);
+  readonly currentLanguageIso = this.i18n.currentIso;
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly dxfExporter = inject(DxfExporterService);
@@ -107,7 +114,8 @@ export class HeaderComponent {
     settings: Settings01Icon,
     delete: Delete02Icon,
     megaphone: Megaphone01Icon,
-    rocket: Rocket01Icon
+    rocket: Rocket01Icon,
+    globe: Globe02Icon
   };
 
   // Versión actual de la aplicación
@@ -120,6 +128,7 @@ export class HeaderComponent {
   // Estado de menús desplegables y modales
   readonly isProjectDropdownOpen = signal(false);
   readonly isExportDropdownOpen = signal(false);
+  readonly isLanguageDropdownOpen = signal(false);
   readonly showProjectsModal = signal(false);
   readonly showSettingsModal = signal(false);
   readonly showNewProjectModal = signal(false);
@@ -165,6 +174,7 @@ export class HeaderComponent {
   });
 
   readonly settingsForm: FormGroup = this.fb.group({
+    interfaceLanguage: ['es', Validators.required],
     sawKerf: [4, [Validators.required, Validators.min(0)]],
     trimMargin: [10, [Validators.required, Validators.min(0)]],
     defaultBoardThickness: [15, [Validators.required, Validators.min(10), Validators.max(35)]],
@@ -206,6 +216,7 @@ export class HeaderComponent {
     const s = this.project().settings;
     const room = this.project().roomConfig || DEFAULT_ROOM_CONFIG;
     this.settingsForm.patchValue({
+      interfaceLanguage: this.i18n.currentLang(),
       sawKerf: s.sawKerf,
       trimMargin: s.trimMargin,
       defaultBoardThickness: s.defaultBoardThickness || 15,
@@ -228,12 +239,18 @@ export class HeaderComponent {
       floorDepth: depth
     });
     this.projectService.updateWorkspaceDimensions(width, depth);
-    this.showToast(`📐 Espacio de Trabajo: ${(width / 1000).toFixed(1)} × ${(depth / 1000).toFixed(1)} m`);
+    this.showToast(this.i18n.t('settings.workspaceToast', {
+      width: (width / 1000).toFixed(1),
+      depth: (depth / 1000).toFixed(1)
+    }));
   }
 
   saveSettings() {
     if (this.settingsForm.valid) {
       const raw = this.settingsForm.value;
+      if (raw.interfaceLanguage) {
+        this.i18n.setLanguage(raw.interfaceLanguage as AppLanguage);
+      }
       const applyToAll = !!raw.applyThicknessToAllParts;
       const val: ProjectSettings = {
         sawKerf: Number(raw.sawKerf),
@@ -254,8 +271,8 @@ export class HeaderComponent {
 
       this.showSettingsModal.set(false);
       this.showToast(applyToAll
-        ? `Configuración guardada. Espesor base ${val.defaultBoardThickness} mm aplicado a las piezas.`
-        : `Configuración guardada. Espesor base predeterminado: ${val.defaultBoardThickness} mm.`
+        ? this.i18n.t('settings.configSavedAllToast', { thickness: val.defaultBoardThickness ?? 15 })
+        : this.i18n.t('settings.configSavedToast', { thickness: val.defaultBoardThickness ?? 15 })
       );
     }
   }
@@ -307,12 +324,28 @@ export class HeaderComponent {
     e?.stopPropagation();
     this.isProjectDropdownOpen.update(v => !v);
     this.isExportDropdownOpen.set(false);
+    this.isLanguageDropdownOpen.set(false);
   }
 
   toggleExportDropdown(e?: Event) {
     e?.stopPropagation();
     this.isExportDropdownOpen.update(v => !v);
     this.isProjectDropdownOpen.set(false);
+    this.isLanguageDropdownOpen.set(false);
+  }
+
+  toggleLanguageDropdown(e?: Event) {
+    e?.stopPropagation();
+    this.isLanguageDropdownOpen.update(v => !v);
+    this.isProjectDropdownOpen.set(false);
+    this.isExportDropdownOpen.set(false);
+  }
+
+  selectLanguage(lang: AppLanguage) {
+    this.i18n.setLanguage(lang);
+    this.isLanguageDropdownOpen.set(false);
+    const langOpt = this.i18n.currentLanguageOption();
+    this.showToast(`${this.i18n.t('nav.language')}: ${langOpt.name} (${langOpt.iso})`);
   }
 
   startEditingTitle(e?: Event) {
@@ -339,6 +372,7 @@ export class HeaderComponent {
   closeDropdowns() {
     this.isProjectDropdownOpen.set(false);
     this.isExportDropdownOpen.set(false);
+    this.isLanguageDropdownOpen.set(false);
   }
 
   /**
@@ -397,29 +431,29 @@ export class HeaderComponent {
   async loadCloudProject(item: CloudProjectRecord) {
     await this.projectService.loadCloudProject(item);
     this.showProjectsModal.set(false);
-    this.showToast(`☁️ Proyecto "${item.name}" cargado desde Supabase`);
+    this.showToast(this.i18n.t('projects.cloudProjectLoaded', { name: item.name }));
   }
 
   async deleteCloudProject(item: CloudProjectRecord, event: Event) {
     event.stopPropagation();
     const confirmed = await this.confirmService.ask({
-      title: '¿Eliminar proyecto de la nube?',
-      message: `El proyecto "${item.name}" se eliminará permanentemente de tu base de datos de Supabase. Esta acción no se puede deshacer.`,
-      confirmText: 'Eliminar de la nube',
-      cancelText: 'Cancelar',
+      title: this.i18n.t('projects.deleteCloudTitle'),
+      message: this.i18n.t('projects.deleteCloudMessage', { name: item.name }),
+      confirmText: this.i18n.t('projects.deleteCloudConfirm'),
+      cancelText: this.i18n.t('common.cancel'),
       severity: 'danger'
     });
     if (confirmed) {
       const ok = await this.projectService.deleteCloudProject(item.id);
       if (ok) {
-        this.showToast('Proyecto eliminado de la nube');
+        this.showToast(this.i18n.t('projects.deletedFromCloud'));
       }
     }
   }
 
   refreshCloud() {
     void this.supabase.refreshProjects();
-    this.showToast('Actualizando proyectos de Supabase...');
+    this.showToast(this.i18n.t('projects.refreshingCloud'));
   }
 
   copySqlScript() {
@@ -447,30 +481,30 @@ export class HeaderComponent {
   async deleteLocalProject(meta: ProjectMeta, event: Event) {
     event.stopPropagation();
     const confirmed = await this.confirmService.ask({
-      title: '¿Eliminar proyecto local?',
-      message: `El proyecto "${meta.name}" se eliminará permanentemente de la memoria local de tu navegador.`,
-      confirmText: 'Eliminar Proyecto',
-      cancelText: 'Cancelar',
+      title: this.i18n.t('projects.deleteLocalTitle'),
+      message: this.i18n.t('projects.deleteLocalMessage', { name: meta.name }),
+      confirmText: this.i18n.t('projects.deleteLocalConfirm'),
+      cancelText: this.i18n.t('common.cancel'),
       severity: 'danger'
     });
     if (confirmed) {
       this.projectService.deleteLocalProject(meta.id);
-      this.showToast('Proyecto eliminado de la memoria local');
+      this.showToast(this.i18n.t('projects.deletedFromLocal'));
     }
   }
 
   async resetDemo() {
     const confirmed = await this.confirmService.ask({
-      title: '¿Restablecer mueble demo?',
-      message: 'Se cargará el mueble demo de barra en Melamina Roble y Blanco con precios en Pesos Colombianos (COP). Cualquier cambio no guardado en la nube o exportado en JSON se sobrescribirá.',
-      confirmText: 'Restablecer Demo',
-      cancelText: 'Volver',
+      title: this.i18n.t('projects.resetDemoTitle'),
+      message: this.i18n.t('projects.resetDemoMessage'),
+      confirmText: this.i18n.t('projects.resetDemoConfirm'),
+      cancelText: this.i18n.t('projects.resetDemoCancel'),
       severity: 'warning'
     });
     if (confirmed) {
       this.projectService.resetToDemo();
       this.showProjectsModal.set(false);
-      this.showToast('Mueble demo restablecido');
+      this.showToast(this.i18n.t('projects.demoResetDone'));
     }
   }
 

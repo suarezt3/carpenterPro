@@ -24,6 +24,8 @@ import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { ThemeService } from '../../services/theme.service';
 import { HardwareItem, Material, isStoneMaterial } from '../../models/melamine.models';
 import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
+import { I18nService } from '../../services/i18n.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 /**
  * Vista de Presupuesto Financiero y Cotización Comercial de Carpintería.
@@ -33,13 +35,14 @@ import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 @Component({
   selector: 'app-budget-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, HugeiconsIconComponent],
+  imports: [ReactiveFormsModule, HugeiconsIconComponent, TranslatePipe],
   templateUrl: './budget-view.html',
   styleUrl: './budget-view.css'
 })
 export class BudgetViewComponent implements OnInit {
   readonly themeService = inject(ThemeService);
   readonly currencyExchange = inject(CurrencyExchangeService);
+  readonly i18n = inject(I18nService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly optimizer = inject(CutOptimizerService);
@@ -432,10 +435,10 @@ export class BudgetViewComponent implements OnInit {
     const item = this.allHardware().find(h => h.id === itemId);
     const itemName = item ? `"${item.name}"` : 'este herraje';
     const confirmed = await this.confirmService.ask({
-      title: '¿Eliminar herraje del presupuesto?',
-      message: `Se eliminará ${itemName} del listado de herrajes y costos adicionales.`,
-      confirmText: 'Eliminar Herraje',
-      cancelText: 'Cancelar',
+      title: this.i18n.t('budget.deleteHardwareTitle'),
+      message: this.i18n.t('budget.deleteHardwareMessage', { name: itemName }),
+      confirmText: this.i18n.t('budget.deleteHardwareConfirm'),
+      cancelText: this.i18n.t('common.cancel'),
       severity: 'danger'
     });
     if (confirmed) {
@@ -707,6 +710,18 @@ export class BudgetViewComponent implements OnInit {
     const select = event.target as HTMLSelectElement | null;
     if (select && select.value) {
       this.projectService.updateCurrency(select.value);
+    }
+  }
+
+  getApplianceFinishLabel(finish?: string): string {
+    switch (finish) {
+      case 'stainless_steel': return this.i18n.t('appliance.finishStainlessSteel');
+      case 'black_matte': return this.i18n.t('appliance.finishBlackMatte');
+      case 'white_gloss': return this.i18n.t('appliance.finishWhiteGloss');
+      case 'gold_brass': return this.i18n.t('appliance.finishGoldBrass');
+      case 'natural_wood': return this.i18n.t('appliance.finishNaturalWood');
+      case 'retro_red': return this.i18n.t('appliance.finishRetroRed');
+      default: return finish || '';
     }
   }
 }

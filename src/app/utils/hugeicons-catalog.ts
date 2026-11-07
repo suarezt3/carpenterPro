@@ -423,3 +423,12 @@ export const KitchenUtensilsIcon = defIcon([
 export const LayoutLinearIcon = defIcon(['M3 12H21']);
 export const LayoutLIcon = defIcon(['M4 4V20H20']);
 export const LayoutUIcon = defIcon(['M4 4V20H20V4']);
+
+export const Globe02Icon: HugeIconDefinition = [
+  ['circle', { cx: '12', cy: '12', r: '10', key: 'hi_0' }],
+  ['path', { d: 'M8 12C8 18 12 22 12 22C12 22 16 18 16 12C16 6 12 2 12 2C12 2 8 6 8 12Z', key: 'hi_1' }],
+  ['path', { d: 'M21 15H3', key: 'hi_2' }],
+  ['path', { d: 'M21 9H3', key: 'hi_3' }]
+];
+export const GlobeIcon = Globe02Icon;
+

@@ -20,6 +20,7 @@ import { ProjectStorageService } from '../../services/project-storage.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { ThemeService } from '../../services/theme.service';
 import { Material, OptimizationResult, PlacedPart, PlacedSheet } from '../../models/melamine.models';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 /**
  * Vista interactiva del Optimizador de Corte 2D por Guillotina.
@@ -29,7 +30,7 @@ import { Material, OptimizationResult, PlacedPart, PlacedSheet } from '../../mod
 @Component({
   selector: 'app-cut-optimizer-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HugeiconsIconComponent],
+  imports: [HugeiconsIconComponent, TranslatePipe],
   templateUrl: './cut-optimizer-view.html',
   styleUrl: './cut-optimizer-view.css'
 })

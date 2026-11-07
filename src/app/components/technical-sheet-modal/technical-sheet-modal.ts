@@ -23,6 +23,7 @@ import { Project, Part, DrillHole } from '../../models/melamine.models';
 import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 /**
  * Representa una pieza proyectada ortográficamente en un plano 2D (Frontal, Lateral o Planta).
@@ -58,7 +59,7 @@ export interface DimensionLine2D {
  */
 @Component({
   selector: 'app-technical-sheet-modal',
-  imports: [HugeiconsIconComponent],
+  imports: [HugeiconsIconComponent, TranslatePipe],
   templateUrl: './technical-sheet-modal.html',
   styleUrl: './technical-sheet-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush

@@ -12,8 +12,8 @@
           <hugeicons-icon [icon]="icons.blueprint" [size]="18" [strokeWidth]="1.8"></hugeicons-icon>
         </div>
         <div>
-          <h3 class="text-sm sm:text-base font-bold tracking-tight">Plano Técnico 2D de Fabricación (Taller)</h3>
-          <p class="text-xs text-zinc-500">Vistas ortográficas acotadas con cuadro de rotulación de ingeniería</p>
+          <h3 class="text-sm sm:text-base font-bold tracking-tight">{{ 'technicalSheet.title' | t }}</h3>
+          <p class="text-xs text-zinc-500">{{ 'technicalSheet.subtitle' | t }}</p>
         </div>
       </div>
 
@@ -27,7 +27,7 @@
           [class]="isBlueprintDark() ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 border border-zinc-200'"
           class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition cursor-pointer">
           <hugeicons-icon [icon]="isBlueprintDark() ? icons.sun : icons.moon" [size]="15" [strokeWidth]="2"></hugeicons-icon>
-          <span>{{ isBlueprintDark() ? 'Papel Blanco' : 'CAD Oscuro' }}</span>
+          <span>{{ isBlueprintDark() ? ('technicalSheet.whitePaper' | t) : ('technicalSheet.darkCad' | t) }}</span>
         </button>
 
         <!-- Exportar DXF para CNC -->
@@ -36,7 +36,7 @@
           (click)="downloadDxf()"
           class="px-3 py-1.5 bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 rounded-md text-xs font-medium flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
           <hugeicons-icon [icon]="icons.download" [size]="15" [strokeWidth]="2"></hugeicons-icon>
-          <span>Exportar DXF CNC</span>
+          <span>{{ 'technicalSheet.exportDxf' | t }}</span>
         </button>
 
         <!-- Imprimir o Guardar como PDF -->
@@ -45,7 +45,7 @@
           (click)="printSheet()"
           class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer">
           <hugeicons-icon [icon]="icons.print" [size]="15" [strokeWidth]="2"></hugeicons-icon>
-          <span>Imprimir / Guardar PDF</span>
+          <span>{{ 'technicalSheet.printPdf' | t }}</span>
         </button>
 
         <!-- Cerrar Modal -->
@@ -53,7 +53,7 @@
           type="button"
           (click)="modalClose.emit()"
           class="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-md transition cursor-pointer"
-          title="Cerrar plano">
+          [title]="'technicalSheet.close' | t">
           <hugeicons-icon [icon]="icons.close" [size]="18" [strokeWidth]="2"></hugeicons-icon>
         </button>
       </div>
@@ -72,24 +72,24 @@
           [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-zinc-200'">
           <div>
             <span class="text-[10px] font-mono tabular-nums uppercase tracking-widest text-zinc-500 font-medium block mb-0.5">
-              PIEZO3D STUDIO • ESPECIFICACIÓN TÉCNICA DE CARPINTERÍA
+              {{ 'technicalSheet.headerSpec' | t }}
             </span>
             <h2 class="text-xl sm:text-2xl font-bold tracking-tight">
               {{ project().name }}
             </h2>
             <p class="text-xs text-zinc-500 mt-0.5">
-              Cliente: <strong class="text-zinc-800">{{ project().clientName || 'General' }}</strong> • Fecha: <strong class="text-zinc-800">{{ project().date }}</strong> • Medidas en Milímetros (mm)
+              {{ 'technicalSheet.client' | t }} <strong class="text-zinc-800">{{ project().clientName || ('technicalSheet.generalClient' | t) }}</strong> • {{ 'technicalSheet.date' | t }} <strong class="text-zinc-800">{{ project().date }}</strong> • {{ 'technicalSheet.measuresMm' | t }}
             </p>
           </div>
 
           <!-- Resumen de Dimensiones Generales -->
           <div class="text-right shrink-0">
-            <span class="text-[10px] font-mono text-zinc-500 block">VOLUMEN EXTERIOR (L x A x P):</span>
+            <span class="text-[10px] font-mono text-zinc-500 block">{{ 'technicalSheet.outerVolume' | t }}</span>
             <span class="text-base sm:text-lg font-bold font-mono tabular-nums text-zinc-900">
               {{ bounds().width }} × {{ bounds().height }} × {{ bounds().depth }} mm
             </span>
             <p class="text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums">
-              {{ project().parts.length }} piezas • {{ drillHoles().length }} perforaciones de taller
+              {{ 'technicalSheet.summaryLine' | t:{ parts: project().parts.length, drills: drillHoles().length } }}
             </p>
           </div>
         </div>
@@ -103,10 +103,10 @@
               [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-zinc-200'">
               <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
                 <hugeicons-icon [icon]="icons.view" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-                <span>01. Vista Frontal (Alzada)</span>
+                <span>{{ 'technicalSheet.frontView' | t }}</span>
               </span>
               <span class="text-[11px] font-mono tabular-nums text-zinc-500">
-                Ancho: {{ bounds().width }} mm | Alto: {{ bounds().height }} mm
+                {{ 'technicalSheet.widthLabel' | t }} {{ bounds().width }} mm | {{ 'technicalSheet.heightLabel' | t }} {{ bounds().height }} mm
               </span>
             </div>
 
@@ -148,7 +148,7 @@
                   font-size="11"
                   font-family="monospace"
                   fill="#64748b">
-                  Nivel Suelo 0.00
+                  {{ 'technicalSheet.groundLevel' | t }}
                 </text>
 
                 <!-- Piezas proyectadas en Vista Frontal -->
@@ -172,7 +172,7 @@
                         font-family="monospace"
                         font-weight="bold"
                         [attr.fill]="isBlueprintDark() ? '#e2e8f0' : '#1e293b'">
-                        {{ piece.name }}
+                        {{ piece.name | t }}
                       </text>
                     }
                   </g>
@@ -234,10 +234,10 @@
               [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-zinc-200'">
               <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
                 <hugeicons-icon [icon]="icons.ruler" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-                <span>02. Vista Lateral (Perfil)</span>
+                <span>{{ 'technicalSheet.sideView' | t }}</span>
               </span>
               <span class="text-[11px] font-mono tabular-nums text-zinc-500">
-                Prof: {{ bounds().depth }} mm
+                {{ 'technicalSheet.depthLabel' | t }} {{ bounds().depth }} mm
               </span>
             </div>
 
@@ -277,7 +277,7 @@
                   font-family="monospace"
                   font-weight="bold"
                   fill="#0284c7">
-                  Prof: {{ bounds().depth }} mm
+                  {{ 'technicalSheet.depthLabel' | t }} {{ bounds().depth }} mm
                 </text>
               </svg>
             </div>
@@ -289,35 +289,35 @@
           [class]="isBlueprintDark() ? 'border-zinc-700 bg-zinc-950/80' : 'border-zinc-300 bg-zinc-50'">
 
           <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
-            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">PROYECTO:</span>
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">{{ 'technicalSheet.projectHeader' | t }}:</span>
             <p class="font-bold truncate text-sm mt-0.5 text-zinc-900">{{ project().name }}</p>
             <span class="text-[10px] text-zinc-400">Piezo3D Studio</span>
           </div>
 
           <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
-            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">CLIENTE / TALLER:</span>
-            <p class="font-bold truncate text-sm mt-0.5 text-zinc-900">{{ project().clientName || 'General' }}</p>
-            <span class="text-[10px] text-zinc-400">Fecha: {{ project().date }}</span>
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">{{ 'technicalSheet.clientHeader' | t }}:</span>
+            <p class="font-bold truncate text-sm mt-0.5 text-zinc-900">{{ project().clientName || ('technicalSheet.generalClient' | t) }}</p>
+            <span class="text-[10px] text-zinc-400">{{ 'technicalSheet.date' | t }}: {{ project().date }}</span>
           </div>
 
           <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
-            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">ENSAMBLE & TORNILLERÍA:</span>
-            <p class="font-semibold text-zinc-900 mt-0.5">Soberbio 4x50 mm</p>
-            <span class="text-[10px] text-zinc-400">+ Tarugos madera 8x30</span>
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">{{ 'technicalSheet.assemblyHardware' | t }}:</span>
+            <p class="font-semibold text-zinc-900 mt-0.5">{{ 'technicalSheet.euroScrew' | t }}</p>
+            <span class="text-[10px] text-zinc-400">{{ 'technicalSheet.woodDowels' | t }}</span>
           </div>
 
           <div class="border-b md:border-b-0 md:border-r pb-2 md:pb-0 pr-2">
-            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">MATERIAL PRINCIPAL:</span>
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">{{ 'technicalSheet.mainMaterial' | t }}:</span>
             <p class="font-bold truncate mt-0.5 text-zinc-900">{{ mainBoardInfo().name }}</p>
-            <span class="text-[10px] text-zinc-400">Espesor: {{ mainBoardInfo().thickness }} mm</span>
+            <span class="text-[10px] text-zinc-400">{{ 'technicalSheet.mainThickness' | t }}: {{ mainBoardInfo().thickness }} mm</span>
           </div>
 
           <div class="flex flex-col justify-between">
             <div>
-              <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">APROBACIÓN DE CORTE:</span>
+              <span class="text-[9px] uppercase tracking-wider text-zinc-500 block font-semibold">{{ 'technicalSheet.cutApproval' | t }}:</span>
               <div class="h-6 border-b border-dashed border-zinc-300 mt-2"></div>
             </div>
-            <span class="text-[9px] text-zinc-500 text-right">Firma / Sello de Taller</span>
+            <span class="text-[9px] text-zinc-500 text-right">{{ 'technicalSheet.workshopSignature' | t }}</span>
           </div>
         </div>
 
@@ -327,10 +327,10 @@
             [class]="isBlueprintDark() ? 'border-zinc-800' : 'border-zinc-200'">
             <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
               <hugeicons-icon [icon]="icons.list" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-              <span>03. Listado de Piezas y Mecanizados para Armado</span>
+              <span>{{ 'technicalSheet.partsAndMachining' | t }}</span>
             </span>
             <span class="text-xs font-mono tabular-nums font-semibold text-zinc-800">
-              Total: {{ project().parts.length }} piezas | {{ drillHoles().length }} taladros
+              {{ 'technicalSheet.totalSummary' | t:{ parts: project().parts.length, drills: drillHoles().length } }}
             </span>
           </div>
 
@@ -339,13 +339,13 @@
             <table class="w-full text-left text-xs font-mono tabular-nums">
               <thead [class]="isBlueprintDark() ? 'bg-zinc-800/80 text-zinc-300' : 'bg-zinc-100 text-zinc-700'">
                 <tr>
-                  <th class="p-2.5">Pieza</th>
-                  <th class="p-2.5">Cant.</th>
-                  <th class="p-2.5">Medida (Largo x Ancho)</th>
-                  <th class="p-2.5">Esp.</th>
-                  <th class="p-2.5">Material</th>
-                  <th class="p-2.5">Tapacantos (L1/L2/A1/A2)</th>
-                  <th class="p-2.5">Mecanizados / Taladros</th>
+                  <th class="p-2.5">{{ 'technicalSheet.thPart' | t }}</th>
+                  <th class="p-2.5">{{ 'technicalSheet.thQty' | t }}</th>
+                  <th class="p-2.5">{{ 'technicalSheet.thDimension' | t }}</th>
+                  <th class="p-2.5">{{ 'technicalSheet.thThickness' | t }}</th>
+                  <th class="p-2.5">{{ 'technicalSheet.thMaterial' | t }}</th>
+                  <th class="p-2.5">{{ 'technicalSheet.thEdges' | t }}</th>
+                  <th class="p-2.5">{{ 'technicalSheet.thMachining' | t }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y"
@@ -353,12 +353,12 @@
                 @for (part of project().parts; track part.id) {
                   <tr class="hover:bg-zinc-50 transition">
                     <td class="p-2.5 font-medium">
-                      <div>{{ part.name }}</div>
+                      <div>{{ part.name | t }}</div>
                       @if (part.shapeType === 'circle') {
-                        <div class="text-[10px] text-zinc-600 font-medium">Cilindro Ø{{ part.diameter || part.width }}mm (Longitud {{ part.length }}mm)</div>
+                        <div class="text-[10px] text-zinc-600 font-medium">{{ 'partsList.cylinderDim' | t:{ diam: part.diameter || part.width, length: part.length } }}</div>
                       }
                       @if (part.rotationX || part.rotationY || part.rotationZ) {
-                        <div class="text-[10px] text-zinc-500 font-normal">Ángulos 3D: X {{ part.rotationX || 0 }}° | Y {{ part.rotationY || 0 }}° | Z {{ part.rotationZ || 0 }}°</div>
+                        <div class="text-[10px] text-zinc-500 font-normal">{{ 'partsList.orientation3d' | t:{ x: part.rotationX || 0, y: part.rotationY || 0, z: part.rotationZ || 0 } }}</div>
                       }
                     </td>
                     <td class="p-2.5">{{ part.quantity }}x</td>
@@ -368,15 +368,15 @@
                     <td class="p-2.5 text-[11px]">
                       {{ part.edges.l1 !== 'none' ? 'L1 ' : '' }}{{ part.edges.l2 !== 'none' ? 'L2 ' : '' }}{{ part.edges.a1 !== 'none' ? 'A1 ' : '' }}{{ part.edges.a2 !== 'none' ? 'A2' : '' }}
                       @if (part.edges.l1 === 'none' && part.edges.l2 === 'none' && part.edges.a1 === 'none' && part.edges.a2 === 'none') {
-                        <span class="text-zinc-400">Sin canto</span>
+                        <span class="text-zinc-400">{{ 'technicalSheet.noEdge' | t }}</span>
                       }
                     </td>
                     <td class="p-2.5 text-[11px] text-zinc-700 font-medium">
                       @let partDrills = joineryData().drillHolesByPart.get(part.id);
                       @if (partDrills && partDrills.length > 0) {
-                        <span>{{ partDrills.length }} taladros (4x50 / 8x30)</span>
+                        <span>{{ 'technicalSheet.drillsCount' | t:{ count: partDrills.length } }}</span>
                       } @else {
-                        <span class="text-zinc-400">Corte libre</span>
+                        <span class="text-zinc-400">{{ 'technicalSheet.freeCut' | t }}</span>
                       }
                     </td>
                   </tr>

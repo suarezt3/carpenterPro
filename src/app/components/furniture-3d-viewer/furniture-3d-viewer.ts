@@ -68,6 +68,8 @@ import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.s
 import { GlbModelLoaderService } from '../../services/glb-model-loader.service';
 import { SpatialReferenceGuideService } from '../../services/spatial-reference-guide.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
+import { I18nService } from '../../services/i18n.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
@@ -184,7 +186,7 @@ export interface WallToWallSnapGuide {
 
 @Component({
   selector: 'app-furniture-3d-viewer',
-  imports: [HugeiconsIconComponent],
+  imports: [HugeiconsIconComponent, TranslatePipe],
   templateUrl: './furniture-3d-viewer.html',
   styleUrl: './furniture-3d-viewer.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -195,6 +197,7 @@ export interface WallToWallSnapGuide {
   }
 })
 export class Furniture3dViewerComponent implements OnDestroy {
+  readonly i18n = inject(I18nService);
   private readonly ngZone = inject(NgZone);
   private readonly projectStorage = inject(ProjectStorageService);
   private joineryEngine = inject(JoineryEngineService);
@@ -1003,6 +1006,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const mats = this.materials();
       const xRay = this.isXRay();
       this.activeTool();
+      this.i18n.currentLang();
 
       if (this.scene && this.pieceObjects.length > 0) {
         this.updateSelectionHighlights(selIds, mats, xRay);
@@ -1059,12 +1063,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     });
 
-    // 7. Actualizar Guía de Referencia Espacial, Escala Humana 3D y GridHelper al cambiar tamaño de escenario
+    // 7. Actualizar Guía de Referencia Espacial, Escala Humana 3D y GridHelper al cambiar tamaño de escenario o idioma
     effect(() => {
       this.showReferenceGuide();
       this.referenceGuidePos();
       this.isReferenceGuideSelected();
       this.isWhiteTheme();
+      this.i18n.currentLang();
       const cfg = this.roomConfig();
       // Track floorWidth and floorDepth for reactivity
       const _fw = cfg.floorWidth;
@@ -4773,7 +4778,7 @@ private createHandleMesh(
       badgeType: 'length',
       part,
       currentValue: part.length,
-      label: 'Largo',
+      label: this.i18n.t('optimizer.lengthLabel'),
       baseScaleX: 140,
       baseScaleY: 38
     };
@@ -4804,7 +4809,7 @@ private createHandleMesh(
       badgeType: 'width',
       part,
       currentValue: part.width,
-      label: 'Ancho',
+      label: this.i18n.t('inspector.width'),
       baseScaleX: 140,
       baseScaleY: 38
     };
@@ -5409,7 +5414,7 @@ private createHandleMesh(
             distance: Math.round(roofBottomY - floorTopY),
             targetPart: null,
             badgeType: 'bottom_clearance',
-            label: 'Luz Libre'
+            label: this.i18n.t('designer.freeClearance')
           });
         }
       } else {
@@ -5420,7 +5425,7 @@ private createHandleMesh(
           distance: Math.round(shelfBoundsList[0].bounds.minY - floorTopY),
           targetPart: shelf0,
           badgeType: 'bottom_clearance',
-          label: 'Luz Inferior'
+          label: this.i18n.t('designer.lowerClearance')
         });
 
         for (let i = 0; i < shelfBoundsList.length - 1; i++) {
@@ -5431,12 +5436,12 @@ private createHandleMesh(
 
           let targetPart = upperShelf;
           let badgeType: 'top_clearance' | 'bottom_clearance' = 'bottom_clearance';
-          let label = 'Luz Inferior';
+          let label = this.i18n.t('designer.lowerClearance');
 
           if (selectedOrDraggingPart && selectedOrDraggingPart.id === lowerShelf.id) {
             targetPart = lowerShelf;
             badgeType = 'top_clearance';
-            label = 'Luz Superior';
+            label = this.i18n.t('designer.upperClearance');
           }
 
           bays.push({
@@ -5458,7 +5463,7 @@ private createHandleMesh(
             distance: Math.round(roofBottomY - lastY),
             targetPart: lastShelf,
             badgeType: 'top_clearance',
-            label: 'Luz Superior'
+            label: this.i18n.t('designer.upperClearance')
           });
         }
       }
@@ -5636,7 +5641,7 @@ private createHandleMesh(
         badgeType: 'top_clearance',
         part,
         currentValue: clr.topClearance,
-        label: 'Luz Superior',
+        label: this.i18n.t('designer.upperClearance'),
         referenceY: topY,
         baseScaleX: 140,
         baseScaleY: 38
@@ -5681,7 +5686,7 @@ private createHandleMesh(
         badgeType: 'bottom_clearance',
         part,
         currentValue: clr.bottomClearance,
-        label: 'Luz Inferior',
+        label: this.i18n.t('designer.lowerClearance'),
         referenceY: botY,
         baseScaleX: 140,
         baseScaleY: 38

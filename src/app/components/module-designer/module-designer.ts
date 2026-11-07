@@ -91,6 +91,8 @@ import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical
 import { TemplatesModalComponent } from '../templates-modal/templates-modal';
 import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templates-catalog.service';
 import { MELAMINE_FAMILIES, MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
+import { I18nService } from '../../services/i18n.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
@@ -118,7 +120,8 @@ function normalizeSearchText(value: string | null | undefined): string {
     HugeiconsIconComponent,
     Furniture3dViewerComponent,
     TechnicalSheetModalComponent,
-    TemplatesModalComponent
+    TemplatesModalComponent,
+    TranslatePipe
   ],
   templateUrl: './module-designer.html',
   styleUrl: './module-designer.css',
@@ -127,6 +130,7 @@ function normalizeSearchText(value: string | null | undefined): string {
   }
 })
 export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
+  readonly i18n = inject(I18nService);
   readonly projectService = inject(ProjectStorageService);
   private isRouteAttached = true;
 

@@ -6,13 +6,13 @@
       <div>
         <div class="flex items-center gap-2">
           <hugeicons-icon [icon]="icons.optimizer" [size]="18" [strokeWidth]="1.9" class="text-zinc-700 shrink-0"></hugeicons-icon>
-          <h2 [class]="themeService.isClassic() ? 'text-base font-semibold text-zinc-900' : 'text-base font-semibold text-white'">Optimizador de Corte 2D Guillotina</h2>
+          <h2 [class]="themeService.isClassic() ? 'text-base font-semibold text-zinc-900' : 'text-base font-semibold text-white'">{{ 'optimizer.title' | t }}</h2>
           <span class="text-[10px] font-mono px-2 py-0.5 rounded font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
-            Algoritmo Activo
+            {{ 'optimizer.algorithmActive' | t }}
           </span>
         </div>
         <p [class]="themeService.isClassic() ? 'text-xs text-zinc-500 mt-0.5' : 'text-xs text-zinc-400 mt-0.5'">
-          Cortes continuos de borde a borde para escuadradora / sierra de mesa. Respeto estricto de veta, ancho de disco ({{ settings().sawKerf }}mm) y refilado perimetral ({{ settings().trimMargin }}mm).
+          {{ 'optimizer.description' | t }}
         </p>
       </div>
 
@@ -27,9 +27,9 @@
             : (themeService.isClassic()
                 ? 'px-3 py-1.5 bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer'
                 : 'px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-md flex items-center gap-1.5 transition cursor-pointer')"
-          title="Descontar el espesor real de tapacantos (0.45mm / 2.0mm) de las dimensiones de corte">
+          [title]="'optimizer.subtractEdgeTooltip' | t">
           <hugeicons-icon [icon]="icons.sawCut" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-          <span>{{ subtractEdgeBanding() ? 'Descuento Canto: ACTIVO' : 'Descontar Canto' }}</span>
+          <span>{{ subtractEdgeBanding() ? ('optimizer.subtractEdgeActive' | t) : ('optimizer.subtractEdge' | t) }}</span>
         </button>
 
         <!-- Botón Imprimir Diagrama -->
@@ -38,7 +38,7 @@
           (click)="printCurrentSheet()"
           [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer' : 'px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-xs cursor-pointer'">
           <hugeicons-icon [icon]="icons.print" [size]="15" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
-          <span>Imprimir Diagrama</span>
+          <span>{{ 'optimizer.printDiagram' | t }}</span>
         </button>
 
         <!-- Botón Descargar con Menú Desplegable -->
@@ -50,10 +50,10 @@
             class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-xs cursor-pointer disabled:opacity-50">
             @if (isExporting()) {
               <hugeicons-icon [icon]="icons.loading" [size]="15" [strokeWidth]="2" class="animate-spin"></hugeicons-icon>
-              <span>Procesando...</span>
+              <span>{{ 'optimizer.processing' | t }}</span>
             } @else {
               <hugeicons-icon [icon]="icons.download" [size]="15" [strokeWidth]="2"></hugeicons-icon>
-              <span>Descargar</span>
+              <span>{{ 'optimizer.download' | t }}</span>
               <hugeicons-icon [icon]="icons.chevronDown" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             }
           </button>
@@ -65,7 +65,7 @@
               [class]="themeService.isClassic() ? 'absolute right-0 mt-1.5 w-60 bg-white border border-zinc-200 rounded-md shadow-xl z-50 py-1 animate-in fade-in zoom-in-95' : 'absolute right-0 mt-1.5 w-60 bg-zinc-900 border border-zinc-700 rounded-md shadow-2xl z-50 py-1 animate-in fade-in zoom-in-95'">
 
               <div [class]="themeService.isClassic() ? 'px-3 py-1.5 border-b border-zinc-100 text-[10px] uppercase font-mono text-zinc-400 tracking-wider' : 'px-3 py-1.5 border-b border-zinc-800 text-[10px] uppercase font-mono text-zinc-500 tracking-wider'">
-                Formato de Exportación
+                {{ 'optimizer.exportFormat' | t }}
               </div>
 
               <!-- Opción 1: PNG Alta Resolución -->
@@ -77,8 +77,8 @@
                   <hugeicons-icon [icon]="icons.image" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 </div>
                 <div>
-                  <div class="font-medium">PNG en Alta Resolución</div>
-                  <div [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 font-mono' : 'text-[10px] text-zinc-400 font-mono'">Ultra HD (2800px)</div>
+                  <div class="font-medium">{{ 'optimizer.pngHighRes' | t }}</div>
+                  <div [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 font-mono' : 'text-[10px] text-zinc-400 font-mono'">{{ 'optimizer.pngUltraHd' | t }}</div>
                 </div>
               </button>
 
@@ -91,8 +91,8 @@
                   <hugeicons-icon [icon]="icons.pdf" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 </div>
                 <div>
-                  <div class="font-medium">PDF Apaisado de Taller</div>
-                  <div [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 font-mono' : 'text-[10px] text-zinc-400 font-mono'">Plano técnico completo (1 pág)</div>
+                  <div class="font-medium">{{ 'optimizer.pdfLandscape' | t }}</div>
+                  <div [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 font-mono' : 'text-[10px] text-zinc-400 font-mono'">{{ 'optimizer.pdfFullPlan' | t }}</div>
                 </div>
               </button>
             </div>
@@ -105,13 +105,13 @@
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 xl:gap-3 mt-3">
       <!-- Placas Usadas -->
       <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-white border border-zinc-200/90 rounded-md shadow-2xs' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-md'">
-        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">Tableros Enteros</span>
-        <span [class]="themeService.isClassic() ? 'text-base xl:text-lg font-bold text-zinc-900 font-mono tabular-nums' : 'text-base xl:text-lg font-bold text-white font-mono tabular-nums'">{{ optimizationResult().totalSheetsUsed }} <span [class]="themeService.isClassic() ? 'text-xs text-zinc-400 font-normal font-sans' : 'text-xs text-zinc-500 font-normal font-sans'">placas</span></span>
+        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">{{ 'optimizer.sheetsNeeded' | t }}</span>
+        <span [class]="themeService.isClassic() ? 'text-base xl:text-lg font-bold text-zinc-900 font-mono tabular-nums' : 'text-base xl:text-lg font-bold text-white font-mono tabular-nums'">{{ optimizationResult().totalSheetsUsed }} <span [class]="themeService.isClassic() ? 'text-xs text-zinc-400 font-normal font-sans' : 'text-xs text-zinc-500 font-normal font-sans'">{{ 'optimizer.sheetsUnit' | t }}</span></span>
       </div>
 
       <!-- Eficiencia General -->
       <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-white border border-zinc-200/90 rounded-md shadow-2xs' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-md'">
-        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">Aprovechamiento</span>
+        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">{{ 'optimizer.efficiency' | t }}</span>
         <div class="flex items-center gap-1.5">
           <span class="text-base xl:text-lg font-bold text-emerald-700 font-mono tabular-nums">{{ optimizationResult().overallEfficiency }}%</span>
           <div [class]="themeService.isClassic() ? 'w-12 h-1.5 bg-zinc-100 rounded-full overflow-hidden' : 'w-12 h-1.5 bg-zinc-800 rounded-full overflow-hidden'">
@@ -122,25 +122,25 @@
 
       <!-- Desperdicio / Merma -->
       <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-white border border-zinc-200/90 rounded-md shadow-2xs' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-md'">
-        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">Merma / Desecho</span>
+        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">{{ 'optimizer.waste' | t }}</span>
         <span class="text-base xl:text-lg font-bold text-zinc-700 font-mono tabular-nums">{{ optimizationResult().wasteAreaM2 }} <span [class]="themeService.isClassic() ? 'text-xs text-zinc-400 font-normal font-sans' : 'text-xs text-zinc-500 font-normal font-sans'">m²</span></span>
       </div>
 
       <!-- Piezas Colocadas -->
       <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-white border border-zinc-200/90 rounded-md shadow-2xs' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-md'">
-        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">Piezas Colocadas</span>
+        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">{{ 'optimizer.placedParts' | t }}</span>
         <span class="text-base xl:text-lg font-bold text-zinc-900 font-mono tabular-nums">{{ optimizationResult().totalPartsPlaced }} / {{ optimizationResult().totalPartsCount }}</span>
       </div>
 
       <!-- Sierra / Corte Metros -->
       <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-white border border-zinc-200/90 rounded-md shadow-2xs' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-md'">
-        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">Corte de Sierra</span>
+        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">{{ 'optimizer.sawCuts' | t }}</span>
         <span class="text-base xl:text-lg font-bold text-zinc-900 font-mono tabular-nums">{{ optimizationResult().totalCutMeters }} <span [class]="themeService.isClassic() ? 'text-xs text-zinc-400 font-normal font-sans' : 'text-xs text-zinc-500 font-normal font-sans'">ml</span></span>
       </div>
 
       <!-- Tapacanto total -->
       <div [class]="themeService.isClassic() ? 'p-2.5 xl:p-3 bg-white border border-zinc-200/90 rounded-md shadow-2xs' : 'p-2.5 xl:p-3 bg-zinc-950/70 border border-zinc-800 rounded-md'">
-        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">Total Tapacantos</span>
+        <span [class]="themeService.isClassic() ? 'text-[10px] font-medium text-zinc-500 uppercase tracking-wider block' : 'text-[10px] font-medium text-zinc-400 uppercase tracking-wider block'">{{ 'optimizer.totalEdges' | t }}</span>
         <span class="text-base xl:text-lg font-bold text-zinc-900 font-mono tabular-nums">{{ (optimizationResult().thinEdgeMeters + optimizationResult().thickEdgeMeters).toFixed(1) }} <span [class]="themeService.isClassic() ? 'text-xs text-zinc-400 font-normal font-sans' : 'text-xs text-zinc-500 font-normal font-sans'">ml</span></span>
       </div>
     </div>
@@ -155,13 +155,13 @@
         class="w-full flex items-center justify-between gap-3 px-3.5 sm:px-4 py-2.5 cursor-pointer text-left">
         <div class="flex items-center gap-2 min-w-0">
           <hugeicons-icon [icon]="icons.settings" [size]="16" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
-          <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-900' : 'text-xs font-semibold text-white'">Medidas de Tableros</span>
+          <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-900' : 'text-xs font-semibold text-white'">{{ 'optimizer.sheetSizes' | t }}</span>
           <span [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 truncate' : 'text-[11px] text-zinc-400 truncate'">
-            · {{ sheetTypes().length }} {{ sheetTypes().length === 1 ? 'tipo de placa' : 'tipos de placa' }} (material + espesor). Edita el formato si tu proveedor maneja otra medida.
+            · {{ sheetTypes().length }} (material + {{ 'inspector.thickness' | t }})
           </span>
         </div>
         <span [class]="themeService.isClassic() ? 'text-[11px] font-medium text-zinc-700 shrink-0' : 'text-[11px] font-medium text-zinc-300 shrink-0'">
-          {{ showSheetConfig() ? 'Ocultar' : 'Configurar' }}
+          {{ showSheetConfig() ? ('optimizer.hideConfig' | t) : ('optimizer.configure' | t) }}
         </span>
       </button>
 
@@ -170,7 +170,7 @@
 
           <!-- Aplicar formato a todos -->
           <div class="flex flex-wrap items-center gap-1.5 pt-2">
-            <span [class]="themeService.isClassic() ? 'text-[11px] font-medium text-zinc-700 mr-1' : 'text-[11px] font-medium text-zinc-300 mr-1'">Aplicar a todos:</span>
+            <span [class]="themeService.isClassic() ? 'text-[11px] font-medium text-zinc-700 mr-1' : 'text-[11px] font-medium text-zinc-300 mr-1'">{{ 'optimizer.applyToAll' | t }}</span>
             @for (ps of sheetSizePresets; track ps.label) {
               <button
                 type="button"
@@ -192,13 +192,13 @@
                     <span class="text-[10px] font-mono tabular-nums font-medium px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-800 shrink-0">{{ st.material.thickness }} mm</span>
                   </div>
                   <span [class]="themeService.isClassic() ? 'text-[10px] font-mono tabular-nums text-zinc-500 shrink-0' : 'text-[10px] font-mono tabular-nums text-zinc-400 shrink-0'">
-                    {{ st.partsCount }} pzs · {{ sheetsCountByType().get(st.material.id) || 0 }} placa(s)
+                    {{ st.partsCount }} pzs · {{ sheetsCountByType().get(st.material.id) || 0 }} {{ 'optimizer.sheetsUnit' | t }}
                   </span>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
                   <label class="flex items-center gap-1 text-[11px]">
-                    <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">Largo</span>
+                    <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">{{ 'optimizer.lengthLabel' | t }}</span>
                     <input
                       type="number"
                       min="300"
@@ -206,18 +206,18 @@
                       step="10"
                       [value]="st.material.sheetLength"
                       (change)="onSheetDimensionChange(st.material, 'sheetLength', $event)"
-                      aria-label="Largo del tablero en mm"
+                      [attr.aria-label]="'optimizer.lengthLabel' | t"
                       [class]="themeService.isClassic() ? 'w-20 px-2 py-1 bg-white border border-zinc-200 rounded text-xs font-mono tabular-nums font-semibold text-zinc-900 text-right focus:outline-hidden focus:border-zinc-900' : 'w-20 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs font-mono tabular-nums font-semibold text-white text-right focus:outline-hidden focus:border-zinc-400'" />
                   </label>
                   <button
                     type="button"
                     (click)="swapSheetDimensions(st.material)"
-                    title="Intercambiar largo y ancho"
+                    [title]="'optimizer.swapDimensions' | t"
                     [class]="themeService.isClassic() ? 'p-1 rounded-md hover:bg-zinc-200 text-zinc-500 cursor-pointer' : 'p-1 rounded-md hover:bg-zinc-800 text-zinc-400 cursor-pointer'">
                     <hugeicons-icon [icon]="icons.swap" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                   </button>
                   <label class="flex items-center gap-1 text-[11px]">
-                    <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">Ancho</span>
+                    <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">{{ 'optimizer.widthLabel' | t }}</span>
                     <input
                       type="number"
                       min="300"
@@ -225,7 +225,7 @@
                       step="10"
                       [value]="st.material.sheetWidth"
                       (change)="onSheetDimensionChange(st.material, 'sheetWidth', $event)"
-                      aria-label="Ancho del tablero en mm"
+                      [attr.aria-label]="'optimizer.widthLabel' | t"
                       [class]="themeService.isClassic() ? 'w-20 px-2 py-1 bg-white border border-zinc-200 rounded text-xs font-mono tabular-nums font-semibold text-zinc-900 text-right focus:outline-hidden focus:border-zinc-900' : 'w-20 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs font-mono tabular-nums font-semibold text-white text-right focus:outline-hidden focus:border-zinc-400'" />
                   </label>
                   <span [class]="themeService.isClassic() ? 'text-[10px] font-mono text-zinc-400' : 'text-[10px] font-mono text-zinc-500'">mm</span>
@@ -248,7 +248,7 @@
           </div>
 
           <p [class]="themeService.isClassic() ? 'text-[10px] text-zinc-500' : 'text-[10px] text-zinc-500'">
-            El espesor de cada placa se toma del espesor real de las piezas. Si un mismo acabado se usa en 15 mm y 18 mm, se optimizan y cotizan como placas distintas.
+            {{ 'optimizer.boardThicknessNote' | t }}
           </p>
         </div>
       }
@@ -260,13 +260,13 @@
     <div class="print:hidden p-3 rounded-md border border-rose-300 bg-rose-50 text-rose-800 text-xs flex items-start gap-2">
       <hugeicons-icon [icon]="icons.alert" [size]="16" [strokeWidth]="2" class="shrink-0 mt-0.5 text-rose-600"></hugeicons-icon>
       <div>
-        <p class="font-semibold">{{ unplacedPartsSummary().length }} pieza(s) no caben en el tablero configurado:</p>
+        <p class="font-semibold">{{ 'optimizer.unplacedAlert' | t:{ count: unplacedPartsSummary().length } }}</p>
         <p class="mt-0.5 font-mono tabular-nums text-[11px]">
           @for (up of unplacedPartsSummary(); track up.name + up.length + up.width; let last = $last) {
-            <span>{{ up.name }} ({{ up.length }} × {{ up.width }} × {{ up.thickness }} mm){{ up.count > 1 ? ' ×' + up.count : '' }}</span>{{ last ? '' : ' · ' }}
+            <span>{{ up.name | t }} ({{ up.length }} × {{ up.width }} × {{ up.thickness }} mm){{ up.count > 1 ? ' ×' + up.count : '' }}</span>{{ last ? '' : ' · ' }}
           }
         </p>
-        <p class="mt-0.5 text-rose-700/80 text-[11px]">Aumenta la medida del tablero en "Medidas de Tableros" o divide la pieza.</p>
+        <p class="mt-0.5 text-rose-700/80 text-[11px]">{{ 'optimizer.unplacedAdvice' | t }}</p>
       </div>
     </div>
   }
@@ -283,7 +283,7 @@
             : (themeService.isClassic() ? 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium shadow-2xs' : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 font-medium')"
           class="flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs whitespace-nowrap transition cursor-pointer">
           <hugeicons-icon [icon]="icons.board" [size]="15" [strokeWidth]="2"></hugeicons-icon>
-          <span>Tablero #{{ sheet.sheetIndex }}: {{ sheet.material.name }}</span>
+          <span>{{ 'optimizer.sheetTabTitle' | t:{ index: sheet.sheetIndex, name: sheet.material.name } }}</span>
           <span [class]="selectedSheetIndex() === sIdx ? 'bg-zinc-800 text-zinc-200 font-mono tabular-nums' : (themeService.isClassic() ? 'bg-zinc-100 text-zinc-600 font-mono tabular-nums' : 'bg-zinc-800 text-zinc-400 font-mono tabular-nums')" class="px-1.5 py-0.5 rounded text-[10px]">
             {{ sheet.efficiencyPercent }}%
           </span>
@@ -300,15 +300,15 @@
         <!-- Membrete Técnico de Impresión (Visible SOLO al imprimir o guardar PDF) -->
         <div class="hidden print:flex flex-row justify-between items-end border-b-2 border-slate-900 pb-2 mb-2">
           <div>
-            <h1 class="text-lg font-black text-slate-900 tracking-tight">PLANO DE CORTE TÉCNICO · TABLERO #{{ sheet.sheetIndex }}</h1>
+            <h1 class="text-lg font-black text-slate-900 tracking-tight">{{ 'optimizer.technicalCutPlan' | t:{ index: sheet.sheetIndex } }}</h1>
             <p class="text-xs text-slate-600">
-              <strong>Proyecto:</strong> {{ project().name || 'Proyecto Cocina' }} &nbsp;|&nbsp;
-              <strong>Material:</strong> {{ sheet.material.name }} ({{ sheet.material.thickness }} mm)
+              <strong>{{ 'optimizer.projectLabel' | t }}</strong> {{ project().name || 'Proyecto Cocina' }} &nbsp;|&nbsp;
+              <strong>{{ 'optimizer.materialLabel' | t }}</strong> {{ sheet.material.name }} ({{ sheet.material.thickness }} mm)
             </p>
           </div>
           <div class="text-right text-xs font-mono font-bold text-slate-900">
-            <div>Dimensión: {{ sheet.length }} × {{ sheet.width }} mm</div>
-            <div class="text-sky-700">Aprovechamiento: {{ sheet.efficiencyPercent }}% · Piezas: {{ sheet.placedParts.length }} · Sierra: {{ sheet.cutLengthMeters }} ml</div>
+            <div>{{ 'optimizer.dimensionLabel' | t }} {{ sheet.length }} × {{ sheet.width }} mm</div>
+            <div class="text-sky-700">{{ 'optimizer.efficiencyShort' | t }} {{ sheet.efficiencyPercent }}% · {{ 'optimizer.partsCount' | t }} {{ sheet.placedParts.length }} · {{ 'optimizer.sawMeters' | t }} {{ sheet.cutLengthMeters }} ml</div>
           </div>
         </div>
 
@@ -317,14 +317,14 @@
           <div>
             <div class="flex flex-wrap items-center gap-2">
               <h3 [class]="themeService.isClassic() ? 'text-sm font-semibold text-zinc-900' : 'text-sm font-semibold text-white'">
-                Plano de Corte - Tablero #{{ sheet.sheetIndex }}
+                {{ 'optimizer.cutMapTitle' | t:{ index: sheet.sheetIndex } }}
               </h3>
               <span [class]="themeService.isClassic() ? 'text-xs px-2 py-0.5 rounded bg-zinc-100 text-zinc-700 border border-zinc-200 font-mono tabular-nums' : 'text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono tabular-nums'">
-                {{ sheet.length }} × {{ sheet.width }} mm (Espesor: {{ sheet.material.thickness }}mm)
+                {{ sheet.length }} × {{ sheet.width }} mm ({{ 'labels.thicknessLabel' | t }} {{ sheet.material.thickness }}mm)
               </span>
             </div>
             <p [class]="themeService.isClassic() ? 'text-xs text-zinc-500 mt-0.5 font-mono tabular-nums' : 'text-xs text-zinc-400 mt-0.5 font-mono tabular-nums'">
-              {{ sheet.placedParts.length }} piezas ubicadas · {{ sheet.cutLengthMeters }} ml de corte · {{ sheet.usedAreaM2 }} m² utilizados
+              {{ 'optimizer.sheetCutInfo' | t:{ parts: sheet.placedParts.length, cuts: sheet.cutLengthMeters, area: sheet.usedAreaM2 } }}
             </p>
           </div>
 
@@ -334,7 +334,7 @@
               type="button"
               (click)="zoomOut()"
               [class]="themeService.isClassic() ? 'p-1.5 bg-white hover:bg-zinc-50 text-zinc-700 rounded-md border border-zinc-200 shadow-2xs cursor-pointer' : 'p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md border border-zinc-700 cursor-pointer'"
-              title="Alejar">
+              [title]="'optimizer.zoomOut' | t">
               <hugeicons-icon [icon]="icons.zoomOut" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             </button>
             <span [class]="themeService.isClassic() ? 'text-xs text-zinc-700 font-mono tabular-nums px-1.5' : 'text-xs text-zinc-300 font-mono tabular-nums px-1.5'">{{ (zoomLevel() * 100).toFixed(0) }}%</span>
@@ -342,15 +342,15 @@
               type="button"
               (click)="zoomIn()"
               [class]="themeService.isClassic() ? 'p-1.5 bg-white hover:bg-zinc-50 text-zinc-700 rounded-md border border-zinc-200 shadow-2xs cursor-pointer' : 'p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md border border-zinc-700 cursor-pointer'"
-              title="Acercar">
+              [title]="'optimizer.zoomIn' | t">
               <hugeicons-icon [icon]="icons.zoomIn" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             </button>
             <button
               type="button"
               (click)="resetZoom()"
               [class]="themeService.isClassic() ? 'p-1.5 bg-white hover:bg-zinc-50 text-zinc-700 rounded-md border border-zinc-200 text-xs font-medium px-2.5 shadow-2xs cursor-pointer' : 'p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md border border-zinc-700 text-xs font-medium px-2.5 cursor-pointer'"
-              title="Ajustar">
-              Reset
+              [title]="'optimizer.resetZoom' | t">
+              {{ 'optimizer.resetZoom' | t }}
             </button>
           </div>
         </div>
@@ -435,7 +435,7 @@
                           font-size="7"
                           fill="#94a3b8"
                           font-family="monospace">
-                          Retazo ({{ scrap.length }}×{{ scrap.width }})
+                          {{ 'optimizer.scrapLabel' | t }} ({{ scrap.length }}×{{ scrap.width }})
                         </text>
                       }
                     </g>
@@ -519,7 +519,7 @@
                             font-weight="bold"
                             fill="#ffffff"
                             style="text-shadow: 0px 1px 2px rgba(0,0,0,0.85);">
-                            {{ placed.part.name }}
+                            {{ placed.part.name | t }}
                           </text>
                         }
 
@@ -585,21 +585,21 @@
                 <div class="flex items-center gap-2.5">
                   <span class="px-2 py-0.5 rounded bg-zinc-800 text-white font-bold font-mono text-[11px] border border-zinc-700">{{ hp.tag }}</span>
                   <div>
-                    <span class="font-semibold text-white">{{ hp.part.name }}</span>
-                    <span class="text-zinc-400"> ({{ hp.part.moduleName || hp.part.groupName || 'Manual' }})</span>
+                    <span class="font-semibold text-white">{{ hp.part.name | t }}</span>
+                    <span class="text-zinc-400"> ({{ hp.part.moduleName || hp.part.groupName || ('optimizer.manualPartGroup' | t) }})</span>
                   </div>
                   @if (subtractEdgeBanding() && (hp.nominalLength || hp.nominalWidth)) {
                     <div class="flex items-center gap-1.5 font-mono tabular-nums">
-                      <span class="text-emerald-400 font-semibold" title="Medida real de corte en sierra">Corte: {{ hp.length }} × {{ hp.width }} × {{ hp.part.thickness }}mm</span>
-                      <span class="text-zinc-400 text-[11px] line-through" title="Medida nominal terminada">Nom: {{ hp.nominalLength || hp.part.length }} × {{ hp.nominalWidth || hp.part.width }}mm</span>
+                      <span class="text-emerald-400 font-semibold" [title]="'optimizer.subtractEdgeTooltip' | t">{{ 'optimizer.cutMeasure' | t }} {{ hp.length }} × {{ hp.width }} × {{ hp.part.thickness }}mm</span>
+                      <span class="text-zinc-400 text-[11px] line-through" [title]="'optimizer.nominalMeasure' | t">{{ 'optimizer.nominalMeasure' | t }} {{ hp.nominalLength || hp.part.length }} × {{ hp.nominalWidth || hp.part.width }}mm</span>
                     </div>
                   } @else {
                     <span class="font-mono tabular-nums text-emerald-400 font-semibold">{{ hp.length }} × {{ hp.width }} × {{ hp.part.thickness }} mm</span>
                   }
                 </div>
                 <div class="flex items-center gap-3 text-[11px] font-mono tabular-nums text-zinc-300">
-                  <span>Veta: <strong class="text-white">{{ hp.part.grain === 'length' ? 'Longitudinal' : hp.part.grain === 'width' ? 'Transversal' : 'Libre' }}</strong></span>
-                  <span>Cantos: <strong class="text-sky-400">L1: {{ hp.part.edges.l1 }}, L2: {{ hp.part.edges.l2 }}</strong> · <strong class="text-amber-400">A1: {{ hp.part.edges.a1 }}, A2: {{ hp.part.edges.a2 }}</strong></span>
+                  <span>{{ 'partsList.grain' | t }}: <strong class="text-white">{{ hp.part.grain === 'length' ? ('optimizer.grainLongitudinal' | t) : hp.part.grain === 'width' ? ('optimizer.grainTransverse' | t) : ('optimizer.grainFree' | t) }}</strong></span>
+                  <span>{{ 'inspector.edgeBanding' | t }}: <strong class="text-sky-400">L1: {{ hp.part.edges.l1 }}, L2: {{ hp.part.edges.l2 }}</strong> · <strong class="text-amber-400">A1: {{ hp.part.edges.a1 }}, A2: {{ hp.part.edges.a2 }}</strong></span>
                 </div>
               </div>
             }
@@ -610,9 +610,9 @@
             <div class="flex items-center justify-between mb-2">
               <h4 [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5' : 'text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5'">
                 <hugeicons-icon [icon]="icons.list" [size]="15" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
-                <span>Piezas en Tablero ({{ sheet.placedParts.length }})</span>
+                <span>{{ 'optimizer.partsOnSheet' | t:{ count: sheet.placedParts.length } }}</span>
               </h4>
-              <span [class]="themeService.isClassic() ? 'text-[11px] font-mono text-zinc-400' : 'text-[11px] font-mono text-zinc-500'">Secuencia guiada</span>
+              <span [class]="themeService.isClassic() ? 'text-[11px] font-mono text-zinc-400' : 'text-[11px] font-mono text-zinc-500'">{{ 'optimizer.guidedSequence' | t }}</span>
             </div>
 
             <div [class]="themeService.isClassic() ? 'overflow-x-auto overflow-y-auto scrollbar-thin max-h-60 2xl:max-h-[calc(100dvh-310px)] border border-zinc-200/90 rounded-md shadow-2xs' : 'overflow-x-auto overflow-y-auto scrollbar-thin max-h-60 2xl:max-h-[calc(100dvh-310px)] border border-zinc-800 rounded-md'">
@@ -620,10 +620,10 @@
                 <thead [class]="themeService.isClassic() ? 'bg-zinc-50 text-zinc-500 uppercase text-[10px] font-mono border-b border-zinc-200/90 sticky top-0' : 'bg-zinc-950 text-zinc-400 uppercase text-[10px] font-mono border-b border-zinc-800 sticky top-0'">
                   <tr>
                     <th class="py-2 px-2.5">#</th>
-                    <th class="py-2 px-2.5">Pieza</th>
-                    <th class="py-2 px-2.5 text-right">Medidas</th>
-                    <th class="py-2 px-2 text-center">Rot.</th>
-                    <th class="py-2 px-2.5 text-center">Cantos</th>
+                    <th class="py-2 px-2.5">{{ 'optimizer.thPart' | t }}</th>
+                    <th class="py-2 px-2.5 text-right">{{ 'optimizer.thDimensions' | t }}</th>
+                    <th class="py-2 px-2 text-center">{{ 'optimizer.thRot' | t }}</th>
+                    <th class="py-2 px-2.5 text-center">{{ 'optimizer.thEdges' | t }}</th>
                   </tr>
                 </thead>
                 <tbody [class]="themeService.isClassic() ? 'divide-y divide-zinc-100 text-zinc-700' : 'divide-y divide-zinc-800 text-zinc-200'">
@@ -636,8 +636,8 @@
                         : (themeService.isClassic() ? 'hover:bg-zinc-50/80 cursor-pointer' : 'hover:bg-zinc-800/40 cursor-pointer')">
                       <td class="py-2 px-2.5 font-mono tabular-nums font-bold text-zinc-900">{{ p.tag }}</td>
                       <td class="py-2 px-2.5">
-                        <div [class]="themeService.isClassic() ? 'font-medium text-zinc-900 truncate max-w-36' : 'font-medium text-white truncate max-w-36'" [title]="p.part.name">{{ p.part.name }}</div>
-                        <div [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 truncate max-w-36' : 'text-[10px] text-zinc-500 truncate max-w-36'">{{ p.part.moduleName || p.part.groupName || 'Manual' }}</div>
+                        <div [class]="themeService.isClassic() ? 'font-medium text-zinc-900 truncate max-w-36' : 'font-medium text-white truncate max-w-36'" [title]="p.part.name | t">{{ p.part.name | t }}</div>
+                        <div [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 truncate max-w-36' : 'text-[10px] text-zinc-500 truncate max-w-36'">{{ p.part.moduleName || p.part.groupName || ('optimizer.manualPartGroup' | t) }}</div>
                       </td>
                       <td class="py-2 px-2.5 text-right font-mono tabular-nums whitespace-nowrap">
                         @if (subtractEdgeBanding() && (p.nominalLength || p.nominalWidth)) {
@@ -651,7 +651,7 @@
                         @if (p.rotated) {
                           <span class="px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-800 text-[10px] font-mono font-medium">90°</span>
                         } @else {
-                          <span [class]="themeService.isClassic() ? 'text-zinc-400 text-[10px] font-mono' : 'text-zinc-500 text-[10px] font-mono'">No</span>
+                          <span [class]="themeService.isClassic() ? 'text-zinc-400 text-[10px] font-mono' : 'text-zinc-500 text-[10px] font-mono'">0°</span>
                         }
                       </td>
                       <td class="py-2 px-2.5 text-center font-mono tabular-nums text-[10px] whitespace-nowrap">
@@ -672,8 +672,8 @@
   } @else {
     <div [class]="themeService.isClassic() ? 'p-12 text-center bg-white rounded-md border border-zinc-200/90 shadow-2xs flex flex-col items-center' : 'p-12 text-center bg-zinc-900 rounded-md border border-zinc-800 flex flex-col items-center'">
       <hugeicons-icon [icon]="icons.board" [size]="36" [strokeWidth]="1.6" class="text-zinc-400 mb-2"></hugeicons-icon>
-      <h3 [class]="themeService.isClassic() ? 'text-sm font-semibold text-zinc-800' : 'text-sm font-semibold text-zinc-300'">No hay piezas para optimizar</h3>
-      <p [class]="themeService.isClassic() ? 'text-xs text-zinc-500 mt-1' : 'text-xs text-zinc-500 mt-1'">Agrega módulos en el Diseñador o piezas en la pestaña de Despiece para generar los diagramas de corte.</p>
+      <h3 [class]="themeService.isClassic() ? 'text-sm font-semibold text-zinc-800' : 'text-sm font-semibold text-zinc-300'">{{ 'optimizer.noParts' | t }}</h3>
+      <p [class]="themeService.isClassic() ? 'text-xs text-zinc-500 mt-1' : 'text-xs text-zinc-500 mt-1'">{{ 'optimizer.noPartsDesc' | t }}</p>
     </div>
   }
 </div>

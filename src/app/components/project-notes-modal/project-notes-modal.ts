@@ -31,6 +31,8 @@ import {
 import { ThemeService } from '../../services/theme.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
+import { I18nService } from '../../services/i18n.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 import { ProjectNoteItem } from '../../models/melamine.models';
 
 /**
@@ -40,13 +42,14 @@ import { ProjectNoteItem } from '../../models/melamine.models';
  */
 @Component({
   selector: 'app-project-notes-modal',
-  imports: [ReactiveFormsModule, DatePipe, HugeiconsIconComponent],
+  imports: [ReactiveFormsModule, DatePipe, HugeiconsIconComponent, TranslatePipe],
   templateUrl: './project-notes-modal.html',
   styleUrl: './project-notes-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProjectNotesModalComponent implements OnInit, OnDestroy {
   readonly themeService = inject(ThemeService);
+  readonly i18n = inject(I18nService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly fb = inject(FormBuilder);
@@ -594,10 +597,10 @@ export class ProjectNotesModalComponent implements OnInit, OnDestroy {
     const noteTitle = note ? `"${note.title}"` : 'esta nota';
 
     const confirmed = await this.confirmService.ask({
-      title: '¿Eliminar nota del proyecto?',
-      message: `Se eliminará ${noteTitle} de la bitácora del proyecto.`,
-      confirmText: 'Eliminar Nota',
-      cancelText: 'Cancelar',
+      title: this.i18n.t('notes.deleteNoteTitle'),
+      message: this.i18n.t('notes.deleteNoteMessage', { title: noteTitle }),
+      confirmText: this.i18n.t('notes.deleteNoteConfirm'),
+      cancelText: this.i18n.t('common.cancel'),
       severity: 'danger'
     });
 
@@ -673,14 +676,14 @@ export class ProjectNotesModalComponent implements OnInit, OnDestroy {
   getCategoryBadge(category: ProjectNoteItem['category']) {
     switch (category) {
       case 'adjustment':
-        return { label: 'Ajuste de Medidas', bgClass: 'bg-rose-500/10 border-rose-500/30', textClass: 'text-rose-500', icon: this.icons.adjustment };
+        return { label: this.i18n.t('notes.catBadgeAdjustment'), bgClass: 'bg-rose-500/10 border-rose-500/30', textClass: 'text-rose-500', icon: this.icons.adjustment };
       case 'design':
-        return { label: 'Diseño CAD', bgClass: 'bg-indigo-500/10 border-indigo-500/30', textClass: 'text-indigo-500', icon: this.icons.design };
+        return { label: this.i18n.t('notes.catBadgeDesign'), bgClass: 'bg-indigo-500/10 border-indigo-500/30', textClass: 'text-indigo-500', icon: this.icons.design };
       case 'general':
-        return { label: 'General / Taller', bgClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-sky-500', icon: this.icons.general };
+        return { label: this.i18n.t('notes.catBadgeGeneral'), bgClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-sky-500', icon: this.icons.general };
       case 'pending':
       default:
-        return { label: 'Por Hacer', bgClass: 'bg-amber-500/10 border-amber-500/30', textClass: 'text-amber-500', icon: this.icons.pending };
+        return { label: this.i18n.t('notes.catBadgePending'), bgClass: 'bg-amber-500/10 border-amber-500/30', textClass: 'text-amber-500', icon: this.icons.pending };
     }
   }
 }

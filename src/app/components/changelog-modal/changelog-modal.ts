@@ -18,7 +18,9 @@ import {
   Tick02Icon
 } from '@hugeicons/core-free-icons';
 import { ThemeService } from '../../services/theme.service';
-import { APP_CURRENT_VERSION, APP_RELEASES, APP_ROADMAP } from '../../data/changelog.data';
+import { I18nService } from '../../services/i18n.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
+import { APP_CURRENT_VERSION, APP_RELEASES_BY_LANG, APP_ROADMAP_BY_LANG } from '../../data/changelog.data';
 import { ChangeType, ReleaseVersion, RoadmapItem, RoadmapStatus } from '../../models/changelog.models';
 
 /**
@@ -28,21 +30,28 @@ import { ChangeType, ReleaseVersion, RoadmapItem, RoadmapStatus } from '../../mo
  */
 @Component({
   selector: 'app-changelog-modal',
-  imports: [CommonModule, FormsModule, HugeiconsIconComponent],
+  imports: [CommonModule, FormsModule, HugeiconsIconComponent, TranslatePipe],
   templateUrl: './changelog-modal.html',
   styleUrl: './changelog-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ChangelogModalComponent {
   readonly themeService = inject(ThemeService);
+  readonly i18n = inject(I18nService);
 
   readonly isOpen = input<boolean>(false);
   readonly modalClose = output<void>();
 
-  // Versión actual del aplicativo y conjuntos de datos
+  // Versión actual del aplicativo y conjuntos de datos reactivos según el idioma activo
   readonly currentVersion = APP_CURRENT_VERSION;
-  readonly releases: ReleaseVersion[] = APP_RELEASES;
-  readonly roadmapItems: RoadmapItem[] = APP_ROADMAP;
+  readonly releases = computed<ReleaseVersion[]>(() => {
+    const lang = this.i18n.currentLang();
+    return APP_RELEASES_BY_LANG[lang] || APP_RELEASES_BY_LANG['es'];
+  });
+  readonly roadmapItems = computed<RoadmapItem[]>(() => {
+    const lang = this.i18n.currentLang();
+    return APP_ROADMAP_BY_LANG[lang] || APP_ROADMAP_BY_LANG['es'];
+  });
 
   // Estado interactivo de navegación y filtros
   readonly activeTab = signal<'changelog' | 'roadmap'>('changelog');
@@ -72,7 +81,7 @@ export class ChangelogModalComponent {
     const q = this.searchQuery().trim().toLowerCase();
     const filter = this.activeChangeFilter();
 
-    return this.releases
+    return this.releases()
       .map(release => {
         const matchedChanges = release.changes.filter(change => {
           const matchesType = filter === 'all' || change.type === filter;
@@ -105,7 +114,7 @@ export class ChangelogModalComponent {
     const q = this.searchQuery().trim().toLowerCase();
     const status = this.activeRoadmapStatus();
 
-    return this.roadmapItems.filter(item => {
+    return this.roadmapItems().filter(item => {
       const matchesStatus = status === 'all' || item.status === status;
       const matchesQuery = !q ||
         item.title.toLowerCase().includes(q) ||
@@ -118,15 +127,15 @@ export class ChangelogModalComponent {
 
   // Conteo por estado de Roadmap
   readonly inProgressCount = computed(() =>
-    this.roadmapItems.filter(i => i.status === 'in_progress').length
+    this.roadmapItems().filter(i => i.status === 'in_progress').length
   );
 
   readonly plannedCount = computed(() =>
-    this.roadmapItems.filter(i => i.status === 'planned').length
+    this.roadmapItems().filter(i => i.status === 'planned').length
   );
 
   readonly evaluatingCount = computed(() =>
-    this.roadmapItems.filter(i => i.status === 'evaluating').length
+    this.roadmapItems().filter(i => i.status === 'evaluating').length
   );
 
   close() {
@@ -158,10 +167,10 @@ export class ChangelogModalComponent {
 
   getBadgeLabel(type: ChangeType): string {
     switch (type) {
-      case 'feature': return 'NUEVO';
-      case 'improvement': return 'MEJORA';
-      case 'fix': return 'CORREGIDO';
-      case 'cad': return 'CAD 3D';
+      case 'feature': return this.i18n.t('changelog.badgeNew');
+      case 'improvement': return this.i18n.t('changelog.badgeImprovement');
+      case 'fix': return this.i18n.t('changelog.badgeFix');
+      case 'cad': return this.i18n.t('changelog.badgeCad');
     }
   }
 
@@ -181,9 +190,9 @@ export class ChangelogModalComponent {
 
   getStatusLabel(status: RoadmapStatus): string {
     switch (status) {
-      case 'in_progress': return 'En Desarrollo';
-      case 'planned': return 'Planificado';
-      case 'evaluating': return 'En Evaluación';
+      case 'in_progress': return this.i18n.t('changelog.statusInProgress');
+      case 'planned': return this.i18n.t('changelog.statusPlanned');
+      case 'evaluating': return this.i18n.t('changelog.statusEvaluating');
     }
   }
 }

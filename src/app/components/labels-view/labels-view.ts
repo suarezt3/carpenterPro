@@ -8,6 +8,7 @@ import {
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { ThemeService } from '../../services/theme.service';
 import { Part, isStoneMaterial } from '../../models/melamine.models';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 /**
  * Representa una etiqueta individual expandida por unidad física a cortar.
@@ -28,7 +29,7 @@ export interface FlatPartLabel {
 @Component({
   selector: 'app-labels-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HugeiconsIconComponent],
+  imports: [HugeiconsIconComponent, TranslatePipe],
   templateUrl: './labels-view.html',
   styleUrl: './labels-view.css'
 })

@@ -7,7 +7,7 @@
     <div class="flex items-center gap-2 xl:gap-2.5 min-w-0">
       <div class="flex items-center gap-1.5 shrink-0">
         <hugeicons-icon [icon]="icons.cube3d" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-        <span class="text-xs font-bold text-slate-900 tracking-tight whitespace-nowrap hidden sm:inline">Modelador 3D</span>
+        <span class="text-xs font-bold text-slate-900 tracking-tight whitespace-nowrap hidden sm:inline">{{ 'designer.modeler3d' | t }}</span>
       </div>
 
       <span class="text-slate-300 hidden md:inline">|</span>
@@ -23,7 +23,7 @@
           class="h-6 xl:h-6.5 px-2 xl:px-2.5 text-[11px] rounded-md flex items-center gap-1 transition cursor-pointer"
           title="Línea Cocinas: Gabinetes bajos, aéreos, esquineros 45° y rectos ciegos">
           <hugeicons-icon [icon]="icons.kitchen" [size]="13" [strokeWidth]="2" [class.text-amber-400]="selectedEnvironmentLine() === 'kitchen'"></hugeicons-icon>
-          <span class="whitespace-nowrap">Cocinas</span>
+          <span class="whitespace-nowrap">{{ 'designer.kitchens' | t }}</span>
         </button>
 
         <button
@@ -35,8 +35,7 @@
           class="h-6 xl:h-6.5 px-2 xl:px-2.5 text-[11px] rounded-md flex items-center gap-1 transition cursor-pointer"
           title="Línea Closets y Dormitorios: Roperos, armarios dobles con barras de colgado y organizadores">
           <hugeicons-icon [icon]="icons.closetDoor" [size]="13" [strokeWidth]="2" [class.text-indigo-400]="selectedEnvironmentLine() === 'closet'"></hugeicons-icon>
-          <span class="hidden md:inline whitespace-nowrap">Closets</span>
-          <span class="md:hidden whitespace-nowrap">Closet</span>
+          <span class="whitespace-nowrap">{{ 'designer.closets' | t }}</span>
         </button>
 
         <button
@@ -48,7 +47,7 @@
           class="h-6 xl:h-6.5 px-2 xl:px-2.5 text-[11px] rounded-md flex items-center gap-1 transition cursor-pointer"
           title="Línea Muebles de Baño: Vanities flotantes con destaje de sifón en U y botiquines">
           <hugeicons-icon [icon]="icons.vanity" [size]="13" [strokeWidth]="2" [class.text-sky-400]="selectedEnvironmentLine() === 'bathroom'"></hugeicons-icon>
-          <span class="whitespace-nowrap">Baños</span>
+          <span class="whitespace-nowrap">{{ 'designer.bathrooms' | t }}</span>
         </button>
 
         <button
@@ -60,8 +59,7 @@
           class="h-6 xl:h-6.5 px-2 xl:px-2.5 text-[11px] rounded-md flex items-center gap-1 transition cursor-pointer"
           title="Línea Hogar y Estudio: Racks flotantes TV, escritorios home office y libreros">
           <hugeicons-icon [icon]="icons.shelves" [size]="13" [strokeWidth]="2" [class.text-emerald-400]="selectedEnvironmentLine() === 'living_office'"></hugeicons-icon>
-          <span class="hidden lg:inline whitespace-nowrap">Hogar/Estudio</span>
-          <span class="lg:hidden whitespace-nowrap">Estudio</span>
+          <span class="whitespace-nowrap">{{ 'designer.livingOffice' | t }}</span>
         </button>
       </div>
     </div>
@@ -76,7 +74,7 @@
         class="h-6.5 xl:h-7 px-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
         title="Insertar nuevo módulo paramétrico desde catálogo">
         <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.4" class="shrink-0 text-white"></hugeicons-icon>
-        <span class="whitespace-nowrap">+ Módulo</span>
+        <span class="whitespace-nowrap">{{ 'designer.addModule' | t }}</span>
       </button>
 
       <!-- BOTÓN + MESÓN / CUBIERTA 3D -->
@@ -89,7 +87,7 @@
         class="h-6.5 xl:h-7 px-2 xl:px-2.5 text-xs font-semibold border rounded-md flex items-center gap-1.5 transition cursor-pointer"
         title="Diseñar mesón o cubierta 3D continua para los muebles">
         <hugeicons-icon [icon]="icons.countertopPro" [size]="13" [strokeWidth]="2" [class]="showKitchenProPanel() ? 'text-white shrink-0' : 'text-amber-600 shrink-0'"></hugeicons-icon>
-        <span class="hidden sm:inline whitespace-nowrap">+ Mesón</span>
+        <span class="hidden sm:inline whitespace-nowrap">{{ 'designer.addCountertop' | t }}</span>
       </button>
 
       <!-- BOTÓN + EQUIPO 3D -->
@@ -102,7 +100,7 @@
         class="h-6.5 xl:h-7 px-2 text-xs font-medium border rounded-md flex items-center gap-1.5 transition cursor-pointer"
         title="Insertar electrodomésticos, fregaderos o accesorios 3D">
         <hugeicons-icon [icon]="icons.appliance" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-amber-600]="activeDockTab() !== 'appliances'"></hugeicons-icon>
-        <span class="hidden md:inline whitespace-nowrap">+ Equipo 3D</span>
+        <span class="hidden md:inline whitespace-nowrap">{{ 'designer.addAppliance' | t }}</span>
       </button>
 
       <!-- BOTÓN + TABLERO LIBRE -->
@@ -112,7 +110,7 @@
         class="h-6.5 xl:h-7 px-2 text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-100 border border-zinc-200/90 rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
         title="Añadir un tablero o pieza libre al lienzo 3D">
         <hugeicons-icon [icon]="icons.squareShape" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-        <span class="hidden xl:inline whitespace-nowrap">+ Tablero Libre</span>
+        <span class="hidden xl:inline whitespace-nowrap">{{ 'designer.addFreeBoard' | t }}</span>
       </button>
 
       <span class="text-slate-300 hidden sm:inline">|</span>
@@ -127,7 +125,7 @@
         class="h-6.5 xl:h-7 px-2 xl:px-2.5 text-xs rounded-md flex items-center gap-1.5 transition cursor-pointer"
         title="Alternar entre modo taller (Módulo aislado) y contexto arquitectónico (Habitación 3D)">
         <hugeicons-icon [icon]="icons.homeRoof" [size]="13" [strokeWidth]="2" [class.text-zinc-400]="workspaceMode() !== 'room'"></hugeicons-icon>
-        <span class="whitespace-nowrap">{{ workspaceMode() === 'room' ? 'Habitación ON' : 'Habitación 3D' }}</span>
+        <span class="whitespace-nowrap">{{ workspaceMode() === 'room' ? ('designer.roomOn' | t) : ('designer.room3d' | t) }}</span>
       </button>
 
       <!-- Botón Configurar Entorno (Visible en Modo Habitación) -->
@@ -138,7 +136,7 @@
           class="h-6.5 xl:h-7 px-2 text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-100 border border-zinc-200/90 rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer animate-in fade-in"
           title="Configurar medidas de paredes, piso y catálogo de texturas">
           <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-          <span class="hidden lg:inline whitespace-nowrap">Entorno</span>
+          <span class="hidden lg:inline whitespace-nowrap">{{ 'designer.environment' | t }}</span>
         </button>
       }
 
@@ -159,7 +157,7 @@
           [strokeWidth]="2"
           [class]="viewer3d.isPerformanceMode() ? 'text-emerald-600 shrink-0' : 'text-zinc-400 shrink-0'">
         </hugeicons-icon>
-        <span class="hidden 2xl:inline">60 FPS</span>
+        <span class="hidden 2xl:inline">{{ 'designer.performance60fps' | t }}</span>
       </button>
 
       <!-- Botón Mostrar/Ocultar Bandeja Lateral -->
@@ -170,7 +168,7 @@
         class="h-6.5 xl:h-7 px-2 text-xs font-medium rounded-md border flex items-center gap-1 transition cursor-pointer"
         [title]="isSidebarCollapsed() ? 'Mostrar bandeja de propiedades' : 'Ocultar bandeja para lienzo 3D al 100% de pantalla'">
         <hugeicons-icon [icon]="icons.sidebarToggle" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-        <span class="hidden 2xl:inline text-[11px]">{{ isSidebarCollapsed() ? 'Mostrar' : 'Ocultar' }}</span>
+        <span class="hidden 2xl:inline text-[11px]">{{ isSidebarCollapsed() ? ('designer.show' | t) : ('designer.hide' | t) }}</span>
       </button>
     </div>
   </div>
@@ -1487,7 +1485,7 @@
                 : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium'"
               class="flex-auto py-1.5 px-2.5 text-xs rounded-md flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap">
               <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-zinc-400]="activeDockTab() !== 'piece'"></hugeicons-icon>
-              <span>{{ selectedWall() ? 'Muro' : (selectedPart() ? 'Pieza' : 'Propiedades') }}</span>
+              <span>{{ selectedWall() ? ('designer.tabWall' | t) : (selectedPart() ? ('designer.tabPiece' | t) : ('designer.tabProperties' | t)) }}</span>
               @if (selectedWall()) {
                 <span class="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0 animate-pulse"></span>
               } @else if (selectedPart()) {
@@ -1503,7 +1501,7 @@
                 : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium'"
               class="flex-auto py-1.5 px-2 text-xs rounded-md flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap">
               <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.2" class="shrink-0" [class.text-zinc-400]="activeDockTab() !== 'catalog'"></hugeicons-icon>
-              <span>Catálogo</span>
+              <span>{{ 'designer.tabCatalog' | t }}</span>
             </button>
 
             <button
@@ -1515,7 +1513,7 @@
               class="flex-auto py-1.5 px-2 text-xs rounded-md flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
               title="Repositorio y catálogo 3D de electrodomésticos y accesorios">
               <hugeicons-icon [icon]="icons.appliance" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-zinc-400]="activeDockTab() !== 'appliances'"></hugeicons-icon>
-              <span>Equipos</span>
+              <span>{{ 'designer.tabAppliances' | t }}</span>
               @if (appliances().length > 0) {
                 <span class="px-1.5 py-0.2 rounded-full text-[9px] bg-zinc-200 text-zinc-800 font-mono tabular-nums shrink-0">
                   {{ appliances().length }}
@@ -1528,7 +1526,7 @@
             type="button"
             (click)="toggleSidebar()"
             class="w-7 h-7 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200/70 rounded-md cursor-pointer flex items-center justify-center shrink-0 transition"
-            title="Colapsar bandeja lateral (100% pantalla 3D)">
+            [title]="'designer.collapseSidebar' | t">
             <hugeicons-icon [icon]="icons.chevronRight" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           </button>
         </div>
@@ -1560,7 +1558,7 @@
               class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 active:scale-95 text-white text-[10px] font-bold shadow-2xs flex items-center gap-1 shrink-0 transition cursor-pointer"
               title="Restaurar la visibilidad de todas las piezas, módulos y equipos (Alt+H)">
               <hugeicons-icon [icon]="icons.eye" [size]="12" [strokeWidth]="2"></hugeicons-icon>
-              <span>Mostrar Todo</span>
+              <span>{{ 'designer.showAll' | t }}</span>
             </button>
           </div>
         }
@@ -1861,10 +1859,10 @@
                     <div class="flex items-center justify-between">
                       <span class="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
                         <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
-                        <span>Cambiar Melamina en Bloque</span>
+                        <span>{{ 'inspector.changeMelamineBlock' | t }}</span>
                       </span>
                       <span class="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200">
-                        {{ selectedMelamineParts().length }} {{ selectedMelamineParts().length === 1 ? 'pieza' : 'piezas' }}
+                        {{ selectedMelamineParts().length }} {{ selectedMelamineParts().length === 1 ? ('inspector.piece' | t) : ('inspector.pieces' | t) }}
                       </span>
                     </div>
 
@@ -2031,7 +2029,7 @@
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.ruler" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
-                    <span>Medidas del Módulo</span>
+                    <span>{{ 'inspector.dimensions' | t }}</span>
                   </span>
                   <span class="text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                     {{ gStats.width }} × {{ gStats.height }} × {{ gStats.depth }} mm
@@ -2042,7 +2040,7 @@
                   <!-- ANCHO DEL MÓDULO (X) -->
                   <div class="bg-white p-1.5 rounded-lg border border-slate-200 shadow-2xs border-t-2 border-t-indigo-500">
                     <div class="flex items-center justify-between mb-1">
-                      <span class="text-[10px] font-bold text-slate-700">Ancho</span>
+                      <span class="text-[10px] font-bold text-slate-700">{{ 'inspector.width' | t }}</span>
                       <span class="text-[8px] font-mono text-slate-400">mm</span>
                     </div>
                     <input
@@ -2062,7 +2060,7 @@
                   <!-- ALTO DEL MÓDULO (Y) -->
                   <div class="bg-white p-1.5 rounded-lg border border-slate-200 shadow-2xs border-t-2 border-t-emerald-500">
                     <div class="flex items-center justify-between mb-1">
-                      <span class="text-[10px] font-bold text-slate-700">Alto</span>
+                      <span class="text-[10px] font-bold text-slate-700">{{ 'inspector.height' | t }}</span>
                       <span class="text-[8px] font-mono text-slate-400">mm</span>
                     </div>
                     <input
@@ -2082,7 +2080,7 @@
                   <!-- PROFUNDIDAD / FONDO DEL MÓDULO (Z) -->
                   <div class="bg-white p-1.5 rounded-lg border border-slate-200 shadow-2xs border-t-2 border-t-sky-500">
                     <div class="flex items-center justify-between mb-1">
-                      <span class="text-[10px] font-bold text-slate-700">Fondo</span>
+                      <span class="text-[10px] font-bold text-slate-700">{{ 'inspector.depthShort' | t }}</span>
                       <span class="text-[8px] font-mono text-slate-400">mm</span>
                     </div>
                     <input
@@ -2103,7 +2101,7 @@
                 <!-- Espesor Estructural del Módulo -->
                 <div class="pt-2 border-t border-slate-200/80 space-y-1.5">
                   <div class="flex items-center justify-between">
-                    <span class="text-[10px] text-slate-600 font-semibold">{{ isSelectedGroupCountertop() ? 'Espesor de Mesón:' : 'Espesor Estructural (Tablero):' }}</span>
+                    <span class="text-[10px] text-slate-600 font-semibold">{{ isSelectedGroupCountertop() ? ('inspector.thicknessCountertop' | t) : ('inspector.thicknessStructural' | t) }}</span>
                     <div class="flex items-center gap-1">
                       <button
                         type="button"
@@ -2182,7 +2180,7 @@
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-                    <span>{{ isSelectedGroupCountertop() ? 'Material de Mesón y Salpicaderos' : 'Material del Módulo' }}</span>
+                    <span>{{ isSelectedGroupCountertop() ? 'Material de Mesón y Salpicaderos' : ('inspector.moduleMaterial' | t) }}</span>
                   </span>
                   <span class="text-[9px] text-slate-400 font-semibold">{{ isSelectedGroupCountertop() ? 'Piedra / Macizo' : 'Aplicar en bloque' }}</span>
                 </div>
@@ -2273,19 +2271,19 @@
                       type="button"
                       (click)="applyGroupMaterial(groupMatSelect.value, 'all')"
                       class="py-1 px-1.5 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-800 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer">
-                      Todo el Módulo
+                      {{ 'inspector.wholeModule' | t }}
                     </button>
                     <button
                       type="button"
                       (click)="applyGroupMaterial(groupMatSelect.value, 'structure')"
                       class="py-1 px-1.5 bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-800 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer">
-                      Solo Estructura
+                      {{ 'inspector.structureOnly' | t }}
                     </button>
                     <button
                       type="button"
                       (click)="applyGroupMaterial(groupMatSelect.value, 'doors')"
                       class="py-1 px-1.5 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer">
-                      Solo Frentes
+                      {{ 'inspector.frontsOnly' | t }}
                     </button>
                   </div>
                 }
@@ -2297,7 +2295,7 @@
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
                       <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-indigo-600 shrink-0"></hugeicons-icon>
-                      <span>Configuración Paramétrica</span>
+                      <span>{{ 'inspector.parametricConfig' | t }}</span>
                     </span>
                     <span class="text-[9px] font-mono font-bold uppercase px-1.5 py-0.2 bg-indigo-200/70 text-indigo-900 rounded">
                       {{ isDrawerCabinet(pCfg) ? 'Cajonera' : (isWallOrHangingCabinet(pCfg) ? 'Alacena Aérea' : (pCfg.moduleType || 'Gabinete')) }}
@@ -2308,9 +2306,9 @@
                   @if (isFloorBaseApplicable(pCfg)) {
                     <div class="bg-white p-2 rounded-lg border border-indigo-100 space-y-1.5">
                       <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-                        <span>Base del Mueble</span>
+                        <span>{{ 'inspector.cabinetBase' | t }}</span>
                         <span class="text-[10px] font-mono text-indigo-700">
-                          {{ pCfg.hasPlinth !== false ? ('Zócalo ' + (pCfg.plinthHeight || 80) + ' mm') : (pCfg.elevationY ? ('Flotante +' + pCfg.elevationY + ' mm') : 'Al piso') }}
+                          {{ pCfg.hasPlinth !== false ? ('Zócalo ' + (pCfg.plinthHeight || 80) + ' mm') : (pCfg.elevationY ? ('Flotante +' + pCfg.elevationY + ' mm') : ('inspector.toFloor' | t)) }}
                         </span>
                       </div>
                       <div class="grid grid-cols-2 gap-1 text-[10px]">
@@ -2319,19 +2317,19 @@
                           (click)="updateActiveGroupParametricConfig({ hasPlinth: true, elevationY: 0 })"
                           [class]="pCfg.hasPlinth !== false ? 'bg-indigo-600 text-white font-bold shadow-2xs' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'"
                           class="py-1 px-1.5 rounded-md text-center transition cursor-pointer">
-                          Con Zócalo
+                          {{ 'inspector.plinth' | t }}
                         </button>
                         <button
                           type="button"
                           (click)="updateActiveGroupParametricConfig({ hasPlinth: false, elevationY: pCfg.elevationY || 200 })"
                           [class]="pCfg.hasPlinth === false ? 'bg-indigo-600 text-white font-bold shadow-2xs' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'"
                           class="py-1 px-1.5 rounded-md text-center transition cursor-pointer">
-                          Flotante / Aéreo
+                          {{ 'inspector.floating' | t }}
                         </button>
                       </div>
                       @if (pCfg.hasPlinth === false) {
                         <div class="flex items-center justify-between pt-1 text-[10px]">
-                          <span class="text-slate-600">Elevación Y (mm):</span>
+                          <span class="text-slate-600">{{ 'inspector.elevationY' | t }}</span>
                           <div class="flex items-center gap-1">
                             <button type="button" (click)="updateActiveGroupParametricConfig({ elevationY: Math.max(0, (pCfg.elevationY || 200) - 50) })" class="w-5 h-5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-bold flex items-center justify-center cursor-pointer">-</button>
                             <input
@@ -2352,9 +2350,9 @@
                   @if (isTopStructureApplicable(pCfg)) {
                     <div class="bg-white p-2 rounded-lg border border-indigo-100 space-y-1.5">
                       <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-                        <span>Estructura Superior (Techo)</span>
+                        <span>{{ 'inspector.topStructure' | t }}</span>
                         <span class="text-[10px] font-mono text-indigo-700">
-                          {{ (pCfg.topTieStrips || pCfg.hasTopCover === false) ? 'Amarres (Mesón)' : 'Tapa Maciza' }}
+                          {{ (pCfg.topTieStrips || pCfg.hasTopCover === false) ? ('inspector.tieStrips' | t) : ('inspector.solidTop' | t) }}
                         </span>
                       </div>
                       <div class="grid grid-cols-2 gap-1 text-[10px]">
@@ -2363,14 +2361,14 @@
                           (click)="updateActiveGroupParametricConfig({ topTieStrips: true, hasTopCover: false })"
                           [class]="(pCfg.topTieStrips || pCfg.hasTopCover === false) ? 'bg-indigo-600 text-white font-bold shadow-2xs' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'"
                           class="py-1 px-1.5 rounded-md text-center transition cursor-pointer">
-                          Amarres (Mesón)
+                          {{ 'inspector.tieStrips' | t }}
                         </button>
                         <button
                           type="button"
                           (click)="updateActiveGroupParametricConfig({ topTieStrips: false, hasTopCover: true })"
                           [class]="(!pCfg.topTieStrips && pCfg.hasTopCover !== false) ? 'bg-indigo-600 text-white font-bold shadow-2xs' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'"
                           class="py-1 px-1.5 rounded-md text-center transition cursor-pointer">
-                          Tapa Maciza
+                          {{ 'inspector.solidTop' | t }}
                         </button>
                       </div>
                     </div>
@@ -2382,7 +2380,7 @@
                       <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
                         <span class="flex items-center gap-1">
                           <hugeicons-icon [icon]="icons.sink" [size]="12" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
-                          <span>Destaje Sifón en U</span>
+                          <span>{{ 'inspector.siphonCutout' | t }}</span>
                         </span>
                         <label class="relative inline-flex items-center cursor-pointer">
                           <input
@@ -2396,7 +2394,7 @@
                       @if (pCfg.siphonCutout?.enabled) {
                         <div class="grid grid-cols-2 gap-1.5 pt-1 text-[10px]">
                           <div>
-                            <span class="text-slate-500 block mb-0.5">Ancho (mm)</span>
+                            <span class="text-slate-500 block mb-0.5">{{ 'inspector.width' | t }} (mm)</span>
                             <input
                               type="number"
                               min="100"
@@ -2406,7 +2404,7 @@
                               class="w-full h-5 px-1 bg-slate-50 border border-slate-200 rounded text-center font-mono font-bold text-slate-900" />
                           </div>
                           <div>
-                            <span class="text-slate-500 block mb-0.5">Fondo (mm)</span>
+                            <span class="text-slate-500 block mb-0.5">{{ 'inspector.depthShort' | t }} (mm)</span>
                             <input
                               type="number"
                               min="100"
@@ -2422,7 +2420,7 @@
 
                   <!-- Frentes e Interior: Puertas, Cajones, Repisas, Barras de Colgado -->
                   <div class="bg-white p-2 rounded-lg border border-indigo-100 space-y-2">
-                    <span class="text-[11px] font-bold text-slate-800 block">Distribución Interior y Frentes</span>
+                    <span class="text-[11px] font-bold text-slate-800 block">{{ 'inspector.interiorAndFronts' | t }}</span>
 
                     <!-- Selector Rápido de Frente para Módulos Bajos (Puertas vs Cajonera) -->
                     @if (canSwitchCabinetFrontType(pCfg)) {
@@ -2432,14 +2430,14 @@
                           (click)="switchToCabinetMode('doors')"
                           [class]="!isDrawerCabinet(pCfg) ? 'bg-indigo-600 text-white font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900 font-medium'"
                           class="py-1 rounded text-center transition cursor-pointer">
-                          Puertas y Repisas
+                          {{ 'inspector.doorsAndShelves' | t }}
                         </button>
                         <button
                           type="button"
                           (click)="switchToCabinetMode('drawers')"
                           [class]="isDrawerCabinet(pCfg) ? 'bg-indigo-600 text-white font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900 font-medium'"
                           class="py-1 rounded text-center transition cursor-pointer">
-                          Cajonera
+                          {{ 'inspector.drawerUnit' | t }}
                         </button>
                       </div>
                     }
@@ -2447,17 +2445,17 @@
                     <!-- Puertas: Solo mostrar si NO es cajonera pura -->
                     @if (!isDrawerCabinet(pCfg)) {
                       <div class="flex items-center justify-between text-[10px]">
-                        <span class="text-slate-600 font-medium">Puertas:</span>
+                        <span class="text-slate-600 font-medium">{{ 'inspector.doors' | t }}</span>
                         <select
                           [value]="pCfg.doorOpening || 'none'"
                           (change)="updateActiveGroupParametricConfig({ doorOpening: $any($event.target).value })"
                           class="h-6 px-1.5 bg-slate-50 border border-slate-200 rounded text-[10px] font-semibold text-slate-800 cursor-pointer">
-                          <option value="none">Sin Puerta</option>
-                          <option value="left">1P Izquierda</option>
-                          <option value="right">1P Derecha</option>
-                          <option value="double">2 Puertas (Doble)</option>
+                          <option value="none">{{ 'inspector.noDoor' | t }}</option>
+                          <option value="left">{{ 'inspector.oneDoorLeft' | t }}</option>
+                          <option value="right">{{ 'inspector.oneDoorRight' | t }}</option>
+                          <option value="double">{{ 'inspector.doubleDoors' | t }}</option>
                           @if (isWallOrHangingCabinet(pCfg)) {
-                            <option value="top">Elevable (Pistón a Gas)</option>
+                            <option value="top">{{ 'inspector.liftUpDoor' | t }}</option>
                           }
                         </select>
                       </div>
@@ -2466,7 +2464,7 @@
                     <!-- Cajones: Solo mostrar si es cajonera -->
                     @if (isDrawerCabinet(pCfg)) {
                       <div class="flex items-center justify-between text-[10px]">
-                        <span class="text-slate-600 font-medium">Cajones:</span>
+                        <span class="text-slate-600 font-medium">{{ 'inspector.drawers' | t }}</span>
                         <div class="flex items-center gap-1">
                           <button type="button" (click)="updateActiveGroupParametricConfig({ drawersCount: Math.max(1, (pCfg.drawersCount || 1) - 1) })" class="w-5 h-5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-bold flex items-center justify-center cursor-pointer">-</button>
                           <span class="w-6 text-center font-mono font-bold text-slate-900 text-[11px]">{{ pCfg.drawersCount || 1 }}</span>
@@ -2478,7 +2476,7 @@
                     <!-- Repisas: Solo mostrar si NO es cajonera pura -->
                     @if (!isDrawerCabinet(pCfg)) {
                       <div class="flex items-center justify-between text-[10px]">
-                        <span class="text-slate-600 font-medium">Repisas:</span>
+                        <span class="text-slate-600 font-medium">{{ 'inspector.shelves' | t }}</span>
                         <div class="flex items-center gap-1">
                           <button type="button" (click)="updateActiveGroupParametricConfig({ shelvesCount: Math.max(0, (pCfg.shelvesCount || 0) - 1) })" class="w-5 h-5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-bold flex items-center justify-center cursor-pointer">-</button>
                           <span class="w-6 text-center font-mono font-bold text-slate-900 text-[11px]">{{ pCfg.shelvesCount || 0 }}</span>
@@ -2490,7 +2488,7 @@
                     <!-- Barras de Colgado (Solo Closets y Dormitorios) -->
                     @if (isHangingRodsApplicable(pCfg)) {
                       <div class="flex items-center justify-between text-[10px]">
-                        <span class="text-slate-600 font-medium">Barras Colgador:</span>
+                        <span class="text-slate-600 font-medium">{{ 'inspector.hangingRods' | t }}</span>
                         <div class="flex items-center gap-1">
                           <button
                             type="button"
@@ -2519,7 +2517,7 @@
                     class="w-full py-2 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
                     title="Duplicar este módulo ensamblado a la derecha (+X) con separación estándar">
                     <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2" class="text-white shrink-0"></hugeicons-icon>
-                    <span>Duplicar al Lado (+X)</span>
+                    <span>{{ 'inspector.duplicateToSide' | t }}</span>
                   </button>
                 </div>
               }
@@ -2529,9 +2527,9 @@
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="2" class="text-amber-500 shrink-0"></hugeicons-icon>
-                    <span>Posición 3D del Módulo</span>
+                    <span>{{ 'inspector.module3dPosition' | t }}</span>
                   </span>
-                  <span class="text-[9px] font-mono text-slate-400 font-semibold">En Bloque</span>
+                  <span class="text-[9px] font-mono text-slate-400 font-semibold">{{ 'inspector.inBlock' | t }}</span>
                 </div>
 
                 <div class="grid grid-cols-3 gap-1.5">
@@ -2600,25 +2598,25 @@
                     type="button"
                     (click)="alignSelectedGroup('floor')"
                     class="py-1 px-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-                    title="Apoyar módulo directamente sobre el suelo (Y=0)">
+                    [title]="'inspector.alignFloor' | t">
                     <hugeicons-icon [icon]="icons.alignBottom" [size]="12" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
-                    <span>Al Suelo</span>
+                    <span>{{ 'inspector.alignFloor' | t }}</span>
                   </button>
                   <button
                     type="button"
                     (click)="alignSelectedGroup('centerX')"
                     class="py-1 px-1 bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-                    title="Centrar módulo en eje X (X=0)">
+                    [title]="'inspector.alignCenterX' | t">
                     <hugeicons-icon [icon]="icons.alignCenter" [size]="12" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
-                    <span>Centrar X</span>
+                    <span>{{ 'inspector.alignCenterX' | t }}</span>
                   </button>
                   <button
                     type="button"
                     (click)="alignSelectedGroup('centerZ')"
                     class="py-1 px-1 bg-white hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 border border-slate-200 text-slate-700 rounded-lg text-[10px] text-center transition font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-                    title="Centrar módulo en profundidad Z (Z=0)">
+                    [title]="'inspector.alignCenterZ' | t">
                     <hugeicons-icon [icon]="icons.cameraFocus" [size]="12" [strokeWidth]="2" class="text-sky-500 shrink-0"></hugeicons-icon>
-                    <span>Centrar Z</span>
+                    <span>{{ 'inspector.alignCenterZ' | t }}</span>
                   </button>
                 </div>
               </div>
@@ -2631,7 +2629,7 @@
                     <span>Giro y Orientación del Módulo</span>
                   </span>
                   <span class="text-[9px] font-bold uppercase px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded font-mono">
-                    En Bloque
+                    {{ 'inspector.inBlock' | t }}
                   </span>
                 </div>
 
@@ -2812,7 +2810,7 @@
                   (click)="duplicateSelectedGroup()"
                   class="py-2 px-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-200 flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer">
                   <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-                  <span class="truncate">Duplicar Módulo</span>
+                  <span class="truncate">{{ 'inspector.duplicateModule' | t }}</span>
                 </button>
 
                 <button
@@ -2820,7 +2818,7 @@
                   (click)="hideActiveGroup()"
                   class="py-2 px-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-200 flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer">
                   <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
-                  <span class="truncate">Ocultar Módulo</span>
+                  <span class="truncate">{{ 'inspector.hideModule' | t }}</span>
                 </button>
 
                 @if (!isSelectedGroupCountertop()) {
@@ -2829,7 +2827,7 @@
                     (click)="ungroupSelected()"
                     class="py-2 px-2 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl border border-amber-200 flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer">
                     <hugeicons-icon [icon]="icons.unlink" [size]="13" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
-                    <span class="truncate">Desagrupar</span>
+                    <span class="truncate">{{ 'inspector.ungroup' | t }}</span>
                   </button>
                 }
 
@@ -2838,7 +2836,7 @@
                   (click)="deleteSelectedPart()"
                   class="py-2 px-2 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl border border-rose-200 flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer">
                   <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
-                  <span class="truncate">Eliminar Módulo</span>
+                  <span class="truncate">{{ 'inspector.deleteModule' | t }}</span>
                 </button>
               </div>
 
@@ -2895,7 +2893,7 @@
                       class="text-[10px] font-medium text-amber-700 hover:text-amber-800 flex items-center gap-0.5 cursor-pointer"
                       [title]="activeSelectedGroupId() ? 'Girar módulo 90° en bloque (Tecla R)' : 'Girar 90° e intercambiar Largo/Ancho (Tecla R)'">
                       <hugeicons-icon [icon]="icons.rotateRight" [size]="11" [strokeWidth]="2"></hugeicons-icon>
-                      <span>Girar 90° (R)</span>
+                      <span>{{ 'inspector.rotate90' | t }}</span>
                     </button>
                   </div>
                   <div class="grid grid-cols-3 gap-1 bg-zinc-100 p-0.5 rounded-md text-[10px]">
@@ -2938,7 +2936,7 @@
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.ruler" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                    <span>Medidas de la Pieza</span>
+                    <span>{{ 'inspector.partDimensions' | t }}</span>
                   </span>
                   <span class="text-[10px] font-mono tabular-nums font-semibold text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200">
                     {{ sel.length }} × {{ sel.width }} × {{ sel.thickness }} mm
@@ -3043,7 +3041,7 @@
                 <!-- Espesor de Pieza (Grosor) -->
                 <div class="pt-2 border-t border-zinc-200/80 space-y-1.5">
                   <div class="flex items-center justify-between">
-                    <span class="text-[10px] text-zinc-500 font-medium">Espesor de Tablero (Grosor):</span>
+                    <span class="text-[10px] text-zinc-500 font-medium">{{ 'inspector.boardThickness' | t }}</span>
                     <div class="flex items-center gap-1">
                       <button
                         type="button"
@@ -3226,9 +3224,9 @@
                 <!-- Dirección de la Veta -->
                 <div class="pt-2 border-t border-zinc-200/80 space-y-1">
                   <div class="flex items-center justify-between text-[10px]">
-                    <span class="font-semibold text-zinc-500">Dirección de la Veta:</span>
+                    <span class="font-semibold text-zinc-500">{{ 'inspector.grainDirection' | t }}</span>
                     <span class="font-mono text-[9px] text-zinc-400">
-                      {{ sel.grain === 'length' ? 'A lo largo' : (sel.grain === 'width' ? 'A lo ancho' : 'Sin veta') }}
+                      {{ sel.grain === 'length' ? ('inspector.grainLength' | t) : (sel.grain === 'width' ? ('inspector.grainWidth' | t) : ('inspector.grainNone' | t)) }}
                     </span>
                   </div>
                   <div class="grid grid-cols-3 gap-1 text-[10px]">
@@ -3237,24 +3235,24 @@
                       (click)="updateSelectedPart({ grain: 'length' })"
                       [class]="sel.grain === 'length' ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium'"
                       class="py-1 px-1 rounded-md transition text-center cursor-pointer border"
-                      title="Veta paralela al Largo de la pieza">
-                      A lo Largo
+                      [title]="'inspector.grainLength' | t">
+                      {{ 'inspector.grainLength' | t }}
                     </button>
                     <button
                       type="button"
                       (click)="updateSelectedPart({ grain: 'width' })"
                       [class]="sel.grain === 'width' ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium'"
                       class="py-1 px-1 rounded-md transition text-center cursor-pointer border"
-                      title="Veta paralela al Ancho de la pieza">
-                      A lo Ancho
+                      [title]="'inspector.grainWidth' | t">
+                      {{ 'inspector.grainWidth' | t }}
                     </button>
                     <button
                       type="button"
                       (click)="updateSelectedPart({ grain: 'none' })"
                       [class]="(!sel.grain || sel.grain === 'none') ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium'"
                       class="py-1 px-1 rounded-md transition text-center cursor-pointer border"
-                      title="Sin orientación de veta / Color sólido">
-                      Sin Veta
+                      [title]="'inspector.grainNone' | t">
+                      {{ 'inspector.grainNone' | t }}
                     </button>
                   </div>
                 </div>
@@ -3263,7 +3261,7 @@
                 @if ((sel.thickness || 18) > 6 && sel.componentRole !== 'countertop' && sel.componentRole !== 'backsplash' && !isSelectedGroupCountertop() && !isSelectedPartCountertop()) {
                   <div class="pt-2 border-t border-zinc-200/80 space-y-1.5">
                     <div class="flex items-center justify-between">
-                      <span class="text-[10px] font-semibold text-zinc-500">Tapacantos por Borde:</span>
+                      <span class="text-[10px] font-semibold text-zinc-500">{{ 'inspector.edgeBandingByEdge' | t }}</span>
                       <span class="text-[9px] text-zinc-400">Clic para alternar (Sin / 0.45 / 2.0mm)</span>
                     </div>
 
@@ -3333,7 +3331,7 @@
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.chamferCut" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                    <span>Cortes Especiales y Esquinas</span>
+                    <span>{{ 'inspector.specialCuts' | t }}</span>
                   </span>
                   <span class="text-[9px] font-mono tabular-nums font-semibold px-1.5 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200">
                     {{ sel.cornerCutConfig?.type && sel.cornerCutConfig?.type !== 'none' ? sel.cornerCutConfig?.type : 'Rectángulo' }}
@@ -3348,7 +3346,7 @@
                     [class]="(!sel.cornerCutConfig || sel.cornerCutConfig.type === 'none') ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium'"
                     class="py-1 px-1 rounded-md transition text-center cursor-pointer border"
                     title="Restaurar pieza rectangular estándar">
-                    Recto
+                    {{ 'inspector.straight' | t }}
                   </button>
                   <button
                     type="button"
@@ -3356,7 +3354,7 @@
                     [class]="sel.cornerCutConfig?.type === 'chamfer_corner' ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium'"
                     class="py-1 px-1 rounded-md transition text-center cursor-pointer border"
                     title="Chaflán diagonal a 45° o medidas X/Y en esquina">
-                    Chaflán
+                    {{ 'inspector.chamfer' | t }}
                   </button>
                   <button
                     type="button"
@@ -3364,7 +3362,7 @@
                     [class]="sel.cornerCutConfig?.type === 'diagonal_side' ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium'"
                     class="py-1 px-1 rounded-md transition text-center cursor-pointer border"
                     title="Corte diagonal en trapecio a lo largo del costado">
-                    Diagonal
+                    {{ 'inspector.diagonal' | t }}
                   </button>
                   <button
                     type="button"
@@ -3372,7 +3370,7 @@
                     [class]="sel.cornerCutConfig?.type === 'notch_l' ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium'"
                     class="py-1 px-1 rounded-md transition text-center cursor-pointer border"
                     title="Destaje en L en esquina para salvar columnas o ductos">
-                    Destaje L
+                    {{ 'inspector.notchL' | t }}
                   </button>
                   <button
                     type="button"
@@ -3380,7 +3378,7 @@
                     [class]="sel.cornerCutConfig?.type === 'rounded_corners' ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium'"
                     class="py-1 px-1 rounded-md transition text-center cursor-pointer border"
                     title="Bordes redondeados para barras desayunadoras e islas">
-                    Curvo
+                    {{ 'inspector.rounded' | t }}
                   </button>
                   <button
                     type="button"
@@ -3388,14 +3386,14 @@
                     [class]="sel.cornerCutConfig?.type === 'u_siphon_cutout' ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium'"
                     class="py-1 px-1 rounded-md transition text-center cursor-pointer border"
                     title="Destaje para sifón de lavamanos en U (fondo central)">
-                    Sifón U
+                    {{ 'inspector.siphonCut' | t }}
                   </button>
                 </div>
 
                 <!-- Selector de Esquina y Cotas X / Y del Corte -->
                 <div class="grid grid-cols-3 gap-1.5 items-end pt-0.5">
                   <div>
-                    <span class="text-[9px] font-semibold text-zinc-500 block mb-0.5">Esquina</span>
+                    <span class="text-[9px] font-semibold text-zinc-500 block mb-0.5">{{ 'inspector.corner' | t }}</span>
                     <select
                       [value]="specialCutCorner()"
                       (change)="specialCutCorner.set($any($event.target).value); sel.cornerCutConfig?.type && sel.cornerCutConfig?.type !== 'none' && applySpecialCutToSelectedPart(sel.cornerCutConfig!.type)"
@@ -3436,9 +3434,9 @@
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                    <span>Posición 3D (Coordenadas)</span>
+                    <span>{{ 'inspector.position3dCoords' | t }}</span>
                   </span>
-                  <span class="text-[9px] font-mono tabular-nums text-zinc-400 font-semibold">Ejes X · Y · Z</span>
+                  <span class="text-[9px] font-mono tabular-nums text-zinc-400 font-semibold">{{ 'inspector.axesCoords' | t }}</span>
                 </div>
 
                 <div class="grid grid-cols-3 gap-1.5">
@@ -3508,7 +3506,7 @@
                     class="py-1 px-1 bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-700 rounded-md text-[10px] text-center transition font-medium shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                     title="Apoyar directamente sobre el suelo (Y=0)">
                     <hugeicons-icon [icon]="icons.alignBottom" [size]="12" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
-                    <span>Al Suelo</span>
+                    <span>{{ 'inspector.alignFloor' | t }}</span>
                   </button>
                   <button
                     type="button"
@@ -3516,7 +3514,7 @@
                     class="py-1 px-1 bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-700 rounded-md text-[10px] text-center transition font-medium shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                     title="Centrar en eje X (X=0)">
                     <hugeicons-icon [icon]="icons.alignCenter" [size]="12" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
-                    <span>Centrar X</span>
+                    <span>{{ 'inspector.alignCenterX' | t }}</span>
                   </button>
                   <button
                     type="button"
@@ -3524,7 +3522,7 @@
                     class="py-1 px-1 bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-700 rounded-md text-[10px] text-center transition font-medium shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                     title="Centrar en profundidad Z (Z=0)">
                     <hugeicons-icon [icon]="icons.cameraFocus" [size]="12" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
-                    <span>Centrar Z</span>
+                    <span>{{ 'inspector.alignCenterZ' | t }}</span>
                   </button>
                 </div>
               </div>
@@ -3535,7 +3533,7 @@
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
                       <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                      <span>Inclinación / Giro 3D</span>
+                      <span>{{ 'inspector.rotation3d' | t }}</span>
                     </span>
                     <button
                       type="button"
@@ -3607,10 +3605,10 @@
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
                       <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                      <span>Giro del Módulo</span>
+                      <span>{{ 'inspector.moduleRotation' | t }}</span>
                     </span>
                     <span class="text-[9px] font-semibold uppercase px-1.5 py-0.2 bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-md font-mono">
-                      En Bloque
+                      {{ 'inspector.inBlock' | t }}
                     </span>
                   </div>
 
@@ -3637,7 +3635,7 @@
                   <!-- Orientación de Cara / Frente -->
                   <div class="pt-0.5">
                     <div class="text-[10px] text-zinc-500 font-medium mb-1 flex items-center justify-between">
-                      <span>Orientar Frente hacia:</span>
+                      <span>{{ 'inspector.orientFacingToward' | t }}</span>
                       <span class="font-semibold text-zinc-900 capitalize">{{ currentGroupFacing() }}</span>
                     </div>
                     <div class="grid grid-cols-4 gap-1 bg-zinc-100 p-0.5 rounded-md border border-zinc-200 text-[10px]">
@@ -3646,28 +3644,28 @@
                         (click)="setGroupFaceDirection('front')"
                         [class]="currentGroupFacing() === 'front' ? 'bg-zinc-900 text-white font-medium shadow-xs' : 'text-zinc-600 hover:text-zinc-900'"
                         class="py-1 rounded-md text-center transition cursor-pointer">
-                        Frente
+                        {{ 'designer.faceFront' | t }}
                       </button>
                       <button
                         type="button"
                         (click)="setGroupFaceDirection('right')"
                         [class]="currentGroupFacing() === 'right' ? 'bg-zinc-900 text-white font-medium shadow-xs' : 'text-zinc-600 hover:text-zinc-900'"
                         class="py-1 rounded-md text-center transition cursor-pointer">
-                        Der
+                        {{ 'designer.faceRight' | t }}
                       </button>
                       <button
                         type="button"
                         (click)="setGroupFaceDirection('back')"
                         [class]="currentGroupFacing() === 'back' ? 'bg-zinc-900 text-white font-medium shadow-xs' : 'text-zinc-600 hover:text-zinc-900'"
                         class="py-1 rounded-md text-center transition cursor-pointer">
-                        Atrás
+                        {{ 'designer.faceBack' | t }}
                       </button>
                       <button
                         type="button"
                         (click)="setGroupFaceDirection('left')"
                         [class]="currentGroupFacing() === 'left' ? 'bg-zinc-900 text-white font-medium shadow-xs' : 'text-zinc-600 hover:text-zinc-900'"
                         class="py-1 rounded-md text-center transition cursor-pointer">
-                        Izq
+                        {{ 'designer.faceLeft' | t }}
                       </button>
                     </div>
                   </div>
@@ -3692,7 +3690,7 @@
                     <div class="p-2 bg-emerald-50/40 rounded-md border border-emerald-100 flex flex-col justify-between">
                       <label class="text-[10px] text-zinc-600 font-medium flex items-center gap-1">
                         <hugeicons-icon [icon]="icons.arrowDown" [size]="11" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
-                        <span>Luz Inferior</span>
+                        <span>{{ 'designer.lowerClearance' | t }}</span>
                       </label>
                       <div class="relative mt-1 flex items-center">
                         <input
@@ -3713,7 +3711,7 @@
                     <div class="p-2 bg-emerald-50/40 rounded-md border border-emerald-100 flex flex-col justify-between">
                       <label class="text-[10px] text-zinc-600 font-medium flex items-center gap-1">
                         <hugeicons-icon [icon]="icons.arrowUp" [size]="11" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
-                        <span>Luz Superior</span>
+                        <span>{{ 'designer.upperClearance' | t }}</span>
                       </label>
                       <div class="relative mt-1 flex items-center">
                         <input

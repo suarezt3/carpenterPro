@@ -25,18 +25,18 @@
             }
           </div>
 
-          <div class="min-w-0">
+            <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <h2 [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'" class="text-base sm:text-lg font-bold tracking-tight">
-                Novedades & Hoja de Ruta
+                {{ 'changelog.title' | t }}
               </h2>
               <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-200 border border-zinc-700 text-[11px] font-mono font-medium shadow-2xs">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>{{ currentVersion }} Actual</span>
+                <span>{{ currentVersion }} {{ 'changelog.currentBadge' | t }}</span>
               </span>
             </div>
             <p [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-xs truncate">
-              Historial oficial de mejoras continuas y plan de desarrollo para Piezo3D Studio
+              {{ 'changelog.subtitle' | t }}
             </p>
           </div>
         </div>
@@ -48,7 +48,7 @@
             ? 'text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 border border-zinc-200'
             : 'text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-700'"
           class="h-8 w-8 rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-          title="Cerrar modal (Esc)">
+          [title]="'changelog.closeModal' | t">
           <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
         </button>
       </div>
@@ -73,13 +73,13 @@
               : (themeService.isClassic() ? 'text-zinc-600 hover:text-zinc-900 font-medium' : 'text-zinc-400 hover:text-zinc-200 font-medium')"
             class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer">
             <hugeicons-icon [icon]="icons.megaphone" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-            <span>Historial de Novedades</span>
+            <span>{{ 'changelog.tabChangelog' | t }}</span>
             <span
               [class]="activeTab() === 'changelog'
                 ? 'bg-zinc-700 text-zinc-100'
                 : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'"
               class="text-[10px] px-1.5 py-0.2 rounded font-mono font-medium">
-              {{ releases.length }}
+              {{ releases().length }}
             </span>
           </button>
 
@@ -91,13 +91,13 @@
               : (themeService.isClassic() ? 'text-zinc-600 hover:text-zinc-900 font-medium' : 'text-zinc-400 hover:text-zinc-200 font-medium')"
             class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer">
             <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-            <span>Próximamente</span>
+            <span>{{ 'changelog.tabUpcoming' | t }}</span>
             <span
               [class]="activeTab() === 'roadmap'
                 ? 'bg-zinc-700 text-zinc-100'
                 : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'"
               class="text-[10px] px-1.5 py-0.2 rounded font-mono font-medium">
-              Roadmap
+              {{ 'changelog.tabRoadmap' | t }}
             </span>
           </button>
         </div>
@@ -118,14 +118,14 @@
             type="text"
             [ngModel]="searchQuery()"
             (ngModelChange)="searchQuery.set($event)"
-            [placeholder]="activeTab() === 'changelog' ? 'Buscar en versiones...' : 'Buscar en roadmap...'"
+            [placeholder]="activeTab() === 'changelog' ? ('changelog.searchReleasesPlaceholder' | t) : ('changelog.searchRoadmapPlaceholder' | t)"
             class="w-full bg-transparent text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none p-0 border-none leading-none font-medium" />
           @if (searchQuery()) {
             <button
               type="button"
               (click)="searchQuery.set('')"
               class="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-0.5 rounded cursor-pointer shrink-0"
-              title="Borrar búsqueda">
+              [title]="'changelog.clearSearch' | t">
               <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             </button>
           }
@@ -141,7 +141,7 @@
           <!-- Filtros por Tipo de Cambio -->
           <div class="flex items-center gap-1.5 flex-wrap">
             <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-xs font-semibold mr-1">
-              Filtrar por:
+              {{ 'changelog.filterBy' | t }}
             </span>
 
             <button
@@ -151,7 +151,7 @@
                 ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
                 : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
               class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1 border">
-              <span>Todas</span>
+              <span>{{ 'changelog.filterAll' | t }}</span>
             </button>
 
             <button
@@ -162,7 +162,7 @@
                 : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
               class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5 border">
               <hugeicons-icon [icon]="icons.check" [size]="13" [strokeWidth]="2.5" class="text-zinc-400"></hugeicons-icon>
-              <span>Nuevas Funciones</span>
+              <span>{{ 'changelog.filterFeatures' | t }}</span>
             </button>
 
             <button
@@ -173,7 +173,7 @@
                 : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
               class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5 border">
               <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-zinc-400"></hugeicons-icon>
-              <span>Mejoras</span>
+              <span>{{ 'changelog.filterImprovements' | t }}</span>
             </button>
 
             <button
@@ -184,7 +184,7 @@
                 : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
               class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5 border">
               <hugeicons-icon [icon]="icons.settings" [size]="13" [strokeWidth]="2" class="text-zinc-400"></hugeicons-icon>
-              <span>Correcciones</span>
+              <span>{{ 'changelog.filterFixes' | t }}</span>
             </button>
           </div>
 
@@ -219,7 +219,7 @@
                       @if (release.isCurrent) {
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-200 border border-zinc-700 text-[10px] font-mono font-medium uppercase tracking-wide shadow-2xs">
                           <hugeicons-icon [icon]="icons.verified" [size]="12" [strokeWidth]="2" class="text-zinc-300"></hugeicons-icon>
-                          <span>Versión Actual en Uso</span>
+                          <span>{{ 'changelog.currentVersionInUse' | t }}</span>
                         </span>
                       }
                     </div>
@@ -242,7 +242,7 @@
                         : 'bg-zinc-900/60 border-zinc-800 text-zinc-300'"
                       class="mt-3 p-3 rounded-md border text-xs space-y-1.5">
                       <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-[10px] font-semibold uppercase tracking-wider block">
-                        Puntos Clave:
+                        {{ 'changelog.keyPoints' | t }}
                       </span>
                       @for (highlight of release.highlights; track highlight) {
                         <div class="flex items-start gap-2">
@@ -293,16 +293,16 @@
             <div class="py-12 text-center flex flex-col items-center justify-center gap-2">
               <hugeicons-icon [icon]="icons.search" [size]="32" [strokeWidth]="1.5" class="text-zinc-400"></hugeicons-icon>
               <h4 [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-200'" class="text-sm font-bold">
-                No se encontraron novedades para "{{ searchQuery() }}"
+                {{ 'changelog.noReleasesFound' | t:{ query: searchQuery() } }}
               </h4>
               <p [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-xs">
-                Intenta buscar por otro término o limpia los filtros activos.
+                {{ 'changelog.noReleasesDesc' | t }}
               </p>
               <button
                 type="button"
                 (click)="searchQuery.set(''); activeChangeFilter.set('all')"
                 class="mt-2 px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white rounded-md hover:bg-zinc-800 transition cursor-pointer">
-                Restablecer Filtros
+                {{ 'changelog.resetFilters' | t }}
               </button>
             </div>
           }
@@ -317,10 +317,10 @@
               <div>
                 <h3 [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'" class="text-sm sm:text-base font-bold flex items-center gap-2">
                   <hugeicons-icon [icon]="icons.rocket" [size]="16" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-                  <span>Hoja de Ruta de Próximas Funciones</span>
+                  <span>{{ 'changelog.roadmapTitle' | t }}</span>
                 </h3>
                 <p [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-xs">
-                  Desarrollo activo planificado para las siguientes entregas de Piezo3D Studio
+                  {{ 'changelog.roadmapSubtitle' | t }}
                 </p>
               </div>
 
@@ -333,7 +333,7 @@
                     ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
                     : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
                   class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer border">
-                  Todas ({{ roadmapItems.length }})
+                  {{ 'changelog.filterAll' | t }} ({{ roadmapItems().length }})
                 </button>
 
                 <button
@@ -344,7 +344,7 @@
                     : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
                   class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1.5 border">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>En Desarrollo ({{ inProgressCount() }})</span>
+                  <span>{{ 'changelog.statusInProgress' | t }} ({{ inProgressCount() }})</span>
                 </button>
 
                 <button
@@ -354,7 +354,7 @@
                     ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
                     : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
                   class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer border">
-                  Planificadas ({{ plannedCount() }})
+                  {{ 'changelog.statusPlanned' | t }} ({{ plannedCount() }})
                 </button>
 
                 <button
@@ -364,7 +364,7 @@
                     ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
                     : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
                   class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer border">
-                  En Estudio ({{ evaluatingCount() }})
+                  {{ 'changelog.statusEvaluating' | t }} ({{ evaluatingCount() }})
                 </button>
               </div>
             </div>
@@ -411,7 +411,7 @@
                       <div class="flex items-center justify-between text-[11px]">
                         <span [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="flex items-center gap-1 font-medium">
                           <hugeicons-icon [icon]="icons.clock" [size]="12" [strokeWidth]="2"></hugeicons-icon>
-                          <span>{{ item.targetTimeline || 'Fecha por definir' }}</span>
+                          <span>{{ item.targetTimeline || ('changelog.timelineTbd' | t) }}</span>
                         </span>
 
                         @if (item.progressPercent !== undefined) {
@@ -439,13 +439,13 @@
               <div class="py-12 text-center flex flex-col items-center justify-center gap-2">
                 <hugeicons-icon [icon]="icons.search" [size]="32" [strokeWidth]="1.5" class="text-zinc-400"></hugeicons-icon>
                 <h4 [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-200'" class="text-sm font-bold">
-                  No se encontraron elementos para "{{ searchQuery() }}"
+                  {{ 'changelog.noRoadmapFound' | t:{ query: searchQuery() } }}
                 </h4>
                 <button
                   type="button"
                   (click)="searchQuery.set(''); activeRoadmapStatus.set('all')"
                   class="mt-2 px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white rounded-md hover:bg-zinc-800 transition cursor-pointer">
-                  Restablecer Búsqueda
+                  {{ 'changelog.resetSearch' | t }}
                 </button>
               </div>
             }
@@ -462,16 +462,16 @@
                 </div>
                 <div>
                   <h5 [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'" class="text-xs font-bold">
-                    ¿Requieres una función específica para tu taller?
+                    {{ 'changelog.ctaTitle' | t }}
                   </h5>
                   <p [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'" class="text-[11px]">
-                    El desarrollo continuo de Piezo3D Studio se prioriza en base a las solicitudes de los carpinteros y diseñadores.
+                    {{ 'changelog.ctaDesc' | t }}
                   </p>
                 </div>
               </div>
 
               <span class="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium text-center shrink-0 font-mono">
-                Tu opinión construye el software
+                {{ 'changelog.ctaBadge' | t }}
               </span>
             </div>
 
@@ -491,7 +491,7 @@
         <div class="flex items-center gap-2">
           <span class="font-bold">Piezo3D Studio</span>
           <span>·</span>
-          <span>Despiece & Diseño Modular 3D</span>
+          <span>{{ 'changelog.footerSubtitle' | t }}</span>
         </div>
 
         <button
@@ -499,7 +499,7 @@
           (click)="close()"
           class="px-4 py-2 rounded-md font-medium text-white bg-blue-600 hover:bg-blue-700 transition cursor-pointer shadow-xs flex items-center gap-1.5">
           <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
-          <span>Entendido</span>
+          <span>{{ 'changelog.understoodBtn' | t }}</span>
         </button>
       </div>
 

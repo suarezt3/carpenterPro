@@ -9,6 +9,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { ThemeService } from '../../services/theme.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 /**
  * Componente global de diálogo de confirmación asíncrona (Promise-based).
@@ -17,7 +18,7 @@ import { ThemeService } from '../../services/theme.service';
 @Component({
   selector: 'app-confirm-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HugeiconsIconComponent],
+  imports: [HugeiconsIconComponent, TranslatePipe],
   host: {
     '(window:keydown)': 'handleKeyDown($event)'
   },

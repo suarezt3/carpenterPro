@@ -1,5 +1,6 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import * as THREE from 'three';
+import { I18nService } from './i18n.service';
 
 export interface SpatialGuideOptions {
   figurePos: { x: number; z: number };
@@ -19,6 +20,7 @@ export interface SpatialGuideOptions {
   providedIn: 'root'
 })
 export class SpatialReferenceGuideService {
+  private readonly i18n = inject(I18nService);
 
   buildGuideScene(options: SpatialGuideOptions): THREE.Group {
     const rootGroup = new THREE.Group();
@@ -149,8 +151,8 @@ export class SpatialReferenceGuideService {
     // 5. Badges cardinales perimetrales de alta visibilidad en los 4 bordes exteriores
     // FRENTE (+Z)
     const frontSprite = this.createPerimeterBadge({
-      title: 'FRENTE (+Z)',
-      subtitle: 'VISTA PRINCIPAL',
+      title: this.i18n.t('designer.directionFront'),
+      subtitle: this.i18n.t('designer.directionFrontSub'),
       icon: '▲',
       borderColor: '#0284c7',
       accentColor: '#0284c7',
@@ -164,8 +166,8 @@ export class SpatialReferenceGuideService {
 
     // ATRÁS (-Z)
     const backSprite = this.createPerimeterBadge({
-      title: 'ATRÁS (-Z)',
-      subtitle: 'VISTA POSTERIOR',
+      title: this.i18n.t('designer.directionBack'),
+      subtitle: this.i18n.t('designer.directionBackSub'),
       icon: '▼',
       borderColor: '#475569',
       accentColor: '#334155',
@@ -179,8 +181,8 @@ export class SpatialReferenceGuideService {
 
     // IZQUIERDA (-X)
     const leftSprite = this.createPerimeterBadge({
-      title: 'IZQUIERDA (-X)',
-      subtitle: 'LATERAL IZQUIERDO',
+      title: this.i18n.t('designer.directionLeft'),
+      subtitle: this.i18n.t('designer.directionLeftSub'),
       icon: '►',
       borderColor: '#475569',
       accentColor: '#334155',
@@ -194,8 +196,8 @@ export class SpatialReferenceGuideService {
 
     // DERECHA (+X)
     const rightSprite = this.createPerimeterBadge({
-      title: 'DERECHA (+X)',
-      subtitle: 'LATERAL DERECHO',
+      title: this.i18n.t('designer.directionRight'),
+      subtitle: this.i18n.t('designer.directionRightSub'),
       icon: '◄',
       borderColor: '#475569',
       accentColor: '#334155',
@@ -204,8 +206,6 @@ export class SpatialReferenceGuideService {
       isFront: false
     });
     rightSprite.position.set(halfW + 180, 65, 0);
-    rightSprite.scale.set(780, 148, 1);
-    group.add(rightSprite);
     rightSprite.scale.set(780, 148, 1);
     group.add(rightSprite);
 

@@ -93,7 +93,7 @@
       (click)="setActiveTool(activeTool() === 'move' ? 'select' : 'move')"
       [class]="activeTool() === 'select' || activeTool() === 'move' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-      title="Seleccionar y Mover (V): Haz clic para seleccionar piezas o arrastrar flechas 3D">
+      [title]="'designer.toolSelectMove' | t">
       <hugeicons-icon [icon]="activeTool() === 'move' ? icons.moveAxes : icons.cursorSelect" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
@@ -103,7 +103,7 @@
       (click)="setActiveTool('rotate_90')"
       [class]="activeTool() === 'rotate_90' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-      title="Rotar 90° (R / Q): Gira piezas o módulos 90 grados">
+      [title]="'designer.toolRotate90' | t">
       <hugeicons-icon [icon]="icons.rotate90" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
@@ -113,7 +113,7 @@
       (click)="toggleMagneticSnap()"
       [class]="isMagneticSnap() ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-      [title]="isMagneticSnap() ? 'Imán Inteligente ACTIVO (Snapping magnético a caras y aristas)' : 'Activar Imán Inteligente (Snapping magnético)'">
+      [title]="'designer.toolMagnet' | t">
       <hugeicons-icon [icon]="icons.magnet" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
@@ -123,7 +123,7 @@
       (click)="setActiveTool('measure')"
       [class]="activeTool() === 'measure' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-      title="Cinta Métrica 3D (T): Mide distancias reales y luces entre aristas o caras">
+      [title]="'designer.toolMeasure' | t">
       <hugeicons-icon [icon]="icons.ruler" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
@@ -133,7 +133,7 @@
       (click)="toggleAllDoorsAndDrawers()"
       [class]="isAllOpen() ? 'text-zinc-900 bg-zinc-100 ring-1 ring-zinc-300 font-bold' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition relative cursor-pointer shrink-0"
-      [title]="isAllOpen() ? 'Cerrar todas las puertas y cajones (Animación fluida)' : 'Abrir todas las puertas y cajones en 3D (Animación fluida)'">
+      [title]="'designer.toolOpenDoors' | t">
       <hugeicons-icon [icon]="isAllOpen() ? icons.doorOpen : icons.doorClosed" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       @if (isAllOpen()) {
         <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zinc-900 border border-white"></span>
@@ -158,7 +158,7 @@
       (click)="toggleDrillHoles()"
       [class]="showDrillHoles() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition relative cursor-pointer shrink-0"
-      title="Mecanizados CNC: Perforaciones calculadas (Cazoletas de bisagra Ø35mm moradas, tornillos 4x50 cyan y clavijas 8x30 ámbar)">
+      [title]="'designer.toolCnc' | t">
       <hugeicons-icon [icon]="icons.cncTarget" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       @if (showDrillHoles() && allDrillHoles().length > 0) {
         <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
@@ -173,7 +173,7 @@
       (click)="toggleDimensions()"
       [class]="show3dDimensions() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-      title="Cotas 3D: Mostrar u ocultar líneas de acotado milimétrico sobre el mueble">
+      [title]="'designer.toolDimensions' | t">
       <hugeicons-icon [icon]="icons.dimensions3d" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
@@ -183,7 +183,7 @@
       (click)="toggleClearances()"
       [class]="showClearances() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-      title="Luz Libre: Cotas dinámicas de huecos interiores útiles entre baldas y laterales">
+      [title]="'designer.toolClearances' | t">
       <hugeicons-icon [icon]="icons.clearanceVert" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
@@ -193,7 +193,7 @@
       (click)="toggleXRay()"
       [class]="isXRay() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-      title="Rayos X: Transparencia técnica para inspeccionar ensambles interiores">
+      [title]="'designer.toolXray' | t">
       <hugeicons-icon [icon]="icons.eye" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
@@ -248,7 +248,7 @@
       (click)="toggleReferenceGuide()"
       [class]="showReferenceGuide() ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-      [title]="showReferenceGuide() ? 'Ocultar Guía de Frente y Escala Humana 1.72m (Tecla G o Supr al seleccionarla)' : 'Mostrar Guía de Frente y Escala Humana 1.72m (Tecla G)'">
+      [title]="'designer.toolReferenceGuide' | t">
       <hugeicons-icon [icon]="icons.humanGuide" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
 
@@ -257,7 +257,7 @@
       type="button"
       (click)="resetCamera()"
       class="cad-tool-btn rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer shrink-0"
-      title="Centrar y reiniciar cámara (Z)">
+      [title]="'designer.toolResetCamera' | t">
       <hugeicons-icon [icon]="icons.cameraFocus" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
     </button>
   </div>
@@ -463,7 +463,7 @@
           (click)="showAllParts()"
           class="bg-slate-950 hover:bg-slate-800 text-white px-2.5 py-0.5 rounded-lg text-[11px] font-bold ml-1.5 cursor-pointer transition shadow-xs flex items-center gap-1">
           <hugeicons-icon [icon]="icons.eye" [size]="12" [strokeWidth]="2"></hugeicons-icon>
-          <span>Mostrar Todo</span>
+          <span>{{ 'designer.showAll' | t }}</span>
           <span class="text-[9px] text-slate-400 font-mono">Alt+H</span>
         </button>
       </div>
@@ -1805,7 +1805,7 @@
               (click)="selectGroupInViewer(parentGrp.id, false)"
               class="px-1.5 py-0.5 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 border border-zinc-600 text-[9px] font-semibold uppercase tracking-wider transition cursor-pointer"
               title="Volver a seleccionar el módulo completo">
-              ← Módulo
+              ← {{ 'designer.module' | t }}
             </button>
           }
           <input
@@ -1838,7 +1838,7 @@
           <span class="text-[10px] text-zinc-400 font-semibold">mm</span>
         </div>
       } @else {
-        <span class="text-zinc-400 text-[11px] italic font-sans">Selecciona una pieza o módulo</span>
+        <span class="text-zinc-400 text-[11px] italic font-sans">{{ 'designer.selectPieceOrModule' | t }}</span>
       }
     </div>
   </div>

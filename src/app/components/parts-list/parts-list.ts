@@ -16,6 +16,8 @@ import { ProjectStorageService } from '../../services/project-storage.service';
 import { EdgeBandingType, GrainDirection, Part, isStoneMaterial, computePartCutDimensions } from '../../models/melamine.models';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { ThemeService } from '../../services/theme.service';
+import { I18nService } from '../../services/i18n.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
@@ -29,12 +31,13 @@ const cadSvg = (paths: string[]): HugeIconDef =>
 @Component({
   selector: 'app-parts-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, HugeiconsIconComponent],
+  imports: [ReactiveFormsModule, HugeiconsIconComponent, TranslatePipe],
   templateUrl: './parts-list.html',
   styleUrl: './parts-list.css'
 })
 export class PartsListComponent {
   readonly themeService = inject(ThemeService);
+  readonly i18n = inject(I18nService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
   private readonly fb = inject(FormBuilder);
@@ -480,12 +483,12 @@ export class PartsListComponent {
 
   async deletePart(partId: string) {
     const part = this.parts().find(p => p.id === partId);
-    const partName = part ? `"${part.name}"` : 'esta pieza';
+    const partName = part ? `"${this.i18n.translatePartName(part.name)}"` : 'esta pieza';
     const confirmed = await this.confirmService.ask({
-      title: '¿Eliminar pieza de la lista?',
-      message: `Se eliminará ${partName} del despiece y de todos los cálculos de corte.`,
-      confirmText: 'Eliminar Pieza',
-      cancelText: 'Cancelar',
+      title: this.i18n.t('partsList.deletePartTitle'),
+      message: this.i18n.t('partsList.deletePartMessage', { name: partName }),
+      confirmText: this.i18n.t('partsList.deletePartConfirm'),
+      cancelText: this.i18n.t('common.cancel'),
       severity: 'danger'
     });
     if (confirmed) {
@@ -503,12 +506,12 @@ export class PartsListComponent {
 
   async deleteAppliance(applianceId: string) {
     const app = this.appliances().find(a => a.id === applianceId);
-    const name = app ? `"${app.name}"` : 'este equipo';
+    const name = app ? `"${this.i18n.translatePartName(app.name)}"` : 'este equipo';
     const confirmed = await this.confirmService.ask({
-      title: '¿Eliminar equipo del proyecto?',
-      message: `Se eliminará ${name} de la lista de equipamiento y de la escena 3D.`,
-      confirmText: 'Eliminar Equipo',
-      cancelText: 'Cancelar',
+      title: this.i18n.t('partsList.deleteApplianceDialogTitle'),
+      message: this.i18n.t('partsList.deleteApplianceDialogMessage', { name }),
+      confirmText: this.i18n.t('partsList.deleteApplianceDialogConfirm'),
+      cancelText: this.i18n.t('common.cancel'),
       severity: 'danger'
     });
     if (confirmed) {
