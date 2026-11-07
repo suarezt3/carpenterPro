@@ -21,7 +21,7 @@
               : 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800/60 text-[10px] font-medium transition cursor-pointer shadow-2xs'"
             [title]="'nav.changelogTooltip' | t:{ version: appVersion }">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>{{ appVersion }}</span>
+            <span>{{ appVersion }} {{ 'changelog.currentBadge' | t }}</span>
             <span class="hidden xl:inline text-[9px] font-medium opacity-90">· {{ 'nav.changelog' | t }}</span>
           </button>
 

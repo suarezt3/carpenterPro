@@ -3,15 +3,80 @@ import { AppLanguage } from './i18n-translations.data';
 
 export const RELEASES_ES: ReleaseVersion[] = [
   {
+    version: 'v3.0.0',
+    name: 'Evolución Industrial: Motor Paramétrico Multi-Ambiente, Cotas HD 3D y Exportación Total',
+    releaseDate: 'Noviembre 2026',
+    isCurrent: true,
+    summary: 'Gran salto arquitectónico hacia la parametrización integral de muebles por ambientes, acotado tridimensional interactivo de luz interna, catálogo masivo de melaminas, presupuesto multimoneda en vivo y suite de exportación industrial para producción.',
+    highlights: [
+      'Motor paramétrico multi-ambiente en 4 líneas: Cocinas, Closets, Baños (destaje sifón en U) y Hogar/Estudio',
+      'Cotas de luz interna HD con riel vertical anti-colisión y edición numérica directa en el lienzo 3D',
+      'Catálogo masivo con más de 35 melaminas, mesones de mármol/cuarzo, electrodomésticos 3D y selección con Shift',
+      'Presupuesto multimoneda en tiempo real (COP canónico a USD, MXN, EUR), herrajes automáticos y descuento de tapacanto',
+      'Exportación industrial completa: SketchUp .DAE milimétrico, manuales de armado PDF estilo IKEA y DXF CNC',
+      'Sistema multilenguaje instantáneo en 6 idiomas (ES, EN, PT, FR, IT, DE) reactivo sin recargar WebGL'
+    ],
+    changes: [
+      {
+        type: 'feature',
+        title: 'Motor Paramétrico Multi-Ambiente en 4 Líneas de Diseño',
+        description: 'Módulos inteligentes especializados para Cocinas Integrales (bajos, aéreos, esquineros a 45° y ciegos), Closets y Vestidores (distribución de repisas, cajoneras y barras colgadoras), Baños (vanities flotantes con destaje para sifón en U paramétrico) y Hogar / Estudio (escritorios y libreros) con resolución geométrica sin colisiones.',
+        tag: 'Paramétrico'
+      },
+      {
+        type: 'feature',
+        title: 'Cotas de Luz Interna HD y Edición Numérica Directa en 3D',
+        description: 'Visualización nítida de distancias útiles (Luz Superior, Luz Inferior y Ancho Interno) mediante sprites de alta resolución. Permite hacer clic directamente sobre cualquier cota en 3D para editar su valor con el teclado, con desplazamiento de entrepaños en riel vertical con detección anti-colisión y auto-centrado.',
+        tag: 'Cotas 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Catálogo Masivo de Materiales y Selección Múltiple con Shift',
+        description: 'Más de 35 melaminas organizadas en familias comerciales (maderas naturales, unicolores mate, alto brillo y textiles), mesones de cuarzo y mármol con salpicadero paramétrico, y catálogo de electrodomésticos low-poly. Soporte de selección múltiple con Shift para editar propiedades y texturas en lote.',
+        tag: 'Catálogo & 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Presupuesto Multimoneda en Tiempo Real y Descuento de Tapacanto',
+        description: 'Cotización dinámica con base canónica en COP convertible en vivo a USD, MXN, EUR y otras divisas con tasas de mercado actualizadas. Incorporación del ajuste subtractEdgeBandingFromCut en el optimizador 2D para descontar el espesor del tapacanto en las piezas de corte.',
+        tag: 'Presupuesto'
+      },
+      {
+        type: 'feature',
+        title: 'Exportación Industrial Completa (.DAE, Manuales PDF y DXF)',
+        description: 'Exportador 3D COLLADA 1.4.1 (.DAE) milimétrico compatible con SketchUp con jerarquías limpias, generador de manuales de armado paso a paso estilo IKEA en PDF con vista explosionada y tabla de tornillería, y archivos DXF con entidades LWPOLYLINE para corte y mecanizado.',
+        tag: 'Exportación'
+      },
+      {
+        type: 'feature',
+        title: 'Sistema Multilenguaje Instantáneo en 6 Idiomas',
+        description: 'Cambio fluido e instantáneo entre Español, English, Português, Français, Italiano y Deutsch en toda la interfaz sin necesidad de recargar la página ni reiniciar el contexto WebGL.',
+        tag: 'Multilenguaje'
+      },
+      {
+        type: 'improvement',
+        title: 'Cómputo Unificado de Herrajes y Fijaciones sin Duplicidad',
+        description: 'Detección automática de bisagras, correderas, tiradores y tornillos según la cinemática del módulo, evitando duplicación en el costo final de los herrajes.',
+        tag: 'Herrajes'
+      },
+      {
+        type: 'fix',
+        title: 'Optimización de Holguras y Ranurado en Módulos Especiales',
+        description: 'Ajuste de holguras perimetrales de 2 mm en frentes de cajón y alineación de ranuras de fondo de 3 mm en esquineros y vanities suspendidos.',
+        tag: 'Geometría'
+      }
+    ]
+  },
+  {
     version: 'v2.5.0',
     name: 'Sincronización Total de Espesores, Tableros a Medida e Interfaz CAD Pro',
     releaseDate: '23 de Octubre de 2026',
-    isCurrent: true,
+    isCurrent: false,
     summary: 'Actualización mayor enfocada en consistencia de cálculo milimétrico entre el visor 3D, despiece y optimizador de corte, además de una interfaz ultracompacta para portátiles.',
     highlights: [
       'Sincronización de espesores reales (15 mm, 18 mm) en todas las vistas y presupuestos',
       'Configurador paramétrico del tamaño de tablero de corte con presets comerciales',
-      'Cinta flotante de edición CAD ultracompacta sin solapamiento en pantallas HD'
+      'Cinta flotante de edición compacta sin solapamiento en pantallas HD'
     ],
     changes: [
       {
@@ -28,8 +93,8 @@ export const RELEASES_ES: ReleaseVersion[] = [
       },
       {
         type: 'improvement',
-        title: 'Rediseño de la cinta flotante superior a iconos compactos CAD',
-        description: 'Se redujo el ancho de la cinta de opciones en más del 60%, reemplazando textos por botones icónicos con tooltip interactivo (Congelar, Duplicar, Mover, Girar y Orientación H/L/F), eliminando solapamientos con la barra CAD izquierda en pantallas HD (1366×768).',
+        title: 'Rediseño de la cinta superior a controles compactos',
+        description: 'Se redujo el ancho de la cinta de opciones en más del 60%, reemplazando textos por botones icónicos con tooltip interactivo (Congelar, Duplicar, Mover, Girar y Orientación H/L/F), eliminando solapamientos en pantallas HD (1366×768).',
         tag: 'Interfaz'
       },
       {
@@ -61,7 +126,7 @@ export const RELEASES_ES: ReleaseVersion[] = [
       {
         type: 'feature',
         title: 'Generador de Mesones Inteligentes',
-        description: 'Generación de mesones 3D que se adaptan a la huella superior de los muebles bajos seleccionados o permiten trazado libre.',
+        description: 'Generación de mesones 3D paramétricos que se adaptan a la huella superior de los muebles bajos seleccionados.',
         tag: 'Cocina Pro'
       },
       {
@@ -138,27 +203,27 @@ export const RELEASES_ES: ReleaseVersion[] = [
   },
   {
     version: 'v2.1.0',
-    name: 'Herramientas CAD Profesionales & Escala Humana',
+    name: 'Precisión Dimensional & Escala Humana',
     releaseDate: '1 de Octubre de 2026',
     isCurrent: false,
-    summary: 'Inclusión de herramientas de precisión milimétrica, cinta métrica, empujar/tirar (Push-Pull) y referencia visual ergonómica.',
+    summary: 'Inclusión de herramientas de precisión milimétrica, medición paramétrica tridimensional y referencia visual ergonómica.',
     highlights: [
-      'Cinta métrica 3D con medición entre vértices, aristas y centros',
-      'Empujar / Tirar para redimensionar tableros arrastrando directamente en el modelo',
+      'Medición tridimensional dinámica entre piezas, aristas y centros',
+      'Edición dimensional guiada en ejes ortogonales X, Y, Z',
       'Figura de escala humana y brújula de orientación espacial'
     ],
     changes: [
       {
         type: 'feature',
-        title: 'Herramienta Cinta Métrica CAD',
-        description: 'Toma de medidas precisas punto a punto en el espacio tridimensional con visualización de cotas dinámicas.',
-        tag: 'CAD'
+        title: 'Medición Dimensional de Precisión',
+        description: 'Toma de medidas precisas punto a punto en el espacio tridimensional con visualización de cotas.',
+        tag: 'Medición'
       },
       {
         type: 'feature',
-        title: 'Empujar / Tirar (Push-Pull)',
-        description: 'Ajuste directo de dimensiones estirando o contrayendo tableros en el eje correspondiente.',
-        tag: 'CAD'
+        title: 'Ajuste Dimensional Ortogonal',
+        description: 'Ajuste directo de dimensiones sobre los ejes ortogonales para tableros y módulos.',
+        tag: 'Geometría'
       }
     ]
   },
@@ -192,96 +257,132 @@ export const RELEASES_ES: ReleaseVersion[] = [
 
 export const ROADMAP_ES: RoadmapItem[] = [
   {
-    id: 'diagonal_cuts',
-    title: 'Mesones con Cortes Diagonales y Chaflanes a 45°',
-    description: 'Herramienta de corte poligonal que permitirá realizar esquinas redondeadas, biseles y cortes en ángulo sobre mesones de granito, cuarzo y tableros para barras americanas e islas de cocina.',
+    id: 'custom_glb_import',
+    title: 'Importación de Modelos 3D Personalizados en Formato .GLB / .GLTF',
+    description: 'Capacidad de arrastrar y soltar modelos 3D personalizados de electrodomésticos, campanas, griferías o accesorios decorativos con optimización automática de polígonos y texturas.',
     status: 'in_progress',
-    category: 'Mesones & Geometría',
-    targetTimeline: 'Próxima Versión (v2.6.0)',
+    category: 'Personalización & 3D',
+    targetTimeline: 'Q1 2027',
     badge: 'En Desarrollo Activo',
-    progressPercent: 75
+    progressPercent: 65
   },
   {
-    id: 'furniture_gallery_3d',
-    title: 'Galería de Accesorios, Indumentaria y Electrodomésticos 3D',
-    description: 'Catálogo de modelos 3D listos para arrastrar al proyecto: lavaplatos bajo/sobre tope, griferías monomando, estufas de inducción/gas, hornos empotrables, campanas extractoras, sillas altas de barra y lámparas colgantes.',
+    id: 'cloud_quote_link',
+    title: 'Cotización Compartible por Enlace Web Público en la Nube',
+    description: 'Generación de enlaces interactivos seguros para que los clientes finales exploren el presupuesto, desglose de materiales y visualización 3D desde cualquier teléfono o tablet.',
     status: 'in_progress',
-    category: 'Ambientación & Decoración',
-    targetTimeline: 'Próxima Versión (v2.6.0)',
-    badge: 'En Desarrollo Activo',
-    progressPercent: 60
+    category: 'Ventas & Clientes',
+    targetTimeline: 'Q1 2027',
+    badge: 'En Desarrollo',
+    progressPercent: 45
   },
   {
-    id: 'cnc_mechanization_view',
-    title: 'Mecanizados CNC en Lista de Despiece y Vista 3D',
-    description: 'Definición gráfica de perforaciones de 35 mm para bisagras de cazoleta, líneas de taladros sistema 32 mm, perforaciones para correderas telescópicas y ranuras de fondo de 3 mm / 5.5 mm.',
-    status: 'in_progress',
-    category: 'Fabricación & CNC',
-    targetTimeline: 'Noviembre 2026',
-    badge: 'En Pruebas',
-    progressPercent: 40
-  },
-  {
-    id: 'technical_pdf_blueprints',
-    title: 'Generación Automática de Planos Técnicos de Taller en PDF',
-    description: 'Exportación con un clic de cuadernillo técnico en PDF conteniendo vistas acotadas en 2D (planta, alzada y perfil) de cada módulo por separado para facilitar el armado por parte del operario en taller.',
+    id: 'hardware_brand_templates',
+    title: 'Plantillas Avanzadas de Herrajes Blum y Hettich',
+    description: 'Integración paramétrica de sistemas de elevación (Aventos HK-S, HF), cajoneras metálicas (Legrabox, AvanTech YOU) y guías ocultas con mapas de perforación exactos.',
     status: 'planned',
-    category: 'Documentación de Taller',
-    targetTimeline: 'Q4 2026',
+    category: 'Herrajes Industriales',
+    targetTimeline: 'Q2 2027',
     badge: 'Planificado',
-    progressPercent: 15
+    progressPercent: 20
+  },
+  {
+    id: 'gcode_cnc_export',
+    title: 'Postprocesador Directo de Código G-Code para CNC de 3 Ejes',
+    description: 'Generación directa de archivos G-Code estándar (G0, G1, G2, G3) para fresado de ranuras, desbaste perimetral y taladrado en routers CNC de carpintería.',
+    status: 'evaluating',
+    category: 'Integración CNC',
+    targetTimeline: 'Evaluación Técnica',
+    badge: 'Bajo Estudio'
   },
   {
     id: 'photorealistic_presentation',
     title: 'Modo Presentación Fotorrealista para Clientes',
-    description: 'Modo de visualización comercial con iluminación HDRI avanzada, reflejos en mesones y melaminas brillo, sombras de contacto y generación de enlaces interactivos para que el cliente final explore el diseño desde su celular.',
+    description: 'Visualización comercial de alta fidelidad con iluminación ambiental HDRI, reflejos en melaminas brillo y sombras de contacto suaves.',
     status: 'planned',
     category: 'Ventas & Clientes',
-    targetTimeline: 'Q1 2027',
+    targetTimeline: 'Q2 2027',
     badge: 'Planificado',
-    progressPercent: 10
-  },
-  {
-    id: 'commercial_quote_generator',
-    title: 'Generador de Propuesta Comercial con Logo Personalizado',
-    description: 'Creación de cotizaciones formales para el cliente final con logo del taller, desglose de materiales, accesorios, mano de obra, condiciones de pago y render en portada listo para enviar por WhatsApp o correo.',
-    status: 'planned',
-    category: 'Gestión Comercial',
-    targetTimeline: 'Q1 2027',
-    badge: 'Planificado',
-    progressPercent: 0
-  },
-  {
-    id: 'gcode_cnc_export',
-    title: 'Generación Directa de Código G-Code para Centros CNC',
-    description: 'Postprocesadores compatibles con máquinas router CNC de 3 ejes para fresado, ranurado y taladrado directo sin intermediarios.',
-    status: 'evaluating',
-    category: 'Integración Industrial',
-    targetTimeline: 'Evaluación Técnica',
-    badge: 'Bajo Estudio'
-  },
-  {
-    id: 'hardware_brand_integration',
-    title: 'Integración de Catálogos de Fabricantes de Herrajes',
-    description: 'Sistemas de elevación aventos, cajones metálicos tipo tandembox/antaro y correderas ocultas sincronizadas con catálogos de marcas líderes.',
-    status: 'evaluating',
-    category: 'Herrajes Pro',
-    targetTimeline: 'Evaluación Técnica',
-    badge: 'Bajo Estudio'
+    progressPercent: 15
   }
 ];
 
 export const RELEASES_EN: ReleaseVersion[] = [
   {
+    version: 'v3.0.0',
+    name: 'Industrial Evolution: Multi-Room Parametric Engine, HD 3D Dimensions & Full Export',
+    releaseDate: 'November 2026',
+    isCurrent: true,
+    summary: 'Major architectural breakthrough introducing comprehensive parametric furniture design across room categories, real-time HD internal clearance dimensioning, massive melamine catalog, live multi-currency budgeting, and a full industrial export suite for manufacturing.',
+    highlights: [
+      'Multi-room parametric engine in 4 lines: Kitchens, Closets, Bathrooms (U-siphon vanity cutout), and Living/Office',
+      'HD internal clearance dimensions with vertical anti-collision rail and direct numeric inline editing in 3D',
+      'Massive catalog with 35+ melamines, marble/quartz countertops, 3D appliances, and Shift batch multi-selection',
+      'Real-time multi-currency budget (canonical COP to USD, MXN, EUR), automatic hardware calculation and edge banding deduction',
+      'Complete industrial export: millimeter-scale SketchUp .DAE, IKEA-style step-by-step PDF assembly guides, and CNC DXF',
+      'Instantaneous 6-language system (ES, EN, PT, FR, IT, DE) reactively switching without WebGL reload'
+    ],
+    changes: [
+      {
+        type: 'feature',
+        title: 'Multi-Room Parametric Engine in 4 Specialized Lines',
+        description: 'Full parametric design with tailored modules for Fitted Kitchens (base, wall, 45° corner, and blind straight units), Closets & Wardrobes (dynamic shelving, drawer banks, and hanging rods), Bathrooms (floating vanities with automatic parametric U-siphon cutout), and Living / Office (desks and bookcases) with zero geometric collisions.',
+        tag: 'Parametric'
+      },
+      {
+        type: 'feature',
+        title: 'HD Internal Clearance Dimensions & Direct 3D Editing',
+        description: 'Crisp real-time display of usable internal clearances (Top Clearance, Bottom Clearance, and Internal Width) via high-definition billboard sprites. Click directly on any 3D dimension label to input exact numbers via keyboard, with vertical rail shelf sliding and anti-collision centering.',
+        tag: '3D Dimensions'
+      },
+      {
+        type: 'feature',
+        title: 'Massive Material Catalog and Shift Batch Multi-Selection',
+        description: 'Over 35 commercial melamines grouped into woodgrains, matte solids, high gloss, and textiles, plus quartz and marble countertops with parametric backsplashes, and low-poly 3D appliances. Select multiple items with Shift to batch-update finishes and properties.',
+        tag: 'Catalog & 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Real-Time Multi-Currency Budgeting & Edge Banding Cut Allowance',
+        description: 'Dynamic quotation engine with canonical COP base converting live to USD, MXN, EUR and more using real-time forex rates. Integrates subtractEdgeBandingFromCut option in the 2D cut optimizer to deduct edge tape thickness for seamless joinery.',
+        tag: 'Budget'
+      },
+      {
+        type: 'feature',
+        title: 'Full Industrial Export Suite (.DAE, PDF Manuals & CNC DXF)',
+        description: 'Millimeter-scale COLLADA 1.4.1 (.DAE) 3D exporter for SketchUp with organized part hierarchies, IKEA-style step-by-step PDF assembly manual generator with exploded views and fastener schedules, and CNC DXF export with LWPOLYLINE entities.',
+        tag: 'Export'
+      },
+      {
+        type: 'feature',
+        title: 'Instantaneous 6-Language Reactive System',
+        description: 'Seamless live switching between Spanish, English, Portuguese, French, Italian, and German across the entire interface without page reloads or WebGL context reset.',
+        tag: 'Multilingual'
+      },
+      {
+        type: 'improvement',
+        title: 'Unified Hardware & Fastener Computation without Double Charges',
+        description: 'Automated calculation of cup hinges, drawer slides, pulls, and assembly screws based on module dimensions and opening mechanics, eliminating quote discrepancies.',
+        tag: 'Hardware'
+      },
+      {
+        type: 'fix',
+        title: 'Clearance and Back Groove Alignment in Corner and Vanity Units',
+        description: 'Standardized 2 mm perimeter clearances on drawer fronts and doors, and corrected 3 mm back panel groove alignment on corner and vanity units.',
+        tag: 'Geometry'
+      }
+    ]
+  },
+  {
     version: 'v2.5.0',
     name: 'Total Thickness Sync, Custom Sheet Sizes & Pro CAD Interface',
     releaseDate: 'October 23, 2026',
-    isCurrent: true,
+    isCurrent: false,
     summary: 'Major update focused on millimeter precision calculation consistency across 3D viewer, cut list and cut optimizer, plus an ultra-compact interface for laptops.',
     highlights: [
       'Real thickness synchronization (15 mm, 18 mm) across all views and budgets',
       'Parametric cut sheet size configurator with commercial presets',
-      'Ultra-compact floating CAD toolbar without overlap on HD screens'
+      'Ultra-compact floating toolbar without overlap on HD screens'
     ],
     changes: [
       {
@@ -298,7 +399,7 @@ export const RELEASES_EN: ReleaseVersion[] = [
       },
       {
         type: 'improvement',
-        title: 'Redesign of top floating toolbar to compact CAD icons',
+        title: 'Top floating toolbar redesign to compact controls',
         description: 'Reduced toolbar width by over 60%, replacing text with iconic buttons and tooltips, eliminating overlaps on HD screens (1366×768).',
         tag: 'Interface'
       },
@@ -331,7 +432,7 @@ export const RELEASES_EN: ReleaseVersion[] = [
       {
         type: 'feature',
         title: 'Smart Countertop Generator',
-        description: 'Generate 3D countertops adapting automatically to base cabinet footprints or freeform placement.',
+        description: 'Generate parametric 3D countertops adapting automatically to base cabinet footprints.',
         tag: 'Kitchen Pro'
       },
       {
@@ -408,27 +509,27 @@ export const RELEASES_EN: ReleaseVersion[] = [
   },
   {
     version: 'v2.1.0',
-    name: 'Professional CAD Tools & Human Scale Reference',
+    name: 'Dimensional Precision & Human Scale',
     releaseDate: 'October 1, 2026',
     isCurrent: false,
-    summary: 'Inclusion of precision CAD tools, 3D tape measure, Push-Pull direct extrusion, and ergonomic human scale reference.',
+    summary: 'Inclusion of millimeter precision tools, dynamic 3D dimensioning and ergonomic visual reference.',
     highlights: [
-      '3D tape measure with vertex, edge, and center point snapping',
-      'Push / Pull tool to resize panels directly in the 3D viewport',
+      'Dynamic 3D measurement between parts, edges and centers',
+      'Guided dimensional adjustment across orthogonal X, Y, Z axes',
       'Human scale figure and spatial orientation compass'
     ],
     changes: [
       {
         type: 'feature',
-        title: 'CAD Tape Measure Tool',
-        description: 'Point-to-point 3D measurements with dynamic dimension readouts.',
-        tag: 'CAD'
+        title: 'Precision Dimensional Measurement',
+        description: 'Accurate point-to-point distance readings in 3D space with dimension display.',
+        tag: 'Measurement'
       },
       {
         type: 'feature',
-        title: 'Push / Pull (Extrude)',
-        description: 'Direct dimension adjustment by pulling or pushing panel faces.',
-        tag: 'CAD'
+        title: 'Orthogonal Dimensional Adjustment',
+        description: 'Direct dimension adjustment along orthogonal axes for panels and modules.',
+        tag: 'Geometry'
       }
     ]
   },
@@ -462,96 +563,132 @@ export const RELEASES_EN: ReleaseVersion[] = [
 
 export const ROADMAP_EN: RoadmapItem[] = [
   {
-    id: 'diagonal_cuts',
-    title: 'Countertops with Diagonal Cuts and 45° Chamfers',
-    description: 'Polygonal cutting tool for rounded corners, bevels, and angled cuts on granite, quartz, and breakfast bars or kitchen islands.',
+    id: 'custom_glb_import',
+    title: 'Custom 3D Model Import in .GLB / .GLTF Format',
+    description: 'Drag-and-drop custom 3D models for appliances, range hoods, faucets, and decorative accessories with automatic polygon and texture optimization.',
     status: 'in_progress',
-    category: 'Countertops & Geometry',
-    targetTimeline: 'Next Version (v2.6.0)',
-    badge: 'Active Development',
-    progressPercent: 75
-  },
-  {
-    id: 'furniture_gallery_3d',
-    title: '3D Appliances, Accessories & Fittings Gallery',
-    description: 'Ready-to-drag 3D models catalog: undermount/topmount sinks, faucets, induction/gas stoves, built-in ovens, range hoods, bar stools, and pendant lights.',
-    status: 'in_progress',
-    category: 'Room & Decoration',
-    targetTimeline: 'Next Version (v2.6.0)',
-    badge: 'Active Development',
-    progressPercent: 60
-  },
-  {
-    id: 'cnc_mechanization_view',
-    title: 'CNC Machining in Cut List and 3D View',
-    description: 'Visual definition of 35 mm cup hinge borings, system 32 drill hole lines, drawer slide drillings, and 3 mm / 5.5 mm back panel grooves.',
-    status: 'in_progress',
-    category: 'Manufacturing & CNC',
-    targetTimeline: 'November 2026',
-    badge: 'In Testing',
-    progressPercent: 40
-  },
-  {
-    id: 'technical_pdf_blueprints',
-    title: 'Automatic Workshop PDF Technical Blueprints',
-    description: 'One-click export of workshop PDF booklet with dimensioned 2D views (plan, elevation, section) for every module to streamline assembly.',
-    status: 'planned',
-    category: 'Workshop Blueprints',
-    targetTimeline: 'Q4 2026',
-    badge: 'Planned',
-    progressPercent: 15
-  },
-  {
-    id: 'photorealistic_presentation',
-    title: 'Photorealistic Client Presentation Mode',
-    description: 'Commercial visualization mode with advanced HDRI lighting, glossy reflections, contact shadows, and shareable interactive mobile links for clients.',
-    status: 'planned',
-    category: 'Sales & Client',
+    category: 'Customization & 3D',
     targetTimeline: 'Q1 2027',
-    badge: 'Planned',
-    progressPercent: 10
+    badge: 'Active Development',
+    progressPercent: 65
   },
   {
-    id: 'commercial_quote_generator',
-    title: 'Commercial Proposal Generator with Custom Logo',
-    description: 'Formal quotes for clients with shop logo, breakdown of materials, accessories, labor, payment terms, and cover render ready for WhatsApp or email.',
-    status: 'planned',
-    category: 'Commercial Management',
+    id: 'cloud_quote_link',
+    title: 'Shareable Cloud Web Quote Link',
+    description: 'Generate secure interactive links allowing end clients to review quotes, material breakdowns, and interactive 3D views from any phone or tablet.',
+    status: 'in_progress',
+    category: 'Sales & Clients',
     targetTimeline: 'Q1 2027',
+    badge: 'In Development',
+    progressPercent: 45
+  },
+  {
+    id: 'hardware_brand_templates',
+    title: 'Advanced Blum & Hettich Hardware Templates',
+    description: 'Parametric integration for lift systems (Aventos HK-S, HF), metal drawer boxes (Legrabox, AvanTech YOU), and concealed undermount slides with exact boring patterns.',
+    status: 'planned',
+    category: 'Industrial Hardware',
+    targetTimeline: 'Q2 2027',
     badge: 'Planned',
-    progressPercent: 0
+    progressPercent: 20
   },
   {
     id: 'gcode_cnc_export',
-    title: 'Direct G-Code Generation for CNC Routers',
-    description: 'Direct post-processors for 3-axis CNC router machines for direct milling, grooving, and drilling without third-party software.',
+    title: 'Direct 3-Axis CNC G-Code Postprocessor',
+    description: 'Direct generation of standard G-Code files (G0, G1, G2, G3) for groove milling, contour routing, and boring operations on woodworking CNC routers.',
     status: 'evaluating',
-    category: 'Industrial Integration',
+    category: 'CNC Integration',
     targetTimeline: 'Technical Evaluation',
     badge: 'Under Study'
   },
   {
-    id: 'hardware_brand_integration',
-    title: 'Hardware Manufacturer Catalogs Integration',
-    description: 'Aventos lift systems, tandembox metal drawers, and concealed runners synchronized with leading brand catalogs.',
-    status: 'evaluating',
-    category: 'Pro Hardware',
-    targetTimeline: 'Technical Evaluation',
-    badge: 'Under Study'
+    id: 'photorealistic_presentation',
+    title: 'Photorealistic Presentation Mode for Clients',
+    description: 'High-fidelity commercial visualization with HDRI environmental lighting, high-gloss melamine reflections, and soft contact shadows.',
+    status: 'planned',
+    category: 'Sales & Clients',
+    targetTimeline: 'Q2 2027',
+    badge: 'Planned',
+    progressPercent: 15
   }
 ];
 
 export const RELEASES_PT: ReleaseVersion[] = [
   {
+    version: 'v3.0.0',
+    name: 'Evolução Industrial: Motor Paramétrico Multi-Ambiente, Cotas HD 3D e Exportação Total',
+    releaseDate: 'Novembro de 2026',
+    isCurrent: true,
+    summary: 'Grande salto arquitetônico para o design paramétrico por ambientes, cotas interativas de vão interno em 3D, catálogo massivo de melaminas, orçamento multimoeda em tempo real e exportação industrial para marcenaria.',
+    highlights: [
+      'Motor paramétrico multi-ambiente em 4 linhas: Cozinhas, Closets, Banheiros (recorte sifão em U) e Estudo/Home Office',
+      'Cotas de luz interna HD com trilho vertical anticolisão e edição numérica direta no espaço 3D',
+      'Catálogo massivo com mais de 35 melaminas, bancadas de mármore/quartzo, eletrodomésticos 3D e seleção com Shift',
+      'Orçamento multimoeda em tempo real (COP canônico para USD, MXN, EUR), ferragens automáticas e desconto de fita de borda',
+      'Exportação industrial completa: SketchUp .DAE milimétrico, manuais de montagem PDF estilo IKEA e DXF CNC',
+      'Sistema multilíngue instantâneo em 6 idiomas (ES, EN, PT, FR, IT, DE) reativo sem recarregar o WebGL'
+    ],
+    changes: [
+      {
+        type: 'feature',
+        title: 'Motor Paramétrico Multi-Ambiente em 4 Linhas Especializadas',
+        description: 'Módulos inteligentes para Cozinhas Planejadas (balcões, aéreos, cantos a 45° e retos), Closets e Guarda-roupas (prateleiras, gaveteiros e cabideiros), Banheiros (gabinetes flutuantes com recorte paramétrico para sifão em U) e Home Office com 0 colisões.',
+        tag: 'Paramétrico'
+      },
+      {
+        type: 'feature',
+        title: 'Cotas de Luz Interna HD e Edição Numérica Direta em 3D',
+        description: 'Visualização nítida de vãos úteis livres (Luz Superior, Luz Inferior e Largura Interna) com sprites HD. Permite clicar diretamente em qualquer cota no 3D para digitar a medida no teclado, com deslizamento de prateleiras em trilho vertical anticolisão.',
+        tag: 'Cotas 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Catálogo Massivo de Materiais e Seleção Múltipla com Shift',
+        description: 'Mais de 35 padrões de melamina em famílias (madeiras, unicolores foscos, alto brilho e tecidos), bancadas de quartzo/mármore com rodobanca paramétrica e eletrodomésticos 3D. Seleção em lote com a tecla Shift.',
+        tag: 'Catálogo & 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Orçamento Multimoeda em Tempo Real e Desconto de Fita de Borda',
+        description: 'Cálculo de custos dinâmico com base canônica em COP conversível ao vivo para USD, MXN, EUR e outras moedas com taxas de mercado. Opção subtractEdgeBandingFromCut no otimizador de corte para descontar a espessura da borda.',
+        tag: 'Orçamento'
+      },
+      {
+        type: 'feature',
+        title: 'Exportação Industrial Completa (.DAE, Manuais PDF e DXF CNC)',
+        description: 'Exportador 3D COLLADA 1.4.1 (.DAE) milimétrico para SketchUp com hierarquia de peças, gerador de manuais de montagem passo a passo estilo IKEA em PDF com lista de ferragens, e exportação DXF com entidades LWPOLYLINE.',
+        tag: 'Exportação'
+      },
+      {
+        type: 'feature',
+        title: 'Sistema Multilíngue Instantâneo em 6 Idiomas',
+        description: 'Alternância fluida entre Espanhol, Inglês, Português, Francês, Italiano e Alemão em toda a interface sem recarregar a página nem reiniciar o visor 3D.',
+        tag: 'Multilíngue'
+      },
+      {
+        type: 'improvement',
+        title: 'Cálculo Unificado de Ferragens e Fixações sem Duplicidade',
+        description: 'Cálculo automatizado de dobradiças, corrediças, puxadores e parafusos de acordo com a cinemática do módulo, eliminando inconsistências no orçamento.',
+        tag: 'Ferragens'
+      },
+      {
+        type: 'fix',
+        title: 'Otimização de Folgas e Rasgo de Fundo em Módulos Especiais',
+        description: 'Ajuste de folgas perimetrais de 2 mm nas frentes de gaveta e alinhamento do canal de fundo de 3 mm em cantoneiras e gabinetes de banheiro.',
+        tag: 'Geometria'
+      }
+    ]
+  },
+  {
     version: 'v2.5.0',
     name: 'Sincronização Total de Espessuras, Chapas Sob Medida e Interface CAD Pro',
     releaseDate: '23 de Outubro de 2026',
-    isCurrent: true,
+    isCurrent: false,
     summary: 'Grande atualização focada na consistência de cálculo milimétrico entre o visualizador 3D, plano de corte e otimizador, além de interface ultracompacta para notebooks.',
     highlights: [
       'Sincronização de espessuras reais (15 mm, 18 mm) em todas as vistas e orçamentos',
       'Configurador paramétrico de tamanho de chapa com predefinições comerciais',
-      'Barra flutuante de edição CAD ultracompacta sem sobreposição em telas HD'
+      'Barra flutuante de edição ultracompacta sem sobreposição em telas HD'
     ],
     changes: [
       {
@@ -568,7 +705,7 @@ export const RELEASES_PT: ReleaseVersion[] = [
       },
       {
         type: 'improvement',
-        title: 'Redesenho da barra flutuante superior para ícones compactos CAD',
+        title: 'Redesenho da barra superior para controles compactos',
         description: 'Redução de largura em mais de 60%, substituindo textos por botões com tooltip interativo, eliminando sobreposições em telas HD (1366×768).',
         tag: 'Interface'
       },
@@ -678,27 +815,27 @@ export const RELEASES_PT: ReleaseVersion[] = [
   },
   {
     version: 'v2.1.0',
-    name: 'Ferramentas CAD Profissionais & Escala Humana',
+    name: 'Precisão Dimensional & Escala Humana',
     releaseDate: '1 de Outubro de 2026',
     isCurrent: false,
-    summary: 'Inclusão de ferramentas de precisão milimétrica, fita métrica 3D, empurrar/puxar (Push-Pull) e referência ergonômica.',
+    summary: 'Inclusão de ferramentas de precisão milimétrica, medição paramétrica tridimensional e referência visual ergonômica.',
     highlights: [
-      'Fita métrica 3D com medição entre vértices, arestas e centros',
-      'Empurrar / Puxar para redimensionar chapas diretamente no modelo',
-      'Figura de escala humana e bússola espacial'
+      'Medição tridimensional dinâmica entre peças, arestas e centros',
+      'Ajuste dimensional guiado nos eixos ortogonais X, Y, Z',
+      'Figura de escala humana e bússola de orientação espacial'
     ],
     changes: [
       {
         type: 'feature',
-        title: 'Ferramenta Fita Métrica CAD',
-        description: 'Medição ponto a ponto no espaço tridimensional com cotas dinâmicas.',
-        tag: 'CAD'
+        title: 'Medição Dimensional de Precisão',
+        description: 'Leitura de distâncias precisas ponto a ponto no espaço tridimensional com visualização de cotas.',
+        tag: 'Medição'
       },
       {
         type: 'feature',
-        title: 'Empurrar / Puxar (Push-Pull)',
-        description: 'Ajuste direto de medidas esticando ou contraindo chapas no eixo correspondente.',
-        tag: 'CAD'
+        title: 'Ajuste Dimensional Ortogonal',
+        description: 'Ajuste direto de dimensões nos eixos ortogonais para painéis e módulos.',
+        tag: 'Geometria'
       }
     ]
   },
@@ -732,96 +869,132 @@ export const RELEASES_PT: ReleaseVersion[] = [
 
 export const ROADMAP_PT: RoadmapItem[] = [
   {
-    id: 'diagonal_cuts',
-    title: 'Bancadas com Cortes Diagonais e Chanfros a 45°',
-    description: 'Ferramenta de corte poligonal para cantos arredondados, chanfros e cortes angulares em bancadas e ilhas de cozinha.',
+    id: 'custom_glb_import',
+    title: 'Importação de Modelos 3D Personalizados em Formato .GLB / .GLTF',
+    description: 'Capacidade de arrastar e soltar modelos 3D personalizados de eletrodomésticos, coifas, torneiras ou acessórios com otimização automática de polígonos.',
     status: 'in_progress',
-    category: 'Bancadas & Geometria',
-    targetTimeline: 'Próxima Versão (v2.6.0)',
+    category: 'Personalização & 3D',
+    targetTimeline: 'Q1 2027',
     badge: 'Em Desenvolvimento Ativo',
-    progressPercent: 75
+    progressPercent: 65
   },
   {
-    id: 'furniture_gallery_3d',
-    title: 'Galeria de Eletrodomésticos, Acessórios e Decoração 3D',
-    description: 'Catálogo de modelos 3D prontos: pias de embutir/sobrepor, torneiras monocomando, cooktops, fornos, coifas, banquetas e luminárias.',
+    id: 'cloud_quote_link',
+    title: 'Orçamento Compartilhável por Link Web Público na Nuvem',
+    description: 'Geração de links interativos seguros para os clientes finais revisarem o orçamento, materiais e visualização 3D em qualquer smartphone ou tablet.',
     status: 'in_progress',
-    category: 'Decoração & Ambiente',
-    targetTimeline: 'Próxima Versão (v2.6.0)',
-    badge: 'Em Desenvolvimento Ativo',
-    progressPercent: 60
-  },
-  {
-    id: 'cnc_mechanization_view',
-    title: 'Usinagens CNC na Lista de Peças e Vista 3D',
-    description: 'Definição gráfica de furações de 35 mm para dobradiças de caneco, furação sistema 32 mm, corrediças telescópicas e ranhuras de fundo de 3 mm / 5.5 mm.',
-    status: 'in_progress',
-    category: 'Fabricação & CNC',
-    targetTimeline: 'Novembro 2026',
-    badge: 'Em Testes',
-    progressPercent: 40
-  },
-  {
-    id: 'technical_pdf_blueprints',
-    title: 'Geração Automática de Plantas Técnicas de Oficina em PDF',
-    description: 'Exportação em 1 clique de caderno técnico em PDF com vistas cotadas em 2D de cada módulo para facilitar a montagem na oficina.',
-    status: 'planned',
-    category: 'Documentação Técnica',
-    targetTimeline: 'Q4 2026',
-    badge: 'Planejado',
-    progressPercent: 15
-  },
-  {
-    id: 'photorealistic_presentation',
-    title: 'Modo Apresentação Fotorrealista para Clientes',
-    description: 'Modo comercial com iluminação HDRI avançada, reflexos em bancadas, sombras suaves e links interativos para o cliente visualizar no celular.',
-    status: 'planned',
     category: 'Vendas & Clientes',
     targetTimeline: 'Q1 2027',
-    badge: 'Planejado',
-    progressPercent: 10
+    badge: 'Em Desenvolvimento',
+    progressPercent: 45
   },
   {
-    id: 'commercial_quote_generator',
-    title: 'Gerador de Proposta Comercial com Logotipo Personalizado',
-    description: 'Criação de orçamentos formais com logo da marcenaria, detalhamento de materiais, ferragens, mão de obra e render na capa pronto para WhatsApp.',
+    id: 'hardware_brand_templates',
+    title: 'Modelos Avançados de Ferragens Blum e Hettich',
+    description: 'Integração paramétrica de sistemas de elevação (Aventos), gavetas metálicas (Legrabox, AvanTech YOU) e corrediças ocultas com furação milimétrica.',
     status: 'planned',
-    category: 'Gestão Comercial',
-    targetTimeline: 'Q1 2027',
+    category: 'Ferragens Industriais',
+    targetTimeline: 'Q2 2027',
     badge: 'Planejado',
-    progressPercent: 0
+    progressPercent: 20
   },
   {
     id: 'gcode_cnc_export',
-    title: 'Geração Direta de Código G-Code para Roteadores CNC',
-    description: 'Pós-processadores para roteadores CNC de 3 eixos para usinagem, furação e ranhuras diretas sem programas intermediários.',
+    title: 'Pós-processador Direto de Código G-Code para CNC de 3 Eixos',
+    description: 'Geração direta de arquivos G-Code padrão (G0, G1, G2, G3) para fresamento de ranhuras, usinagem perimétrica e furação em roteadores CNC de marcenaria.',
     status: 'evaluating',
-    category: 'Integração Industrial',
+    category: 'Integração CNC',
     targetTimeline: 'Avaliação Técnica',
     badge: 'Em Estudo'
   },
   {
-    id: 'hardware_brand_integration',
-    title: 'Integração de Catálogos de Fabricantes de Ferragens',
-    description: 'Sistemas de elevação aventos, gavetas metálicas tandembox e corrediças ocultas integradas aos catálogos das marcas líderes.',
-    status: 'evaluating',
-    category: 'Ferragens Pro',
-    targetTimeline: 'Avaliação Técnica',
-    badge: 'Em Estudo'
+    id: 'photorealistic_presentation',
+    title: 'Modo de Apresentação Fotorrealista para Clientes',
+    description: 'Visualização comercial de alta fidelidade com iluminação HDRI, reflexos em melaminas de alto brilho e sombras suaves.',
+    status: 'planned',
+    category: 'Vendas & Clientes',
+    targetTimeline: 'Q2 2027',
+    badge: 'Planejado',
+    progressPercent: 15
   }
 ];
 
 export const RELEASES_FR: ReleaseVersion[] = [
   {
+    version: 'v3.0.0',
+    name: 'Évolution Industrielle: Moteur Paramétrique Multi-Pièces, Cotes HD 3D et Exportation Complète',
+    releaseDate: 'Novembre 2026',
+    isCurrent: true,
+    summary: 'Avancée architecturale majeure introduisant la conception paramétrique par pièces, le cotage 3D interactif du jeu intérieur, un vaste catalogue de mélaminés, le chiffrage multidevise en direct et l\'exportation industrielle pour l\'agencement.',
+    highlights: [
+      'Moteur paramétrique multi-pièces en 4 lignes: Cuisines, Dressings, Salles de bain (découpe siphon en U) et Bureau/Séjour',
+      'Cotes de lumière interne HD avec rail vertical anti-collision et édition numérique directe dans la vue 3D',
+      'Catalogue massif avec plus de 35 mélaminés, plans de travail marbre/quartz, électroménagers 3D et sélection Shift',
+      'Devis multidevise en temps réel (base COP vers USD, MXN, EUR), calcul automatique de quincaillerie et déduction de chant',
+      'Exportation industrielle complète: SketchUp .DAE millimétrique, manuels de montage PDF style IKEA et DXF CNC',
+      'Système multilingue instantané en 6 langues (ES, EN, PT, FR, IT, DE) réactif sans rechargement WebGL'
+    ],
+    changes: [
+      {
+        type: 'feature',
+        title: 'Moteur Paramétrique Multi-Pièces en 4 Lignes Spécialisées',
+        description: 'Conception paramétrique complète pour Cuisines (meubles bas, hauts, d\'angle à 45° et droits), Dressings (tablettes dynamiques, blocs tiroirs et tringles), Salles de bain (meubles vasque avec découpe automatique en U pour siphon) et Bureau sans aucune collision géométrique.',
+        tag: 'Paramétrique'
+      },
+      {
+        type: 'feature',
+        title: 'Cotes de Lumière Interne HD et Édition Numérique Directe en 3D',
+        description: 'Affichage net des dimensions utiles (Lumière Supérieure, Lumière Inférieure et Largeur Interne) avec sprites HD. Cliquez directement sur une cote 3D pour saisir la valeur au clavier, avec déplacement des étagères sur rail vertical anti-collision.',
+        tag: 'Cotes 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Catalogue Massif de Matériaux et Sélection Multiple avec Shift',
+        description: 'Plus de 35 décors mélaminés (bois, unis mats, brillant et textiles), plans de travail en quartz/marbre avec crédence paramétrique et électroménagers 3D. Sélection multiple avec la touche Shift pour modifier les propriétés par lot.',
+        tag: 'Catalogue & 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Devis Multidevise en Temps Réel et Déduction d\'Épaisseur de Chant',
+        description: 'Calcul dynamique avec base canonique COP convertie en temps réel en USD, MXN, EUR avec taux de change en direct. Option subtractEdgeBandingFromCut dans l\'optimiseur de coupe pour déduire l\'épaisseur des bandes de chant.',
+        tag: 'Devis'
+      },
+      {
+        type: 'feature',
+        title: 'Exportation Industrielle Complète (.DAE, Manuais PDF et DXF CNC)',
+        description: 'Exportateur 3D COLLADA 1.4.1 (.DAE) millimétrique pour SketchUp avec hiérarchies claires, générateur de manuels d\'assemblage étape par étape style IKEA en PDF avec quincaillerie détaillée, et fichiers DXF avec entités LWPOLYLINE.',
+        tag: 'Exportation'
+      },
+      {
+        type: 'feature',
+        title: 'Système Multilingue Instantané en 6 Langues',
+        description: 'Changement fluide et instantané entre Espagnol, Anglais, Portugais, Français, Italien et Allemand sur toute l\'interface sans recharger la page ni réinitialiser WebGL.',
+        tag: 'Multilingue'
+      },
+      {
+        type: 'improvement',
+        title: 'Calcul Unifié de Quincaillerie et Fixations sans Doublons',
+        description: 'Comptabilisation automatique des charnières, coulisses, poignées et vis selon les dimensions et ouvertures du meuble, éliminant les doublons de coût.',
+        tag: 'Quincaillerie'
+      },
+      {
+        type: 'fix',
+        title: 'Ajustement des Jeux et Rainures de Fond pour Meubles Spéciaux',
+        description: 'Standardisation des jeux de 2 mm sur façades et tiroirs, et alignement précis des rainures de fond de 3 mm sur les angles et meubles vasque.',
+        tag: 'Géométrie'
+      }
+    ]
+  },
+  {
     version: 'v2.5.0',
     name: 'Synchronisation Totale des Épaisseurs, Panneaux Sur-Mesure & Interface CAD Pro',
     releaseDate: '23 Octobre 2026',
-    isCurrent: true,
+    isCurrent: false,
     summary: 'Mise à jour majeure axée sur la cohérence de calcul millimétrique entre le visualiseur 3D, la fiche de débit et l\'optimiseur de coupe, plus une interface ultra-compacte.',
     highlights: [
       'Synchronisation des épaisseurs réelles (15 mm, 18 mm) sur toutes les vues et devis',
       'Configurateur paramétrique de dimensions de panneau avec préréglages du commerce',
-      'Barre d\'outils CAD flottante ultra-compacte sans chevauchement sur écrans HD'
+      'Barre d\'outils flottante ultra-compacte sans chevauchement sur écrans HD'
     ],
     changes: [
       {
@@ -838,7 +1011,7 @@ export const RELEASES_FR: ReleaseVersion[] = [
       },
       {
         type: 'improvement',
-        title: 'Refonte de la barre supérieure en icônes compactes CAD',
+        title: 'Refonte de la barre supérieure en contrôles compacts',
         description: 'Réduction de la largeur de plus de 60%, remplaçant les textes par des boutons à info-bulles interactives, éliminant les chevauchements en HD (1366×768).',
         tag: 'Interface'
       },
@@ -948,27 +1121,27 @@ export const RELEASES_FR: ReleaseVersion[] = [
   },
   {
     version: 'v2.1.0',
-    name: 'Outils CAD Professionnels & Échelle Humaine',
+    name: 'Précision Dimensionnelle & Échelle Humaine',
     releaseDate: '1 Octobre 2026',
     isCurrent: false,
-    summary: 'Outils de précision millimétrique, mètre ruban 3D, extrusion pousser/tirer et référence ergonomique humaine.',
+    summary: 'Intégration d\'outils de précision millimétrique, mesure paramétrique 3D et référence visuelle ergonomique.',
     highlights: [
-      'Mètre ruban 3D avec mesure entre sommets, arêtes et centres',
-      'Pousser / Tirer pour redimensionner les panneaux directement dans la scène 3D',
-      'Silhouette d\'échelle humaine et boussole spatiale'
+      'Mesure 3D dynamique entre pièces, arêtes et centres',
+      'Ajustement dimensionnel guidé sur les axes orthogonaux X, Y, Z',
+      'Silhouette à échelle humaine et boussole d\'orientation spatiale'
     ],
     changes: [
       {
         type: 'feature',
-        title: 'Outil Mètre Ruban CAD',
-        description: 'Prise de mesures précises point à point avec affichage de cotes dynamiques.',
-        tag: 'CAD'
+        title: 'Mesure Dimensionnelle de Précision',
+        description: 'Relevé de distances précises point à point dans l\'espace 3D avec affichage de cotes.',
+        tag: 'Mesure'
       },
       {
         type: 'feature',
-        title: 'Pousser / Tirer (Push-Pull)',
-        description: 'Ajustement direct en étirant ou contractant les panneaux sur l\'axe voulu.',
-        tag: 'CAD'
+        title: 'Ajustement Dimensionnel Orthogonal',
+        description: 'Ajustement direct des dimensions sur les axes orthogonaux pour panneaux et modules.',
+        tag: 'Géométrie'
       }
     ]
   },
@@ -1002,96 +1175,132 @@ export const RELEASES_FR: ReleaseVersion[] = [
 
 export const ROADMAP_FR: RoadmapItem[] = [
   {
-    id: 'diagonal_cuts',
-    title: 'Plans de Travail avec Coupes Diagonales et Chanfreins 45°',
-    description: 'Outil de découpe polygonale pour angles arrondis, chanfreins et coupes biaises sur plans en granit, quartz et îlots.',
+    id: 'custom_glb_import',
+    title: 'Importation de Modèles 3D Personnalisés au Format .GLB / .GLTF',
+    description: 'Glisser-déposer des modèles 3D personnalisés d\'appareils électroménagers, hottes, robinetterie et accessoires avec optimisation automatique des polygones.',
     status: 'in_progress',
-    category: 'Plans & Géométrie',
-    targetTimeline: 'Prochaine Version (v2.6.0)',
-    badge: 'En Développement Actif',
-    progressPercent: 75
+    category: 'Personnalisation & 3D',
+    targetTimeline: 'Q1 2027',
+    badge: 'Développement Actif',
+    progressPercent: 65
   },
   {
-    id: 'furniture_gallery_3d',
-    title: 'Galerie d\'Électroménager, Accessoires et Décoration 3D',
-    description: 'Catalogue d\'objets 3D prêts à glisser : éviers sous/sur plan, mitigeurs, plaques induction/gaz, fours, hottes, tabourets et luminaires.',
+    id: 'cloud_quote_link',
+    title: 'Devis Partageable par Lien Web Public dans le Cloud',
+    description: 'Génération de liens interactifs sécurisés permettant aux clients d\'examiner le devis, les matériaux et la vue 3D interactive depuis leur smartphone.',
     status: 'in_progress',
-    category: 'Ambiance & Décoration',
-    targetTimeline: 'Prochaine Version (v2.6.0)',
-    badge: 'En Développement Actif',
-    progressPercent: 60
+    category: 'Ventes & Clients',
+    targetTimeline: 'Q1 2027',
+    badge: 'En Développement',
+    progressPercent: 45
   },
   {
-    id: 'cnc_mechanization_view',
-    title: 'Usinages CNC dans la Liste de Pièces et Vue 3D',
-    description: 'Définition visuelle des perçages 35 mm pour charnières invisibles, perçages système 32 mm, coulisses de tiroir et rainures de fond.',
-    status: 'in_progress',
-    category: 'Fabrication & CNC',
-    targetTimeline: 'Novembre 2026',
-    badge: 'En Phase de Test',
-    progressPercent: 40
-  },
-  {
-    id: 'technical_pdf_blueprints',
-    title: 'Génération Automatique de Plans d\'Atelier en PDF',
-    description: 'Export en un clic d\'un livret technique PDF contenant les vues cotées 2D de chaque caisson pour faciliter l\'assemblage en atelier.',
+    id: 'hardware_brand_templates',
+    title: 'Modèles Avancés de Quincaillerie Blum et Hettich',
+    description: 'Intégration paramétrique des systèmes de relevage (Aventos HK-S, HF), tiroirs métalliques (Legrabox, AvanTech YOU) et coulisses invisibles avec perçages exacts.',
     status: 'planned',
-    category: 'Plans d\'Atelier',
-    targetTimeline: 'T4 2026',
+    category: 'Quincaillerie Industrielle',
+    targetTimeline: 'Q2 2027',
     badge: 'Planifié',
-    progressPercent: 15
+    progressPercent: 20
+  },
+  {
+    id: 'gcode_cnc_export',
+    title: 'Post-processeur Direct de Code G-Code pour CNC 3 Axes',
+    description: 'Génération directe de fichiers G-Code standard (G0, G1, G2, G3) pour le rainurage, détourage de contours et perçage sur défonceuses CNC bois.',
+    status: 'evaluating',
+    category: 'Intégration CNC',
+    targetTimeline: 'Évaluation Technique',
+    badge: 'À l\'Étude'
   },
   {
     id: 'photorealistic_presentation',
     title: 'Mode Présentation Photoréaliste pour Clients',
-    description: 'Rendu commercial haute fidélité avec éclairage HDRI, reflets sur plans de travail et lien interactif visualisable sur smartphone.',
+    description: 'Rendu commercial haute fidélité avec éclairage d\'ambiance HDRI, reflets sur laques brillantes et ombres douces.',
     status: 'planned',
-    category: 'Ventes & Clients',
-    targetTimeline: 'T1 2027',
+    category: 'Ventas & Clients',
+    targetTimeline: 'Q2 2027',
     badge: 'Planifié',
-    progressPercent: 10
-  },
-  {
-    id: 'commercial_quote_generator',
-    title: 'Générateur de Proposition Commerciale avec Logo Personnalisé',
-    description: 'Devis formels avec logo de l\'atelier, décomposition des matériaux, quincaillerie, main d\'œuvre et rendu en page de garde.',
-    status: 'planned',
-    category: 'Gestion Commerciale',
-    targetTimeline: 'T1 2027',
-    badge: 'Planifié',
-    progressPercent: 0
-  },
-  {
-    id: 'gcode_cnc_export',
-    title: 'Génération Directe de G-Code pour Centres d\'Usinage CNC',
-    description: 'Post-processeurs pour fraiseuses CNC 3 axes pour rainurage, perçage et détourage direct sans logiciel tiers.',
-    status: 'evaluating',
-    category: 'Intégration Industrielle',
-    targetTimeline: 'Évaluation Technique',
-    badge: 'À l\'Étude'
-  },
-  {
-    id: 'hardware_brand_integration',
-    title: 'Intégration des Catalogues Fabricants de Quincaillerie',
-    description: 'Systèmes de relevage aventos, tiroirs métalliques tandembox et coulisses invisibles synchronisés avec les grands fabricants.',
-    status: 'evaluating',
-    category: 'Quincaillerie Pro',
-    targetTimeline: 'Évaluation Technique',
-    badge: 'À l\'Étude'
+    progressPercent: 15
   }
 ];
 
 export const RELEASES_IT: ReleaseVersion[] = [
   {
+    version: 'v3.0.0',
+    name: 'Evoluzione Industriale: Motore Parametrico Multi-Ambiente, Quote HD 3D ed Esportazione Completa',
+    releaseDate: 'Novembre 2026',
+    isCurrent: true,
+    summary: 'Importante svolta architetturale per la progettazione parametrica per ambienti, quote interattive di luce interna in 3D, catalogo completo di nobilitati, preventivazione multivaluta in tempo reale e suite di esportazione industriale.',
+    highlights: [
+      'Motore parametrico multi-ambiente in 4 linee: Cucine, Armadi, Bagno (scasso sifone a U) e Ufficio/Living',
+      'Quote di luce interna HD con binario verticale anti-collisione e modifica numerica diretta nel visualizzatore 3D',
+      'Catalogo completo con oltre 35 nobilitati, top in marmo/quarzo, elettrodomestici 3D e selezione multipla con Shift',
+      'Preventivo multivaluta in tempo reale (COP canonico verso USD, MXN, EUR), ferramenta automatica e detrazione bordi',
+      'Esportazione industriale completa: SketchUp .DAE millimetrico, manuali di montaggio PDF stile IKEA e DXF CNC',
+      'Sistema multilingue istantaneo in 6 lingue (ES, EN, PT, FR, IT, DE) reattivo senza ricaricare WebGL'
+    ],
+    changes: [
+      {
+        type: 'feature',
+        title: 'Motore Parametrico Multi-Ambiente in 4 Linee Specializzate',
+        description: 'Progettazione parametrica completa per Cucine Componibili (basi, pensili, angolari a 45° e ciechi), Armadi e Guardaroba (ripiani dinamici, cassettiere e tubi appendiabiti), Arredo Bagno (mobili sospesi con scasso parametrico per sifone a U) e Ufficio senza alcuna collisione.',
+        tag: 'Parametrico'
+      },
+      {
+        type: 'feature',
+        title: 'Quote di Luce Interna HD e Modifica Numerica Diretta in 3D',
+        description: 'Visualizzazione nitida delle luci utili libere (Luce Superiore, Inferiore e Larghezza Interna) con sprite HD ad alta definizione. È possibile fare clic direttamente su qualsiasi quota in 3D per inserire il valore numerico da tastiera, con binario verticale anti-collisione.',
+        tag: 'Quote 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Catalogo Materiali e Selezione Multipla in Blocco con Shift',
+        description: 'Oltre 35 nobilitati commerciali suddivisi in famiglie (essenze legno, tinte unite opache, lucidi e tessuti), top in quarzo e marmo con alzatina parametrica ed elettrodomestici 3D. Selezione multipla con tasto Shift per modificare materiali e parametri in blocco.',
+        tag: 'Catalogo & 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Preventivo Multivaluta in Tempo Reale e Detrazione Bordatura',
+        description: 'Calcolo dinamico con valuta base canonica in COP convertibile in tempo reale in USD, MXN, EUR con tassi di cambio live. Impostazione subtractEdgeBandingFromCut nell\'ottimizzatore 2D per detrarre lo spessore del bordo nelle misure di taglio.',
+        tag: 'Preventivo'
+      },
+      {
+        type: 'feature',
+        title: 'Esportazione Industriale Completa (.DAE, Manuali PDF e DXF CNC)',
+        description: 'Esportatore 3D COLLADA 1.4.1 (.DAE) millimetrico per SketchUp con gerarchie ordinate, generatore di manuali di montaggio passo-passo stile IKEA in PDF con distinta ferramenta e file DXF con entità LWPOLYLINE per CNC.',
+        tag: 'Esportazione'
+      },
+      {
+        type: 'feature',
+        title: 'Sistema Multilingue Istantaneo in 6 Lingue',
+        description: 'Passaggio fluido e reattivo tra Spagnolo, Inglese, Portoghese, Francese, Italiano e Tedesco su tutta l\'interfaccia senza ricaricare la pagina né riavviare il contesto WebGL.',
+        tag: 'Multilingue'
+      },
+      {
+        type: 'improvement',
+        title: 'Calcolo Unificato di Ferramenta e Fissaggi senza Duplicazioni',
+        description: 'Rilevamento automatico di cerniere, guide per cassetti, maniglie e viti di giunzione in base alla cinematica del mobile, eliminando discrepanze di costo.',
+        tag: 'Ferramenta'
+      },
+      {
+        type: 'fix',
+        title: 'Ottimizzazione Fughe e Scanalature Schienale nei Moduli Speciali',
+        description: 'Standardizzazione delle luci perimetrali di 2 mm su ante e cassetti e allineamento preciso delle fresate schienale da 3 mm su basi angolari e vanità.',
+        tag: 'Geometria'
+      }
+    ]
+  },
+  {
     version: 'v2.5.0',
     name: 'Sincronizzazione Totale Spessori, Pannelli su Misura e Interfaccia CAD Pro',
     releaseDate: '23 Ottobre 2026',
-    isCurrent: true,
+    isCurrent: false,
     summary: 'Aggiornamento principale focalizzato sulla coerenza millimetrica tra visualizzatore 3D, distinta pezzi e ottimizzatore di taglio, oltre a un\'interfaccia ultracompatta per notebook.',
     highlights: [
       'Sincronizzazione spessori reali (15 mm, 18 mm) su tutte le viste e preventivi',
       'Configuratore parametrico dimensioni pannello con misure commerciali',
-      'Barra mobile CAD ultracompatta senza sovrapposizioni su schermi HD'
+      'Barra mobile ultracompatta senza sovrapposizioni su schermi HD'
     ],
     changes: [
       {
@@ -1108,8 +1317,8 @@ export const RELEASES_IT: ReleaseVersion[] = [
       },
       {
         type: 'improvement',
-        title: 'Riprogettazione della barra superiore con icone CAD compatte',
-        description: 'Larghezza ridotta di oltre il 60%, sostituendo i testi con icone e tooltip interattivi, eliminando sovrapposizioni in HD (1366×768).',
+        title: 'Riprogettazione della barra superiore con controlli compatti',
+        description: 'Larghezza ridotta di oltre il 60%, sostituendo i testi con pulsanti a icone e tooltip interattivi, eliminando sovrapposizioni in HD (1366×768).',
         tag: 'Interfaccia'
       },
       {
@@ -1218,27 +1427,27 @@ export const RELEASES_IT: ReleaseVersion[] = [
   },
   {
     version: 'v2.1.0',
-    name: 'Strumenti CAD Professionali & Scala Umana',
+    name: 'Precisione Dimensionale & Scala Umana',
     releaseDate: '1 Ottobre 2026',
     isCurrent: false,
-    summary: 'Inclusione di strumenti di precisione millimetrica, flessometro 3D, estrudi Spingi/Tira e figura umana ergonomica.',
+    summary: 'Introduzione di strumenti di precisione millimetrica, misurazione parametrica 3D e riferimento visivo ergonomico.',
     highlights: [
-      'Flessometro 3D con misurazione tra vertici, spigoli e punti mediani',
-      'Strumento Spingi / Tira per ridimensionare pannelli direttamente nel 3D',
-      'Sagoma di scala umana e bussola di orientamento nello spazio'
+      'Misurazione 3D dinamica tra pezzi, spigoli e punti centrali',
+      'Regolazione dimensionale guidata sugli assi ortogonali X, Y, Z',
+      'Figura in scala umana e bussola di orientamento spaziale'
     ],
     changes: [
       {
         type: 'feature',
-        title: 'Strumento Flessometro CAD',
-        description: 'Misurazioni precise punto a punto nello spazio con quote dinamiche.',
-        tag: 'CAD'
+        title: 'Misurazione Dimensionale di Precisione',
+        description: 'Rilevamento distanze punto a punto nello spazio tridimensionale con visualizzazione quote.',
+        tag: 'Misurazione'
       },
       {
         type: 'feature',
-        title: 'Spingi / Tira (Push-Pull)',
-        description: 'Modifica diretta trascinando le facce dei pannelli sull\'asse desiderato.',
-        tag: 'CAD'
+        title: 'Regolazione Dimensionale Ortogonale',
+        description: 'Regolazione diretta delle dimensioni lungo gli assi ortogonali per pannelli e moduli.',
+        tag: 'Geometria'
       }
     ]
   },
@@ -1272,96 +1481,132 @@ export const RELEASES_IT: ReleaseVersion[] = [
 
 export const ROADMAP_IT: RoadmapItem[] = [
   {
-    id: 'diagonal_cuts',
-    title: 'Piani di Lavoro con Tagli Diagonali e Smussi a 45°',
-    description: 'Strumento di taglio poligonale per spigoli arrotondati, biselli e tagli angolari su piani in quarzo, granito e penisole.',
+    id: 'custom_glb_import',
+    title: 'Importazione di Modelli 3D Personalizzati in Formato .GLB / .GLTF',
+    description: 'Funzionalità drag-and-drop per modelli 3D personalizzati di elettrodomestici, cappe, rubinetteria e accessori con ottimizzazione automatica dei poligoni.',
     status: 'in_progress',
-    category: 'Piani & Geometria',
-    targetTimeline: 'Prossima Versione (v2.6.0)',
+    category: 'Personalizzazione & 3D',
+    targetTimeline: 'Q1 2027',
     badge: 'In Sviluppo Attivo',
-    progressPercent: 75
+    progressPercent: 65
   },
   {
-    id: 'furniture_gallery_3d',
-    title: 'Galleria di Elettrodomestici, Accessori e Arredi 3D',
-    description: 'Catalogo di modelli 3D pronti da trascinare: lavelli sottopiano/soprapiano, miscelatori, piani a induzione/gas, forni a incasso, cappe, sgabelli e lampade.',
+    id: 'cloud_quote_link',
+    title: 'Preventivo Condivisibile tramite Link Web Pubblico in Cloud',
+    description: 'Generazione di link interattivi sicuri che consentono ai clienti di consultare preventivo, distinta materiali e vista 3D da smartphone o tablet.',
     status: 'in_progress',
-    category: 'Ambiente & Arredo',
-    targetTimeline: 'Prossima Versione (v2.6.0)',
-    badge: 'In Sviluppo Attivo',
-    progressPercent: 60
+    category: 'Vendite & Clienti',
+    targetTimeline: 'Q1 2027',
+    badge: 'In Sviluppo',
+    progressPercent: 45
   },
   {
-    id: 'cnc_mechanization_view',
-    title: 'Lavorazioni CNC nella Distinta Pezzi e Vista 3D',
-    description: 'Rappresentazione grafica di fori da 35 mm per cerniere, file di fori sistema 32 mm, guide per cassetti e canali schienale da 3 mm / 5.5 mm.',
-    status: 'in_progress',
-    category: 'Produzione & CNC',
-    targetTimeline: 'Novembre 2026',
-    badge: 'In Fase di Test',
-    progressPercent: 40
-  },
-  {
-    id: 'technical_pdf_blueprints',
-    title: 'Generazione Automatica di Disegni Tecnici PDF per Falegnameria',
-    description: 'Esportazione con un clic di fascicoli tecnici PDF con piante, prospetti e sezioni quotate in 2D per facilitare il montaggio.',
+    id: 'hardware_brand_templates',
+    title: 'Template Avanzati di Ferramenta Blum e Hettich',
+    description: 'Integrazione parametrica di sistemi a ribalta (Aventos HK-S, HF), cassetti metallici (Legrabox, AvanTech YOU) e guide a scomparsa con schemi di foratura esatti.',
     status: 'planned',
-    category: 'Disegni di Laboratorio',
-    targetTimeline: 'Q4 2026',
+    category: 'Ferramenta Industriale',
+    targetTimeline: 'Q2 2027',
     badge: 'Pianificato',
-    progressPercent: 15
+    progressPercent: 20
+  },
+  {
+    id: 'gcode_cnc_export',
+    title: 'Post-processor Diretto di Codice G-Code per CNC a 3 Assi',
+    description: 'Generazione diretta di file G-Code standard (G0, G1, G2, G3) per fresatura scanalature, contornatura e forature su centri di lavoro CNC per legno.',
+    status: 'evaluating',
+    category: 'Integrazione CNC',
+    targetTimeline: 'Valutazione Tecnica',
+    badge: 'In Valutazione'
   },
   {
     id: 'photorealistic_presentation',
     title: 'Modalità Presentazione Fotorealistica per Clienti',
-    description: 'Visualizzazione commerciale ad alta fedeltà con illuminazione HDRI, riflessi realistici e link condivisibili per visualizzazione da smartphone.',
+    description: 'Visualizzazione commerciale ad alta fedeltà con illuminazione ambientale HDRI, riflessi su nobilitati lucidi e ombre di contatto morbide.',
     status: 'planned',
     category: 'Vendite & Clienti',
-    targetTimeline: 'Q1 2027',
+    targetTimeline: 'Q2 2027',
     badge: 'Pianificato',
-    progressPercent: 10
-  },
-  {
-    id: 'commercial_quote_generator',
-    title: 'Generatore di Proposte Commerciali con Logo Personalizzato',
-    description: 'Creazione di preventivi formali con logo del laboratorio, elenco materiali, accessori, manodopera e render di copertina.',
-    status: 'planned',
-    category: 'Gestione Commerciale',
-    targetTimeline: 'Q1 2027',
-    badge: 'Pianificato',
-    progressPercent: 0
-  },
-  {
-    id: 'gcode_cnc_export',
-    title: 'Generazione Diretta di Codice G-Code per Centri di Lavoro CNC',
-    description: 'Post-processori compatibili con pantografi e router CNC a 3 assi per fresatura, canali e forature dirette.',
-    status: 'evaluating',
-    category: 'Integrazione Industriale',
-    targetTimeline: 'Valutazione Tecnica',
-    badge: 'In Valutazione'
-  },
-  {
-    id: 'hardware_brand_integration',
-    title: 'Integrazione dei Cataloghi Produttori Ferramenta',
-    description: 'Sistemi di apertura verso l\'alto aventos, cassetti metallici tandembox e guide a scomparsa sincronizzati con i produttori leader.',
-    status: 'evaluating',
-    category: 'Ferramenta Pro',
-    targetTimeline: 'Valutazione Tecnica',
-    badge: 'In Valutazione'
+    progressPercent: 15
   }
 ];
 
 export const RELEASES_DE: ReleaseVersion[] = [
   {
+    version: 'v3.0.0',
+    name: 'Industrielle Evolution: Raumübergreifende parametrische Konstruktion, HD-3D-Bemaßung & Voller Export',
+    releaseDate: 'November 2026',
+    isCurrent: true,
+    summary: 'Bedeutender architektonischer Meilenstein für parametrisches Möbeldesign nach Raumbereichen, interaktive HD-Lichtmaß-Bemaßung im 3D-Raum, massiven Melaminkatalog, Live-Multiwährungs-Kalkulation und industrielle Fertigungsexporte.',
+    highlights: [
+      'Parametrische Konstruktion in 4 Produktlinien: Küchen, Schränke, Bad (U-Siphon-Ausklinkung) und Wohnen/Büro',
+      'HD-Lichtmaßbemaßung mit vertikaler Antikollisions-Gleitschiene und direkter numerischer Eingabe im 3D-Viewer',
+      'Umfassender Materialkatalog mit über 35 Dekoren, Marmor-/Quarz-Arbeitsplatten, 3D-Geräten und Shift-Mehrfachauswahl',
+      'Echtzeit-Multiwährungskalkulation (kanonisches COP in USD, MXN, EUR), automatischer Beschlagsberechnung und Kantenabzug',
+      'Vollständiger Industrie-Export: millimetergenaues SketchUp .DAE, IKEA-Stil PDF-Aufbauanleitungen und CNC-DXF',
+      'Reaktives 6-Sprachen-System (ES, EN, PT, FR, IT, DE) ohne Neuladen der WebGL-Grafik'
+    ],
+    changes: [
+      {
+        type: 'feature',
+        title: 'Parametrische Konstruktion in 4 Speziallinien',
+        description: 'Vollparametrisches Design mit Modulen für Einbauküchen (Unter-, Ober-, 45°-Eck- und Eckblendschränke), Schränke und Ankleiden (dynamische Fachböden, Schubkästen und Kleiderstangen), Badezimmermöbel (schwebende Waschtische mit parametrischer U-Siphonausklinkung) und Homeoffice ohne geometrische Kollisionen.',
+        tag: 'Parametrisch'
+      },
+      {
+        type: 'feature',
+        title: 'HD-Lichtmaßbemaßung und direkte numerische Bearbeitung in 3D',
+        description: 'Gestochen scharfe Anzeige nutzbarer Innenmaße (Oberes Lichtmaß, Unteres Lichtmaß, Innenbreite) über hochauflösende Billboard-Sprites. Klicken Sie direkt auf eine 3D-Maßzahl zur Tastatureingabe mit vertikaler Fachbodenverstellung und Kollisionsschutz.',
+        tag: '3D-Maße'
+      },
+      {
+        type: 'feature',
+        title: 'Umfangreicher Dekorkatalog und Shift-Mehrfachauswahl',
+        description: 'Über 35 Handelsdekore gegliedert in Holzstrukturen, Mattfarben, Hochglanz und Textil, Quarz- und Marmorarbeitsplatten mit parametrischer Wischleiste sowie Low-Poly-3D-Geräte. Mehrfachauswahl mit Shift für Sammelbearbeitung.',
+        tag: 'Katalog & 3D'
+      },
+      {
+        type: 'feature',
+        title: 'Echtzeit-Multiwährungskalkulation und Kantenstärkenabzug',
+        description: 'Dynamische Preiskalkulation mit COP als Leitwährung und Live-Umrechnung in USD, MXN, EUR anhand aktueller Marktkurse. Option subtractEdgeBandingFromCut im 2D-Zuschnittoptimierer zum Abzug der Kantenstärke vom Zuschnittmaß.',
+        tag: 'Kalkulation'
+      },
+      {
+        type: 'feature',
+        title: 'Vollständiger Industrie-Export (.DAE, PDF-Anleitungen und DXF CNC)',
+        description: 'Millimetergenauer COLLADA 1.4.1 (.DAE) 3D-Export für SketchUp mit Bauteilgruppen, IKEA-Stil PDF-Montageanleitungs-Generator mit Explosionszeichnungen und Beschlagslisten sowie CNC-DXF mit LWPOLYLINE-Geometrien.',
+        tag: 'Export'
+      },
+      {
+        type: 'feature',
+        title: 'Sofortige 6-Sprachen-Umschaltung',
+        description: 'Nahtloser und reaktiver Sprachwechsel zwischen Spanisch, Englisch, Portugiesisch, Französisch, Italienisch und Deutsch ohne Seitenreload oder WebGL-Neustart.',
+        tag: 'Mehrsprachigkeit'
+      },
+      {
+        type: 'improvement',
+        title: 'Einheitliche Beschlagsberechnung ohne Doppelberechnungen',
+        description: 'Automatische Ermittlung von Topfbändern, Schubkastenführungen, Griffen und Verbindungsschrauben passend zur Modulkinematik ohne Berechnungsfehler.',
+        tag: 'Beschläge'
+      },
+      {
+        type: 'fix',
+        title: 'Optimierung von Fugen und Rückwandnuten bei Sondermöbeln',
+        description: 'Standardisierte 2 mm Frontfugen an Schubkästen und Türen sowie präzise Ausrichtung der 3 mm Rückwandnut an Eck- und Waschtischmöbeln.',
+        tag: 'Geometrie'
+      }
+    ]
+  },
+  {
     version: 'v2.5.0',
     name: 'Vollständige Stärken-Synchronisation, Maßplatten & Pro-CAD-Oberfläche',
     releaseDate: '23. Oktober 2026',
-    isCurrent: true,
+    isCurrent: false,
     summary: 'Großes Update mit Fokus auf millimetergenaue Konsistenz zwischen 3D-Viewer, Stückliste und Zuschnittoptimierer sowie ultrakompakter Oberfläche für Laptops.',
     highlights: [
       'Synchronisation realer Plattenstärken (15 mm, 18 mm) über alle Ansichten und Kalkulationen',
       'Parametrischer Plattenmaß-Konfigurator mit handelsüblichen Standardformaten',
-      'Ultrakompakte schwebende CAD-Leiste ohne Überlappungen auf HD-Displays'
+      'Ultrakompakte schwebende Steuerleiste ohne Überlappungen auf HD-Displays'
     ],
     changes: [
       {
@@ -1378,7 +1623,7 @@ export const RELEASES_DE: ReleaseVersion[] = [
       },
       {
         type: 'improvement',
-        title: 'Neugestaltung der oberen Werkzeugleiste mit kompakten CAD-Symbolen',
+        title: 'Neugestaltung der oberen Leiste mit kompakten Steuerelementen',
         description: 'Breitenreduktion um mehr als 60 % durch Icon-Buttons mit Tooltips, verhindert Überlappung auf HD-Bildschirmen (1366×768).',
         tag: 'Oberfläche'
       },
@@ -1488,27 +1733,27 @@ export const RELEASES_DE: ReleaseVersion[] = [
   },
   {
     version: 'v2.1.0',
-    name: 'Professionelle CAD-Werkzeuge & Ergonomischer Maßstab',
+    name: 'Dimensionale Präzision & Menschlicher Maßstab',
     releaseDate: '1. Oktober 2026',
     isCurrent: false,
-    summary: 'Millimetergenaue Werkzeuge, 3D-Messband, Drücken/Ziehen (Push-Pull) und menschliche Maßstabsfigur.',
+    summary: 'Einführung von Millimeter-Präzisionswerkzeugen, dynamischer 3D-Bemaßung und ergonomischer Referenzfigur.',
     highlights: [
-      '3D-Messband zum Messen zwischen Eckpunkten, Kanten und Mittelpunkten',
-      'Drücken/Ziehen zum direkten Ändern von Plattenabmessungen im 3D-Raum',
-      'Menschliche Maßstabsfigur und Kompass zur räumlichen Orientierung'
+      'Dynamische 3D-Abstandsmessung zwischen Bauteilen, Kanten und Mittelpunkten',
+      'Geführte Maßanpassung entlang orthogonaler X-, Y-, Z-Achsen',
+      'Menschliche Maßstabsfigur und räumlicher Orientierungskompass'
     ],
     changes: [
       {
         type: 'feature',
-        title: 'CAD-Messbandwerkzeug',
-        description: 'Präzise Punkt-zu-Punkt-Messung mit dynamischer Maßanzeige.',
-        tag: 'CAD'
+        title: 'Präzisions-Abstandsmessung',
+        description: 'Punkt-zu-Punkt-Abstandsmessung im 3D-Raum mit dynamischer Maßanzeige.',
+        tag: 'Messung'
       },
       {
         type: 'feature',
-        title: 'Drücken / Ziehen (Push-Pull)',
-        description: 'Direktes Anpassen von Bauteilmaßen durch Ziehen oder Drücken der Plattenseiten.',
-        tag: 'CAD'
+        title: 'Orthogonale Maßanpassung',
+        description: 'Direkte Maßanpassung entlang orthogonaler Achsen für Platten und Module.',
+        tag: 'Geometrie'
       }
     ]
   },
@@ -1542,82 +1787,53 @@ export const RELEASES_DE: ReleaseVersion[] = [
 
 export const ROADMAP_DE: RoadmapItem[] = [
   {
-    id: 'diagonal_cuts',
-    title: 'Arbeitsplatten mit Diagonalschnitten und 45°-Fasen',
-    description: 'Polygonales Schneidwerkzeug für gerundete Ecken, Fasen und Gehrungsschnitte auf Arbeitsplatten aus Granit, Quarz oder Thekenplatten.',
+    id: 'custom_glb_import',
+    title: 'Import benutzerdefinierter 3D-Modelle im .GLB / .GLTF-Format',
+    description: 'Drag-and-Drop benutzerdefinierter 3D-Modelle für Elektrogeräte, Dunstabzugshauben, Armaturen und Deko mit automatischer Polygon- und Texturoptimierung.',
     status: 'in_progress',
-    category: 'Arbeitsplatten & Geometrie',
-    targetTimeline: 'Nächste Version (v2.6.0)',
+    category: 'Anpassung & 3D',
+    targetTimeline: 'Q1 2027',
     badge: 'In aktiver Entwicklung',
-    progressPercent: 75
+    progressPercent: 65
   },
   {
-    id: 'furniture_gallery_3d',
-    title: '3D-Bibliothek für Einbaugeräte, Zubehör und Deko',
-    description: '3D-Modellkatalog zum direkten Einfügen: Unterbau-/Auflagespülen, Einhebelmischer, Induktions-/Gaskochfelder, Einbaubacköfen, Dunstabzugshauben, Barhocker und Hängeleuchten.',
+    id: 'cloud_quote_link',
+    title: 'Teilbarer Web-Angebotslink in der Cloud',
+    description: 'Erstellung sicherer interaktiver Links, über die Endkunden Angebote, Materialaufstellungen und 3D-Ansichten auf Smartphones oder Tablets einsehen können.',
     status: 'in_progress',
-    category: 'Raum & Dekoration',
-    targetTimeline: 'Nächste Version (v2.6.0)',
-    badge: 'In aktiver Entwicklung',
-    progressPercent: 60
-  },
-  {
-    id: 'cnc_mechanization_view',
-    title: 'CNC-Bearbeitungen in Stückliste und 3D-Ansicht',
-    description: 'Grafische Definition von 35-mm-Topfbandbohrungen, System-32-Lochreihen, Schubladenführungsbohrungen und 3-mm- / 5.5-mm-Rückwandnuten.',
-    status: 'in_progress',
-    category: 'Fertigung & CNC',
-    targetTimeline: 'November 2026',
-    badge: 'In Testphase',
-    progressPercent: 40
-  },
-  {
-    id: 'technical_pdf_blueprints',
-    title: 'Automatische Werkstatt-PDF-Fertigungspläne',
-    description: '1-Klick-Export eines technischen PDF-Buchs mit 2D-Ansichten (Grundriss, Ansicht, Schnitt) jedes Korpus zur reibungslosen Montage.',
-    status: 'planned',
-    category: 'Werkstattdokumentation',
-    targetTimeline: 'Q4 2026',
-    badge: 'Geplant',
-    progressPercent: 15
-  },
-  {
-    id: 'photorealistic_presentation',
-    title: 'Fotorealistischer Kunden-Präsentationsmodus',
-    description: 'Verkaufsfördernde Ansicht mit HDRI-Beleuchtung, Glanzeffekten auf Arbeitsplatten und interaktiven Weblinks für das Kunden-Smartphone.',
-    status: 'planned',
     category: 'Vertrieb & Kunden',
     targetTimeline: 'Q1 2027',
-    badge: 'Geplant',
-    progressPercent: 10
+    badge: 'In Entwicklung',
+    progressPercent: 45
   },
   {
-    id: 'commercial_quote_generator',
-    title: 'Kundenangebot-Generator mit eigenem Firmenlogo',
-    description: 'Erstellung formeller Angebote mit Werkstatt-Logo, Aufschlüsselung von Material, Beschlägen, Lohnkosten und Deckblatt-Rendering.',
+    id: 'hardware_brand_templates',
+    title: 'Erweiterte Beschlagsvorlagen von Blum und Hettich',
+    description: 'Parametrische Integration von Klappensystemen (Aventos HK-S, HF), Metall-Schubkastensystemen (Legrabox, AvanTech YOU) und Unterflurführungen mit exakten Bohrbildern.',
     status: 'planned',
-    category: 'Kaufmännische Verwaltung',
-    targetTimeline: 'Q1 2027',
+    category: 'Industriebeschläge',
+    targetTimeline: 'Q2 2027',
     badge: 'Geplant',
-    progressPercent: 0
+    progressPercent: 20
   },
   {
     id: 'gcode_cnc_export',
-    title: 'Direkte G-Code-Generierung für CNC-Bearbeitungszentren',
-    description: 'Postprozessoren für 3-Achs-CNC-Fräsen zum direkten Fräsen, Nuten und Bohren ohne externe Software.',
+    title: 'Direkter G-Code-Postprozessor für 3-Achs-CNC-Maschinen',
+    description: 'Direkte Erzeugung standardisierter G-Code-Dateien (G0, G1, G2, G3) für Nutfräsungen, Konturschnitte und Bohrungen auf Holz-CNC-Fräsen.',
     status: 'evaluating',
-    category: 'Industrielle Integration',
+    category: 'CNC-Integration',
     targetTimeline: 'Technische Prüfung',
     badge: 'In Prüfung'
   },
   {
-    id: 'hardware_brand_integration',
-    title: 'Integration führender Beschlagshersteller-Kataloge',
-    description: 'Aventos-Klappenbeschläge, Tandembox-Metallschubkästen und Unterflurführungen direkt synchronisiert mit Herstellerdaten.',
-    status: 'evaluating',
-    category: 'Profi-Beschläge',
-    targetTimeline: 'Technische Prüfung',
-    badge: 'In Prüfung'
+    id: 'photorealistic_presentation',
+    title: 'Fotorealistischer Präsentationsmodus für Kunden',
+    description: 'Kommerzielle High-End-Visualisierung mit HDRI-Umgebungsbeleuchtung, Reflexionen auf Glanzmelamin und weichen Kontaktschatten.',
+    status: 'planned',
+    category: 'Vertrieb & Kunden',
+    targetTimeline: 'Q2 2027',
+    badge: 'Geplant',
+    progressPercent: 15
   }
 ];
 

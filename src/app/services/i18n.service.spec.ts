@@ -223,7 +223,7 @@ describe('I18nService & TranslatePipe (Multilenguaje Reactivo en Tiempo Real)', 
 
       const currentRelease = releases.find(r => r.isCurrent);
       expect(currentRelease).toBeDefined();
-      expect(currentRelease!.version).toBe('v2.5.0');
+      expect(currentRelease!.version).toBe('v3.0.0');
       expect(currentRelease!.name.trim().length).toBeGreaterThan(0);
       expect(currentRelease!.summary.trim().length).toBeGreaterThan(0);
       expect(currentRelease!.highlights.length).toBeGreaterThan(0);

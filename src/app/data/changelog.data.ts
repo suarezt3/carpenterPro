@@ -7,7 +7,7 @@ import {
   ROADMAP_ES
 } from './changelog-i18n.data';
 
-export const APP_CURRENT_VERSION = 'v2.5.0';
+export const APP_CURRENT_VERSION = 'v3.0.0';
 
 export { APP_RELEASES_BY_LANG, APP_ROADMAP_BY_LANG };
 

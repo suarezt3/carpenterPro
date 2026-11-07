@@ -27,19 +27,19 @@
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <h2 class="text-base sm:text-lg font-bold tracking-tight truncate" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
-                Centro de Ayuda y Manual Interactivo
+                {{ 'help.title' | t }}
               </h2>
               <button
                 type="button"
                 (click)="openChangelog.emit()"
                 class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-[10px] font-medium transition cursor-pointer shadow-2xs"
-                title="Ver historial de novedades de versiones y roadmap en desarrollo">
+                [title]="'help.changelogRoadmapTooltip' | t">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Novedades & Roadmap</span>
+                <span>{{ 'help.changelogRoadmap' | t }}</span>
               </button>
             </div>
             <p class="text-xs truncate" [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">
-              Guía práctica de herramientas 3D, escala humana, bloqueo de piezas, menú contextual, mecanizados CNC y corte.
+              {{ 'help.subtitle' | t }}
             </p>
           </div>
         </div>
@@ -49,7 +49,7 @@
           (click)="close()"
           [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 border border-zinc-200' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-700'"
           class="w-8 h-8 rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-          title="Cerrar manual (Esc)">
+          [title]="'help.closeManual' | t">
           <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
         </button>
       </div>
@@ -57,23 +57,23 @@
       <!-- CONTENIDO DIVIDIDO (PANEL LATERAL + DETALLE DEL ARTÍCULO) -->
       <div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
 
-        <!-- PANEL LATERAL IZQUIERDO: BUSCADOR, CATEGORÍAS VISIBLES Y LISTA DE GUÍAS -->
+        <!-- PANEL LATERAL IZQUIERDO: BUSCADOR, CATEGORÍAS Y LISTA DE GUÍAS -->
         <div
           class="w-full md:w-84 lg:w-96 border-b md:border-b-0 md:border-r flex flex-col shrink-0 min-h-0"
           [class]="themeService.isClassic() ? 'bg-zinc-50/70 border-zinc-200' : 'bg-zinc-950 border-zinc-800'">
 
-          <!-- Barra de búsqueda y filtros sin scroll horizontal -->
+          <!-- Barra de búsqueda y filtros -->
           <div class="p-3.5 border-b flex flex-col gap-2.5 shrink-0" [class]="themeService.isClassic() ? 'border-zinc-200 bg-white' : 'border-zinc-800 bg-zinc-900'">
             <div class="flex items-center justify-between">
               <label for="doc-search-input" class="text-[11px] font-semibold uppercase tracking-wider" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-400'">
-                Buscar en el Manual
+                {{ 'help.searchLabel' | t }}
               </label>
               <span class="text-[10px] font-mono tabular-nums font-medium px-2 py-0.5 rounded-md" [class]="themeService.isClassic() ? 'bg-zinc-100 text-zinc-700 border border-zinc-200' : 'bg-zinc-800 text-zinc-300 border border-zinc-700'">
-                {{ filteredArticles().length }} {{ filteredArticles().length === 1 ? 'guía' : 'guías' }}
+                {{ filteredArticles().length }} {{ filteredArticles().length === 1 ? ('help.guideCountSingle' | t) : ('help.guideCountPlural' | t) }}
               </span>
             </div>
 
-            <!-- Input con lupa perfectamente centrada -->
+            <!-- Input con icono de búsqueda -->
             <div class="relative flex items-center w-full">
               <span class="absolute left-3 inset-y-0 flex items-center pointer-events-none text-zinc-400">
                 <hugeicons-icon [icon]="icons.search" [size]="15" [strokeWidth]="2"></hugeicons-icon>
@@ -83,7 +83,7 @@
                 type="text"
                 [value]="searchQuery()"
                 (input)="onSearchInput($event)"
-                placeholder="Ej. congelar, frente, manija, corte, tecla..."
+                [placeholder]="'help.searchPlaceholder' | t"
                 autocomplete="off"
                 [class]="themeService.isClassic()
                   ? 'w-full pl-9 pr-8 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-md focus:bg-white focus:border-zinc-900 outline-hidden text-zinc-900 font-medium placeholder:text-zinc-400 transition'
@@ -94,7 +94,7 @@
                   type="button"
                   (click)="searchQuery.set('')"
                   class="absolute right-2.5 inset-y-0 flex items-center text-zinc-400 hover:text-zinc-700 transition cursor-pointer"
-                  title="Limpiar búsqueda">
+                  [title]="'help.clearSearch' | t">
                   <hugeicons-icon [icon]="icons.cancel" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                 </button>
               }
@@ -102,7 +102,7 @@
 
             <!-- Chips de Categorías en cuadrícula envolvente -->
             <div class="flex flex-wrap gap-1 pt-0.5">
-              @for (cat of categories; track cat.id) {
+              @for (cat of categories(); track cat.id) {
                 <button
                   type="button"
                   (click)="selectCategory(cat.id)"
@@ -122,13 +122,13 @@
             @if (filteredArticles().length === 0) {
               <div class="p-6 text-center text-xs text-zinc-500 flex flex-col items-center gap-2">
                 <hugeicons-icon [icon]="icons.searchOff" [size]="28" [strokeWidth]="1.6" class="text-zinc-400"></hugeicons-icon>
-                <span class="font-bold text-zinc-800">No encontramos resultados</span>
-                <span>Prueba buscando "congelar", "frente", "cajón", "atajo" o "sierra".</span>
+                <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ 'help.noResultsTitle' | t }}</span>
+                <span>{{ 'help.noResultsDesc' | t }}</span>
                 <button
                   type="button"
                   (click)="searchQuery.set(''); activeCategory.set('all')"
                   class="mt-1 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-md text-xs transition cursor-pointer">
-                  Mostrar todas las guías
+                  {{ 'help.showAllGuides' | t }}
                 </button>
               </div>
             }
@@ -143,8 +143,7 @@
                 class="p-2.5 rounded-md border text-left transition-all flex items-start gap-2.5 group cursor-pointer">
                 <div
                   [class]="art.iconColor"
-                  [class.bg-zinc-100]="themeService.isClassic() && selectedArticleId() !== art.id"
-                  [class.bg-zinc-100]="themeService.isClassic() && selectedArticleId() === art.id"
+                  [class.bg-zinc-100]="themeService.isClassic()"
                   [class.bg-zinc-800]="!themeService.isClassic()"
                   class="w-8 h-8 rounded-md flex items-center justify-center border border-zinc-200/80 dark:border-zinc-700 shrink-0 mt-0.5">
                   <hugeicons-icon [icon]="getArticleIcon(art.icon)" [size]="16" [strokeWidth]="2"></hugeicons-icon>
@@ -194,7 +193,7 @@
                 <span
                   [class]="themeService.isClassic() ? 'bg-zinc-100 text-zinc-800 border-zinc-200 font-medium' : 'bg-zinc-800 text-zinc-200 border-zinc-700 font-medium'"
                   class="px-2.5 py-0.5 text-[10px] uppercase font-mono rounded-md border">
-                  {{ art.badge || 'Guía Oficial' }}
+                  {{ art.badge || ('help.officialBadge' | t) }}
                 </span>
                 <span class="text-xs text-zinc-300">•</span>
                 <span
@@ -227,7 +226,7 @@
                   [class]="themeService.isClassic() ? 'text-zinc-800 font-bold' : 'text-zinc-200 font-bold'"
                   class="text-xs uppercase tracking-wider flex items-center gap-1.5">
                   <hugeicons-icon [icon]="icons.tune" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-                  <span>Resumen Rápido y Parámetros</span>
+                  <span>{{ 'help.specsTitle' | t }}</span>
                 </h4>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -257,7 +256,7 @@
                 [class]="themeService.isClassic() ? 'text-zinc-800 font-bold' : 'text-zinc-200 font-bold'"
                 class="text-xs uppercase tracking-wider flex items-center gap-1.5">
                 <hugeicons-icon [icon]="icons.listNumbered" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-                <span>Cómo usarlo paso a paso</span>
+                <span>{{ 'help.stepsTitle' | t }}</span>
               </h4>
 
               <div class="flex flex-col gap-2">
@@ -285,7 +284,7 @@
                 [class]="themeService.isClassic() ? 'bg-amber-50/70 border-amber-300/80 text-amber-950' : 'bg-amber-950/30 border-amber-800/60 text-amber-200'">
                 <div class="flex items-center gap-2">
                   <hugeicons-icon [icon]="icons.lightbulb" [size]="16" [strokeWidth]="2" class="text-amber-600"></hugeicons-icon>
-                  <h4 class="text-xs font-bold uppercase tracking-wider">Recomendaciones de Uso</h4>
+                  <h4 class="text-xs font-bold uppercase tracking-wider">{{ 'help.tipsTitle' | t }}</h4>
                 </div>
                 <ul class="list-disc list-inside text-xs font-medium flex flex-col gap-1.5 leading-relaxed pl-1" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-200'">
                   @for (tip of art.tips; track tip) {
@@ -308,7 +307,7 @@
                     : 'px-3 py-2 rounded-md border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition flex items-center gap-2 cursor-pointer'">
                   <hugeicons-icon [icon]="icons.arrowLeft" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                   <div class="text-left">
-                    <span class="block text-[9px] uppercase opacity-60 font-medium">Anterior</span>
+                    <span class="block text-[9px] uppercase opacity-60 font-medium">{{ 'help.prevGuide' | t }}</span>
                     <span class="truncate max-w-[140px] sm:max-w-[200px] block leading-tight">{{ prev.title }}</span>
                   </div>
                 </button>
@@ -324,7 +323,7 @@
                     ? 'px-3 py-2 rounded-md border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-900 text-xs font-medium transition flex items-center gap-2 cursor-pointer shadow-2xs'
                     : 'px-3 py-2 rounded-md border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition flex items-center gap-2 cursor-pointer'">
                   <div class="text-right">
-                    <span class="block text-[9px] uppercase opacity-60 font-medium">Siguiente</span>
+                    <span class="block text-[9px] uppercase opacity-60 font-medium">{{ 'help.nextGuide' | t }}</span>
                     <span class="truncate max-w-[140px] sm:max-w-[200px] block leading-tight">{{ next.title }}</span>
                   </div>
                   <hugeicons-icon [icon]="icons.arrowRight" [size]="14" [strokeWidth]="2"></hugeicons-icon>
@@ -334,8 +333,8 @@
           } @else {
             <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
               <hugeicons-icon [icon]="icons.book" [size]="42" [strokeWidth]="1.6" class="text-zinc-400 mb-2"></hugeicons-icon>
-              <h3 class="text-base font-bold text-zinc-800">Selecciona una guía para leer</h3>
-              <p class="text-xs text-zinc-500">Explora la lista lateral o escribe lo que buscas en el buscador.</p>
+              <h3 class="text-base font-bold text-zinc-800 dark:text-zinc-200">{{ 'help.emptySelectTitle' | t }}</h3>
+              <p class="text-xs text-zinc-500">{{ 'help.emptySelectDesc' | t }}</p>
             </div>
           }
         </div>
@@ -347,14 +346,14 @@
         [class]="themeService.isClassic() ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-950 border-zinc-800'">
         <div class="flex items-center gap-2 text-xs font-medium" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-400'">
           <hugeicons-icon [icon]="icons.verified" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-          <span>Piezo3D Studio · Manual Interactivo de Usuario</span>
+          <span>{{ 'help.footerText' | t }}</span>
         </div>
 
         <button
           type="button"
           (click)="close()"
           class="px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition shadow-xs cursor-pointer">
-          Entendido, Cerrar
+          {{ 'help.closeBtn' | t }}
         </button>
       </div>
 
