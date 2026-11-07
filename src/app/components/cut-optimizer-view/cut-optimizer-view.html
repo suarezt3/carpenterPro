@@ -1,7 +1,7 @@
-<div class="w-full px-3 sm:px-5 2xl:px-6 py-3 xl:py-4 space-y-3.5 xl:space-y-4">
+<div class="w-full px-3 sm:px-5 2xl:px-6 py-3 xl:py-4 space-y-3.5 xl:space-y-4 print:p-0 print:m-0 print:space-y-0">
 
-  <!-- Banner Superior de Estadísticas Globales de Optimización -->
-  <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs' : 'bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs'">
+  <!-- Banner Superior de Estadísticas Globales de Optimización (Oculto al imprimir) -->
+  <div class="optimizer-kpi-banner print:hidden" [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs' : 'bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs'">
     <div [class]="themeService.isClassic() ? 'flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-zinc-200' : 'flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-zinc-800'">
       <div>
         <div class="flex items-center gap-2">
@@ -295,7 +295,7 @@
     @if (currentSheet(); as sheet) {
       <div
         id="print-sheet-wrapper"
-        [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs space-y-3.5' : 'bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs space-y-3.5'">
+        [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md p-3.5 sm:p-4 shadow-2xs space-y-3.5 print:p-0 print:m-0 print:space-y-0 print:border-none print:shadow-none print:bg-transparent' : 'bg-zinc-900 border border-zinc-800 rounded-md p-3.5 sm:p-4 shadow-xs space-y-3.5 print:p-0 print:m-0 print:space-y-0 print:border-none print:shadow-none print:bg-transparent'">
 
         <!-- Membrete Técnico de Impresión (Visible SOLO al imprimir o guardar PDF) -->
         <div class="hidden print:flex flex-row justify-between items-end border-b-2 border-slate-900 pb-2 mb-2">
@@ -359,10 +359,10 @@
         <div class="grid grid-cols-1 2xl:grid-cols-12 gap-4 items-start">
 
           <!-- COLUMNA IZQUIERDA (8 cols en FHD/2K): LIENZO SVG DEL TABLERO + TOOLTIP -->
-          <div class="2xl:col-span-8 space-y-3 min-w-0">
+          <div class="2xl:col-span-8 space-y-3 min-w-0 print:space-y-0 print:w-full print:p-0 print:m-0">
             <div
               id="print-sheet-canvas-container"
-              [class]="themeService.isClassic() ? 'w-full bg-zinc-100/70 rounded-md border border-zinc-200 overflow-auto scrollbar-thin p-2.5 sm:p-4 flex justify-center items-center' : 'w-full bg-zinc-950 rounded-md border border-zinc-800 overflow-auto scrollbar-thin p-2.5 sm:p-4 flex justify-center items-center'">
+              [class]="themeService.isClassic() ? 'w-full bg-zinc-100/70 rounded-md border border-zinc-200 overflow-auto scrollbar-thin p-2.5 sm:p-4 flex justify-center items-center print:p-0 print:m-0 print:border-none print:bg-white print:overflow-visible' : 'w-full bg-zinc-950 rounded-md border border-zinc-800 overflow-auto scrollbar-thin p-2.5 sm:p-4 flex justify-center items-center print:p-0 print:m-0 print:border-none print:bg-white print:overflow-visible'">
               <div
                 id="print-sheet-inner-zoom"
                 [style.transform]="'scale(' + zoomLevel() + ')'"
@@ -378,7 +378,8 @@
                   [attr.width]="canvasW"
                   [attr.height]="canvasH"
                   [attr.viewBox]="'0 0 ' + canvasW + ' ' + canvasH"
-                  class="print-board-svg board-svg-responsive shadow-2xl border-2 border-zinc-700 rounded select-none bg-zinc-900">
+                  [style.aspect-ratio]="sheet.length + ' / ' + sheet.width"
+                  class="print-board-svg board-svg-responsive shadow-2xl border-2 border-zinc-700 rounded select-none bg-zinc-900 print:bg-white print:border-slate-900 print:shadow-none">
 
                   <defs>
                     <!-- Textura de veta de madera para las piezas colocadas -->
@@ -394,7 +395,7 @@
                   </defs>
 
                   <!-- Tablero Crudo (Fondo) -->
-                  <rect x="0" y="0" [attr.width]="canvasW" [attr.height]="canvasH" [attr.fill]="themeService.isClassic() ? '#cbd5e1' : '#27272a'" />
+                  <rect class="board-raw-background" x="0" y="0" [attr.width]="canvasW" [attr.height]="canvasH" [attr.fill]="themeService.isClassic() ? '#cbd5e1' : '#27272a'" />
 
                   <!-- Margen de refilado perimetral (Línea punteada) -->
                   @if (trimPx > 0) {

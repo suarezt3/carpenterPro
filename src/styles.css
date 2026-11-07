@@ -81,33 +81,68 @@
     margin: 8mm;
   }
 
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   html,
-  body {
+  body,
+  app-root {
     background: #ffffff !important;
     color: #000000 !important;
     height: auto !important;
     min-height: 0 !important;
+    max-height: none !important;
     overflow: visible !important;
+    position: static !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Desbloquear todos los wrappers de layout de la aplicación */
+  app-root > div,
+  app-header,
+  main,
+  main > div,
+  main > div > div {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+    position: static !important;
   }
 
   /* Ocultar elementos globales de la aplicación al imprimir */
   header,
-  app-header,
   nav,
   footer,
+  app-confirm-dialog,
   .print\:hidden {
     display: none !important;
   }
 
-  main {
-    overflow: visible !important;
-    height: auto !important;
-    max-height: none !important;
-    display: block !important;
+  /* Ocultar app-header cuando no contenga modales de impresión abiertos */
+  body:not(.technical-sheet-open) app-header,
+  app-header:not(:has(app-technical-sheet-modal)) {
+    display: none !important;
+  }
+
+  /* Si el modal de plano técnico está abierto al imprimir, ocultar el resto de la aplicación */
+  body.technical-sheet-open main:not(:has(app-technical-sheet-modal)),
+  body:has(app-header app-technical-sheet-modal) main,
+  body.technical-sheet-open footer,
+  body:has(app-technical-sheet-modal) footer {
+    display: none !important;
   }
 
   /* Ajuste óptimo del contenedor del plano de corte para encajar al 100% en la página sin cortarse */
   #print-sheet-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
@@ -117,17 +152,35 @@
     break-inside: avoid !important;
   }
 
+  #print-sheet-wrapper .grid {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #print-sheet-wrapper .grid > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   #print-sheet-canvas-container {
     background: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 4px !important;
-    padding: 6px !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
     overflow: visible !important;
     min-height: auto !important;
     height: auto !important;
+    width: 100% !important;
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   #print-sheet-inner-zoom {
@@ -135,14 +188,26 @@
     width: 100% !important;
     display: flex !important;
     justify-content: center !important;
+    align-items: center !important;
+    overflow: visible !important;
   }
 
   .print-board-svg {
-    width: 100% !important;
+    width: auto !important;
     max-width: 100% !important;
     height: auto !important;
-    max-height: 140mm !important;
+    max-height: 165mm !important;
+    aspect-ratio: 2440 / 1830;
+    margin: 0 auto !important;
     box-shadow: none !important;
     border: 1.5px solid #0f172a !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .print-board-svg .board-raw-background {
+    fill: #f8fafc !important;
   }
 }

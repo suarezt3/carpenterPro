@@ -435,8 +435,29 @@ export class CutOptimizerViewComponent {
       color: #64748b;
     }
     @media print {
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       body {
-        padding: 0;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+      }
+      .diagram-container {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        overflow: visible !important;
+      }
+      .diagram-container svg {
+        max-height: 165mm !important;
+        width: auto !important;
+        max-width: 100% !important;
+        height: auto !important;
+        aspect-ratio: ${sheet.length} / ${sheet.width};
       }
     }
   </style>

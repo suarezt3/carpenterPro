@@ -5,7 +5,9 @@ import {
   output,
   signal,
   computed,
-  inject
+  inject,
+  OnInit,
+  OnDestroy
 } from '@angular/core';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
@@ -64,9 +66,21 @@ export interface DimensionLine2D {
   styleUrl: './technical-sheet-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class TechnicalSheetModalComponent {
+export class TechnicalSheetModalComponent implements OnInit, OnDestroy {
   private readonly joineryEngine = inject(JoineryEngineService);
   private readonly dxfExporter = inject(DxfExporterService);
+
+  ngOnInit(): void {
+    if (typeof document !== 'undefined') {
+      document.body.classList.add('technical-sheet-open');
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('technical-sheet-open');
+    }
+  }
 
   // Iconos vectoriales de Hugeicons utilizados en la lámina técnica
   readonly icons = {
