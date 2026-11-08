@@ -403,5 +403,17 @@ describe('Empirical Adversarial Audit — Milestone 2: Help Center & Interactive
         expect(footerText?.textContent?.trim()).toBeTruthy();
       }
     });
+
+    it('debe sincronizar initialTab=feedback con activeModalTab cuando isOpen es true', async () => {
+      fixture.componentRef.setInput('initialTab', 'feedback');
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(fixture.componentInstance.activeModalTab()).toBe('feedback');
+
+      fixture.componentInstance.selectTab('manual');
+      expect(fixture.componentInstance.activeModalTab()).toBe('manual');
+    });
   });
 });
+

@@ -2,6 +2,7 @@ import { Injectable, PLATFORM_ID, computed, DestroyRef, inject, signal } from '@
 import { isPlatformBrowser } from '@angular/common';
 import { createClient, Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { Project } from '../models/melamine.models';
+import { CreateFeedbackPayload, UserFeedbackRecord } from '../models/feedback.models';
 
 /**
  * Estructura del registro que se guarda en la tabla `public.projects` de Supabase.
@@ -73,6 +74,80 @@ CREATE POLICY "projects_update_policy" ON public.projects
 
 CREATE POLICY "projects_delete_policy" ON public.projects
   FOR DELETE USING (auth.uid() = user_id);
+`;
+
+/**
+ * Script SQL para la tabla public.user_feedback con políticas RLS y trigger de auto-aprobación.
+ */
+export const SUPABASE_FEEDBACK_SQL_SETUP = `-- ==========================================
+-- TABLA DE FEEDBACK, REPORTES Y TESTIMONIALES CON AUTO-APROBACIÓN
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.user_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT auth.uid(),
+  category TEXT NOT NULL CHECK (category IN ('bug', 'feature', 'support', 'testimonial')),
+  title TEXT,
+  message TEXT NOT NULL CHECK (char_length(trim(message)) >= 10),
+  contact_email TEXT,
+  target_module TEXT CHECK (target_module IN ('designer_3d', 'parts_list', 'optimizer_2d', 'budget', 'labels', 'exports', 'general')),
+  severity_or_priority TEXT CHECK (severity_or_priority IN ('low', 'medium', 'high', 'critical')),
+  rating SMALLINT CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5)),
+  author_name TEXT,
+  author_role TEXT,
+  author_location TEXT,
+  allow_public_display BOOLEAN NOT NULL DEFAULT false,
+  is_approved_public BOOLEAN NOT NULL DEFAULT false,
+  app_version TEXT NOT NULL DEFAULT 'v3.0.0',
+  app_language TEXT NOT NULL DEFAULT 'es',
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_review', 'resolved', 'archived')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE FUNCTION public.fn_auto_approve_feedback_testimonial()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$ BEGIN IF NEW.category = 'testimonial' AND NEW.allow_public_display = true AND COALESCE(NEW.rating, 0) >= 4 THEN NEW.is_approved_public := true; ELSE NEW.is_approved_public := false; END IF; RETURN NEW; END; $$;
+
+DROP TRIGGER IF EXISTS trg_auto_approve_feedback_testimonial ON public.user_feedback;
+CREATE TRIGGER trg_auto_approve_feedback_testimonial
+  BEFORE INSERT ON public.user_feedback
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fn_auto_approve_feedback_testimonial();
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_category ON public.user_feedback(category);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_public_testimonials 
+  ON public.user_feedback(category, allow_public_display, is_approved_public, created_at DESC)
+  WHERE category = 'testimonial' AND allow_public_display = true AND is_approved_public = true;
+
+ALTER TABLE public.user_feedback ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can insert feedback"
+  ON public.user_feedback
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (
+    char_length(trim(message)) >= 10
+    AND (user_id IS NULL OR auth.uid() = user_id)
+  );
+
+CREATE POLICY "Authenticated users can view own feedback"
+  ON public.user_feedback
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Public can view approved landing page testimonials"
+  ON public.user_feedback
+  FOR SELECT
+  TO anon, authenticated
+  USING (
+    category = 'testimonial'
+    AND allow_public_display = true
+    AND is_approved_public = true
+  );
 `;
 
 @Injectable({
@@ -368,6 +443,200 @@ export class SupabaseService {
     } catch (err) {
       console.error('Error deleting from Supabase:', err);
       return false;
+    }
+  }
+
+  // ==========================================
+  // OPERACIONES DE FEEDBACK, BUGS, SOPORTE Y TESTIMONIOS
+  // ==========================================
+
+  /**
+   * Envía un reporte de bug, solicitud de función, consulta de soporte o testimonio a Supabase.
+   * Si es un testimonio calificado con 4 o 5 estrellas con display público, el trigger de PostgreSQL
+   * lo auto-aprueba automáticamente. Maneja de forma segura las políticas RLS para anon y authenticated,
+   * evitando el error 42501 al no solicitar RETURNING * en registros donde el usuario anónimo no tiene SELECT.
+   */
+  async submitFeedback(payload: CreateFeedbackPayload): Promise<{ success: boolean; data?: UserFeedbackRecord; error?: string }> {
+    if (!this.isBrowser) return { success: false, error: 'SSR mode' };
+
+    const userId = this.currentUser()?.id || null;
+    const isTestimonial = payload.category === 'testimonial';
+    const clientUuid = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : undefined;
+
+    const ratingVal = isTestimonial ? (payload.rating ?? 5) : null;
+    const allowPublic = isTestimonial ? !!payload.allow_public_display : false;
+    const isAutoApprovedCandidate = isTestimonial && allowPublic && (ratingVal ?? 0) >= 4;
+
+    const record = {
+      ...(clientUuid ? { id: clientUuid } : {}),
+      user_id: userId,
+      category: payload.category,
+      title: payload.title?.trim() || null,
+      message: payload.message.trim(),
+      contact_email: payload.contact_email?.trim() || (this.currentUser()?.email || null),
+      target_module: !isTestimonial ? (payload.target_module || 'general') : null,
+      severity_or_priority: !isTestimonial ? (payload.severity_or_priority || 'medium') : null,
+      rating: ratingVal,
+      author_name: isTestimonial ? (payload.author_name?.trim() || null) : null,
+      author_role: isTestimonial ? (payload.author_role?.trim() || null) : null,
+      author_location: isTestimonial ? (payload.author_location?.trim() || null) : null,
+      allow_public_display: allowPublic,
+      app_version: 'v3.0.0',
+      app_language: (payload.metadata?.['language'] as string) || 'es',
+      metadata: payload.metadata || {},
+      status: 'open' as const
+    };
+
+    // Solo se puede solicitar .select() / return=representation si RLS permite SELECT post-inserción:
+    // 1. Usuarios autenticados (auth.uid() = user_id)
+    // 2. Testimonios públicos auto-aprobados (category='testimonial' AND allow_public_display=true AND is_approved_public=true)
+    const canSelectPostInsert = Boolean(userId || isAutoApprovedCandidate);
+
+    try {
+      if (this.client) {
+        if (canSelectPostInsert) {
+          const { data, error } = await this.client
+            .from('user_feedback')
+            .insert(record)
+            .select()
+            .maybeSingle();
+
+          if (error) {
+            // Si falla por RLS SELECT (ej. desincronización de token o trigger), reintentar inserción minimal
+            if (error.code === '42501' || error.message?.includes('policy') || error.code === 'PGRST116') {
+              const { error: minError } = await this.client.from('user_feedback').insert(record);
+              if (minError) return { success: false, error: minError.message };
+            } else {
+              return { success: false, error: error.message };
+            }
+          } else if (data) {
+            return { success: true, data: data as UserFeedbackRecord };
+          }
+        } else {
+          // Inserción minimal sin RETURNING para evitar error RLS 42501 en usuarios anónimos
+          const { error } = await this.client
+            .from('user_feedback')
+            .insert(record);
+
+          if (error) {
+            return { success: false, error: error.message };
+          }
+        }
+
+        const fallbackData: UserFeedbackRecord = {
+          id: clientUuid || 'feedback-' + Date.now(),
+          ...record,
+          is_approved_public: isAutoApprovedCandidate,
+          created_at: new Date().toISOString()
+        };
+        return { success: true, data: fallbackData };
+      } else {
+        const fetchHeaders = {
+          ...this.headers,
+          'Prefer': canSelectPostInsert ? 'return=representation' : 'return=minimal'
+        };
+
+        const res = await fetch(`${this.config.url}/rest/v1/user_feedback`, {
+          method: 'POST',
+          headers: fetchHeaders,
+          body: JSON.stringify(record)
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          return { success: false, error: `Supabase Error (${res.status}): ${errText}` };
+        }
+
+        if (canSelectPostInsert) {
+          try {
+            const data: UserFeedbackRecord[] = await res.json();
+            if (data && data.length > 0) {
+              return { success: true, data: data[0] };
+            }
+          } catch {
+            // PostgREST respondió sin cuerpo
+          }
+        }
+
+        const fallbackData: UserFeedbackRecord = {
+          id: clientUuid || 'feedback-' + Date.now(),
+          ...record,
+          is_approved_public: isAutoApprovedCandidate,
+          created_at: new Date().toISOString()
+        };
+        return { success: true, data: fallbackData };
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: msg };
+    }
+  }
+
+  /**
+   * Obtiene el historial de envíos de feedback realizados por el usuario autenticado.
+   */
+  async getMyFeedback(): Promise<UserFeedbackRecord[]> {
+    if (!this.isBrowser) return [];
+    const user = this.currentUser();
+    if (!user) return [];
+
+    try {
+      if (this.client) {
+        const { data, error } = await this.client
+          .from('user_feedback')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (error) return [];
+        return (data || []) as UserFeedbackRecord[];
+      } else {
+        const url = `${this.config.url}/rest/v1/user_feedback?user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=20`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: this.headers
+        });
+        if (!res.ok) return [];
+        return await res.json();
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Consulta testimonios públicos aprobados por la comunidad (lectura permitida por RLS a anónimos y autenticados).
+   */
+  async getPublicApprovedTestimonials(limit = 10): Promise<UserFeedbackRecord[]> {
+    if (!this.isBrowser) return [];
+
+    try {
+      if (this.client) {
+        const { data, error } = await this.client
+          .from('user_feedback')
+          .select('*')
+          .eq('category', 'testimonial')
+          .eq('allow_public_display', true)
+          .eq('is_approved_public', true)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        if (error) return [];
+        return (data || []) as UserFeedbackRecord[];
+      } else {
+        const url = `${this.config.url}/rest/v1/user_feedback?category=eq.testimonial&allow_public_display=eq.true&is_approved_public=eq.true&order=created_at.desc&limit=${limit}`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: this.headers
+        });
+        if (!res.ok) return [];
+        return await res.json();
+      }
+    } catch {
+      return [];
     }
   }
 

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject, effect } from '@angular/core';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   ArrowLeft01Icon,
@@ -25,13 +25,15 @@ import {
   ViewIcon,
   SlidersHorizontalIcon,
   Exchange01Icon,
-  SquareIcon
+  SquareIcon,
+  CustomerSupportIcon
 } from '@hugeicons/core-free-icons';
 import { ThemeService } from '../../services/theme.service';
 import { I18nService } from '../../services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { DocArticle, DocCategory } from '../../models/documentation.models';
 import { APP_DOC_ARTICLES_BY_LANG, APP_DOC_CATEGORIES_BY_LANG } from '../../data/documentation-i18n.data';
+import { FeedbackFormComponent } from '../feedback-form/feedback-form';
 
 /**
  * Modal de documentación técnica interactiva y manual de usuario en CarpenterPro.
@@ -40,7 +42,7 @@ import { APP_DOC_ARTICLES_BY_LANG, APP_DOC_CATEGORIES_BY_LANG } from '../../data
  */
 @Component({
   selector: 'app-documentation-modal',
-  imports: [HugeiconsIconComponent, TranslatePipe],
+  imports: [HugeiconsIconComponent, TranslatePipe, FeedbackFormComponent],
   templateUrl: './documentation-modal.html',
   styleUrl: './documentation-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -71,18 +73,36 @@ export class DocumentationModalComponent {
     roomEnvironment: Cabinet02Icon,
     scissors: ScissorsIcon,
     tag: Tag01Icon,
-    download: Download01Icon
+    download: Download01Icon,
+    support: CustomerSupportIcon
   };
 
   // Estado de apertura del modal y eventos de salida
   readonly isOpen = input<boolean>(false);
+  readonly initialTab = input<'manual' | 'feedback'>('manual');
   readonly modalClose = output<void>();
   readonly openChangelog = output<void>();
+
+  // Control de pestaña activa del modal: Manual técnico vs Soporte & Feedback
+  readonly activeModalTab = signal<'manual' | 'feedback'>('manual');
+
+  constructor() {
+    effect(() => {
+      const tab = this.initialTab();
+      if (this.isOpen()) {
+        this.activeModalTab.set(tab);
+      }
+    });
+  }
 
   // Signals reactivos para el buscador, categoría activa y artículo seleccionado
   readonly searchQuery = signal<string>('');
   readonly activeCategory = signal<string>('all');
   readonly selectedArticleId = signal<string>('diseno_parametrico_ambientes');
+
+  selectTab(tab: 'manual' | 'feedback'): void {
+    this.activeModalTab.set(tab);
+  }
 
   /**
    * Categorías de documentación reactivas según el idioma activo del sistema.

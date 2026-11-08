@@ -9,7 +9,7 @@
 
     <!-- Contenedor Principal del Modal -->
     <div
-      class="relative w-full max-w-6xl max-h-[90vh] flex flex-col rounded-lg shadow-2xl overflow-hidden border transition-colors duration-200"
+      class="relative w-full max-w-6xl max-h-[min(88vh,860px)] flex flex-col rounded-lg shadow-2xl overflow-hidden border transition-colors duration-200"
       [class]="themeService.isClassic() ? 'bg-white border-zinc-200/90 text-zinc-900' : 'bg-zinc-900 border-zinc-700/80 text-zinc-100'"
       role="document"
       tabindex="0"
@@ -18,11 +18,15 @@
 
       <!-- CABECERA DEL MODAL -->
       <div
-        class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b shrink-0"
+        class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b shrink-0 flex-wrap sm:flex-nowrap gap-3"
         [class]="themeService.isClassic() ? 'bg-zinc-50 border-zinc-200 text-zinc-900' : 'bg-zinc-950 border-zinc-800 text-zinc-100'">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-8 h-8 rounded-md flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 shrink-0">
-            <hugeicons-icon [icon]="icons.book" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+            @if (activeModalTab() === 'manual') {
+              <hugeicons-icon [icon]="icons.book" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+            } @else {
+              <hugeicons-icon [icon]="icons.support" [size]="18" [strokeWidth]="2" class="text-blue-400"></hugeicons-icon>
+            }
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
@@ -44,17 +48,47 @@
           </div>
         </div>
 
-        <button
-          type="button"
-          (click)="close()"
-          [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 border border-zinc-200' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-700'"
-          class="w-8 h-8 rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
-          [title]="'help.closeManual' | t">
-          <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
-        </button>
+        <!-- CONMUTADOR DE PESTAÑAS (MANUAL TÉCNICO vs SOPORTE & FEEDBACK) -->
+        <div class="flex items-center gap-2">
+          <div
+            class="inline-flex items-center p-0.5 rounded-md border shrink-0"
+            [class]="themeService.isClassic() ? 'bg-zinc-200/90 border-zinc-300' : 'bg-zinc-800 border-zinc-700'">
+            <button
+              type="button"
+              (click)="selectTab('manual')"
+              [class]="activeModalTab() === 'manual'
+                ? 'bg-zinc-900 text-white shadow-xs font-medium'
+                : (themeService.isClassic() ? 'text-zinc-700 hover:text-zinc-900 font-medium' : 'text-zinc-400 hover:text-zinc-200 font-medium')"
+              class="px-2.5 py-1 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer">
+              <hugeicons-icon [icon]="icons.book" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+              <span>{{ 'help.tabManual' | t }}</span>
+            </button>
+
+            <button
+              type="button"
+              (click)="selectTab('feedback')"
+              [class]="activeModalTab() === 'feedback'
+                ? 'bg-zinc-900 text-white shadow-xs font-medium'
+                : (themeService.isClassic() ? 'text-zinc-700 hover:text-zinc-900 font-medium' : 'text-zinc-400 hover:text-zinc-200 font-medium')"
+              class="px-2.5 py-1 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer">
+              <hugeicons-icon [icon]="icons.support" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+              <span>{{ 'help.tabSupportFeedback' | t }}</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            (click)="close()"
+            [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 border border-zinc-200' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-700'"
+            class="w-8 h-8 rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
+            [title]="'help.closeManual' | t">
+            <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+          </button>
+        </div>
       </div>
 
-      <!-- CONTENIDO DIVIDIDO (PANEL LATERAL + DETALLE DEL ARTÍCULO) -->
+      <!-- CONTENIDO DIVIDIDO (PANEL LATERAL + DETALLE DEL ARTÍCULO) O FORMULARIO DE FEEDBACK -->
+      @if (activeModalTab() === 'manual') {
       <div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
 
         <!-- PANEL LATERAL IZQUIERDO: BUSCADOR, CATEGORÍAS Y LISTA DE GUÍAS -->
@@ -176,6 +210,23 @@
                 </div>
               </button>
             }
+          </div>
+
+          <!-- Acceso rápido a Soporte y Feedback en la barra lateral -->
+          <div class="p-2.5 border-t shrink-0 flex items-center justify-between gap-2"
+            [class]="themeService.isClassic() ? 'bg-zinc-100/70 border-zinc-200' : 'bg-zinc-900 border-zinc-800'">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <hugeicons-icon [icon]="icons.support" [size]="14" [strokeWidth]="2" class="text-blue-500 shrink-0"></hugeicons-icon>
+              <span class="text-[11px] truncate font-medium" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-300'">
+                {{ 'feedback.title' | t }}
+              </span>
+            </div>
+            <button
+              type="button"
+              (click)="selectTab('feedback')"
+              class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-semibold transition cursor-pointer shrink-0 shadow-2xs">
+              {{ 'feedback.catBug' | t }}
+            </button>
           </div>
         </div>
 
@@ -339,6 +390,12 @@
           }
         </div>
       </div>
+      } @else {
+        <!-- SECCIÓN DE SOPORTE, REPORTES Y FEEDBACK / TESTIMONIOS -->
+        <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <app-feedback-form (navigateToManual)="selectTab('manual')" class="w-full flex-1 min-h-0 flex flex-col overflow-hidden"></app-feedback-form>
+        </div>
+      }
 
       <!-- PIE DEL MODAL -->
       <div
@@ -352,8 +409,9 @@
         <button
           type="button"
           (click)="close()"
-          class="px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition shadow-xs cursor-pointer">
-          {{ 'help.closeBtn' | t }}
+          class="px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition shadow-xs cursor-pointer flex items-center gap-1.5">
+          <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+          <span>{{ 'help.closeBtn' | t }}</span>
         </button>
       </div>
 

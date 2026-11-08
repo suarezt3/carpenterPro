@@ -1,0 +1,610 @@
+<div class="w-full flex-1 min-h-0 flex flex-col overflow-hidden text-xs">
+
+  <!-- SUB-BARRA DE NAVEGACIÓN Y PESTAÑAS INTERNAS -->
+  <div
+    class="px-5 py-3 border-b flex items-center justify-between gap-3 shrink-0"
+    [class]="themeService.isClassic() ? 'bg-zinc-100/80 border-zinc-200' : 'bg-zinc-950/80 border-zinc-800'">
+
+    <div class="inline-flex items-center p-0.5 rounded-md border"
+      [class]="themeService.isClassic() ? 'bg-zinc-200/90 border-zinc-300' : 'bg-zinc-800 border-zinc-700'">
+
+      <button
+        type="button"
+        (click)="switchSubView('form')"
+        [class]="activeSubView() === 'form'
+          ? 'bg-zinc-900 text-white shadow-xs font-medium'
+          : (themeService.isClassic() ? 'text-zinc-700 hover:text-zinc-900 font-medium' : 'text-zinc-400 hover:text-zinc-200 font-medium')"
+        class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer">
+        <hugeicons-icon [icon]="icons.send" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+        <span>{{ 'feedback.title' | t }}</span>
+      </button>
+
+      <button
+        type="button"
+        (click)="switchSubView('history')"
+        [class]="activeSubView() === 'history'
+          ? 'bg-zinc-900 text-white shadow-xs font-medium'
+          : (themeService.isClassic() ? 'text-zinc-700 hover:text-zinc-900 font-medium' : 'text-zinc-400 hover:text-zinc-200 font-medium')"
+        class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer">
+        <hugeicons-icon [icon]="icons.user" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+        <span>{{ 'feedback.myHistoryTitle' | t }}</span>
+      </button>
+
+      <button
+        type="button"
+        (click)="switchSubView('community')"
+        [class]="activeSubView() === 'community'
+          ? 'bg-zinc-900 text-white shadow-xs font-medium'
+          : (themeService.isClassic() ? 'text-zinc-700 hover:text-zinc-900 font-medium' : 'text-zinc-400 hover:text-zinc-200 font-medium')"
+        class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 cursor-pointer">
+        <hugeicons-icon [icon]="icons.sparkles" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+        <span>{{ 'feedback.communityTestimonials' | t }}</span>
+      </button>
+    </div>
+
+    <button
+      type="button"
+      (click)="navigateToManual.emit()"
+      class="px-3 py-1.5 rounded-md border text-xs font-medium transition cursor-pointer shadow-2xs flex items-center gap-1.5"
+      [class]="themeService.isClassic() ? 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-200'">
+      <hugeicons-icon [icon]="icons.book" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+      <span>{{ 'feedback.viewManualBtn' | t }}</span>
+    </button>
+  </div>
+
+  <!-- CONTENEDOR DESPLAZABLE DEL CONTENIDO -->
+  <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-5 pb-10 scrollbar-thin">
+
+    <!-- ========================================== -->
+    <!-- 1. VISTA: FORMULARIO DINÁMICO DE ENVÍO      -->
+    <!-- ========================================== -->
+    @if (activeSubView() === 'form') {
+
+      @if (submitSuccess(); as successData) {
+        <!-- ESTADO DE ÉXITO CONFIRMADO -->
+        <div class="max-w-2xl mx-auto py-8 px-4 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+          <div class="w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-blue-50 text-blue-600 border border-blue-200 dark:bg-zinc-800 dark:text-blue-400 dark:border-zinc-700 shadow-sm">
+            <hugeicons-icon [icon]="icons.success" [size]="36" [strokeWidth]="2.2"></hugeicons-icon>
+          </div>
+
+          <h3 class="text-xl font-bold tracking-tight mb-2" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
+            {{ 'feedback.successTitle' | t }}
+          </h3>
+
+          <p class="text-xs sm:text-sm max-w-md mb-6" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-400'">
+            {{ 'feedback.successMsg' | t }}
+          </p>
+
+          <!-- Banner de confirmación para testimonios públicos -->
+          @if (successData.is_approved_public) {
+            <div class="w-full max-w-md p-3.5 mb-6 rounded-lg border flex items-center gap-3 text-left bg-blue-50/60 dark:bg-zinc-800/60 border-blue-200 dark:border-zinc-700 text-blue-950 dark:text-zinc-200 shadow-xs">
+              <hugeicons-icon [icon]="icons.sparkles" [size]="18" [strokeWidth]="2" class="text-blue-600 dark:text-blue-400 shrink-0"></hugeicons-icon>
+              <div class="text-xs">
+                <span class="font-bold block">{{ 'feedback.approvedBadge' | t }}</span>
+                <span>{{ 'feedback.successAutoApproved' | t }}</span>
+              </div>
+            </div>
+          }
+
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              (click)="resetForm()"
+              class="px-4 py-2 rounded-md font-medium transition cursor-pointer bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5">
+              <hugeicons-icon [icon]="icons.send" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+              <span>{{ 'feedback.sendAnotherBtn' | t }}</span>
+            </button>
+
+            <button
+              type="button"
+              (click)="navigateToManual.emit()"
+              class="px-4 py-2 rounded-md border font-medium transition cursor-pointer flex items-center gap-1.5"
+              [class]="themeService.isClassic() ? 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-200'">
+              <hugeicons-icon [icon]="icons.book" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+              <span>{{ 'feedback.viewManualBtn' | t }}</span>
+            </button>
+          </div>
+        </div>
+
+      } @else {
+
+        <!-- FORMULARIO PRINCIPAL -->
+        <div class="max-w-3xl mx-auto flex flex-col space-y-4">
+
+          <!-- ENCABEZADO EXPLICATIVO -->
+          <div>
+            <h3 class="text-base sm:text-lg font-bold tracking-tight" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
+              {{ 'feedback.title' | t }}
+            </h3>
+            <p class="text-xs" [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">
+              {{ 'feedback.subtitle' | t }}
+            </p>
+          </div>
+
+          <!-- SELECTOR DE CATEGORÍA (4 PÍLDORAS GRANDES) -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[11px] font-semibold uppercase tracking-wider" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-400'">
+              {{ 'feedback.categoryLabel' | t }}
+            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              @for (cat of categoryOptions; track cat.id) {
+                <button
+                  type="button"
+                  (click)="setCategory(cat.id)"
+                  [class]="selectedCategory() === cat.id
+                    ? (themeService.isClassic()
+                        ? 'border-zinc-900 bg-zinc-900 text-white shadow-sm ring-1 ring-zinc-900'
+                        : 'border-white bg-zinc-800 text-white shadow-sm ring-1 ring-white/20')
+                    : (themeService.isClassic()
+                        ? 'border-zinc-200 bg-white hover:border-zinc-300 text-zinc-700 hover:bg-zinc-50/70'
+                        : 'border-zinc-800 bg-zinc-900/80 hover:border-zinc-700 text-zinc-300 hover:bg-zinc-800/80')"
+                  class="p-3 rounded-lg border text-left transition flex flex-col gap-1 cursor-pointer">
+                  <div class="flex items-center gap-2">
+                    <hugeicons-icon [icon]="getCategoryIcon(cat.id)" [size]="16" [strokeWidth]="2"
+                      [class.text-blue-400]="selectedCategory() !== cat.id"></hugeicons-icon>
+                    <span class="font-bold text-xs">{{ cat.labelKey | t }}</span>
+                  </div>
+                  <span class="text-[10px] opacity-75 line-clamp-2 leading-snug">
+                    {{ cat.descKey | t }}
+                  </span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- AVISO DE COMUNIDAD CUANDO ES TESTIMONIO -->
+          @if (isTestimonial()) {
+            <div class="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 flex items-center gap-2.5 dark:bg-zinc-800/60 dark:border-zinc-700">
+              <hugeicons-icon [icon]="icons.sparkles" [size]="15" [strokeWidth]="2" class="text-slate-400 dark:text-zinc-400 shrink-0"></hugeicons-icon>
+              <span class="text-slate-600 dark:text-zinc-300 text-xs font-normal">
+                @if (isAutoApprovedEligible()) {
+                  {{ 'feedback.communityNotice' | t }}
+                } @else {
+                  {{ 'feedback.manualReviewNotice' | t }}
+                }
+              </span>
+            </div>
+          }
+
+          <!-- FORMULARIO REACTIVO -->
+          <form [formGroup]="feedbackForm" (ngSubmit)="onSubmit()" class="flex flex-col space-y-4">
+
+            <!-- BLOQUE DINÁMICO: TESTIMONIO (ESTRELLAS + DATOS DE AUTOR) -->
+            @if (isTestimonial()) {
+              <!-- SELECTOR INTERACTIVO DE ESTRELLAS (1 a 5) EN FILA COMPACTA -->
+              <div class="px-4 py-3 rounded-xl border flex items-center justify-between gap-3"
+                [class]="themeService.isClassic() ? 'bg-zinc-50/70 border-zinc-200' : 'bg-zinc-900/90 border-zinc-800'">
+                <div class="min-w-0">
+                  <span class="block text-xs font-bold leading-tight" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-zinc-100'">
+                    {{ 'feedback.ratingLabel' | t }}
+                  </span>
+                  <span class="text-[11px] font-medium" [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">
+                    {{ feedbackForm.controls.rating.value }} / 5 {{ 'feedback.stars' | t }}
+                  </span>
+                </div>
+
+                <div class="flex items-center gap-1 shrink-0">
+                  @for (star of [1, 2, 3, 4, 5]; track star) {
+                    <button
+                      type="button"
+                      (click)="setRating(star)"
+                      [class]="star <= feedbackForm.controls.rating.value
+                        ? 'star-active text-amber-400'
+                        : 'star-inactive text-slate-300 hover:text-amber-300 dark:text-zinc-600'"
+                      class="p-1 rounded-md hover:scale-110 transition-transform bg-transparent border-0 cursor-pointer select-none flex items-center justify-center"
+                      [title]="star + ' ' + ('feedback.stars' | t)">
+                      <hugeicons-icon [icon]="icons.star" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <!-- DATOS DEL AUTOR (NOMBRE, ROL, UBICACIÓN) -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="flex flex-col gap-1">
+                  <label class="text-[11px] font-semibold" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-300'">
+                    {{ 'feedback.authorNameLabel' | t }}
+                  </label>
+                  <div class="relative flex items-center">
+                    <span class="absolute left-2.5 text-zinc-400 pointer-events-none">
+                      <hugeicons-icon [icon]="icons.user" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    </span>
+                    <input
+                      type="text"
+                      formControlName="author_name"
+                      [placeholder]="'feedback.authorNamePlaceholder' | t"
+                      class="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border outline-hidden transition"
+                      [class]="themeService.isClassic()
+                        ? 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-900'
+                        : 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-zinc-400'"
+                    />
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                  <label class="text-[11px] font-semibold" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-300'">
+                    {{ 'feedback.authorRoleLabel' | t }}
+                  </label>
+                  <input
+                    type="text"
+                    formControlName="author_role"
+                    [placeholder]="'feedback.authorRolePlaceholder' | t"
+                    class="w-full px-3 py-1.5 text-xs rounded-md border outline-hidden transition"
+                    [class]="themeService.isClassic()
+                      ? 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-900'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-zinc-400'"
+                  />
+                </div>
+
+                <div class="flex flex-col gap-1">
+                  <label class="text-[11px] font-semibold" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-300'">
+                    {{ 'feedback.authorLocationLabel' | t }}
+                  </label>
+                  <div class="relative flex items-center">
+                    <span class="absolute left-2.5 text-zinc-400 pointer-events-none">
+                      <hugeicons-icon [icon]="icons.location" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    </span>
+                    <input
+                      type="text"
+                      formControlName="author_location"
+                      [placeholder]="'feedback.authorLocationPlaceholder' | t"
+                      class="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border outline-hidden transition"
+                      [class]="themeService.isClassic()
+                        ? 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-900'
+                        : 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-zinc-400'"
+                    />
+                  </div>
+                </div>
+              </div>
+            }
+
+            <!-- BLOQUE DINÁMICO: BUG / FEATURE / SUPPORT (MÓDULO Y SEVERIDAD) -->
+            @if (!isTestimonial()) {
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- SELECTOR DE MÓDULO AFECTADO -->
+                <div class="flex flex-col gap-1">
+                  <label class="text-[11px] font-semibold" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-300'">
+                    {{ 'feedback.moduleLabel' | t }}
+                  </label>
+                  <select
+                    formControlName="target_module"
+                    class="w-full px-3 py-1.5 text-xs rounded-md border outline-hidden transition cursor-pointer"
+                    [class]="themeService.isClassic()
+                      ? 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-900'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-zinc-400'">
+                    @for (mod of moduleOptions; track mod.id) {
+                      <option [value]="mod.id">{{ mod.labelKey | t }}</option>
+                    }
+                  </select>
+                </div>
+
+                <!-- SELECTOR DE PRIORIDAD / SEVERIDAD -->
+                <div class="flex flex-col gap-1">
+                  <label class="text-[11px] font-semibold" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-300'">
+                    {{ 'feedback.severityLabel' | t }}
+                  </label>
+                  <select
+                    formControlName="severity_or_priority"
+                    class="w-full px-3 py-1.5 text-xs rounded-md border outline-hidden transition cursor-pointer"
+                    [class]="themeService.isClassic()
+                      ? 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-900'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-zinc-400'">
+                    @for (sev of severityOptions; track sev.id) {
+                      <option [value]="sev.id">{{ sev.labelKey | t }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+            }
+
+            <!-- CAMPO: TÍTULO O ASUNTO -->
+            <div class="flex flex-col gap-1">
+              <label class="text-[11px] font-semibold" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-300'">
+                {{ 'feedback.titleLabel' | t }}
+              </label>
+              <input
+                type="text"
+                formControlName="title"
+                [placeholder]="(
+                  selectedCategory() === 'bug' ? 'feedback.titlePlaceholderBug' :
+                  selectedCategory() === 'feature' ? 'feedback.titlePlaceholderFeature' :
+                  selectedCategory() === 'support' ? 'feedback.titlePlaceholderSupport' :
+                  'feedback.titlePlaceholderTestimonial'
+                ) | t"
+                class="w-full px-3 py-1.5 text-xs rounded-md border outline-hidden transition"
+                [class]="themeService.isClassic()
+                  ? 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-900'
+                  : 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-zinc-400'"
+              />
+            </div>
+
+            <!-- CAMPO: MENSAJE DETALLADO -->
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] font-semibold" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-300'">
+                  {{ 'feedback.messageLabel' | t }} *
+                </label>
+                <span class="text-[10px] font-medium"
+                  [class.text-emerald-600]="messageCharCount() >= 10"
+                  [class.text-amber-600]="messageCharCount() < 10">
+                  {{ messageCharCount() }} {{ 'feedback.charsCount' | t }} ({{ 'feedback.messageMinChars' | t }})
+                </span>
+              </div>
+              <textarea
+                rows="3"
+                formControlName="message"
+                [placeholder]="(
+                  selectedCategory() === 'bug' ? 'feedback.messagePlaceholderBug' :
+                  selectedCategory() === 'feature' ? 'feedback.messagePlaceholderFeature' :
+                  selectedCategory() === 'support' ? 'feedback.messagePlaceholderSupport' :
+                  'feedback.messagePlaceholderTestimonial'
+                ) | t"
+                class="w-full px-3 py-2 text-xs rounded-md border outline-hidden transition resize-y font-sans leading-relaxed min-h-[88px]"
+                [class]="themeService.isClassic()
+                  ? 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-900'
+                  : 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-zinc-400'">
+              </textarea>
+            </div>
+
+            <!-- CAMPO: CORREO DE CONTACTO -->
+            <div class="flex flex-col gap-1">
+              <label class="text-[11px] font-semibold" [class]="themeService.isClassic() ? 'text-zinc-700' : 'text-zinc-300'">
+                {{ 'feedback.emailLabel' | t }}
+              </label>
+              <div class="relative flex items-center">
+                <span class="absolute left-2.5 text-zinc-400 pointer-events-none">
+                  <hugeicons-icon [icon]="icons.mail" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                </span>
+                <input
+                  type="email"
+                  formControlName="contact_email"
+                  [placeholder]="'feedback.emailPlaceholder' | t"
+                  class="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border outline-hidden transition"
+                  [class]="feedbackForm.controls.contact_email.touched && feedbackForm.controls.contact_email.invalid
+                    ? 'border-rose-500 focus:border-rose-500 bg-rose-50/30'
+                    : (themeService.isClassic()
+                      ? 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-900'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-zinc-400')"
+                />
+              </div>
+              @if (feedbackForm.controls.contact_email.touched && feedbackForm.controls.contact_email.invalid) {
+                <span class="text-[10px] text-rose-500 font-medium">
+                  {{ 'feedback.emailInvalid' | t }}
+                </span>
+              }
+            </div>
+
+            <!-- CHECKBOX: PERMITIR MOSTRAR TESTIMONIO PÚBLICO -->
+            @if (isTestimonial()) {
+              <label class="flex items-center gap-2.5 p-2 rounded-md transition cursor-pointer select-none"
+                [class]="themeService.isClassic() ? 'hover:bg-zinc-100 text-zinc-800' : 'hover:bg-zinc-800/60 text-zinc-200'">
+                <input
+                  type="checkbox"
+                  formControlName="allow_public_display"
+                  class="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span class="text-xs font-medium">{{ 'feedback.allowPublicLabel' | t }}</span>
+              </label>
+            }
+
+            <!-- ALERTA DE ERROR -->
+            @if (submitError()) {
+              <div class="p-3 rounded-md border flex items-center justify-between gap-2 bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-200">
+                <div class="flex items-center gap-2">
+                  <hugeicons-icon [icon]="icons.alert" [size]="16" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
+                  <span class="text-xs font-medium">{{ submitError() }}</span>
+                </div>
+                <button
+                  type="button"
+                  (click)="submitError.set(null)"
+                  class="text-rose-600 dark:text-rose-400 hover:opacity-80 transition cursor-pointer">
+                  <hugeicons-icon [icon]="icons.cancel" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                </button>
+              </div>
+            }
+
+            <!-- BOTÓN DE ENVÍO -->
+            <div class="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="submit"
+                [disabled]="submitting() || messageCharCount() < 10"
+                class="px-5 py-2.5 rounded-md font-medium text-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs bg-blue-600 hover:bg-blue-700 text-white">
+                @if (submitting()) {
+                  <hugeicons-icon [icon]="icons.loading" [size]="15" [strokeWidth]="2" class="animate-spin"></hugeicons-icon>
+                  <span>{{ 'feedback.submitting' | t }}</span>
+                } @else {
+                  <hugeicons-icon [icon]="icons.send" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+                  <span>{{ 'feedback.submitBtn' | t }}</span>
+                }
+              </button>
+            </div>
+
+          </form>
+
+        </div>
+      }
+
+    }
+
+    <!-- ========================================== -->
+    <!-- 2. VISTA: MIS ENVÍOS (HISTORIAL DE USUARIO) -->
+    <!-- ========================================== -->
+    @if (activeSubView() === 'history') {
+      <div class="max-w-3xl mx-auto flex flex-col gap-4">
+        <div>
+          <h3 class="text-base sm:text-lg font-bold tracking-tight" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
+            {{ 'feedback.myHistoryTitle' | t }}
+          </h3>
+          <p class="text-xs" [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">
+            @if (supabase.isAuthenticated()) {
+              <span>{{ 'feedback.activeSession' | t:{ email: (supabase.currentUser()?.email || '') } }}</span>
+            } @else {
+              <span>{{ 'feedback.loginHint' | t }}</span>
+            }
+          </p>
+        </div>
+
+        @if (loadingHistory()) {
+          <!-- SKELETON LOADER -->
+          <div class="flex flex-col gap-3">
+            @for (i of [1, 2, 3]; track i) {
+              <div class="p-4 rounded-lg border animate-pulse flex flex-col gap-2"
+                [class]="themeService.isClassic() ? 'bg-zinc-100 border-zinc-200' : 'bg-zinc-800 border-zinc-700'">
+                <div class="h-4 w-1/3 bg-zinc-300 dark:bg-zinc-700 rounded"></div>
+                <div class="h-3 w-3/4 bg-zinc-200 dark:bg-zinc-700/60 rounded"></div>
+              </div>
+            }
+          </div>
+        } @else if (myFeedbackList().length === 0) {
+          <!-- EMPTY STATE -->
+          <div class="p-10 text-center flex flex-col items-center justify-center gap-2.5 border rounded-lg"
+            [class]="themeService.isClassic() ? 'bg-zinc-50/50 border-zinc-200 text-zinc-500' : 'bg-zinc-900/40 border-zinc-800 text-zinc-400'">
+            <hugeicons-icon [icon]="icons.quote" [size]="36" [strokeWidth]="1.8" class="text-zinc-400 dark:text-zinc-500"></hugeicons-icon>
+            <span class="font-bold text-xs">{{ 'feedback.noHistoryDesc' | t }}</span>
+            <button
+              type="button"
+              (click)="switchSubView('form')"
+              class="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-2 shadow-2xs">
+              <hugeicons-icon [icon]="icons.send" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+              <span>{{ 'feedback.createRequestBtn' | t }}</span>
+            </button>
+          </div>
+        } @else {
+          <!-- LISTA DE HISTORIAL -->
+          <div class="flex flex-col gap-3">
+            @for (item of myFeedbackList(); track item.id) {
+              <div class="p-4 rounded-lg border text-left flex flex-col gap-2"
+                [class]="themeService.isClassic() ? 'bg-white border-zinc-200 shadow-2xs' : 'bg-zinc-900 border-zinc-800'">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                      {{ getCategoryLabel(item.category) }}
+                    </span>
+                    @if (item.title) {
+                      <span class="font-bold text-xs" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-zinc-100'">
+                        {{ item.title }}
+                      </span>
+                    }
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border" [class]="getStatusBadgeClass(item.status)">
+                      {{ getStatusLabel(item.status) }}
+                    </span>
+                    @if (item.is_approved_public) {
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                        <hugeicons-icon [icon]="icons.sparkles" [size]="10" [strokeWidth]="2"></hugeicons-icon>
+                        <span>{{ 'feedback.approvedBadge' | t }}</span>
+                      </span>
+                    }
+                  </div>
+                </div>
+
+                <p class="text-xs leading-relaxed" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-300'">
+                  {{ item.message }}
+                </p>
+
+                <div class="flex items-center justify-between text-[10px] pt-1 border-t opacity-75"
+                  [class]="themeService.isClassic() ? 'border-zinc-100 text-zinc-500' : 'border-zinc-800/80 text-zinc-400'">
+                  <span>ID: {{ item.id }}</span>
+                  <span>{{ item.created_at | date:'medium' }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- ========================================== -->
+    <!-- 3. VISTA: TESTIMONIOS PÚBLICOS COMUNITARIOS -->
+    <!-- ========================================== -->
+    @if (activeSubView() === 'community') {
+      <div class="max-w-4xl mx-auto flex flex-col gap-4">
+        <div>
+          <h3 class="text-base sm:text-lg font-bold tracking-tight" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
+            {{ 'feedback.communityTestimonials' | t }}
+          </h3>
+          <p class="text-xs" [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">
+            {{ 'feedback.communitySubtitle' | t }}
+          </p>
+        </div>
+
+        @if (loadingCommunity()) {
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            @for (i of [1, 2, 3, 4]; track i) {
+              <div class="p-4 rounded-lg border animate-pulse flex flex-col gap-2"
+                [class]="themeService.isClassic() ? 'bg-zinc-100 border-zinc-200' : 'bg-zinc-800 border-zinc-700'">
+                <div class="h-4 w-1/2 bg-zinc-300 dark:bg-zinc-700 rounded"></div>
+                <div class="h-3 w-full bg-zinc-200 dark:bg-zinc-700/60 rounded"></div>
+              </div>
+            }
+          </div>
+        } @else if (communityTestimonials().length === 0) {
+          <div class="p-10 text-center flex flex-col items-center justify-center gap-2.5 border rounded-lg"
+            [class]="themeService.isClassic() ? 'bg-zinc-50/50 border-zinc-200 text-zinc-500' : 'bg-zinc-900/40 border-zinc-800 text-zinc-400'">
+            <hugeicons-icon [icon]="icons.star" [size]="36" [strokeWidth]="1.8" class="text-amber-400"></hugeicons-icon>
+            <span class="font-bold text-xs">{{ 'feedback.noCommunityTestimonials' | t }}</span>
+            <button
+              type="button"
+              (click)="setCategory('testimonial'); switchSubView('form')"
+              class="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-2 shadow-2xs">
+              <hugeicons-icon [icon]="icons.sparkles" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+              <span>{{ 'feedback.beFirstTestimonial' | t }}</span>
+            </button>
+          </div>
+        } @else {
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            @for (item of communityTestimonials(); track item.id) {
+              <div class="p-4 rounded-lg border flex flex-col justify-between gap-3 text-left shadow-2xs"
+                [class]="themeService.isClassic() ? 'bg-white border-zinc-200' : 'bg-zinc-900 border-zinc-800'">
+                <div class="flex flex-col gap-2">
+                  <!-- Estrellas y Badge -->
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-1 text-amber-400">
+                      @for (star of [1, 2, 3, 4, 5]; track star) {
+                        <hugeicons-icon
+                          [icon]="icons.star"
+                          [size]="14"
+                          [strokeWidth]="2"
+                          [class.star-active]="star <= (item.rating || 5)"
+                          [class.opacity-30]="star > (item.rating || 5)"></hugeicons-icon>
+                      }
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      {{ 'feedback.approvedBadge' | t }}
+                    </span>
+                  </div>
+
+                  @if (item.title) {
+                    <h4 class="font-bold text-xs" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-zinc-100'">
+                      "{{ item.title }}"
+                    </h4>
+                  }
+
+                  <p class="text-xs leading-relaxed italic" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-300'">
+                    "{{ item.message }}"
+                  </p>
+                </div>
+
+                <div class="pt-2 border-t flex items-center justify-between text-[11px]"
+                  [class]="themeService.isClassic() ? 'border-zinc-100 text-zinc-600' : 'border-zinc-800 text-zinc-400'">
+                  <div class="font-semibold" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-zinc-200'">
+                    {{ item.author_name || ('feedback.anonymousAuthor' | t) }}
+                    @if (item.author_role) {
+                      <span class="font-normal opacity-75 block text-[10px]">{{ item.author_role }}</span>
+                    }
+                  </div>
+                  @if (item.author_location) {
+                    <span class="text-[10px] opacity-75">{{ item.author_location }}</span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+  </div>
+</div>

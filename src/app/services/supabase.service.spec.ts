@@ -43,4 +43,38 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
     const sql = SUPABASE_SQL_SETUP;
     expect(sql.toUpperCase()).not.toContain('USER_ID IS NULL');
   });
+
+  describe('Integración de Feedback, Bugs y Testimonios (user_feedback)', () => {
+    it('el script SQL de feedback debe contener la tabla user_feedback con RLS y el trigger de auto-aprobación', async () => {
+      const { SUPABASE_FEEDBACK_SQL_SETUP } = await import('./supabase.service');
+      expect(SUPABASE_FEEDBACK_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.user_feedback');
+      expect(SUPABASE_FEEDBACK_SQL_SETUP).toContain('fn_auto_approve_feedback_testimonial');
+      expect(SUPABASE_FEEDBACK_SQL_SETUP).toContain('trg_auto_approve_feedback_testimonial');
+      expect(SUPABASE_FEEDBACK_SQL_SETUP).toContain('ALTER TABLE public.user_feedback ENABLE ROW LEVEL SECURITY;');
+      expect(SUPABASE_FEEDBACK_SQL_SETUP).toContain('CREATE POLICY "Users can insert feedback"');
+      expect(SUPABASE_FEEDBACK_SQL_SETUP).toContain('CREATE POLICY "Authenticated users can view own feedback"');
+      expect(SUPABASE_FEEDBACK_SQL_SETUP).toContain('CREATE POLICY "Public can view approved landing page testimonials"');
+    });
+
+    it('getMyFeedback debe retornar arreglo vacío cuando no hay usuario autenticado', async () => {
+      service.currentUser.set(null);
+      const list = await service.getMyFeedback();
+      expect(list).toEqual([]);
+    });
+
+    it('submitFeedback debe aceptar payload de bug y retornar éxito o error estructurado', async () => {
+      const res = await service.submitFeedback({
+        category: 'bug',
+        message: 'Valid bug report with sufficient length',
+        target_module: 'general',
+        severity_or_priority: 'medium'
+      });
+      expect(typeof res.success).toBe('boolean');
+      if (res.success) {
+        expect(res.data).toBeDefined();
+        expect(res.data?.category).toBe('bug');
+      }
+    });
+  });
 });
+
