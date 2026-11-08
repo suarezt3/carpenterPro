@@ -277,6 +277,15 @@ export class HardwareCatalogService {
       icon: 'motion_photos_paused'
     },
     {
+      id: 'push_open',
+      name: 'Corredera Telescópica Push-to-Open (Apertura por presión)',
+      extensionType: 'Extensión Total con Expulsión Táctil',
+      loadCapacityKg: 40,
+      description: 'Mecanismo expulsor mecánico integrado para frentes lisos sin manija (apertura al presionar).',
+      unitCost: 38500,
+      icon: 'view_week'
+    },
+    {
       id: 'undermount',
       name: 'Corredera Oculta Bajo Cajón (Tandem)',
       extensionType: 'Extensión Total Oculta Sincronizada',
@@ -397,6 +406,7 @@ export class HardwareCatalogService {
     let hinges165 = 0;
     let hingesGas = 0;
     let drawersCount = 0;
+    let pushDrawersCount = 0;
     let handlesCount = 0;
     let slidingDoorsCount = 0;
     let hangingRodsCount = 0;
@@ -412,6 +422,15 @@ export class HardwareCatalogService {
                     notes.includes('colgador') || notes.includes('tubo') || n.includes('colgador');
       if (isRod) {
         hangingRodsCount += qty;
+        continue;
+      }
+
+      // Ignorar piezas estructurales internas de la caja del cajón salvo que sean el contrafrente de un cajón oculto sin tapa vista
+      const isDrawerBoxInternal =
+        part.componentRole === 'drawer_box' ||
+        part.componentRole === 'drawer_lateral' ||
+        (part.thickness !== undefined && part.thickness <= 6 && (n.includes('fondo') || n.includes('caj')));
+      if (isDrawerBoxInternal && !part.hardwareConfig?.isMovable) {
         continue;
       }
 
@@ -455,8 +474,23 @@ export class HardwareCatalogService {
           handlesCount += qty;
         }
       } else if (detected.movableType === 'drawer') {
-        drawersCount += qty;
-        if (hw.handleType && hw.handleType !== 'none') {
+        const isPushOpen =
+          hw.slideType === 'push_open' ||
+          hw.drawerOpeningSystem === 'push' ||
+          notes.includes('push-to-open') ||
+          notes.includes('apertura por presión');
+        const isFingerPull =
+          hw.drawerOpeningSystem === 'finger_pull' ||
+          notes.includes('uñero') ||
+          notes.includes('gola');
+
+        if (isPushOpen) {
+          pushDrawersCount += qty;
+        } else {
+          drawersCount += qty;
+        }
+
+        if (!isPushOpen && !isFingerPull && hw.handleType && hw.handleType !== 'none') {
           handlesCount += qty;
         }
       }
@@ -521,6 +555,18 @@ export class HardwareCatalogService {
         quantity: drawersCount,
         unitCost: 24000,
         notes: 'Capacidad 40kg por cajón con rodamientos y freno hidráulico'
+      });
+    }
+
+    if (pushDrawersCount > 0) {
+      items.push({
+        id: 'hw_correderas_push',
+        name: 'Corredera Telescópica Push-to-Open (Apertura por presión)',
+        category: 'slide',
+        unit: 'par',
+        quantity: pushDrawersCount,
+        unitCost: 38500,
+        notes: 'Mecanismo expulsor táctil integrado para frente liso sin manija'
       });
     }
 

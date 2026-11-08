@@ -207,6 +207,7 @@
           (clearanceCalculated)="onClearanceCalculated($event)"
           (groupUngroupRequested)="ungroup($event)"
           (drawerWizardRequested)="openDrawerWizard()"
+          (insertDrawerInCavityRequested)="openDrawerWizardForCavity($event)"
           (groupRotationRequested)="onGroupRotationRequested($event)"
           (groupDuplicationRequested)="onGroupDuplicationRequested($event)"
           (groupResizeRequested)="onGroupResizeRequestedFromViewer($event)"
@@ -1956,10 +1957,10 @@
               <div class="p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-2 shadow-2xs">
                 <div class="flex items-center justify-between gap-1.5">
                   <div class="flex items-center gap-1.5 min-w-0">
-                    <span class="w-2 h-2 rounded-full shrink-0" [class]="isSelectedGroupCountertop() ? 'bg-amber-500 animate-pulse' : 'bg-indigo-600 animate-pulse'"></span>
-                    <hugeicons-icon [icon]="isSelectedGroupCountertop() ? icons.palette : icons.inbox" [size]="13" [strokeWidth]="2" [class]="isSelectedGroupCountertop() ? 'text-amber-600 shrink-0' : 'text-indigo-600 shrink-0'"></hugeicons-icon>
-                    <span class="text-[10px] font-bold uppercase tracking-wider truncate" [class]="isSelectedGroupCountertop() ? 'text-amber-800' : 'text-indigo-800'">
-                      {{ isSelectedGroupCountertop() ? 'Mesón Monolítico (' + gStats.partsCount + ' pzs)' : 'Módulo Completo (' + gStats.partsCount + ' piezas)' }}
+                    <span class="w-2 h-2 rounded-full shrink-0" [class]="isSelectedGroupCountertop() ? 'bg-amber-500 animate-pulse' : (isSelectedGroupModularDrawer() ? 'bg-sky-500 animate-pulse' : 'bg-indigo-600 animate-pulse')"></span>
+                    <hugeicons-icon [icon]="isSelectedGroupCountertop() ? icons.palette : icons.inbox" [size]="13" [strokeWidth]="2" [class]="isSelectedGroupCountertop() ? 'text-amber-600 shrink-0' : (isSelectedGroupModularDrawer() ? 'text-sky-600 shrink-0' : 'text-indigo-600 shrink-0')"></hugeicons-icon>
+                    <span class="text-[10px] font-bold uppercase tracking-wider truncate" [class]="isSelectedGroupCountertop() ? 'text-amber-800' : (isSelectedGroupModularDrawer() ? 'text-sky-800' : 'text-indigo-800')">
+                      {{ isSelectedGroupCountertop() ? 'Mesón Monolítico (' + gStats.partsCount + ' pzs)' : (isSelectedGroupModularDrawer() ? ('drawer.inspectorBadge' | t) + ' (' + gStats.partsCount + ' pzs)' : 'Módulo Completo (' + gStats.partsCount + ' piezas)') }}
                     </span>
                   </div>
                   <button
@@ -1985,11 +1986,11 @@
                     <button
                       type="button"
                       (click)="openEditSelectedGroup($event)"
-                      [class]="isSelectedGroupCountertop() ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white'"
+                      [class]="isSelectedGroupCountertop() ? 'bg-amber-600 hover:bg-amber-500 text-white' : (isSelectedGroupModularDrawer() ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white')"
                       class="py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 shadow-2xs transition cursor-pointer"
-                      [title]="isSelectedGroupCountertop() ? 'Abrir panel Mesones 3D en Cocina Pro Studio' : 'Abrir asistente paramétrico de este módulo'">
+                      [title]="isSelectedGroupCountertop() ? 'Abrir panel Mesones 3D en Cocina Pro Studio' : (isSelectedGroupModularDrawer() ? ('drawer.inspectorBadge' | t) : 'Abrir asistente paramétrico de este módulo')">
                       <hugeicons-icon [icon]="icons.tune" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                      <span class="truncate">{{ isSelectedGroupCountertop() ? 'Mesón 3D' : 'Configurar' }}</span>
+                      <span class="truncate">{{ isSelectedGroupCountertop() ? 'Mesón 3D' : (isSelectedGroupModularDrawer() ? ('drawer.editDrawer' | t) : 'Configurar') }}</span>
                     </button>
                   } @else {
                     <div
@@ -2024,6 +2025,197 @@
                 </div>
               </div>
 
+              <!-- 2A. INSPECTOR CONTEXTUAL EXCLUSIVO PARA CAJÓN MODULAR -->
+              @if (selectedModularDrawerGroup(); as drawerGrp) {
+                @if (selectedModularDrawerConfig(); as dCfg) {
+                  <div class="bg-sky-50/75 p-2.5 rounded-xl border border-sky-200 space-y-2.5 shadow-2xs font-sans">
+
+                    <!-- 1. Control Interactivo: Abrir / Cerrar Cajón en 3D -->
+                    <div class="bg-white p-2 rounded-lg border border-sky-100 space-y-1.5">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                          <hugeicons-icon [icon]="isGroupOpen() ? icons.doorOpen : icons.doorClosed" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                          <span>{{ 'drawer.openClose3d' | t }}</span>
+                        </span>
+                        <button
+                          type="button"
+                          (click)="toggleSelectedModularDrawerOpen(drawerGrp.id)"
+                          [class]="isGroupOpen() || selectedModularDrawerExtensionPct() > 0 ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold' : 'bg-sky-600 hover:bg-sky-500 text-white font-bold'"
+                          class="px-2 py-0.5 rounded-md text-[10px] transition cursor-pointer shadow-2xs">
+                          {{ isGroupOpen() || selectedModularDrawerExtensionPct() > 0 ? ('drawer.closeDrawer' | t) : ('drawer.openDrawer' | t) }}
+                        </button>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          [value]="selectedModularDrawerExtensionPct()"
+                          (input)="onSelectedModularDrawerSlideInput(drawerGrp.id, $event)"
+                          class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-600" />
+                        <span class="text-[10px] font-bold tabular-nums text-sky-800 w-9 text-right">{{ selectedModularDrawerExtensionPct() }}%</span>
+                      </div>
+                    </div>
+
+                    <!-- 2. Tipo de Montaje del Frente -->
+                    <div class="bg-white p-2 rounded-lg border border-sky-100 space-y-1.5">
+                      <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">{{ 'drawer.frontMountTitle' | t }}</span>
+                      <div class="grid grid-cols-3 gap-1 text-[10px]">
+                        <button
+                          type="button"
+                          (click)="setSelectedModularDrawerFrontMount(drawerGrp.id, 'overlay')"
+                          [class]="(dCfg.frontMountType || 'overlay') === 'overlay' ? 'bg-sky-600 text-white font-bold shadow-2xs border-sky-700' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-medium'"
+                          class="py-1.5 px-1 rounded-md border text-center transition cursor-pointer">
+                          {{ 'drawer.frontOverlayShort' | t }}
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setSelectedModularDrawerFrontMount(drawerGrp.id, 'inset')"
+                          [class]="dCfg.frontMountType === 'inset' ? 'bg-sky-600 text-white font-bold shadow-2xs border-sky-700' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-medium'"
+                          class="py-1.5 px-1 rounded-md border text-center transition cursor-pointer">
+                          {{ 'drawer.frontInsetShort' | t }}
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setSelectedModularDrawerFrontMount(drawerGrp.id, 'none')"
+                          [class]="dCfg.frontMountType === 'none' ? 'bg-sky-600 text-white font-bold shadow-2xs border-sky-700' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-medium'"
+                          class="py-1.5 px-1 rounded-md border text-center transition cursor-pointer">
+                          {{ 'drawer.frontNoneShort' | t }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 3. Sistema de Apertura (Visible cuando tiene frente) -->
+                    @if (dCfg.frontMountType !== 'none') {
+                      <div class="bg-white p-2 rounded-lg border border-sky-100 space-y-1.5">
+                        <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">{{ 'drawer.openingSystemTitle' | t }}</span>
+                        <div class="grid grid-cols-3 gap-1 text-[10px]">
+                          <button
+                            type="button"
+                            (click)="setSelectedModularDrawerOpeningSystem(drawerGrp.id, 'handle')"
+                            [class]="(dCfg.handleType || 'handle') === 'handle' ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-medium'"
+                            class="py-1.5 px-1 rounded-md border text-center transition cursor-pointer">
+                            {{ 'drawer.openingHandleShort' | t }}
+                          </button>
+                          <button
+                            type="button"
+                            (click)="setSelectedModularDrawerOpeningSystem(drawerGrp.id, 'push')"
+                            [class]="dCfg.handleType === 'push' ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-medium'"
+                            class="py-1.5 px-1 rounded-md border text-center transition cursor-pointer">
+                            {{ 'drawer.openingPushShort' | t }}
+                          </button>
+                          <button
+                            type="button"
+                            (click)="setSelectedModularDrawerOpeningSystem(drawerGrp.id, 'finger_pull')"
+                            [class]="dCfg.handleType === 'finger_pull' ? 'bg-indigo-600 text-white font-bold shadow-2xs border-indigo-700' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-medium'"
+                            class="py-1.5 px-1 rounded-md border text-center transition cursor-pointer">
+                            {{ 'drawer.openingFingerPullShort' | t }}
+                          </button>
+                        </div>
+                      </div>
+                    }
+
+                    <!-- 4. Parámetros Técnicos en Vivo (Ancho Hueco, Corredera, Alto Caja y Frente) -->
+                    <div class="bg-white p-2 rounded-lg border border-sky-100 space-y-2">
+                      <div class="flex items-center justify-between gap-1.5">
+                        <span class="text-[10px] font-bold text-slate-700">{{ 'drawer.cavityWidthLabel' | t }}</span>
+                        <button
+                          type="button"
+                          (click)="autoFitSelectedModularDrawer(drawerGrp.id)"
+                          class="px-2 py-0.5 bg-sky-100 hover:bg-sky-200 text-sky-900 border border-sky-300 rounded text-[9px] font-bold flex items-center gap-1 transition cursor-pointer"
+                          title="Detectar el hueco del mueble contenedor y auto-ajustar ancho, profundidad y corredera sin colisiones">
+                          <hugeicons-icon [icon]="icons.magnet" [size]="11" [strokeWidth]="2" class="text-sky-700 shrink-0"></hugeicons-icon>
+                          <span>{{ 'drawer.autoFitCavityBtn' | t }}</span>
+                        </button>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-1.5">
+                        <div>
+                          <span class="text-[9px] font-semibold text-slate-500 block mb-0.5">{{ 'drawer.cavityWidthLabel' | t }} (mm)</span>
+                          <input
+                            type="number"
+                            min="160"
+                            step="5"
+                            [value]="dCfg.outerWidth"
+                            (change)="onSelectedModularDrawerNumberChange(drawerGrp.id, 'outerWidth', $event)"
+                            class="w-full h-7 px-2 bg-slate-50 focus:bg-white border border-slate-200 rounded-md text-xs font-bold tabular-nums text-slate-900 focus:outline-hidden focus:border-sky-500" />
+                        </div>
+
+                        <div>
+                          <span class="text-[9px] font-semibold text-slate-500 block mb-0.5">{{ 'drawer.slideLengthLabel' | t }} (mm)</span>
+                          <input
+                            type="number"
+                            min="250"
+                            max="650"
+                            step="50"
+                            [value]="dCfg.slideLength"
+                            (change)="onSelectedModularDrawerNumberChange(drawerGrp.id, 'slideLength', $event)"
+                            class="w-full h-7 px-2 bg-slate-50 focus:bg-white border border-slate-200 rounded-md text-xs font-bold tabular-nums text-slate-900 focus:outline-hidden focus:border-sky-500" />
+                        </div>
+                      </div>
+
+                      <div class="flex items-center justify-between gap-1 pt-0.5">
+                        <span class="text-[9px] text-slate-500 font-medium">Corredera:</span>
+                        <div class="flex items-center gap-1">
+                          <button type="button" (click)="setSelectedModularDrawerPreset(drawerGrp.id, 'slideLength', 300)" [class]="dCfg.slideLength === 300 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[9px] rounded tabular-nums cursor-pointer">300</button>
+                          <button type="button" (click)="setSelectedModularDrawerPreset(drawerGrp.id, 'slideLength', 350)" [class]="dCfg.slideLength === 350 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[9px] rounded tabular-nums cursor-pointer">350</button>
+                          <button type="button" (click)="setSelectedModularDrawerPreset(drawerGrp.id, 'slideLength', 400)" [class]="dCfg.slideLength === 400 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[9px] rounded tabular-nums cursor-pointer">400</button>
+                          <button type="button" (click)="setSelectedModularDrawerPreset(drawerGrp.id, 'slideLength', 450)" [class]="dCfg.slideLength === 450 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[9px] rounded tabular-nums cursor-pointer">450</button>
+                          <button type="button" (click)="setSelectedModularDrawerPreset(drawerGrp.id, 'slideLength', 500)" [class]="dCfg.slideLength === 500 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[9px] rounded tabular-nums cursor-pointer">500</button>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100">
+                        <div>
+                          <span class="text-[9px] font-semibold text-slate-500 block mb-0.5">{{ 'drawer.boxHeightLabel' | t }} (mm)</span>
+                          <input
+                            type="number"
+                            min="60"
+                            step="10"
+                            [value]="dCfg.boxHeight"
+                            (change)="onSelectedModularDrawerNumberChange(drawerGrp.id, 'boxHeight', $event)"
+                            class="w-full h-7 px-2 bg-slate-50 focus:bg-white border border-slate-200 rounded-md text-xs font-bold tabular-nums text-slate-900 focus:outline-hidden focus:border-sky-500" />
+                        </div>
+
+                        @if (dCfg.frontMountType !== 'none') {
+                          <div>
+                            <span class="text-[9px] font-semibold text-slate-500 block mb-0.5">{{ 'drawer.frontHeightLabel' | t }} (mm)</span>
+                            <input
+                              type="number"
+                              min="80"
+                              step="10"
+                              [value]="dCfg.frontHeight || 180"
+                              (change)="onSelectedModularDrawerNumberChange(drawerGrp.id, 'frontHeight', $event)"
+                              class="w-full h-7 px-2 bg-slate-50 focus:bg-white border border-slate-200 rounded-md text-xs font-bold tabular-nums text-slate-900 focus:outline-hidden focus:border-sky-500" />
+                          </div>
+                        }
+                      </div>
+                    </div>
+
+                    <!-- 5. Duplicado Inteligente en 1 Clic (+Y / -Y) -->
+                    <div class="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        (click)="duplicateSelectedDrawerVertically(drawerGrp.id, 'up')"
+                        class="py-1.5 px-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer"
+                        title="Duplicar una copia idéntica inmediatamente arriba en el mismo hueco respetando la holgura">
+                        <hugeicons-icon [icon]="icons.arrowUp" [size]="12" [strokeWidth]="2.2" class="shrink-0"></hugeicons-icon>
+                        <span class="truncate">{{ 'drawer.duplicateUpBtn' | t }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="duplicateSelectedDrawerVertically(drawerGrp.id, 'down')"
+                        class="py-1.5 px-2 bg-white hover:bg-sky-100 text-sky-900 border border-sky-300 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer"
+                        title="Duplicar una copia idéntica inmediatamente abajo en el mismo hueco respetando la holgura">
+                        <hugeicons-icon [icon]="icons.arrowDown" [size]="12" [strokeWidth]="2.2" class="shrink-0"></hugeicons-icon>
+                        <span class="truncate">{{ 'drawer.duplicateDownBtn' | t }}</span>
+                      </button>
+                    </div>
+
+                  </div>
+                }
+              } @else {
               <!-- 2. MEDIDAS DEL MÓDULO EN BLOQUE (ANCHO × ALTO × PROFUNDIDAD + ESPESOR) -->
               <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
                 <div class="flex items-center justify-between">
@@ -2174,6 +2366,7 @@
                   }
                 </div>
               </div>
+              }
 
               <!-- 3. MATERIAL DEL MÓDULO / MESÓN (EN BLOQUE) -->
               <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
@@ -5734,11 +5927,11 @@
 
 </div>
 
-<!-- MODAL: ASISTENTE DE CAJÓN MODULAR -->
+<!-- MODAL: ASISTENTE DE CAJÓN MODULAR (SMART CAVITY FIT + MONTAJE SOLAPADO/A RAS + APERTURA PUSH/UÑERO) -->
 @defer (when showDrawerWizard()) {
   @if (showDrawerWizard()) {
-    <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-8">
+    <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto font-sans">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-8 font-sans">
 
       <!-- Cabecera -->
       <div class="px-6 py-4 bg-linear-to-r from-sky-600 to-indigo-700 text-white flex items-center justify-between">
@@ -5747,8 +5940,8 @@
             <hugeicons-icon [icon]="icons.inbox" [size]="20" [strokeWidth]="1.9"></hugeicons-icon>
           </div>
           <div>
-            <h3 class="font-bold text-sm tracking-tight">Asistente de Cajón Modular</h3>
-            <p class="text-[11px] text-sky-100">Genera las 5 o 6 piezas exactas ensambladas con holgura para correderas</p>
+            <h3 class="font-bold text-sm tracking-tight">{{ 'drawer.wizardTitle' | t }}</h3>
+            <p class="text-[11px] text-sky-100">{{ 'drawer.wizardSubtitle' | t }}</p>
           </div>
         </div>
         <button
@@ -5760,12 +5953,88 @@
       </div>
 
       <!-- Cuerpo del Formulario -->
-      <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+      <div class="p-6 space-y-4 max-h-[74vh] overflow-y-auto font-sans">
+
+        <!-- 1. AUTO-ENCAJE INTELIGENTE EN HUECO ("Smart Cavity Fit") -->
+        <div class="p-3.5 bg-sky-50/80 rounded-xl border border-sky-200/90 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-sky-950 flex items-center gap-1.5">
+              <hugeicons-icon [icon]="icons.magnet" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+              <span>{{ 'drawer.smartFitTargetLabel' | t }}</span>
+            </span>
+            @if (selectedDrawerWizardCavity(); as selCav) {
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 tabular-nums">
+                {{ 'drawer.zeroCollisionsBadge' | t }}
+              </span>
+            }
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <span class="block text-[10px] font-bold text-slate-600 mb-1">{{ 'drawer.targetModuleLabel' | t }}</span>
+              <select
+                [value]="drawerWizardTargetModuleId()"
+                (change)="onDrawerWizardTargetModuleChange($event)"
+                class="w-full px-3 py-2 text-xs font-semibold bg-white border border-sky-200 rounded-xl text-slate-900 focus:outline-hidden focus:border-sky-500 cursor-pointer">
+                <option value="floor">{{ 'drawer.createLooseOnFloor' | t }}</option>
+                @for (mod of availableCabinetModulesForDrawer(); track mod.id) {
+                  <option [value]="mod.id">{{ mod.name }}</option>
+                }
+              </select>
+            </div>
+
+            @if (drawerWizardTargetModuleId() !== 'floor' && availableCavitiesForDrawerModule().length > 0) {
+              <div>
+                <span class="block text-[10px] font-bold text-slate-600 mb-1">{{ 'drawer.targetCavityLabel' | t }}</span>
+                <select
+                  [value]="selectedDrawerWizardCavity()?.id || ''"
+                  (change)="onDrawerWizardTargetCavityChange($event)"
+                  class="w-full px-3 py-2 text-xs font-semibold bg-white border border-sky-200 rounded-xl text-slate-900 focus:outline-hidden focus:border-sky-500 tabular-nums cursor-pointer">
+                  @for (cav of availableCavitiesForDrawerModule(); track cav.id) {
+                    <option [value]="cav.id">{{ cav.label }}</option>
+                  }
+                </select>
+              </div>
+            }
+          </div>
+
+          @if (selectedDrawerWizardCavity(); as selCav) {
+            <div class="pt-2 border-t border-sky-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="text-[11px] text-sky-900 font-medium tabular-nums">
+                Luz útil: <strong class="font-bold">{{ selCav.internalWidth }} mm</strong> ancho × <strong class="font-bold">{{ selCav.internalHeight }} mm</strong> alto × <strong class="font-bold">{{ selCav.internalDepth }} mm</strong> fondo
+              </div>
+
+              <div class="flex items-center gap-1">
+                <span class="text-[10px] font-bold text-slate-600 mr-1">{{ 'drawer.quantityInCavityLabel' | t }}:</span>
+                <button
+                  type="button"
+                  (click)="setDrawerWizardCount(1)"
+                  [class]="drawerWizardCount() === 1 ? 'bg-sky-600 text-white font-bold shadow-2xs' : 'bg-white hover:bg-sky-100 text-slate-700 border border-sky-200 font-semibold'"
+                  class="w-7 h-7 rounded-lg text-xs tabular-nums transition cursor-pointer">1</button>
+                <button
+                  type="button"
+                  (click)="setDrawerWizardCount(2)"
+                  [class]="drawerWizardCount() === 2 ? 'bg-sky-600 text-white font-bold shadow-2xs' : 'bg-white hover:bg-sky-100 text-slate-700 border border-sky-200 font-semibold'"
+                  class="w-7 h-7 rounded-lg text-xs tabular-nums transition cursor-pointer">2</button>
+                <button
+                  type="button"
+                  (click)="setDrawerWizardCount(3)"
+                  [class]="drawerWizardCount() === 3 ? 'bg-sky-600 text-white font-bold shadow-2xs' : 'bg-white hover:bg-sky-100 text-slate-700 border border-sky-200 font-semibold'"
+                  class="w-7 h-7 rounded-lg text-xs tabular-nums transition cursor-pointer">3</button>
+                <button
+                  type="button"
+                  (click)="setDrawerWizardCount(4)"
+                  [class]="drawerWizardCount() === 4 ? 'bg-sky-600 text-white font-bold shadow-2xs' : 'bg-white hover:bg-sky-100 text-slate-700 border border-sky-200 font-semibold'"
+                  class="w-7 h-7 rounded-lg text-xs tabular-nums transition cursor-pointer">4</button>
+              </div>
+            </div>
+          }
+        </div>
 
         <!-- Nombre e identificación con validación de duplicados -->
         <div>
           <div class="flex items-center justify-between mb-1">
-            <span class="block text-xs font-bold text-slate-700">Nombre del Cajón / Módulo</span>
+            <span class="block text-xs font-bold text-slate-700">Nombre del Cajón / Batería</span>
             @if (isDrawerWizardNameDuplicate()) {
               <span class="text-[10px] text-rose-500 font-semibold flex items-center gap-1">
                 <hugeicons-icon [icon]="icons.warning" [size]="12" [strokeWidth]="2"></hugeicons-icon>
@@ -5776,7 +6045,7 @@
           <input
             type="text"
             [value]="drawerForm().name"
-            (input)="updateDrawerFormField('name', $any($event.target).value)"
+            (input)="onDrawerWizardTextInput('name', $event)"
             [class]="isDrawerWizardNameDuplicate() ? 'border-rose-400 bg-rose-50/40 text-rose-950 focus:border-rose-500' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-sky-500'"
             class="w-full px-3 py-2 text-xs font-semibold border rounded-xl focus:outline-hidden"
             placeholder="ej. Cajón 1, Gaveta Superior" />
@@ -5796,52 +6065,148 @@
           }
         </div>
 
-        <!-- Dimensiones Principales -->
+        <!-- 2. TIPO DE MONTAJE DEL FRENTE Y SISTEMA DE APERTURA -->
+        <div class="p-3.5 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-3">
+          <div>
+            <span class="block text-[11px] font-bold text-indigo-950 mb-1.5">{{ 'drawer.frontMountTitle' | t }}</span>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                (click)="setDrawerWizardFrontMount('overlay')"
+                [class]="(drawerForm().frontMountType || 'overlay') === 'overlay' ? 'bg-indigo-600 text-white font-bold border-indigo-700 shadow-xs' : 'bg-white hover:bg-indigo-50 text-slate-700 border-indigo-200 font-semibold'"
+                class="p-2 rounded-xl border text-left transition cursor-pointer">
+                <span class="block text-xs leading-tight">{{ 'drawer.frontOverlay' | t }}</span>
+                <span [class]="(drawerForm().frontMountType || 'overlay') === 'overlay' ? 'text-indigo-100' : 'text-slate-400'" class="block text-[10px] mt-0.5 leading-tight">Cubre cantos laterales (+0.5mm)</span>
+              </button>
+
+              <button
+                type="button"
+                (click)="setDrawerWizardFrontMount('inset')"
+                [class]="drawerForm().frontMountType === 'inset' ? 'bg-indigo-600 text-white font-bold border-indigo-700 shadow-xs' : 'bg-white hover:bg-indigo-50 text-slate-700 border-indigo-200 font-semibold'"
+                class="p-2 rounded-xl border text-left transition cursor-pointer">
+                <span class="block text-xs leading-tight">{{ 'drawer.frontInset' | t }}</span>
+                <span [class]="drawerForm().frontMountType === 'inset' ? 'text-indigo-100' : 'text-slate-400'" class="block text-[10px] mt-0.5 leading-tight">Embutido a ras (Luz - 4mm)</span>
+              </button>
+
+              <button
+                type="button"
+                (click)="setDrawerWizardFrontMount('none')"
+                [class]="drawerForm().frontMountType === 'none' ? 'bg-indigo-600 text-white font-bold border-indigo-700 shadow-xs' : 'bg-white hover:bg-indigo-50 text-slate-700 border-indigo-200 font-semibold'"
+                class="p-2 rounded-xl border text-left transition cursor-pointer">
+                <span class="block text-xs leading-tight">{{ 'drawer.frontNone' | t }}</span>
+                <span [class]="drawerForm().frontMountType === 'none' ? 'text-indigo-100' : 'text-slate-400'" class="block text-[10px] mt-0.5 leading-tight">5 piezas internas para closet</span>
+              </button>
+            </div>
+          </div>
+
+          @if (drawerForm().frontMountType !== 'none') {
+            <div class="pt-2 border-t border-indigo-100 space-y-2.5">
+              <div>
+                <span class="block text-[11px] font-bold text-indigo-950 mb-1.5">{{ 'drawer.openingSystemTitle' | t }}</span>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    (click)="setDrawerWizardOpeningSystem('handle')"
+                    [class]="(drawerForm().handleType || 'handle') === 'handle' ? 'bg-sky-600 text-white font-bold border-sky-700 shadow-xs' : 'bg-white hover:bg-sky-50 text-slate-700 border-indigo-200 font-semibold'"
+                    class="p-2 rounded-xl border text-left transition cursor-pointer">
+                    <span class="block text-xs leading-tight">{{ 'drawer.openingHandle' | t }}</span>
+                    <span [class]="(drawerForm().handleType || 'handle') === 'handle' ? 'text-sky-100' : 'text-slate-400'" class="block text-[10px] mt-0.5 leading-tight">Tirador metálico central 3D</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    (click)="setDrawerWizardOpeningSystem('push')"
+                    [class]="drawerForm().handleType === 'push' ? 'bg-sky-600 text-white font-bold border-sky-700 shadow-xs' : 'bg-white hover:bg-sky-50 text-slate-700 border-indigo-200 font-semibold'"
+                    class="p-2 rounded-xl border text-left transition cursor-pointer">
+                    <span class="block text-xs leading-tight">{{ 'drawer.openingPush' | t }}</span>
+                    <span [class]="drawerForm().handleType === 'push' ? 'text-sky-100' : 'text-slate-400'" class="block text-[10px] mt-0.5 leading-tight">Frente liso + Corredera Push</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    (click)="setDrawerWizardOpeningSystem('finger_pull')"
+                    [class]="drawerForm().handleType === 'finger_pull' ? 'bg-sky-600 text-white font-bold border-sky-700 shadow-xs' : 'bg-white hover:bg-sky-50 text-slate-700 border-indigo-200 font-semibold'"
+                    class="p-2 rounded-xl border text-left transition cursor-pointer">
+                    <span class="block text-xs leading-tight">{{ 'drawer.openingFingerPull' | t }}</span>
+                    <span [class]="drawerForm().handleType === 'finger_pull' ? 'text-sky-100' : 'text-slate-400'" class="block text-[10px] mt-0.5 leading-tight">Descuento superior de 28 mm</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <span class="block text-[10px] font-semibold text-slate-600 mb-1">
+                    Alto Frente Nominal (mm)
+                    @if (drawerForm().handleType === 'finger_pull') {
+                      <span class="text-sky-700 font-bold tabular-nums">(Corte: {{ computedDrawerWizardEffectiveFrontHeight() }} mm)</span>
+                    }
+                  </span>
+                  <input
+                    type="number"
+                    [value]="drawerForm().frontHeight || 180"
+                    (input)="onDrawerWizardNumberInput('frontHeight', $event)"
+                    class="w-full px-2.5 py-1.5 text-xs font-bold tabular-nums bg-white border border-indigo-200 rounded-lg focus:outline-hidden focus:border-indigo-500" />
+                </div>
+                <div>
+                  <span class="block text-[10px] font-semibold text-slate-600 mb-1">Ancho Frente Visto (mm)</span>
+                  <input
+                    type="number"
+                    [value]="drawerForm().frontWidth || drawerForm().outerWidth"
+                    (input)="onDrawerWizardNumberInput('frontWidth', $event)"
+                    class="w-full px-2.5 py-1.5 text-xs font-bold tabular-nums bg-white border border-indigo-200 rounded-lg focus:outline-hidden focus:border-indigo-500" />
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- 3. DIMENSIONES PRINCIPALES DE LA CAJA Y CORREDERA -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
           <div>
             <span class="block text-[11px] font-bold text-slate-700 mb-1">
-              Ancho Hueco (mm)
+              {{ 'drawer.cavityWidthLabel' | t }} (mm)
             </span>
             <input
               type="number"
               [value]="drawerForm().outerWidth"
-              (input)="updateDrawerFormField('outerWidth', +$any($event.target).value)"
-              class="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
-            <span class="text-[10px] text-slate-400">Luz exterior total</span>
+              (input)="onDrawerWizardNumberInput('outerWidth', $event)"
+              class="w-full px-3 py-2 text-xs font-bold tabular-nums bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
+            <span class="text-[10px] text-slate-400">Luz interna horizontal</span>
           </div>
 
           <div>
             <span class="block text-[11px] font-bold text-slate-700 mb-1">
-              Corredera (mm)
+              {{ 'drawer.slideLengthLabel' | t }} (mm)
             </span>
             <input
               type="number"
               [value]="drawerForm().slideLength"
-              (input)="updateDrawerFormField('slideLength', +$any($event.target).value)"
-              class="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
+              (input)="onDrawerWizardNumberInput('slideLength', $event)"
+              class="w-full px-3 py-2 text-xs font-bold tabular-nums bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
             <div class="flex items-center gap-1 mt-1">
-              <button type="button" (click)="updateDrawerFormField('slideLength', 350)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono cursor-pointer">350</button>
-              <button type="button" (click)="updateDrawerFormField('slideLength', 400)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono cursor-pointer">400</button>
-              <button type="button" (click)="updateDrawerFormField('slideLength', 450)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono cursor-pointer">450</button>
-              <button type="button" (click)="updateDrawerFormField('slideLength', 500)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono cursor-pointer">500</button>
+              <button type="button" (click)="updateDrawerFormField('slideLength', 300)" [class]="drawerForm().slideLength === 300 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">300</button>
+              <button type="button" (click)="updateDrawerFormField('slideLength', 350)" [class]="drawerForm().slideLength === 350 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">350</button>
+              <button type="button" (click)="updateDrawerFormField('slideLength', 400)" [class]="drawerForm().slideLength === 400 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">400</button>
+              <button type="button" (click)="updateDrawerFormField('slideLength', 450)" [class]="drawerForm().slideLength === 450 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">450</button>
+              <button type="button" (click)="updateDrawerFormField('slideLength', 500)" [class]="drawerForm().slideLength === 500 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">500</button>
             </div>
           </div>
 
           <div>
             <span class="block text-[11px] font-bold text-slate-700 mb-1">
-              Alto Caja (mm)
+              {{ 'drawer.boxHeightLabel' | t }} (mm)
             </span>
             <input
               type="number"
               [value]="drawerForm().boxHeight"
-              (input)="updateDrawerFormField('boxHeight', +$any($event.target).value)"
-              class="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
+              (input)="onDrawerWizardNumberInput('boxHeight', $event)"
+              class="w-full px-3 py-2 text-xs font-bold tabular-nums bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
             <div class="flex items-center gap-1 mt-1">
-              <button type="button" (click)="updateDrawerFormField('boxHeight', 120)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono cursor-pointer">120</button>
-              <button type="button" (click)="updateDrawerFormField('boxHeight', 140)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono cursor-pointer">140</button>
-              <button type="button" (click)="updateDrawerFormField('boxHeight', 160)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono cursor-pointer">160</button>
-              <button type="button" (click)="updateDrawerFormField('boxHeight', 180)" class="px-1 py-0.5 text-[9px] bg-slate-100 hover:bg-slate-200 rounded font-mono cursor-pointer">180</button>
+              <button type="button" (click)="updateDrawerFormField('boxHeight', 120)" [class]="drawerForm().boxHeight === 120 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">120</button>
+              <button type="button" (click)="updateDrawerFormField('boxHeight', 140)" [class]="drawerForm().boxHeight === 140 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">140</button>
+              <button type="button" (click)="updateDrawerFormField('boxHeight', 160)" [class]="drawerForm().boxHeight === 160 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">160</button>
+              <button type="button" (click)="updateDrawerFormField('boxHeight', 180)" [class]="drawerForm().boxHeight === 180 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">180</button>
             </div>
           </div>
 
@@ -5862,8 +6227,8 @@
               <input
                 type="number"
                 [value]="drawerForm().slideGap"
-                (input)="updateDrawerFormField('slideGap', +$any($event.target).value)"
-                class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-slate-200 rounded-lg focus:outline-hidden" />
+                (input)="onDrawerWizardNumberInput('slideGap', $event)"
+                class="w-full px-2.5 py-1.5 text-xs font-bold tabular-nums bg-white border border-slate-200 rounded-lg focus:outline-hidden" />
               <span class="text-[9px] text-slate-400">13 mm cada lado (26 mm)</span>
             </div>
 
@@ -5872,8 +6237,8 @@
               <input
                 type="number"
                 [value]="drawerForm().boxThickness"
-                (input)="updateDrawerFormField('boxThickness', +$any($event.target).value)"
-                class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-slate-200 rounded-lg focus:outline-hidden" />
+                (input)="onDrawerWizardNumberInput('boxThickness', $event)"
+                class="w-full px-2.5 py-1.5 text-xs font-bold tabular-nums bg-white border border-slate-200 rounded-lg focus:outline-hidden" />
               <span class="text-[9px] text-slate-400">Estándar 15 mm</span>
             </div>
 
@@ -5882,70 +6247,49 @@
               <input
                 type="number"
                 [value]="drawerForm().bottomThickness"
-                (input)="updateDrawerFormField('bottomThickness', +$any($event.target).value)"
-                class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-slate-200 rounded-lg focus:outline-hidden" />
+                (input)="onDrawerWizardNumberInput('bottomThickness', $event)"
+                class="w-full px-2.5 py-1.5 text-xs font-bold tabular-nums bg-white border border-slate-200 rounded-lg focus:outline-hidden" />
               <span class="text-[9px] text-slate-400">MDF 3 mm Durolac</span>
             </div>
           </div>
         </div>
 
-        <!-- Frente Exterior Opcional -->
-        <div class="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-2">
-          <label class="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              [checked]="drawerForm().includeFront"
-              (change)="updateDrawerFormField('includeFront', $any($event.target).checked)"
-              class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" />
-            <span class="text-xs font-bold text-indigo-950">Incluir Frente Exterior Solapado (Tapa Vista con Tirador)</span>
-          </label>
-
-          @if (drawerForm().includeFront) {
-            <div class="grid grid-cols-2 gap-3 pt-2 border-t border-indigo-100">
-              <div>
-                <span class="block text-[10px] font-semibold text-slate-600 mb-1">Alto Frente Visto (mm)</span>
-                <input
-                  type="number"
-                  [value]="drawerForm().frontHeight || 180"
-                  (input)="updateDrawerFormField('frontHeight', +$any($event.target).value)"
-                  class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-indigo-200 rounded-lg focus:outline-hidden" />
-              </div>
-              <div>
-                <span class="block text-[10px] font-semibold text-slate-600 mb-1">Ancho Frente Visto (mm)</span>
-                <input
-                  type="number"
-                  [value]="drawerForm().frontWidth || drawerForm().outerWidth"
-                  (input)="updateDrawerFormField('frontWidth', +$any($event.target).value)"
-                  class="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-indigo-200 rounded-lg focus:outline-hidden" />
-              </div>
-            </div>
-          }
-        </div>
-
         <!-- Elevación Y inicial -->
         <div class="flex items-center justify-between text-xs text-slate-600">
-          <span class="font-semibold">Elevación inicial (eje Y desde el suelo):</span>
+          <span class="font-semibold">Elevación base inicial (eje Y desde el suelo):</span>
           <div class="flex items-center gap-2">
             <input
               type="number"
               [value]="drawerForm().posY"
-              (input)="updateDrawerFormField('posY', +$any($event.target).value)"
-              class="w-24 px-2.5 py-1 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg text-right focus:outline-hidden" />
-            <span class="text-slate-400 font-mono">mm</span>
+              (input)="onDrawerWizardNumberInput('posY', $event)"
+              class="w-24 px-2.5 py-1 text-xs font-bold tabular-nums bg-slate-50 border border-slate-200 rounded-lg text-right focus:outline-hidden" />
+            <span class="text-slate-400 font-semibold">mm</span>
           </div>
         </div>
 
-        <!-- Previsualización de piezas calculadas -->
-        <div class="p-3 bg-slate-100 rounded-xl text-[11px] space-y-1">
-          <span class="font-bold text-slate-700 block text-xs">Desglose calculado automáticamente:</span>
-          <div class="text-slate-600 grid grid-cols-2 gap-1 font-mono text-[10px]">
-            <div>• 2× Laterales: {{ drawerForm().slideLength }} × {{ drawerForm().boxHeight }} × {{ drawerForm().boxThickness }} mm</div>
-            <div>• 1× Contra-frente: {{ drawerForm().outerWidth - drawerForm().slideGap - (2 * drawerForm().boxThickness) }} × {{ drawerForm().boxHeight }} mm</div>
-            <div>• 1× Trasera: {{ drawerForm().outerWidth - drawerForm().slideGap - (2 * drawerForm().boxThickness) }} × {{ drawerForm().boxHeight }} mm</div>
+        <!-- Previsualización de piezas calculadas (Tipografía Inter + tabular-nums) -->
+        <div class="p-3 bg-slate-100 rounded-xl text-[11px] space-y-1 font-sans">
+          <span class="font-bold text-slate-700 block text-xs">Desglose calculado automáticamente (por cajón):</span>
+          <div class="text-slate-600 grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] font-medium tabular-nums">
+            <div>• 2× Laterales: {{ drawerForm().slideLength }} × {{ computedDrawerWizardEffectiveBoxHeight() }} × {{ drawerForm().boxThickness }} mm</div>
+            <div>• 1× Contra-frente: {{ drawerForm().outerWidth - drawerForm().slideGap - (2 * drawerForm().boxThickness) }} × {{ computedDrawerWizardEffectiveBoxHeight() }} mm</div>
+            <div>• 1× Trasera: {{ drawerForm().outerWidth - drawerForm().slideGap - (2 * drawerForm().boxThickness) }} × {{ computedDrawerWizardEffectiveBoxHeight() }} mm</div>
             <div>• 1× Fondo MDF: {{ drawerForm().outerWidth - drawerForm().slideGap }} × {{ drawerForm().slideLength }} × {{ drawerForm().bottomThickness }} mm</div>
+            @if (drawerForm().frontMountType !== 'none') {
+              <div class="sm:col-span-2 text-indigo-800 font-semibold">
+                • 1× Frente ({{ drawerForm().frontMountType === 'inset' ? ('drawer.frontInset' | t) : ('drawer.frontOverlay' | t) }}): {{ drawerForm().frontWidth }} × {{ computedDrawerWizardEffectiveFrontHeight() }} × {{ drawerForm().frontThickness || 15 }} mm
+              </div>
+            }
           </div>
-          <p class="text-[10px] text-emerald-700 font-semibold pt-1">
-            ✓ Incluye 1 par de correderas telescópicas en la lista de herrajes.
+          <p class="text-[10px] text-emerald-700 font-semibold pt-1 flex items-center gap-1.5">
+            <hugeicons-icon [icon]="icons.checkCircle" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+            @if (drawerForm().handleType === 'push') {
+              <span>Incluye 1 par de Correderas Telescópicas Push-to-Open (Apertura por presión) por cajón en presupuesto.</span>
+            } @else if (drawerForm().handleType === 'finger_pull') {
+              <span>Incluye 1 par de correderas telescópicas y descuento superior de 28 mm para uñero (sin tirador).</span>
+            } @else {
+              <span>Incluye 1 par de correderas telescópicas y 1 tirador metálico por cajón en la lista de herrajes.</span>
+            }
           </p>
         </div>
 
@@ -5966,7 +6310,13 @@
           [class]="isDrawerWizardNameDuplicate() || !drawerForm().name.trim() ? 'opacity-50 cursor-not-allowed bg-slate-400 text-white' : 'bg-linear-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-md shadow-sky-600/20 cursor-pointer'"
           class="px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition">
           <hugeicons-icon [icon]="icons.checkCircle" [size]="15" [strokeWidth]="2"></hugeicons-icon>
-          <span>Crear y Ensamblar Cajón</span>
+          <span>
+            @if (drawerWizardTargetModuleId() !== 'floor' && drawerWizardCount() > 1) {
+              Insertar {{ drawerWizardCount() }} Cajones en Hueco
+            } @else {
+              Crear y Ensamblar Cajón
+            }
+          </span>
         </button>
       </div>
 

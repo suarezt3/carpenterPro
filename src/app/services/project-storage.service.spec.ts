@@ -531,4 +531,335 @@ describe('ProjectStorageService - Duplicación Inteligente y Restricciones Espac
       expect(collisions.length).toBe(0);
     });
   });
+
+  describe('7. Cajón Modular (Smart Cavity Fit, Frentes Overlay/Inset, Push-to-Open, Uñero y Duplicación con 0 Colisiones)', () => {
+    const generateBase600Module = (): { parts: Part[]; group: PartGroup } => {
+      const config: ParametricCabinetConfig = {
+        code: 'MOD_BASE_600',
+        name: 'Módulo Base 600mm',
+        moduleType: 'base_cabinet',
+        category: 'kitchen_base',
+        width: 600,
+        height: 750,
+        depth: 550,
+        structureThickness: 18,
+        doorThickness: 18,
+        backThickness: 3,
+        backType: 'groove',
+        shelvesCount: 0,
+        doorOpening: 'none',
+        structureMaterialId: 'mat_white_18',
+        doorMaterialId: 'mat_white_18',
+        backMaterialId: 'mat_back_3',
+        handleType: 'none',
+        handleFinish: 'chrome',
+        facadeGap: 3,
+        posX: 0,
+        posY: 375,
+        posZ: 0
+      };
+      const res = cabinetGen.generateParametricCabinet(config, MOCK_MATERIALS);
+      return { parts: res.parts, group: res.group };
+    };
+
+    it('debe insertar un Cajón Modular con Frente Exterior Solapado (overlay) en un módulo de 600mm con 0 colisiones', () => {
+      const { parts, group } = generateBase600Module();
+      projectService.updateProject(p => ({
+        ...p,
+        parts,
+        groups: [group]
+      }), false);
+
+      const cavities = partGeometry.detectModuleCavities(group, projectService.currentProject().parts);
+      expect(cavities.length).toBeGreaterThan(0);
+      const cavity = cavities[0];
+      expect(cavity.internalWidth).toBe(564); // 600 - 2 * 18
+
+      const slideLen = partGeometry.getOptimalCommercialSlideLength(cavity.internalDepth, 'overlay', 18);
+      const createdGroups = projectService.addParametricDrawersToCavity(
+        {
+          cavityWidth: cavity.internalWidth,
+          slideLength: slideLen,
+          boxHeight: 140,
+          frontWidth: cavity.internalWidth + 2 * cavity.lateralThickness - 4,
+          frontHeight: 180,
+          thickness: 15,
+          frontThickness: 18,
+          bottomThickness: 3,
+          includeFront: true,
+          frontMountType: 'overlay',
+          handleType: 'handle',
+          materialId: 'mat_white_18',
+          frontMaterialId: 'mat_white_18',
+          bottomMaterialId: 'mat_back_3'
+        },
+        cavity,
+        1
+      );
+
+      expect(createdGroups.length).toBe(1);
+      const drawerGroup = createdGroups[0];
+      expect(drawerGroup.templateId).toBe('modular_drawer');
+
+      const allParts = projectService.currentProject().parts;
+      const drawerParts = allParts.filter(p => p.groupId === drawerGroup.id);
+      const frontPart = drawerParts.find(p => p.componentRole === 'drawer_front')!;
+      expect(frontPart).toBeDefined();
+      expect(frontPart.length).toBe(596); // 600 - 4mm (en vertical_xy length mapea al ancho horizontal X)
+
+      // Verificar que la cara trasera del frente solapado está a +0.5mm delante de los laterales del módulo
+      const frontBounds = partGeometry.getWorldAABB(frontPart);
+      expect(frontBounds.minZ).toBeCloseTo(cavity.frontPlaneZ + 0.5, 1);
+
+      // Cero colisiones en JoineryEngineService.detectCollisions()
+      const collisions = joineryEngine.detectCollisions(allParts);
+      expect(collisions.length).toBe(0);
+    });
+
+    it('debe insertar un Cajón Modular con Frente a Ras Embutido (inset) y Apertura Push-to-Open en un módulo de 600mm con 0 colisiones', () => {
+      const { parts, group } = generateBase600Module();
+      projectService.updateProject(p => ({
+        ...p,
+        parts,
+        groups: [group]
+      }), false);
+
+      const cavities = partGeometry.detectModuleCavities(group, projectService.currentProject().parts);
+      const cavity = cavities[0];
+      const slideLen = partGeometry.getOptimalCommercialSlideLength(cavity.internalDepth, 'inset', 18);
+
+      const createdGroups = projectService.addParametricDrawersToCavity(
+        {
+          cavityWidth: cavity.internalWidth,
+          slideLength: slideLen,
+          boxHeight: 140,
+          frontWidth: cavity.internalWidth - 4,
+          frontHeight: 180,
+          thickness: 15,
+          frontThickness: 18,
+          bottomThickness: 3,
+          includeFront: true,
+          frontMountType: 'inset',
+          handleType: 'push',
+          materialId: 'mat_white_18',
+          frontMaterialId: 'mat_white_18',
+          bottomMaterialId: 'mat_back_3'
+        },
+        cavity,
+        1
+      );
+
+      expect(createdGroups.length).toBe(1);
+      const drawerGroup = createdGroups[0];
+      const allParts = projectService.currentProject().parts;
+      const drawerParts = allParts.filter(p => p.groupId === drawerGroup.id);
+
+      const frontPart = drawerParts.find(p => p.componentRole === 'drawer_front')!;
+      expect(frontPart).toBeDefined();
+      // Ancho del frente embutido: anchoInterno (564) - 4 mm = 560 mm (2mm holgura por lado)
+      expect(frontPart.length).toBe(560);
+      expect(frontPart.hardwareConfig?.handleType).toBe('push');
+      expect(frontPart.hardwareConfig?.slideType).toBe('push_open');
+
+      // La cara exterior del frente embutido queda exactamente a ras (mismo plano Z) que el borde delantero de los laterales
+      const frontBounds = partGeometry.getWorldAABB(frontPart);
+      expect(frontBounds.maxZ).toBeCloseTo(cavity.frontPlaneZ, 1);
+
+      // Retraso automático de la caja interna por espesorFrente (18mm)
+      const sidePart = drawerParts.find(p => p.name.includes('Lateral Izq'))!;
+      const sideBounds = partGeometry.getWorldAABB(sidePart);
+      expect(sideBounds.maxZ).toBeCloseTo(cavity.frontPlaneZ - 18, 1);
+
+      // Cero colisiones en JoineryEngineService.detectCollisions()
+      const collisions = joineryEngine.detectCollisions(allParts);
+      expect(collisions.length).toBe(0);
+    });
+
+    it('debe descontar 28mm en el frente cuando se configura Uñero / Gola (finger_pull) y permitir duplicar verticalmente con 0 colisiones', () => {
+      const { parts, group } = generateBase600Module();
+      projectService.updateProject(p => ({
+        ...p,
+        parts,
+        groups: [group]
+      }), false);
+
+      const cavities = partGeometry.detectModuleCavities(group, projectService.currentProject().parts);
+      const cavity = cavities[0];
+
+      const createdGroups = projectService.addParametricDrawersToCavity(
+        {
+          cavityWidth: cavity.internalWidth,
+          slideLength: 450,
+          boxHeight: 120,
+          frontWidth: cavity.internalWidth - 4,
+          frontHeight: 200,
+          thickness: 15,
+          frontThickness: 18,
+          bottomThickness: 3,
+          includeFront: true,
+          frontMountType: 'inset',
+          handleType: 'finger_pull',
+          materialId: 'mat_white_18',
+          frontMaterialId: 'mat_white_18',
+          bottomMaterialId: 'mat_back_3'
+        },
+        cavity,
+        1
+      );
+
+      const drawerGroup = createdGroups[0];
+      const frontPart = projectService.currentProject().parts.find(
+        p => p.groupId === drawerGroup.id && p.componentRole === 'drawer_front'
+      )!;
+      // 200mm nominal - 28mm descuento uñero = 172mm real (en vertical_xy width mapea a la altura Y)
+      expect(frontPart.width).toBe(172);
+
+      // Duplicar hacia arriba (+Y) en el mismo hueco
+      const dupAbove = projectService.duplicateModularDrawerVertically(drawerGroup.id, 1);
+      expect(dupAbove).not.toBeNull();
+
+      const allParts = projectService.currentProject().parts;
+      const collisions = joineryEngine.detectCollisions(allParts);
+      expect(collisions.length).toBe(0);
+    });
+
+    it('debe insertar una batería de 3 cajones en un hueco repartiendo la luz vertical automáticamente con 0 colisiones', () => {
+      const { parts, group } = generateBase600Module();
+      projectService.updateProject(p => ({
+        ...p,
+        parts,
+        groups: [group]
+      }), false);
+
+      const cavities = partGeometry.detectModuleCavities(group, projectService.currentProject().parts);
+      const cavity = cavities[0];
+
+      const createdGroups = projectService.addParametricDrawersToCavity(
+        {
+          cavityWidth: cavity.internalWidth,
+          slideLength: 450,
+          boxHeight: 140,
+          frontWidth: cavity.internalWidth + 32,
+          frontHeight: 180,
+          thickness: 15,
+          frontThickness: 18,
+          bottomThickness: 3,
+          includeFront: true,
+          frontMountType: 'overlay',
+          handleType: 'handle',
+          materialId: 'mat_white_18',
+          frontMaterialId: 'mat_white_18',
+          bottomMaterialId: 'mat_back_3'
+        },
+        cavity,
+        3
+      );
+
+      expect(createdGroups.length).toBe(3);
+
+      const allParts = projectService.currentProject().parts;
+      const collisions = joineryEngine.detectCollisions(allParts);
+      expect(collisions.length).toBe(0);
+    });
+
+    it('debe permitir editar manualmente outerWidth en el Inspector aunque tenga hostGroupId y restaurarlo con autoFitModularDrawerToCavity', () => {
+      const { parts, group } = generateBase600Module();
+      projectService.updateProject(p => ({
+        ...p,
+        parts,
+        groups: [group]
+      }), false);
+
+      const cavities = partGeometry.detectModuleCavities(group, projectService.currentProject().parts);
+      const cavity = cavities[0];
+      const [drawerGroup] = projectService.addParametricDrawersToCavity(cavity, 1, {
+        slideLength: 450,
+        boxHeight: 140,
+        bottomThickness: 3,
+        includeFront: true,
+        frontMountType: 'inset',
+        handleType: 'handle'
+      });
+
+      expect(projectService.getModularDrawerConfig(drawerGroup.id)?.outerWidth).toBe(564);
+
+      // El usuario edita manualmente Ancho de Hueco a 480mm desde el Inspector Contextual
+      projectService.updateModularDrawerGroup(drawerGroup.id, { outerWidth: 480 });
+      const customCfg = projectService.getModularDrawerConfig(drawerGroup.id)!;
+      expect(customCfg.outerWidth).toBe(480);
+
+      // Luego pulsa Auto-ajustar al hueco del mueble en 1 clic
+      const refitted = projectService.autoFitModularDrawerToCavity(drawerGroup.id);
+      expect(refitted).not.toBeNull();
+      expect(projectService.getModularDrawerConfig(drawerGroup.id)?.outerWidth).toBe(564);
+
+      const collisions = joineryEngine.detectCollisions(projectService.currentProject().parts);
+      expect(collisions.length).toBe(0);
+    });
+
+    it('debe preservar la orientación y posición 3D al editar parámetros en el Inspector tras rotar 90° el módulo y el cajón', () => {
+      const { parts, group } = generateBase600Module();
+      projectService.updateProject(p => ({
+        ...p,
+        parts,
+        groups: [group]
+      }), false);
+
+      const cavities = partGeometry.detectModuleCavities(group, projectService.currentProject().parts);
+      const [drawerGroup] = projectService.addParametricDrawersToCavity(cavities[0], 1, {
+        slideLength: 450,
+        boxHeight: 140,
+        bottomThickness: 3,
+        includeFront: true,
+        frontMountType: 'overlay',
+        handleType: 'handle'
+      });
+
+      // Rotar rígidamente 90° tanto el gabinete como el cajón
+      const allIds = projectService.currentProject().parts.map(p => p.id);
+      projectService.rotateMultiplePartsRigidly(allIds, 90);
+
+      // Cambiar en el Inspector de 'overlay' a 'inset' y a apertura 'push'
+      const updated = projectService.updateModularDrawerGroup(drawerGroup.id, {
+        frontMountType: 'inset',
+        handleType: 'push'
+      });
+      expect(updated).not.toBeNull();
+      expect(updated!.facingDirection).toBe('right');
+
+      const liveCfg = projectService.getModularDrawerConfig(drawerGroup.id)!;
+      expect(liveCfg.facingDirection).toBe('right');
+      expect(liveCfg.frontMountType).toBe('inset');
+      expect(liveCfg.handleType).toBe('push');
+
+      const collisions = joineryEngine.detectCollisions(projectService.currentProject().parts);
+      expect(collisions.length).toBe(0);
+    });
+
+    it('debe retornar null al duplicar hacia abajo (-Y) un cajón que ya está apoyado en la base del vano sin generar colisión en Y=0', () => {
+      const { parts, group } = generateBase600Module();
+      projectService.updateProject(p => ({
+        ...p,
+        parts,
+        groups: [group]
+      }), false);
+
+      const cavities = partGeometry.detectModuleCavities(group, projectService.currentProject().parts);
+      const [drawerGroup] = projectService.addParametricDrawersToCavity(cavities[0], 1, {
+        slideLength: 450,
+        boxHeight: 140,
+        bottomThickness: 3,
+        includeFront: true,
+        frontMountType: 'overlay',
+        handleType: 'handle'
+      });
+
+      const dupBelow = projectService.duplicateModularDrawerVertically(drawerGroup.id, 'down');
+      expect(dupBelow).toBeNull();
+
+      const collisions = joineryEngine.detectCollisions(projectService.currentProject().parts);
+      expect(collisions.length).toBe(0);
+    });
+  });
 });
+

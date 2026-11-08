@@ -1061,7 +1061,7 @@
           }
         </div>
 
-        <!-- BOTÓN EDITAR MÓDULO COMPLETO (Solo para Módulos/Armarios, no para cajones sueltos) -->
+        <!-- BOTÓN EDITAR MÓDULO COMPLETO E INSERTAR CAJÓN EN HUECO -->
         @if (part.groupId && isContextMenuCabinetModule()) {
           <button
             type="button"
@@ -1071,7 +1071,31 @@
               <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="2" class="text-indigo-600"></hugeicons-icon>
               <span>Editar Módulo Completo</span>
             </div>
-            <span class="text-[9px] font-mono bg-indigo-200/60 text-indigo-800 px-1.5 py-0.5 rounded uppercase">Paramétrico</span>
+            <span class="text-[9px] font-sans font-bold bg-indigo-200/60 text-indigo-800 px-1.5 py-0.5 rounded uppercase">Paramétrico</span>
+          </button>
+
+          <button
+            type="button"
+            (click)="$event.stopPropagation(); requestInsertDrawerInContextCavity()"
+            class="w-full my-0.5 py-1.5 px-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 font-bold rounded-xl flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
+            <div class="flex items-center gap-1.5">
+              <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="2" class="text-emerald-600"></hugeicons-icon>
+              <span>{{ 'drawer.insertInCavity3d' | t }}</span>
+            </div>
+            <span class="text-[9px] font-sans font-bold bg-emerald-200/60 text-emerald-900 px-1.5 py-0.5 rounded uppercase">Auto-Fit</span>
+          </button>
+        }
+
+        @if (part.groupId && isContextMenuDrawerGroup()) {
+          <button
+            type="button"
+            (click)="$event.stopPropagation(); onEditModuleFromContext(part.groupId, $event)"
+            class="w-full my-0.5 py-1.5 px-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 text-indigo-700 font-bold rounded-xl flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
+            <div class="flex items-center gap-1.5">
+              <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="2" class="text-indigo-600"></hugeicons-icon>
+              <span>{{ 'drawer.editDrawer' | t }}</span>
+            </div>
+            <span class="text-[9px] font-sans font-bold bg-indigo-200/60 text-indigo-800 px-1.5 py-0.5 rounded uppercase">Editar</span>
           </button>
         }
 

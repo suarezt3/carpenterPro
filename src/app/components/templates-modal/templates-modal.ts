@@ -185,7 +185,7 @@ export class TemplatesModalComponent {
 
   // Parámetros reactivos específicos para Cajoneras (Gavetas)
   drawersCount = signal<number>(3);
-  drawerSlideType = signal<'telescopic' | 'soft_close' | 'telescopic_35' | 'undermount'>('telescopic');
+  drawerSlideType = signal<'telescopic' | 'soft_close' | 'telescopic_35' | 'undermount' | 'push_open'>('telescopic');
   drawerFrontType = signal<'overlay' | 'inset'>('overlay');
   hasPlinth = signal<boolean>(true);
   plinthHeight = signal<number>(70);

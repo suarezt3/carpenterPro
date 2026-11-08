@@ -23,6 +23,7 @@ export type ComponentRole =
   | 'door' 
   | 'drawer_front' 
   | 'drawer_box'
+  | 'drawer_bottom'
   | 'drawer_lateral'
   | 'plinth' 
   | 'tie'
@@ -65,6 +66,11 @@ export type HandleType =
   | 'knob_round' 
   | 'knob_square' 
   | 'cup_vintage' 
+  | 'push_open'
+  | 'gola_less'
+  | 'handle'
+  | 'push'
+  | 'finger_pull'
   | 'none';
 
 export type HandleFinish = 
@@ -86,9 +92,48 @@ export type HingeType =
 export type SlideType = 
   | 'telescopic'     // Telescópica 45mm
   | 'soft_close'     // Telescópica con Cierre Suave
+  | 'push_open'      // Telescópica Push-to-Open (Apertura por presión)
   | 'undermount'     // Corredera Oculta bajo fondo
   | 'telescopic_35'  // Telescópica Ligera 35mm
   | 'none';
+
+export type DrawerFrontMountType = 'overlay' | 'inset' | 'none';
+export type DrawerOpeningSystem = 'handle' | 'push' | 'finger_pull';
+
+export interface ModuleCavityInfo {
+  id: string;
+  groupId: string;
+  moduleId: string;
+  moduleName: string;
+  groupName: string;
+  bayIndex?: number;
+  verticalIndex?: number;
+  totalInBay?: number;
+  label: string;
+  facingDirection: 'front' | 'right' | 'back' | 'left';
+  rotationY: number;
+  minSpan?: number;
+  maxSpan?: number;
+  centerSpan?: number;
+  innerWidth: number;
+  internalWidth: number;
+  leftSideThickness: number;
+  rightSideThickness: number;
+  sideThickness: number;
+  lateralThickness: number;
+  minY: number;
+  maxY: number;
+  height: number;
+  internalHeight: number;
+  frontEdgeCoord: number;
+  frontPlaneZ: number;
+  backInnerCoord: number;
+  internalDepth: number;
+  optimalSlideLength: number;
+  centerX: number;
+  centerY?: number;
+  centerZ: number;
+}
 
 export type OpeningDirection = 'left' | 'right' | 'top' | 'bottom';
 
@@ -104,39 +149,61 @@ export interface PartHardwareConfig {
   slideType?: SlideType;
   slideLength?: number;
   isOpen?: boolean;
+  frontMountType?: DrawerFrontMountType;
+  drawerOpeningSystem?: DrawerOpeningSystem;
 }
 
 export interface PartGroup {
   id: string;
   name: string; // ej. "Cajón 1", "Cajón Inferior"
   type: 'drawer' | 'door_set' | 'assembly' | 'custom';
+  subType?: 'drawer' | string;
+  templateId?: 'modular_drawer' | string;
   isCountertop?: boolean;
   facingDirection?: 'front' | 'right' | 'back' | 'left';
   isOpen?: boolean; // Estado abierto/cerrado
   slideExtension?: number; // 0 (cerrado) a 1 (100% abierto)
   slideLength?: number; // Largo de corredera en mm (ej. 400, 450, 500)
-  slideType?: SlideType; // Telescópica estándar, cierre suave, etc.
+  slideType?: SlideType; // Telescópica estándar, cierre suave, push_open, etc.
   colorHex?: string;
   frontGap?: number; // Holgura lateral para correderas (26mm total)
   parametricConfig?: ParametricCabinetConfig;
+  drawerConfig?: ParametricDrawerConfig;
+  hostGroupId?: string;
+  hostCavityId?: string;
   isLocked?: boolean;
 }
 
 export interface ParametricDrawerConfig {
   name: string; // ej. "Cajón 1"
-  outerWidth: number; // Ancho del hueco / exterior en mm (ej. 400)
+  outerWidth: number; // Ancho del hueco / luz interna horizontal en mm (ej. 564)
+  cavityWidth?: number; // Alias de outerWidth
   slideLength: number; // Largo de corredera / profundidad del cajón en mm (ej. 450)
   boxHeight: number; // Altura de caja del cajón en mm (ej. 140)
   boxThickness: number; // Espesor de laterales/trasera (default: 15mm)
+  thickness?: number; // Alias de boxThickness
   bottomThickness: number; // Espesor del fondo (default: 3mm MDF)
   slideGap: number; // Holgura total correderas (default: 26mm = 13mm cada lado)
   includeFront: boolean; // Si incluye frente/tapa exterior visto
-  frontHeight?: number; // Altura del frente exterior (mm)
+  frontMountType?: DrawerFrontMountType; // 'overlay' | 'inset' | 'none'
+  handleType?: DrawerOpeningSystem; // 'handle' | 'push' | 'finger_pull'
+  frontHeight?: number; // Altura nominal del frente exterior (mm)
   frontWidth?: number; // Ancho del frente exterior (mm)
+  frontThickness?: number; // Espesor de tapa frontal (15 o 18 mm)
+  sideThickness?: number; // Espesor de laterales del módulo receptor (15 o 18 mm)
+  facingDirection?: 'front' | 'right' | 'back' | 'left';
+  rotationY?: number;
+  frontEdgeCoord?: number; // Coordenada Z (o X) del borde frontal de los laterales del módulo
+  hostGroupId?: string; // ID del módulo donde está encajado
+  hostCavityId?: string; // ID del vano/hueco donde está encajado
+  targetModuleId?: string;
+  targetCavityId?: string;
+  drawersCount?: 1 | 2 | 3 | 4; // Cantidad de cajones a insertar en el hueco
   posX?: number; // Posición X inicial (centro)
   posY?: number; // Posición Y inicial (elevación base)
   posZ?: number; // Posición Z inicial (profundidad centro)
   materialId?: string;
+  frontMaterialId?: string;
   bottomMaterialId?: string;
 }
 
@@ -172,7 +239,7 @@ export interface ParametricCabinetConfig {
   posZ?: number;
   // Propiedades paramétricas específicas de cajoneras y multi-ambiente
   drawersCount?: number; // Número de gavetas (2, 3, 4, 5, 6)
-  drawerSlideType?: 'telescopic' | 'soft_close' | 'telescopic_35' | 'undermount';
+  drawerSlideType?: 'telescopic' | 'soft_close' | 'telescopic_35' | 'undermount' | 'push_open';
   drawerFrontType?: 'overlay' | 'inset';
   hasPlinth?: boolean;
   plinthHeight?: number;

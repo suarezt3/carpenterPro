@@ -22,7 +22,11 @@ import {
   getResolvedRoomWalls,
   rescaleWallsToFloor,
   WorkspaceMode,
-  Camera3DState
+  Camera3DState,
+  DrawerFrontMountType,
+  DrawerOpeningSystem,
+  ModuleCavityInfo,
+  SlideType
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { JoineryEngineService } from './joinery-engine.service';
@@ -2082,7 +2086,7 @@ export class ProjectStorageService {
                 pt.componentRole === 'drawer_lateral' ||
                 (pt.name.toUpperCase().includes('LATERAL') && pt.name.toUpperCase().includes('CAJ')));
 
-            if ((isBacksplash || isPlinth || isDrawerBoxSide) && horizontalSpan > verticalHeight) {
+            if (isDrawerBoxSide || ((isBacksplash || isPlinth) && horizontalSpan > verticalHeight)) {
               newLength = horizontalSpan;
               newWidth = verticalHeight;
             } else {
@@ -2581,7 +2585,7 @@ export class ProjectStorageService {
               pt.componentRole === 'drawer_lateral' ||
               (pt.name.toUpperCase().includes('LATERAL') && pt.name.toUpperCase().includes('CAJ')));
 
-          if ((isPlinth || isDrawerBoxSide) && newSz > newSy) {
+          if (isDrawerBoxSide || (isPlinth && newSz > newSy)) {
             newLength = newSz;
             newWidth = newSy;
           } else {
@@ -2723,77 +2727,224 @@ export class ProjectStorageService {
     });
   }
 
-  addParametricDrawer(cfg: ParametricDrawerConfig): PartGroup {
-    const defaultMat = this.materialsList().find(m => m.id === cfg.materialId) || this.materialsList()[0];
-    const mdfMat = this.materialsList().find(m => m.id === cfg.bottomMaterialId || m.thickness === 3) || defaultMat;
+  /**
+   * Construye de forma determinista y con 0 colisiones las piezas 3D de un Cajón Modular
+   * según su montaje de frente ('overlay' | 'inset' | 'none'), sistema de apertura
+   * ('handle' | 'push' | 'finger_pull') y orientación del mueble ('front' | 'right' | 'back' | 'left').
+   */
+  buildModularDrawerParts(
+    groupId: string,
+    groupName: string,
+    cfg: ParametricDrawerConfig
+  ): { parts: Part[]; normalizedConfig: ParametricDrawerConfig } {
+    const currentProj = this.currentProject();
+    const materials = this.materialsList();
+    const defaultMat =
+      materials.find(m => m.id === cfg.materialId) ||
+      materials.find(m => m.thickness >= 15) ||
+      materials[0];
+    const frontMat =
+      materials.find(m => m.id === (cfg.frontMaterialId || cfg.materialId)) ||
+      defaultMat;
+    const mdfMat =
+      materials.find(m => m.id === cfg.bottomMaterialId || m.thickness === 3) ||
+      defaultMat;
 
-    const t = cfg.boxThickness || 15;
-    const bT = cfg.bottomThickness || 3;
+    const frontMountType: DrawerFrontMountType =
+      cfg.frontMountType ?? (cfg.includeFront === false ? 'none' : 'overlay');
+    const handleType: DrawerOpeningSystem = cfg.handleType ?? 'handle';
+
+    const t = Math.max(12, cfg.boxThickness || cfg.thickness || 15);
+    const ft = Math.max(12, cfg.frontThickness || t);
+    const bT = Math.max(3, cfg.bottomThickness || 3);
     const gap = cfg.slideGap ?? 26;
-    const boxWidth = Math.max(120, cfg.outerWidth - gap);
-    const boxLen = cfg.slideLength || 450;
-    const boxH = cfg.boxHeight || 140;
 
-    const basePosX = cfg.posX ?? 0;
-    const basePosY = cfg.posY ?? 100;
-    const basePosZ = cfg.posZ ?? 0;
+    const effectiveHostGroupId = cfg.hostGroupId || cfg.targetModuleId;
+    const effectiveHostCavityId = cfg.hostCavityId || cfg.targetCavityId;
 
-    const groupId = 'grp_caj_' + crypto.randomUUID().slice(0, 8);
-    const groupName = cfg.name || `Cajón ${(this.groupsList().length) + 1}`;
+    // Detectar si el cajón se ubica dentro de un hueco existente en la escena
+    let matchedCavity: ModuleCavityInfo | undefined;
+    if (effectiveHostGroupId && effectiveHostGroupId !== 'floor') {
+      const hostGrp = (currentProj?.groups || []).find(g => g.id === effectiveHostGroupId);
+      const cavs = this.partGeometry.detectModuleCavities(
+        effectiveHostGroupId,
+        currentProj?.parts || [],
+        hostGrp
+      );
+      matchedCavity =
+        (effectiveHostCavityId ? cavs.find(c => c.id === effectiveHostCavityId) : undefined) ||
+        cavs[0];
+    } else if (cfg.frontEdgeCoord === undefined && currentProj) {
+      const reqX = cfg.posX ?? 0;
+      const reqY = cfg.posY ?? 100;
+      const reqZ = cfg.posZ ?? 0;
+      const allCavs = this.partGeometry.detectAllSceneCavities(
+        currentProj.parts || [],
+        currentProj.groups || []
+      );
+      matchedCavity = allCavs.find(c => {
+        const isWZ = c.facingDirection === 'right' || c.facingDirection === 'left';
+        const spanDist = isWZ ? Math.abs(reqZ - c.centerZ) : Math.abs(reqX - c.centerX);
+        const depthDist = isWZ ? Math.abs(reqX - c.centerX) : Math.abs(reqZ - c.centerZ);
+        return (
+          spanDist <= c.innerWidth / 2 + 40 &&
+          depthDist <= c.internalDepth / 2 + 80 &&
+          reqY >= c.minY - 25 &&
+          reqY <= c.maxY + 25
+        );
+      });
+    }
 
-    const newGroup: PartGroup = {
-      id: groupId,
-      name: groupName,
-      type: 'drawer',
-      isOpen: false,
-      slideExtension: 0,
-      slideLength: boxLen,
-      slideType: 'telescopic',
-      frontGap: gap
-    };
+    const facingDirection: 'front' | 'right' | 'back' | 'left' =
+      cfg.facingDirection ?? matchedCavity?.facingDirection ?? 'front';
+    const isWidthZ = facingDirection === 'right' || facingDirection === 'left';
+    const dirSign = facingDirection === 'front' || facingDirection === 'right' ? 1 : -1;
+
+    const st = Math.max(12, cfg.sideThickness ?? matchedCavity?.leftSideThickness ?? 18);
+
+    // Si el usuario pasó el ancho total del módulo (ej. 600mm) o no especificó un ancho personalizado, usar la luz interna real de la cavidad
+    const rawRequestedWidth = cfg.outerWidth || cfg.cavityWidth || 0;
+    const isOuterCabinetWidth =
+      !!matchedCavity &&
+      rawRequestedWidth > 0 &&
+      Math.abs(
+        rawRequestedWidth -
+          (matchedCavity.innerWidth + matchedCavity.leftSideThickness + matchedCavity.rightSideThickness)
+      ) <= 6;
+    let outerWidth = Math.max(140, rawRequestedWidth || matchedCavity?.innerWidth || 564);
+    if (matchedCavity && (rawRequestedWidth <= 0 || isOuterCabinetWidth)) {
+      outerWidth = matchedCavity.innerWidth;
+    }
+
+    let slideLength = cfg.slideLength || 450;
+    if (matchedCavity) {
+      const setback = frontMountType === 'inset' ? ft : frontMountType === 'none' ? 5 : 0;
+      if (slideLength + setback > matchedCavity.internalDepth) {
+        slideLength = this.partGeometry.getOptimalCommercialSlideLength(
+          matchedCavity.internalDepth,
+          frontMountType,
+          ft
+        );
+      }
+    }
+
+    const boxWidth = Math.max(100, Math.round((outerWidth - gap) * 10) / 10);
+    const testeraWidth = Math.max(60, Math.round((boxWidth - 2 * t) * 10) / 10);
+
+    const nominalFrontH = Math.max(80, Math.round(cfg.frontHeight || (cfg.boxHeight || 140) + bT + 30));
+    // Si es Uñero / Gola ('finger_pull'), descontar automáticamente 28 mm en el borde superior del frente
+    const effFrontH =
+      handleType === 'finger_pull' && frontMountType !== 'none'
+        ? Math.max(60, nominalFrontH - 28)
+        : nominalFrontH;
+
+    const rawBoxH = Math.max(50, Math.round(cfg.boxHeight || 140));
+    const effBoxH =
+      frontMountType !== 'none'
+        ? Math.max(50, Math.min(rawBoxH, effFrontH - bT - 6))
+        : rawBoxH;
+
+    // Ancho del frente según tipo de montaje:
+    // - 'inset': anchoInterno - 4 mm (2 mm de holgura por lado para 0 colisiones contra laterales)
+    // - 'overlay': anchoInterno + 2 * espesorLateral - 4 mm (cubre ambos cantos con 2 mm de margen exterior)
+    const frontWidth =
+      frontMountType === 'inset'
+        ? Math.max(100, Math.round((outerWidth - 4) * 10) / 10)
+        : cfg.frontWidth && cfg.frontMountType === 'overlay' && Math.abs(cfg.frontWidth - outerWidth) > 2
+          ? Math.round(cfg.frontWidth * 10) / 10
+          : Math.max(100, Math.round((outerWidth + 2 * st - 4) * 10) / 10);
+
+    const basePosX = matchedCavity && !isWidthZ ? matchedCavity.centerX : (cfg.posX ?? 0);
+    const basePosZ = matchedCavity && isWidthZ ? matchedCavity.centerZ : (cfg.posZ ?? 0);
+    let basePosY = cfg.posY ?? (matchedCavity ? matchedCavity.minY + 2 : 100);
+    if (matchedCavity && basePosY < matchedCavity.minY + 1.5 && basePosY >= matchedCavity.minY - 10) {
+      basePosY = matchedCavity.minY + 2;
+    }
+
+    // Coordenada del plano frontal de los laterales del mueble
+    const defaultDepthCenter = isWidthZ ? (cfg.posX ?? 0) : (cfg.posZ ?? 0);
+    const frontEdgeCoord =
+      cfg.frontEdgeCoord ??
+      matchedCavity?.frontEdgeCoord ??
+      Math.round((defaultDepthCenter + dirSign * (slideLength / 2 + (frontMountType === 'inset' ? ft : 0))) * 10) / 10;
+
+    // Posicionamiento en el eje de profundidad:
+    // - 'overlay': frente 0.5 mm por delante del borde de los laterales; caja interna llega hasta frontEdgeCoord
+    // - 'inset': cara exterior del frente exactamente a ras (en frontEdgeCoord); caja interna retrasada por espesorFrente (ft)
+    // - 'none': sin frente; caja interna retrasada 5 mm dentro del vano
+    const boxFrontEdge =
+      frontMountType === 'inset'
+        ? frontEdgeCoord - dirSign * ft
+        : frontMountType === 'none'
+          ? frontEdgeCoord - dirSign * 5
+          : frontEdgeCoord;
+
+    const boxDepthCenter = Math.round((boxFrontEdge - dirSign * (slideLength / 2)) * 10) / 10;
+    const contraFrenteDepthPos = Math.round((boxFrontEdge - dirSign * (t / 2)) * 10) / 10;
+    const traseraDepthPos = Math.round((boxFrontEdge - dirSign * (slideLength - t / 2)) * 10) / 10;
+    const frontDepthPos =
+      frontMountType === 'inset'
+        ? Math.round((frontEdgeCoord - dirSign * (ft / 2)) * 10) / 10
+        : Math.round((frontEdgeCoord + dirSign * (0.5 + ft / 2)) * 10) / 10;
+
+    const boxCenterY = Math.round((basePosY + bT + effBoxH / 2) * 10) / 10;
+    const fondoCenterY = Math.round((basePosY + bT / 2) * 10) / 10;
+    const frontCenterY = Math.round((basePosY + effFrontH / 2) * 10) / 10;
+
+    const spanCenter = isWidthZ ? basePosZ : basePosX;
+    const leftSpanPos = Math.round((spanCenter - boxWidth / 2 + t / 2) * 10) / 10;
+    const rightSpanPos = Math.round((spanCenter + boxWidth / 2 - t / 2) * 10) / 10;
+
+    const partHandleType: HandleType =
+      handleType === 'handle'
+        ? 'bar_modern'
+        : handleType === 'finger_pull'
+          ? 'finger_pull'
+          : 'push';
+    const partSlideType: SlideType = handleType === 'push' ? 'push_open' : 'telescopic';
 
     const fondo: Part = {
       id: `${groupId}_fondo_mdf`,
       name: `Fondo MDF (${groupName})`,
       groupId,
       groupName,
-      length: boxWidth,
-      width: boxLen,
+      length: isWidthZ ? slideLength : boxWidth,
+      width: isWidthZ ? boxWidth : slideLength,
       thickness: bT,
       quantity: 1,
       materialId: mdfMat ? mdfMat.id : 'mat_mdf_3',
       materialName: mdfMat ? mdfMat.name : 'MDF Durolac Blanco',
+      colorHex: mdfMat?.colorHex,
       grain: 'none',
       edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-      posX: basePosX,
-      posY: basePosY + (bT / 2),
-      posZ: basePosZ,
+      posX: isWidthZ ? boxDepthCenter : spanCenter,
+      posY: fondoCenterY,
+      posZ: isWidthZ ? spanCenter : boxDepthCenter,
       orientation: 'horizontal',
       componentRole: 'drawer_box',
       notes: 'Fondo MDF 3mm colocado por debajo de la caja'
     };
-
-    const boxCenterY = basePosY + bT + (boxH / 2);
 
     const latIzq: Part = {
       id: `${groupId}_lat_izq`,
       name: `Lateral Izq (${groupName})`,
       groupId,
       groupName,
-      length: boxLen,
-      width: boxH,
+      length: slideLength,
+      width: effBoxH,
       thickness: t,
       quantity: 1,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
       materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      colorHex: defaultMat?.colorHex,
       grain: defaultMat?.hasGrain ? 'length' : 'none',
       edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-      posX: basePosX - (boxWidth / 2) + (t / 2),
+      posX: isWidthZ ? boxDepthCenter : leftSpanPos,
       posY: boxCenterY,
-      posZ: basePosZ,
-      orientation: 'vertical_yz',
+      posZ: isWidthZ ? leftSpanPos : boxDepthCenter,
+      orientation: isWidthZ ? 'vertical_xy' : 'vertical_yz',
       componentRole: 'drawer_box',
-      notes: `Corredera ${boxLen}mm`
+      notes: `Corredera ${slideLength}mm`
     };
 
     const latDer: Part = {
@@ -2801,41 +2952,56 @@ export class ProjectStorageService {
       name: `Lateral Der (${groupName})`,
       groupId,
       groupName,
-      length: boxLen,
-      width: boxH,
+      length: slideLength,
+      width: effBoxH,
       thickness: t,
       quantity: 1,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
       materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      colorHex: defaultMat?.colorHex,
       grain: defaultMat?.hasGrain ? 'length' : 'none',
       edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-      posX: basePosX + (boxWidth / 2) - (t / 2),
+      posX: isWidthZ ? boxDepthCenter : rightSpanPos,
       posY: boxCenterY,
-      posZ: basePosZ,
-      orientation: 'vertical_yz',
+      posZ: isWidthZ ? rightSpanPos : boxDepthCenter,
+      orientation: isWidthZ ? 'vertical_xy' : 'vertical_yz',
       componentRole: 'drawer_box',
-      notes: `Corredera ${boxLen}mm`
+      notes: `Corredera ${slideLength}mm`
     };
 
-    const testeraWidth = Math.max(80, boxWidth - (2 * t));
     const contraFrente: Part = {
       id: `${groupId}_contrafrente`,
       name: `Contra-frente (${groupName})`,
       groupId,
       groupName,
       length: testeraWidth,
-      width: boxH,
+      width: effBoxH,
       thickness: t,
       quantity: 1,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
       materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      colorHex: defaultMat?.colorHex,
       grain: defaultMat?.hasGrain ? 'length' : 'none',
       edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-      posX: basePosX,
+      posX: isWidthZ ? contraFrenteDepthPos : spanCenter,
       posY: boxCenterY,
-      posZ: basePosZ + (boxLen / 2) - (t / 2),
-      orientation: 'vertical_xy',
+      posZ: isWidthZ ? spanCenter : contraFrenteDepthPos,
+      orientation: isWidthZ ? 'vertical_yz' : 'vertical_xy',
       componentRole: 'drawer_box',
+      ...(frontMountType === 'none'
+        ? {
+            hardwareConfig: {
+              isMovable: true,
+              movableType: 'drawer' as const,
+              handleType: 'none' as const,
+              handlePosition: 'centered' as const,
+              slideType: partSlideType,
+              frontMountType: 'none' as const,
+              drawerOpeningSystem: handleType,
+              isOpen: false
+            }
+          }
+        : {}),
       notes: 'Frente interior de caja'
     };
 
@@ -2845,67 +3011,178 @@ export class ProjectStorageService {
       groupId,
       groupName,
       length: testeraWidth,
-      width: boxH,
+      width: effBoxH,
       thickness: t,
       quantity: 1,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
       materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
+      colorHex: defaultMat?.colorHex,
       grain: defaultMat?.hasGrain ? 'length' : 'none',
       edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-      posX: basePosX,
+      posX: isWidthZ ? traseraDepthPos : spanCenter,
       posY: boxCenterY,
-      posZ: basePosZ - (boxLen / 2) + (t / 2),
-      orientation: 'vertical_xy',
+      posZ: isWidthZ ? spanCenter : traseraDepthPos,
+      orientation: isWidthZ ? 'vertical_yz' : 'vertical_xy',
       componentRole: 'drawer_box',
       notes: 'Trasera de caja'
     };
 
-    const newParts: Part[] = [latIzq, latDer, contraFrente, trasera, fondo];
+    const parts: Part[] = [latIzq, latDer, contraFrente, trasera, fondo];
 
-    const includeFront = cfg.includeFront !== false;
-    if (includeFront) {
-      const fW = cfg.frontWidth || cfg.outerWidth;
-      const fH = cfg.frontHeight || (boxH + bT + 30);
+    if (frontMountType !== 'none') {
+      const mountLabel =
+        frontMountType === 'inset' ? 'Frente A Ras (Embutido)' : 'Frente Exterior Solapado';
+      const openLabel =
+        handleType === 'push'
+          ? 'Push-to-Open'
+          : handleType === 'finger_pull'
+            ? 'Uñero Superior (-28mm)'
+            : 'Con Tirador';
+
       const frente: Part = {
         id: `${groupId}_frente`,
         name: `Frente Vista (${groupName})`,
         groupId,
         groupName,
-        length: fW,
-        width: fH,
-        thickness: t,
+        length: isWidthZ ? effFrontH : frontWidth,
+        width: isWidthZ ? frontWidth : effFrontH,
+        thickness: ft,
         quantity: 1,
-        materialId: defaultMat ? defaultMat.id : 'mat-1',
-        materialName: defaultMat ? defaultMat.name : 'Melamina Estándar',
-        grain: defaultMat?.hasGrain ? 'length' : 'none',
+        materialId: frontMat ? frontMat.id : 'mat-1',
+        materialName: frontMat ? frontMat.name : 'Melamina Estándar',
+        colorHex: frontMat?.colorHex,
+        grain: frontMat?.hasGrain ? 'length' : 'none',
         edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
-        posX: basePosX,
-        posY: basePosY + (fH / 2),
-        posZ: basePosZ + (boxLen / 2) + (t / 2),
-        orientation: 'vertical_xy',
+        posX: isWidthZ ? frontDepthPos : spanCenter,
+        posY: frontCenterY,
+        posZ: isWidthZ ? spanCenter : frontDepthPos,
+        orientation: isWidthZ ? 'vertical_yz' : 'vertical_xy',
         componentRole: 'drawer_front',
         hardwareConfig: {
           isMovable: true,
           movableType: 'drawer',
-          handleType: 'bar_modern',
+          handleType: partHandleType,
           handlePosition: 'centered',
-          slideType: 'telescopic',
+          slideType: partSlideType,
+          frontMountType,
+          drawerOpeningSystem: handleType,
           isOpen: false
         },
-        notes: 'Frente visto con tirador y cantos gruesos'
+        notes: `${mountLabel} · ${openLabel}`
       };
-      newParts.push(frente);
+      parts.push(frente);
     }
 
-    const slideHwItem: HardwareItem = {
-      id: 'hw_slide_' + crypto.randomUUID().slice(0, 8),
-      name: `Par Correderas Telescópicas ${boxLen}mm (${groupName})`,
+    const normalizedConfig: ParametricDrawerConfig = {
+      name: groupName,
+      outerWidth,
+      cavityWidth: outerWidth,
+      slideLength,
+      boxHeight: effBoxH,
+      frontHeight: nominalFrontH,
+      frontWidth,
+      includeFront: frontMountType !== 'none',
+      frontMountType,
+      handleType,
+      materialId: defaultMat?.id || cfg.materialId || 'mat-1',
+      frontMaterialId: frontMat?.id || cfg.frontMaterialId || cfg.materialId || 'mat-1',
+      bottomMaterialId: mdfMat?.id || cfg.bottomMaterialId || 'mat_mdf_3',
+      boxThickness: t,
+      thickness: t,
+      frontThickness: ft,
+      sideThickness: st,
+      bottomThickness: bT,
+      slideGap: gap,
+      posX: isWidthZ ? boxDepthCenter : spanCenter,
+      posY: basePosY,
+      posZ: isWidthZ ? spanCenter : boxDepthCenter,
+      facingDirection,
+      frontEdgeCoord,
+      hostGroupId: effectiveHostGroupId ?? matchedCavity?.groupId,
+      hostCavityId: effectiveHostCavityId ?? matchedCavity?.id,
+      drawersCount: 1
+    };
+
+    return { parts, normalizedConfig };
+  }
+
+  private buildDrawerHardwareItems(
+    groupId: string,
+    groupName: string,
+    cfg: ParametricDrawerConfig
+  ): HardwareItem[] {
+    const items: HardwareItem[] = [];
+    const boxLen = cfg.slideLength || 450;
+    const isPush = cfg.handleType === 'push';
+    const isHandle = (cfg.handleType ?? 'handle') === 'handle' && cfg.frontMountType !== 'none';
+
+    items.push({
+      id: `hw_slide_${groupId}`,
+      name: isPush
+        ? `Corredera Telescópica Push-to-Open (Apertura por presión) ${boxLen}mm (${groupName})`
+        : `Par Correderas Telescópicas ${boxLen}mm (${groupName})`,
       category: 'slide',
       unit: 'par',
       quantity: 1,
-      unitCost: 18500,
+      unitCost: isPush ? 26500 : 18500,
       notes: `Para ${groupName}`
+    });
+
+    if (isHandle) {
+      items.push({
+        id: `hw_handle_${groupId}`,
+        name: `Tirador Metálico para Cajón (${groupName})`,
+        category: 'handle',
+        unit: 'und',
+        quantity: 1,
+        unitCost: 8500,
+        notes: `Para ${groupName}`
+      });
+    }
+
+    return items;
+  }
+
+  addParametricDrawer(cfg: Partial<ParametricDrawerConfig> & Pick<ParametricDrawerConfig, 'slideLength' | 'boxHeight' | 'bottomThickness' | 'includeFront'>): PartGroup {
+    const drawerGroupsCount = (this.groupsList() || []).filter(
+      g => g.type === 'drawer' || g.subType === 'drawer' || g.templateId === 'modular_drawer'
+    ).length;
+    const groupId = 'drawer_grp_' + crypto.randomUUID().slice(0, 8);
+    const groupName = cfg.name || `Cajón ${drawerGroupsCount + 1}`;
+
+    const hasHostModule = !!(cfg.hostGroupId || cfg.targetModuleId);
+    const fullInputCfg: ParametricDrawerConfig = {
+      name: groupName,
+      outerWidth: cfg.outerWidth || cfg.cavityWidth || (hasHostModule ? 0 : 564),
+      boxThickness: cfg.boxThickness || cfg.thickness || 15,
+      slideGap: cfg.slideGap ?? 26,
+      ...cfg
     };
+
+    const { parts: newParts, normalizedConfig } = this.buildModularDrawerParts(
+      groupId,
+      groupName,
+      fullInputCfg
+    );
+
+    const newGroup: PartGroup = {
+      id: groupId,
+      name: groupName,
+      type: 'drawer',
+      subType: 'drawer',
+      templateId: 'modular_drawer',
+      isOpen: false,
+      slideExtension: 0,
+      slideLength: normalizedConfig.slideLength,
+      slideType: normalizedConfig.handleType === 'push' ? 'push_open' : 'telescopic',
+      frontGap: normalizedConfig.slideGap ?? 26,
+      facingDirection: normalizedConfig.facingDirection ?? 'front',
+      drawerConfig: normalizedConfig,
+      hostGroupId: normalizedConfig.hostGroupId,
+      hostCavityId: normalizedConfig.hostCavityId
+    };
+
+    const hwItems = this.buildDrawerHardwareItems(groupId, groupName, normalizedConfig);
 
     this.updateProject(p => {
       const curGroups = p.groups || [];
@@ -2914,11 +3191,627 @@ export class ProjectStorageService {
         ...p,
         groups: [...curGroups, newGroup],
         parts: [...p.parts, ...newParts],
-        hardware: [...curHw, slideHwItem]
+        hardware: [...curHw, ...hwItems]
       };
     });
 
     return newGroup;
+  }
+
+  /**
+   * Inserta 1, 2, 3 o 4 cajones modulares perfectamente encajados en una cavidad/vano
+   * de un mueble existente, dividiendo automáticamente la luz vertical cuando son 2, 3 o 4 cajones.
+   */
+  addParametricDrawersToCavity(
+    arg1: (Partial<ParametricDrawerConfig> & Pick<ParametricDrawerConfig, 'slideLength' | 'boxHeight' | 'bottomThickness' | 'includeFront'>) | ModuleCavityInfo,
+    arg2?: ModuleCavityInfo | number,
+    arg3?: number | (Partial<ParametricDrawerConfig> & Pick<ParametricDrawerConfig, 'slideLength' | 'boxHeight' | 'bottomThickness' | 'includeFront'>)
+  ): PartGroup[] {
+    let cfg: Partial<ParametricDrawerConfig> & Pick<ParametricDrawerConfig, 'slideLength' | 'boxHeight' | 'bottomThickness' | 'includeFront'>;
+    let cavity: ModuleCavityInfo | undefined;
+    let rawCount = 1;
+
+    if ('innerWidth' in arg1 || 'internalDepth' in arg1) {
+      cavity = arg1 as ModuleCavityInfo;
+      rawCount = typeof arg2 === 'number' ? arg2 : 1;
+      cfg = (arg3 as Partial<ParametricDrawerConfig> & Pick<ParametricDrawerConfig, 'slideLength' | 'boxHeight' | 'bottomThickness' | 'includeFront'>) || {
+        outerWidth: cavity.innerWidth,
+        slideLength: cavity.optimalSlideLength || 450,
+        boxHeight: 140,
+        bottomThickness: 3,
+        includeFront: true
+      };
+    } else {
+      cfg = arg1;
+      if (arg2 && typeof arg2 === 'object' && ('innerWidth' in arg2 || 'internalDepth' in arg2)) {
+        cavity = arg2 as ModuleCavityInfo;
+        rawCount = typeof arg3 === 'number' ? arg3 : (cfg.drawersCount || 1);
+      } else {
+        rawCount = typeof arg2 === 'number' ? arg2 : (cfg.drawersCount || 1);
+      }
+    }
+
+    const count = Math.max(1, Math.min(4, Math.round(rawCount || 1))) as 1 | 2 | 3 | 4;
+    const currentProj = this.currentProject();
+
+    const effectiveHostGroupId = cfg.hostGroupId || cfg.targetModuleId;
+    const effectiveHostCavityId = cfg.hostCavityId || cfg.targetCavityId;
+
+    if (!cavity && effectiveHostGroupId && effectiveHostGroupId !== 'floor' && currentProj) {
+      const hostGrp = (currentProj.groups || []).find(g => g.id === effectiveHostGroupId);
+      const cavs = this.partGeometry.detectModuleCavities(
+        effectiveHostGroupId,
+        currentProj.parts || [],
+        hostGrp
+      );
+      cavity =
+        (effectiveHostCavityId ? cavs.find(c => c.id === effectiveHostCavityId) : undefined) || cavs[0];
+    }
+
+    if (!cavity) {
+      if (count === 1) {
+        return [this.addParametricDrawer(cfg)];
+      }
+      const created: PartGroup[] = [];
+      const fH = Math.max(100, cfg.frontHeight || 173);
+      const handleType = cfg.handleType ?? 'handle';
+      const stepY =
+        handleType === 'finger_pull' ? Math.max(60, fH - 28) + 28 : fH + 3;
+      const baseY = cfg.posY ?? 100;
+      for (let i = 0; i < count; i++) {
+        created.push(
+          this.addParametricDrawer({
+            ...cfg,
+            name: cfg.name ? `${cfg.name} (${i + 1}/${count})` : undefined,
+            posY: Math.round((baseY + i * stepY) * 10) / 10,
+            drawersCount: 1
+          })
+        );
+      }
+      return created;
+    }
+
+    const frontMountType: DrawerFrontMountType =
+      cfg.frontMountType ?? (cfg.includeFront === false ? 'none' : 'overlay');
+    const handleType: DrawerOpeningSystem = cfg.handleType ?? 'handle';
+    const ft = Math.max(12, cfg.frontThickness || cfg.boxThickness || cfg.thickness || 15);
+    const bT = Math.max(3, cfg.bottomThickness || 3);
+
+    const optimalSlide = this.partGeometry.getOptimalCommercialSlideLength(
+      cavity.internalDepth,
+      frontMountType,
+      ft
+    );
+    const setback = frontMountType === 'inset' ? ft : frontMountType === 'none' ? 5 : 0;
+    const safeSlideLength =
+      cfg.slideLength && cfg.slideLength + setback <= cavity.internalDepth
+        ? cfg.slideLength
+        : optimalSlide;
+
+    if (count === 1) {
+      const singleY =
+        cfg.posY !== undefined && cfg.posY >= cavity.minY && cfg.posY <= cavity.maxY - 60
+          ? Math.max(cavity.minY + 2, cfg.posY)
+          : cavity.minY + 2;
+      return [
+        this.addParametricDrawer({
+          ...cfg,
+          outerWidth: cavity.innerWidth,
+          slideLength: safeSlideLength,
+          sideThickness: cavity.leftSideThickness,
+          frontMountType,
+          handleType,
+          posX: cavity.centerX,
+          posY: Math.round(singleY * 10) / 10,
+          posZ: cavity.centerZ,
+          facingDirection: cavity.facingDirection,
+          frontEdgeCoord: cavity.frontEdgeCoord,
+          hostGroupId: cavity.groupId,
+          hostCavityId: cavity.id,
+          drawersCount: 1
+        })
+      ];
+    }
+
+    // Batería de 2, 3 o 4 cajones: dividir automáticamente la luz vertical de la cavidad en partes iguales
+    const interGap = 3;
+    const usableHeight = Math.max(count * 80, cavity.height - 4 - (count - 1) * interGap);
+    const slotNominalFrontH = Math.max(80, Math.floor(usableHeight / count));
+    const effFrontH =
+      handleType === 'finger_pull' && frontMountType !== 'none'
+        ? Math.max(60, slotNominalFrontH - 28)
+        : slotNominalFrontH;
+    const slotBoxH = Math.max(
+      50,
+      Math.min(cfg.boxHeight || 140, effFrontH - bT - 12)
+    );
+
+    const createdGroups: PartGroup[] = [];
+    for (let i = 0; i < count; i++) {
+      const slotPosY = Math.round((cavity.minY + 2 + i * (slotNominalFrontH + interGap)) * 10) / 10;
+      const baseName = cfg.name?.trim() || `Cajón`;
+      const itemGroup = this.addParametricDrawer({
+        ...cfg,
+        name: `${baseName} ${i + 1}`,
+        outerWidth: cavity.innerWidth,
+        slideLength: safeSlideLength,
+        boxHeight: slotBoxH,
+        frontHeight: slotNominalFrontH,
+        sideThickness: cavity.leftSideThickness,
+        frontMountType,
+        handleType,
+        posX: cavity.centerX,
+        posY: slotPosY,
+        posZ: cavity.centerZ,
+        facingDirection: cavity.facingDirection,
+        frontEdgeCoord: cavity.frontEdgeCoord,
+        hostGroupId: cavity.groupId,
+        hostCavityId: cavity.id,
+        drawersCount: 1
+      });
+      createdGroups.push(itemGroup);
+    }
+
+    return createdGroups;
+  }
+
+  /**
+   * Obtiene o reconstruye la configuración paramétrica de un grupo de Cajón Modular,
+   * sincronizando siempre su posición real 3D, rotación (facingDirection), plano frontal
+   * y pertenencia actual a la cavidad.
+   */
+  getModularDrawerConfig(groupId: string): ParametricDrawerConfig | null {
+    const proj = this.currentProject();
+    if (!proj) return null;
+    const group = (proj.groups || []).find(g => g.id === groupId);
+    if (!group) return null;
+
+    const stored = group.drawerConfig;
+    const gParts = proj.parts.filter(p => p.groupId === groupId);
+    if (gParts.length === 0) {
+      return stored ? { ...stored } : null;
+    }
+
+    const fondo = gParts.find(
+      p => p.id.endsWith('_fondo_mdf') || (p.orientation === 'horizontal' && p.thickness <= 6)
+    );
+    const lat = gParts.find(
+      p => p.id.endsWith('_lat_izq') || p.name.toLowerCase().includes('lateral izq')
+    );
+    const frente = gParts.find(
+      p => p.componentRole === 'drawer_front' || p.id.endsWith('_frente')
+    );
+    const contra = gParts.find(
+      p => p.id.endsWith('_contrafrente') || p.name.toLowerCase().includes('contra-frente')
+    );
+    const trasera = gParts.find(
+      p => p.id.endsWith('_trasera') || p.name.toLowerCase().includes('trasera')
+    );
+
+    let facingDirection: 'front' | 'right' | 'back' | 'left';
+    if (lat && contra && trasera) {
+      if (lat.orientation === 'vertical_xy') {
+        facingDirection = (contra.posX ?? 0) >= (trasera.posX ?? 0) ? 'right' : 'left';
+      } else {
+        facingDirection = (contra.posZ ?? 0) >= (trasera.posZ ?? 0) ? 'front' : 'back';
+      }
+    } else {
+      facingDirection =
+        group.facingDirection ??
+        stored?.facingDirection ??
+        this.computeGeometricFacingDirection(groupId, proj.parts);
+    }
+
+    const isWidthZ = facingDirection === 'right' || facingDirection === 'left';
+    const dirSign = facingDirection === 'front' || facingDirection === 'right' ? 1 : -1;
+    const gap = stored?.slideGap ?? group.frontGap ?? 26;
+    const boxWidth = fondo
+      ? isWidthZ
+        ? fondo.width
+        : fondo.length
+      : stored
+        ? stored.outerWidth - gap
+        : 538;
+    const outerWidth = Math.round((boxWidth + gap) * 10) / 10;
+    const slideLength = lat ? lat.length : stored?.slideLength || group.slideLength || 450;
+    const boxHeight = lat ? lat.width : stored?.boxHeight || 140;
+    const frontMountType: DrawerFrontMountType =
+      frente?.hardwareConfig?.frontMountType ??
+      stored?.frontMountType ??
+      (frente ? 'overlay' : 'none');
+    const handleType: DrawerOpeningSystem =
+      frente?.hardwareConfig?.drawerOpeningSystem ??
+      contra?.hardwareConfig?.drawerOpeningSystem ??
+      stored?.handleType ??
+      (frente?.hardwareConfig?.handleType === 'push_open' ||
+      frente?.hardwareConfig?.handleType === 'push'
+        ? 'push'
+        : frente?.hardwareConfig?.handleType === 'gola_less' ||
+            frente?.hardwareConfig?.handleType === 'finger_pull'
+          ? 'finger_pull'
+          : 'handle');
+
+    const rawFrontH = frente
+      ? isWidthZ
+        ? frente.length
+        : frente.width
+      : stored?.frontHeight || boxHeight + 33;
+    const nominalFrontH =
+      handleType === 'finger_pull' && frente ? rawFrontH + 28 : rawFrontH;
+
+    let minY = Infinity;
+    for (const pt of gParts) {
+      const b = this.partGeometry.getWorldAABB(pt);
+      if (b.minY < minY) minY = b.minY;
+    }
+    const liveMinY = Number.isFinite(minY) ? Math.round(minY * 10) / 10 : stored?.posY ?? 100;
+    const livePosX = fondo?.posX ?? stored?.posX ?? 0;
+    const livePosZ = fondo?.posZ ?? stored?.posZ ?? 0;
+
+    const t = lat?.thickness || stored?.boxThickness || 15;
+    const ft = frente?.thickness || stored?.frontThickness || t;
+    const bT = fondo?.thickness || stored?.bottomThickness || 3;
+
+    const boxDepthCenter = isWidthZ ? livePosX : livePosZ;
+    const setback = frontMountType === 'inset' ? ft : frontMountType === 'none' ? 5 : 0;
+    const liveFrontEdgeCoord =
+      Math.round((boxDepthCenter + dirSign * (slideLength / 2 + setback)) * 10) / 10;
+
+    let hostGroupId = group.hostGroupId ?? stored?.hostGroupId;
+    let hostCavityId = group.hostCavityId ?? stored?.hostCavityId;
+    let sideThickness = stored?.sideThickness ?? 18;
+
+    if (hostGroupId && hostGroupId !== 'floor') {
+      const hostGrp = (proj.groups || []).find(g => g.id === hostGroupId);
+      const cavs = this.partGeometry.detectModuleCavities(
+        hostGroupId,
+        proj.parts || [],
+        hostGrp
+      );
+      const cav = (hostCavityId ? cavs.find(c => c.id === hostCavityId) : undefined) || cavs[0];
+      if (cav) {
+        const spanCenter = isWidthZ ? livePosZ : livePosX;
+        const cavSpanCenter = isWidthZ ? cav.centerZ : cav.centerX;
+        const cavDepthCenter = isWidthZ ? cav.centerX : cav.centerZ;
+        const stillInCavity =
+          Math.abs(spanCenter - cavSpanCenter) <= cav.innerWidth / 2 + 60 &&
+          Math.abs(boxDepthCenter - cavDepthCenter) <= cav.internalDepth / 2 + 100 &&
+          liveMinY >= cav.minY - 40 &&
+          liveMinY <= cav.maxY + 40;
+        if (stillInCavity) {
+          hostCavityId = cav.id;
+          sideThickness = cav.leftSideThickness;
+        } else {
+          hostGroupId = undefined;
+          hostCavityId = undefined;
+        }
+      } else {
+        hostGroupId = undefined;
+        hostCavityId = undefined;
+      }
+    }
+
+    return {
+      ...stored,
+      name: group.name,
+      outerWidth,
+      cavityWidth: outerWidth,
+      slideLength,
+      boxHeight,
+      frontHeight: nominalFrontH,
+      frontWidth: frente
+        ? isWidthZ
+          ? frente.width
+          : frente.length
+        : stored?.frontWidth || outerWidth,
+      includeFront: !!frente,
+      frontMountType,
+      handleType,
+      materialId: lat?.materialId || stored?.materialId || 'mat-1',
+      frontMaterialId:
+        frente?.materialId || stored?.frontMaterialId || lat?.materialId || 'mat-1',
+      bottomMaterialId: fondo?.materialId || stored?.bottomMaterialId || 'mat_mdf_3',
+      boxThickness: t,
+      thickness: t,
+      frontThickness: ft,
+      sideThickness,
+      bottomThickness: bT,
+      slideGap: gap,
+      posX: livePosX,
+      posY: liveMinY,
+      posZ: livePosZ,
+      facingDirection,
+      frontEdgeCoord: liveFrontEdgeCoord,
+      hostGroupId,
+      hostCavityId
+    };
+  }
+
+  /**
+   * Actualiza en vivo los parámetros de un Cajón Modular desde el Inspector Contextual,
+   * recalculando sus piezas 3D y herrajes sin perder su identidad ni selección.
+   */
+  updateModularDrawerGroup(
+    groupId: string,
+    changes: Partial<ParametricDrawerConfig>
+  ): PartGroup | null {
+    const baseCfg = this.getModularDrawerConfig(groupId);
+    if (!baseCfg) return null;
+
+    const proj = this.currentProject();
+    const existingGroup = (proj.groups || []).find(g => g.id === groupId);
+    if (!existingGroup) return null;
+
+    const mergedCfg: ParametricDrawerConfig = {
+      ...baseCfg,
+      ...changes
+    };
+
+    if (changes.outerWidth !== undefined) {
+      mergedCfg.cavityWidth = changes.outerWidth;
+    }
+
+    // Si cambió el ancho de hueco manualmente o el tipo de montaje, limpiar frontWidth fijo para que se recalcule según overlay/inset
+    if (changes.outerWidth !== undefined || changes.frontMountType !== undefined) {
+      delete mergedCfg.frontWidth;
+    }
+
+    const groupName = mergedCfg.name || existingGroup.name;
+    const { parts: rebuiltParts, normalizedConfig } = this.buildModularDrawerParts(
+      groupId,
+      groupName,
+      mergedCfg
+    );
+
+    // Preservar estado abierto/cerrado actual
+    const isCurrentlyOpen = !!existingGroup.isOpen;
+    const finalParts = rebuiltParts.map(pt => {
+      if (pt.hardwareConfig?.isMovable) {
+        return {
+          ...pt,
+          hardwareConfig: {
+            ...pt.hardwareConfig,
+            isOpen: isCurrentlyOpen
+          }
+        };
+      }
+      return pt;
+    });
+
+    const updatedGroup: PartGroup = {
+      ...existingGroup,
+      name: groupName,
+      type: 'drawer',
+      subType: 'drawer',
+      templateId: 'modular_drawer',
+      slideLength: normalizedConfig.slideLength,
+      slideType: normalizedConfig.handleType === 'push' ? 'push_open' : 'telescopic',
+      frontGap: normalizedConfig.slideGap ?? 26,
+      facingDirection: normalizedConfig.facingDirection ?? existingGroup.facingDirection ?? 'front',
+      drawerConfig: normalizedConfig,
+      hostGroupId: normalizedConfig.hostGroupId,
+      hostCavityId: normalizedConfig.hostCavityId
+    };
+
+    const newHwItems = this.buildDrawerHardwareItems(groupId, groupName, normalizedConfig);
+
+    this.updateProject(p => {
+      const otherParts = p.parts.filter(pt => pt.groupId !== groupId);
+      const otherHw = (p.hardware || []).filter(
+        h =>
+          h.id !== `hw_slide_${groupId}` &&
+          h.id !== `hw_handle_${groupId}` &&
+          !h.notes?.includes(existingGroup.name)
+      );
+      return {
+        ...p,
+        groups: (p.groups || []).map(g => (g.id === groupId ? updatedGroup : g)),
+        parts: [...otherParts, ...finalParts],
+        hardware: [...otherHw, ...newHwItems]
+      };
+    });
+
+    return updatedGroup;
+  }
+
+  /**
+   * Auto-encaja en 1 clic (o al arrastrar en 3D) un Cajón Modular dentro de la cavidad
+   * de su mueble anfitrión o del mueble más cercano en la escena.
+   */
+  autoFitModularDrawerToCavity(
+    groupId: string,
+    targetCavity?: ModuleCavityInfo,
+    targetBaseY?: number
+  ): ModuleCavityInfo | null {
+    const proj = this.currentProject();
+    if (!proj) return null;
+    const baseCfg = this.getModularDrawerConfig(groupId);
+    if (!baseCfg) return null;
+
+    let cavity = targetCavity;
+    if (!cavity) {
+      const allCavities = this.partGeometry.detectAllSceneCavities(
+        proj.parts || [],
+        proj.groups || []
+      );
+      if (allCavities.length === 0) return null;
+
+      if (baseCfg.hostGroupId) {
+        cavity =
+          allCavities.find(c => c.id === baseCfg.hostCavityId) ||
+          allCavities.find(c => c.groupId === baseCfg.hostGroupId);
+      }
+
+      if (!cavity) {
+        const gParts = proj.parts.filter(p => p.groupId === groupId);
+        let cx = baseCfg.posX ?? 0;
+        let cy = baseCfg.posY ?? 100;
+        let cz = baseCfg.posZ ?? 0;
+        if (gParts.length > 0) {
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+          for (const pt of gParts) {
+            const b = this.partGeometry.getWorldAABB(pt);
+            if (b.minX < minX) minX = b.minX;
+            if (b.maxX > maxX) maxX = b.maxX;
+            if (b.minY < minY) minY = b.minY;
+            if (b.maxY > maxY) maxY = b.maxY;
+            if (b.minZ < minZ) minZ = b.minZ;
+            if (b.maxZ > maxZ) maxZ = b.maxZ;
+          }
+          cx = (minX + maxX) / 2;
+          cy = minY;
+          cz = (minZ + maxZ) / 2;
+        }
+
+        let bestDist = Infinity;
+        for (const cand of allCavities) {
+          const d = Math.hypot(cx - cand.centerX, cz - cand.centerZ) + Math.abs(cy - (cand.minY + cand.maxY) / 2) * 0.4;
+          if (d < bestDist) {
+            bestDist = d;
+            cavity = cand;
+          }
+        }
+      }
+    }
+
+    if (!cavity) return null;
+
+    const frontMountType = baseCfg.frontMountType ?? 'overlay';
+    const ft = baseCfg.frontThickness || baseCfg.boxThickness || 15;
+    const optimalSlide = this.partGeometry.getOptimalCommercialSlideLength(
+      cavity.internalDepth,
+      frontMountType,
+      ft
+    );
+
+    const desiredY = targetBaseY ?? baseCfg.posY ?? cavity.minY + 2;
+    const clampedY = Math.max(
+      cavity.minY + 2,
+      Math.min(cavity.maxY - Math.max(80, baseCfg.frontHeight || 140) - 2, desiredY)
+    );
+
+    this.updateModularDrawerGroup(groupId, {
+      outerWidth: cavity.innerWidth,
+      slideLength: optimalSlide,
+      sideThickness: cavity.leftSideThickness,
+      posX: cavity.centerX,
+      posY: Math.round(clampedY * 10) / 10,
+      posZ: cavity.centerZ,
+      facingDirection: cavity.facingDirection,
+      frontEdgeCoord: cavity.frontEdgeCoord,
+      hostGroupId: cavity.groupId,
+      hostCavityId: cavity.id
+    });
+
+    return {
+      ...cavity,
+      optimalSlideLength: optimalSlide
+    };
+  }
+
+  /**
+   * Duplica un Cajón Modular en 1 clic inmediatamente encima (+Y) o debajo (-Y)
+   * dentro del mismo hueco, respetando la holgura entre frentes (3 mm en solapado/embutido,
+   * o 28 mm si es uñero) con 0 colisiones.
+   */
+  duplicateModularDrawerVertically(
+    groupId: string,
+    direction: 'up' | 'down' | 1 | -1
+  ): PartGroup | null {
+    const proj = this.currentProject();
+    if (!proj) return null;
+    const baseCfg = this.getModularDrawerConfig(groupId);
+    if (!baseCfg) return null;
+
+    const gParts = proj.parts.filter(p => p.groupId === groupId);
+    if (gParts.length === 0) return null;
+
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const pt of gParts) {
+      const b = this.partGeometry.getWorldAABB(pt);
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxY > maxY) maxY = b.maxY;
+    }
+
+    const visualHeight = Math.max(60, maxY - minY);
+    const interFrontGap = baseCfg.handleType === 'finger_pull' ? 28 : 3;
+    const stepY = visualHeight + interFrontGap;
+    const dirSign = direction === 'up' || direction === 1 ? 1 : -1;
+
+    let matchedCavity: ModuleCavityInfo | undefined;
+    if (baseCfg.hostGroupId && baseCfg.hostGroupId !== 'floor') {
+      const hostGrp = (proj.groups || []).find(g => g.id === baseCfg.hostGroupId);
+      const cavs = this.partGeometry.detectModuleCavities(
+        baseCfg.hostGroupId,
+        proj.parts || [],
+        hostGrp
+      );
+      matchedCavity =
+        (baseCfg.hostCavityId ? cavs.find(c => c.id === baseCfg.hostCavityId) : undefined) ||
+        cavs[0];
+    }
+
+    const minAllowedY = matchedCavity ? matchedCavity.minY + 1.5 : 0;
+    const maxAllowedY = matchedCavity ? matchedCavity.maxY - visualHeight - 1.5 : 3000;
+
+    let candidateMinY = Math.round((minY + dirSign * stepY) * 10) / 10;
+
+    // Si ya existe otro cajón en esa altura dentro de la misma columna, avanzar al siguiente espacio libre
+    const allDrawerGroups = (proj.groups || []).filter(
+      g => g.type === 'drawer' || g.subType === 'drawer' || g.templateId === 'modular_drawer'
+    );
+
+    let foundValidSlot = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (dirSign < 0 && candidateMinY < minAllowedY - 0.5) {
+        return null;
+      }
+      if (dirSign > 0 && matchedCavity && candidateMinY > maxAllowedY + 0.5) {
+        return null;
+      }
+
+      const candMaxY = candidateMinY + visualHeight;
+      const hasVerticalOverlap = allDrawerGroups.some(og => {
+        const ogParts = proj.parts.filter(p => p.groupId === og.id);
+        if (ogParts.length === 0) return false;
+        let oMinX = Infinity, oMaxX = -Infinity, oMinY = Infinity, oMaxY = -Infinity, oMinZ = Infinity, oMaxZ = -Infinity;
+        for (const pt of ogParts) {
+          const b = this.partGeometry.getWorldAABB(pt);
+          if (b.minX < oMinX) oMinX = b.minX;
+          if (b.maxX > oMaxX) oMaxX = b.maxX;
+          if (b.minY < oMinY) oMinY = b.minY;
+          if (b.maxY > oMaxY) oMaxY = b.maxY;
+          if (b.minZ < oMinZ) oMinZ = b.minZ;
+          if (b.maxZ > oMaxZ) oMaxZ = b.maxZ;
+        }
+        const sameColumn =
+          Math.abs((oMinX + oMaxX) / 2 - (baseCfg.posX ?? 0)) < 120 &&
+          Math.abs((oMinZ + oMaxZ) / 2 - (baseCfg.posZ ?? 0)) < 120;
+        if (!sameColumn) return false;
+        const overlapY = Math.min(candMaxY, oMaxY) - Math.max(candidateMinY, oMinY);
+        return overlapY > 0.5;
+      });
+
+      if (!hasVerticalOverlap) {
+        foundValidSlot = true;
+        break;
+      }
+      candidateMinY = Math.round((candidateMinY + dirSign * stepY) * 10) / 10;
+    }
+
+    if (!foundValidSlot || candidateMinY < minAllowedY - 0.5) {
+      return null;
+    }
+
+    const existingCount = allDrawerGroups.length;
+    const cleanBase = (baseCfg.name || 'Cajón').replace(/\s+\d+$/, '').trim();
+
+    return this.addParametricDrawer({
+      ...baseCfg,
+      name: `${cleanBase} ${existingCount + 1}`,
+      posY: candidateMinY
+    });
   }
 
   // ==========================================

@@ -1,6 +1,12 @@
 import { Injectable } from '@angular/core';
 import * as THREE from 'three';
-import { Part, PartCornerCutConfig } from '../models/melamine.models';
+import {
+  DrawerFrontMountType,
+  ModuleCavityInfo,
+  Part,
+  PartCornerCutConfig,
+  PartGroup
+} from '../models/melamine.models';
 
 export interface PartLocalDimensions {
   sx: number;
@@ -1397,5 +1403,339 @@ export class PartGeometryService {
         axis: 'x'
       };
     }
+  }
+
+  /**
+   * Calcula el largo óptimo de corredera comercial (300, 350, 400, 450 o 500 mm)
+   * que cabe en la profundidad interna útil sin chocar con el fondo trasero,
+   * descontando el espesor del frente cuando el montaje es a ras ('inset').
+   */
+  getOptimalCommercialSlideLength(
+    internalDepth: number,
+    frontMountOrSetback: DrawerFrontMountType | number = 'overlay',
+    frontThickness = 15
+  ): number {
+    const commercialSizes = [500, 450, 400, 350, 300];
+    const setback =
+      typeof frontMountOrSetback === 'number'
+        ? frontMountOrSetback
+        : frontMountOrSetback === 'inset'
+          ? Math.max(12, frontThickness || 15)
+          : frontMountOrSetback === 'none'
+            ? 5
+            : 0;
+    const maxSafeLength = internalDepth - setback - 3;
+    for (const size of commercialSizes) {
+      if (size <= maxSafeLength) {
+        return size;
+      }
+    }
+    const maxExactLength = internalDepth - setback;
+    for (const size of commercialSizes) {
+      if (size <= maxExactLength) {
+        return size;
+      }
+    }
+    return 300;
+  }
+
+  /**
+   * Detecta automáticamente todas las cavidades/vanos verticales libres (Luces Internas)
+   * dentro de un módulo existente, soportando divisiones verticales, entrepaños y las 4 orientaciones.
+   */
+  detectModuleCavities(
+    groupOrId: string | PartGroup,
+    allParts: Part[],
+    groupOrName?: PartGroup | string
+  ): ModuleCavityInfo[] {
+    const groupId = typeof groupOrId === 'string' ? groupOrId : groupOrId?.id;
+    const group: PartGroup | undefined =
+      typeof groupOrId === 'object'
+        ? groupOrId
+        : typeof groupOrName === 'object'
+          ? groupOrName
+          : undefined;
+    const customModuleName = typeof groupOrName === 'string' ? groupOrName : undefined;
+
+    if (!groupId) return [];
+    if (
+      group &&
+      (group.type === 'drawer' ||
+        group.subType === 'drawer' ||
+        group.templateId === 'modular_drawer')
+    ) {
+      return [];
+    }
+
+    const groupParts = allParts.filter(p => p.groupId === groupId);
+    if (groupParts.length < 2) return [];
+
+    // Excluir grupos que solo contienen piezas de cajón
+    const nonDrawerParts = groupParts.filter(
+      p =>
+        p.componentRole !== 'drawer_box' &&
+        p.componentRole !== 'drawer_front' &&
+        p.componentRole !== 'drawer_bottom' &&
+        p.componentRole !== 'drawer_lateral'
+    );
+    if (nonDrawerParts.length < 2) return [];
+
+    const sLeft = nonDrawerParts.find(p => p.componentRole === 'side_left');
+    const sRight = nonDrawerParts.find(p => p.componentRole === 'side_right');
+
+    // Determinar si el ancho del módulo corre en X (lados en vertical_yz) o en Z (lados en vertical_xy)
+    const yzStructural = nonDrawerParts.filter(
+      p =>
+        p.orientation === 'vertical_yz' &&
+        p.componentRole !== 'plinth' &&
+        p.componentRole !== 'back' &&
+        p.componentRole !== 'door' &&
+        p.componentRole !== 'backsplash'
+    );
+    const xyStructural = nonDrawerParts.filter(
+      p =>
+        p.orientation === 'vertical_xy' &&
+        p.componentRole !== 'plinth' &&
+        p.componentRole !== 'back' &&
+        p.componentRole !== 'door' &&
+        p.componentRole !== 'backsplash'
+    );
+
+    let isWidthZ = false;
+    if (group?.facingDirection === 'right' || group?.facingDirection === 'left') {
+      isWidthZ = true;
+    } else if (group?.facingDirection === 'front' || group?.facingDirection === 'back') {
+      isWidthZ = false;
+    } else if (sLeft && sRight) {
+      isWidthZ = sLeft.orientation === 'vertical_xy' || sRight.orientation === 'vertical_xy';
+    } else {
+      isWidthZ = xyStructural.length >= 2 && yzStructural.length < 2;
+    }
+
+    const verticalPanels = isWidthZ ? xyStructural : yzStructural;
+    if (verticalPanels.length < 2) return [];
+
+    const panelBounds = verticalPanels
+      .map(p => ({ part: p, aabb: this.getWorldAABB(p) }))
+      .sort((a, b) =>
+        isWidthZ
+          ? (a.aabb.minZ + a.aabb.maxZ) / 2 - (b.aabb.minZ + b.aabb.maxZ) / 2
+          : (a.aabb.minX + a.aabb.maxX) / 2 - (b.aabb.minX + b.aabb.maxX) / 2
+      );
+
+    // Determinar orientación frontal exacta del módulo
+    const backPart = nonDrawerParts.find(
+      p =>
+        p.componentRole === 'back' ||
+        p.name.toLowerCase().includes('fondo') ||
+        p.name.toLowerCase().includes('trasera')
+    );
+    const backAABB = backPart ? this.getWorldAABB(backPart) : null;
+
+    let facingDirection: 'front' | 'right' | 'back' | 'left' =
+      group?.facingDirection ?? (isWidthZ ? 'right' : 'front');
+
+    if (!group?.facingDirection && backAABB) {
+      const firstSide = panelBounds[0].aabb;
+      const lastSide = panelBounds[panelBounds.length - 1].aabb;
+      if (isWidthZ) {
+        const modCenterX = (Math.min(firstSide.minX, lastSide.minX) + Math.max(firstSide.maxX, lastSide.maxX)) / 2;
+        facingDirection = backAABB.px <= modCenterX ? 'right' : 'left';
+      } else {
+        const modCenterZ = (Math.min(firstSide.minZ, lastSide.minZ) + Math.max(firstSide.maxZ, lastSide.maxZ)) / 2;
+        facingDirection = backAABB.pz <= modCenterZ ? 'front' : 'back';
+      }
+    }
+
+    const rotationY =
+      facingDirection === 'right'
+        ? 90
+        : facingDirection === 'back'
+          ? 180
+          : facingDirection === 'left'
+            ? 270
+            : 0;
+
+    const moduleName = customModuleName || group?.name || 'Módulo';
+    const cavities: ModuleCavityInfo[] = [];
+
+    // Recorrer cada columna horizontal formada por pares adyacentes de paneles verticales (laterales y divisores)
+    for (let colIdx = 0; colIdx < panelBounds.length - 1; colIdx++) {
+      const leftPanel = panelBounds[colIdx];
+      const rightPanel = panelBounds[colIdx + 1];
+
+      const spanMin = isWidthZ ? leftPanel.aabb.maxZ : leftPanel.aabb.maxX;
+      const spanMax = isWidthZ ? rightPanel.aabb.minZ : rightPanel.aabb.minX;
+      const innerWidth = Math.round((spanMax - spanMin) * 10) / 10;
+      if (innerWidth < 120) continue;
+
+      const leftSideThickness = Math.round((isWidthZ ? leftPanel.aabb.sz : leftPanel.aabb.sx) * 10) / 10;
+      const rightSideThickness = Math.round((isWidthZ ? rightPanel.aabb.sz : rightPanel.aabb.sx) * 10) / 10;
+
+      // Coordenadas de profundidad en esta columna
+      let frontEdgeCoord = 0;
+      let backInnerCoord = 0;
+      if (facingDirection === 'front') {
+        frontEdgeCoord = Math.max(leftPanel.aabb.maxZ, rightPanel.aabb.maxZ);
+        const sideMinZ = Math.min(leftPanel.aabb.minZ, rightPanel.aabb.minZ);
+        backInnerCoord = backAABB ? Math.max(sideMinZ, backAABB.maxZ) : sideMinZ;
+      } else if (facingDirection === 'back') {
+        frontEdgeCoord = Math.min(leftPanel.aabb.minZ, rightPanel.aabb.minZ);
+        const sideMaxZ = Math.max(leftPanel.aabb.maxZ, rightPanel.aabb.maxZ);
+        backInnerCoord = backAABB ? Math.min(sideMaxZ, backAABB.minZ) : sideMaxZ;
+      } else if (facingDirection === 'right') {
+        frontEdgeCoord = Math.max(leftPanel.aabb.maxX, rightPanel.aabb.maxX);
+        const sideMinX = Math.min(leftPanel.aabb.minX, rightPanel.aabb.minX);
+        backInnerCoord = backAABB ? Math.max(sideMinX, backAABB.maxX) : sideMinX;
+      } else {
+        frontEdgeCoord = Math.min(leftPanel.aabb.minX, rightPanel.aabb.minX);
+        const sideMaxX = Math.max(leftPanel.aabb.maxX, rightPanel.aabb.maxX);
+        backInnerCoord = backAABB ? Math.min(sideMaxX, backAABB.minX) : sideMaxX;
+      }
+
+      const internalDepth = Math.round(Math.max(150, Math.abs(frontEdgeCoord - backInnerCoord)));
+      const optimalSlideLength = this.getOptimalCommercialSlideLength(internalDepth, 'overlay', leftSideThickness);
+
+      // Encontrar piezas horizontales que se solapan con esta columna
+      const horizPartsInCol = nonDrawerParts
+        .filter(
+          p =>
+            p.orientation === 'horizontal' &&
+            p.componentRole !== 'plinth' &&
+            p.componentRole !== 'countertop'
+        )
+        .map(p => ({ part: p, aabb: this.getWorldAABB(p) }))
+        .filter(item => {
+          const itemMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
+          const itemMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
+          const overlap = Math.min(spanMax, itemMax) - Math.max(spanMin, itemMin);
+          return overlap > 20;
+        });
+
+      const bottomCandidates = horizPartsInCol
+        .filter(item => item.part.componentRole === 'bottom' || (!this.isInternalShelf(item.part) && item.part.componentRole !== 'top' && item.part.componentRole !== 'tie'))
+        .sort((a, b) => a.aabb.minY - b.aabb.minY);
+
+      const topCandidates = horizPartsInCol
+        .filter(item => item.part.componentRole === 'top' || item.part.componentRole === 'tie' || (!this.isInternalShelf(item.part) && item.part.componentRole !== 'bottom'))
+        .sort((a, b) => b.aabb.maxY - a.aabb.maxY);
+
+      const panelMinY = Math.max(leftPanel.aabb.minY, rightPanel.aabb.minY);
+      const panelMaxY = Math.min(leftPanel.aabb.maxY, rightPanel.aabb.maxY);
+
+      const floorTopY =
+        bottomCandidates.length > 0
+          ? Math.max(panelMinY, bottomCandidates[0].aabb.maxY)
+          : panelMinY;
+
+      const roofBottomY =
+        topCandidates.length > 0 && topCandidates[0].aabb.minY > floorTopY + 60
+          ? Math.min(panelMaxY, topCandidates[0].aabb.minY)
+          : panelMaxY;
+
+      if (roofBottomY - floorTopY < 70) continue;
+
+      // Entrepaños internos en esta columna
+      const shelvesInCol = horizPartsInCol
+        .filter(
+          item =>
+            this.isInternalShelf(item.part) &&
+            item.aabb.minY > floorTopY + 30 &&
+            item.aabb.maxY < roofBottomY - 30
+        )
+        .sort((a, b) => a.aabb.minY - b.aabb.minY);
+
+      const yIntervals: { minY: number; maxY: number }[] = [];
+      if (shelvesInCol.length === 0) {
+        yIntervals.push({ minY: floorTopY, maxY: roofBottomY });
+      } else {
+        yIntervals.push({ minY: floorTopY, maxY: shelvesInCol[0].aabb.minY });
+        for (let i = 0; i < shelvesInCol.length - 1; i++) {
+          yIntervals.push({
+            minY: shelvesInCol[i].aabb.maxY,
+            maxY: shelvesInCol[i + 1].aabb.minY
+          });
+        }
+        yIntervals.push({
+          minY: shelvesInCol[shelvesInCol.length - 1].aabb.maxY,
+          maxY: roofBottomY
+        });
+      }
+
+      const spanCenter = Math.round(((spanMin + spanMax) / 2) * 10) / 10;
+      const depthCenter = Math.round(((frontEdgeCoord + backInnerCoord) / 2) * 10) / 10;
+      const centerX = isWidthZ ? depthCenter : spanCenter;
+      const centerZ = isWidthZ ? spanCenter : depthCenter;
+
+      const validIntervals = yIntervals.filter(iv => iv.maxY - iv.minY >= 70);
+      validIntervals.forEach((iv, rowIdx) => {
+        const minY = Math.round(iv.minY * 10) / 10;
+        const maxY = Math.round(iv.maxY * 10) / 10;
+        const height = Math.round((maxY - minY) * 10) / 10;
+        const colLabel = panelBounds.length > 2 ? `Col ${colIdx + 1} · ` : '';
+        const rowLabel =
+          validIntervals.length === 1
+            ? 'Vano Principal'
+            : rowIdx === 0
+              ? 'Vano Inferior'
+              : rowIdx === validIntervals.length - 1
+                ? 'Vano Superior'
+                : `Vano Central ${rowIdx}`;
+
+        const roundedFrontEdge = Math.round(frontEdgeCoord * 10) / 10;
+        cavities.push({
+          id: `${groupId}_cav_${colIdx}_${rowIdx}`,
+          groupId,
+          moduleId: groupId,
+          moduleName,
+          groupName: moduleName,
+          bayIndex: colIdx,
+          verticalIndex: rowIdx,
+          totalInBay: validIntervals.length,
+          label: `${colLabel}${rowLabel} (${Math.round(innerWidth)} × ${Math.round(height)} × ${Math.round(internalDepth)} mm)`,
+          centerX,
+          centerY: Math.round(((minY + maxY) / 2) * 10) / 10,
+          centerZ,
+          minY,
+          maxY,
+          height,
+          internalHeight: height,
+          innerWidth,
+          internalWidth: innerWidth,
+          internalDepth,
+          optimalSlideLength,
+          leftSideThickness,
+          rightSideThickness,
+          sideThickness: leftSideThickness,
+          lateralThickness: leftSideThickness,
+          frontEdgeCoord: roundedFrontEdge,
+          frontPlaneZ: roundedFrontEdge,
+          backInnerCoord: Math.round(backInnerCoord * 10) / 10,
+          facingDirection,
+          rotationY
+        });
+      });
+    }
+
+    return cavities;
+  }
+
+  /**
+   * Detecta todas las cavidades/vanos de todos los muebles de la escena actual.
+   */
+  detectAllSceneCavities(allParts: Part[], groups: PartGroup[]): ModuleCavityInfo[] {
+    const result: ModuleCavityInfo[] = [];
+    for (const group of groups) {
+      if (
+        group.type === 'drawer' ||
+        group.subType === 'drawer' ||
+        group.templateId === 'modular_drawer'
+      ) {
+        continue;
+      }
+      const groupCavities = this.detectModuleCavities(group.id, allParts, group);
+      result.push(...groupCavities);
+    }
+    return result;
   }
 }

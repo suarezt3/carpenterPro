@@ -58,7 +58,9 @@ import {
   RoomWallInstance,
   getResolvedRoomWalls,
   DEFAULT_ROOM_CONFIG,
-  ApplianceItem
+  ApplianceItem,
+  ModuleCavityInfo,
+  ParametricDrawerConfig
 } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { PartGeometryService, PartWorldAABB } from '../../services/part-geometry.service';
@@ -373,6 +375,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   drillHolesUpdated = output<DrillHole[]>();
   groupUngroupRequested = output<string>();
   drawerWizardRequested = output<void>();
+  insertDrawerInCavityRequested = output<{ groupId: string; partId?: string }>();
   groupRotationRequested = output<{ groupId: string; deltaAngle: 90 | -90 | 180 }>();
   groupDuplicationRequested = output<string>();
   groupResizeRequested = output<{ groupId: string; prop: 'width' | 'height' | 'depth' | 'thickness'; value: number }>();
@@ -1081,6 +1084,31 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     });
 
+    // 8. Sincronizar apertura interactiva de Cajones Modulares (0% a 100%) desde el Inspector Contextual al visor 3D
+    effect(() => {
+      const groups = this.partGroups();
+      this.parts();
+      if (!this.scene || this.pieceObjects.length === 0) return;
+      let changed = false;
+      for (const g of groups) {
+        if (g.type === 'drawer' || g.subType === 'drawer' || g.templateId === 'modular_drawer') {
+          const ext = g.slideExtension !== undefined ? g.slideExtension : (g.isOpen ? 1 : 0);
+          for (const p of this.pieceObjects) {
+            if (p.part.groupId === g.id) {
+              const prev = this.openTargetMap.get(p.part.id) ?? 0;
+              const curAnim = this.openCurrentMap.get(p.part.id) ?? 0;
+              if (Math.abs(prev - ext) > 0.005 || Math.abs(curAnim - ext) > 0.005) {
+                this.openTargetMap.set(p.part.id, ext);
+                changed = true;
+              }
+            }
+          }
+        }
+      }
+      if (changed) {
+        this.requestRender(55);
+      }
+    });
   }
 
   private initThree() {
@@ -1816,8 +1844,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
           if (drawerBoxMesh) mesh.add(drawerBoxMesh);
         }
 
-        if (isDrawerFront && shouldRenderHardware) {
-          if (vis.showHandles) {
+        const isSlideHostForHeadlessDrawer =
+          !isDrawerFront &&
+          part.id.endsWith('_contrafrente') &&
+          !parts.some(op => op.groupId === part.groupId && op.componentRole === 'drawer_front');
+
+        if ((isDrawerFront || isSlideHostForHeadlessDrawer) && shouldRenderHardware) {
+          if (isDrawerFront && vis.showHandles) {
             handleGroup = this.createHandleMesh(part, hw, localDims.sx, localDims.sy, localDims.sz, false, 'top', drawerFacing);
             if (handleGroup) mesh.add(handleGroup);
           }
@@ -3621,7 +3654,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
           );
           if (isBacksplash) {
             sx = t; sy = Math.min(L, W); sz = Math.max(L, W);
-          } else if ((isPlinth || isDrawerLateral) && L > W) {
+          } else if (isDrawerLateral || (isPlinth && L > W)) {
             sx = t; sy = W; sz = L;
           } else {
             sx = t; sy = L; sz = W;
@@ -3789,7 +3822,15 @@ private createHandleMesh(
   ): THREE.Group {
     const group = new THREE.Group();
     const handleType = hw.handleType || 'bar_modern';
-    if (handleType === 'none') return group;
+    if (
+      handleType === 'none' ||
+      handleType === 'push' ||
+      handleType === 'push_open' ||
+      handleType === 'finger_pull' ||
+      handleType === 'gola_less'
+    ) {
+      return group;
+    }
 
     const effectiveFinish: HandleFinish =
       hw.handleFinish || (handleType === 'bar_black' ? 'black' : 'brushed_steel');
@@ -3873,10 +3914,22 @@ private createHandleMesh(
         group.position.set(0, sy / 2 - margin, sz / 2 + 15);
       }
     } else {
-      // Tirador de Cajón en coordenadas locales del frente (cara frontal en +sz / 2)
+      // Tirador de Cajón en coordenadas locales del frente según las 4 orientaciones cardinales
       const isVerticalBar = handleType === 'bar_modern' || handleType === 'bar_black';
-      group.position.set(0, 0, sz / 2 + 15);
-      group.rotation.set(0, 0, isVerticalBar ? Math.PI / 2 : 0);
+      const barRoll = isVerticalBar ? Math.PI / 2 : 0;
+      if (drawerFacing === 'right') {
+        group.position.set(sx / 2 + 15, 0, 0);
+        group.rotation.set(0, Math.PI / 2, barRoll, 'YXZ');
+      } else if (drawerFacing === 'left') {
+        group.position.set(-sx / 2 - 15, 0, 0);
+        group.rotation.set(0, -Math.PI / 2, barRoll, 'YXZ');
+      } else if (drawerFacing === 'back') {
+        group.position.set(0, 0, -sz / 2 - 15);
+        group.rotation.set(0, Math.PI, barRoll, 'YXZ');
+      } else {
+        group.position.set(0, 0, sz / 2 + 15);
+        group.rotation.set(0, 0, barRoll, 'YXZ');
+      }
     }
 
     group.traverse(child => {
@@ -4392,7 +4445,7 @@ private createHandleMesh(
         const t2 = (x2 === maxX ? drawerLatDer : drawerLatIzq).thickness || 15;
         
         // Guard against matching exterior carcass walls: drawer box laterals must be inside front span
-        const maxExpectedSpan = (sx / 2);
+        const maxExpectedSpan = (sx / 2) + 36;
         if (Math.abs(minX - px) <= maxExpectedSpan && Math.abs(maxX - px) <= maxExpectedSpan) {
           leftX = (minX - (t1 / 2) - px) - (railThickness / 2);
           rightX = (maxX + (t2 / 2) - px) + (railThickness / 2);
@@ -4453,7 +4506,7 @@ private createHandleMesh(
         const t1 = (z1 === minZ ? drawerLatIzq : drawerLatDer).thickness || 15;
         const t2 = (z2 === maxZ ? drawerLatDer : drawerLatIzq).thickness || 15;
         // Guard against matching exterior carcass walls: drawer box laterals must be inside front span
-        const maxExpectedSpan = (sz / 2);
+        const maxExpectedSpan = (sz / 2) + 36;
         if (Math.abs(minZ - pz) <= maxExpectedSpan && Math.abs(maxZ - pz) <= maxExpectedSpan) {
           leftZ = (minZ - (t1 / 2) - pz) - (railThickness / 2);
           rightZ = (maxZ + (t2 / 2) - pz) + (railThickness / 2);
@@ -7248,6 +7301,10 @@ private createHandleMesh(
               deltaZ = Math.round(deltaWorld.z / snap) * snap;
             }
 
+            if (this.isMagneticSnap() && this.trySmartFitDrawerGroupOnDrag(e, { dx: deltaX, dy: deltaY, dz: deltaZ })) {
+              return;
+            }
+
             if (this.isMagneticSnap()) {
               const externalParts = this.parts().filter(p => !this.dragInitialParts.some(dp => dp.id === p.id));
               if (externalParts.length > 0) {
@@ -7715,6 +7772,10 @@ private createHandleMesh(
             let effDx = dx;
             let effDy = Math.max(minAllowedDy, dy);
             let effDz = dz;
+
+            if (this.isMagneticSnap() && this.trySmartFitDrawerGroupOnDrag(e, { dx: effDx, dy: effDy, dz: effDz })) {
+              return;
+            }
 
             if (this.isMagneticSnap()) {
               // 1. Imán inteligente entre este módulo/grupo y cualquier otra pieza o módulo externo
@@ -8394,6 +8455,305 @@ private createHandleMesh(
     this.requestRender(4);
   }
 
+  private liveDraggedDrawerCavityFit: {
+    groupId: string;
+    config: ParametricDrawerConfig;
+  } | null = null;
+
+  private clearLiveDraggedDrawerCavityFit() {
+    if (!this.liveDraggedDrawerCavityFit) return;
+    this.liveDraggedDrawerCavityFit = null;
+    this.disposeGroup(this.internalClearanceGroup);
+    if (this.dragInitialParts.length > 0) {
+      const restoreList = this.dragInitialParts.map(initPart => ({
+        part: initPart,
+        updates: {
+          length: initPart.length,
+          width: initPart.width,
+          thickness: initPart.thickness,
+          orientation: initPart.orientation,
+          posX: initPart.posX,
+          posY: initPart.posY,
+          posZ: initPart.posZ,
+          notes: initPart.notes,
+          hardwareConfig: initPart.hardwareConfig
+        }
+      }));
+      this.previewPartUpdatesInPlace(restoreList);
+    }
+  }
+
+  /**
+   * Auto-Encaje Inteligente ("Smart Cavity Fit") al arrastrar un Cajón Modular en el visor 3D:
+   * - Si el cursor/cajón entra en la cavidad de un mueble existente, auto-centra y auto-redimensiona
+   *   instantáneamente sus piezas al anchoInterno y profundidad útil del hueco, adoptando la rotación
+   *   del módulo receptor y deslizando verticalmente (posY) con cotas en vivo de Luz Superior y Luz Inferior.
+   */
+  private trySmartFitDrawerGroupOnDrag(
+    e: PointerEvent,
+    proposedDelta: { dx: number; dy: number; dz: number }
+  ): boolean {
+    if (e.altKey || this.dragInitialParts.length < 2) {
+      this.clearLiveDraggedDrawerCavityFit();
+      return false;
+    }
+
+    const groupId = this.dragInitialParts[0]?.groupId;
+    if (!groupId || !this.dragInitialParts.every(p => p.groupId === groupId)) {
+      this.clearLiveDraggedDrawerCavityFit();
+      return false;
+    }
+
+    const grp = this.partGroups().find(g => g.id === groupId);
+    const isModularDrawer =
+      !!grp &&
+      (grp.type === 'drawer' || grp.subType === 'drawer' || grp.templateId === 'modular_drawer');
+    if (!isModularDrawer || !grp) {
+      this.clearLiveDraggedDrawerCavityFit();
+      return false;
+    }
+
+    const allCavities = this.partGeometry.detectAllSceneCavities(this.parts(), this.partGroups());
+    if (allCavities.length === 0) {
+      this.clearLiveDraggedDrawerCavityFit();
+      return false;
+    }
+
+    let initMinX = Infinity, initMaxX = -Infinity;
+    let initMinY = Infinity, initMaxY = -Infinity;
+    let initMinZ = Infinity, initMaxZ = -Infinity;
+    for (const p of this.dragInitialParts) {
+      const b = this.getPartBounds(p);
+      if (b.minX < initMinX) initMinX = b.minX;
+      if (b.maxX > initMaxX) initMaxX = b.maxX;
+      if (b.minY < initMinY) initMinY = b.minY;
+      if (b.maxY > initMaxY) initMaxY = b.maxY;
+      if (b.minZ < initMinZ) initMinZ = b.minZ;
+      if (b.maxZ > initMaxZ) initMaxZ = b.maxZ;
+    }
+
+    const initCenterX = (initMinX + initMaxX) / 2;
+    const initCenterZ = (initMinZ + initMaxZ) / 2;
+    const initVisualH = Math.max(60, initMaxY - initMinY);
+
+    const candCenterX = initCenterX + proposedDelta.dx;
+    const candMinY = initMinY + proposedDelta.dy;
+    const candCenterZ = initCenterZ + proposedDelta.dz;
+
+    const camDir = new THREE.Vector3();
+    this.camera.getWorldDirection(camDir);
+    camDir.y = 0;
+    if (camDir.lengthSq() < 1e-4) camDir.set(0, 0, -1);
+    camDir.normalize();
+
+    let matchedCavity: ModuleCavityInfo | null = null;
+    let bestHitY: number | null = null;
+    let bestScore = Infinity;
+
+    for (const cav of allCavities) {
+      const isWZ = cav.facingDirection === 'right' || cav.facingDirection === 'left';
+      const cavPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+        camDir,
+        new THREE.Vector3(cav.centerX, (cav.minY + cav.maxY) / 2, cav.centerZ)
+      );
+      const rayHit = new THREE.Vector3();
+      const hasRayHit = !!this.raycaster.ray.intersectPlane(cavPlane, rayHit);
+
+      const raySpanDist = hasRayHit
+        ? isWZ
+          ? Math.abs(rayHit.z - cav.centerZ)
+          : Math.abs(rayHit.x - cav.centerX)
+        : Infinity;
+      const rayInside =
+        hasRayHit &&
+        raySpanDist <= cav.innerWidth / 2 + 55 &&
+        rayHit.y >= cav.minY - 50 &&
+        rayHit.y <= cav.maxY + 50;
+
+      const planeSpanDist = isWZ
+        ? Math.abs(candCenterZ - cav.centerZ)
+        : Math.abs(candCenterX - cav.centerX);
+      const planeDepthDist = isWZ
+        ? Math.abs(candCenterX - cav.centerX)
+        : Math.abs(candCenterZ - cav.centerZ);
+      const planeInside =
+        planeSpanDist <= cav.innerWidth / 2 + 55 &&
+        planeDepthDist <= cav.internalDepth / 2 + 95 &&
+        candMinY >= cav.minY - 65 &&
+        candMinY <= cav.maxY + 65;
+
+      if (rayInside || planeInside) {
+        const score = Math.min(raySpanDist, planeSpanDist);
+        if (score < bestScore) {
+          bestScore = score;
+          matchedCavity = cav;
+          bestHitY = hasRayHit ? rayHit.y - initVisualH / 2 : candMinY;
+        }
+      }
+    }
+
+    if (!matchedCavity) {
+      this.clearLiveDraggedDrawerCavityFit();
+      return false;
+    }
+
+    const baseCfg = this.projectStorage.getModularDrawerConfig(groupId);
+    if (!baseCfg) {
+      this.clearLiveDraggedDrawerCavityFit();
+      return false;
+    }
+
+    const frontMountType = baseCfg.frontMountType ?? 'overlay';
+    const ft = baseCfg.frontThickness || baseCfg.boxThickness || 15;
+    const optimalSlide = this.partGeometry.getOptimalCommercialSlideLength(
+      matchedCavity.internalDepth,
+      frontMountType,
+      ft
+    );
+
+    const minAllowedY = matchedCavity.minY + 2;
+    const maxAllowedY = Math.max(minAllowedY, matchedCavity.maxY - initVisualH - 2);
+    let targetBaseY = Math.round(bestHitY ?? candMinY);
+
+    // Imán suave a la base del vano y al centro vertical del vano
+    const midAllowedY = Math.round((minAllowedY + maxAllowedY) / 2);
+    if (Math.abs(targetBaseY - minAllowedY) <= 14) {
+      targetBaseY = Math.round(minAllowedY);
+    } else if (Math.abs(targetBaseY - midAllowedY) <= 12) {
+      targetBaseY = midAllowedY;
+    }
+    targetBaseY = Math.max(Math.round(minAllowedY), Math.min(Math.round(maxAllowedY), targetBaseY));
+
+    const { parts: rebuiltParts, normalizedConfig } = this.projectStorage.buildModularDrawerParts(
+      groupId,
+      grp.name,
+      {
+        ...baseCfg,
+        outerWidth: matchedCavity.innerWidth,
+        slideLength: optimalSlide,
+        sideThickness: matchedCavity.leftSideThickness,
+        posX: matchedCavity.centerX,
+        posY: targetBaseY,
+        posZ: matchedCavity.centerZ,
+        facingDirection: matchedCavity.facingDirection,
+        frontEdgeCoord: matchedCavity.frontEdgeCoord,
+        hostGroupId: matchedCavity.groupId,
+        hostCavityId: matchedCavity.id
+      }
+    );
+
+    const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+    for (const initPart of this.dragInitialParts) {
+      const rebuilt =
+        rebuiltParts.find(rp => rp.id === initPart.id) ||
+        rebuiltParts.find(rp => rp.componentRole === initPart.componentRole && rp.name === initPart.name);
+      if (!rebuilt) continue;
+      updatesList.push({
+        part: initPart,
+        updates: {
+          length: rebuilt.length,
+          width: rebuilt.width,
+          thickness: rebuilt.thickness,
+          orientation: rebuilt.orientation,
+          posX: rebuilt.posX,
+          posY: rebuilt.posY,
+          posZ: rebuilt.posZ,
+          notes: rebuilt.notes,
+          hardwareConfig: rebuilt.hardwareConfig
+        }
+      });
+    }
+
+    if (updatesList.length === 0) {
+      this.clearLiveDraggedDrawerCavityFit();
+      return false;
+    }
+
+    this.liveDraggedDrawerCavityFit = { groupId, config: normalizedConfig };
+    this.clearPartSnapGuides();
+    this.clearWallSnapGuides();
+    this.clearLegSnapGuides();
+
+    this.previewPartUpdatesInPlace(updatesList);
+    this.renderDrawerCavityClearances(matchedCavity, targetBaseY, targetBaseY + initVisualH);
+    this.internalClearanceGroup.position.set(0, 0, 0);
+    this.requestRender(2);
+    return true;
+  }
+
+  /**
+   * Renderiza en vivo las cotas técnicas de Luz Superior y Luz Inferior mientras se desliza
+   * un Cajón Modular por el riel vertical de un hueco en el visor 3D.
+   */
+  private renderDrawerCavityClearances(
+    cavity: ModuleCavityInfo,
+    drawerMinY: number,
+    drawerMaxY: number
+  ) {
+    this.disposeGroup(this.internalClearanceGroup);
+
+    const bottomClr = Math.max(0, Math.round(drawerMinY - cavity.minY));
+    const topClr = Math.max(0, Math.round(cavity.maxY - drawerMaxY));
+
+    const isWZ = cavity.facingDirection === 'right' || cavity.facingDirection === 'left';
+    const dirSign = cavity.facingDirection === 'front' || cavity.facingDirection === 'right' ? 1 : -1;
+    const refDepth = cavity.frontEdgeCoord + dirSign * 26;
+    const refX = isWZ ? refDepth : cavity.centerX;
+    const refZ = isWZ ? cavity.centerZ : refDepth;
+
+    // Luz Superior
+    if (topClr >= 4) {
+      const p1 = new THREE.Vector3(refX, drawerMaxY, refZ);
+      const p2 = new THREE.Vector3(refX, cavity.maxY, refZ);
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      const line = new THREE.Line(lineGeo, this.internalClearanceLineMat);
+      line.computeLineDistances();
+      this.internalClearanceGroup.add(line);
+
+      const midY = (drawerMaxY + cavity.maxY) / 2;
+      const badge = this.createInternalClearanceBadge(`Luz Sup: ${topClr} mm`, false, false);
+      badge.position.set(refX, midY, refZ + (isWZ ? 0 : dirSign * 10));
+      this.internalClearanceGroup.add(badge);
+    }
+
+    // Luz Inferior
+    if (bottomClr >= 4) {
+      const p1 = new THREE.Vector3(refX, cavity.minY, refZ);
+      const p2 = new THREE.Vector3(refX, drawerMinY, refZ);
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      const line = new THREE.Line(lineGeo, this.internalClearanceLineMat);
+      line.computeLineDistances();
+      this.internalClearanceGroup.add(line);
+
+      const midY = (cavity.minY + drawerMinY) / 2;
+      const badge = this.createInternalClearanceBadge(`Luz Inf: ${bottomClr} mm`, false, false);
+      badge.position.set(refX, midY, refZ + (isWZ ? 0 : dirSign * 10));
+      this.internalClearanceGroup.add(badge);
+    }
+
+    // Etiqueta de Ancho de Hueco Auto-Encajado
+    const widthBadge = this.createInternalClearanceBadge(
+      `Hueco: ${Math.round(cavity.innerWidth)} mm`,
+      true,
+      false
+    );
+    widthBadge.position.set(refX, cavity.minY + 18, refZ + (isWZ ? 0 : dirSign * 14));
+    this.internalClearanceGroup.add(widthBadge);
+
+    this.ngZone.run(() => {
+      this.clearanceCalculated.emit({
+        topClearance: topClr,
+        bottomClearance: bottomClr,
+        leftClearance: 0,
+        rightClearance: 0,
+        topNeighborName: cavity.moduleName,
+        bottomNeighborName: cavity.moduleName,
+        leftNeighborName: 'Lateral Izq',
+        rightNeighborName: 'Lateral Der'
+      });
+    });
+  }
+
   /**
    * Consolida en la zona de Angular los cambios acumulados tras finalizar un arrastre 3D (`pointerup`).
    */
@@ -8401,8 +8761,9 @@ private createHandleMesh(
     const hasPartUpdates = this.liveDragPartUpdates.size > 0;
     const hasAppUpdates = this.liveDragApplianceUpdates.size > 0;
     const primaryApp = this.liveDragPrimaryApplianceUpdate;
+    const drawerFit = this.liveDraggedDrawerCavityFit;
 
-    if (!hasPartUpdates && !hasAppUpdates && !primaryApp) return;
+    if (!hasPartUpdates && !hasAppUpdates && !primaryApp && !drawerFit) return;
 
     const partUpdatesList = Array.from(this.liveDragPartUpdates.values());
     const appUpdatesList = Array.from(this.liveDragApplianceUpdates.values());
@@ -8410,6 +8771,7 @@ private createHandleMesh(
     this.liveDragPartUpdates.clear();
     this.liveDragApplianceUpdates.clear();
     this.liveDragPrimaryApplianceUpdate = null;
+    this.liveDraggedDrawerCavityFit = null;
     this.internalClearanceGroup.position.set(0, 0, 0);
 
     this.ngZone.run(() => {
@@ -8421,6 +8783,35 @@ private createHandleMesh(
         this.partModified.emit(partUpdatesList[0]);
       } else if (partUpdatesList.length === 1) {
         this.partModified.emit(partUpdatesList[0]);
+      }
+      if (drawerFit) {
+        this.projectStorage.updateGroup(drawerFit.groupId, {
+          slideLength: drawerFit.config.slideLength,
+          facingDirection: drawerFit.config.facingDirection,
+          drawerConfig: drawerFit.config,
+          hostGroupId: drawerFit.config.hostGroupId,
+          hostCavityId: drawerFit.config.hostCavityId
+        });
+      } else if (partUpdatesList.length > 1) {
+        const draggedGroupId = partUpdatesList[0]?.part.groupId;
+        if (
+          draggedGroupId &&
+          partUpdatesList.every(u => u.part.groupId === draggedGroupId) &&
+          this.partGroups().some(
+            g =>
+              g.id === draggedGroupId &&
+              (g.type === 'drawer' || g.subType === 'drawer' || g.templateId === 'modular_drawer')
+          )
+        ) {
+          const syncedCfg = this.projectStorage.getModularDrawerConfig(draggedGroupId);
+          if (syncedCfg) {
+            this.projectStorage.updateGroup(draggedGroupId, {
+              drawerConfig: syncedCfg,
+              hostGroupId: syncedCfg.hostGroupId,
+              hostCavityId: syncedCfg.hostCavityId
+            });
+          }
+        }
       }
       if (partUpdatesList.length === 1) {
         const singlePart = partUpdatesList[0].part;
@@ -8969,8 +9360,17 @@ private createHandleMesh(
   readonly isContextMenuDrawerGroup = computed<boolean>(() => {
     const grp = this.contextMenuGroup();
     if (!grp) return false;
-    return grp.type === 'drawer';
+    return grp.type === 'drawer' || grp.subType === 'drawer' || grp.templateId === 'modular_drawer';
   });
+
+  requestInsertDrawerInContextCavity() {
+    const part = this.contextMenuPart();
+    if (!part?.groupId) return;
+    const grpId = part.groupId;
+    const prtId = part.id;
+    this.closeContextMenu();
+    this.insertDrawerInCavityRequested.emit({ groupId: grpId, partId: prtId });
+  }
 
   readonly isContextMenuCountertopGroup = computed<boolean>(() => {
     const grp = this.contextMenuGroup();
@@ -9561,7 +9961,7 @@ private createHandleMesh(
             !isCabinetSide &&
             ptIncludesDrawer(part);
 
-          if ((isPlinth || isDrawerBoxSide) && horizontalSpan > verticalHeight) {
+          if (isDrawerBoxSide || (isPlinth && horizontalSpan > verticalHeight)) {
             updates.length = horizontalSpan;
             updates.width = verticalHeight;
           } else {
@@ -10468,6 +10868,7 @@ private createHandleMesh(
           this.openTargetMap.set(p.part.id, next);
         }
       }
+      this.requestRender(60);
     }
   }
 

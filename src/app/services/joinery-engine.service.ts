@@ -188,11 +188,41 @@ export class JoineryEngineService {
             continue;
           }
 
+          // Excluir bloques 3D de correderas telescópicas (13 mm por lado) en contacto con laterales o cajón
+          const nameA = b1.part.name.toUpperCase();
+          const nameB = b2.part.name.toUpperCase();
+          const isSlideA =
+            nameA.includes('CORREDERA') ||
+            nameA.includes('SLIDE') ||
+            nameA.includes('RIEL TELESC');
+          const isSlideB =
+            nameB.includes('CORREDERA') ||
+            nameB.includes('SLIDE') ||
+            nameB.includes('RIEL TELESC');
+          if (isSlideA || isSlideB) {
+            continue;
+          }
+
           // Ranura de fondo de cajón MDF (encastre ranurado estándar de 4-8 mm)
           const isDrawerBottomJoint =
             ((b1.part.componentRole === 'drawer_box' && (b1.part.thickness || 0) <= 6) && b2.part.componentRole === 'drawer_box') ||
             ((b2.part.componentRole === 'drawer_box' && (b2.part.thickness || 0) <= 6) && b1.part.componentRole === 'drawer_box');
           if (isDrawerBottomJoint && (overlapX <= 12 || overlapZ <= 12) && overlapY <= 8) {
+            continue;
+          }
+
+          // Contacto al ras de frentes y cajas de cajón (overlay / inset) dentro de su vano
+          const isDrawerPartA =
+            b1.part.componentRole === 'drawer_front' ||
+            b1.part.componentRole === 'drawer_box' ||
+            b1.part.componentRole === 'drawer_bottom' ||
+            b1.part.componentRole === 'drawer_lateral';
+          const isDrawerPartB =
+            b2.part.componentRole === 'drawer_front' ||
+            b2.part.componentRole === 'drawer_box' ||
+            b2.part.componentRole === 'drawer_bottom' ||
+            b2.part.componentRole === 'drawer_lateral';
+          if ((isDrawerPartA || isDrawerPartB) && Math.min(overlapX, overlapY, overlapZ) <= 1.5) {
             continue;
           }
 
@@ -368,10 +398,21 @@ export class JoineryEngineService {
     const slideY = drawer.py - drawer.sy * 0.15;
     const facing = this.getPartFacingDirection(drawer.part, allParts);
 
+    const isModularDrawer =
+      drawer.part.moduleId === 'cajon_independiente' ||
+      (drawer.part.groupId || '').startsWith('drawer_grp_');
+
     // Filtrar solo costados/divisores estructurales reales del módulo (excluir puertas, frentes, fondos, cajones internos)
     const candidateSides = allBounds.filter(b => {
       if (b.part.id === drawer.part.id) return false;
-      if (drawer.part.groupId && b.part.groupId && b.part.groupId !== drawer.part.groupId) return false;
+      if (
+        !isModularDrawer &&
+        drawer.part.groupId &&
+        b.part.groupId &&
+        b.part.groupId !== drawer.part.groupId
+      ) {
+        return false;
+      }
       const role = b.part.componentRole;
       if (
         role === 'door' ||

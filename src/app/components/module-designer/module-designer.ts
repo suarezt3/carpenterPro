@@ -78,7 +78,10 @@ import {
   SpecialCutPresetType,
   isCountertopMaterial,
   DEFAULT_COUNTERTOP_MATERIALS,
-  EnvironmentLine
+  EnvironmentLine,
+  DrawerFrontMountType,
+  DrawerOpeningSystem,
+  ModuleCavityInfo
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -1095,8 +1098,12 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
   readonly openGroupCardIds = signal<Set<string>>(new Set());
 
-  // Estado del Asistente de Cajón Modular
+  // Estado del Asistente de Cajón Modular (Smart Cavity Fit + Montaje Solapado/A Ras + Apertura Push/Uñero)
   readonly showDrawerWizard = signal<boolean>(false);
+  readonly drawerWizardTargetModuleId = signal<string>('floor');
+  readonly drawerWizardTargetCavityId = signal<string>('');
+  readonly drawerWizardCount = signal<1 | 2 | 3 | 4>(1);
+
   readonly drawerForm = signal<ParametricDrawerConfig>({
     name: 'Cajón 1',
     outerWidth: 400,
@@ -1106,11 +1113,88 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     bottomThickness: 3,
     slideGap: 26,
     includeFront: true,
+    frontMountType: 'overlay',
+    handleType: 'handle',
     frontHeight: 180,
-    frontWidth: 396,
+    frontWidth: 432,
+    frontThickness: 15,
+    sideThickness: 18,
     posX: 0,
     posY: 120,
-    posZ: 0
+    posZ: 0,
+    rotationY: 0
+  });
+
+  readonly availableCabinetModulesForDrawer = computed<PartGroup[]>(() => {
+    const grps = this.groups();
+    const parts = this.currentParts();
+    return grps.filter(g => {
+      if (this.isCountertopGroup(g.id) || this.isModularDrawerGroup(g.id)) return false;
+      const cavities = this.partGeometry.detectModuleCavities(g.id, parts, g.name);
+      return cavities.length > 0;
+    });
+  });
+
+  readonly availableCavitiesForDrawerModule = computed<ModuleCavityInfo[]>(() => {
+    const modId = this.drawerWizardTargetModuleId();
+    if (!modId || modId === 'floor') return [];
+    const grp = this.groups().find(g => g.id === modId);
+    return this.partGeometry.detectModuleCavities(modId, this.currentParts(), grp?.name || 'Módulo');
+  });
+
+  readonly selectedDrawerWizardCavity = computed<ModuleCavityInfo | null>(() => {
+    const cavities = this.availableCavitiesForDrawerModule();
+    if (cavities.length === 0) return null;
+    const targetId = this.drawerWizardTargetCavityId();
+    return cavities.find(c => c.id === targetId) || cavities[0] || null;
+  });
+
+  readonly computedDrawerWizardEffectiveFrontHeight = computed<number>(() => {
+    const cfg = this.drawerForm();
+    const mount = cfg.frontMountType ?? (cfg.includeFront ? 'overlay' : 'none');
+    if (mount === 'none') return 0;
+    const rawH = cfg.frontHeight || 180;
+    return cfg.handleType === 'finger_pull' ? Math.max(80, Math.round(rawH - 28)) : Math.round(rawH);
+  });
+
+  readonly computedDrawerWizardEffectiveBoxHeight = computed<number>(() => {
+    const cfg = this.drawerForm();
+    const mount = cfg.frontMountType ?? (cfg.includeFront ? 'overlay' : 'none');
+    if (mount === 'none') return Math.round(cfg.boxHeight);
+    const effFrontH = this.computedDrawerWizardEffectiveFrontHeight();
+    return Math.min(Math.round(cfg.boxHeight), Math.max(60, effFrontH - 20));
+  });
+
+  readonly isSelectedGroupModularDrawer = computed<boolean>(() => {
+    const gid = this.activeSelectedGroupId();
+    if (gid && this.isModularDrawerGroup(gid)) return true;
+    const sel = this.selectedPart();
+    if (sel?.groupId && this.isModularDrawerGroup(sel.groupId) && this.selectedGroupIds().length <= 1) {
+      return true;
+    }
+    return false;
+  });
+
+  readonly selectedModularDrawerGroup = computed<PartGroup | null>(() => {
+    const gid = this.activeSelectedGroupId() || (this.selectedGroupIds().length === 1 ? this.selectedGroupIds()[0] : this.selectedPart()?.groupId);
+    if (!gid || !this.isModularDrawerGroup(gid)) return null;
+    return this.groups().find(g => g.id === gid) || null;
+  });
+
+  readonly selectedModularDrawerConfig = computed<ParametricDrawerConfig | null>(() => {
+    const grp = this.selectedModularDrawerGroup();
+    if (!grp) return null;
+    this.currentParts();
+    return this.projectService.getModularDrawerConfig(grp.id);
+  });
+
+  readonly selectedModularDrawerExtensionPct = computed<number>(() => {
+    const grp = this.selectedModularDrawerGroup();
+    if (!grp) return 0;
+    if (typeof grp.slideExtension === 'number') {
+      return Math.round(Math.max(0, Math.min(1, grp.slideExtension)) * 100);
+    }
+    return grp.isOpen ? 100 : 0;
   });
 
   // Modal de agrupación manual y renombrado en línea
@@ -1933,9 +2017,25 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     return false;
   });
 
+  isModularDrawerGroup(groupId: string | null | undefined): boolean {
+    if (!groupId) return false;
+    const grp = this.groups().find(g => g.id === groupId);
+    if (grp && (grp.type === 'drawer' || grp.subType === 'drawer' || grp.templateId === 'modular_drawer' || !!grp.drawerConfig)) {
+      return true;
+    }
+    const parts = this.currentParts().filter(p => p.groupId === groupId);
+    if (parts.length === 0) return false;
+    const hasCabinetSide = parts.some(p =>
+      (p.componentRole === 'side_left' || p.componentRole === 'side_right') &&
+      !p.name.toUpperCase().includes('CAJ')
+    );
+    if (hasCabinetSide) return false;
+    return parts.some(p => p.componentRole === 'drawer_box' || p.id.startsWith('caj_ind_'));
+  }
+
   openEditSelectedGroup(event?: Event) {
     event?.stopPropagation();
-    const gId = this.activeSelectedGroupId();
+    const gId = this.activeSelectedGroupId() || this.selectedPart()?.groupId;
     if (gId) {
       this.openEditGroup(gId, event);
     }
@@ -1944,6 +2044,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   /**
    * Abre el asistente paramétrico cargando las dimensiones actuales del grupo seleccionado.
    * Si el grupo es un Mesón / Encimera 3D, abre la pestaña Mesones 3D de Cocina Pro Studio.
+   * Si el grupo es un Cajón Modular, abre el Inspector Contextual Exclusivo en el panel derecho.
    */
   openEditGroup(groupId: string, event?: Event) {
     event?.stopPropagation();
@@ -1952,6 +2053,16 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const parts = this.currentParts().filter(p => p.groupId === groupId);
     if (parts.length === 0) {
       this.showToast('⚠️ No se encontraron piezas para editar en este módulo');
+      return;
+    }
+
+    if (this.isModularDrawerGroup(groupId)) {
+      this.showTemplatesDropdown.set(false);
+      this.showTemplatesModal.set(false);
+      this.isSidebarCollapsed.set(false);
+      this.selectEntireGroup(groupId);
+      this.activeDockTab.set('piece');
+      this.showToast('Inspector de Cajón Modular activo en el panel derecho');
       return;
     }
 
@@ -3023,6 +3134,10 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   onGroupDuplicationRequested(groupId: string) {
+    if (this.isModularDrawerGroup(groupId)) {
+      this.duplicateSelectedDrawerVertically(groupId, 'up');
+      return;
+    }
     const result = this.projectService.duplicateGroup(groupId);
     if (result) {
       this.selectedPartIds.set(result.newPartIds);
@@ -3931,34 +4046,248 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     return this.openGroupCardIds().has(groupId);
   }
 
-  // --- ASISTENTE DE CAJÓN MODULAR ---
+  // --- ASISTENTE DE CAJÓN MODULAR (SMART CAVITY FIT + MONTAJE SOLAPADO/A RAS + APERTURA PUSH/UÑERO) ---
 
-  openDrawerWizard() {
+  openDrawerWizard(preselectedModuleId?: string, preselectedPartId?: string) {
     const uniqueName = this.getNextUniqueGroupName('Cajón');
     const defaultMat = this.materials()[0];
     const mdfMat = this.materials().find(m => m.thickness === 3) || defaultMat;
+    const defaultT = this.defaultBoardThickness();
+
+    // Detectar si el usuario tiene seleccionado un módulo de gabinete o entrepaño
+    let targetModId = preselectedModuleId || 'floor';
+    if (targetModId === 'floor') {
+      const activeGid = this.activeSelectedGroupId() || this.selectedPart()?.groupId;
+      if (activeGid && !this.isCountertopGroup(activeGid) && !this.isModularDrawerGroup(activeGid)) {
+        const modCavities = this.partGeometry.detectModuleCavities(activeGid, this.currentParts());
+        if (modCavities.length > 0) {
+          targetModId = activeGid;
+        }
+      }
+    }
+
+    this.drawerWizardTargetModuleId.set(targetModId);
+    this.drawerWizardCount.set(1);
+
+    if (targetModId !== 'floor') {
+      const grp = this.groups().find(g => g.id === targetModId);
+      const cavities = this.partGeometry.detectModuleCavities(targetModId, this.currentParts(), grp?.name || 'Módulo');
+      if (cavities.length > 0) {
+        let chosenCavity = cavities[0];
+        const refPartId = preselectedPartId || this.selectedPartId();
+        if (refPartId) {
+          const refPart = this.currentParts().find(p => p.id === refPartId);
+          if (refPart) {
+            const py = refPart.posY ?? 0;
+            const match = cavities.find(c => py >= c.minY - 25 && py <= c.maxY + 25);
+            if (match) chosenCavity = match;
+          }
+        }
+        this.drawerWizardTargetCavityId.set(chosenCavity.id);
+        const frontW = Math.round(chosenCavity.internalWidth + 2 * chosenCavity.sideThickness - 4);
+        const boxH = Math.max(80, Math.min(160, Math.round(chosenCavity.internalHeight - 40)));
+        const frontH = Math.max(100, Math.min(200, Math.round(chosenCavity.internalHeight - 6)));
+        this.drawerForm.set({
+          name: uniqueName,
+          outerWidth: chosenCavity.internalWidth,
+          slideLength: chosenCavity.optimalSlideLength,
+          boxHeight: boxH,
+          boxThickness: defaultT,
+          bottomThickness: 3,
+          slideGap: 26,
+          includeFront: true,
+          frontMountType: 'overlay',
+          handleType: 'handle',
+          frontHeight: frontH,
+          frontWidth: frontW,
+          frontThickness: defaultT,
+          sideThickness: chosenCavity.sideThickness,
+          posX: chosenCavity.centerX,
+          posY: Math.round(chosenCavity.minY + 2),
+          posZ: chosenCavity.centerZ,
+          rotationY: chosenCavity.rotationY,
+          targetModuleId: targetModId,
+          targetCavityId: chosenCavity.id,
+          materialId: defaultMat ? defaultMat.id : 'mat-1',
+          bottomMaterialId: mdfMat ? mdfMat.id : 'mat_mdf_3'
+        });
+        this.showDrawerWizard.set(true);
+        return;
+      }
+      this.drawerWizardTargetModuleId.set('floor');
+    }
+
+    this.drawerWizardTargetCavityId.set('');
     this.drawerForm.set({
       name: uniqueName,
       outerWidth: 400,
       slideLength: 450,
       boxHeight: 140,
-      boxThickness: 15,
+      boxThickness: defaultT,
       bottomThickness: 3,
       slideGap: 26,
       includeFront: true,
+      frontMountType: 'overlay',
+      handleType: 'handle',
       frontHeight: 180,
-      frontWidth: 396,
+      frontWidth: 432,
+      frontThickness: defaultT,
+      sideThickness: 18,
       posX: 0,
       posY: 100 + (this.groups().length) * 200,
       posZ: 0,
+      rotationY: 0,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
       bottomMaterialId: mdfMat ? mdfMat.id : 'mat_mdf_3'
     });
     this.showDrawerWizard.set(true);
   }
 
+  openDrawerWizardForCavity(event: { groupId: string; partId?: string }) {
+    this.openDrawerWizard(event.groupId, event.partId);
+  }
+
   closeDrawerWizard() {
     this.showDrawerWizard.set(false);
+  }
+
+  onDrawerWizardTargetModuleChange(event: Event) {
+    const modId = (event.target as HTMLSelectElement).value || 'floor';
+    this.drawerWizardTargetModuleId.set(modId);
+    if (modId === 'floor') {
+      this.drawerWizardTargetCavityId.set('');
+      this.drawerWizardCount.set(1);
+      this.drawerForm.update(cur => ({
+        ...cur,
+        targetModuleId: undefined,
+        targetCavityId: undefined,
+        rotationY: 0
+      }));
+      return;
+    }
+    const cavities = this.availableCavitiesForDrawerModule();
+    if (cavities.length > 0) {
+      this.applyCavityToDrawerWizardForm(cavities[0]);
+    }
+  }
+
+  onDrawerWizardTargetCavityChange(event: Event) {
+    const cavId = (event.target as HTMLSelectElement).value;
+    const cav = this.availableCavitiesForDrawerModule().find(c => c.id === cavId);
+    if (cav) {
+      this.applyCavityToDrawerWizardForm(cav);
+    }
+  }
+
+  private applyCavityToDrawerWizardForm(cavity: ModuleCavityInfo) {
+    this.drawerWizardTargetCavityId.set(cavity.id);
+    const cur = this.drawerForm();
+    const mount = cur.frontMountType ?? 'overlay';
+    const frontT = cur.frontThickness || 15;
+    const optSlide = this.partGeometry.getOptimalCommercialSlideLength(
+      cavity.internalDepth,
+      mount,
+      frontT
+    );
+    const frontW = mount === 'inset'
+      ? Math.max(80, Math.round(cavity.internalWidth - 4))
+      : Math.max(80, Math.round(cavity.internalWidth + 2 * cavity.sideThickness - 4));
+    const count = this.drawerWizardCount();
+    const gapBetween = cur.handleType === 'finger_pull' ? 28 : 3;
+    const slotH = Math.floor((cavity.internalHeight - 4 - (count - 1) * gapBetween) / count);
+    const frontH = count === 1
+      ? Math.max(100, Math.min(cur.frontHeight || 180, Math.round(cavity.internalHeight - 4)))
+      : Math.max(80, slotH);
+    const effFrontH = cur.handleType === 'finger_pull' ? Math.max(80, frontH - 28) : frontH;
+    const boxH = Math.max(70, Math.min(160, effFrontH - 25));
+
+    this.drawerForm.update(prev => ({
+      ...prev,
+      outerWidth: cavity.internalWidth,
+      slideLength: optSlide,
+      boxHeight: boxH,
+      frontHeight: frontH,
+      frontWidth: frontW,
+      sideThickness: cavity.sideThickness,
+      posX: cavity.centerX,
+      posY: Math.round(cavity.minY + 2),
+      posZ: cavity.centerZ,
+      rotationY: cavity.rotationY,
+      targetModuleId: cavity.moduleId,
+      targetCavityId: cavity.id
+    }));
+  }
+
+  setDrawerWizardCount(count: 1 | 2 | 3 | 4) {
+    this.drawerWizardCount.set(count);
+    const cav = this.selectedDrawerWizardCavity();
+    if (cav) {
+      this.applyCavityToDrawerWizardForm(cav);
+    }
+  }
+
+  setDrawerWizardFrontMount(mountType: DrawerFrontMountType) {
+    const cur = this.drawerForm();
+    const cav = this.selectedDrawerWizardCavity();
+    const sideT = cav ? cav.sideThickness : (cur.sideThickness || 18);
+    const outerW = cur.outerWidth || 400;
+    const frontW = mountType === 'inset'
+      ? Math.max(80, Math.round(outerW - 4))
+      : Math.max(80, Math.round(outerW + 2 * sideT - 4));
+    let slideLen = cur.slideLength;
+    if (cav) {
+      slideLen = this.partGeometry.getOptimalCommercialSlideLength(
+        cav.internalDepth,
+        mountType,
+        cur.frontThickness || 15
+      );
+    }
+    this.drawerForm.update(prev => ({
+      ...prev,
+      frontMountType: mountType,
+      includeFront: mountType !== 'none',
+      frontWidth: frontW,
+      slideLength: slideLen
+    }));
+  }
+
+  setDrawerWizardOpeningSystem(handleType: DrawerOpeningSystem) {
+    this.drawerForm.update(prev => ({
+      ...prev,
+      handleType
+    }));
+    const cav = this.selectedDrawerWizardCavity();
+    if (cav && this.drawerWizardCount() > 1) {
+      this.applyCavityToDrawerWizardForm(cav);
+    }
+  }
+
+  onDrawerWizardTextInput(field: 'name', event: Event) {
+    const val = (event.target as HTMLInputElement).value;
+    this.updateDrawerFormField(field, val);
+  }
+
+  onDrawerWizardNumberInput(
+    field: 'outerWidth' | 'slideLength' | 'boxHeight' | 'boxThickness' | 'bottomThickness' | 'slideGap' | 'frontHeight' | 'frontWidth' | 'frontThickness' | 'posY',
+    event: Event
+  ) {
+    const num = Number((event.target as HTMLInputElement).value);
+    if (isNaN(num)) return;
+    if (field === 'outerWidth') {
+      const cur = this.drawerForm();
+      const mount = cur.frontMountType ?? 'overlay';
+      const sideT = cur.sideThickness || 18;
+      const nextFrontW = mount === 'inset'
+        ? Math.max(80, Math.round(num - 4))
+        : Math.max(80, Math.round(num + 2 * sideT - 4));
+      this.drawerForm.update(prev => ({
+        ...prev,
+        outerWidth: num,
+        frontWidth: nextFrontW
+      }));
+      return;
+    }
+    this.updateDrawerFormField(field, num);
   }
 
   updateDrawerFormField<K extends keyof ParametricDrawerConfig>(field: K, value: ParametricDrawerConfig[K]) {
@@ -3967,21 +4296,136 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
   submitDrawerWizard() {
     const config = this.drawerForm();
-    const cleanName = config.name.trim();
+    const cleanName = (config.name || '').trim();
     if (!cleanName) {
-      this.showToast('⚠️ Ingresa un nombre para el cajón');
+      this.showToast('Ingresa un nombre para el cajón');
       return;
     }
     if (this.isGroupNameTaken(cleanName)) {
       const suggestion = this.getNextUniqueGroupName('Cajón');
-      this.showToast(`⚠️ Ya existe un cajón llamado "${cleanName}". Sugerencia: ${suggestion}`);
+      this.showToast(`Ya existe un cajón llamado "${cleanName}". Sugerencia: ${suggestion}`);
       return;
     }
+
+    const cav = this.selectedDrawerWizardCavity();
+    const count = this.drawerWizardCount();
+
+    if (cav && this.drawerWizardTargetModuleId() !== 'floor') {
+      const createdGroups = this.projectService.addParametricDrawersToCavity(
+        cav,
+        count,
+        {
+          ...config,
+          name: cleanName
+        }
+      );
+      this.showDrawerWizard.set(false);
+      if (createdGroups.length > 0) {
+        const lastGrp = createdGroups[createdGroups.length - 1];
+        this.selectEntireGroup(lastGrp.id);
+        this.openGroupCardIds.update(s => {
+          const next = new Set(s);
+          for (const g of createdGroups) next.add(g.id);
+          return next;
+        });
+        this.showToast(
+          createdGroups.length === 1
+            ? `${lastGrp.name} encajado automáticamente sin colisiones`
+            : `Batería de ${createdGroups.length} cajones encajada en el hueco sin colisiones`
+        );
+      }
+      return;
+    }
+
     const grp = this.projectService.addParametricDrawer({ ...config, name: cleanName });
     this.showDrawerWizard.set(false);
     this.selectEntireGroup(grp.id);
     this.openGroupCardIds.update(s => new Set(s).add(grp.id));
-    this.showToast(`✨ ${grp.name} generado con 5-6 piezas ensambladas`);
+    this.showToast(`${grp.name} generado con piezas ensambladas`);
+  }
+
+  // --- INSPECTOR CONTEXTUAL EXCLUSIVO PARA CAJÓN MODULAR ---
+
+  toggleSelectedModularDrawerOpen(groupId: string) {
+    this.projectService.toggleGroupOpen(groupId);
+    this.viewer3d()?.toggleGroupAnimation(groupId);
+  }
+
+  onSelectedModularDrawerSlideInput(groupId: string, event: Event) {
+    const pct = Number((event.target as HTMLInputElement).value);
+    if (isNaN(pct)) return;
+    const ratio = Math.max(0, Math.min(1, pct / 100));
+    this.projectService.setGroupSlideExtension(groupId, ratio);
+  }
+
+  setSelectedModularDrawerFrontMount(groupId: string, frontMountType: DrawerFrontMountType) {
+    this.projectService.updateModularDrawerGroup(groupId, {
+      frontMountType,
+      includeFront: frontMountType !== 'none'
+    });
+    this.selectEntireGroup(groupId);
+    const label = frontMountType === 'overlay'
+      ? 'Exterior Solapado'
+      : (frontMountType === 'inset' ? 'A Ras (Embutido)' : 'Interno Sin Tapa');
+    this.showToast(`Montaje de frente actualizado: ${label}`);
+  }
+
+  setSelectedModularDrawerOpeningSystem(groupId: string, handleType: DrawerOpeningSystem) {
+    this.projectService.updateModularDrawerGroup(groupId, { handleType });
+    this.selectEntireGroup(groupId);
+    const label = handleType === 'handle'
+      ? 'Con Manija'
+      : (handleType === 'push' ? 'Push-to-Open (Liso)' : 'Uñero / Gola (-28mm)');
+    this.showToast(`Sistema de apertura actualizado: ${label}`);
+  }
+
+  onSelectedModularDrawerNumberChange(
+    groupId: string,
+    field: 'outerWidth' | 'slideLength' | 'boxHeight' | 'frontHeight',
+    event: Event
+  ) {
+    const val = Number((event.target as HTMLInputElement).value);
+    if (isNaN(val) || val < 60) return;
+    this.projectService.updateModularDrawerGroup(groupId, { [field]: Math.round(val) });
+    this.selectEntireGroup(groupId);
+  }
+
+  setSelectedModularDrawerPreset(
+    groupId: string,
+    field: 'slideLength' | 'boxHeight',
+    value: number
+  ) {
+    this.projectService.updateModularDrawerGroup(groupId, { [field]: value });
+    this.selectEntireGroup(groupId);
+  }
+
+  autoFitSelectedModularDrawer(groupId: string) {
+    const fitted = this.projectService.autoFitModularDrawerToCavity(groupId);
+    if (fitted) {
+      this.selectEntireGroup(groupId);
+      this.showToast(`Cajón auto-ajustado al hueco (${fitted.internalWidth} × ${fitted.optimalSlideLength} mm) con 0 colisiones`);
+    } else {
+      this.showToast('No se detectó un módulo receptor cercano para auto-ajustar este cajón');
+    }
+  }
+
+  duplicateSelectedDrawerVertically(groupId: string, direction: 'up' | 'down') {
+    const res = this.projectService.duplicateModularDrawerVertically(groupId, direction);
+    if (res) {
+      this.selectEntireGroup(res.id);
+      this.openGroupCardIds.update(s => new Set(s).add(res.id));
+      this.showToast(
+        direction === 'up'
+          ? `"${res.name}" duplicado arriba (+Y) respetando holgura`
+          : `"${res.name}" duplicado abajo (-Y) respetando holgura`
+      );
+    } else {
+      this.showToast(
+        direction === 'up'
+          ? 'No hay espacio vertical suficiente hacia arriba en el hueco'
+          : 'No hay espacio vertical suficiente hacia abajo (nivel del piso o base del vano)'
+      );
+    }
   }
 
   // --- AGRUPACIÓN MANUAL Y DESAGRUPACIÓN ---
@@ -5361,6 +5805,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const gid = this.activeSelectedGroupId();
     if (!gid) return false;
     if (this.isSelectedGroupCountertop() || this.isCountertopGroup(gid)) return false;
+    if (this.isModularDrawerGroup(gid) || this.isSelectedGroupModularDrawer()) return false;
 
     const grp = this.groups().find(g => g.id === gid);
     if (grp?.isCountertop) return false;
