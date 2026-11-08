@@ -430,14 +430,14 @@ export class HeaderComponent {
   // --- ACCIONES EN LA NUBE CON SUPABASE ---
 
   async saveCurrentToCloud() {
-    this.showToast('Guardando en Supabase...');
+    this.showToast(this.i18n.t('projects.savingToCloud'));
     const res = await this.projectService.saveCurrentToCloud();
     if (res.success) {
-      this.showToast('¡Proyecto guardado en la nube exitosamente!');
+      this.showToast(this.i18n.t('projects.savedToCloud'));
     } else if (res.error === 'table_needed') {
       this.showSqlModal.set(true);
     } else {
-      this.showToast('Aviso: Guardado localmente. Supabase reportó: ' + (res.error || 'Verifica la tabla'));
+      this.showToast(this.i18n.t('projects.saveLocalFallback', { error: res.error || this.i18n.t('projects.checkConnection') }));
     }
   }
 

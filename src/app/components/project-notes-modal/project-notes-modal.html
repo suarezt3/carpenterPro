@@ -28,7 +28,7 @@
               <h2 class="text-sm font-semibold tracking-tight text-zinc-900">
                 {{ 'notes.title' | t }}
               </h2>
-              <span class="px-2 py-0.5 text-[10px] font-medium font-mono tabular-nums rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
+              <span class="px-2 py-0.5 text-[10px] font-medium font-sans tabular-nums rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
                 {{ notes().length }} {{ notes().length === 1 ? ('notes.noteCount' | t) : ('notes.notesCount' | t) }}
               </span>
             </div>
@@ -71,7 +71,7 @@
 
             <!-- Barra superior del formulario -->
             <div class="flex items-center justify-between border-b border-zinc-200 pb-2.5">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-900 flex items-center gap-1.5 font-mono">
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-900 flex items-center gap-1.5 font-sans">
                 <hugeicons-icon [icon]="editingNoteId() ? icons.edit : icons.note" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
                 <span>{{ editingNoteId() ? ('notes.editNoteTitle' | t) : ('notes.createNoteTitle' | t) }}</span>
               </span>
@@ -94,8 +94,9 @@
                     id="note-title-input"
                     type="text"
                     formControlName="title"
+                    maxlength="100"
                     [placeholder]="'notes.noteTitlePlaceholder' | t"
-                    class="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:outline-hidden focus:border-zinc-500 shadow-2xs" />
+                    class="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:outline-hidden focus:border-zinc-500 shadow-2xs font-sans" />
                 </div>
 
                 <div>
@@ -120,7 +121,7 @@
                   <label class="text-xs font-medium flex items-center gap-1.5 text-zinc-700">
                     <span>{{ 'notes.detailsLabel' | t }}</span>
                   </label>
-                  <span class="text-[10px] text-zinc-600 font-mono font-medium bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200">
+                  <span class="text-[10px] text-zinc-600 font-sans font-medium bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200">
                     {{ 'notes.richEditorBadge' | t }}
                   </span>
                 </div>
@@ -263,12 +264,27 @@
               </div>
 
               <!-- Barra inferior del formulario -->
-              <div class="flex items-center justify-between pt-1">
-                <span class="text-[11px] text-zinc-500 font-sans flex items-center gap-1.5 font-medium">
-                  <hugeicons-icon [icon]="icons.cloud" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                  <span>{{ 'notes.autoSaveWithProject' | t }}</span>
-                </span>
-                <div class="flex items-center gap-2">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-zinc-100">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-[11px] text-zinc-500 font-sans flex items-center gap-1.5 font-medium shrink-0">
+                    <hugeicons-icon [icon]="icons.cloud" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    <span>{{ 'notes.autoSaveWithProject' | t }}</span>
+                  </span>
+                  @if (noteForm.invalid) {
+                    <span class="text-[11px] text-amber-600 flex items-center gap-1 font-sans font-medium">
+                      <span class="text-zinc-300">•</span>
+                      <hugeicons-icon [icon]="icons.pending" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                      @if (noteForm.get('title')?.invalid && noteForm.get('content')?.invalid) {
+                        <span>{{ 'notes.validationMissingBoth' | t }}</span>
+                      } @else if (noteForm.get('title')?.invalid) {
+                        <span>{{ 'notes.validationMissingTitle' | t }}</span>
+                      } @else {
+                        <span>{{ 'notes.validationMissingContent' | t }}</span>
+                      }
+                    </span>
+                  }
+                </div>
+                <div class="flex items-center gap-2 justify-end shrink-0">
                   <button
                     type="button"
                     (click)="cancelForm()"
@@ -278,7 +294,7 @@
                   <button
                     type="submit"
                     [disabled]="noteForm.invalid"
-                    class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                    class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
                     <hugeicons-icon [icon]="icons.check" [size]="15" [strokeWidth]="2.2"></hugeicons-icon>
                     <span>{{ editingNoteId() ? ('notes.updateNoteBtn' | t) : ('notes.saveNoteBtn' | t) }}</span>
                   </button>
@@ -419,7 +435,7 @@
                             {{ note.title }}
                           </h3>
                           <span
-                            class="inline-flex items-center gap-1 text-[10px] font-medium font-mono px-2 py-0.2 rounded-md border mt-1"
+                            class="inline-flex items-center gap-1 text-[10px] font-medium font-sans px-2 py-0.2 rounded-md border mt-1"
                             [class]="badge.bgClass + ' ' + badge.textClass">
                             <hugeicons-icon [icon]="badge.icon" [size]="11" [strokeWidth]="2"></hugeicons-icon>
                             <span>{{ badge.label }}</span>
@@ -456,7 +472,7 @@
                   </div>
 
                   <!-- Pie de tarjeta con fecha y estado -->
-                  <div class="pt-2.5 mt-2 border-t border-zinc-100 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                  <div class="pt-2.5 mt-2 border-t border-zinc-100 flex items-center justify-between text-[10px] font-sans text-zinc-500">
                     <span>{{ 'notes.updatedAt' | t }} {{ note.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span>
                     @if (note.completed) {
                       <span class="text-emerald-700 font-medium flex items-center gap-1">
@@ -479,7 +495,7 @@
 
       <!-- PIE DEL MODAL -->
       <div class="flex items-center justify-between px-5 py-3 border-t border-zinc-200 bg-[#F4F4F6] shrink-0 text-xs font-sans text-zinc-600">
-        <div class="flex items-center gap-2 font-medium text-[11px] font-mono">
+        <div class="flex items-center gap-2 font-medium text-[11px] font-sans">
           <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
           <span>{{ autoSyncEnabled() ? ('notes.syncCloudActive' | t) : ('notes.syncSavedWithProject' | t) }}</span>
         </div>

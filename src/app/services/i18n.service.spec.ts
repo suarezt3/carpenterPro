@@ -215,6 +215,32 @@ describe('I18nService & TranslatePipe (Multilenguaje Reactivo en Tiempo Real)', 
     }
   });
 
+  it('debe contener las nuevas claves de Despiece, Guardado en Nube y Validación de Notas en los 6 idiomas', () => {
+    for (const opt of APP_LANGUAGES) {
+      service.setLanguage(opt.code);
+
+      // Despiece: badge y tooltip
+      const badgeText = service.t('partsList.appliancesTabBadge', { count: 3 });
+      expect(badgeText).toContain('3');
+      expect(badgeText.trim().length).toBeGreaterThan(1);
+
+      const edgeTooltip = service.t('partsList.cycleEdgeTooltip', { edge: 'L1' });
+      expect(edgeTooltip).toContain('L1');
+
+      // Guardado en la nube y privacidad
+      expect(service.t('projects.savingToCloud')).toBeTruthy();
+      expect(service.t('projects.savedToCloud')).toBeTruthy();
+      expect(service.t('projects.checkConnection')).toBeTruthy();
+      const fallbackToast = service.t('projects.saveLocalFallback', { error: 'Network timeout' });
+      expect(fallbackToast).toContain('Network timeout');
+
+      // Validación de notas de proyecto
+      expect(service.t('notes.validationMissingBoth')).toBeTruthy();
+      expect(service.t('notes.validationMissingTitle')).toBeTruthy();
+      expect(service.t('notes.validationMissingContent')).toBeTruthy();
+    }
+  });
+
   it('debe proveer versiones de Changelog y Roadmap completas para cada uno de los 6 idiomas', () => {
     for (const opt of APP_LANGUAGES) {
       const releases = APP_RELEASES_BY_LANG[opt.code];

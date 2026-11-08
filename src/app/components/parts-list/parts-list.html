@@ -68,7 +68,7 @@
       class="px-3.5 py-1.5 rounded-md text-xs flex items-center gap-2 transition cursor-pointer">
       <hugeicons-icon [icon]="icons.cube3d" [size]="15" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
       <span>{{ 'partsList.melamineCutList' | t }}</span>
-      <span class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums font-semibold"
+      <span class="px-1.5 py-0.5 rounded text-[10px] font-sans tabular-nums font-semibold"
         [class]="activeTab() === 'melamine'
           ? (themeService.isClassic() ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-300 text-zinc-900')
           : (themeService.isClassic() ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-300')">
@@ -85,7 +85,7 @@
       class="px-3.5 py-1.5 rounded-md text-xs flex items-center gap-2 transition cursor-pointer">
       <hugeicons-icon [icon]="icons.appliance" [size]="15" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
       <span>{{ 'partsList.equipmentAndAppliances' | t }}</span>
-      <span class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums font-semibold"
+      <span class="px-1.5 py-0.5 rounded text-[10px] font-sans tabular-nums font-semibold"
         [class]="activeTab() === 'appliances'
           ? (themeService.isClassic() ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-300 text-zinc-900')
           : (themeService.isClassic() ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-300')">
@@ -294,10 +294,10 @@
                       type="button"
                       (click)="cycleEdgeBanding(part, 'l1')"
                       [class]="part.edges.l1 === 'thick'
-                        ? 'bg-amber-50/80 border border-amber-300 border-b-[2px] border-b-amber-500 text-zinc-800 font-semibold font-mono tabular-nums text-[10px] rounded'
+                        ? 'bg-amber-50/80 border border-amber-300 border-b-[2px] border-b-amber-500 text-zinc-800 font-semibold font-sans tabular-nums text-[10px] rounded'
                         : part.edges.l1 === 'thin'
-                          ? 'bg-sky-50/80 border border-sky-300 border-b-[2px] border-b-sky-500 text-zinc-800 font-semibold font-mono tabular-nums text-[10px] rounded'
-                          : 'bg-zinc-50 border border-dashed border-zinc-200 text-zinc-400 font-mono text-[10px] rounded'"
+                          ? 'bg-sky-50/80 border border-sky-300 border-b-[2px] border-b-sky-500 text-zinc-800 font-semibold font-sans tabular-nums text-[10px] rounded'
+                          : 'bg-zinc-50 border border-dashed border-zinc-200 text-zinc-400 font-sans text-[10px] rounded'"
                       class="px-1.5 py-0.5 transition hover:scale-105 cursor-pointer"
                       [title]="'partsList.cycleEdgeTooltip' | t:{ edge: 'L1' }">
                       L1
@@ -306,10 +306,10 @@
                       type="button"
                       (click)="cycleEdgeBanding(part, 'l2')"
                       [class]="part.edges.l2 === 'thick'
-                        ? 'bg-amber-50/80 border border-amber-300 border-b-[2px] border-b-amber-500 text-zinc-800 font-semibold font-mono tabular-nums text-[10px] rounded'
+                        ? 'bg-amber-50/80 border border-amber-300 border-b-[2px] border-b-amber-500 text-zinc-800 font-semibold font-sans tabular-nums text-[10px] rounded'
                         : part.edges.l2 === 'thin'
-                          ? 'bg-sky-50/80 border border-sky-300 border-b-[2px] border-b-sky-500 text-zinc-800 font-semibold font-mono tabular-nums text-[10px] rounded'
-                          : 'bg-zinc-50 border border-dashed border-zinc-200 text-zinc-400 font-mono text-[10px] rounded'"
+                          ? 'bg-sky-50/80 border border-sky-300 border-b-[2px] border-b-sky-500 text-zinc-800 font-semibold font-sans tabular-nums text-[10px] rounded'
+                          : 'bg-zinc-50 border border-dashed border-zinc-200 text-zinc-400 font-sans text-[10px] rounded'"
                       class="px-1.5 py-0.5 transition hover:scale-105 cursor-pointer"
                       [title]="'partsList.cycleEdgeTooltip' | t:{ edge: 'L2' }">
                       L2
@@ -318,10 +318,10 @@
                       type="button"
                       (click)="cycleEdgeBanding(part, 'a1')"
                       [class]="part.edges.a1 === 'thick'
-                        ? 'bg-amber-50/80 border border-amber-300 border-b-[2px] border-b-amber-500 text-zinc-800 font-semibold font-mono tabular-nums text-[10px] rounded'
+                        ? 'bg-amber-50/80 border border-amber-300 border-b-[2px] border-b-amber-500 text-zinc-800 font-semibold font-sans tabular-nums text-[10px] rounded'
                         : part.edges.a1 === 'thin'
-                          ? 'bg-sky-50/80 border border-sky-300 border-b-[2px] border-b-sky-500 text-zinc-800 font-semibold font-mono tabular-nums text-[10px] rounded'
-                          : 'bg-zinc-50 border border-dashed border-zinc-200 text-zinc-400 font-mono text-[10px] rounded'"
+                          ? 'bg-sky-50/80 border border-sky-300 border-b-[2px] border-b-sky-500 text-zinc-800 font-semibold font-sans tabular-nums text-[10px] rounded'
+                          : 'bg-zinc-50 border border-dashed border-zinc-200 text-zinc-400 font-sans text-[10px] rounded'"
                       class="px-1.5 py-0.5 transition hover:scale-105 cursor-pointer"
                       [title]="'partsList.cycleEdgeTooltip' | t:{ edge: 'A1' }">
                       A1
@@ -330,10 +330,10 @@
                       type="button"
                       (click)="cycleEdgeBanding(part, 'a2')"
                       [class]="part.edges.a2 === 'thick'
-                        ? 'bg-amber-50/80 border border-amber-300 border-b-[2px] border-b-amber-500 text-zinc-800 font-semibold font-mono tabular-nums text-[10px] rounded'
+                        ? 'bg-amber-50/80 border border-amber-300 border-b-[2px] border-b-amber-500 text-zinc-800 font-semibold font-sans tabular-nums text-[10px] rounded'
                         : part.edges.a2 === 'thin'
-                          ? 'bg-sky-50/80 border border-sky-300 border-b-[2px] border-b-sky-500 text-zinc-800 font-semibold font-mono tabular-nums text-[10px] rounded'
-                          : 'bg-zinc-50 border border-dashed border-zinc-200 text-zinc-400 font-mono text-[10px] rounded'"
+                          ? 'bg-sky-50/80 border border-sky-300 border-b-[2px] border-b-sky-500 text-zinc-800 font-semibold font-sans tabular-nums text-[10px] rounded'
+                          : 'bg-zinc-50 border border-dashed border-zinc-200 text-zinc-400 font-sans text-[10px] rounded'"
                       class="px-1.5 py-0.5 transition hover:scale-105 cursor-pointer"
                       [title]="'partsList.cycleEdgeTooltip' | t:{ edge: 'A2' }">
                       A2

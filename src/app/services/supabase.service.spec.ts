@@ -1,5 +1,37 @@
 import { TestBed } from '@angular/core/testing';
 import { SupabaseService, SUPABASE_SQL_SETUP, SUPABASE_CONFIG } from './supabase.service';
+import { Project, ProjectSettings } from '../models/melamine.models';
+
+const testSettings: ProjectSettings = {
+  sawKerf: 4,
+  trimMargin: 10,
+  currency: 'COP',
+  defaultBoardThickness: 18,
+  thinEdgeThickness: 0.45,
+  thickEdgeThickness: 2.0,
+  thinEdgeCostPerMeter: 1800,
+  thickEdgeCostPerMeter: 4200,
+  optimizationPreference: 'guillotine_length',
+  subtractEdgeBandingFromCut: false
+};
+
+const createMockProject = (id: string, name: string): Project => ({
+  id,
+  name,
+  clientName: 'Cliente Prueba',
+  date: '2026-11-07',
+  notes: '',
+  settings: testSettings,
+  materials: [],
+  modules: [],
+  parts: [],
+  hardware: [],
+  laborCost: 0,
+  laborType: 'fixed',
+  profitMarginPercent: 30,
+  taxPercent: 19,
+  updatedAt: '2026-11-07'
+});
 
 describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
   let service: SupabaseService;
@@ -74,6 +106,92 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(res.data).toBeDefined();
         expect(res.data?.category).toBe('bug');
       }
+    });
+
+    it('el script SQL de setup debe incluir DEFAULT auth.uid(), ALTER COLUMN y NOTIFY reload schema', () => {
+      expect(SUPABASE_SQL_SETUP).toContain('user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid()');
+      expect(SUPABASE_SQL_SETUP).toContain('ALTER TABLE public.projects ALTER COLUMN user_id SET DEFAULT auth.uid();');
+      expect(SUPABASE_SQL_SETUP).toContain("NOTIFY pgrst, 'reload schema';");
+    });
+
+    it('saveProjectCloud debe ser un alias funcional de saveProject', async () => {
+      expect(typeof service.saveProjectCloud).toBe('function');
+    });
+
+    it('cleanErrorMessage debe sanitizar nombres de infraestructura y extraer mensaje de error', () => {
+      const errWithSupabase = service.cleanErrorMessage('Supabase Error (400): Could not find the table');
+      expect(errWithSupabase.toLowerCase()).not.toContain('supabase');
+      expect(errWithSupabase).toContain('La tabla de proyectos no ha sido inicializada en la nube');
+
+      const errPgrst204 = service.cleanErrorMessage("Could not find the 'user_id' column of 'projects' in the schema cache");
+      expect(errPgrst204).toContain('La base de datos en la nube requiere sincronizar la estructura de proyectos.');
+
+      const jsonErr = service.cleanErrorMessage('{"message": "Custom error occurred in Supabase"}');
+      expect(jsonErr.toLowerCase()).not.toContain('supabase');
+      expect(jsonErr).toContain('Custom error occurred in Servicio en la nube');
+    });
+
+    it('saveProject omite user_id en el payload cuando no hay usuario autenticado', async () => {
+      service.currentUser.set(null);
+      let capturedPayload: Record<string, unknown> | null = null;
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+        if (init?.body && typeof init.body === 'string') {
+          capturedPayload = JSON.parse(init.body) as Record<string, unknown>;
+        }
+        return Promise.resolve(new Response(JSON.stringify([{ id: 'proj_anon', name: 'Demo' }]), { status: 200 }));
+      });
+
+      const testProject = createMockProject('proj_anon', 'Mueble Anonimo');
+      const res = await service.saveProject(testProject);
+      expect(res.success).toBe(true);
+      expect(capturedPayload).toBeDefined();
+      expect(capturedPayload!['user_id']).toBeUndefined();
+
+      fetchSpy.mockRestore();
+    });
+
+    it('saveProject reintenta transparentemente sin user_id si PostgREST reporta columna ausente en schema cache', async () => {
+      // Usuario autenticado
+      service.currentUser.set({ id: 'usr-123', email: 'test@example.com', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '' });
+
+      const payloadsSent: Array<Record<string, unknown>> = [];
+      let callCount = 0;
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+        callCount++;
+        if (init?.body && typeof init.body === 'string') {
+          payloadsSent.push(JSON.parse(init.body) as Record<string, unknown>);
+        }
+
+        if (callCount === 1) {
+          // Primer intento falla con HTTP 400 y error de user_id en schema cache
+          return Promise.resolve(new Response(
+            JSON.stringify({
+              code: 'PGRST204',
+              message: "Could not find the 'user_id' column of 'projects' in the schema cache"
+            }),
+            { status: 400 }
+          ));
+        }
+
+        // Reintento exitoso
+        return Promise.resolve(new Response(
+          JSON.stringify([{ id: 'proj_retry', name: 'Mueble Rescatado' }]),
+          { status: 200 }
+        ));
+      });
+
+      const testProject = createMockProject('proj_retry', 'Mueble Rescatado');
+      const res = await service.saveProject(testProject);
+      expect(res.success).toBe(true);
+      expect(callCount).toBe(2);
+      // El primer intento incluía user_id
+      expect(payloadsSent[0]['user_id']).toBe('usr-123');
+      // El segundo intento (retry) lo omitió
+      expect(payloadsSent[1]['user_id']).toBeUndefined();
+
+      fetchSpy.mockRestore();
     });
   });
 });

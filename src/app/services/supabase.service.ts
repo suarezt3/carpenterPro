@@ -37,7 +37,7 @@ export const SUPABASE_SQL_SETUP = `-- ==========================================
 
 CREATE TABLE IF NOT EXISTS public.projects (
   id TEXT PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   name TEXT NOT NULL,
   client_name TEXT DEFAULT '',
   updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS public.projects (
 );
 
 -- Asegurar columna user_id e índices si la tabla ya existía
-ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid();
+ALTER TABLE public.projects ALTER COLUMN user_id SET DEFAULT auth.uid();
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON public.projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON public.projects(updated_at DESC);
 
@@ -74,6 +75,9 @@ CREATE POLICY "projects_update_policy" ON public.projects
 
 CREATE POLICY "projects_delete_policy" ON public.projects
   FOR DELETE USING (auth.uid() = user_id);
+
+-- Recargar caché de esquema de PostgREST inmediatamente
+NOTIFY pgrst, 'reload schema';
 `;
 
 /**
@@ -309,10 +313,10 @@ export class SupabaseService {
           text.includes('relation "public.projects" does not exist')
         ) {
           this.syncStatus.set('table_needed');
-          this.errorMessage.set('La tabla "projects" aún no ha sido creada en tu Supabase.');
+          this.errorMessage.set('La tabla de proyectos aún no ha sido creada en la nube.');
           return [];
         }
-        throw new Error(`Error Supabase (${res.status}): ${text}`);
+        throw new Error(`Error del servicio en la nube (${res.status}): ${this.cleanErrorMessage(text)}`);
       }
 
       const data: CloudProjectRecord[] = await res.json();
@@ -322,13 +326,14 @@ export class SupabaseService {
       this.errorMessage.set(null);
       return data;
     } catch (err: unknown) {
-      console.warn('Supabase fetch failed:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('PGRST205') || msg.includes('Could not find the table')) {
+      console.warn('Cloud projects fetch failed:', err);
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      if (rawMsg.includes('PGRST205') || rawMsg.includes('Could not find the table')) {
         this.syncStatus.set('table_needed');
       } else {
+        const cleanMsg = this.cleanErrorMessage(rawMsg);
         this.syncStatus.set('error');
-        this.errorMessage.set(msg);
+        this.errorMessage.set(cleanMsg);
       }
       return [];
     }
@@ -364,16 +369,21 @@ export class SupabaseService {
     this.syncStatus.set('syncing');
 
     const userId = this.currentUser()?.id;
-    const record: CloudProjectRecord = {
+    const recordPayload: Record<string, unknown> = {
       id: project.id,
       name: project.name || 'Sin Título',
       client_name: project.clientName || '',
       updated_at: new Date().toISOString(),
       modules_count: (project.groups && project.groups.length > 0) ? project.groups.length : (project.modules ? project.modules.length : 0),
       parts_count: project.parts ? project.parts.reduce((acc, p) => acc + (p.quantity || 1), 0) : 0,
-      user_id: userId || null,
       data: project
     };
+
+    // Solo incluir user_id si hay un usuario autenticado para evitar error 400
+    // en tablas donde la columna no existe o espera omitirse en anónimo
+    if (userId) {
+      recordPayload['user_id'] = userId;
+    }
 
     try {
       // Upsert en Supabase usando el encabezado Prefer: resolution=merge-duplicates
@@ -384,7 +394,7 @@ export class SupabaseService {
           ...this.headers,
           'Prefer': 'resolution=merge-duplicates,return=representation'
         },
-        body: JSON.stringify(record)
+        body: JSON.stringify(recordPayload)
       });
 
       if (!res.ok) {
@@ -393,11 +403,66 @@ export class SupabaseService {
           this.syncStatus.set('table_needed');
           return { success: false, error: 'table_needed' };
         }
-        throw new Error(`Supabase Error (${res.status}): ${text}`);
+
+        // Si la tabla legacy en Supabase no tiene aún la columna user_id en el schema cache (PGRST204 / HTTP 400),
+        // reintentar de forma transparente omitiendo user_id para no bloquear el guardado del usuario
+        if (recordPayload['user_id'] && (text.includes("'user_id'") || (text.includes('user_id') && text.includes('schema cache')) || text.includes('PGRST204'))) {
+          delete recordPayload['user_id'];
+          const retryRes = await fetch(url, {
+            method: 'POST',
+            headers: {
+              ...this.headers,
+              'Prefer': 'resolution=merge-duplicates,return=representation'
+            },
+            body: JSON.stringify(recordPayload)
+          });
+
+          if (retryRes.ok) {
+            const savedRows: CloudProjectRecord[] = await retryRes.json();
+            const fallbackRecord: CloudProjectRecord = {
+              id: project.id,
+              name: project.name || 'Sin Título',
+              client_name: project.clientName || '',
+              updated_at: recordPayload['updated_at'] as string,
+              modules_count: recordPayload['modules_count'] as number,
+              parts_count: recordPayload['parts_count'] as number,
+              data: project
+            };
+            const savedRecord = savedRows[0] ?? fallbackRecord;
+
+            this.cloudProjects.update(list => {
+              const exists = list.some(item => item.id === savedRecord.id);
+              if (exists) {
+                return list.map(item => (item.id === savedRecord.id ? savedRecord : item));
+              }
+              return [savedRecord, ...list];
+            });
+
+            this.syncStatus.set('synced');
+            this.lastSyncTime.set(new Date());
+            this.errorMessage.set(null);
+            return { success: true };
+          } else {
+            const retryText = await retryRes.text();
+            throw new Error(`Error del servicio en la nube (${retryRes.status}): ${this.cleanErrorMessage(retryText)}`);
+          }
+        }
+
+        throw new Error(`Error del servicio en la nube (${res.status}): ${this.cleanErrorMessage(text)}`);
       }
 
       const savedRows: CloudProjectRecord[] = await res.json();
-      const savedRecord = savedRows[0] ?? record;
+      const fallbackRecord: CloudProjectRecord = {
+        id: project.id,
+        name: project.name || 'Sin Título',
+        client_name: project.clientName || '',
+        updated_at: recordPayload['updated_at'] as string,
+        modules_count: recordPayload['modules_count'] as number,
+        parts_count: recordPayload['parts_count'] as number,
+        user_id: userId || null,
+        data: project
+      };
+      const savedRecord = savedRows[0] ?? fallbackRecord;
 
       // Actualizar estado local en memoria sin re-descargar toda la tabla
       this.cloudProjects.update(list => {
@@ -413,15 +478,52 @@ export class SupabaseService {
       this.errorMessage.set(null);
       return { success: true };
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('PGRST205') || msg.includes('Could not find the table')) {
+      console.warn('Cloud save failed:', err);
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      if (rawMsg.includes('PGRST205') || rawMsg.includes('Could not find the table')) {
         this.syncStatus.set('table_needed');
-      } else {
-        this.syncStatus.set('error');
-        this.errorMessage.set(msg);
+        return { success: false, error: 'table_needed' };
       }
-      return { success: false, error: msg };
+      const cleanMsg = this.cleanErrorMessage(rawMsg);
+      this.syncStatus.set('error');
+      this.errorMessage.set(cleanMsg);
+      return { success: false, error: cleanMsg };
     }
+  }
+
+  /**
+   * Sanitiza mensajes de error técnicos para cumplir con la regla de Privacidad de Infraestructura,
+   * evitando exponer "Supabase", "PostgreSQL", "PGRST...", detalles de base de datos o UUIDs al usuario.
+   */
+  cleanErrorMessage(raw: string): string {
+    if (!raw) return 'Error desconocido al conectar con el servicio en la nube.';
+    let cleaned = raw;
+    if (cleaned.includes('PGRST204') || (cleaned.includes('user_id') && cleaned.includes('schema cache'))) {
+      return 'La base de datos en la nube requiere sincronizar la estructura de proyectos.';
+    }
+    if (cleaned.includes('PGRST205') || cleaned.includes('Could not find the table') || cleaned.includes('relation "public.projects" does not exist')) {
+      return 'La tabla de proyectos no ha sido inicializada en la nube.';
+    }
+    try {
+      if (cleaned.trim().startsWith('{') && cleaned.trim().endsWith('}')) {
+        const parsed = JSON.parse(cleaned);
+        if (parsed.message) {
+          cleaned = String(parsed.message);
+        }
+      }
+    } catch {
+      // no-op
+    }
+    cleaned = cleaned.replace(/Supabase/gi, 'Servicio en la nube');
+    cleaned = cleaned.replace(/PostgreSQL|Postgres/gi, 'Base de datos');
+    return cleaned;
+  }
+
+  /**
+   * Alias de conveniencia para saveProject en la nube
+   */
+  async saveProjectCloud(project: Project): Promise<{ success: boolean; error?: string }> {
+    return this.saveProject(project);
   }
 
   /**
