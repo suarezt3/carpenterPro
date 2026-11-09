@@ -37,3 +37,7 @@
 ## 6. Tipografía Única Obligatoria (Inter) y Privacidad de Infraestructura en UI
 - **Tipografía Única Obligatoria:** Toda la interfaz de usuario, modales, formularios, botones, inputs, selectores, contadores de caracteres y textos de ayuda deben usar exclusivamente la fuente sans-serif **Inter** (`font-sans`). Queda **estrictamente prohibido** el uso de fuentes monoespaciadas (`font-mono`, `monospace`, etc.) en textos de interfaz, etiquetas o contadores visibles para el usuario.
 - **Privacidad de Infraestructura en UI:** Jamás muestres nombres de proveedores tecnológicos, servicios de backend, bases de datos o identificadores técnicos de bajo nivel (ej. `Supabase`, `PostgreSQL`, `Postgres`, `UUID`, hashes internos) en botones de acción, pantallas de confirmación, toasts, alertas o textos visibles de cara al usuario final. La interfaz debe comunicarse siempre con términos profesionales de producto (ej. *"Enviar"*, *"Guardar en la nube"*, *"Hemos recibido tu mensaje correctamente"*).
+
+## 7. Originalidad de Marca (Cero Menciones a Terceros)
+- **Originalidad de Marca:** Prohibido mencionar nombres de empresas, tiendas o softwares de terceros (como IKEA, Homecenter, SketchUp, Excel, etc.) en textos visibles para el usuario. Toda terminología debe ser técnica, neutral y propia del producto (ej. *"Manuales RTA"*, *"Modelo 3D universal (.DAE)"*, *"Hojas de cálculo externas"*).
+

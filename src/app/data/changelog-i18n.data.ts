@@ -13,7 +13,7 @@ export const RELEASES_ES: ReleaseVersion[] = [
       'Cotas de luz interna HD con riel vertical anti-colisión y edición numérica directa en el lienzo 3D',
       'Catálogo masivo con más de 35 melaminas, mesones de mármol/cuarzo, electrodomésticos 3D y selección con Shift',
       'Presupuesto multimoneda en tiempo real (COP canónico a USD, MXN, EUR), herrajes automáticos y descuento de tapacanto',
-      'Exportación industrial completa: SketchUp .DAE milimétrico, manuales de armado PDF estilo IKEA y DXF CNC',
+      'Exportación industrial completa: Modelo 3D .DAE milimétrico, manuales de armado PDF paso a paso y DXF CNC',
       'Sistema multilenguaje instantáneo en 6 idiomas (ES, EN, PT, FR, IT, DE) reactivo sin recargar WebGL'
     ],
     changes: [
@@ -44,7 +44,7 @@ export const RELEASES_ES: ReleaseVersion[] = [
       {
         type: 'feature',
         title: 'Exportación Industrial Completa (.DAE, Manuales PDF y DXF)',
-        description: 'Exportador 3D COLLADA 1.4.1 (.DAE) milimétrico compatible con SketchUp con jerarquías limpias, generador de manuales de armado paso a paso estilo IKEA en PDF con vista explosionada y tabla de tornillería, y archivos DXF con entidades LWPOLYLINE para corte y mecanizado.',
+        description: 'Exportador 3D COLLADA 1.4.1 (.DAE) milimétrico con jerarquías limpias, generador de manuales de armado paso a paso en PDF con vista explosionada y tabla de tornillería, y archivos DXF con entidades LWPOLYLINE para corte y mecanizado.',
         tag: 'Exportación'
       },
       {
@@ -319,7 +319,7 @@ export const RELEASES_EN: ReleaseVersion[] = [
       'HD internal clearance dimensions with vertical anti-collision rail and direct numeric inline editing in 3D',
       'Massive catalog with 35+ melamines, marble/quartz countertops, 3D appliances, and Shift batch multi-selection',
       'Real-time multi-currency budget (canonical COP to USD, MXN, EUR), automatic hardware calculation and edge banding deduction',
-      'Complete industrial export: millimeter-scale SketchUp .DAE, IKEA-style step-by-step PDF assembly guides, and CNC DXF',
+      'Complete industrial export: millimeter-scale 3D Model .DAE, step-by-step PDF assembly guides, and CNC DXF',
       'Instantaneous 6-language system (ES, EN, PT, FR, IT, DE) reactively switching without WebGL reload'
     ],
     changes: [
@@ -350,7 +350,7 @@ export const RELEASES_EN: ReleaseVersion[] = [
       {
         type: 'feature',
         title: 'Full Industrial Export Suite (.DAE, PDF Manuals & CNC DXF)',
-        description: 'Millimeter-scale COLLADA 1.4.1 (.DAE) 3D exporter for SketchUp with organized part hierarchies, IKEA-style step-by-step PDF assembly manual generator with exploded views and fastener schedules, and CNC DXF export with LWPOLYLINE entities.',
+        description: 'Millimeter-scale COLLADA 1.4.1 (.DAE) 3D exporter with organized part hierarchies, step-by-step PDF assembly manual generator with exploded views and fastener schedules, and CNC DXF export with LWPOLYLINE entities.',
         tag: 'Export'
       },
       {
@@ -625,7 +625,7 @@ export const RELEASES_PT: ReleaseVersion[] = [
       'Cotas de luz interna HD com trilho vertical anticolisão e edição numérica direta no espaço 3D',
       'Catálogo massivo com mais de 35 melaminas, bancadas de mármore/quartzo, eletrodomésticos 3D e seleção com Shift',
       'Orçamento multimoeda em tempo real (COP canônico para USD, MXN, EUR), ferragens automáticas e desconto de fita de borda',
-      'Exportação industrial completa: SketchUp .DAE milimétrico, manuais de montagem PDF estilo IKEA e DXF CNC',
+      'Exportação industrial completa: Modelo 3D .DAE milimétrico, manuais de montagem PDF passo a passo e DXF CNC',
       'Sistema multilíngue instantâneo em 6 idiomas (ES, EN, PT, FR, IT, DE) reativo sem recarregar o WebGL'
     ],
     changes: [
@@ -656,7 +656,7 @@ export const RELEASES_PT: ReleaseVersion[] = [
       {
         type: 'feature',
         title: 'Exportação Industrial Completa (.DAE, Manuais PDF e DXF CNC)',
-        description: 'Exportador 3D COLLADA 1.4.1 (.DAE) milimétrico para SketchUp com hierarquia de peças, gerador de manuais de montagem passo a passo estilo IKEA em PDF com lista de ferragens, e exportação DXF com entidades LWPOLYLINE.',
+        description: 'Exportador 3D COLLADA 1.4.1 (.DAE) milimétrico com hierarquia de peças, gerador de manuais de montagem passo a passo em PDF com lista de ferragens, e exportação DXF com entidades LWPOLYLINE.',
         tag: 'Exportação'
       },
       {
@@ -931,7 +931,7 @@ export const RELEASES_FR: ReleaseVersion[] = [
       'Cotes de lumière interne HD avec rail vertical anti-collision et édition numérique directe dans la vue 3D',
       'Catalogue massif avec plus de 35 mélaminés, plans de travail marbre/quartz, électroménagers 3D et sélection Shift',
       'Devis multidevise en temps réel (base COP vers USD, MXN, EUR), calcul automatique de quincaillerie et déduction de chant',
-      'Exportation industrielle complète: SketchUp .DAE millimétrique, manuels de montage PDF style IKEA et DXF CNC',
+      'Exportation industrielle complète: Modèle 3D .DAE millimétrique, manuels de montage PDF pas à pas et DXF CNC',
       'Système multilingue instantané en 6 langues (ES, EN, PT, FR, IT, DE) réactif sans rechargement WebGL'
     ],
     changes: [
@@ -962,7 +962,7 @@ export const RELEASES_FR: ReleaseVersion[] = [
       {
         type: 'feature',
         title: 'Exportation Industrielle Complète (.DAE, Manuais PDF et DXF CNC)',
-        description: 'Exportateur 3D COLLADA 1.4.1 (.DAE) millimétrique pour SketchUp avec hiérarchies claires, générateur de manuels d\'assemblage étape par étape style IKEA en PDF avec quincaillerie détaillée, et fichiers DXF avec entités LWPOLYLINE.',
+        description: 'Exportateur 3D COLLADA 1.4.1 (.DAE) millimétrique avec hiérarchies claires, générateur de manuels d\'assemblage étape par étape en PDF avec quincaillerie détaillée, et fichiers DXF avec entités LWPOLYLINE.',
         tag: 'Exportation'
       },
       {
@@ -1237,7 +1237,7 @@ export const RELEASES_IT: ReleaseVersion[] = [
       'Quote di luce interna HD con binario verticale anti-collisione e modifica numerica diretta nel visualizzatore 3D',
       'Catalogo completo con oltre 35 nobilitati, top in marmo/quarzo, elettrodomestici 3D e selezione multipla con Shift',
       'Preventivo multivaluta in tempo reale (COP canonico verso USD, MXN, EUR), ferramenta automatica e detrazione bordi',
-      'Esportazione industriale completa: SketchUp .DAE millimetrico, manuali di montaggio PDF stile IKEA e DXF CNC',
+      'Esportazione industriale completa: Modello 3D .DAE millimetrico, manuali di montaggio PDF passo dopo passo e DXF CNC',
       'Sistema multilingue istantaneo in 6 lingue (ES, EN, PT, FR, IT, DE) reattivo senza ricaricare WebGL'
     ],
     changes: [
@@ -1268,7 +1268,7 @@ export const RELEASES_IT: ReleaseVersion[] = [
       {
         type: 'feature',
         title: 'Esportazione Industriale Completa (.DAE, Manuali PDF e DXF CNC)',
-        description: 'Esportatore 3D COLLADA 1.4.1 (.DAE) millimetrico per SketchUp con gerarchie ordinate, generatore di manuali di montaggio passo-passo stile IKEA in PDF con distinta ferramenta e file DXF con entità LWPOLYLINE per CNC.',
+        description: 'Esportatore 3D COLLADA 1.4.1 (.DAE) millimetrico con gerarchie ordinate, generatore di manuali di montaggio passo-passo in PDF con distinta ferramenta e file DXF con entità LWPOLYLINE per CNC.',
         tag: 'Esportazione'
       },
       {
@@ -1543,7 +1543,7 @@ export const RELEASES_DE: ReleaseVersion[] = [
       'HD-Lichtmaßbemaßung mit vertikaler Antikollisions-Gleitschiene und direkter numerischer Eingabe im 3D-Viewer',
       'Umfassender Materialkatalog mit über 35 Dekoren, Marmor-/Quarz-Arbeitsplatten, 3D-Geräten und Shift-Mehrfachauswahl',
       'Echtzeit-Multiwährungskalkulation (kanonisches COP in USD, MXN, EUR), automatischer Beschlagsberechnung und Kantenabzug',
-      'Vollständiger Industrie-Export: millimetergenaues SketchUp .DAE, IKEA-Stil PDF-Aufbauanleitungen und CNC-DXF',
+      'Vollständiger Industrie-Export: millimetergenaues 3D-Modell .DAE, Schritt-für-Schritt PDF-Aufbauanleitungen und CNC-DXF',
       'Reaktives 6-Sprachen-System (ES, EN, PT, FR, IT, DE) ohne Neuladen der WebGL-Grafik'
     ],
     changes: [
@@ -1574,7 +1574,7 @@ export const RELEASES_DE: ReleaseVersion[] = [
       {
         type: 'feature',
         title: 'Vollständiger Industrie-Export (.DAE, PDF-Anleitungen und DXF CNC)',
-        description: 'Millimetergenauer COLLADA 1.4.1 (.DAE) 3D-Export für SketchUp mit Bauteilgruppen, IKEA-Stil PDF-Montageanleitungs-Generator mit Explosionszeichnungen und Beschlagslisten sowie CNC-DXF mit LWPOLYLINE-Geometrien.',
+        description: 'Millimetergenauer COLLADA 1.4.1 (.DAE) 3D-Export mit Bauteilgruppen, Schritt-für-Schritt PDF-Montageanleitungs-Generator mit Explosionszeichnungen und Beschlagslisten sowie CNC-DXF mit LWPOLYLINE-Geometrien.',
         tag: 'Export'
       },
       {

@@ -1,3 +1,9 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* Desbloquear altura y overflow en layout global para impresión */
 @media print {
   :host {

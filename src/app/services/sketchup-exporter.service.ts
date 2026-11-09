@@ -83,7 +83,7 @@ export class SketchupExporterService {
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '');
 
-    a.download = `${cleanName || 'proyecto'}-sketchup-3d.dae`;
+    a.download = `${cleanName || 'proyecto'}-modelo-3d.dae`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -170,7 +170,7 @@ export class SketchupExporterService {
     // <asset> con escala 1:1 milimétrica y orientación Z_UP para SketchUp
     lines.push('  <asset>');
     lines.push('    <contributor>');
-    lines.push('      <authoring_tool>Piezo3D Studio - SketchUp COLLADA Exporter</authoring_tool>');
+    lines.push('      <authoring_tool>Piezo3D Studio - 3D COLLADA Exporter</authoring_tool>');
     lines.push('    </contributor>');
     lines.push(`    <created>${createdIso}</created>`);
     lines.push(`    <modified>${createdIso}</modified>`);

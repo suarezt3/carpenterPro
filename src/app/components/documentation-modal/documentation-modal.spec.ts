@@ -17,7 +17,7 @@ describe('Empirical Adversarial Audit — Milestone 2: Help Center & Interactive
     'diseno_parametrico_ambientes',
     'ajuste_repisas_luz_interna',
     'presupuesto_multimoneda_tapacanto',
-    'exportacion_sketchup_pdf_armado',
+    'exportacion_dae_pdf_armado',
     'escala_humana_brujula',
     'bloqueo_congelar_piezas',
     'menu_contextual_inteligente',
@@ -168,7 +168,7 @@ describe('Empirical Adversarial Audit — Milestone 2: Help Center & Interactive
         'diseno_parametrico_ambientes',
         'ajuste_repisas_luz_interna',
         'presupuesto_multimoneda_tapacanto',
-        'exportacion_sketchup_pdf_armado'
+        'exportacion_dae_pdf_armado'
       ];
 
       for (const lang of EXPECTED_LANGUAGES) {

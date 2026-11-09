@@ -1,0 +1,43 @@
+<div [class]="themeService.isClassic() ? 'h-dvh w-full bg-slate-100 text-slate-800 flex flex-col overflow-hidden font-sans' : 'h-dvh w-full bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden font-sans'">
+  <!-- Barra de Proyecto y Pestañas del Estudio -->
+  <app-header
+    class="shrink-0 relative z-50"
+    [activeTab]="activeTab()"
+    (tabChanged)="onTabChanged($event)">
+  </app-header>
+
+  <!-- Área de Trabajo Principal (Cargada perezosamente por RouterOutlet) -->
+  <main [class]="activeTab() === 'modules'
+    ? 'flex-1 min-h-0 w-full flex flex-col overflow-hidden'
+    : 'flex-1 min-h-0 w-full overflow-y-auto scrollbar-thin'">
+    <div [class]="activeTab() === 'modules'
+      ? 'h-full w-full flex flex-col min-h-0 flex-1'
+      : 'min-h-full flex flex-col justify-between'">
+      <div [class]="activeTab() === 'modules'
+        ? 'h-full w-full flex flex-col min-h-0 flex-1'
+        : 'flex-1 w-full max-w-[1920px] 2xl:max-w-[2240px] mx-auto'">
+        <router-outlet></router-outlet>
+      </div>
+
+      @if (activeTab() !== 'modules') {
+        <!-- Pie de página informativo para vistas de reporte y despiece -->
+        <footer [class]="themeService.isClassic() ? 'bg-white border-t border-slate-200 py-2.5 lg:py-3.5 text-center text-xs text-slate-500 print:hidden mt-6 shrink-0' : 'bg-zinc-900/60 border-t border-zinc-800/80 py-2.5 lg:py-3.5 text-center text-xs text-zinc-500 print:hidden mt-6 shrink-0'">
+          <div class="w-full max-w-[1920px] 2xl:max-w-[2240px] mx-auto px-3 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span [class]="themeService.isClassic() ? 'font-bold text-slate-800' : 'font-bold text-zinc-300'">Piezo3D Studio</span>
+              <span>·</span>
+              <span>Software CAD Modular de Despiece, Optimización y Presupuesto</span>
+            </div>
+            <div [class]="themeService.isClassic() ? 'flex items-center gap-4 text-[11px] text-slate-500' : 'flex items-center gap-4 text-[11px] text-zinc-400'">
+              <span>Cortes tipo Guillotina</span>
+              <span>·</span>
+              <span>Holguras Telescópicas -26mm</span>
+              <span>·</span>
+              <span>Almacenamiento Local</span>
+            </div>
+          </div>
+        </footer>
+      }
+    </div>
+  </main>
+</div>

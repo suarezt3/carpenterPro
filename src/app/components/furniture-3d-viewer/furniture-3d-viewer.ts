@@ -517,7 +517,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly isMagneticSnap = signal<boolean>(true);
   readonly nudgeStep = signal<number>(1); // 1 mm default (toggleable to 10mm)
 
-  // 3D Measurement Tape / Ruler tool (Motor de Inferencias estilo SketchUp)
+  // 3D Measurement Tape / Ruler tool (Motor de Inferencias CAD)
   readonly isMeasureMode = signal<boolean>(false);
   readonly isMeasurementPersistent = signal<boolean>(false);
   readonly measurePointA = signal<{ x: number; y: number; z: number } | null>(null);
@@ -2771,7 +2771,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
-  // --- MAGNETIC SNAP ENGINE (MOTOR DE INFERENCIAS ESTILO SKETCHUP) ---
+  // --- MAGNETIC SNAP ENGINE (MOTOR DE INFERENCIAS CAD) ---
 
   // Estructura universal de candidato de imán magnético
   private findMagneticSnapCandidate(
@@ -6207,7 +6207,7 @@ private createHandleMesh(
     }
 
     // 0. Selección múltiple por ventana (Marquee Box Selection con tecla Shift presionada)
-    // Desactiva OrbitControls para que la cámara no se mueva durante el arrastre de selección (estilo SketchUp)
+    // Desactiva OrbitControls para que la cámara no se mueva durante el arrastre de selección técnica
     if (e.button === 0 && e.shiftKey) {
       const canvasBounds = canvas.getBoundingClientRect();
       this.isMarqueeSelecting = true;
@@ -6228,7 +6228,7 @@ private createHandleMesh(
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // 0. Measurement Tape 2-Click & Drag Mode (Motor de Inferencias estilo SketchUp)
+    // 0. Measurement Tape 2-Click & Drag Mode (Motor de Inferencias CAD)
     if (this.isMeasureMode()) {
       if (e.button !== 0) return; // Solo responder a clic primario
 
@@ -6285,7 +6285,7 @@ private createHandleMesh(
         }
       }
 
-      // Si el Punto A YA está fijado (Segundo clic en modo 2-Clicks estilo SketchUp):
+      // Si el Punto A YA está fijado (Segundo clic en modo 2-Clicks de precisión CAD):
       if (this.measurePointA() && !this.isMeasurementPersistent()) {
         if (snapCand) {
           const resolvedB = this.resolveMeasurementPointB(snapCand, e.shiftKey);

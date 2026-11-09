@@ -165,28 +165,28 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     ]
   },
 
-  // 4. GUÍA 4: Exportación 3D para SketchUp (.DAE), Planos PDF y Guía de Armado RTA
+  // 4. GUÍA 4: Exportación de Modelo 3D (.DAE), Planos PDF y Guía de Armado RTA
   {
-    id: 'exportacion_sketchup_pdf_armado',
+    id: 'exportacion_dae_pdf_armado',
     category: 'optimizador',
-    title: 'Exportación 3D para SketchUp (.DAE), Planos PDF y Guía de Armado RTA',
-    shortDesc: 'Genera entregables industriales listos para taller y cliente: modelo 3D COLLADA .DAE milimétrico para SketchUp, planos 2D acotados en PDF y manual interactivo de armado paso a paso RTA.',
+    title: 'Exportación de Modelo 3D (.DAE), Planos PDF y Guía de Armado RTA',
+    shortDesc: 'Genera entregables industriales listos para taller y cliente: modelo 3D COLLADA .DAE milimétrico universal, planos 2D acotados en PDF y manual interactivo de armado paso a paso RTA.',
     icon: 'download',
     iconColor: 'text-sky-500',
     badge: 'Fabricación Industrial',
     steps: [
-      'Exportación 3D para SketchUp (.DAE): En la cabecera superior, haz clic en el menú "Exportar" y selecciona "Exportar 3D SketchUp (.DAE)". El sistema compila un archivo COLLADA 1.4.1 a escala milimétrica (1 unidad = 1 mm), con jerarquía de piezas agrupadas por módulo en el Outliner de SketchUp y conversión al eje vertical Z_UP nativo.',
+      'Exportación de Modelo 3D (.DAE): En la cabecera superior, haz clic en el menú "Exportar" y selecciona "Exportar Modelo 3D (.DAE)". El sistema compila un archivo COLLADA 1.4.1 a escala milimétrica (1 unidad = 1 mm), con jerarquía de piezas agrupadas por módulo en capas limpias y conversión al eje vertical Z_UP estándar.',
       'Planos 2D Técnicos en PDF: En el menú Exportar o en la vista de Despiece, pulsa "Plano 2D Técnico (PDF)". Se descargará una ficha técnica de taller con el despiece completo, representación de caras con perforaciones de mecanizados y cotas de cantos para taladrar en banco.',
       'Planos de Corte 2D de Tableros: En la pestaña "3. Optimizador 2D", pulsa "Exportar Planos de Corte" para imprimir el diagrama de corte de guillotina con numeración correlativa de piezas, kerf de sierra y etiquetas adhesivas con código de barras.',
-      'Guía de Armado RTA Paso a Paso: Pulsa el botón "Guía de Armado" en la cabecera para abrir el asistente de montaje estilo IKEA / Homecenter. Visualiza el ensamble isométrico etapa por etapa de cada módulo, con listado de tornillería y herrajes requeridos por paso para el instalador o cliente.'
+      'Guía de Armado RTA Paso a Paso: Pulsa el botón "Guía de Armado" en la cabecera para abrir el asistente de montaje paso a paso. Visualiza el ensamble isométrico etapa por etapa de cada módulo, con listado de tornillería y herrajes requeridos por paso para el instalador o cliente.'
     ],
     tips: [
-      'El archivo .DAE exportado conserva las texturas de melamina y puede abrirse de inmediato en SketchUp Make/Pro, Lumion, Blender o V-Ray sin requerir extensiones intermedias.',
+      'El archivo .DAE exportado conserva las texturas de melamina y la geometría agrupada lista para visualización y renderizado sin requerir extensiones intermedias.',
       'La Guía de Armado RTA puede imprimirse o compartirse para agilizar el montaje en obra sin errores de orientación de piezas.'
     ],
     technicalDetails: [
-      { label: 'Formato 3D', value: 'COLLADA 1.4.1 (.DAE) con matriz Three.js (Y-Up) a SketchUp (Z-Up)' },
-      { label: 'Escala Exportación', value: 'Milimétrica 1:1 con nombres sanitizados para Outliner' },
+      { label: 'Formato 3D', value: 'COLLADA 1.4.1 (.DAE) universal con coordenadas milimétricas' },
+      { label: 'Escala Exportación', value: 'Milimétrica 1:1 con nombres sanitizados para jerarquías 3D' },
       { label: 'Documentos PDF', value: 'Fichas técnicas acotadas, diagramas de corte 2D y etiquetas' },
       { label: 'Manual RTA', value: 'Pasos isométricos 2D con cómputo desglosado de herrajes' }
     ]
@@ -381,7 +381,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     iconColor: 'text-indigo-600',
     badge: 'Edición en Lote',
     steps: [
-      'Ventana de Selección Múltiple (Estilo SketchUp): Mantén presionada la tecla [ Shift ] y arrastra el ratón con clic izquierdo sobre el lienzo 3D. Se dibujará una caja de selección traslúcida que atrapará todas las piezas y muebles que toque o contenga, sin rotar la cámara.',
+      'Ventana de Selección Múltiple: Mantén presionada la tecla [ Shift ] y arrastra el ratón con clic izquierdo sobre el lienzo 3D. Se dibujará una caja de selección traslúcida que atrapará todas las piezas y muebles que toque o contenga, sin rotar la cámara.',
       'Selección Aditiva con Clic: Mantén [ Shift ] presionado y haz clic sobre piezas o módulos individuales para añadirlos o quitarlos de la selección activa.',
       'Cinta Flotante Contextual: Observa el badge que indica el número total de piezas seleccionadas (ej. "8 piezas seleccionadas").',
       'Rotación en Bloque: Pulsa la tecla [ R ] para girar 90 grados todas las piezas y módulos seleccionados alrededor de su centroide común sin desarmar su distribución relativa.',
@@ -559,7 +559,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     badge: 'Productividad',
     steps: [
       '• [ V ] o [ Barra Espaciadora ]: Herramienta Seleccionar piezas (Shift + Clic para añadir o quitar piezas/módulos)',
-      '• [ Shift + Arrastre ]: Ventana de Selección Múltiple (estilo SketchUp). Congela la cámara y encierra varios muebles o piezas para seleccionarlos en bloque',
+      '• [ Shift + Arrastre ]: Ventana de Selección Múltiple. Congela la cámara y encierra varios muebles o piezas para seleccionarlos en bloque',
       '• [ Shift + Clic ]: Añadir o remover piezas de la selección activa',
       '• [ M ]: Herramienta Mover (traslación en espacio 3D para posicionar módulos o piezas)',
       '• [ R ] / [ Q ]: Rotar 90° en bloque la pieza, cajón o todos los módulos seleccionados (alrededor de su centroide común)',
@@ -575,7 +575,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
       '• [ Esc ]: Cancelar herramienta activa, limpiar selección actual o cerrar ventanas emergentes'
     ],
     tips: [
-      'Selección Múltiple tipo SketchUp: Mantén presionado [ Shift ] y arrastra el ratón con el botón izquierdo sobre el lienzo 3D. Se dibujará una caja de selección que atrapará todos los módulos que toque o contenga, sin rotar la cámara.',
+      'Selección Múltiple en Bloque: Mantén presionado [ Shift ] y arrastra el ratón con el botón izquierdo sobre el lienzo 3D. Se dibujará una caja de selección que atrapará todos los módulos que toque o contenga, sin rotar la cámara.',
       'Atajo [ R ] dedicado exclusivamente a ROTAR: al pulsar R con un cajón, módulo o varios muebles seleccionados, girará 90° de inmediato sin alterar la herramienta activa.',
       'La barra espaciadora o la tecla [ V ] te regresan al instante a la herramienta de selección estándar.'
     ],
@@ -683,28 +683,28 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     ]
   },
 
-  // 4. GUIDE 4: 3D Export for SketchUp (.DAE), PDF Blueprints & RTA Assembly Guide
+  // 4. GUIDE 4: 3D Model (.DAE) Export, PDF Blueprints & RTA Assembly Guide
   {
-    id: 'exportacion_sketchup_pdf_armado',
+    id: 'exportacion_dae_pdf_armado',
     category: 'optimizador',
-    title: '3D Export for SketchUp (.DAE), PDF Blueprints & RTA Assembly Guide',
-    shortDesc: 'Produce industrial shop drawings and client deliverables: millimeter-scale COLLADA .DAE 3D models for SketchUp, dimensioned 2D PDF blueprints, and step-by-step RTA assembly manuals.',
+    title: '3D Model (.DAE) Export, PDF Blueprints & RTA Assembly Guide',
+    shortDesc: 'Produce industrial shop drawings and client deliverables: millimeter-scale universal COLLADA .DAE 3D models, dimensioned 2D PDF blueprints, and step-by-step RTA assembly manuals.',
     icon: 'download',
     iconColor: 'text-sky-500',
     badge: 'Industrial Manufacturing',
     steps: [
-      '3D Export for SketchUp (.DAE): In the top header menu, click "Export" and choose "Export 3D SketchUp (.DAE)". The system compiles a clean COLLADA 1.4.1 file at 1:1 millimeter scale, grouped by module in SketchUp Outliner and converted to native Z_UP vertical orientation.',
+      '3D Model (.DAE) Export: In the top header menu, click "Export" and choose "Export 3D Model (.DAE)". The system compiles a clean COLLADA 1.4.1 file at 1:1 millimeter scale, grouped by module in organized hierarchies and converted to standard Z_UP vertical orientation.',
       '2D Technical Blueprints in PDF: In Export menu or Parts List, click "2D Technical Blueprint (PDF)". Download shop-ready drawings with full piece indexing, hole drilling coordinates, and edge banding legends.',
       '2D Sheet Cutting Layouts: In tab "3. 2D Optimizer", click "Export Cut Layouts" to print the guillotine cutting diagram with numbered parts, saw kerf allowances, and barcode label prints.',
-      'Step-by-Step RTA Assembly Guide: Click "Assembly Guide" in the header to open the IKEA / Homecenter-style assembly manual. Review isometric exploded steps for each module with bill of materials per phase.'
+      'Step-by-Step RTA Assembly Guide: Click "Assembly Guide" in the header to open the step-by-step assembly manual. Review isometric exploded steps for each module with bill of materials per phase for installers or clients.'
     ],
     tips: [
-      'The exported .DAE file retains melamine texture coordinates and opens cleanly in SketchUp Make/Pro, Lumion, Blender, or V-Ray without conversion plugins.',
+      'The exported .DAE file retains melamine texture coordinates and grouped geometry ready for 3D visualization and rendering without plugins.',
       'The RTA Assembly Guide can be printed or shared digitally to ensure error-free on-site installation.'
     ],
     technicalDetails: [
-      { label: '3D Format', value: 'COLLADA 1.4.1 (.DAE) with Three.js (Y-Up) to SketchUp (Z-Up) transform' },
-      { label: 'Export Scale', value: 'Millimeter 1:1 with sanitized entity names for Outliner' },
+      { label: '3D Format', value: 'Universal COLLADA 1.4.1 (.DAE) with millimeter coordinates' },
+      { label: 'Export Scale', value: 'Millimeter 1:1 with sanitized entity names for 3D hierarchies' },
       { label: 'PDF Documents', value: 'Dimensioned technical sheets, 2D cutting diagrams, and labels' },
       { label: 'RTA Manual', value: '2D isometric sequence with itemized hardware requirements' }
     ]
@@ -899,7 +899,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     iconColor: 'text-indigo-600',
     badge: 'Batch Editing',
     steps: [
-      'SketchUp-Style Selection Box: Hold [ Shift ] and drag with left-click across the 3D canvas. A translucent box captures all touching cabinets without orbiting the camera.',
+      'Multi-Selection Window Box: Hold [ Shift ] and drag with left-click across the 3D canvas. A translucent box captures all touching cabinets without orbiting the camera.',
       'Additive Selection: Hold [ Shift ] and click individual parts to add or remove them from the selection.',
       'Contextual Counter: Observe the top counter badge showing total selected parts.',
       'Bulk 90° Rotation: Press [ R ] to spin all selected items 90° around their common centroid without altering relative spacing.',
@@ -1077,7 +1077,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     badge: 'Productivity',
     steps: [
       '• [ V ] or [ Spacebar ]: Select tool (Shift + Click to add/remove parts)',
-      '• [ Shift + Drag ]: Multi-selection window (SketchUp style). Locks camera and captures multiple cabinets in a marquee',
+      '• [ Shift + Drag ]: Multi-selection window. Locks camera and captures multiple cabinets in a marquee',
       '• [ Shift + Click ]: Add or remove parts from active selection',
       '• [ M ]: Move tool (reposition modules or boards in 3D space)',
       '• [ R ] / [ Q ]: Rotate active selection 90° around shared centroid',
@@ -1093,7 +1093,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
       '• [ Esc ]: Cancel active tool, clear selection, or dismiss modals'
     ],
     tips: [
-      'SketchUp Multi-Selection: Hold [ Shift ] and drag left-click across the 3D viewport. A marquee box captures all touching cabinets without orbiting.',
+      'Multi-Selection Marquee: Hold [ Shift ] and drag left-click across the 3D viewport. A marquee box captures all touching cabinets without orbiting.',
       'Shortcut [ R ] is dedicated exclusively to ROTATE: pressing R with a cabinet selected spins it 90° immediately without tool switching.',
       'Press Spacebar or [ V ] anytime to return to standard selection.'
     ],
@@ -1201,28 +1201,28 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     ]
   },
 
-  // 4. GUIA 4: Exportação 3D para SketchUp (.DAE), Plantas PDF e Manual de Montagem RTA
+  // 4. GUIA 4: Exportação de Modelo 3D (.DAE), Plantas PDF e Manual de Montagem RTA
   {
-    id: 'exportacion_sketchup_pdf_armado',
+    id: 'exportacion_dae_pdf_armado',
     category: 'optimizador',
-    title: 'Exportação 3D para SketchUp (.DAE), Plantas PDF e Manual de Montagem RTA',
-    shortDesc: 'Gere entregáveis industriais prontos para oficina e cliente: modelo 3D COLLADA .DAE milimétrico para SketchUp, plantas 2D cotadas em PDF e manual interativo de montagem RTA.',
+    title: 'Exportação de Modelo 3D (.DAE), Plantas PDF e Manual de Montagem RTA',
+    shortDesc: 'Gere entregáveis industriais prontos para oficina e cliente: modelo 3D COLLADA .DAE milimétrico universal, plantas 2D cotadas em PDF e manual interativo de montagem passo a passo RTA.',
     icon: 'download',
     iconColor: 'text-sky-500',
     badge: 'Fabricação Industrial',
     steps: [
-      'Exportação 3D para SketchUp (.DAE): No menu superior, clique em "Exportar" e selecione "Exportar 3D SketchUp (.DAE)". O sistema gera um arquivo COLLADA 1.4.1 em escala milimétrica (1 unidade = 1 mm), com hierarquia de peças agrupadas por módulo no Outliner do SketchUp e conversão para o eixo vertical Z_UP nativo.',
+      'Exportação de Modelo 3D (.DAE): No menu superior, clique em "Exportar" e selecione "Exportar Modelo 3D (.DAE)". O sistema gera um arquivo COLLADA 1.4.1 em escala milimétrica (1 unidade = 1 mm), com hierarquia de peças agrupadas por módulo em camadas organizadas e conversão para o eixo vertical Z_UP padrão.',
       'Plantas Técnicas 2D em PDF: No menu Exportar ou na Lista de Peças, clique em "Planta 2D Técnica (PDF)". Baixe uma ficha de fábrica com listagem de corte completa, representação gráfica das faces com furações CNC e cotas de fita de borda.',
       'Planos de Corte 2D de Chapas: Na aba "3. Otimizador 2D", clique em "Exportar Planos de Corte" para imprimir o diagrama de corte guilhotina com numeração sequencial das peças, espessura da serra (kerf) e etiquetas com código de barras.',
-      'Manual de Montagem RTA Passo a Passo: Clique em "Guia de Montagem" no cabeçalho para abrir o manual no estilo IKEA / Tok&Stok. Visualize a montagem isométrica etapa por etapa de cada módulo com relação de ferragens por fase.'
+      'Manual de Montagem RTA Passo a Passo: Clique em "Guia de Montagem" no cabeçalho para abrir o manual de montagem passo a passo. Visualize a montagem isométrica etapa por etapa de cada módulo com relação de ferragens por fase.'
     ],
     tips: [
-      'O arquivo .DAE exportado mantém o mapeamento de texturas de melamina e pode ser aberto imediatamente no SketchUp, Lumion, Blender ou V-Ray sem necessidade de plugins.',
+      'O arquivo .DAE exportado mantém o mapeamento de texturas e a geometria agrupada pronta para visualização e renderização 3D sem necessidade de plugins.',
       'O Manual de Montagem RTA pode ser impresso ou compartilhado digitalmente para agilizar a instalação na obra sem dúvidas sobre o posicionamento das peças.'
     ],
     technicalDetails: [
-      { label: 'Formato 3D', value: 'COLLADA 1.4.1 (.DAE) com conversão Three.js (Y-Up) para SketchUp (Z-Up)' },
-      { label: 'Escala de Exportação', value: 'Milimétrica 1:1 com nomenclatura organizada para o Outliner' },
+      { label: 'Formato 3D', value: 'COLLADA 1.4.1 (.DAE) universal com coordenadas milimétricas' },
+      { label: 'Escala de Exportação', value: 'Milimétrica 1:1 com nomenclatura organizada para hierarquias 3D' },
       { label: 'Documentos PDF', value: 'Fichas técnicas cotadas, diagramas de corte 2D e etiquetas adesivas' },
       { label: 'Manual RTA', value: 'Sequência isométrica 2D com relação discriminada de ferragens' }
     ]
@@ -1417,7 +1417,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     iconColor: 'text-indigo-600',
     badge: 'Edição em Lote',
     steps: [
-      'Caixa de Seleção Múltipla (Estilo SketchUp): Mantenha pressionada a tecla [ Shift ] e arraste o mouse com o botão esquerdo sobre o visualizador 3D. Uma caixa translúcida envolverá e selecionará todas as peças tocadas, sem girar a câmera.',
+      'Caixa de Seleção Múltipla: Mantenha pressionada a tecla [ Shift ] e arraste o mouse com o botão esquerdo sobre o visualizador 3D. Uma caixa translúcida envolverá e selecionará todas as peças tocadas, sem girar a câmera.',
       'Seleção Aditiva por Clique: Segure [ Shift ] e clique em peças ou módulos avulsos para adicioná-los ou removê-los da seleção.',
       'Contador Contextual: Observe na barra superior o número total de peças selecionadas (ex.: "8 peças selecionadas").',
       'Rotação em Bloco: Pressione a tecla [ R ] para girar em 90° todas as peças selecionadas ao redor de seu centro comum sem desconfigurar a distância entre elas.',
@@ -1595,7 +1595,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     badge: 'Produtividade',
     steps: [
       '• [ V ] ou [ Barra de Espaço ]: Ferramenta Selecionar peças (Shift + Clique para adicionar/remover peças ou módulos)',
-      '• [ Shift + Arrastar ]: Janela de Seleção Múltipla (estilo SketchUp). Congela a câmera e seleciona múltiplos móveis ou painéis em bloco',
+      '• [ Shift + Arrastar ]: Janela de Seleção Múltipla. Congela a câmera e seleciona múltiplos móveis ou painéis em bloco',
       '• [ Shift + Clique ]: Adicionar ou remover peças da seleção atual',
       '• [ M ]: Ferramenta Mover (translação no espaço 3D para posicionar módulos ou peças)',
       '• [ R ] / [ Q ]: Girar 90° em bloco a peça, gaveta ou módulos selecionados (ao redor de seu centroide comum)',
@@ -1611,7 +1611,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
       '• [ Esc ]: Cancelar ferramenta ativa, limpar seleção atual ou fechar janelas modais'
     ],
     tips: [
-      'Seleção Múltipla estilo SketchUp: Segure [ Shift ] e arraste com o botão esquerdo do mouse no visor 3D. A caixa de seleção capturará todos os módulos que tocar, sem girar a câmera.',
+      'Seleção Múltipla em Bloco: Segure [ Shift ] e arraste com o botão esquerdo do mouse no visor 3D. A caixa de seleção capturará todos os módulos que tocar, sem girar a câmera.',
       'Atalho [ R ] exclusivo para GIRAR: ao pressionar R com um módulo ou gaveta selecionada, ele gira 90° imediatamente sem trocar a ferramenta ativa.',
       'A barra de espaço ou tecla [ V ] retorna instantaneamente à ferramenta de seleção padrão.'
     ],
@@ -1719,28 +1719,28 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     ]
   },
 
-  // 4. GUIDE 4: Exportation 3D pour SketchUp (.DAE), Plans PDF et Guide de Montage RTA
+  // 4. GUIDE 4: Exportation Modèle 3D (.DAE), Plans PDF et Notice de Montage RTA
   {
-    id: 'exportacion_sketchup_pdf_armado',
+    id: 'exportacion_dae_pdf_armado',
     category: 'optimizador',
-    title: 'Exportation 3D pour SketchUp (.DAE), Plans PDF et Guide de Montage RTA',
-    shortDesc: 'Générez des livrables industriels complets : modèle 3D COLLADA .DAE millimétrique pour SketchUp, plans 2D cotés en PDF et manuel interactif de montage RTA.',
+    title: 'Exportation Modèle 3D (.DAE), Plans PDF et Notice de Montage RTA',
+    shortDesc: 'Générez des livrables industriels complets : modèle 3D COLLADA .DAE millimétrique universel, plans 2D cotés en PDF et notice interactive d\'assemblage pas à pas RTA.',
     icon: 'download',
     iconColor: 'text-sky-500',
     badge: 'Fabrication Industrielle',
     steps: [
-      'Exportation 3D pour SketchUp (.DAE) : Dans le menu supérieur, cliquez sur "Exporter" et choisissez "Exporter 3D SketchUp (.DAE)". Le système compile un fichier COLLADA 1.4.1 à l\'échelle millimétrique (1 unité = 1 mm), avec hiérarchie des pièces groupées par caisson dans l\'Outliner de SketchUp et orientation verticale Z_UP native.',
+      'Exportation Modèle 3D (.DAE) : Dans le menu supérieur, cliquez sur "Exporter" et choisissez "Exporter Modèle 3D (.DAE)". Le système compile un fichier COLLADA 1.4.1 à l\'échelle millimétrique (1 unité = 1 mm), avec hiérarchie des pièces groupées par caisson et orientation verticale Z_UP standard.',
       'Plans Techniques 2D en PDF : Dans le menu Exporter ou la vue de Débit, cliquez sur "Plan 2D Technique (PDF)". Téléchargez une fiche d\'atelier avec la nomenclature complète, les faces avec perçages CNC et les légendes d\'encollage de chant.',
       'Plans de Débit 2D des Panneaux : Dans l\'onglet "3. Optimiseur 2D", cliquez sur "Exporter Plans de Débit" pour imprimer le schéma de coupe guillotine avec numérotation des pièces, trait de scie (kerf) et étiquettes à code-barres.',
-      'Guide de Montage RTA Étape par Étape : Cliquez sur "Guide de Montage" pour ouvrir le livret d\'assemblage style IKEA. Visualisez l\'assemblage isométrique phase par phase de chaque caisson avec nomenclature de visserie par étape.'
+      'Notice de Montage RTA Pas à Pas : Cliquez sur "Guide de Montage" pour ouvrir le livret d\'assemblage étape par étape. Visualisez l\'assemblage isométrique phase par phase de chaque caisson avec nomenclature de visserie par étape.'
     ],
     tips: [
-      'Le fichier .DAE exporté préserve les textures de mélaminé et s\'ouvre immédiatement dans SketchUp Make/Pro, Lumion, Blender ou V-Ray sans module d\'extension.',
+      'Le fichier .DAE exporté préserve les textures et la géométrie groupée prête pour la visualisation et le rendu 3D sans module d\'extension.',
       'Le livret de montage RTA peut être imprimé ou partagé numériquement pour faciliter l\'installation sur chantier sans erreur de sens des pièces.'
     ],
     technicalDetails: [
-      { label: 'Format 3D', value: 'COLLADA 1.4.1 (.DAE) avec transformation Three.js (Y-Up) vers SketchUp (Z-Up)' },
-      { label: 'Échelle d\'Export', value: 'Millimétrique 1:1 avec noms assainis pour l\'Outliner' },
+      { label: 'Format 3D', value: 'COLLADA 1.4.1 (.DAE) universel avec coordonnées en millimètres' },
+      { label: 'Échelle d\'Export', value: 'Millimétrique 1:1 avec hiérarchies 3D organisées' },
       { label: 'Documents PDF', value: 'Fiches techniques cotées, schémas de débit 2D et étiquettes' },
       { label: 'Manuel RTA', value: 'Séquence isométrique 2D avec nomenclature détaillée de quincaillerie' }
     ]
@@ -1935,7 +1935,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     iconColor: 'text-indigo-600',
     badge: 'Édition Groupée',
     steps: [
-      'Cadre de Sélection Multiple (Style SketchUp) : Maintenez enfoncée la touche [ Shift ] et tracez un rectangle au clic gauche sur le canevas 3D. Une boîte translucide capturera tous les meubles et panneaux touchés, sans faire pivoter la caméra.',
+      'Cadre de Sélection Multiple : Maintenez enfoncée la touche [ Shift ] et tracez un rectangle au clic gauche sur le canevas 3D. Une boîte translucide capturera tous les meubles et panneaux touchés, sans faire pivoter la caméra.',
       'Sélection Cumulative par Clic : Maintenez [ Shift ] et cliquez sur des panneaux ou caissons individuels pour les ajouter ou les retirer de la sélection.',
       'Compteur Contextuel : Observez le badge supérieur indiquant le nombre de pièces sélectionnées (ex. : "8 pièces sélectionnées").',
       'Rotation Groupée : Appuyez sur [ R ] pour faire pivoter de 90° tous les composants sélectionnés autour de leur barycentre commun sans déformer leurs espacements relatifs.',
@@ -2113,7 +2113,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     badge: 'Productivité',
     steps: [
       '• [ V ] ou [ Barre d\'espace ] : Outil Sélectionner (Shift + Clic pour ajouter/retirer des pièces ou modules)',
-      '• [ Shift + Glisser ] : Boîte de Sélection Multiple (style SketchUp). Fige la caméra et sélectionne plusieurs caissons ou panneaux en groupe',
+      '• [ Shift + Glisser ] : Boîte de Sélection Multiple. Fige la caméra et sélectionne plusieurs caissons ou panneaux en groupe',
       '• [ Shift + Clic ] : Ajouter ou retirer des composants de la sélection courante',
       '• [ M ] : Outil Déplacer (translation dans l\'espace 3D pour positionner panneaux ou modules)',
       '• [ R ] / [ Q ] : Pivoter de 90° en bloc le panneau, le tiroir ou les modules sélectionnés (autour de leur barycentre commun)',
@@ -2129,7 +2129,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
       '• [ Échap ] : Annuler l\'outil actif, vider la sélection courante ou fermer les fenêtres modales'
     ],
     tips: [
-      'Sélection Multiple style SketchUp : Maintenez [ Shift ] et tracez un rectangle avec le bouton gauche dans le visualiseur 3D. Le cadre capturera tous les meubles touchés sans faire tourner la scène.',
+      'Sélection Multiple Groupée : Maintenez [ Shift ] et tracez un rectangle avec le bouton gauche dans le visualiseur 3D. Le cadre capturera tous les meubles touchés sans faire tourner la scène.',
       'Touche [ R ] dédiée au PIVOTEMENT : presser R avec un meuble ou tiroir sélectionné le fait pivoter de 90° aussitôt sans quitter l\'outil en cours.',
       'La barre d\'espace ou la touche [ V ] vous ramène immédiatement à l\'outil de sélection standard.'
     ],
@@ -2237,28 +2237,28 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     ]
   },
 
-  // 4. GUIDA 4: Esportazione 3D per SketchUp (.DAE), Tavole PDF e Guida di Montaggio RTA
+  // 4. GUIDA 4: Esportazione Modello 3D (.DAE), Tavole PDF e Guida di Montaggio RTA
   {
-    id: 'exportacion_sketchup_pdf_armado',
+    id: 'exportacion_dae_pdf_armado',
     category: 'optimizador',
-    title: 'Esportazione 3D per SketchUp (.DAE), Tavole PDF e Guida di Montaggio RTA',
-    shortDesc: 'Genera elaborati industriali pronti per falegnameria e cliente: modello 3D COLLADA .DAE millimetrico per SketchUp, tavole 2D quotate in PDF e manuale di montaggio RTA.',
+    title: 'Esportazione Modello 3D (.DAE), Tavole PDF e Guida di Montaggio RTA',
+    shortDesc: 'Genera elaborati industriali pronti per falegnameria e cliente: modello 3D COLLADA .DAE millimetrico universale, tavole 2D quotate in PDF e manuale di montaggio passo dopo passo RTA.',
     icon: 'download',
     iconColor: 'text-sky-500',
     badge: 'Produzione Industriale',
     steps: [
-      'Esportazione 3D per SketchUp (.DAE): Nel menu superiore, fai clic su "Esporta" e seleziona "Esporta 3D SketchUp (.DAE)". Il sistema compila un file COLLADA 1.4.1 in scala millimetrica 1:1, con elementi raggruppati per mobile nell\'Outliner di SketchUp e conversione all\'asse verticale Z_UP nativo.',
+      'Esportazione Modello 3D (.DAE): Nel menu superiore, fai clic su "Esporta" e seleziona "Esporta Modello 3D (.DAE)". Il sistema compila un file COLLADA 1.4.1 in scala millimetrica 1:1, con elementi raggruppati per mobile in livelli ordinati e orientamento verticale Z_UP standard.',
       'Tavole Tecniche 2D in PDF: Nel menu Esporta o nella vista Distinta, clicca su "Tavola 2D Tecnica (PDF)". Scarica una scheda d\'officina con distinta completa, rappresentazione delle facce con forature CNC e quote di bordatura.',
       'Schemi di Taglio 2D dei Pannelli: Nella scheda "3. Ottimizzatore 2D", clicca su "Esporta Schemi di Taglio" per stampare il piano di taglio a ghigliottina con numerazione dei pezzi, spessore lama (kerf) ed etichette con codice a barre.',
-      'Manuale di Montaggio RTA Passo dopo Passo: Fai clic su "Guida al Montaggio" per visualizzare il fascicolo d\'assemblaggio in stile IKEA. Esamina l\'esploso isometrico fase per fase di ogni mobile con tabella della viteria per passaggio.'
+      'Manuale di Montaggio RTA Passo dopo Passo: Fai clic su "Guida al Montaggio" per visualizzare il fascicolo d\'assemblaggio passo dopo passo. Esamina l\'esploso isometrico fase per fase di ogni mobile con tabella della viteria per passaggio.'
     ],
     tips: [
-      'Il file .DAE esportato conserva le texture melamminiche e può essere aperto direttamente in SketchUp Make/Pro, Lumion, Blender o V-Ray senza necessità di plugin.',
+      'Il file .DAE esportato conserva le texture e la geometria raggruppata pronta per la visualizzazione e il rendering 3D senza estensioni.',
       'La Guida di Montaggio RTA può essere stampata o inviata al cliente per semplificare la posa in opera senza dubbi sul verso dei pannelli.'
     ],
     technicalDetails: [
-      { label: 'Formato 3D', value: 'COLLADA 1.4.1 (.DAE) con conversione Three.js (Y-Up) a SketchUp (Z-Up)' },
-      { label: 'Scala Esportazione', value: 'Millimetrica 1:1 con nomi ordinati per l\'Outliner' },
+      { label: 'Formato 3D', value: 'COLLADA 1.4.1 (.DAE) universale con coordinate millimetriche' },
+      { label: 'Scala Esportazione', value: 'Millimetrica 1:1 con gerarchie 3D ordinate' },
       { label: 'Documenti PDF', value: 'Schede tecniche quotate, schemi di taglio 2D ed etichette' },
       { label: 'Manuale RTA', value: 'Sequenza isometrica 2D con distinta dettagliata della ferramenta' }
     ]
@@ -2453,7 +2453,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     iconColor: 'text-indigo-600',
     badge: 'Modifica in Blocco',
     steps: [
-      'Riquadro di Selezione Multipla (Stile SketchUp): Tieni premuto il tasto [ Shift ] e trascina con il clic sinistro sulla vista 3D. Un rettangolo traslucido selezionerà tutti i mobili e pannelli toccati, senza far ruotare la camera.',
+      'Riquadro di Selezione Multipla: Tieni premuto il tasto [ Shift ] e trascina con il clic sinistro sulla vista 3D. Un rettangolo traslucido selezionerà tutti i mobili e pannelli toccati, senza far ruotare la camera.',
       'Selezione Additiva con Clic: Tieni premuto [ Shift ] e fai clic su singoli pezzi o moduli per aggiungerli o toglierli dalla selezione.',
       'Contatore Contestuale: Osserva il badge sulla barra superiore che indica il totale dei pezzi selezionati (es. "8 pezzi selezionati").',
       'Rotazione in Blocco: Premi il tasto [ R ] per ruotare di 90° tutti i componenti selezionati attorno al loro baricentro comune senza alterare le distanze reciproche.',
@@ -2631,7 +2631,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     badge: 'Produtività',
     steps: [
       '• [ V ] o [ Barra Spaziatrice ]: Strumento Seleziona (Shift + Clic per aggiungere/rimuovere pezzi o mobili)',
-      '• [ Shift + Trascina ]: Finestra di Selezione Multipla (stile SketchUp). Blocca la camera e seleziona più mobili o pannelli in blocco',
+      '• [ Shift + Trascina ]: Finestra di Selezione Multipla. Blocca la camera e seleziona più mobili o pannelli in blocco',
       '• [ Shift + Clic ]: Aggiunge o toglie componenti dalla selezione attiva',
       '• [ M ]: Strumento Sposta (traslazione nello spazio 3D per posizionare moduli o pannelli)',
       '• [ R ] / [ Q ]: Ruota di 90° in blocco il pezzo, cassetto o moduli selezionati (attorno al baricentro comune)',
@@ -2647,7 +2647,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
       '• [ Esc ]: Annulla strumento attivo, deseleziona tutto o chiude finestre modali'
     ],
     tips: [
-      'Selezione Multipla stile SketchUp: Tieni premuto [ Shift ] e trascina con il tasto sinistro nel visualizzatore 3D. Il riquadro catturerà tutti i mobili toccati senza far girare la camera.',
+      'Selezione Multipla in Blocco: Tieni premuto [ Shift ] e trascina con il tasto sinistro nel visualizzatore 3D. Il riquadro catturerà tutti i mobili toccati senza far girare la camera.',
       'Tasto [ R ] dedicato alla ROTAZIONE: premendo R con un mobile o cassetto selezionato, questo ruota di 90° all\'istante senza cambiare strumento.',
       'La barra spaziatrice o il tasto [ V ] ti riportano subito allo strumento di selezione standard.'
     ],
@@ -2755,28 +2755,28 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     ]
   },
 
-  // 4. ANLEITUNG 4: 3D-Export für SketchUp (.DAE), PDF-Werkstattpläne & RTA-Montageanleitung
+  // 4. ANLEITUNG 4: 3D-Modell-Export (.DAE), PDF-Werkstattpläne & RTA-Montageanleitung
   {
-    id: 'exportacion_sketchup_pdf_armado',
+    id: 'exportacion_dae_pdf_armado',
     category: 'optimizador',
-    title: '3D-Export für SketchUp (.DAE), PDF-Werkstattpläne & RTA-Montageanleitung',
-    shortDesc: 'Generieren Sie industriefähige Werkstatt- und Kundendokumente: millimetergenaues COLLADA .DAE 3D-Modell für SketchUp, bemaßte 2D-PDF-Pläne und RTA-Montagehandbuch.',
+    title: '3D-Modell-Export (.DAE), PDF-Werkstattpläne & RTA-Montageanleitung',
+    shortDesc: 'Generieren Sie industriefähige Werkstatt- und Kundendokumente: millimetergenaues universelles COLLADA .DAE 3D-Modell, bemaßte 2D-PDF-Pläne und Schritt-für-Schritt RTA-Montagehandbuch.',
     icon: 'download',
     iconColor: 'text-sky-500',
     badge: 'Industrielle Fertigung',
     steps: [
-      '3D-Export für SketchUp (.DAE): Klicken Sie im oberen Menü auf "Exportieren" und wählen Sie "3D SketchUp (.DAE)". Das System generiert eine saubere COLLADA 1.4.1-Datei im Millimetermaßstab 1:1, gegliedert nach Korpusgruppen im SketchUp-Outliner und transformiert auf die native Z_UP-Ausrichtung.',
+      '3D-Modell-Export (.DAE): Klicken Sie im oberen Menü auf "Exportieren" und wählen Sie "3D-Modell exportieren (.DAE)". Das System generiert eine saubere COLLADA 1.4.1-Datei im Millimetermaßstab 1:1 mit bauteilbezogenen Baugruppen und Standard-Z_UP-Ausrichtung.',
       'Bemaßte 2D-Werkstattpläne als PDF: Klicken Sie im Exportmenü oder in der Stückliste auf "Technischer 2D-Plan (PDF)". Laden Sie werkstattfertige Zeichnungen mit vollständiger Bauteilnummerierung, CNC-Bohrbildern und Kantenbelegung herunter.',
       '2D-Plattenzuschnittpläne: Klicken Sie unter "3. 2D-Optimierer" auf "Schnittpläne exportieren", um den Guillotine-Schnittplan mit nummerierten Zuschnittteilen, Sägeblatt-Schnittfugen und Barcode-Etiketten auszugeben.',
-      'Schritt-für-Schritt RTA-Montageanleitung: Klicken Sie auf "Montageanleitung", um das Handbuch im IKEA-Stil aufzurufen. Prüfen Sie die isometrische Explosionszeichnung Korpus für Korpus mit Bauphasen und Schraubenlisten.'
+      'Schritt-für-Schritt RTA-Montageanleitung: Klicken Sie auf "Montageanleitung", um das Handbuch Schritt für Schritt aufzurufen. Prüfen Sie die isometrische Explosionszeichnung Korpus für Korpus mit Bauphasen und Schraubenlisten.'
     ],
     tips: [
-      'Die exportierte .DAE-Datei behält Texturkoordinaten bei und lässt sich ohne Zusatz-Plugins direkt in SketchUp, Lumion, Blender oder V-Ray öffnen.',
+      'Die exportierte .DAE-Datei behält Texturen und gruppierte Geometrie bei, bereit für 3D-Visualisierung und Rendering ohne Zusatzprogramme.',
       'Das RTA-Montagehandbuch kann ausgedruckt oder digital geteilt werden, um Fehler bei der Montage vor Ort auszuschließen.'
     ],
     technicalDetails: [
-      { label: '3D-Format', value: 'COLLADA 1.4.1 (.DAE) mit Three.js (Y-Up) zu SketchUp (Z-Up) Transform' },
-      { label: 'Exportmaßstab', value: 'Millimetergenau 1:1 mit bereinigten Gruppennamen für Outliner' },
+      { label: '3D-Format', value: 'Universelles COLLADA 1.4.1 (.DAE) mit Millimeterkoordinaten' },
+      { label: 'Exportmaßstab', value: 'Millimetergenau 1:1 mit bereinigten 3D-Hierarchien' },
       { label: 'PDF-Dokumente', value: 'Bemaßte Werkstattzeichnungen, 2D-Schnittpläne und Etiketten' },
       { label: 'RTA-Handbuch', value: 'Isometrische 2D-Montageschritte mit Bauteil- und Schraubenlisten' }
     ]
@@ -2971,7 +2971,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     iconColor: 'text-indigo-600',
     badge: 'Stapelbearbeitung',
     steps: [
-      'Auswahlfenster (SketchUp-Stil): Halten Sie [ Shift ] gedrückt und ziehen Sie mit linker Maustaste ein Auswahlfenster im 3D-Viewport. Ein transparenter Rahmen erfasst alle berührten Teile, ohne die Kamera zu drehen.',
+      'Auswahlfenster: Halten Sie [ Shift ] gedrückt und ziehen Sie mit linker Maustaste ein Auswahlfenster im 3D-Viewport. Ein transparenter Rahmen erfasst alle berührten Teile, ohne die Kamera zu drehen.',
       'Additive Einzelselektion: Halten Sie [ Shift ] und klicken Sie auf Bauteile oder Korpusse, um sie zur Auswahl hinzuzufügen oder abzuwählen.',
       'Zähler in der Werkzeugleiste: Ein Indikator oben zeigt die Gesamtzahl ausgewählter Teile (z. B. "8 Teile ausgewählt").',
       'Gemeinsame Drehung: Drücken Sie [ R ], um alle markierten Teile um 90° um ihren gemeinsamen Schwerpunkt zu drehen, ohne die Relativabstände zu verändern.',
@@ -3149,7 +3149,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     badge: 'Produktivität',
     steps: [
       '• [ V ] oder [ Leertaste ]: Auswahlwerkzeug (Shift + Klick zum Hinzufügen/Abwählen von Bauteilen oder Korpussen)',
-      '• [ Shift + Ziehen ]: Mehrfachauswahl-Fenster (SketchUp-Stil). Sperrt die Kamera und erfasst mehrere Korpusse oder Platten als Gruppe',
+      '• [ Shift + Ziehen ]: Mehrfachauswahl-Fenster. Sperrt die Kamera und erfasst mehrere Korpusse oder Platten als Gruppe',
       '• [ Shift + Klick ]: Bauteile zur aktiven Auswahl hinzufügen oder entfernen',
       '• [ M ]: Verschiebewerkzeug (Transformation im 3D-Raum zum Platzieren von Modulen)',
       '• [ R ] / [ Q ]: Markiertes Bauteil, Schubkasten oder Korpusse um 90° um den gemeinsamen Schwerpunkt drehen',
@@ -3165,7 +3165,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
       '• [ Esc ]: Aktives Werkzeug abbrechen, Auswahl aufheben oder Modals schließen'
     ],
     tips: [
-      'SketchUp-Mehrfachauswahl: Halten Sie [ Shift ] und ziehen Sie mit linker Maustaste im 3D-Viewport. Das Auswahlfenster erfasst alle berührten Korpusse, ohne die Szene zu rotieren.',
+      'Mehrfachauswahl in der Szene: Halten Sie [ Shift ] und ziehen Sie mit linker Maustaste im 3D-Viewport. Das Auswahlfenster erfasst alle berührten Korpusse, ohne die Szene zu rotieren.',
       'Kürzel [ R ] exklusiv zum DREHEN: Beim Drücken von R mit markiertem Korpus dreht sich dieser sofort um 90°, ohne das aktive Werkzeug zu wechseln.',
       'Die Leertaste oder Taste [ V ] bringt Sie jederzeit sofort zum Standard-Auswahlwerkzeug zurück.'
     ],

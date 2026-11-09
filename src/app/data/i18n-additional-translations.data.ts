@@ -422,7 +422,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'settings.configSavedToast': 'Configuración guardada. Espesor base predeterminado: {thickness} mm.',
     'settings.configSavedAllToast': 'Configuración guardada. Espesor base {thickness} mm aplicado a las piezas.',
 
-    // Guía de Armado Paso a Paso (Manual RTA estilo Homecenter / IKEA)
+    // Guía de Armado Paso a Paso (Manuales RTA)
     'assemblyGuide.title': 'Guía de Armado Paso a Paso',
     'assemblyGuide.subtitle': 'Manual técnico ilustrado de ensamble RTA con despiece indexado y kit de herrajes',
     'assemblyGuide.menuTitle': 'Guía de Armado (PDF)',
@@ -553,7 +553,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.modOptimizer2d': 'Optimizador 2D y Corte',
     'feedback.modBudget': 'Presupuesto y Costes',
     'feedback.modLabels': 'Etiquetas Térmicas',
-    'feedback.modExports': 'Exportaciones (PDF, DXF, SketchUp)',
+    'feedback.modExports': 'Exportaciones (PDF, DXF, DAE)',
     'feedback.sevLow': 'Baja',
     'feedback.sevMedium': 'Media',
     'feedback.sevHigh': 'Alta',
@@ -1022,7 +1022,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'settings.configSavedToast': 'Settings saved. Default base thickness: {thickness} mm.',
     'settings.configSavedAllToast': 'Settings saved. Base thickness {thickness} mm applied to parts.',
 
-    // Step-by-Step Assembly Guide (RTA IKEA/Homecenter style)
+    // Step-by-Step Assembly Guide (RTA Manuals)
     'assemblyGuide.title': 'Step-by-Step Assembly Guide',
     'assemblyGuide.subtitle': 'Illustrated technical RTA assembly manual with indexed parts list and hardware kit',
     'assemblyGuide.menuTitle': 'Assembly Guide (PDF)',
@@ -1153,7 +1153,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.modOptimizer2d': '2D Optimizer & Cutting',
     'feedback.modBudget': 'Budget & Costs',
     'feedback.modLabels': 'Thermal Labels',
-    'feedback.modExports': 'Exports (PDF, DXF, SketchUp)',
+    'feedback.modExports': 'Exports (PDF, DXF, DAE)',
     'feedback.sevLow': 'Low',
     'feedback.sevMedium': 'Medium',
     'feedback.sevHigh': 'High',
@@ -1622,7 +1622,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'settings.configSavedToast': 'Configurações salvas. Espessura base padrão: {thickness} mm.',
     'settings.configSavedAllToast': 'Configurações salvas. Espessura base {thickness} mm aplicada às peças.',
 
-    // Guia de Montagem Passo a Passo (Manual RTA estilo Homecenter / IKEA)
+    // Guia de Montagem Passo a Passo (Manuais RTA)
     'assemblyGuide.title': 'Guia de Montagem Passo a Passo',
     'assemblyGuide.subtitle': 'Manual técnico ilustrado de montagem RTA com despiece indexado e kit de ferragens',
     'assemblyGuide.menuTitle': 'Guia de Montagem (PDF)',
@@ -1753,7 +1753,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.modOptimizer2d': 'Otimizador 2D e Corte',
     'feedback.modBudget': 'Orçamento e Custos',
     'feedback.modLabels': 'Etiquetas Térmicas',
-    'feedback.modExports': 'Exportações (PDF, DXF, SketchUp)',
+    'feedback.modExports': 'Exportações (PDF, DXF, DAE)',
     'feedback.sevLow': 'Baixa',
     'feedback.sevMedium': 'Média',
     'feedback.sevHigh': 'Alta',
@@ -2222,7 +2222,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'settings.configSavedToast': 'Paramètres enregistrés. Épaisseur de base par défaut : {thickness} mm.',
     'settings.configSavedAllToast': 'Paramètres enregistrés. Épaisseur de base {thickness} mm appliquée aux pièces.',
 
-    // Guide d'Assemblage Pas à Pas (Manuel RTA style IKEA/Castorama)
+    // Guide d'Assemblage Pas à Pas (Manuels RTA)
     'assemblyGuide.title': 'Guide d\'Assemblage Pas à Pas',
     'assemblyGuide.subtitle': 'Manuel technique illustré de montage RTA avec débit indexé et kit de quincaillerie',
     'assemblyGuide.menuTitle': 'Guide d\'Assemblage (PDF)',
@@ -2353,7 +2353,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.modOptimizer2d': 'Optimiseur 2D & Découpe',
     'feedback.modBudget': 'Devis & Coûts',
     'feedback.modLabels': 'Étiquettes Thermiques',
-    'feedback.modExports': 'Exports (PDF, DXF, SketchUp)',
+    'feedback.modExports': 'Exports (PDF, DXF, DAE)',
     'feedback.sevLow': 'Basse',
     'feedback.sevMedium': 'Moyenne',
     'feedback.sevHigh': 'Haute',
@@ -2822,7 +2822,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'settings.configSavedToast': 'Impostazioni salvate. Spessore base predefinito: {thickness} mm.',
     'settings.configSavedAllToast': 'Impostazioni salvate. Spessore base {thickness} mm applicato ai pezzi.',
 
-    // Guida di Montaggio Passo-Passo (Manuale RTA stile IKEA/Leroy Merlin)
+    // Guida di Montaggio Passo-Passo (Manuali RTA)
     'assemblyGuide.title': 'Guida di Montaggio Passo-Passo',
     'assemblyGuide.subtitle': 'Manuale tecnico illustrato di montaggio RTA con distinta base indicizzata e kit ferramenta',
     'assemblyGuide.menuTitle': 'Guida di Montaggio (PDF)',
@@ -2953,7 +2953,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.modOptimizer2d': 'Ottimizzatore 2D & Taglio',
     'feedback.modBudget': 'Preventivo & Costi',
     'feedback.modLabels': 'Etichette Termiche',
-    'feedback.modExports': 'Esportazioni (PDF, DXF, SketchUp)',
+    'feedback.modExports': 'Esportazioni (PDF, DXF, DAE)',
     'feedback.sevLow': 'Bassa',
     'feedback.sevMedium': 'Media',
     'feedback.sevHigh': 'Alta',
@@ -3422,7 +3422,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'settings.configSavedToast': 'Einstellungen gespeichert. Standard-Grundstärke: {thickness} mm.',
     'settings.configSavedAllToast': 'Einstellungen gespeichert. Grundstärke {thickness} mm auf Teile angewendet.',
 
-    // Schritt-für-Schritt-Montageanleitung (RTA IKEA/Bauhaus Stil)
+    // Schritt-für-Schritt-Montageanleitung (RTA-Handbücher)
     'assemblyGuide.title': 'Schritt-für-Schritt-Montageanleitung',
     'assemblyGuide.subtitle': 'Illustrierte technische RTA-Montageanleitung mit indizierter Teileliste und Beschlagsatz',
     'assemblyGuide.menuTitle': 'Montageanleitung (PDF)',
@@ -3553,7 +3553,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.modOptimizer2d': '2D-Zuschnittoptimierer',
     'feedback.modBudget': 'Kalkulation & Kosten',
     'feedback.modLabels': 'Thermoetiketten',
-    'feedback.modExports': 'Exporte (PDF, DXF, SketchUp)',
+    'feedback.modExports': 'Exporte (PDF, DXF, DAE)',
     'feedback.sevLow': 'Niedrig',
     'feedback.sevMedium': 'Mittel',
     'feedback.sevHigh': 'Hoch',

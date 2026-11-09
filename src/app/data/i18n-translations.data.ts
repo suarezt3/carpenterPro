@@ -1,4 +1,6 @@
 import { ADDITIONAL_TRANSLATIONS } from './i18n-additional-translations.data';
+import { LANDING_TRANSLATIONS } from './i18n-landing.data';
+export { LANDING_TRANSLATIONS } from './i18n-landing.data';
 
 export type AppLanguage = 'es' | 'en' | 'pt' | 'fr' | 'it' | 'de';
 
@@ -25,6 +27,8 @@ export interface TranslationDictionary {
 const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
   es: {
     // Navegación Global
+    'nav.home': 'Inicio',
+    'nav.returnToLanding': 'Volver a la página principal',
     'nav.designer3d': '1. Diseñador 3D',
     'nav.designer3dShort': '1. 3D',
     'nav.partsList': '2. Despiece',
@@ -57,7 +61,7 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'nav.autoSync': 'Auto-Guardado',
     'nav.technical2d': 'Plano 2D Técnico (PDF)',
     'nav.exportDxf': 'Exportar DXF CNC',
-    'nav.exportSketchup': 'Exportar 3D SketchUp (.DAE)',
+    'nav.exportSketchup': 'Exportar Modelo 3D (.DAE)',
     'nav.jsonBackup': 'Copia JSON',
     'nav.inCloud': 'en nube',
     'nav.cancel': 'Cancelar',
@@ -292,12 +296,12 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'labels.partBadge': 'PIEZA',
     'nav.renameSubtitle': 'Renombrar proyecto y cliente',
     'nav.newProjectSubtitle': 'Crear lienzo en blanco',
-    'nav.openProjectsSubtitle': 'Nube Supabase y guardados locales',
+    'nav.openProjectsSubtitle': 'Nube y guardados locales',
     'nav.autoSyncSubtitle': 'Sincronización en la nube',
     'nav.technical2dSubtitle': 'Fichas acotadas para taller',
     'nav.exportDxfSubtitle': 'Capas vectoriales para mecanizado',
     'nav.exportSketchupSubtitle': 'Modelo 3D agrupado con materiales (mm)',
-    'nav.exportSketchupToast': 'Modelo 3D SketchUp (.DAE) generado y descargado',
+    'nav.exportSketchupToast': 'Modelo 3D (.DAE) generado y descargado',
     'nav.jsonBackupSubtitle': 'Respaldo completo editable',
     'settings.defaultBadge': '(Predeterminado)',
     'settings.selectedBadge': '(Seleccionado)',
@@ -407,6 +411,8 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
 
   en: {
     // Global Navigation
+    'nav.home': 'Home',
+    'nav.returnToLanding': 'Return to home page',
     'nav.designer3d': '1. 3D Designer',
     'nav.designer3dShort': '1. 3D',
     'nav.partsList': '2. Cut List',
@@ -439,7 +445,7 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'nav.autoSync': 'Auto-Sync',
     'nav.technical2d': 'Technical 2D Plan (PDF)',
     'nav.exportDxf': 'Export CNC DXF',
-    'nav.exportSketchup': 'Export 3D SketchUp (.DAE)',
+    'nav.exportSketchup': 'Export 3D Model (.DAE)',
     'nav.jsonBackup': 'JSON Backup',
     'nav.inCloud': 'in cloud',
     'nav.cancel': 'Cancel',
@@ -674,12 +680,12 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'labels.partBadge': 'PART',
     'nav.renameSubtitle': 'Rename project and client',
     'nav.newProjectSubtitle': 'Create blank canvas',
-    'nav.openProjectsSubtitle': 'Supabase cloud and local saves',
+    'nav.openProjectsSubtitle': 'Cloud storage and local saves',
     'nav.autoSyncSubtitle': 'Cloud synchronization',
     'nav.technical2dSubtitle': 'Dimensioned workshop sheets',
     'nav.exportDxfSubtitle': 'Vector layers for CNC machining',
     'nav.exportSketchupSubtitle': 'Grouped 3D model with materials (mm)',
-    'nav.exportSketchupToast': 'SketchUp 3D model (.DAE) generated and downloaded',
+    'nav.exportSketchupToast': '3D model (.DAE) generated and downloaded',
     'nav.jsonBackupSubtitle': 'Full editable project backup',
     'settings.defaultBadge': '(Default)',
     'settings.selectedBadge': '(Selected)',
@@ -789,6 +795,8 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
 
   pt: {
     // Navegação Global
+    'nav.home': 'Início',
+    'nav.returnToLanding': 'Voltar à página inicial',
     'nav.designer3d': '1. Projetista 3D',
     'nav.designer3dShort': '1. 3D',
     'nav.partsList': '2. Plano de Corte',
@@ -821,7 +829,7 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'nav.autoSync': 'Auto-Salvamento',
     'nav.technical2d': 'Plano 2D Técnico (PDF)',
     'nav.exportDxf': 'Exportar DXF CNC',
-    'nav.exportSketchup': 'Exportar 3D SketchUp (.DAE)',
+    'nav.exportSketchup': 'Exportar Modelo 3D (.DAE)',
     'nav.jsonBackup': 'Cópia JSON',
     'nav.inCloud': 'na nuvem',
     'nav.cancel': 'Cancelar',
@@ -1056,12 +1064,12 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'labels.partBadge': 'PEÇA',
     'nav.renameSubtitle': 'Renomear projeto e cliente',
     'nav.newProjectSubtitle': 'Criar tela em branco',
-    'nav.openProjectsSubtitle': 'Nuvem Supabase e salvamentos locais',
+    'nav.openProjectsSubtitle': 'Nuvem e salvamentos locais',
     'nav.autoSyncSubtitle': 'Sincronização na nuvem',
     'nav.technical2dSubtitle': 'Pranchas cotadas para oficina',
     'nav.exportDxfSubtitle': 'Camadas vetoriais para usinagem',
     'nav.exportSketchupSubtitle': 'Modelo 3D agrupado com materiais (mm)',
-    'nav.exportSketchupToast': 'Modelo 3D SketchUp (.DAE) gerado e baixado',
+    'nav.exportSketchupToast': 'Modelo 3D (.DAE) gerado e baixado',
     'nav.jsonBackupSubtitle': 'Backup completo editável',
     'settings.defaultBadge': '(Padrão)',
     'settings.selectedBadge': '(Selecionado)',
@@ -1171,6 +1179,8 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
 
   fr: {
     // Navigation Globale
+    'nav.home': 'Accueil',
+    'nav.returnToLanding': 'Retour à la page d\'accueil',
     'nav.designer3d': '1. Concepteur 3D',
     'nav.designer3dShort': '1. 3D',
     'nav.partsList': '2. Liste de Débit',
@@ -1203,7 +1213,7 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'nav.autoSync': 'Auto-Enregistrement',
     'nav.technical2d': 'Plan Technique 2D (PDF)',
     'nav.exportDxf': 'Exporter DXF CNC',
-    'nav.exportSketchup': 'Exporter 3D SketchUp (.DAE)',
+    'nav.exportSketchup': 'Exporter Modèle 3D (.DAE)',
     'nav.jsonBackup': 'Sauvegarde JSON',
     'nav.inCloud': 'dans le cloud',
     'nav.cancel': 'Annuler',
@@ -1438,12 +1448,12 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'labels.partBadge': 'PIÈCE',
     'nav.renameSubtitle': 'Renommer le projet et le client',
     'nav.newProjectSubtitle': 'Créer un canevas vierge',
-    'nav.openProjectsSubtitle': 'Cloud Supabase et sauvegardes locales',
+    'nav.openProjectsSubtitle': 'Cloud et sauvegardes locales',
     'nav.autoSyncSubtitle': 'Synchronisation dans le cloud',
     'nav.technical2dSubtitle': 'Fiches cotées pour atelier',
     'nav.exportDxfSubtitle': 'Calques vectoriels pour usinage CNC',
     'nav.exportSketchupSubtitle': 'Modèle 3D groupé avec materiales (mm)',
-    'nav.exportSketchupToast': 'Modèle 3D SketchUp (.DAE) généré et téléchargé',
+    'nav.exportSketchupToast': 'Modèle 3D (.DAE) généré et téléchargé',
     'nav.jsonBackupSubtitle': 'Sauvegarde complète modifiable',
     'settings.defaultBadge': '(Par défaut)',
     'settings.selectedBadge': '(Sélectionné)',
@@ -1553,6 +1563,8 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
 
   it: {
     // Navigazione Globale
+    'nav.home': 'Home',
+    'nav.returnToLanding': 'Torna alla pagina iniziale',
     'nav.designer3d': '1. Progettista 3D',
     'nav.designer3dShort': '1. 3D',
     'nav.partsList': '2. Distinta Taglio',
@@ -1585,7 +1597,7 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'nav.autoSync': 'Salvataggio Auto',
     'nav.technical2d': 'Disegno Tecnico 2D (PDF)',
     'nav.exportDxf': 'Esporta DXF CNC',
-    'nav.exportSketchup': 'Esporta 3D SketchUp (.DAE)',
+    'nav.exportSketchup': 'Esporta Modello 3D (.DAE)',
     'nav.jsonBackup': 'Copia JSON',
     'nav.inCloud': 'nel cloud',
     'nav.cancel': 'Annulla',
@@ -1820,12 +1832,12 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'labels.partBadge': 'PEZZO',
     'nav.renameSubtitle': 'Rinomina progetto e cliente',
     'nav.newProjectSubtitle': 'Crea tela vuota',
-    'nav.openProjectsSubtitle': 'Cloud Supabase e salvataggi locali',
+    'nav.openProjectsSubtitle': 'Cloud e salvataggi locali',
     'nav.autoSyncSubtitle': 'Sincronizzazione su cloud',
     'nav.technical2dSubtitle': 'Schede quotate per officina',
     'nav.exportDxfSubtitle': 'Livelli vettoriali per lavorazione CNC',
     'nav.exportSketchupSubtitle': 'Modello 3D raggruppato con materiali (mm)',
-    'nav.exportSketchupToast': 'Modello 3D SketchUp (.DAE) generato e scaricato',
+    'nav.exportSketchupToast': 'Modello 3D (.DAE) generato e scaricato',
     'nav.jsonBackupSubtitle': 'Backup completo modificabile',
     'settings.defaultBadge': '(Predefinito)',
     'settings.selectedBadge': '(Selezionato)',
@@ -1935,6 +1947,8 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
 
   de: {
     // Globale Navigation
+    'nav.home': 'Startseite',
+    'nav.returnToLanding': 'Zurück zur Startseite',
     'nav.designer3d': '1. 3D-Designer',
     'nav.designer3dShort': '1. 3D',
     'nav.partsList': '2. Stückliste',
@@ -1967,7 +1981,7 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'nav.autoSync': 'Auto-Speichern',
     'nav.technical2d': 'Technischer 2D-Plan (PDF)',
     'nav.exportDxf': 'CNC DXF exportieren',
-    'nav.exportSketchup': '3D SketchUp exportieren (.DAE)',
+    'nav.exportSketchup': '3D-Modell exportieren (.DAE)',
     'nav.jsonBackup': 'JSON-Sicherung',
     'nav.inCloud': 'in der Cloud',
     'nav.cancel': 'Abbrechen',
@@ -2202,12 +2216,12 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     'labels.partBadge': 'TEIL',
     'nav.renameSubtitle': 'Projekt und Kunde umbenennen',
     'nav.newProjectSubtitle': 'Leere Arbeitsfläche erstellen',
-    'nav.openProjectsSubtitle': 'Supabase-Cloud und lokale Speicherungen',
+    'nav.openProjectsSubtitle': 'Cloud-Speicher und lokale Speicherungen',
     'nav.autoSyncSubtitle': 'Cloud-Synchronisierung',
     'nav.technical2dSubtitle': 'Bemaßte Werkstattblätter',
     'nav.exportDxfSubtitle': 'Vektor-Ebenen für CNC-Bearbeitung',
     'nav.exportSketchupSubtitle': 'Gruppiertes 3D-Modell mit Materialien (mm)',
-    'nav.exportSketchupToast': 'SketchUp 3D-Modell (.DAE) generiert und heruntergeladen',
+    'nav.exportSketchupToast': '3D-Modell (.DAE) generiert und heruntergeladen',
     'nav.jsonBackupSubtitle': 'Vollständiges bearbeitbares Backup',
     'settings.defaultBadge': '(Standard)',
     'settings.selectedBadge': '(Ausgewählt)',
@@ -2317,11 +2331,11 @@ const BASE_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
 };
 
 export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
-  es: { ...BASE_TRANSLATIONS.es, ...ADDITIONAL_TRANSLATIONS.es },
-  en: { ...BASE_TRANSLATIONS.en, ...ADDITIONAL_TRANSLATIONS.en },
-  pt: { ...BASE_TRANSLATIONS.pt, ...ADDITIONAL_TRANSLATIONS.pt },
-  fr: { ...BASE_TRANSLATIONS.fr, ...ADDITIONAL_TRANSLATIONS.fr },
-  it: { ...BASE_TRANSLATIONS.it, ...ADDITIONAL_TRANSLATIONS.it },
-  de: { ...BASE_TRANSLATIONS.de, ...ADDITIONAL_TRANSLATIONS.de },
+  es: { ...BASE_TRANSLATIONS.es, ...ADDITIONAL_TRANSLATIONS.es, ...LANDING_TRANSLATIONS.es },
+  en: { ...BASE_TRANSLATIONS.en, ...ADDITIONAL_TRANSLATIONS.en, ...LANDING_TRANSLATIONS.en },
+  pt: { ...BASE_TRANSLATIONS.pt, ...ADDITIONAL_TRANSLATIONS.pt, ...LANDING_TRANSLATIONS.pt },
+  fr: { ...BASE_TRANSLATIONS.fr, ...ADDITIONAL_TRANSLATIONS.fr, ...LANDING_TRANSLATIONS.fr },
+  it: { ...BASE_TRANSLATIONS.it, ...ADDITIONAL_TRANSLATIONS.it, ...LANDING_TRANSLATIONS.it },
+  de: { ...BASE_TRANSLATIONS.de, ...ADDITIONAL_TRANSLATIONS.de, ...LANDING_TRANSLATIONS.de },
 };
 

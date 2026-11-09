@@ -687,7 +687,7 @@ describe('SketchupExporterService (Exportación COLLADA 1.4.1 .DAE 3D para Sketc
       });
 
       service.exportProjectToSketchUp(projSpecialName);
-      expect(downloadedFileName).toBe('mueble_de_bano_cocina_apto_502-sketchup-3d.dae');
+      expect(downloadedFileName).toBe('mueble_de_bano_cocina_apto_502-modelo-3d.dae');
     });
 
     it('debe manejar proyectos null o undefined sin arrojar excepciones', () => {

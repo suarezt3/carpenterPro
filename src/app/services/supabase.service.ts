@@ -743,6 +743,13 @@ export class SupabaseService {
   }
 
   /**
+   * Consulta pública de testimonios comunitarios de 4 y 5 estrellas para la Landing Page.
+   */
+  async getPublicTestimonials(limit = 10): Promise<UserFeedbackRecord[]> {
+    return this.getPublicApprovedTestimonials(limit);
+  }
+
+  /**
    * Devuelve el script SQL de configuración para copiarlo desde la interfaz si hace falta.
    */
   getSqlSetupScript(): string {

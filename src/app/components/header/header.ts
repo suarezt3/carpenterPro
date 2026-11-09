@@ -39,6 +39,7 @@ import {
   CubeIcon,
   BookOpen01Icon
 } from '@hugeicons/core-free-icons';
+import { RouterLink } from '@angular/router';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -74,7 +75,8 @@ import { ProjectSettings, DEFAULT_ROOM_CONFIG, RoomConfiguration } from '../../m
     ProjectNotesModalComponent,
     ChangelogModalComponent,
     AssemblyGuideModalComponent,
-    TranslatePipe
+    TranslatePipe,
+    RouterLink
   ],
   host: {
     '(window:keydown)': 'handleGlobalKeyDown($event)',
