@@ -244,9 +244,11 @@
                   <label class="block text-xs font-bold text-zinc-900 mb-1">
                     {{ 'account.profile.email' | t }}
                   </label>
-                  <div class="w-full px-3 py-2 bg-zinc-100 border border-zinc-200 rounded-lg text-xs text-zinc-700 select-all font-medium">
-                    {{ userEmail() }}
-                  </div>
+                  <input
+                    type="email"
+                    [value]="userEmail()"
+                    readonly
+                    class="w-full px-3 py-2 bg-zinc-100/80 border border-zinc-200 rounded-lg text-xs text-zinc-700 font-medium cursor-default focus:outline-hidden select-text" />
                 </div>
 
                 <div>

@@ -304,10 +304,45 @@ export class LandingPageComponent implements OnInit {
 
   readonly currentLanguageOption = this.i18n.currentLanguageOption;
   readonly supportedLanguages = this.i18n.languages;
+  readonly isProcessingAuthCallback = signal<boolean>(false);
 
   ngOnInit(): void {
     this.currencyExchange.initRates();
     void this.fetchCommunityTestimonials();
+    this.checkAuthCallback();
+  }
+
+  private checkAuthCallback(): void {
+    if (typeof window === 'undefined') return;
+
+    if (typeof this.supabaseService.hasAuthErrorParams === 'function' && this.supabaseService.hasAuthErrorParams()) {
+      const search = window.location.search || '';
+      const hash = window.location.hash || '';
+      const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+      const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+      const errorCode = params.get('error_code') || hashParams.get('error_code') || params.get('error') || hashParams.get('error') || 'oauth_error';
+      void this.router.navigate(['/auth'], {
+        queryParams: { mode: 'login', error: errorCode },
+        replaceUrl: true
+      });
+      return;
+    }
+
+    if (typeof this.supabaseService.hasAuthCallbackParams === 'function' && this.supabaseService.hasAuthCallbackParams()) {
+      this.isProcessingAuthCallback.set(true);
+      const waitPromise = typeof this.supabaseService.waitForAuthReady === 'function'
+        ? this.supabaseService.waitForAuthReady()
+        : Promise.resolve(this.supabaseService.currentUser?.() ?? null);
+
+      void waitPromise.then(() => {
+        const user = typeof this.supabaseService.currentUser === 'function' ? this.supabaseService.currentUser() : null;
+        if (user) {
+          void this.router.navigateByUrl('/studio', { replaceUrl: true });
+        } else {
+          this.isProcessingAuthCallback.set(false);
+        }
+      });
+    }
   }
 
   async fetchCommunityTestimonials(): Promise<void> {

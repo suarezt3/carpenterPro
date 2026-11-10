@@ -11,12 +11,20 @@ describe('LandingPageComponent', () => {
   let mockSupabase: {
     getPublicTestimonials: () => Promise<UserFeedbackRecord[]>;
     isAuthenticated: WritableSignal<boolean>;
+    hasAuthCallbackParams: ReturnType<typeof vi.fn>;
+    hasAuthErrorParams: ReturnType<typeof vi.fn>;
+    waitForAuthReady: ReturnType<typeof vi.fn>;
+    currentUser: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
     isAuthSignal = signal(false);
     mockSupabase = {
       isAuthenticated: isAuthSignal,
+      hasAuthCallbackParams: vi.fn().mockReturnValue(false),
+      hasAuthErrorParams: vi.fn().mockReturnValue(false),
+      waitForAuthReady: vi.fn().mockResolvedValue(null),
+      currentUser: vi.fn().mockReturnValue(null),
       getPublicTestimonials: vi.fn().mockResolvedValue([
         {
           id: 'test-1',

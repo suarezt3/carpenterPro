@@ -578,6 +578,25 @@ export class SupabaseService {
         this.userProfile.set(profile);
         return profile;
       }
+
+      if (!error && !data) {
+        // Auto-crear perfil inicial si no existe en user_profiles (OAuth con Google o confirmación de correo)
+        try {
+          await this.client.from('user_profiles').upsert({
+            id: targetUser.id,
+            email: fallback.email,
+            first_name: fallback.first_name,
+            last_name: fallback.last_name,
+            plan: 'free',
+            billing_cycle: 'monthly',
+            subscription_status: 'free',
+            role: 'user',
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' });
+        } catch {
+          // Si falla RLS o la conexión, se mantiene el fallback local seguro
+        }
+      }
     } catch {
       // Fallback silencioso a metadatos locales de sesión
     }
@@ -733,6 +752,39 @@ export class SupabaseService {
     return this.currentUser();
   }
 
+  /**
+   * Determina si la URL actual contiene tokens o parámetros de callback de autenticación
+   * (#access_token=, #type=signup, ?code=, ?auth_callback=1).
+   */
+  hasAuthCallbackParams(): boolean {
+    if (!this.isBrowser || typeof window === 'undefined') return false;
+    const search = window.location.search || '';
+    const hash = window.location.hash || '';
+    return (
+      search.includes('auth_callback=1') ||
+      search.includes('code=') ||
+      hash.includes('access_token=') ||
+      hash.includes('type=signup') ||
+      hash.includes('type=recovery')
+    );
+  }
+
+  /**
+   * Determina si la URL actual contiene parámetros de error de OAuth o autenticación
+   * (?error=, ?error_code=, #error=, #error_code=, bad_oauth_state).
+   */
+  hasAuthErrorParams(): boolean {
+    if (!this.isBrowser || typeof window === 'undefined') return false;
+    const search = window.location.search || '';
+    const hash = window.location.hash || '';
+    return (
+      search.includes('error=') ||
+      search.includes('error_code=') ||
+      hash.includes('error=') ||
+      hash.includes('error_code=')
+    );
+  }
+
   // ==========================================
   // MÉTODOS DE AUTENTICACIÓN Y TRADUCCIÓN DE ERRORES
   // ==========================================
@@ -750,6 +802,16 @@ export class SupabaseService {
     const rawMsg = typeof errObj['message'] === 'string'
       ? errObj['message'].toLowerCase()
       : (error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase());
+
+    if (
+      code === 'bad_oauth_state' ||
+      code.includes('oauth') ||
+      rawMsg.includes('bad_oauth_state') ||
+      rawMsg.includes('oauth state') ||
+      rawMsg.includes('oauth error')
+    ) {
+      return 'auth.errors.oauthUnavailable';
+    }
 
     if (
       code === 'invalid_credentials' ||
@@ -892,7 +954,7 @@ export class SupabaseService {
       const cleanLastName = (payload.lastName ?? '').trim();
       const fullName = [cleanFirstName, cleanLastName].filter(Boolean).join(' ');
       const emailRedirectTo = this.isBrowser && typeof window !== 'undefined'
-        ? `${window.location.origin}/studio`
+        ? `${window.location.origin}/?auth_callback=1`
         : undefined;
 
       const { data, error } = await this.client.auth.signUp({
@@ -949,7 +1011,7 @@ export class SupabaseService {
       const { error } = await this.client.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/studio`
+          redirectTo: `${window.location.origin}/?auth_callback=1`
         }
       });
 
