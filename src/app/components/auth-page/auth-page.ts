@@ -30,6 +30,7 @@ import {
 } from '@hugeicons/core-free-icons';
 
 import { SupabaseService } from '../../services/supabase.service';
+import { PaymentService } from '../../services/payment.service';
 import { I18nService } from '../../services/i18n.service';
 import { AppLanguage } from '../../data/i18n-translations.data';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -64,6 +65,7 @@ const SPECIAL_CHAR_REGEX = /[^\p{L}\p{N}\s]/u;
 })
 export class AuthPageComponent {
   readonly supabaseService = inject(SupabaseService);
+  readonly paymentService = inject(PaymentService);
   readonly i18n = inject(I18nService);
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly route = inject(ActivatedRoute);
@@ -306,6 +308,15 @@ export class AuthPageComponent {
         this.applyModeState('login');
       }
 
+      const rawPlan = params.get('plan');
+      if (rawPlan === 'pro' || rawPlan === 'industrial') {
+        const rawCycle = this.paymentService.normalizeCycle(params.get('cycle'));
+        this.paymentService.savePendingCheckout({
+          plan: rawPlan,
+          cycle: rawCycle
+        });
+      }
+
       const callbackErrorKey = this.extractCallbackErrorKey(params);
       if (callbackErrorKey) {
         this.errorKey.set(callbackErrorKey);
@@ -524,6 +535,10 @@ export class AuthPageComponent {
         );
         if (res.success) {
           await this.router.navigateByUrl('/studio');
+          const pending = this.paymentService.consumePendingCheckout();
+          if (pending) {
+            void this.paymentService.openCheckout(pending.plan, pending.cycle);
+          }
         } else {
           this.errorKey.set(res.errorKey ?? 'auth.errors.invalidCredentials');
         }
@@ -543,6 +558,10 @@ export class AuthPageComponent {
             this.registrationConfirmationPending.set(true);
           } else {
             await this.router.navigateByUrl('/studio');
+            const pending = this.paymentService.consumePendingCheckout();
+            if (pending) {
+              void this.paymentService.openCheckout(pending.plan, pending.cycle);
+            }
           }
         } else {
           this.errorKey.set(res.errorKey ?? 'auth.errors.generic');

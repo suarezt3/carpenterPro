@@ -8,6 +8,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { AssemblyGuideService } from '../../services/assembly-guide.service';
+import { PaymentService } from '../../services/payment.service';
 import { ThemeService } from '../../services/theme.service';
 import { Part, isStoneMaterial } from '../../models/melamine.models';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -39,6 +40,7 @@ export interface FlatPartLabel {
 })
 export class LabelsViewComponent {
   readonly themeService = inject(ThemeService);
+  readonly paymentService = inject(PaymentService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly assemblyGuideService = inject(AssemblyGuideService);
 
@@ -54,6 +56,10 @@ export class LabelsViewComponent {
   readonly canGenerateAssemblyGuide = this.assemblyGuideService.canGenerateAssemblyGuide;
 
   openAssemblyGuideModal() {
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     this.showAssemblyGuideModal.set(true);
   }
 
@@ -127,6 +133,10 @@ export class LabelsViewComponent {
    * Dispara la ventana nativa de impresión del navegador de forma segura para SSR.
    */
   printLabels() {
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     if (typeof window !== 'undefined') {
       window.print();
     }

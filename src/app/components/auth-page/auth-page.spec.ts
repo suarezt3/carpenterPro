@@ -623,11 +623,23 @@ describe('AuthPageComponent', () => {
 });
 
 describe('Integración de Estado de Sesión en LandingPageComponent y HeaderComponent', () => {
-  it('LandingPageComponent debe enlazar Iniciar Sesión a /auth?mode=login, CTAs de planes a /auth?mode=register y mostrar first_name + Cerrar Sesión al autenticar', async () => {
+  it('LandingPageComponent debe ser 100% pública en la barra superior (sin nombre ni botón Cerrar Sesión) y cerrar sesión automáticamente al inicializarse si había sesión activa', async () => {
     const { LandingPageComponent } = await import('../landing-page/landing-page');
-    const isAuthenticatedSig = signal(false);
-    const userProfileSig = signal<UserProfile | null>(null);
-    const signOutMock = vi.fn().mockResolvedValue(undefined);
+    const isAuthenticatedSig = signal(true);
+    const userProfileSig = signal<UserProfile | null>({
+      id: 'u-1',
+      email: 'sofia@taller.com',
+      first_name: 'Sofía',
+      last_name: 'Méndez',
+      role: 'user',
+      plan: 'pro',
+      created_at: '2026-11-09T00:00:00Z',
+      updated_at: '2026-11-09T00:00:00Z'
+    });
+    const signOutMock = vi.fn().mockImplementation(async () => {
+      isAuthenticatedSig.set(false);
+      userProfileSig.set(null);
+    });
 
     await TestBed.configureTestingModule({
       imports: [LandingPageComponent],
@@ -649,45 +661,30 @@ describe('Integración de Estado de Sesión en LandingPageComponent y HeaderComp
 
     const landingFixture = TestBed.createComponent(LandingPageComponent);
     landingFixture.detectChanges();
+    await landingFixture.whenStable();
+    landingFixture.detectChanges();
     const el = landingFixture.nativeElement as HTMLElement;
 
-    // Sin sesión: link Iniciar Sesión apunta a /auth?mode=login y CTAs de planes a /auth?mode=register
+    // Al entrar a LandingPageComponent con sesión activa, cierra sesión automáticamente
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+
+    // La barra superior de la Landing Page jamás muestra el nombre del usuario ni botón de Cerrar Sesión
+    const userNameEl = el.querySelector('[data-testid="landing-user-name"]');
+    const signOutBtn = el.querySelector('[data-testid="landing-signout-btn"]');
+    expect(userNameEl).toBeNull();
+    expect(signOutBtn).toBeNull();
+
+    // Siempre muestra el enlace Iniciar Sesión (/auth?mode=login) y CTAs de planes
     const loginLink = el.querySelector('[data-testid="landing-login-link"]') as HTMLAnchorElement;
     expect(loginLink).toBeTruthy();
     expect(loginLink.getAttribute('href')).toContain('/auth?mode=login');
 
     const starterCta = el.querySelector('[data-testid="pricing-cta-starter"]') as HTMLAnchorElement;
-    const proCta = el.querySelector('[data-testid="pricing-cta-pro"]') as HTMLAnchorElement;
-    const indCta = el.querySelector('[data-testid="pricing-cta-industrial"]') as HTMLAnchorElement;
+    const proCta = el.querySelector('[data-testid="pricing-cta-pro"]') as HTMLButtonElement;
+    const indCta = el.querySelector('[data-testid="pricing-cta-industrial"]') as HTMLButtonElement;
     expect(starterCta.getAttribute('href')).toContain('/auth?mode=register');
-    expect(proCta.getAttribute('href')).toContain('/auth?mode=register');
-    expect(indCta.getAttribute('href')).toContain('/auth?mode=register');
-
-    // Con sesión activa: muestra first_name + Cerrar Sesión y los planes llevan a /studio
-    userProfileSig.set({
-      id: 'u-1',
-      email: 'sofia@taller.com',
-      first_name: 'Sofía',
-      last_name: 'Méndez',
-      role: 'user',
-      plan: 'pro',
-      created_at: '2026-11-09T00:00:00Z',
-      updated_at: '2026-11-09T00:00:00Z'
-    });
-    isAuthenticatedSig.set(true);
-    landingFixture.detectChanges();
-
-    const userNameEl = el.querySelector('[data-testid="landing-user-name"]') as HTMLElement;
-    const signOutBtn = el.querySelector('[data-testid="landing-signout-btn"]') as HTMLButtonElement;
-    expect(userNameEl?.textContent?.trim()).toBe('Sofía');
-    expect(signOutBtn).toBeTruthy();
-    expect(starterCta.getAttribute('href')).toBe('/studio');
-    expect(proCta.getAttribute('href')).toBe('/studio');
-    expect(indCta.getAttribute('href')).toBe('/studio');
-
-    signOutBtn.click();
-    await landingFixture.whenStable();
-    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(proCta).toBeTruthy();
+    expect(indCta).toBeTruthy();
   });
 
   it('HeaderComponent (Estudio 3D) debe mostrar enlace Iniciar Sesión sin sesión y first_name + Cerrar Sesión con sesión activa', async () => {

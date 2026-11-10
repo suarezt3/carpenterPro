@@ -48,6 +48,7 @@ import {
 
 import { I18nService } from '../../services/i18n.service';
 import { SupabaseService } from '../../services/supabase.service';
+import { PaymentService } from '../../services/payment.service';
 import { CurrencyExchangeService } from '../../services/currency-exchange.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { AppLanguage } from '../../data/i18n-translations.data';
@@ -121,6 +122,7 @@ export interface DisplayTestimonial {
 export class LandingPageComponent implements OnInit {
   readonly i18n = inject(I18nService);
   readonly supabaseService = inject(SupabaseService);
+  readonly paymentService = inject(PaymentService);
   private readonly router = inject(Router);
   readonly currencyExchange = inject(CurrencyExchangeService);
 
@@ -304,6 +306,9 @@ export class LandingPageComponent implements OnInit {
   readonly supportedLanguages = this.i18n.languages;
 
   ngOnInit(): void {
+    if (this.isAuthenticated() && typeof this.supabaseService.signOut === 'function') {
+      void this.supabaseService.signOut();
+    }
     this.currencyExchange.initRates();
     void this.fetchCommunityTestimonials();
   }
@@ -342,6 +347,15 @@ export class LandingPageComponent implements OnInit {
 
   setBillingCycle(cycle: 'monthly' | 'yearly'): void {
     this.billingCycle.set(cycle);
+  }
+
+  /**
+   * Abre el Checkout Overlay para el plan de pago seleccionado ('pro' o 'industrial')
+   * usando el ciclo de facturación activo ('monthly' o 'annual').
+   */
+  selectPaidPlan(plan: 'pro' | 'industrial'): void {
+    const cycle = this.billingCycle() === 'yearly' ? 'annual' : 'monthly';
+    void this.paymentService.openCheckout(plan, cycle);
   }
 
   setPricingCurrency(currency: PricingCurrencyCode): void {

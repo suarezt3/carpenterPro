@@ -51,6 +51,7 @@ import { SketchupExporterService } from '../../services/sketchup-exporter.servic
 import { AssemblyGuideService } from '../../services/assembly-guide.service';
 import { ThemeService } from '../../services/theme.service';
 import { I18nService } from '../../services/i18n.service';
+import { PaymentService } from '../../services/payment.service';
 import { AppLanguage } from '../../data/i18n-translations.data';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
@@ -92,6 +93,7 @@ import { APP_CURRENT_VERSION } from '../../data/changelog.data';
 export class HeaderComponent {
   readonly themeService = inject(ThemeService);
   readonly i18n = inject(I18nService);
+  readonly paymentService = inject(PaymentService);
   readonly currentLanguageIso = this.i18n.currentIso;
   private readonly projectService = inject(ProjectStorageService);
   private readonly assemblyGuideService = inject(AssemblyGuideService);
@@ -568,6 +570,11 @@ export class HeaderComponent {
   }
 
   openTechnicalSheet() {
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.closeDropdowns();
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     this.showTechnicalSheetModal.set(true);
   }
 
@@ -577,6 +584,10 @@ export class HeaderComponent {
 
   openAssemblyGuide() {
     this.closeDropdowns();
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     this.showAssemblyGuideModal.set(true);
   }
 
@@ -603,11 +614,21 @@ export class HeaderComponent {
   }
 
   exportDxf() {
+    if (this.paymentService.isCncExportRestricted()) {
+      this.closeDropdowns();
+      this.paymentService.openUpgradeModal('cnc_export', 'industrial');
+      return;
+    }
     this.dxfExporter.exportProjectToDxf(this.project());
     this.showToast('📐 Archivo DXF para CNC generado y descargado');
   }
 
   exportSketchup() {
+    if (this.paymentService.isCncExportRestricted()) {
+      this.closeDropdowns();
+      this.paymentService.openUpgradeModal('cnc_export', 'industrial');
+      return;
+    }
     this.sketchupExporter.exportProjectToSketchUp(this.project());
     this.showToast(this.i18n.t('nav.exportSketchupToast'));
   }

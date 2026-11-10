@@ -21,6 +21,8 @@ export interface CloudProjectRecord {
 
 export type UserRole = 'user' | 'super_admin';
 export type UserPlan = 'free' | 'pro' | 'industrial';
+export type BillingCycle = 'monthly' | 'annual';
+export type SubscriptionStatus = 'free' | 'active' | 'on_trial' | 'past_due' | 'cancelled' | 'expired';
 
 /**
  * Perfil de usuario sincronizado con `public.user_profiles` y `auth.users`.
@@ -32,8 +34,30 @@ export interface UserProfile {
   last_name: string;
   role: UserRole;
   plan: UserPlan;
+  billing_cycle?: BillingCycle | null;
+  subscription_status?: SubscriptionStatus | null;
+  subscription_id?: string | null;
+  customer_id?: string | null;
+  variant_id?: string | null;
+  current_period_end?: string | null;
+  customer_portal_url?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Registro de factura o recibo de suscripción sincronizado con `public.subscription_invoices`.
+ */
+export interface SubscriptionInvoice {
+  id: string;
+  user_id: string;
+  subscription_id?: string | null;
+  plan: UserPlan;
+  billing_cycle: BillingCycle;
+  amount_usd: number;
+  status: string;
+  invoice_url?: string | null;
+  created_at: string;
 }
 
 export interface SignUpEmailPayload {
@@ -191,9 +215,38 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   last_name TEXT DEFAULT '',
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'super_admin')),
   plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'industrial')),
+  billing_cycle TEXT DEFAULT 'monthly' CHECK (billing_cycle IN ('monthly', 'annual')),
+  subscription_status TEXT DEFAULT 'free' CHECK (subscription_status IN ('free', 'active', 'on_trial', 'past_due', 'cancelled', 'expired')),
+  subscription_id TEXT,
+  customer_id TEXT,
+  variant_id TEXT,
+  current_period_end TIMESTAMPTZ,
+  customer_portal_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS public.subscription_invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  subscription_id TEXT,
+  plan TEXT NOT NULL CHECK (plan IN ('free', 'pro', 'industrial')),
+  billing_cycle TEXT NOT NULL CHECK (billing_cycle IN ('monthly', 'annual')),
+  amount_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'paid',
+  invoice_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscription_invoices_user_id ON public.subscription_invoices(user_id, created_at DESC);
+ALTER TABLE public.subscription_invoices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own invoices" ON public.subscription_invoices;
+CREATE POLICY "Users can view own invoices"
+  ON public.subscription_invoices
+  FOR SELECT
+  TO authenticated
+  USING ((select auth.uid()) = user_id);
 
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 
@@ -459,6 +512,13 @@ export class SupabaseService {
       last_name: lastName,
       role: 'user',
       plan: 'free',
+      billing_cycle: 'monthly',
+      subscription_status: 'free',
+      subscription_id: null,
+      customer_id: null,
+      variant_id: null,
+      current_period_end: null,
+      customer_portal_url: null,
       created_at: user.created_at || nowIso,
       updated_at: user.updated_at || user.created_at || nowIso
     };
@@ -483,12 +543,19 @@ export class SupabaseService {
     try {
       const { data, error } = await this.client
         .from('user_profiles')
-        .select('id, email, first_name, last_name, role, plan, created_at, updated_at')
+        .select('id, email, first_name, last_name, role, plan, billing_cycle, subscription_status, subscription_id, customer_id, variant_id, current_period_end, customer_portal_url, created_at, updated_at')
         .eq('id', targetUser.id)
         .maybeSingle();
 
       if (!error && data) {
         const record = data as Record<string, unknown>;
+        const rawCycle = record['billing_cycle'];
+        const rawStatus = record['subscription_status'];
+        const validStatuses: SubscriptionStatus[] = ['free', 'active', 'on_trial', 'past_due', 'cancelled', 'expired'];
+        const parsedStatus: SubscriptionStatus = typeof rawStatus === 'string' && validStatuses.includes(rawStatus as SubscriptionStatus)
+          ? (rawStatus as SubscriptionStatus)
+          : (record['plan'] === 'pro' || record['plan'] === 'industrial' ? 'active' : 'free');
+
         const profile: UserProfile = {
           id: String(record['id'] ?? targetUser.id),
           email: String(record['email'] ?? targetUser.email ?? ''),
@@ -496,6 +563,13 @@ export class SupabaseService {
           last_name: String(record['last_name'] ?? fallback.last_name),
           role: record['role'] === 'super_admin' ? 'super_admin' : 'user',
           plan: record['plan'] === 'pro' || record['plan'] === 'industrial' ? record['plan'] : 'free',
+          billing_cycle: rawCycle === 'annual' ? 'annual' : 'monthly',
+          subscription_status: parsedStatus,
+          subscription_id: record['subscription_id'] ? String(record['subscription_id']) : null,
+          customer_id: record['customer_id'] ? String(record['customer_id']) : null,
+          variant_id: record['variant_id'] ? String(record['variant_id']) : null,
+          current_period_end: record['current_period_end'] ? String(record['current_period_end']) : null,
+          customer_portal_url: record['customer_portal_url'] ? String(record['customer_portal_url']) : null,
           created_at: String(record['created_at'] ?? fallback.created_at),
           updated_at: String(record['updated_at'] ?? fallback.updated_at)
         };
@@ -508,6 +582,52 @@ export class SupabaseService {
 
     this.userProfile.set(fallback);
     return fallback;
+  }
+
+  /**
+   * Recarga el perfil del usuario desde la nube (por ejemplo, tras completar un pago en el Checkout Overlay).
+   */
+  async refreshUserProfile(): Promise<UserProfile | null> {
+    return this.loadUserProfile(this.currentUser());
+  }
+
+  /**
+   * Consulta el historial real de facturas de suscripción del usuario autenticado en `public.subscription_invoices`.
+   */
+  async getSubscriptionInvoices(limit = 20): Promise<SubscriptionInvoice[]> {
+    if (!this.isBrowser) return [];
+    const user = this.currentUser();
+    if (!user || !this.client) return [];
+
+    try {
+      const { data, error } = await this.client
+        .from('subscription_invoices')
+        .select('id, user_id, subscription_id, plan, billing_cycle, amount_usd, status, invoice_url, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error || !Array.isArray(data)) {
+        return [];
+      }
+
+      return data.map((row) => {
+        const record = row as Record<string, unknown>;
+        return {
+          id: String(record['id'] ?? ''),
+          user_id: String(record['user_id'] ?? user.id),
+          subscription_id: record['subscription_id'] ? String(record['subscription_id']) : null,
+          plan: record['plan'] === 'industrial' ? 'industrial' : (record['plan'] === 'pro' ? 'pro' : 'free'),
+          billing_cycle: record['billing_cycle'] === 'annual' ? 'annual' : 'monthly',
+          amount_usd: Number(record['amount_usd'] ?? 0),
+          status: String(record['status'] ?? 'paid'),
+          invoice_url: record['invoice_url'] ? String(record['invoice_url']) : null,
+          created_at: String(record['created_at'] ?? new Date().toISOString())
+        };
+      });
+    } catch {
+      return [];
+    }
   }
 
   /**

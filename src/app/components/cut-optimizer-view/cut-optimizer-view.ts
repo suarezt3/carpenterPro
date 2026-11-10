@@ -20,6 +20,7 @@ import {
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { AssemblyGuideService } from '../../services/assembly-guide.service';
+import { PaymentService } from '../../services/payment.service';
 import { ThemeService } from '../../services/theme.service';
 import { Material, OptimizationResult, PlacedPart, PlacedSheet } from '../../models/melamine.models';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -39,6 +40,7 @@ import { AssemblyGuideModalComponent } from '../assembly-guide-modal/assembly-gu
 })
 export class CutOptimizerViewComponent {
   readonly themeService = inject(ThemeService);
+  readonly paymentService = inject(PaymentService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly optimizer = inject(CutOptimizerService);
   private readonly assemblyGuideService = inject(AssemblyGuideService);
@@ -89,6 +91,10 @@ export class CutOptimizerViewComponent {
   readonly canGenerateAssemblyGuide = this.assemblyGuideService.canGenerateAssemblyGuide;
 
   openAssemblyGuideModal() {
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     this.showAssemblyGuideModal.set(true);
   }
 
@@ -223,6 +229,10 @@ export class CutOptimizerViewComponent {
    */
   printCurrentSheet() {
     this.closeDownloadMenu();
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     this.resetZoom();
     if (typeof window !== 'undefined') {
       setTimeout(() => {
@@ -237,6 +247,10 @@ export class CutOptimizerViewComponent {
    */
   async downloadCurrentSheetAsPng() {
     this.closeDownloadMenu();
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     if (typeof document === 'undefined') return;
     const sheet = this.currentSheet();
     if (!sheet) return;
@@ -345,6 +359,10 @@ export class CutOptimizerViewComponent {
    */
   async downloadCurrentSheetAsPdf() {
     this.closeDownloadMenu();
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     const sheet = this.currentSheet();
     if (!sheet) return;

@@ -1,10 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { HeaderComponent } from '../header/header';
+import { UpgradePlanModalComponent } from '../upgrade-plan-modal/upgrade-plan-modal';
 import { ThemeService } from '../../services/theme.service';
 import { AssemblyGuideService } from '../../services/assembly-guide.service';
+import { SupabaseService } from '../../services/supabase.service';
+import { PaymentService } from '../../services/payment.service';
 
 export type MainTab = 'modules' | 'parts' | 'optimizer' | 'budget' | 'labels';
 
@@ -27,7 +30,8 @@ export const STUDIO_TAB_TO_ROUTE: Record<MainTab, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterOutlet,
-    HeaderComponent
+    HeaderComponent,
+    UpgradePlanModalComponent
   ],
   templateUrl: './studio-workspace.html',
   styleUrl: './studio-workspace.css',
@@ -36,6 +40,9 @@ export class StudioWorkspaceComponent {
   readonly themeService = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly assemblyGuideService = inject(AssemblyGuideService);
+  private readonly supabaseService = inject(SupabaseService);
+  private readonly paymentService = inject(PaymentService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly activeTab = signal<MainTab>('modules');
   readonly canGenerateAssemblyGuide = this.assemblyGuideService.canGenerateAssemblyGuide;
@@ -51,6 +58,36 @@ export class StudioWorkspaceComponent {
       .subscribe((event) => {
         this.syncTabFromUrl(event.urlAfterRedirects || event.url);
       });
+
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      const offlineHandler = () => {
+        void this.handleOfflineDisconnect();
+      };
+      window.addEventListener('offline', offlineHandler);
+      this.destroyRef.onDestroy(() => {
+        window.removeEventListener('offline', offlineHandler);
+      });
+    }
+
+    // Si el usuario regresa autenticado desde OAuth o registro con una intención de compra pendiente, abrir el Checkout Overlay
+    effect(() => {
+      const isAuth = this.supabaseService.isAuthenticated?.() ?? false;
+      if (isAuth) {
+        untracked(() => {
+          const pending = this.paymentService.consumePendingCheckout();
+          if (pending) {
+            void this.paymentService.openCheckout(pending.plan, pending.cycle);
+          }
+        });
+      }
+    });
+  }
+
+  async handleOfflineDisconnect(): Promise<void> {
+    if (typeof this.supabaseService.signOut === 'function') {
+      await this.supabaseService.signOut();
+    }
+    await this.router.navigateByUrl('/');
   }
 
   private syncTabFromUrl(url: string): void {

@@ -34,6 +34,7 @@ import { ProjectStorageService } from '../../services/project-storage.service';
 import { ThemeService } from '../../services/theme.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { I18nService } from '../../services/i18n.service';
+import { PaymentService } from '../../services/payment.service';
 
 interface IsoPoint {
   u: number;
@@ -53,6 +54,7 @@ export class AssemblyGuideModalComponent implements OnInit, OnDestroy, AfterView
   private readonly projectStorage = inject(ProjectStorageService);
   readonly themeService = inject(ThemeService);
   readonly i18n = inject(I18nService);
+  readonly paymentService = inject(PaymentService);
 
   readonly isOpen = input<boolean>(true);
   readonly selectedModuleIdInput = input<string | null>(null);
@@ -146,6 +148,10 @@ export class AssemblyGuideModalComponent implements OnInit, OnDestroy, AfterView
   }
 
   printGuide(): void {
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     if (typeof window !== 'undefined') {
       window.print();
     }

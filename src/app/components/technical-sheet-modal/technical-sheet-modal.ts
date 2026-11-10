@@ -25,6 +25,7 @@ import { Project, Part, DrillHole } from '../../models/melamine.models';
 import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
+import { PaymentService } from '../../services/payment.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
 /**
@@ -69,6 +70,7 @@ export interface DimensionLine2D {
 export class TechnicalSheetModalComponent implements OnInit, OnDestroy {
   private readonly joineryEngine = inject(JoineryEngineService);
   private readonly dxfExporter = inject(DxfExporterService);
+  private readonly paymentService = inject(PaymentService);
 
   ngOnInit(): void {
     if (typeof document !== 'undefined') {
@@ -310,6 +312,10 @@ export class TechnicalSheetModalComponent implements OnInit, OnDestroy {
    * Abre el diálogo nativo de impresión del navegador para guardar o imprimir el plano en PDF.
    */
   printSheet() {
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     if (typeof window !== 'undefined') {
       window.print();
     }
@@ -319,6 +325,10 @@ export class TechnicalSheetModalComponent implements OnInit, OnDestroy {
    * Descarga el archivo DXF R12 con todas las capas de corte y taladros CNC.
    */
   downloadDxf() {
+    if (this.paymentService.isCncExportRestricted()) {
+      this.paymentService.openUpgradeModal('cnc_export', 'industrial');
+      return;
+    }
     this.dxfExporter.exportProjectToDxf(this.project());
   }
 

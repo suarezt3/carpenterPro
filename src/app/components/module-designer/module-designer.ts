@@ -96,6 +96,7 @@ import { TemplatesModalComponent } from '../templates-modal/templates-modal';
 import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templates-catalog.service';
 import { MELAMINE_FAMILIES, MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { I18nService } from '../../services/i18n.service';
+import { PaymentService } from '../../services/payment.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
 type HugeIconDef = typeof Compass01Icon;
@@ -135,6 +136,7 @@ function normalizeSearchText(value: string | null | undefined): string {
 })
 export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   readonly i18n = inject(I18nService);
+  readonly paymentService = inject(PaymentService);
   readonly projectService = inject(ProjectStorageService);
   private isRouteAttached = true;
 
@@ -643,10 +645,39 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   /**
+   * Cuenta los módulos de carpintería activos en la escena 3D (excluyendo mesones y cajones internos)
+   * y valida si el plan activo permite agregar un nuevo módulo.
+   */
+  private countSceneModules(): number {
+    const parts = this.currentParts();
+    const activeGroupIds = new Set<string>();
+    for (const p of parts) {
+      if (p.groupId && p.componentRole !== 'countertop' && p.componentRole !== 'backsplash') {
+        activeGroupIds.add(p.groupId);
+      }
+    }
+    return this.groups().filter(
+      g => activeGroupIds.has(g.id) && !this.isCountertopGroup(g.id) && !this.isModularDrawerGroup(g.id)
+    ).length;
+  }
+
+  private checkCanAddModuleToScene(): boolean {
+    const currentCount = this.countSceneModules();
+    if (!this.paymentService.canAddModuleToScene(currentCount)) {
+      this.paymentService.openUpgradeModal('modules_limit', 'pro');
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Genera e inserta un nuevo módulo paramétrico en la escena 3D calculando su desplazamiento X
    * automático para no superponerse con muebles existentes.
    */
   onCabinetSubmitted(config: ParametricCabinetConfig) {
+    if (!this.checkCanAddModuleToScene()) {
+      return;
+    }
     let targetX = config.posX ?? 0;
     if (this.currentParts().length > 0 && targetX === 0) {
       targetX = this.templatesCatalog.calculateTemplateOffset(this.currentParts(), config.width);
@@ -2948,6 +2979,11 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const gIds = this.selectedGroupIds();
     const selPartIds = this.selectedPartIds();
 
+    const hasCabinetGroup = gIds.some(id => !this.isCountertopGroup(id) && !this.isModularDrawerGroup(id));
+    if (hasCabinetGroup && !this.checkCanAddModuleToScene()) {
+      return;
+    }
+
     let newAppIds: string[] = [];
     if (selAppIds.length > 0) {
       newAppIds = this.projectService.duplicateMultipleAppliances(selAppIds);
@@ -3136,6 +3172,9 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   onGroupDuplicationRequested(groupId: string) {
     if (this.isModularDrawerGroup(groupId)) {
       this.duplicateSelectedDrawerVertically(groupId, 'up');
+      return;
+    }
+    if (!this.isCountertopGroup(groupId) && !this.checkCanAddModuleToScene()) {
       return;
     }
     const result = this.projectService.duplicateGroup(groupId);
@@ -3985,6 +4024,9 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   onTemplateSelected(event: { template: FurnitureTemplate; mode: 'replace' | 'append' }) {
+    if (event.mode === 'append' && !this.checkCanAddModuleToScene()) {
+      return;
+    }
     this.projectService.loadTemplateFurniture(event.template, event.mode);
     const parts = this.currentParts();
     if (parts.length > 0) {
@@ -4015,6 +4057,10 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   openTechnicalSheet() {
+    if (this.paymentService.isWorkshopExportRestricted()) {
+      this.paymentService.openUpgradeModal('workshop_export', 'pro');
+      return;
+    }
     this.showTechnicalSheetModal.set(true);
   }
 
@@ -4023,10 +4069,18 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   exportDxf() {
+    if (this.paymentService.isCncExportRestricted()) {
+      this.paymentService.openUpgradeModal('cnc_export', 'industrial');
+      return;
+    }
     this.dxfExporter.exportProjectToDxf(this.project());
   }
 
   exportSketchup() {
+    if (this.paymentService.isCncExportRestricted()) {
+      this.paymentService.openUpgradeModal('cnc_export', 'industrial');
+      return;
+    }
     this.sketchupExporter.exportProjectToSketchUp(this.project());
   }
 
@@ -5617,6 +5671,9 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   insertSpecializedKitchenModule(templateId: string, withAutoAppliance = true) {
+    if (!this.checkCanAddModuleToScene()) {
+      return;
+    }
     const tpl = this.templatesCatalog.getTemplateById(templateId);
     if (!tpl) return;
 

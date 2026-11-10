@@ -3,6 +3,7 @@ import { ComponentRef, computed, signal } from '@angular/core';
 import { User } from '@supabase/supabase-js';
 import { AccountSettingsModalComponent } from './account-settings-modal';
 import { SupabaseService, UserProfile } from '../../services/supabase.service';
+import { PaymentService } from '../../services/payment.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { I18nService } from '../../services/i18n.service';
 import { ThemeService, ThemeMode } from '../../services/theme.service';
@@ -87,9 +88,12 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
     const isDarkComputed = computed(() => themeSignal() === 'dark');
 
     supabaseMock = {
+      isAuthenticated: signal(true),
       currentUser: userSignal,
       userProfile: profileSignal,
       updateUserProfile: vi.fn().mockResolvedValue({ success: true }),
+      refreshUserProfile: vi.fn().mockResolvedValue(mockProfile),
+      getSubscriptionInvoices: vi.fn().mockResolvedValue([]),
       buildFallbackProfile: vi.fn().mockReturnValue(mockProfile)
     };
 
@@ -132,6 +136,12 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       imports: [AccountSettingsModalComponent],
       providers: [
         { provide: SupabaseService, useValue: supabaseMock },
+        {
+          provide: PaymentService,
+          useValue: {
+            openCheckout: vi.fn().mockResolvedValue(undefined)
+          }
+        },
         { provide: ProjectStorageService, useValue: projectServiceMock },
         { provide: I18nService, useValue: i18nMock },
         { provide: ThemeService, useValue: themeServiceMock }
@@ -373,6 +383,58 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       expect(toastEl).toBeTruthy();
       expect(toastEl.classList.contains('bg-rose-50/95')).toBe(true);
       expect(toastEl.classList.contains('text-rose-900')).toBe(true);
+    });
+
+    it('debe respetar la jerarquía de planes (free < pro < industrial) en botones superiores e inferiores', () => {
+      // Caso 1: Usuario en Plan Industrial Anual (Plan Máximo)
+      component.userProfile.set({
+        id: 'user-123',
+        email: 'eyder@taller.com',
+        first_name: 'Eyder',
+        last_name: 'Suarez',
+        role: 'user',
+        plan: 'industrial',
+        billing_cycle: 'annual',
+        subscription_status: 'active',
+        current_period_end: '2027-11-10T00:00:00Z',
+        created_at: '2026-11-10T00:00:00Z',
+        updated_at: '2026-11-10T00:00:00Z'
+      });
+      component.setBillingCycleSelect('annual');
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="account-upgrade-plan-btn"]')).toBeNull();
+      expect(el.querySelector('[data-testid="account-max-plan-badge"]')).toBeTruthy();
+
+      const proCardBtn = el.querySelector('[data-testid="account-checkout-pro-btn"]') as HTMLButtonElement;
+      const indCardBtn = el.querySelector('[data-testid="account-checkout-industrial-btn"]') as HTMLButtonElement;
+      expect(proCardBtn.disabled).toBe(true);
+      expect(proCardBtn.textContent?.trim()).toBe('account.billing.includedInIndustrialBtn');
+      expect(indCardBtn.disabled).toBe(true);
+      expect(indCardBtn.textContent?.trim()).toBe('account.billing.currentPlanBtn');
+
+      // Caso 2: Usuario en Plan Industrial Mensual -> muestra botón Cambiar a Plan Anual (-20%) arriba
+      component.userProfile.set({
+        id: 'user-123',
+        email: 'eyder@taller.com',
+        first_name: 'Eyder',
+        last_name: 'Suarez',
+        role: 'user',
+        plan: 'industrial',
+        billing_cycle: 'monthly',
+        subscription_status: 'active',
+        created_at: '2026-11-10T00:00:00Z',
+        updated_at: '2026-11-10T00:00:00Z'
+      });
+      component.setBillingCycleSelect('annual');
+      fixture.detectChanges();
+
+      const updatedIndCardBtn = el.querySelector('[data-testid="account-checkout-industrial-btn"]') as HTMLButtonElement;
+      expect(el.querySelector('[data-testid="account-upgrade-plan-btn"]')).toBeNull();
+      expect(el.querySelector('[data-testid="account-switch-annual-top-btn"]')).toBeTruthy();
+      expect(updatedIndCardBtn.disabled).toBe(false);
+      expect(updatedIndCardBtn.textContent).toContain('account.billing.switchToAnnualBtn');
     });
   });
 

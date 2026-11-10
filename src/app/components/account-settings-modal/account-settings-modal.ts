@@ -19,6 +19,7 @@ import {
   ArrowRight01Icon,
   Cancel01Icon,
   CheckListIcon,
+  CheckmarkCircle02Icon,
   CreditCardIcon,
   Download01Icon,
   Globe02Icon,
@@ -33,7 +34,8 @@ import {
   UserIcon
 } from '@hugeicons/core-free-icons';
 
-import { SupabaseService } from '../../services/supabase.service';
+import { SupabaseService, SubscriptionInvoice } from '../../services/supabase.service';
+import { PaymentService, PaidPlan } from '../../services/payment.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { I18nService } from '../../services/i18n.service';
 import { ThemeService, ThemeMode } from '../../services/theme.service';
@@ -67,6 +69,7 @@ export interface InvoiceMock {
   description: string;
   amountUsd: number;
   status: 'paid';
+  invoiceUrl?: string | null;
 }
 
 @Component({
@@ -91,6 +94,7 @@ export class AccountSettingsModalComponent {
 
   // Injected Services
   readonly supabase = inject(SupabaseService);
+  readonly paymentService = inject(PaymentService);
   readonly projectService = inject(ProjectStorageService);
   readonly i18n = inject(I18nService);
   readonly themeService = inject(ThemeService);
@@ -110,6 +114,7 @@ export class AccountSettingsModalComponent {
     creditCard: CreditCardIcon,
     invoice: Invoice01Icon,
     checkList: CheckListIcon,
+    checkCircle: CheckmarkCircle02Icon,
     check: Tick02Icon,
     close: Cancel01Icon,
     info: InformationCircleIcon,
@@ -156,6 +161,10 @@ export class AccountSettingsModalComponent {
 
   readonly userPlan = computed(() => {
     return this.userProfile()?.plan || 'free';
+  });
+
+  readonly currentBillingCycle = computed<'monthly' | 'annual'>(() => {
+    return this.userProfile()?.billing_cycle === 'annual' ? 'annual' : 'monthly';
   });
 
   readonly userPlanTitleKey = computed(() => {
@@ -221,6 +230,46 @@ export class AccountSettingsModalComponent {
   // ---------------------------------------------------------------------------
   // TAB 4: SUSCRIPCIÓN, MÉTODOS DE PAGO Y FACTURAS (F11)
   // ---------------------------------------------------------------------------
+  readonly billingCycleSelect = signal<'monthly' | 'annual'>('monthly');
+  readonly isLoadingInvoices = signal<boolean>(false);
+  readonly hasLoadedCloudInvoices = signal<boolean>(false);
+  readonly cloudInvoices = signal<SubscriptionInvoice[]>([]);
+
+  readonly subscriptionStatusKey = computed<string>(() => {
+    const status = this.userProfile()?.subscription_status;
+    if (status === 'on_trial') return 'account.billing.statusTrial';
+    if (status === 'cancelled') return 'account.billing.statusCancelled';
+    if (status === 'past_due') return 'account.billing.statusPastDue';
+    if (status === 'expired') return 'account.billing.statusExpired';
+    if (status === 'active' || this.userPlan() !== 'free') return 'account.billing.activeBadge';
+    return 'account.billing.activeBadge';
+  });
+
+  readonly subscriptionBillingCycleKey = computed<string>(() => {
+    if (this.userPlan() === 'free') {
+      return 'account.billing.cycleStarter';
+    }
+    const cycle = this.userProfile()?.billing_cycle;
+    return cycle === 'annual' ? 'account.billing.cycleAnnual' : 'account.billing.cycleMonthly';
+  });
+
+  readonly formattedRenewalDate = computed<string | null>(() => {
+    const rawDate = this.userProfile()?.current_period_end;
+    if (!rawDate) return null;
+    const parsed = new Date(rawDate);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleDateString('es-CO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  });
+
+  readonly customerPortalUrl = computed<string | null>(() => {
+    const url = this.userProfile()?.customer_portal_url;
+    return typeof url === 'string' && url.trim().length > 0 ? url.trim() : null;
+  });
+
   readonly paymentMethods = signal<PaymentMethodMock[]>([
     {
       id: 'pm_1',
@@ -269,6 +318,29 @@ export class AccountSettingsModalComponent {
     }
   ]);
 
+  readonly displayedInvoices = computed<InvoiceMock[]>(() => {
+    if (this.hasLoadedCloudInvoices()) {
+      return this.cloudInvoices().map((inv, idx) => {
+        const dt = new Date(inv.created_at);
+        const formattedDate = Number.isNaN(dt.getTime())
+          ? inv.created_at
+          : dt.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const planTitle = inv.plan === 'industrial' ? 'Plan Industrial & CNC' : 'Plan Taller Pro';
+        const cycleLabel = inv.billing_cycle === 'annual' ? 'Anual' : 'Mensual';
+        return {
+          id: inv.id,
+          invoiceNumber: `INV-${String(idx + 1).padStart(3, '0')}`,
+          date: formattedDate,
+          description: `${planTitle} - ${cycleLabel}`,
+          amountUsd: Number(inv.amount_usd ?? 0),
+          status: 'paid',
+          invoiceUrl: inv.invoice_url ?? null
+        };
+      });
+    }
+    return this.invoices();
+  });
+
   private previousIsOpen = false;
 
   constructor() {
@@ -287,6 +359,7 @@ export class AccountSettingsModalComponent {
           this.loadProfileData();
           this.loadWorkshopData();
           this.loadPreferencesData();
+          void this.loadBillingData();
         });
       }
       this.previousIsOpen = open;
@@ -298,6 +371,9 @@ export class AccountSettingsModalComponent {
   // ---------------------------------------------------------------------------
   selectTab(tab: AccountModalTab) {
     this.activeTab.set(tab);
+    if (tab === 'billing') {
+      void this.loadBillingData();
+    }
   }
 
   closeModal() {
@@ -564,15 +640,68 @@ export class AccountSettingsModalComponent {
   // ---------------------------------------------------------------------------
   // LÓGICA TAB 4: SUSCRIPCIÓN Y FACTURAS
   // ---------------------------------------------------------------------------
-  upgradePlan() {
+  async loadBillingData(): Promise<void> {
+    const profileCycle = this.userProfile()?.billing_cycle;
+    if (profileCycle === 'annual' || profileCycle === 'monthly') {
+      this.billingCycleSelect.set(profileCycle);
+    }
+
+    if (typeof this.supabase.getSubscriptionInvoices !== 'function') {
+      return;
+    }
+
+    this.isLoadingInvoices.set(true);
+    try {
+      const records = await this.supabase.getSubscriptionInvoices(20);
+      this.cloudInvoices.set(records);
+      this.hasLoadedCloudInvoices.set(true);
+    } catch {
+      // Conservar estado previo si falla la red
+    } finally {
+      this.isLoadingInvoices.set(false);
+    }
+  }
+
+  setBillingCycleSelect(cycle: 'monthly' | 'annual'): void {
+    this.billingCycleSelect.set(cycle);
+  }
+
+  selectPlanCheckout(plan: PaidPlan, cycleOverride?: 'monthly' | 'annual'): void {
+    const cycle = cycleOverride ?? this.billingCycleSelect();
+    this.billingCycleSelect.set(cycle);
+    void this.paymentService.openCheckout(plan, cycle);
+  }
+
+  openCustomerPortal(): void {
+    const url = this.customerPortalUrl();
+    if (!url || typeof window === 'undefined') {
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  upgradePlan(plan?: PaidPlan, cycleOverride?: 'monthly' | 'annual') {
     this.showToast(this.i18n.t('account.billing.upgradeMockToast'));
+    const targetPlan: PaidPlan = plan ?? (this.userPlan() === 'pro' ? 'industrial' : 'pro');
+    const cycle = cycleOverride ?? this.billingCycleSelect();
+    this.billingCycleSelect.set(cycle);
+    void this.paymentService.openCheckout(targetPlan, cycle);
   }
 
   addPaymentMethod() {
+    const portalUrl = this.customerPortalUrl();
+    if (portalUrl && typeof window !== 'undefined') {
+      window.open(portalUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
     this.showToast(this.i18n.t('account.billing.addMethodMockToast'));
   }
 
   downloadInvoice(invoice: InvoiceMock) {
+    if (invoice.invoiceUrl && typeof window !== 'undefined') {
+      window.open(invoice.invoiceUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
     this.showToast(`${this.i18n.t('account.billing.downloadPdf')}: ${invoice.invoiceNumber}`);
   }
 }
