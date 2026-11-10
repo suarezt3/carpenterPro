@@ -623,7 +623,7 @@ describe('AuthPageComponent', () => {
 });
 
 describe('Integración de Estado de Sesión en LandingPageComponent y HeaderComponent', () => {
-  it('LandingPageComponent debe ser 100% pública en la barra superior (sin nombre ni botón Cerrar Sesión) y cerrar sesión automáticamente al inicializarse si había sesión activa', async () => {
+  it('LandingPageComponent debe ser 100% pública en la barra superior (sin nombre ni botón Cerrar Sesión) y NO cerrar sesión automáticamente en ngOnInit', async () => {
     const { LandingPageComponent } = await import('../landing-page/landing-page');
     const isAuthenticatedSig = signal(true);
     const userProfileSig = signal<UserProfile | null>({
@@ -636,10 +636,7 @@ describe('Integración de Estado de Sesión en LandingPageComponent y HeaderComp
       created_at: '2026-11-09T00:00:00Z',
       updated_at: '2026-11-09T00:00:00Z'
     });
-    const signOutMock = vi.fn().mockImplementation(async () => {
-      isAuthenticatedSig.set(false);
-      userProfileSig.set(null);
-    });
+    const signOutMock = vi.fn().mockResolvedValue(undefined);
 
     await TestBed.configureTestingModule({
       imports: [LandingPageComponent],
@@ -665,8 +662,8 @@ describe('Integración de Estado de Sesión en LandingPageComponent y HeaderComp
     landingFixture.detectChanges();
     const el = landingFixture.nativeElement as HTMLElement;
 
-    // Al entrar a LandingPageComponent con sesión activa, cierra sesión automáticamente
-    expect(signOutMock).toHaveBeenCalledTimes(1);
+    // ngOnInit no debe cerrar sesión automáticamente para no interrumpir redirecciones post-pago
+    expect(signOutMock).not.toHaveBeenCalled();
 
     // La barra superior de la Landing Page jamás muestra el nombre del usuario ni botón de Cerrar Sesión
     const userNameEl = el.querySelector('[data-testid="landing-user-name"]');
@@ -682,7 +679,7 @@ describe('Integración de Estado de Sesión en LandingPageComponent y HeaderComp
     const starterCta = el.querySelector('[data-testid="pricing-cta-starter"]') as HTMLAnchorElement;
     const proCta = el.querySelector('[data-testid="pricing-cta-pro"]') as HTMLButtonElement;
     const indCta = el.querySelector('[data-testid="pricing-cta-industrial"]') as HTMLButtonElement;
-    expect(starterCta.getAttribute('href')).toContain('/auth?mode=register');
+    expect(starterCta.getAttribute('href')).toBe('/studio');
     expect(proCta).toBeTruthy();
     expect(indCta).toBeTruthy();
   });

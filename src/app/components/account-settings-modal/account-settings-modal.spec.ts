@@ -435,6 +435,22 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       expect(el.querySelector('[data-testid="account-switch-annual-top-btn"]')).toBeTruthy();
       expect(updatedIndCardBtn.disabled).toBe(false);
       expect(updatedIndCardBtn.textContent).toContain('account.billing.switchToAnnualBtn');
+
+      // Verificar título en una sola línea amplia y botón Gestionar Suscripción y Pagos en modo in-app
+      const planTitleEl = el.querySelector('[data-testid="account-active-plan-title"]') as HTMLElement;
+      expect(planTitleEl).toBeTruthy();
+      expect(planTitleEl.className).toContain('whitespace-nowrap');
+
+      const windowOpenSpy = vi.spyOn(window, 'open');
+      const manageBtn = el.querySelector('[data-testid="account-customer-portal-btn"]') as HTMLButtonElement;
+      expect(manageBtn).toBeTruthy();
+      manageBtn.click();
+      fixture.detectChanges();
+
+      expect(windowOpenSpy).not.toHaveBeenCalled();
+      expect(component.showManageBillingNotice()).toBe(true);
+      expect(el.querySelector('[data-testid="account-manage-billing-notice"]')).toBeTruthy();
+      windowOpenSpy.mockRestore();
     });
   });
 

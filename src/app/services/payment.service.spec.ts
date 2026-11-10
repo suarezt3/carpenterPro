@@ -136,4 +136,26 @@ describe('PaymentService (Checkout Overlay, Pre-fill & Plan Limits)', () => {
     expect(service.hasProAccess()).toBe(true);
     expect(service.hasIndustrialAccess()).toBe(true);
   });
+
+  it('debe cerrar automáticamente el Checkout Overlay, refrescar perfil/facturas y navegar a /studio/designer al recibir Checkout.Success', async () => {
+    const closeSpy = vi.fn();
+    window.LemonSqueezy = {
+      Url: {
+        Open: vi.fn(),
+        Close: closeSpy
+      },
+      Setup: vi.fn()
+    };
+
+    const refreshSpy = vi.spyOn(supabaseService, 'refreshUserProfile').mockResolvedValue(null);
+    const invoicesSpy = vi.spyOn(supabaseService, 'getSubscriptionInvoices').mockResolvedValue([]);
+    const navByUrlSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    await service.handleCheckoutSuccess();
+
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(invoicesSpy).toHaveBeenCalled();
+    expect(navByUrlSpy).toHaveBeenCalledWith('/studio/designer');
+  });
 });

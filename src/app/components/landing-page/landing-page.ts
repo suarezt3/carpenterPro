@@ -306,9 +306,6 @@ export class LandingPageComponent implements OnInit {
   readonly supportedLanguages = this.i18n.languages;
 
   ngOnInit(): void {
-    if (this.isAuthenticated() && typeof this.supabaseService.signOut === 'function') {
-      void this.supabaseService.signOut();
-    }
     this.currencyExchange.initRates();
     void this.fetchCommunityTestimonials();
   }

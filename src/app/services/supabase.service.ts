@@ -396,6 +396,8 @@ export class SupabaseService {
     }
   }
 
+  private authInitPromise: Promise<void> | null = null;
+
   /**
    * Inicializa el cliente oficial y escucha cambios de sesión en tiempo real
    * (login, logout, renovación automática del token JWT y recuperación de contraseña).
@@ -417,7 +419,7 @@ export class SupabaseService {
       });
 
       // Recuperar sesión activa guardada en localStorage al abrir la aplicación
-      void this.client.auth.getSession()
+      this.authInitPromise = this.client.auth.getSession()
         .then(async ({ data }) => {
           if (data?.session?.user) {
             this.session.set(data.session);
@@ -712,6 +714,23 @@ export class SupabaseService {
     } finally {
       this.isAuthLoading.set(false);
     }
+  }
+
+  /**
+   * Espera a que termine de restaurarse la sesión inicial desde `localStorage` antes de evaluar guardias de ruta.
+   */
+  async waitForAuthReady(): Promise<User | null> {
+    if (this.authInitPromise) {
+      try {
+        await this.authInitPromise;
+      } catch {
+        // Ignorar errores de inicialización y continuar con sincronización directa
+      }
+    }
+    if (this.isAuthLoading() || !this.currentUser()) {
+      return this.syncAuthSession();
+    }
+    return this.currentUser();
   }
 
   // ==========================================

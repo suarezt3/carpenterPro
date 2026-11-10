@@ -143,8 +143,8 @@
 
           <!-- Botón Primario: Probar Estudio 3D -->
           <a
-            [routerLink]="['/auth']"
-            [queryParams]="{ mode: 'login' }"
+            [routerLink]="isAuthenticated() ? ['/studio/designer'] : ['/auth']"
+            [queryParams]="isAuthenticated() ? null : { mode: 'login' }"
             class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-950 text-white text-xs font-bold tracking-tight shadow-sm hover:shadow transition transform hover:-translate-y-0.5 cursor-pointer">
             <hugeicons-icon [icon]="icons.cube" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             <span>{{ 'landing.nav.openStudio' | t }}</span>
@@ -204,8 +204,8 @@
             {{ 'landing.nav.login' | t }}
           </a>
           <a
-            [routerLink]="['/auth']"
-            [queryParams]="{ mode: 'login' }"
+            [routerLink]="isAuthenticated() ? ['/studio/designer'] : ['/auth']"
+            [queryParams]="isAuthenticated() ? null : { mode: 'login' }"
             (click)="closeMobileMenu()"
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold shrink-0">
             <hugeicons-icon [icon]="icons.cube" [size]="14"></hugeicons-icon>

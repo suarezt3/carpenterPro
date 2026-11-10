@@ -260,7 +260,7 @@ export class PaymentService {
 
   /**
    * Inicializa el objeto global `LemonSqueezy` y suscribe el callback `Checkout.Success`
-   * para refrescar el perfil del usuario en caliente sin recargar la página.
+   * para cerrar el overlay, refrescar el perfil y las facturas en segundo plano y navegar a `/studio/designer` sin recargar la página.
    */
   private initializeLemonOverlay(): void {
     if (!this.isBrowser || typeof window === 'undefined') return;
@@ -270,20 +270,49 @@ export class PaymentService {
       if (window.LemonSqueezy?.Setup && !this.isSetupRegistered) {
         this.isSetupRegistered = true;
         window.LemonSqueezy.Setup({
-          eventHandler: (event: LemonSqueezyEventPayload) => {
+          eventHandler: async (event: LemonSqueezyEventPayload) => {
             if (event?.event === 'Checkout.Success') {
-              this.lastCheckoutSuccessAt.set(Date.now());
-              this.closeUpgradeModal();
-              void this.supabaseService.refreshUserProfile?.();
-              setTimeout(() => {
-                void this.supabaseService.refreshUserProfile?.();
-              }, 2500);
+              await this.handleCheckoutSuccess();
             }
           }
         });
       }
     } catch {
       // Continuar con fallback de apertura estándar si el navegador restringe el objeto global
+    }
+  }
+
+  /**
+   * Procesa el evento `Checkout.Success` cerrando automáticamente el overlay de Lemon Squeezy,
+   * actualizando el perfil y las facturas del usuario y navegando internamente a `/studio/designer`.
+   */
+  async handleCheckoutSuccess(): Promise<void> {
+    if (this.isBrowser && typeof window !== 'undefined') {
+      try {
+        window.LemonSqueezy?.Url?.Close?.();
+      } catch {
+        // Ignorar si el overlay ya fue cerrado por el usuario
+      }
+    }
+
+    this.lastCheckoutSuccessAt.set(Date.now());
+    this.closeUpgradeModal();
+
+    try {
+      await this.supabaseService.refreshUserProfile?.();
+      await this.supabaseService.getSubscriptionInvoices?.(20);
+    } catch {
+      // Continuar con reintento diferido
+    }
+
+    setTimeout(() => {
+      void this.supabaseService.refreshUserProfile?.();
+      void this.supabaseService.getSubscriptionInvoices?.(20);
+    }, 2500);
+
+    const currentUrl = this.router.url || '';
+    if (!currentUrl.startsWith('/studio')) {
+      await this.router.navigateByUrl('/studio/designer');
     }
   }
 

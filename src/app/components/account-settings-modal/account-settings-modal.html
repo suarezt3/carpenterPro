@@ -784,9 +784,10 @@
 
             <!-- RESUMEN DE PLAN ACTIVO -->
             <div class="p-5 rounded-xl bg-zinc-50 border border-zinc-200/90 shadow-2xs space-y-4">
-              <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div class="space-y-1.5">
-                  <div class="flex flex-wrap items-center gap-2">
+              <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                <!-- Columna Izquierda con Espacio Amplio -->
+                <div class="flex-1 min-w-0 pr-0 lg:pr-4 space-y-1.5">
+                  <div class="flex flex-wrap items-center gap-2 mb-2">
                     <span class="text-xs uppercase tracking-wider font-bold text-sky-600">
                       {{ 'account.billing.activePlanTitle' | t }}
                     </span>
@@ -797,10 +798,10 @@
                       {{ subscriptionBillingCycleKey() | t }}
                     </span>
                   </div>
-                  <h4 class="text-xl font-extrabold text-zinc-900 tracking-tight">
+                  <h4 data-testid="account-active-plan-title" class="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight whitespace-nowrap truncate">
                     {{ userPlanTitleKey() | t }}
                   </h4>
-                  <p class="text-xs text-zinc-600 max-w-md">
+                  <p data-testid="account-active-plan-desc" class="text-xs text-zinc-600 leading-relaxed">
                     @if (userPlan() === 'industrial') {
                       {{ 'account.billing.planIndDesc' | t }}
                     } @else if (userPlan() === 'pro') {
@@ -816,24 +817,14 @@
                   }
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2 shrink-0">
-                  @if (customerPortalUrl()) {
-                    <button
-                      type="button"
-                      data-testid="account-customer-portal-btn"
-                      (click)="openCustomerPortal()"
-                      class="px-3.5 py-2 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
-                      <hugeicons-icon [icon]="icons.creditCard" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                      <span>{{ 'account.billing.manageSubscriptionBtn' | t }}</span>
-                    </button>
-                  }
-
+                <!-- Columna Derecha Compacta y Ordenada -->
+                <div class="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0 w-full sm:w-auto">
                   @if (userPlan() === 'free') {
                     <button
                       type="button"
                       data-testid="account-upgrade-plan-btn"
                       (click)="upgradePlan('pro')"
-                      class="px-4 py-2 text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer">
+                      class="px-3.5 py-2 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">
                       <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
                       <span>{{ 'account.billing.upgradeBtn' | t }}</span>
                     </button>
@@ -842,7 +833,7 @@
                       type="button"
                       data-testid="account-upgrade-plan-btn"
                       (click)="upgradePlan('industrial')"
-                      class="px-4 py-2 text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer">
+                      class="px-3.5 py-2 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">
                       <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
                       <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }}</span>
                     </button>
@@ -851,23 +842,41 @@
                       type="button"
                       data-testid="account-switch-annual-top-btn"
                       (click)="upgradePlan('industrial', 'annual')"
-                      class="px-3.5 py-2 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 rounded-lg transition shadow-2xs flex items-center gap-1.5 shrink-0 cursor-pointer">
+                      class="px-3.5 py-2 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">
                       <hugeicons-icon [icon]="icons.checkCircle" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                       <span>{{ 'account.billing.switchToAnnualBtn' | t }}</span>
                     </button>
                   } @else {
                     <span
                       data-testid="account-max-plan-badge"
-                      class="px-3.5 py-2 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg inline-flex items-center gap-1.5 shrink-0">
+                      class="px-3.5 py-2 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0">
                       <hugeicons-icon [icon]="icons.checkCircle" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
                       <span>{{ 'account.billing.maxPlanActiveBadge' | t }}</span>
                     </span>
                   }
+
+                  <button
+                    type="button"
+                    data-testid="account-customer-portal-btn"
+                    (click)="openCustomerPortal()"
+                    class="px-3.5 py-2 text-xs font-semibold bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-lg transition shadow-2xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">
+                    <hugeicons-icon [icon]="icons.creditCard" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    <span>{{ 'account.billing.manageSubscriptionBtn' | t }}</span>
+                  </button>
                 </div>
               </div>
 
+              @if (showManageBillingNotice()) {
+                <div
+                  data-testid="account-manage-billing-notice"
+                  class="p-3 rounded-lg bg-sky-50/90 border border-sky-200 text-sky-900 text-xs font-medium flex items-center gap-2.5 animate-in fade-in duration-150">
+                  <hugeicons-icon [icon]="icons.info" [size]="15" [strokeWidth]="2.2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                  <span>{{ 'account.billing.manageInAppNotice' | t }}</span>
+                </div>
+              }
+
               <!-- OPCIONES DIRECTAS DE SUSCRIPCIÓN CON CHECKOUT OVERLAY -->
-              <div class="pt-4 border-t border-zinc-200/80 space-y-3">
+              <div id="account-billing-plans-section" class="pt-4 border-t border-zinc-200/80 space-y-3">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <h5 class="text-xs font-bold uppercase tracking-wider text-zinc-900">
@@ -1001,7 +1010,7 @@
             </div>
 
             <!-- SECCIÓN MÉTODOS DE PAGO VINCULADOS -->
-            <div class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-3">
+            <div id="account-payment-methods-section" class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-3">
               <div class="flex items-center justify-between">
                 <div>
                   <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-900">

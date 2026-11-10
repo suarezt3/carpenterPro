@@ -234,6 +234,7 @@ export class AccountSettingsModalComponent {
   readonly isLoadingInvoices = signal<boolean>(false);
   readonly hasLoadedCloudInvoices = signal<boolean>(false);
   readonly cloudInvoices = signal<SubscriptionInvoice[]>([]);
+  readonly showManageBillingNotice = signal<boolean>(false);
 
   readonly subscriptionStatusKey = computed<string>(() => {
     const status = this.userProfile()?.subscription_status;
@@ -356,6 +357,7 @@ export class AccountSettingsModalComponent {
       if (open && !this.previousIsOpen) {
         untracked(() => {
           this.activeTab.set(this.initialTab());
+          this.showManageBillingNotice.set(false);
           this.loadProfileData();
           this.loadWorkshopData();
           this.loadPreferencesData();
@@ -363,6 +365,16 @@ export class AccountSettingsModalComponent {
         });
       }
       this.previousIsOpen = open;
+    });
+
+    // Recargar facturas automáticamente si se completa un Checkout.Success mientras el modal está abierto
+    effect(() => {
+      const successAt = this.paymentService.lastCheckoutSuccessAt?.() ?? null;
+      if (successAt && this.isOpen()) {
+        untracked(() => {
+          void this.loadBillingData();
+        });
+      }
     });
   }
 
@@ -673,11 +685,15 @@ export class AccountSettingsModalComponent {
   }
 
   openCustomerPortal(): void {
-    const url = this.customerPortalUrl();
-    if (!url || typeof window === 'undefined') {
-      return;
+    this.showManageBillingNotice.set(true);
+    this.showToast(this.i18n.t('account.billing.manageInAppNotice'), 'info');
+    if (typeof document !== 'undefined') {
+      const targetEl = document.getElementById('account-payment-methods-section')
+        ?? document.getElementById('account-billing-plans-section');
+      if (targetEl && typeof targetEl.scrollIntoView === 'function') {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }
-    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   upgradePlan(plan?: PaidPlan, cycleOverride?: 'monthly' | 'annual') {
@@ -689,11 +705,7 @@ export class AccountSettingsModalComponent {
   }
 
   addPaymentMethod() {
-    const portalUrl = this.customerPortalUrl();
-    if (portalUrl && typeof window !== 'undefined') {
-      window.open(portalUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
+    this.showManageBillingNotice.set(true);
     this.showToast(this.i18n.t('account.billing.addMethodMockToast'));
   }
 
