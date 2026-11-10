@@ -676,9 +676,9 @@ export class ProjectNotesModalComponent implements OnInit, OnDestroy {
   getCategoryBadge(category: ProjectNoteItem['category']) {
     switch (category) {
       case 'adjustment':
-        return { label: this.i18n.t('notes.catBadgeAdjustment'), bgClass: 'bg-rose-500/10 border-rose-500/30', textClass: 'text-rose-500', icon: this.icons.adjustment };
+        return { label: this.i18n.t('notes.catBadgeAdjustment'), bgClass: 'bg-red-500/10 border-red-500/30', textClass: 'text-red-500', icon: this.icons.adjustment };
       case 'design':
-        return { label: this.i18n.t('notes.catBadgeDesign'), bgClass: 'bg-indigo-500/10 border-indigo-500/30', textClass: 'text-indigo-500', icon: this.icons.design };
+        return { label: this.i18n.t('notes.catBadgeDesign'), bgClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-sky-600', icon: this.icons.design };
       case 'general':
         return { label: this.i18n.t('notes.catBadgeGeneral'), bgClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-sky-500', icon: this.icons.general };
       case 'pending':

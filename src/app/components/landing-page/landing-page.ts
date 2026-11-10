@@ -3,6 +3,7 @@ import {
   Component,
   OnInit,
   computed,
+  effect,
   inject,
   signal
 } from '@angular/core';
@@ -29,6 +30,7 @@ import {
   InformationCircleIcon,
   LaptopIcon,
   Layers01Icon,
+  Logout01Icon,
   Mouse01Icon,
   QuoteUpIcon,
   Rocket01Icon,
@@ -118,9 +120,39 @@ export interface DisplayTestimonial {
 })
 export class LandingPageComponent implements OnInit {
   readonly i18n = inject(I18nService);
-  private readonly supabaseService = inject(SupabaseService);
+  readonly supabaseService = inject(SupabaseService);
   private readonly router = inject(Router);
   readonly currencyExchange = inject(CurrencyExchangeService);
+
+  // Estado reactivo seguro de sesión y perfil para barra superior y CTAs de planes
+  readonly isAuthenticated = computed<boolean>(() =>
+    typeof this.supabaseService.isAuthenticated === 'function'
+      ? this.supabaseService.isAuthenticated()
+      : false
+  );
+
+  readonly userProfile = computed(() =>
+    typeof this.supabaseService.userProfile === 'function'
+      ? this.supabaseService.userProfile()
+      : null
+  );
+
+  readonly userFirstName = computed<string>(() => {
+    const firstName = this.userProfile()?.first_name?.trim();
+    if (firstName) {
+      return firstName;
+    }
+    const user = typeof this.supabaseService.currentUser === 'function'
+      ? this.supabaseService.currentUser()
+      : null;
+    const metaFirst = typeof user?.user_metadata?.['first_name'] === 'string'
+      ? user.user_metadata['first_name'].trim()
+      : '';
+    if (metaFirst) {
+      return metaFirst;
+    }
+    return user?.email?.split('@')[0] || this.i18n.t('auth.defaultUserName');
+  });
 
   // Iconos oficiales de Hugeicons (cero SVGs inline y cero emojis)
   readonly icons = {
@@ -146,6 +178,7 @@ export class LandingPageComponent implements OnInit {
     cloud: CloudIcon,
     globe: Globe02Icon,
     user: UserIcon,
+    logout: Logout01Icon,
     checklist: CheckListIcon,
     scissors: ScissorsIcon,
     cabinet: Cabinet01Icon,
@@ -408,7 +441,38 @@ export class LandingPageComponent implements OnInit {
 
   goToStudio(): void {
     this.closeLoginModal();
-    void this.router.navigateByUrl('/studio');
+    if (this.isAuthenticated()) {
+      void this.router.navigateByUrl('/studio');
+    } else {
+      void this.router.navigate(['/auth'], { queryParams: { mode: 'login' } });
+    }
+  }
+
+  handlePlanAction(): void {
+    this.closeMobileMenu();
+    if (this.isAuthenticated()) {
+      void this.router.navigateByUrl('/studio');
+      return;
+    }
+    void this.router.navigateByUrl('/auth?mode=register');
+  }
+
+  async signOut(): Promise<void> {
+    this.closeMobileMenu();
+    if (typeof this.supabaseService.signOut === 'function') {
+      await this.supabaseService.signOut();
+    }
+  }
+
+  constructor() {
+    effect(() => {
+      const isRecovery = typeof this.supabaseService.isPasswordRecoveryMode === 'function'
+        ? this.supabaseService.isPasswordRecoveryMode()
+        : false;
+      if (isRecovery) {
+        void this.router.navigateByUrl('/auth?mode=reset');
+      }
+    });
   }
 
   dismissAnnouncement(): void {

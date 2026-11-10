@@ -11,6 +11,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'auth',
+    loadComponent: () =>
+      import('./components/auth-page/auth-page').then(
+        (m) => m.AuthPageComponent
+      ),
+  },
+  {
     path: 'studio',
     canActivate: [studioAccessGuard],
     loadComponent: () =>

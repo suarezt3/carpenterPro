@@ -50,7 +50,7 @@
             ? 'px-3 py-1.5 bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'
             : 'px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'"
           [title]="!canGenerateAssemblyGuide() ? ('assemblyGuide.noFurnitureTooltip' | t) : ('assemblyGuide.buttonTooltip' | t)">
-          <hugeicons-icon [icon]="icons.book" [size]="14" [strokeWidth]="2" class="text-blue-500 shrink-0"></hugeicons-icon>
+          <hugeicons-icon [icon]="icons.book" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>{{ 'assemblyGuide.button' | t }}</span>
         </button>
 
@@ -60,7 +60,7 @@
             type="button"
             (click)="toggleDownloadMenu()"
             [disabled]="isExporting()"
-            class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-xs cursor-pointer disabled:opacity-50">
+            class="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs rounded-md flex items-center gap-1.5 transition shadow-xs cursor-pointer disabled:opacity-50">
             @if (isExporting()) {
               <hugeicons-icon [icon]="icons.loading" [size]="15" [strokeWidth]="2" class="animate-spin"></hugeicons-icon>
               <span>{{ 'optimizer.processing' | t }}</span>
@@ -270,8 +270,8 @@
 
   <!-- Aviso de piezas que no caben en el tablero configurado -->
   @if (unplacedPartsSummary().length > 0) {
-    <div class="print:hidden p-3 rounded-md border border-rose-300 bg-rose-50 text-rose-800 text-xs flex items-start gap-2">
-      <hugeicons-icon [icon]="icons.alert" [size]="16" [strokeWidth]="2" class="shrink-0 mt-0.5 text-rose-600"></hugeicons-icon>
+    <div class="print:hidden p-3 rounded-md border border-red-300 bg-red-50 text-red-800 text-xs flex items-start gap-2">
+      <hugeicons-icon [icon]="icons.alert" [size]="16" [strokeWidth]="2" class="shrink-0 mt-0.5 text-red-600"></hugeicons-icon>
       <div>
         <p class="font-semibold">{{ 'optimizer.unplacedAlert' | t:{ count: unplacedPartsSummary().length } }}</p>
         <p class="mt-0.5 font-mono tabular-nums text-[11px]">
@@ -279,7 +279,7 @@
             <span>{{ up.name | t }} ({{ up.length }} × {{ up.width }} × {{ up.thickness }} mm){{ up.count > 1 ? ' ×' + up.count : '' }}</span>{{ last ? '' : ' · ' }}
           }
         </p>
-        <p class="mt-0.5 text-rose-700/80 text-[11px]">{{ 'optimizer.unplacedAdvice' | t }}</p>
+        <p class="mt-0.5 text-red-700/80 text-[11px]">{{ 'optimizer.unplacedAdvice' | t }}</p>
       </div>
     </div>
   }

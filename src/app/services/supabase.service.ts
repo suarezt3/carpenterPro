@@ -19,6 +19,30 @@ export interface CloudProjectRecord {
   data: Project;
 }
 
+export type UserRole = 'user' | 'super_admin';
+export type UserPlan = 'free' | 'pro' | 'industrial';
+
+/**
+ * Perfil de usuario sincronizado con `public.user_profiles` y `auth.users`.
+ */
+export interface UserProfile {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: UserRole;
+  plan: UserPlan;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SignUpEmailPayload {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName?: string;
+}
+
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'table_needed' | 'error';
 
 export const SUPABASE_CONFIG = {
@@ -154,6 +178,121 @@ CREATE POLICY "Public can view approved landing page testimonials"
   );
 `;
 
+/**
+ * Script SQL para la tabla `public.user_profiles` con RLS estricto y sincronización automática con `auth.users`.
+ */
+export const SUPABASE_USER_PROFILES_SQL_SETUP = `-- ==========================================
+-- TABLA DE PERFILES DE USUARIO CON TRIGGER AUTOMÁTICO Y RLS
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.user_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT DEFAULT '',
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'super_admin')),
+  plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'industrial')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own profile" ON public.user_profiles;
+CREATE POLICY "Users can view own profile"
+  ON public.user_profiles
+  FOR SELECT
+  TO authenticated
+  USING ((select auth.uid()) = id);
+
+DROP POLICY IF EXISTS "Users can update own profile" ON public.user_profiles;
+CREATE POLICY "Users can update own profile"
+  ON public.user_profiles
+  FOR UPDATE
+  TO authenticated
+  USING ((select auth.uid()) = id)
+  WITH CHECK ((select auth.uid()) = id);
+
+CREATE OR REPLACE FUNCTION public.fn_protect_user_profile_fields()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF current_user IN ('authenticated', 'anon') THEN
+    IF NEW.id IS DISTINCT FROM OLD.id THEN
+      RAISE EXCEPTION 'Modifying profile id is not allowed' USING ERRCODE = '42501';
+    END IF;
+    IF NEW.role IS DISTINCT FROM OLD.role THEN
+      RAISE EXCEPTION 'Modifying user role is not allowed' USING ERRCODE = '42501';
+    END IF;
+    IF NEW.plan IS DISTINCT FROM OLD.plan THEN
+      RAISE EXCEPTION 'Modifying subscription plan directly is not allowed' USING ERRCODE = '42501';
+    END IF;
+  END IF;
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_user_profile_fields ON public.user_profiles;
+CREATE TRIGGER trg_protect_user_profile_fields
+  BEFORE UPDATE ON public.user_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fn_protect_user_profile_fields();
+
+CREATE OR REPLACE FUNCTION public.fn_handle_new_auth_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_first_name TEXT;
+  v_last_name TEXT;
+  v_full_name TEXT;
+BEGIN
+  BEGIN
+    v_first_name := COALESCE(NEW.raw_user_meta_data->>'first_name', '');
+    v_last_name := COALESCE(NEW.raw_user_meta_data->>'last_name', '');
+    v_full_name := COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', '');
+
+    IF v_first_name = '' AND v_full_name <> '' THEN
+      v_first_name := split_part(trim(v_full_name), ' ', 1);
+      v_last_name := trim(substr(trim(v_full_name), length(v_first_name) + 1));
+    END IF;
+
+    INSERT INTO public.user_profiles (id, email, first_name, last_name, role, plan)
+    VALUES (
+      NEW.id,
+      COALESCE(NEW.email, ''),
+      COALESCE(NULLIF(v_first_name, ''), 'Usuario'),
+      COALESCE(v_last_name, ''),
+      'user',
+      'free'
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      email = EXCLUDED.email,
+      first_name = CASE WHEN public.user_profiles.first_name = '' THEN EXCLUDED.first_name ELSE public.user_profiles.first_name END,
+      updated_at = now();
+  EXCEPTION
+    WHEN OTHERS THEN
+      -- Resiliencia absoluta: un error en perfiles jamás bloquea el alta del usuario en auth.users
+      RETURN NEW;
+  END;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.fn_handle_new_auth_user() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_on_auth_user_created ON auth.users;
+CREATE TRIGGER trg_on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fn_handle_new_auth_user();
+`;
+
 @Injectable({
   providedIn: 'root'
 })
@@ -171,15 +310,18 @@ export class SupabaseService {
   readonly lastSyncTime = signal<Date | null>(null);
   readonly errorMessage = signal<string | null>(null);
 
-  // Signals reactivos para conocer en toda la app quién es el usuario logueado
+  // Signals reactivos de sesión y perfil para toda la aplicación
   readonly session = signal<Session | null>(null);
   readonly currentUser = signal<User | null>(null);
-  readonly isAuthenticated = computed(() => this.currentUser() !== null);
+  readonly userProfile = signal<UserProfile | null>(null);
+  readonly isAuthenticated = computed(() => !!this.currentUser());
+  readonly isAuthLoading = signal<boolean>(true);
+  readonly isPasswordRecoveryMode = signal<boolean>(false);
 
   /**
-   * Construye los encabezados HTTP para las peticiones REST a Supabase.
+   * Construye los encabezados HTTP para las peticiones REST.
    * Si el usuario inició sesión, envía su token JWT personal (`session.access_token`)
-   * para que PostgreSQL valide su identidad en las políticas RLS (`auth.uid()`).
+   * para que la base de datos valide su identidad en las políticas RLS (`auth.uid()`).
    */
   private get headers(): Record<string, string> {
     const token = this.session()?.access_token || this.config.publishableKey;
@@ -192,19 +334,27 @@ export class SupabaseService {
   }
 
   constructor() {
-    // Solo inicializamos Supabase y cargamos proyectos si estamos en el navegador del cliente (evita fallos en SSR)
+    // Solo inicializamos cliente y cargamos proyectos si estamos en el navegador (evita fallos en SSR)
     if (this.isBrowser) {
       this.initSupabaseClient();
       void this.refreshProjects();
+    } else {
+      this.isAuthLoading.set(false);
     }
   }
 
   /**
-   * Inicializa el cliente oficial `@supabase/supabase-js` y escucha cambios de sesión
-   * (login, logout, renovación automática del token JWT).
+   * Inicializa el cliente oficial y escucha cambios de sesión en tiempo real
+   * (login, logout, renovación automática del token JWT y recuperación de contraseña).
    */
-  private initSupabaseClient() {
+  private initSupabaseClient(): void {
     try {
+      if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+        this.isPasswordRecoveryMode.set(true);
+      }
+
+      let initialAuthProjectsSynced = false;
+
       this.client = createClient(this.config.url, this.config.publishableKey, {
         auth: {
           persistSession: true,
@@ -213,18 +363,60 @@ export class SupabaseService {
         }
       });
 
-      // Recuperar sesión activa guardada en localStorage al abrir la app
-      void this.client.auth.getSession().then(({ data }) => {
-        if (data?.session) {
-          this.session.set(data.session);
-          this.currentUser.set(data.session.user);
-        }
-      });
+      // Recuperar sesión activa guardada en localStorage al abrir la aplicación
+      void this.client.auth.getSession()
+        .then(async ({ data }) => {
+          if (data?.session?.user) {
+            this.session.set(data.session);
+            this.currentUser.set(data.session.user);
+            this.userProfile.set(this.buildFallbackProfile(data.session.user));
+            if (!initialAuthProjectsSynced) {
+              initialAuthProjectsSynced = true;
+              void this.refreshProjects();
+            }
+            await this.loadUserProfile(data.session.user);
+          }
+          this.isAuthLoading.set(false);
+        })
+        .catch(() => {
+          this.isAuthLoading.set(false);
+        });
 
       // Suscribirse a cambios de estado de autenticación en tiempo real
-      const { data: authListener } = this.client.auth.onAuthStateChange((_event, newSession) => {
+      const { data: authListener } = this.client.auth.onAuthStateChange((event, newSession) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          this.isPasswordRecoveryMode.set(true);
+        }
+
         this.session.set(newSession);
-        this.currentUser.set(newSession?.user ?? null);
+        const user = newSession?.user ?? null;
+        this.currentUser.set(user);
+
+        if (user) {
+          this.userProfile.set(this.buildFallbackProfile(user));
+          const shouldRefreshProjects =
+            event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && !initialAuthProjectsSynced);
+          if (shouldRefreshProjects) {
+            initialAuthProjectsSynced = true;
+          }
+          // Ejecutar consultas secundarias fuera del callback síncrono para evitar bloqueo del lock interno de sesión
+          setTimeout(() => {
+            void this.loadUserProfile(user);
+            if (shouldRefreshProjects) {
+              void this.refreshProjects();
+            }
+          }, 0);
+        } else {
+          this.userProfile.set(null);
+          if (event === 'SIGNED_OUT') {
+            this.cloudProjects.set([]);
+            setTimeout(() => {
+              void this.refreshProjects();
+            }, 0);
+          }
+        }
+
+        this.isAuthLoading.set(false);
       });
 
       // Evitar fugas de memoria cancelando la suscripción al destruir el servicio
@@ -232,58 +424,480 @@ export class SupabaseService {
         authListener.subscription.unsubscribe();
       });
     } catch (err) {
-      console.warn('Supabase client init warning:', err);
+      console.warn('Auth client init warning:', err);
+      this.isAuthLoading.set(false);
     }
   }
 
-  // ==========================================
-  // MÉTODOS DE AUTENTICACIÓN (SUPABASE AUTH)
-  // ==========================================
-
   /**
-   * Inicia sesión con correo y contraseña, actualiza los signals de usuario
-   * y recarga la lista de proyectos pertenecientes a esa cuenta.
+   * Construye un perfil en memoria a partir de `user_metadata` como respaldo inmediato
+   * mientras se sincroniza o si aún no está disponible el registro en `public.user_profiles`.
    */
-  async signInWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string }> {
-    if (!this.client) return { success: false, error: 'Cliente Supabase no disponible' };
-    const { data, error } = await this.client.auth.signInWithPassword({ email, password });
-    if (error) {
-      return { success: false, error: error.message };
+  buildFallbackProfile(user: User): UserProfile {
+    const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+    let firstName = typeof meta['first_name'] === 'string' ? meta['first_name'].trim() : '';
+    let lastName = typeof meta['last_name'] === 'string' ? meta['last_name'].trim() : '';
+    const fullName = typeof meta['full_name'] === 'string'
+      ? meta['full_name'].trim()
+      : (typeof meta['name'] === 'string' ? meta['name'].trim() : '');
+
+    if (!firstName && fullName) {
+      const parts = fullName.split(/\s+/);
+      firstName = parts[0] ?? '';
+      lastName = parts.slice(1).join(' ').trim();
     }
-    this.session.set(data.session);
-    this.currentUser.set(data.user);
-    await this.refreshProjects();
-    return { success: true };
+
+    if (!firstName && user.email) {
+      firstName = user.email.split('@')[0] || 'Usuario';
+    }
+
+    const nowIso = new Date().toISOString();
+    return {
+      id: user.id,
+      email: user.email ?? '',
+      first_name: firstName || 'Usuario',
+      last_name: lastName,
+      role: 'user',
+      plan: 'free',
+      created_at: user.created_at || nowIso,
+      updated_at: user.updated_at || user.created_at || nowIso
+    };
   }
 
   /**
-   * Registra un nuevo usuario en Supabase Auth guardando su nombre en `user_metadata`.
+   * Carga el perfil del usuario desde `public.user_profiles` respetando RLS (`auth.uid() = id`).
    */
-  async signUpWithEmail(email: string, password: string, fullName?: string): Promise<{ success: boolean; error?: string }> {
-    if (!this.client) return { success: false, error: 'Cliente Supabase no disponible' };
-    const { data, error } = await this.client.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName || '' }
+  async loadUserProfile(user?: User | null): Promise<UserProfile | null> {
+    const targetUser = user ?? this.currentUser();
+    if (!targetUser) {
+      this.userProfile.set(null);
+      return null;
+    }
+
+    const fallback = this.buildFallbackProfile(targetUser);
+    if (!this.isBrowser || !this.client) {
+      this.userProfile.set(fallback);
+      return fallback;
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('user_profiles')
+        .select('id, email, first_name, last_name, role, plan, created_at, updated_at')
+        .eq('id', targetUser.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        const record = data as Record<string, unknown>;
+        const profile: UserProfile = {
+          id: String(record['id'] ?? targetUser.id),
+          email: String(record['email'] ?? targetUser.email ?? ''),
+          first_name: String(record['first_name'] || fallback.first_name),
+          last_name: String(record['last_name'] ?? fallback.last_name),
+          role: record['role'] === 'super_admin' ? 'super_admin' : 'user',
+          plan: record['plan'] === 'pro' || record['plan'] === 'industrial' ? record['plan'] : 'free',
+          created_at: String(record['created_at'] ?? fallback.created_at),
+          updated_at: String(record['updated_at'] ?? fallback.updated_at)
+        };
+        this.userProfile.set(profile);
+        return profile;
       }
-    });
-    if (error) {
-      return { success: false, error: error.message };
+    } catch {
+      // Fallback silencioso a metadatos locales de sesión
     }
-    this.session.set(data.session);
-    this.currentUser.set(data.user);
+
+    this.userProfile.set(fallback);
+    return fallback;
+  }
+
+  /**
+   * Actualiza el perfil de usuario (nombre y apellido) en `public.user_profiles`
+   * respetando la política RLS (`auth.uid() = id`).
+   * Al completarse con éxito, actualiza de inmediato la señal reactiva `userProfile`.
+   */
+  async updateUserProfile(updates: { first_name?: string; last_name?: string }): Promise<{ success: boolean; errorKey?: string }> {
+    const user = this.currentUser();
+    if (!user) {
+      return { success: false, errorKey: 'account.profileUpdateNoUser' };
+    }
+
+    const trimmedFirstName = updates.first_name !== undefined ? updates.first_name.trim() : undefined;
+    const trimmedLastName = updates.last_name !== undefined ? updates.last_name.trim() : undefined;
+    const nowIso = new Date().toISOString();
+
+    const payload: Record<string, unknown> = {
+      updated_at: nowIso
+    };
+    if (trimmedFirstName !== undefined) {
+      payload['first_name'] = trimmedFirstName;
+    }
+    if (trimmedLastName !== undefined) {
+      payload['last_name'] = trimmedLastName;
+    }
+
+    if (this.isBrowser && this.client) {
+      try {
+        const { error } = await this.client
+          .from('user_profiles')
+          .update(payload)
+          .eq('id', user.id);
+
+        if (error) {
+          return { success: false, errorKey: 'account.profileUpdateError' };
+        }
+      } catch {
+        return { success: false, errorKey: 'account.profileUpdateError' };
+      }
+    }
+
+    this.userProfile.update((current) => {
+      const fallback = current ?? this.buildFallbackProfile(user);
+      return {
+        ...fallback,
+        first_name: trimmedFirstName !== undefined ? trimmedFirstName : fallback.first_name,
+        last_name: trimmedLastName !== undefined ? trimmedLastName : fallback.last_name,
+        updated_at: nowIso
+      };
+    });
+
     return { success: true };
   }
 
   /**
-   * Cierra la sesión activa, limpia los signals de usuario y refresca la lista.
+   * Sincroniza la sesión activa (usado por guardias de navegación como `studioAccessGuard`
+   * para asegurar que `currentUser` y `userProfile` estén listos al entrar al Estudio).
+   */
+  async syncAuthSession(): Promise<User | null> {
+    if (!this.isBrowser || !this.client) {
+      this.isAuthLoading.set(false);
+      return this.currentUser();
+    }
+
+    try {
+      const { data } = await this.client.auth.getSession();
+      const activeSession = data?.session ?? null;
+      this.session.set(activeSession);
+      const user = activeSession?.user ?? null;
+      this.currentUser.set(user);
+      if (user) {
+        if (!this.userProfile() || this.userProfile()?.id !== user.id) {
+          await this.loadUserProfile(user);
+        }
+      } else {
+        this.userProfile.set(null);
+      }
+      return user;
+    } catch {
+      return this.currentUser();
+    } finally {
+      this.isAuthLoading.set(false);
+    }
+  }
+
+  // ==========================================
+  // MÉTODOS DE AUTENTICACIÓN Y TRADUCCIÓN DE ERRORES
+  // ==========================================
+
+  /**
+   * Convierte cualquier error técnico del backend de autenticación en una clave `i18n` amigable,
+   * garantizando privacidad total de infraestructura (cero mensajes crudos ni nombres de proveedores).
+   */
+  mapAuthErrorToKey(error: unknown): string {
+    if (!error) return 'auth.errors.generic';
+
+    const errObj = typeof error === 'object' ? (error as Record<string, unknown>) : {};
+    const code = typeof errObj['code'] === 'string' ? errObj['code'].toLowerCase() : '';
+    const status = typeof errObj['status'] === 'number' ? errObj['status'] : 0;
+    const rawMsg = typeof errObj['message'] === 'string'
+      ? errObj['message'].toLowerCase()
+      : (error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase());
+
+    if (
+      code === 'invalid_credentials' ||
+      rawMsg.includes('invalid login credentials') ||
+      rawMsg.includes('invalid email or password')
+    ) {
+      return 'auth.errors.invalidCredentials';
+    }
+
+    if (code === 'email_not_confirmed' || rawMsg.includes('email not confirmed')) {
+      return 'auth.errors.emailNotConfirmed';
+    }
+
+    if (
+      code === 'user_already_exists' ||
+      code === 'email_exists' ||
+      rawMsg.includes('already registered') ||
+      rawMsg.includes('already been registered') ||
+      rawMsg.includes('user already exists')
+    ) {
+      return 'auth.errors.userAlreadyRegistered';
+    }
+
+    if (
+      status === 429 ||
+      code === 'over_email_send_rate_limit' ||
+      code.includes('rate_limit') ||
+      rawMsg.includes('rate limit') ||
+      rawMsg.includes('over_email_send_rate_limit') ||
+      rawMsg.includes('too many requests') ||
+      rawMsg.includes('security purposes')
+    ) {
+      return 'auth.errors.rateLimitExceeded';
+    }
+
+    if (
+      code === 'email_address_invalid' ||
+      code === 'validation_failed' ||
+      code === 'invalid_email' ||
+      rawMsg.includes('email_address_invalid') ||
+      rawMsg.includes('unable to validate email') ||
+      rawMsg.includes('invalid email') ||
+      rawMsg.includes('disposable') ||
+      rawMsg.includes('valid email') ||
+      rawMsg.includes('domain')
+    ) {
+      return 'auth.errors.invalidEmailDomain';
+    }
+
+    if (code === 'same_password' || rawMsg.includes('different from the old password')) {
+      return 'auth.errors.samePassword';
+    }
+
+    if (code === 'weak_password' || rawMsg.includes('password should be')) {
+      return 'auth.errors.weakPassword';
+    }
+
+    if (
+      code === 'otp_expired' ||
+      code === 'flow_state_expired' ||
+      code === 'flow_state_not_found' ||
+      code === 'bad_code_verifier' ||
+      code === 'session_not_found' ||
+      rawMsg.includes('auth session missing') ||
+      rawMsg.includes('token has expired') ||
+      rawMsg.includes('email link is invalid') ||
+      (code === 'access_denied' && (rawMsg.includes('expired') || rawMsg.includes('invalid')))
+    ) {
+      return 'auth.errors.sessionExpired';
+    }
+
+    if (
+      code === 'provider_disabled' ||
+      rawMsg.includes('provider is not enabled') ||
+      rawMsg.includes('unsupported provider')
+    ) {
+      return 'auth.errors.oauthUnavailable';
+    }
+
+    if (
+      rawMsg.includes('failed to fetch') ||
+      rawMsg.includes('networkerror') ||
+      rawMsg.includes('network request failed')
+    ) {
+      return 'auth.errors.networkError';
+    }
+
+    return 'auth.errors.generic';
+  }
+
+  /**
+   * Inicia sesión con correo electrónico y contraseña, actualiza sesión + perfil
+   * y recarga los proyectos asociados a la cuenta.
+   */
+  async signInWithEmail(email: string, password: string): Promise<{ success: boolean; errorKey?: string }> {
+    if (!this.client) {
+      return { success: false, errorKey: 'auth.errors.serviceUnavailable' };
+    }
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const { data, error } = await this.client.auth.signInWithPassword({
+        email: normalizedEmail,
+        password
+      });
+
+      if (error) {
+        return { success: false, errorKey: this.mapAuthErrorToKey(error) };
+      }
+
+      this.session.set(data.session);
+      this.currentUser.set(data.user);
+      if (data.user) {
+        await this.loadUserProfile(data.user);
+      }
+      await this.refreshProjects();
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorKey: this.mapAuthErrorToKey(err) };
+    }
+  }
+
+  /**
+   * Registra un nuevo usuario enviando `first_name`, `last_name` y `full_name` en `options.data`
+   * para que el trigger automático cree su fila en `public.user_profiles`.
+   */
+  async signUpWithEmail(payload: SignUpEmailPayload): Promise<{
+    success: boolean;
+    needsEmailConfirmation?: boolean;
+    messageKey?: string;
+    errorKey?: string;
+  }> {
+    if (!this.client) {
+      return { success: false, errorKey: 'auth.errors.serviceUnavailable' };
+    }
+
+    try {
+      const normalizedEmail = payload.email.trim().toLowerCase();
+      const cleanFirstName = payload.firstName.trim();
+      const cleanLastName = (payload.lastName ?? '').trim();
+      const fullName = [cleanFirstName, cleanLastName].filter(Boolean).join(' ');
+      const emailRedirectTo = this.isBrowser && typeof window !== 'undefined'
+        ? `${window.location.origin}/studio`
+        : undefined;
+
+      const { data, error } = await this.client.auth.signUp({
+        email: normalizedEmail,
+        password: payload.password,
+        options: {
+          ...(emailRedirectTo ? { emailRedirectTo } : {}),
+          data: {
+            first_name: cleanFirstName,
+            last_name: cleanLastName,
+            full_name: fullName
+          }
+        }
+      });
+
+      if (error) {
+        return { success: false, errorKey: this.mapAuthErrorToKey(error) };
+      }
+
+      // Cuando la confirmación de correo está activa y el correo ya existe,
+      // el proveedor devuelve un usuario con arreglo `identities` vacío.
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        return { success: false, errorKey: 'auth.errors.userAlreadyRegistered' };
+      }
+
+      if (data.session && data.user) {
+        this.session.set(data.session);
+        this.currentUser.set(data.user);
+        await this.loadUserProfile(data.user);
+        await this.refreshProjects();
+        return { success: true, needsEmailConfirmation: false };
+      }
+
+      // Usuario creado con confirmación de correo pendiente (data.session === null)
+      return {
+        success: true,
+        needsEmailConfirmation: true,
+        messageKey: 'auth.registerCheckEmail'
+      };
+    } catch (err) {
+      return { success: false, errorKey: this.mapAuthErrorToKey(err) };
+    }
+  }
+
+  /**
+   * Inicia el flujo OAuth con Google redirigiendo al Estudio 3D (`/studio`) al completar.
+   */
+  async signInWithGoogle(): Promise<{ success: boolean; errorKey?: string }> {
+    if (!this.client || !this.isBrowser || typeof window === 'undefined') {
+      return { success: false, errorKey: 'auth.errors.serviceUnavailable' };
+    }
+
+    try {
+      const { error } = await this.client.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/studio`
+        }
+      });
+
+      if (error) {
+        return { success: false, errorKey: this.mapAuthErrorToKey(error) };
+      }
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorKey: this.mapAuthErrorToKey(err) };
+    }
+  }
+
+  /**
+   * Envía un enlace seguro de restablecimiento de contraseña redirigiendo a `/auth?mode=reset`.
+   */
+  async sendPasswordResetEmail(email: string): Promise<{ success: boolean; errorKey?: string }> {
+    if (!this.client) {
+      return { success: false, errorKey: 'auth.errors.serviceUnavailable' };
+    }
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const redirectTo = this.isBrowser && typeof window !== 'undefined'
+        ? `${window.location.origin}/auth?mode=reset`
+        : undefined;
+
+      const { error } = await this.client.auth.resetPasswordForEmail(
+        normalizedEmail,
+        redirectTo ? { redirectTo } : undefined
+      );
+
+      if (error) {
+        return { success: false, errorKey: this.mapAuthErrorToKey(error) };
+      }
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorKey: this.mapAuthErrorToKey(err) };
+    }
+  }
+
+  /**
+   * Actualiza la contraseña del usuario autenticado (ej. tras abrir el enlace de recuperación).
+   */
+  async updateUserPassword(newPassword: string): Promise<{ success: boolean; errorKey?: string }> {
+    if (!this.client) {
+      return { success: false, errorKey: 'auth.errors.serviceUnavailable' };
+    }
+
+    try {
+      const { data, error } = await this.client.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        return { success: false, errorKey: this.mapAuthErrorToKey(error) };
+      }
+
+      this.isPasswordRecoveryMode.set(false);
+      if (data.user) {
+        this.currentUser.set(data.user);
+        await this.loadUserProfile(data.user);
+      }
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorKey: this.mapAuthErrorToKey(err) };
+    }
+  }
+
+  /**
+   * Cierra la sesión activa, limpia los signals de usuario y perfil y refresca proyectos.
    */
   async signOut(): Promise<void> {
-    if (!this.client) return;
-    await this.client.auth.signOut();
+    if (this.client) {
+      try {
+        await this.client.auth.signOut();
+      } catch {
+        // Garantizar limpieza local incluso si la red falla
+      }
+    }
     this.session.set(null);
     this.currentUser.set(null);
+    this.userProfile.set(null);
+    this.isPasswordRecoveryMode.set(false);
+    this.cloudProjects.set([]);
     await this.refreshProjects();
   }
 
@@ -561,6 +1175,10 @@ export class SupabaseService {
   async submitFeedback(payload: CreateFeedbackPayload): Promise<{ success: boolean; data?: UserFeedbackRecord; error?: string }> {
     if (!this.isBrowser) return { success: false, error: 'SSR mode' };
 
+    if (!this.currentUser() && this.isAuthLoading()) {
+      await this.syncAuthSession();
+    }
+
     const userId = this.currentUser()?.id || null;
     const isTestimonial = payload.category === 'testimonial';
     const clientUuid = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
@@ -609,9 +1227,9 @@ export class SupabaseService {
             // Si falla por RLS SELECT (ej. desincronización de token o trigger), reintentar inserción minimal
             if (error.code === '42501' || error.message?.includes('policy') || error.code === 'PGRST116') {
               const { error: minError } = await this.client.from('user_feedback').insert(record);
-              if (minError) return { success: false, error: minError.message };
+              if (minError) return { success: false, error: this.cleanErrorMessage(minError.message) };
             } else {
-              return { success: false, error: error.message };
+              return { success: false, error: this.cleanErrorMessage(error.message) };
             }
           } else if (data) {
             return { success: true, data: data as UserFeedbackRecord };
@@ -623,7 +1241,7 @@ export class SupabaseService {
             .insert(record);
 
           if (error) {
-            return { success: false, error: error.message };
+            return { success: false, error: this.cleanErrorMessage(error.message) };
           }
         }
 
@@ -648,7 +1266,7 @@ export class SupabaseService {
 
         if (!res.ok) {
           const errText = await res.text();
-          return { success: false, error: `Supabase Error (${res.status}): ${errText}` };
+          return { success: false, error: this.cleanErrorMessage(errText) };
         }
 
         if (canSelectPostInsert) {
@@ -672,7 +1290,7 @@ export class SupabaseService {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { success: false, error: msg };
+      return { success: false, error: this.cleanErrorMessage(msg) };
     }
   }
 
@@ -681,6 +1299,9 @@ export class SupabaseService {
    */
   async getMyFeedback(): Promise<UserFeedbackRecord[]> {
     if (!this.isBrowser) return [];
+    if (!this.currentUser() && this.isAuthLoading()) {
+      await this.syncAuthSession();
+    }
     const user = this.currentUser();
     if (!user) return [];
 

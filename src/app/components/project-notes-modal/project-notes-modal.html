@@ -46,7 +46,7 @@
             <button
               type="button"
               (click)="openNewNoteForm()"
-              class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+              class="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
               <hugeicons-icon [icon]="icons.add" [size]="15" [strokeWidth]="2.2"></hugeicons-icon>
               <span>{{ 'notes.newNote' | t }}</span>
             </button>
@@ -294,7 +294,7 @@
                   <button
                     type="submit"
                     [disabled]="noteForm.invalid"
-                    class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                    class="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
                     <hugeicons-icon [icon]="icons.check" [size]="15" [strokeWidth]="2.2"></hugeicons-icon>
                     <span>{{ editingNoteId() ? ('notes.updateNoteBtn' | t) : ('notes.saveNoteBtn' | t) }}</span>
                   </button>
@@ -393,7 +393,7 @@
                 <button
                   type="button"
                   (click)="openNewNoteForm()"
-                  class="mt-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                  class="mt-1 px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
                   <hugeicons-icon [icon]="icons.add" [size]="15" [strokeWidth]="2.2"></hugeicons-icon>
                   <span>{{ 'notes.createFirstNote' | t }}</span>
                 </button>
@@ -455,7 +455,7 @@
                         <button
                           type="button"
                           (click)="deleteNote(note.id, $event)"
-                          class="p-1 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer transition"
+                          class="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-md cursor-pointer transition"
                           [title]="'notes.deleteNoteTooltip' | t">
                           <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                         </button>

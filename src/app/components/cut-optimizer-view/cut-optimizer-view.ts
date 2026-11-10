@@ -389,7 +389,7 @@ export class CutOptimizerViewComponent {
       padding: 0;
     }
     body {
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: #ffffff;
       color: #0f172a;
       width: 100vw;
@@ -420,7 +420,7 @@ export class CutOptimizerViewComponent {
     .specs-block {
       text-align: right;
       font-size: 9pt;
-      font-family: monospace;
+      font-family: 'JetBrains Mono', monospace;
       color: #0369a1;
       font-weight: bold;
     }

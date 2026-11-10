@@ -161,7 +161,7 @@ export class ChangelogModalComponent {
       case 'fix':
         return 'bg-amber-600 text-white';
       case 'cad':
-        return 'bg-indigo-700 text-white';
+        return 'bg-zinc-900 text-white';
     }
   }
 
@@ -182,9 +182,9 @@ export class ChangelogModalComponent {
       case 'in_progress':
         return 'bg-emerald-700 text-white';
       case 'planned':
-        return 'bg-blue-700 text-white';
+        return 'bg-sky-700 text-white';
       case 'evaluating':
-        return 'bg-purple-700 text-white';
+        return 'bg-zinc-700 text-white';
     }
   }
 

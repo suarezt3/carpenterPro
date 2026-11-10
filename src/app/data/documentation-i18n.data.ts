@@ -86,7 +86,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     title: 'Diseño Paramétrico por Ambientes (Cocinas, Closets, Baños y Estudio)',
     shortDesc: 'Configura muebles a medida en 4 líneas especializadas con distribución interior inteligente de puertas, cajones, repisas y zócalos sin descuadrar la estructura.',
     icon: 'view_in_ar',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Motor Paramétrico',
     steps: [
       'En la Zona 1 (Barra Superior), selecciona la línea de ambiente de trabajo: Cocinas, Closets, Baños u Hogar/Estudio.',
@@ -248,7 +248,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
       { label: 'Alcance', value: 'Pieza individual (part.isLocked) o Grupo (group.isLocked)' },
       { label: 'Efecto', value: 'Inhabilita traslación, arrastre, rotación y borrado' },
       { label: 'Identificador', value: 'Indicador visual ámbar con icono en 3D y listas' },
-      { label: 'Persistencia', value: 'Se guarda en Supabase y archivo JSON de proyecto' }
+      { label: 'Persistencia', value: 'Se guarda en la nube y archivo JSON de proyecto' }
     ]
   },
 
@@ -259,7 +259,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     title: 'Menú Contextual Inteligente de Clic Derecho',
     shortDesc: 'Menú contextual 3D adaptativo que cambia sus opciones dinámicamente según hagas clic en un Cajón, Puerta, Estructura o en el Espacio Vacío.',
     icon: 'mouse',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Productividad 3D',
     steps: [
       'Haz clic con el botón derecho del ratón en cualquier punto del visor 3D.',
@@ -317,7 +317,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     title: 'Movimiento por Arrastre Directo 3D y Riel Vertical',
     shortDesc: 'Mueve piezas individuales o módulos haciendo clic sostenido sobre cualquier superficie, con restricción inteligente de plano y riel vertical anti-colisión.',
     icon: 'pan_tool',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Interacción Natural',
     steps: [
       'Haz clic con el botón izquierdo sobre cualquier pieza o módulo en el visor 3D.',
@@ -378,7 +378,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     title: 'Selección Múltiple con Shift y Edición en Bloque',
     shortDesc: 'Captura múltiples muebles y piezas mediante caja de selección o Shift + Clic para rotar, mover, duplicar y aplicar melaminas en bloque.',
     icon: 'format_shapes',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Edición en Lote',
     steps: [
       'Ventana de Selección Múltiple: Mantén presionada la tecla [ Shift ] y arrastra el ratón con clic izquierdo sobre el lienzo 3D. Se dibujará una caja de selección traslúcida que atrapará todas las piezas y muebles que toque o contenga, sin rotar la cámara.',
@@ -472,7 +472,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     title: 'Bisagras y Taladros Cazoleta Ø35mm Reversibles Sincronizados',
     shortDesc: 'Apertura hacia la derecha o izquierda con reubicación automática de perforaciones púrpuras y herrajes 3D.',
     icon: 'door_sliding',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Bisagras Dinámicas',
     steps: [
       'Al configurar una puerta batiente en el Inspector Contextual o en el menú contextual de clic derecho, selecciona el sentido de apertura deseado: "Puerta (Bisagra Izquierda)" o "Puerta (Bisagra Derecha)".',
@@ -498,7 +498,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     title: 'Parámetros de Taller, Kerf de Sierra, Tapacantos y Notas',
     shortDesc: 'Configuración milimétrica del corte: espesor de la hoja de sierra (kerf), refilado perimetral, gestión de cantos y cuaderno de notas del proyecto.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-500',
+    iconColor: 'text-sky-600',
     badge: 'Precisión de Fabricación',
     steps: [
       'Antes de enviar a corte, ajusta los parámetros de fabricación en la pestaña del Optimizador o en Ajustes del Proyecto:',
@@ -526,7 +526,7 @@ export const DOC_ARTICLES_ES: DocArticle[] = [
     title: 'Optimización de Corte 2D, Despiece y Descuento de Tapacanto',
     shortDesc: 'Algoritmo guillotina de máximo aprovechamiento de placas con respeto de veta, refilado, kerf de sierra y descuento de cantos.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Ahorro de Material',
     steps: [
       'Ve a la pestaña "3. Optimizador 2D" en la barra superior.',
@@ -604,7 +604,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     title: 'Parametric Design by Environment (Kitchens, Closets, Bathrooms & Office)',
     shortDesc: 'Configure custom cabinetry across 4 specialized lines with intelligent interior distribution of doors, drawers, shelves, and plinths without skewing the structure.',
     icon: 'view_in_ar',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Parametric Engine',
     steps: [
       'In Zone 1 (Top Bar), select your working environment line: Kitchens, Closets, Bathrooms, or Living/Office.',
@@ -766,7 +766,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
       { label: 'Scope', value: 'Individual part (part.isLocked) or Group (group.isLocked)' },
       { label: 'Effect', value: 'Disables translation, dragging, rotation, and deletion' },
       { label: 'Indicator', value: 'Amber visual badge in 3D and parts tables' },
-      { label: 'Persistence', value: 'Stored in Supabase database and project JSON export' }
+      { label: 'Persistence', value: 'Stored in cloud database and project JSON export' }
     ]
   },
 
@@ -777,7 +777,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     title: 'Smart Right-Click Context Menu',
     shortDesc: 'Adaptive 3D context menu that dynamically changes options depending on whether you click a Drawer, Door, Structural Part, or Empty Floor.',
     icon: 'mouse',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: '3D Productivity',
     steps: [
       'Right-click anywhere inside the 3D viewport canvas.',
@@ -835,7 +835,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     title: '3D Direct Drag Movement & Vertical Rail',
     shortDesc: 'Move individual parts or modules by clicking and dragging directly on any face, with smart planar constraint and anti-collision vertical rail.',
     icon: 'pan_tool',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Natural Interaction',
     steps: [
       'Left-click on any part or cabinet in the 3D viewport.',
@@ -896,7 +896,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     title: 'Shift Multi-Selection & Bulk Editing',
     shortDesc: 'Capture multiple cabinets and parts with window selection or Shift + Click to rotate, move, duplicate, and assign textures in bulk.',
     icon: 'format_shapes',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Batch Editing',
     steps: [
       'Multi-Selection Window Box: Hold [ Shift ] and drag with left-click across the 3D canvas. A translucent box captures all touching cabinets without orbiting the camera.',
@@ -990,7 +990,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     title: 'Reversible Hinges & Synchronized Ø35mm Cup Drill Holes',
     shortDesc: 'Left or right swing direction with automatic relocation of purple cup holes and 3D hardware.',
     icon: 'door_sliding',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Dynamic Hinges',
     steps: [
       'When configuring a swing door in the Inspector or right-click menu, choose swing direction: "Door (Left Hinge)" or "Door (Right Hinge)".',
@@ -1016,7 +1016,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     title: 'Workshop Parameters, Saw Kerf, Edge Banding & Notes',
     shortDesc: 'Millimeter cut calibration: blade saw kerf, sheet trimming margin, edge banding allowances, and workshop notes notebook.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-500',
+    iconColor: 'text-sky-600',
     badge: 'Manufacturing Precision',
     steps: [
       'Before exporting cut lists, configure fabrication parameters in Optimizer or Project Settings:',
@@ -1044,7 +1044,7 @@ export const DOC_ARTICLES_EN: DocArticle[] = [
     title: '2D Cut Optimization, Parts List & Edge Banding Deduction',
     shortDesc: 'High-yield 2D guillotine algorithm respecting wood grain orientation, trim margins, saw blade kerf, and edge compensation.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Material Savings',
     steps: [
       'Navigate to tab "3. 2D Optimizer" in the top bar.',
@@ -1122,7 +1122,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     title: 'Design Paramétrico por Ambientes (Cozinhas, Closets, Banheiros e Estúdio)',
     shortDesc: 'Configure móveis sob medida em 4 linhas especializadas com distribuição interna inteligente de portas, gavetas, prateleiras e rodapés sem desalinhamentos.',
     icon: 'view_in_ar',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Motor Paramétrico',
     steps: [
       'Na Zona 1 (Barra Superior), selecione a linha de ambiente de trabalho: Cozinhas, Closets, Banheiros ou Home Office / Estúdio.',
@@ -1284,7 +1284,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
       { label: 'Escopo', value: 'Peça individual (part.isLocked) ou Grupo (group.isLocked)' },
       { label: 'Efeito', value: 'Desativa translação, arrasto, rotação e exclusão' },
       { label: 'Identificador', value: 'Badge visual âmbar no visor 3D e nas tabelas' },
-      { label: 'Persistência', value: 'Salvo no banco Supabase e no arquivo JSON do projeto' }
+      { label: 'Persistência', value: 'Salvo na nuvem e no arquivo JSON do projeto' }
     ]
   },
 
@@ -1295,7 +1295,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     title: 'Menu Contextual Inteligente de Botão Direito',
     shortDesc: 'Menu contextual 3D adaptativo que altera suas opções dinamicamente conforme você clica em Gaveta, Porta, Estrutura ou Espaço Vazio.',
     icon: 'mouse',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Produtividade 3D',
     steps: [
       'Clique com o botão direito do mouse em qualquer ponto do visualizador 3D.',
@@ -1353,7 +1353,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     title: 'Movimentação por Arraste Direto 3D e Trilho Vertical',
     shortDesc: 'Mova peças individuais ou módulos clicando e arrastando diretamente em qualquer superfície, com restrição de plano e trilho vertical anti-colisão.',
     icon: 'pan_tool',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Interação Natural',
     steps: [
       'Dê um clique esquerdo sobre qualquer peça ou gabinete no visualizador 3D.',
@@ -1414,7 +1414,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     title: 'Seleção Múltipla com Shift e Edição em Bloco',
     shortDesc: 'Capture múltiplos móveis e peças por caixa de seleção ou Shift + Clique para girar, mover, duplicar e aplicar melaminas em bloco.',
     icon: 'format_shapes',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Edição em Lote',
     steps: [
       'Caixa de Seleção Múltipla: Mantenha pressionada a tecla [ Shift ] e arraste o mouse com o botão esquerdo sobre o visualizador 3D. Uma caixa translúcida envolverá e selecionará todas as peças tocadas, sem girar a câmera.',
@@ -1508,7 +1508,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     title: 'Dobradiças e Furações Caneco Ø35mm Reversíveis Sincronizadas',
     shortDesc: 'Abertura para esquerda ou direita com reposicionamento automático de furações e ferragens 3D.',
     icon: 'door_sliding',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Dobradiças Dinâmicas',
     steps: [
       'Ao configurar uma porta de bater no Inspetor ou no menu de botão direito, selecione o sentido de abertura: "Porta (Dobradiça Esquerda)" ou "Porta (Dobradiça Direita)".',
@@ -1534,7 +1534,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     title: 'Parâmetros de Oficina, Kerf de Serra, Fitas de Borda e Notas',
     shortDesc: 'Configuração milimétrica de corte: espessura da serra (kerf), refilo perimetral, gestão de fitas de borda e caderno de notas do projeto.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-500',
+    iconColor: 'text-sky-600',
     badge: 'Precisão de Fabricação',
     steps: [
       'Antes de enviar os planos para corte, ajuste os parâmetros de fabricação no Otimizador ou nas Configurações do Projeto:',
@@ -1562,7 +1562,7 @@ export const DOC_ARTICLES_PT: DocArticle[] = [
     title: 'Otimização de Corte 2D, Listagem e Desconto de Fita de Borda',
     shortDesc: 'Algoritmo guilhotina de máximo aproveitamento de chapas com respeito ao veio da madeira, refilo e compensação de bordas.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Economia de Material',
     steps: [
       'Acesse a aba "3. Otimizador 2D" na barra superior.',
@@ -1640,7 +1640,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     title: 'Conception Paramétrique par Espaces (Cuisines, Dressings, Bains et Bureau)',
     shortDesc: 'Configurez des meubles sur mesure dans 4 gammes spécialisées avec distribution intérieure intelligente des portes, tiroirs, étagères et plinthes sans déformation.',
     icon: 'view_in_ar',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Moteur Paramétrique',
     steps: [
       'En Zone 1 (Barre Supérieure), sélectionnez la gamme d\'espace de travail : Cuisines, Dressings, Salles de bain ou Bureau / Salon.',
@@ -1802,7 +1802,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
       { label: 'Portée', value: 'Pièce individuelle (part.isLocked) ou Groupe (group.isLocked)' },
       { label: 'Effet', value: 'Désactive translation, glisser, rotation et suppression' },
       { label: 'Indicateur', value: 'Badge visuel ambré dans la 3D et les listes' },
-      { label: 'Persistance', value: 'Enregistré dans la base Supabase et l\'export JSON du projet' }
+      { label: 'Persistance', value: 'Enregistré dans le cloud et l\'export JSON du projet' }
     ]
   },
 
@@ -1813,7 +1813,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     title: 'Menu Contextuel Intelligent par Clic Droit',
     shortDesc: 'Menu contextuel 3D adaptatif dont les options changent selon que vous cliquez sur un Tiroir, une Porte, un Panneau Structurel ou l\'Espace Vide.',
     icon: 'mouse',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Productivité 3D',
     steps: [
       'Faites un clic droit avec la souris n\'importe où dans le visualiseur 3D.',
@@ -1871,7 +1871,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     title: 'Déplacement par Glisser Direct 3D et Rail Vertical',
     shortDesc: 'Déplacez pièces ou modules d\'un clic glissé direct sur n\'importe quelle face, avec guidage planaire et rail vertical anti-collision.',
     icon: 'pan_tool',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Interaction Naturelle',
     steps: [
       'Cliquez avec le bouton gauche sur n\'importe quelle pièce ou module dans le visualiseur 3D.',
@@ -1932,7 +1932,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     title: 'Sélection Multiple avec Shift et Édition Groupée',
     shortDesc: 'Capturez plusieurs meubles et panneaux par zone de sélection ou Shift + Clic pour pivoter, déplacer, dupliquer et changer de mélaminé en lot.',
     icon: 'format_shapes',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Édition Groupée',
     steps: [
       'Cadre de Sélection Multiple : Maintenez enfoncée la touche [ Shift ] et tracez un rectangle au clic gauche sur le canevas 3D. Une boîte translucide capturera tous les meubles et panneaux touchés, sans faire pivoter la caméra.',
@@ -2026,7 +2026,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     title: 'Charnières et Perçages Boîtier Ø35mm Réversibles Synchronisés',
     shortDesc: 'Sens d\'ouverture gauche ou droit avec repositionnement automatique des perçages et de la quincaillerie 3D.',
     icon: 'door_sliding',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Charnières Dynamiques',
     steps: [
       'Lors de la configuration d\'une porte battante dans l\'Inspecteur ou via le menu clic droit, sélectionnez le côté de ferrage : "Porte (Charnière Gauche)" ou "Porte (Charnière Droite)".',
@@ -2052,7 +2052,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     title: 'Paramètres d\'Atelier, Trait de Scie (Kerf), Chants et Carnet de Notes',
     shortDesc: 'Calibrage millimétrique de découpe : épaisseur de lame (kerf), surcôte de délignage, gestion des bandes de chant et carnet de notes.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-500',
+    iconColor: 'text-sky-600',
     badge: 'Précision de Fabrication',
     steps: [
       'Avant de lancer vos débits, calibrez les paramètres de coupe dans l\'Optimiseur ou dans les Paramètres du Projet :',
@@ -2080,7 +2080,7 @@ export const DOC_ARTICLES_FR: DocArticle[] = [
     title: 'Optimisation de Débit 2D, Calepinage et Déduction de Chant',
     shortDesc: 'Algorithme guillotine 2D pour maximiser le rendement des panneaux avec respect du fil du bois, délignage et déduction des chants rigides.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Économie de Matériau',
     steps: [
       'Ouvrez l\'onglet "3. Optimiseur 2D" dans la barre supérieure.',
@@ -2158,7 +2158,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     title: 'Progettazione Parametrica per Ambienti (Cucine, Armadi, Bagni e Studio)',
     shortDesc: 'Configura mobili su misura in 4 linee specializzate con distribuzione interna intelligente di ante, cassetti, ripiani e zoccoli senza disallineamenti.',
     icon: 'view_in_ar',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Motore Parametrico',
     steps: [
       'Nella Zona 1 (Barra Superiore), seleziona la linea di ambiente desiderata: Cucine, Armadi, Bagni o Zona Giorno / Studio.',
@@ -2320,7 +2320,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
       { label: 'Ambito', value: 'Singolo pezzo (part.isLocked) o Gruppo (group.isLocked)' },
       { label: 'Effetto', value: 'Inibisce traslazione, trascinamento, rotazione ed eliminazione' },
       { label: 'Indicatore', value: 'Badge visivo ambra nella scena 3D e nelle tabelle' },
-      { label: 'Persistenza', value: 'Memorizzato nel database Supabase e nel JSON di progetto' }
+      { label: 'Persistenza', value: 'Memorizzato nel cloud e nel JSON di progetto' }
     ]
   },
 
@@ -2331,7 +2331,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     title: 'Menu Contestuale Intelligente con Tasto Destro',
     shortDesc: 'Menu contestuale 3D adattivo che cambia opzioni dinamicamente se fai clic su Cassetto, Anta, Struttura o Spazio Vuoto.',
     icon: 'mouse',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Produttività 3D',
     steps: [
       'Fai clic con il pulsante destro del mouse in un punto qualunque della vista 3D.',
@@ -2389,7 +2389,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     title: 'Spostamento per Trascinamento Diretto 3D e Guida Verticale',
     shortDesc: 'Sposta pezzi o moduli facendo clic e trascinando direttamente su qualsiasi superficie, con vincolo di piano e guida verticale anti-collisione.',
     icon: 'pan_tool',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Interazione Naturale',
     steps: [
       'Fai clic col tasto sinistro su qualsiasi pezzo o mobile nel visualizzatore 3D.',
@@ -2450,7 +2450,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     title: 'Selezione Multipla con Shift e Modifica in Blocco',
     shortDesc: 'Cattura più mobili e pezzi tramite riquadro di selezione o Shift + Clic per ruotare, spostare, duplicare e assegnare finiture in blocco.',
     icon: 'format_shapes',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Modifica in Blocco',
     steps: [
       'Riquadro di Selezione Multipla: Tieni premuto il tasto [ Shift ] e trascina con il clic sinistro sulla vista 3D. Un rettangolo traslucido selezionerà tutti i mobili e pannelli toccati, senza far ruotare la camera.',
@@ -2544,7 +2544,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     title: 'Cerniere e Fori Scodellino Ø35mm Reversibili Sincronizzati',
     shortDesc: 'Apertura verso sinistra o destra con riposizionamento automatico delle forature e della ferramenta 3D.',
     icon: 'door_sliding',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Cerniere Dinamiche',
     steps: [
       'Configurando un\'anta a battente nell\'Ispettore o nel menu contestuale, seleziona il verso d\'apertura desiderato: "Anta (Cerniera a Sinistra)" o "Anta (Cerniera a Destra)".',
@@ -2570,7 +2570,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     title: 'Parametri di Laboratorio, Spessore Lama (Kerf), Bordi e Note',
     shortDesc: 'Calibrazione millimetrica del taglio: spessore lama sega (kerf), rifilatura perimetrale, gestione bordi e taccuino di progetto.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-500',
+    iconColor: 'text-sky-600',
     badge: 'Precisione di Fabbricazione',
     steps: [
       'Prima di inviare i pezzi al taglio, calibra i parametri di lavorazione nell\'Ottimizzatore o nelle Impostazioni di Progetto:',
@@ -2598,7 +2598,7 @@ export const DOC_ARTICLES_IT: DocArticle[] = [
     title: 'Ottimizzazione di Taglio 2D, Distinta e Detrazione Bordo',
     shortDesc: 'Algoritmo a ghigliottina per massimizzare la resa dei pannelli con rispetto venatura del legno, rifilatura e detrazione bordi rigidi.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Risparmio Materiale',
     steps: [
       'Apri la scheda "3. Ottimizzatore 2D" nella barra superiore.',
@@ -2676,7 +2676,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     title: 'Parametrisches Design nach Räumen (Küchen, Schränke, Bäder & Arbeitszimmer)',
     shortDesc: 'Konfigurieren Sie maßgefertigte Möbel in 4 Speziallinien mit intelligenter Innenaufteilung von Türen, Schubkästen, Fachböden und Sockeln.',
     icon: 'view_in_ar',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: 'Parametrische Engine',
     steps: [
       'Wählen Sie in Zone 1 (Obere Leiste) die gewünschte Raumlinie: Küchen, Schränke, Badezimmer oder Wohnen / Arbeitszimmer.',
@@ -2838,7 +2838,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
       { label: 'Geltungsbereich', value: 'Einzelteil (part.isLocked) oder Baugruppe (group.isLocked)' },
       { label: 'Wirkung', value: 'Sperrt Verschieben, Ziehen, Drehen und Löschen' },
       { label: 'Kennzeichnung', value: 'Bernsteinfarbener Indikator im 3D-Raum und in Tabellen' },
-      { label: 'Persistenz', value: 'Gespeichert in Supabase und in der Projekt-JSON-Datei' }
+      { label: 'Persistenz', value: 'Gespeichert in der Cloud und in der Projekt-JSON-Datei' }
     ]
   },
 
@@ -2849,7 +2849,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     title: 'Intelligentes Rechtsklick-Kontextmenü',
     shortDesc: 'Adaptives 3D-Kontextmenü, das Optionen dynamisch anpasst, je nachdem ob auf Schubkasten, Tür, Korpusteil oder freie Fläche geklickt wird.',
     icon: 'mouse',
-    iconColor: 'text-indigo-500',
+    iconColor: 'text-sky-600',
     badge: '3D-Produktivität',
     steps: [
       'Klicken Sie mit der rechten Maustaste an eine beliebige Stelle im 3D-Viewport.',
@@ -2907,7 +2907,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     title: 'Direktes 3D-Ziehen & Vertikalschienen-Führung',
     shortDesc: 'Verschieben Sie Teile oder Korpusse direkt per Mausklick auf jede Fläche mit planarer Zwangsführung und kollisionsfreier Vertikalschiene.',
     icon: 'pan_tool',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Natürliche Interaktion',
     steps: [
       'Klicken Sie mit der linken Maustaste auf ein beliebiges Bauteil oder einen Korpus im 3D-Viewport.',
@@ -2968,7 +2968,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     title: 'Shift-Mehrfachauswahl & Stapelbearbeitung',
     shortDesc: 'Erfassen Sie mehrere Korpusse und Teile per Auswahlfenster oder Shift + Klick zum Drehen, Verschieben, Duplizieren und gemeinsamen Umfärben.',
     icon: 'format_shapes',
-    iconColor: 'text-indigo-600',
+    iconColor: 'text-sky-600',
     badge: 'Stapelbearbeitung',
     steps: [
       'Auswahlfenster: Halten Sie [ Shift ] gedrückt und ziehen Sie mit linker Maustaste ein Auswahlfenster im 3D-Viewport. Ein transparenter Rahmen erfasst alle berührten Teile, ohne die Kamera zu drehen.',
@@ -3062,7 +3062,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     title: 'Reversible Scharniere & Synchronisierte Ø35mm Topfbohrungen',
     shortDesc: 'Öffnungsrichtung links oder rechts mit automatischer Neupositionierung von Bohrungen und 3D-Beschlägen.',
     icon: 'door_sliding',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Dynamische Scharniere',
     steps: [
       'Wählen Sie bei Drehtüren im Inspektor oder im Rechtsklick-Menü die Anschlagseite: "Tür (Anschlag Links)" oder "Tür (Anschlag Rechts)".',
@@ -3088,7 +3088,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     title: 'Werkstattparameter, Sägeblatt-Schnittfuge (Kerf), Kanten & Notizen',
     shortDesc: 'Millimetergenaue Zuschnittkalibrierung: Schnittfugenbreite (Kerf), Vorritz- und Besäumzugabe, Kantenverwaltung und Projektnotizbuch.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-500',
+    iconColor: 'text-sky-600',
     badge: 'Fertigungspräzision',
     steps: [
       'Vor dem Zuschnitt kalibrieren Sie die Fertigungsparameter im Optimierer oder in den Projekteinstellungen:',
@@ -3116,7 +3116,7 @@ export const DOC_ARTICLES_DE: DocArticle[] = [
     title: '2D-Zuschnittoptimierung, Stückliste & Kantenabzug',
     shortDesc: 'Guillotine-Algorithmus für maximale Plattenausnutzung unter Berücksichtigung von Faserverlauf, Besäumschnitt und Kantenstärkenabzug.',
     icon: 'precision_manufacturing',
-    iconColor: 'text-purple-600',
+    iconColor: 'text-sky-600',
     badge: 'Einsparung',
     steps: [
       'Öffnen Sie den Reiter "3. 2D-Optimierer" in der oberen Leiste.',

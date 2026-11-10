@@ -1,51 +1,39 @@
 <header [class]="themeService.isClassic() ? 'bg-white border-b border-slate-200 text-slate-800 sticky top-0 z-50 print:hidden w-full shadow-xs' : 'bg-zinc-900 border-b border-zinc-800 text-zinc-100 sticky top-0 z-50 print:hidden w-full'">
-  <div class="w-full max-w-[2560px] mx-auto px-2.5 sm:px-3.5 xl:px-4">
-    <div class="flex items-center justify-between h-11 xl:h-11.5 gap-1.5 xl:gap-2 flex-nowrap overflow-visible">
+  <div class="w-full max-w-full overflow-visible px-3">
+    <div class="flex items-center justify-between h-11 xl:h-11.5 gap-1.5 flex-nowrap overflow-visible">
 
       <!-- ZONA 1 (IZQUIERDA): Marca e Identificador Editable del Proyecto -->
-      <div class="flex items-center gap-1.5 min-w-0 shrink">
-        <a routerLink="/" class="w-7 h-7 rounded-md bg-zinc-900 flex items-center justify-center text-white shadow-xs ring-1 ring-white/10 shrink-0 hover:scale-105 transition-transform cursor-pointer" [title]="'nav.returnToLanding' | t">
+      <div class="flex items-center gap-1.5 shrink-0">
+        <div class="w-7 h-7 rounded-md bg-zinc-900 flex items-center justify-center text-white shadow-xs ring-1 ring-white/10 shrink-0 select-none" title="Piezo3D Studio">
           <hugeicons-icon [icon]="icons.logo3d" [size]="16" [strokeWidth]="2"></hugeicons-icon>
-        </a>
+        </div>
 
-        <div class="flex items-center gap-1 min-w-0">
-          <span [class]="themeService.isClassic() ? 'font-bold tracking-tight text-zinc-900 text-sm whitespace-nowrap' : 'font-bold tracking-tight text-white text-sm whitespace-nowrap'">Piezo<span [class]="themeService.isClassic() ? 'text-blue-600' : 'text-blue-400'">3D</span></span>
-          <span [class]="themeService.isClassic() ? 'text-[9px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200 whitespace-nowrap hidden sm:inline-block' : 'text-[9px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 whitespace-nowrap hidden sm:inline-block'">Studio</span>
+        <div class="flex items-center gap-1 shrink-0">
+          <span [class]="themeService.isClassic() ? 'font-bold tracking-tight text-zinc-900 text-sm whitespace-nowrap' : 'font-bold tracking-tight text-white text-sm whitespace-nowrap'">Piezo<span [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-zinc-100'">3D</span></span>
+          <span [class]="themeService.isClassic() ? 'text-[9px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 border border-zinc-200 whitespace-nowrap hidden sm:inline-block' : 'text-[9px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 whitespace-nowrap hidden sm:inline-block'">Studio</span>
 
-          <!-- Botón discreto para volver a la Landing Page -->
-          <a
-            routerLink="/"
-            [class]="themeService.isClassic()
-              ? 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-blue-600 border border-slate-200 text-[10px] font-medium transition cursor-pointer'
-              : 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-blue-400 border border-zinc-700 text-[10px] font-medium transition cursor-pointer'"
-            [title]="'nav.returnToLanding' | t">
-            <hugeicons-icon [icon]="icons.undo" [size]="10" [strokeWidth]="2"></hugeicons-icon>
-            <span class="hidden md:inline">{{ 'nav.home' | t }}</span>
-          </a>
-
-          <!-- Pastilla Interactiva de Versión & Novedades (Changelog & Roadmap) -->
+          <!-- Pastilla Interactiva de Versión (● v3.0.0) -->
           <button
             type="button"
             (click)="openChangelogModal()"
             [class]="themeService.isClassic()
-              ? 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-medium transition cursor-pointer shadow-2xs'
-              : 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800/60 text-[10px] font-medium transition cursor-pointer shadow-2xs'"
+              ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-50 hover:bg-zinc-100 text-zinc-800 border border-zinc-200 text-xs font-medium transition cursor-pointer shadow-2xs whitespace-nowrap shrink-0'
+              : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800/90 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-medium transition cursor-pointer shadow-2xs whitespace-nowrap shrink-0'"
             [title]="'nav.changelogTooltip' | t:{ version: appVersion }">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>{{ appVersion }} {{ 'changelog.currentBadge' | t }}</span>
-            <span class="hidden xl:inline text-[9px] font-medium opacity-90">· {{ 'nav.changelog' | t }}</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-600 shrink-0"></span>
+            <span class="whitespace-nowrap">{{ appVersion }}</span>
           </button>
 
           <span [class]="themeService.isClassic() ? 'text-slate-300 hidden md:inline' : 'text-zinc-600 hidden md:inline'">·</span>
 
           <!-- Botón y Popover para Editar Nombre del Proyecto y Cliente -->
-          <div class="relative hidden md:flex items-center min-w-0">
+          <div class="relative hidden md:flex items-center min-w-[120px] max-w-[180px] 2xl:max-w-[230px] truncate shrink-0">
             <button
               type="button"
               (click)="startEditingTitle($event)"
               [class]="themeService.isClassic()
-                ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200/80 text-zinc-900 border border-zinc-200/90 transition text-xs font-medium max-w-36 lg:max-w-44 xl:max-w-52 2xl:max-w-72 cursor-pointer group shadow-2xs'
-                : 'flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700/80 text-zinc-100 border border-zinc-700/80 transition text-xs font-medium max-w-36 lg:max-w-44 xl:max-w-52 2xl:max-w-72 cursor-pointer group shadow-2xs'"
+                ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200/80 text-zinc-900 border border-zinc-200/90 transition text-xs font-medium w-full min-w-[120px] max-w-[180px] 2xl:max-w-[230px] truncate cursor-pointer group shadow-2xs shrink-0'
+                : 'flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700/80 text-zinc-100 border border-zinc-700/80 transition text-xs font-medium w-full min-w-[120px] max-w-[180px] 2xl:max-w-[230px] truncate cursor-pointer group shadow-2xs shrink-0'"
               [title]="'Haz clic para cambiar el nombre del proyecto (' + project().name + (project().clientName ? ' · ' + project().clientName : '') + ')'">
               <span [class]="themeService.isClassic() ? 'truncate font-semibold text-zinc-900 text-xs' : 'truncate font-semibold text-white text-xs'">{{ project().name }}</span>
               @if (project().clientName) {
@@ -114,7 +102,7 @@
                   </div>
 
                   <div class="flex items-center justify-between pt-1">
-                    <span [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 font-mono tabular-nums' : 'text-[10px] text-zinc-500 font-mono tabular-nums'">{{ 'nav.dbIntact' | t }}</span>
+                    <span [class]="themeService.isClassic() ? 'text-[10px] text-zinc-400 font-sans tabular-nums' : 'text-[10px] text-zinc-500 font-sans tabular-nums'">{{ 'nav.dbIntact' | t }}</span>
                     <div class="flex items-center gap-1.5">
                       <button
                         type="button"
@@ -127,7 +115,7 @@
                       <button
                         type="button"
                         (click)="saveTitleChange()"
-                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                        class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-md text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
                         <span>{{ 'nav.saveAction' | t }}</span>
                       </button>
@@ -140,65 +128,68 @@
         </div>
       </div>
 
-      <!-- ZONA 2 (CENTRO): Pestañas de Navegación Principal -->
+      <!-- ZONA 2 (CENTRO): Pestañas de Navegación Principal Protegidas -->
       <nav [class]="themeService.isClassic() ? 'flex items-center gap-0.5 bg-slate-100 border border-slate-200 rounded-md p-0.5 shadow-inner shrink-0' : 'flex items-center gap-0.5 bg-zinc-950/90 border border-zinc-800/90 rounded-md p-0.5 shadow-inner shrink-0'">
+        <!-- 1. Diseñador 3D -->
         <button
           type="button"
           (click)="selectTab('modules')"
           [class]="activeTab() === 'modules'
-            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-            : (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-          <hugeicons-icon [icon]="icons.tab3d" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+          <hugeicons-icon [icon]="icons.tab3d" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
           <span class="hidden md:inline">{{ 'nav.designer3d' | t }}</span>
           <span class="md:hidden">{{ 'nav.designer3dShort' | t }}</span>
-          <span [class]="activeTab() === 'modules' ? 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-200 font-mono tabular-nums' : (themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-mono tabular-nums' : 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-300 font-mono tabular-nums')">{{ project().modules.length }}</span>
+          <span [class]="activeTab() === 'modules' ? 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-200 font-sans tabular-nums' : (themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-sans tabular-nums' : 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-300 font-sans tabular-nums')">{{ project().modules.length }}</span>
         </button>
 
+        <!-- 2. Despiece -->
         <button
           type="button"
           (click)="selectTab('parts')"
           [class]="activeTab() === 'parts'
-            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-            : (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-          <hugeicons-icon [icon]="icons.tabParts" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+          <hugeicons-icon [icon]="icons.tabParts" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
           <span class="hidden md:inline">{{ 'nav.partsList' | t }}</span>
           <span class="md:hidden">{{ 'nav.partsListShort' | t }}</span>
-          <span [class]="activeTab() === 'parts' ? 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-200 font-mono tabular-nums' : (themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-mono tabular-nums' : 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-300 font-mono tabular-nums')">{{ partsCount() }}</span>
+          <span [class]="activeTab() === 'parts' ? 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-200 font-sans tabular-nums' : (themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-sans tabular-nums' : 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-300 font-sans tabular-nums')">{{ partsCount() }}</span>
         </button>
 
+        <!-- 3. Optimizador 2D -->
         <button
           type="button"
           (click)="selectTab('optimizer')"
           [class]="activeTab() === 'optimizer'
-            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-            : (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-          <hugeicons-icon [icon]="icons.tabOptimizer" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+          <hugeicons-icon [icon]="icons.tabOptimizer" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
           <span class="hidden md:inline">{{ 'nav.optimizer2d' | t }}</span>
           <span class="md:hidden">{{ 'nav.optimizer2dShort' | t }}</span>
         </button>
 
+        <!-- 4. Presupuesto -->
         <button
           type="button"
           (click)="selectTab('budget')"
           [class]="activeTab() === 'budget'
-            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-            : (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-          <hugeicons-icon [icon]="icons.tabBudget" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+          <hugeicons-icon [icon]="icons.tabBudget" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
           <span class="hidden md:inline">{{ 'nav.budget' | t }}</span>
           <span class="md:hidden">{{ 'nav.budgetShort' | t }}</span>
         </button>
 
-        @if (showLabelsTab()) {
-          <button
-            type="button"
-            (click)="selectTab('labels')"
-            [class]="activeTab() === 'labels'
-              ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer')
-              : (themeService.isClassic() ? 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer' : 'flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer')">
-            <hugeicons-icon [icon]="icons.tabLabels" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-            <span>{{ 'nav.labels' | t }}</span>
-          </button>
-        }
+        <!-- 5. Etiquetas -->
+        <button
+          type="button"
+          (click)="selectTab('labels')"
+          [class]="activeTab() === 'labels'
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+          <hugeicons-icon [icon]="icons.tabLabels" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+          <span>{{ 'nav.labels' | t }}</span>
+        </button>
       </nav>
 
       <!-- ZONA 3 (DERECHA): Botones de Acción, Historial, Nube y Configuración -->
@@ -210,13 +201,13 @@
           (click)="themeService.toggleTheme()"
           [class]="themeService.isClassic()
             ? 'h-7.5 w-7.5 inline-flex items-center justify-center text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-100 rounded-md border border-zinc-200/90 transition shrink-0 shadow-2xs cursor-pointer'
-            : 'h-7.5 w-7.5 inline-flex items-center justify-center text-xs font-medium text-amber-300 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition shrink-0 cursor-pointer'"
+            : 'h-7.5 w-7.5 inline-flex items-center justify-center text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition shrink-0 cursor-pointer'"
           [title]="themeService.isClassic() ? ('nav.themeDark' | t) : ('nav.themeLight' | t)">
           <hugeicons-icon
             [icon]="themeService.isClassic() ? icons.sun : icons.moon"
             [size]="15"
             [strokeWidth]="2"
-            [class]="themeService.isClassic() ? 'text-amber-500' : 'text-amber-400'">
+            [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-300'">
           </hugeicons-icon>
         </button>
 
@@ -228,10 +219,10 @@
             ? 'h-7.5 inline-flex items-center gap-1.5 px-2 text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-100 rounded-md border border-zinc-200/90 transition shrink-0 shadow-2xs cursor-pointer'
             : 'h-7.5 inline-flex items-center gap-1.5 px-2 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition shrink-0 shadow-2xs cursor-pointer'"
           [title]="'nav.notesTooltip' | t">
-          <hugeicons-icon [icon]="icons.note" [size]="14" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+          <hugeicons-icon [icon]="icons.note" [size]="14" [strokeWidth]="2" class="text-zinc-600 dark:text-zinc-300 shrink-0"></hugeicons-icon>
           <span class="whitespace-nowrap hidden 2xl:inline">{{ 'nav.notes' | t }}</span>
           @if (pendingNotesCount() > 0) {
-            <span class="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-amber-500 text-zinc-950 font-mono tabular-nums shadow-2xs">
+            <span [class]="themeService.isClassic() ? 'px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-zinc-900 text-white font-sans tabular-nums shadow-2xs' : 'px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-zinc-200 text-zinc-800 font-sans tabular-nums shadow-2xs'">
               {{ pendingNotesCount() }}
             </span>
           }
@@ -272,7 +263,7 @@
             <hugeicons-icon [icon]="icons.project" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
             <span class="whitespace-nowrap hidden sm:inline">{{ 'nav.project' | t }}</span>
             @if (cloudProjects().length > 0) {
-              <span class="px-1 text-[10px] font-bold rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 font-mono tabular-nums">
+              <span class="px-1 text-[10px] font-bold rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 font-sans tabular-nums">
                 {{ cloudProjects().length }}
               </span>
             }
@@ -320,7 +311,7 @@
                   <div class="flex items-center justify-between">
                     <span class="font-bold">{{ 'nav.openProjects' | t }}</span>
                     @if (cloudProjects().length > 0) {
-                      <span class="px-1 text-[9px] font-bold rounded-full bg-blue-500/20 text-blue-600">
+                      <span class="px-1 text-[9px] font-bold rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-400">
                         {{ cloudProjects().length }} {{ 'nav.inCloud' | t }}
                       </span>
                     }
@@ -394,7 +385,7 @@
                   ? 'flex items-center gap-2 px-2.5 py-2 rounded-md opacity-40 cursor-not-allowed text-left'
                   : (themeService.isClassic() ? 'flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-zinc-100 text-left transition cursor-pointer' : 'flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-zinc-800 text-left transition cursor-pointer')"
                 [title]="!canGenerateAssemblyGuide() ? ('assemblyGuide.noFurnitureTooltip' | t) : ('assemblyGuide.menuTooltip' | t)">
-                <hugeicons-icon [icon]="icons.book" [size]="16" [strokeWidth]="2" class="text-blue-500 shrink-0"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.book" [size]="16" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                 <div class="flex flex-col">
                   <span [class]="themeService.isClassic() ? 'font-medium text-zinc-900' : 'font-medium text-zinc-100'">{{ 'assemblyGuide.menuTitle' | t }}</span>
                   <span [class]="themeService.isClassic() ? 'text-[10px] text-zinc-500' : 'text-[10px] text-zinc-400'">{{ 'assemblyGuide.menuSubtitle' | t }}</span>
@@ -437,24 +428,23 @@
           }
         </div>
 
-        <!-- Botón Guardar en la Nube con Supabase -->
+        <!-- Botón Guardar en la Nube -->
         <button
           type="button"
           (click)="saveCurrentToCloud()"
           [class]="syncStatus() === 'syncing'
-            ? 'inline-flex items-center justify-center h-7.5 px-2.5 text-xs font-medium text-white bg-blue-700 rounded-md shadow-xs animate-pulse whitespace-nowrap shrink-0 cursor-pointer'
+            ? 'w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-zinc-900 text-white animate-pulse shadow-2xs cursor-pointer'
             : syncStatus() === 'table_needed'
-            ? 'inline-flex items-center justify-center h-7.5 px-2.5 text-xs font-medium text-amber-300 bg-amber-950/70 hover:bg-amber-900/90 rounded-md border border-amber-600/50 shadow-xs transition whitespace-nowrap shrink-0 cursor-pointer'
-            : 'inline-flex items-center justify-center h-7.5 px-2.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-xs transition whitespace-nowrap shrink-0 cursor-pointer'"
-          [title]="syncStatus() === 'syncing' ? ('nav.saving' | t) : ('nav.save' | t)">
+            ? 'w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-amber-600/50 shadow-2xs transition cursor-pointer'
+            : 'w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-zinc-900 hover:bg-zinc-800 text-white shadow-2xs transition cursor-pointer'"
+          [title]="syncStatus() === 'syncing' ? ('nav.saving' | t) : ('nav.saveProject' | t)">
           @if (syncStatus() === 'syncing') {
-            <hugeicons-icon [icon]="icons.loading" [size]="14" [strokeWidth]="2" class="animate-spin shrink-0"></hugeicons-icon>
+            <hugeicons-icon [icon]="icons.loading" [size]="16" [strokeWidth]="2" class="animate-spin shrink-0"></hugeicons-icon>
           } @else if (syncStatus() === 'table_needed') {
-            <hugeicons-icon [icon]="icons.cloud" [size]="14" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
+            <hugeicons-icon [icon]="icons.cloud" [size]="16" [strokeWidth]="2" class="text-amber-400 shrink-0"></hugeicons-icon>
           } @else {
-            <hugeicons-icon [icon]="icons.cloud" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+            <hugeicons-icon [icon]="icons.cloud" [size]="16" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
           }
-          <span class="whitespace-nowrap hidden 2xl:inline ml-1 font-medium">{{ syncStatus() === 'syncing' ? ('nav.saving' | t) : ('nav.save' | t) }}</span>
         </button>
 
         <!-- Botón Ayuda / Manual Interactivo -->
@@ -462,10 +452,10 @@
           type="button"
           (click)="openDocumentationModal()"
           [class]="themeService.isClassic()
-            ? 'h-7.5 w-7.5 inline-flex items-center justify-center text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition shrink-0 shadow-xs cursor-pointer'
-            : 'h-7.5 w-7.5 inline-flex items-center justify-center text-xs font-semibold text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 rounded-lg border border-emerald-700/50 transition shrink-0 cursor-pointer'"
+            ? 'w-9 h-9 inline-flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 bg-white hover:bg-zinc-100 rounded-lg border border-zinc-200 transition shrink-0 shadow-2xs cursor-pointer'
+            : 'w-9 h-9 inline-flex items-center justify-center text-xs font-semibold text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition shrink-0 cursor-pointer'"
           [title]="'nav.help' | t">
-          <hugeicons-icon [icon]="icons.info" [size]="15" [strokeWidth]="2" class="text-emerald-500 shrink-0"></hugeicons-icon>
+          <hugeicons-icon [icon]="icons.info" [size]="16" [strokeWidth]="2" class="text-zinc-600 dark:text-zinc-300 shrink-0"></hugeicons-icon>
         </button>
 
         <!-- Botón Selector Compacto de Idioma Multi-Lenguaje -->
@@ -478,7 +468,7 @@
               : 'h-9 px-2.5 shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition cursor-pointer'"
             [title]="'nav.language' | t">
             <hugeicons-icon [icon]="icons.globe" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-            <span class="font-mono text-[11px] font-bold tracking-wider">{{ currentLanguageIso() }}</span>
+            <span class="font-sans text-[11px] font-bold tracking-wider">{{ currentLanguageIso() }}</span>
           </button>
 
           @if (isLanguageDropdownOpen()) {
@@ -495,27 +485,62 @@
                   type="button"
                   (click)="selectLanguage(lang.code)"
                   [class]="i18n.currentLang() === lang.code
-                    ? (themeService.isClassic() ? 'bg-zinc-100 text-blue-600 font-bold' : 'bg-zinc-800 text-blue-400 font-bold')
+                    ? (themeService.isClassic() ? 'bg-zinc-100 text-sky-600 font-bold' : 'bg-zinc-800 text-sky-400 font-bold')
                     : (themeService.isClassic() ? 'hover:bg-zinc-50 text-zinc-700' : 'hover:bg-zinc-800/60 text-zinc-300')"
                   class="flex items-center justify-between px-2.5 py-1.5 rounded-md text-left transition cursor-pointer text-xs">
                   <span class="truncate">{{ lang.name }}</span>
-                  <span class="font-mono text-[10px] font-bold px-1 rounded bg-black/5 dark:bg-white/10">{{ lang.iso }}</span>
+                  <span class="font-sans text-[10px] font-bold px-1 rounded bg-black/5 dark:bg-white/10">{{ lang.iso }}</span>
                 </button>
               }
             </div>
           }
         </div>
 
-        <!-- Botón Parámetros del Proyecto y Taller -->
-        <button
-          type="button"
-          (click)="openSettings()"
-          [class]="themeService.isClassic()
-            ? 'h-7.5 w-7.5 inline-flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-md border border-zinc-200/90 hover:border-zinc-300 transition shrink-0 shadow-2xs cursor-pointer'
-            : 'h-7.5 w-7.5 inline-flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md border border-zinc-700 transition shrink-0 cursor-pointer'"
-          [title]="'nav.settings' | t">
-          <hugeicons-icon [icon]="icons.settings" [size]="15" [strokeWidth]="2"></hugeicons-icon>
-        </button>
+        <!-- Estado de Sesión de Usuario: Botón Interactivo de Cuenta & Configuración + Botón Compacto de Cerrar Sesión -->
+        @if (isAuthenticated()) {
+          <!-- Botón Interactivo de Cuenta y Configuración -->
+          <button
+            type="button"
+            (click)="openAccountModal()"
+            [title]="userFirstName()"
+            [class]="themeService.isClassic()
+              ? 'flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-100 cursor-pointer transition-colors whitespace-nowrap shrink-0 shadow-2xs'
+              : 'flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-700 hover:bg-zinc-800 cursor-pointer transition-colors whitespace-nowrap shrink-0'">
+            @if (userAvatarUrl()) {
+              <img [src]="userAvatarUrl()" alt="Avatar" class="w-6 h-6 rounded-full object-cover shrink-0" />
+            } @else {
+              <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 font-sans" [class]="userAvatarBgClass()">
+                {{ userInitials() }}
+              </div>
+            }
+            <span data-testid="studio-user-name" class="max-w-24 truncate text-xs font-semibold font-sans" [class]="themeService.isClassic() ? 'text-zinc-800' : 'text-zinc-200'">{{ userFirstName() }}</span>
+            <hugeicons-icon [icon]="icons.chevronDown" [size]="12" [strokeWidth]="2" [class]="themeService.isClassic() ? 'text-zinc-400 shrink-0' : 'text-zinc-500 shrink-0'"></hugeicons-icon>
+          </button>
+
+          <!-- Botón Minimalista de Cerrar Sesión -->
+          <button
+            type="button"
+            data-testid="studio-signout-btn"
+            (click)="signOutFromStudio()"
+            [title]="'auth.signOut' | t"
+            [class]="themeService.isClassic()
+              ? 'w-9 h-9 rounded-lg border border-zinc-200 text-zinc-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200 flex items-center justify-center shrink-0 cursor-pointer transition-colors shadow-2xs'
+              : 'w-9 h-9 rounded-lg border border-zinc-700 text-zinc-400 hover:text-red-400 hover:bg-red-950/40 hover:border-red-800 flex items-center justify-center shrink-0 cursor-pointer transition-colors'">
+            <hugeicons-icon [icon]="icons.logout" [size]="16" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+          </button>
+        } @else {
+          <a
+            [routerLink]="['/auth']"
+            [queryParams]="{ mode: 'login' }"
+            data-testid="studio-login-link"
+            [title]="'landing.nav.login' | t"
+            [class]="themeService.isClassic()
+              ? 'h-9 px-2.5 shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white hover:bg-zinc-100 text-xs font-semibold text-zinc-700 hover:text-zinc-900 transition shadow-2xs cursor-pointer font-sans'
+              : 'h-9 px-2.5 shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-300 hover:text-white transition cursor-pointer font-sans'">
+            <hugeicons-icon [icon]="icons.user" [size]="14" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
+            <span class="hidden xl:inline">{{ 'landing.nav.login' | t }}</span>
+          </a>
+        }
 
       </div>
 
@@ -543,7 +568,7 @@
       <!-- Cabecera del Modal -->
       <div [class]="themeService.isClassic() ? 'flex items-center justify-between pb-3 border-b border-zinc-200 shrink-0' : 'flex items-center justify-between pb-3 border-b border-zinc-800 shrink-0'">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200 shrink-0">
+          <div class="w-8 h-8 rounded-md bg-zinc-100 text-zinc-900 flex items-center justify-center border border-zinc-200 shrink-0">
             <hugeicons-icon [icon]="icons.cloud" [size]="18" [strokeWidth]="2"></hugeicons-icon>
           </div>
           <div>
@@ -563,7 +588,7 @@
             type="button"
             (click)="projectsTab.set('cloud')"
             [class]="projectsTab() === 'cloud'
-              ? 'px-3 py-1.5 rounded-md bg-blue-600 text-white font-medium shadow-xs cursor-pointer'
+              ? 'px-3 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs cursor-pointer'
               : (themeService.isClassic() ? 'px-3 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 transition cursor-pointer font-medium' : 'px-3 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition cursor-pointer font-medium')">
             <span class="inline-flex items-center gap-1.5">
               <hugeicons-icon [icon]="icons.cloud" [size]="14" [strokeWidth]="2"></hugeicons-icon>
@@ -591,7 +616,7 @@
           <button
             type="button"
             (click)="saveCurrentToCloud()"
-            class="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs">
+            class="px-3 py-1.5 text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs">
             <hugeicons-icon [icon]="icons.cloud" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             <span>{{ 'projects.saveCurrent' | t }}</span>
           </button>
@@ -638,13 +663,13 @@
                   : 'p-3 rounded-md bg-zinc-800/80 border border-zinc-700/70 hover:border-zinc-500 transition flex items-center justify-between gap-4'">
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
-                      <hugeicons-icon [icon]="icons.cloud" [size]="15" [strokeWidth]="2" class="text-blue-500"></hugeicons-icon>
+                      <hugeicons-icon [icon]="icons.cloud" [size]="15" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
                       <h4 [class]="themeService.isClassic() ? 'text-sm font-semibold text-zinc-800 truncate' : 'text-sm font-semibold text-white truncate'">{{ cp.name }}</h4>
                       @if (cp.id === project().id) {
                         <span class="px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 text-[10px] font-semibold">{{ 'projects.currentBadge' | t }}</span>
                       }
                     </div>
-                    <div [class]="themeService.isClassic() ? 'flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-zinc-500 font-mono tabular-nums' : 'flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-zinc-400 font-mono tabular-nums'">
+                    <div [class]="themeService.isClassic() ? 'flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-zinc-500 font-sans tabular-nums' : 'flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-zinc-400 font-sans tabular-nums'">
                       @if (cp.client_name) {
                         <span class="font-sans">{{ 'projects.clientLabel' | t }}: <strong [class]="themeService.isClassic() ? 'text-zinc-700 font-medium' : 'text-zinc-300 font-medium'">{{ cp.client_name }}</strong></span>
                         <span>·</span>
@@ -661,14 +686,14 @@
                     <button
                       type="button"
                       (click)="loadCloudProject(cp)"
-                      class="px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition inline-flex items-center gap-1 shadow-xs cursor-pointer">
+                      class="px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-900 hover:bg-zinc-800 text-white transition inline-flex items-center gap-1 shadow-xs cursor-pointer">
                       <hugeicons-icon [icon]="icons.download" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                       <span>{{ 'projects.open' | t }}</span>
                     </button>
                     <button
                       type="button"
                       (click)="deleteCloudProject(cp, $event)"
-                      [class]="themeService.isClassic() ? 'p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer' : 'p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-md transition cursor-pointer'"
+                      [class]="themeService.isClassic() ? 'p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-md transition cursor-pointer' : 'p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-950/40 rounded-md transition cursor-pointer'"
                       [title]="'projects.deleteCloudTitle' | t">
                       <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                     </button>
@@ -686,7 +711,7 @@
               <button
                 type="button"
                 (click)="saveCurrentToCloud()"
-                class="px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition inline-flex items-center gap-1.5 shadow-xs cursor-pointer">
+                class="px-4 py-2 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition inline-flex items-center gap-1.5 shadow-xs cursor-pointer">
                 <hugeicons-icon [icon]="icons.cloud" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 <span>{{ 'projects.saveCurrentNow' | t }}</span>
               </button>
@@ -740,13 +765,13 @@
                   <button
                     type="button"
                     (click)="loadProject(p)"
-                    class="px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition cursor-pointer shadow-xs">
+                    class="px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-900 hover:bg-zinc-800 text-white transition cursor-pointer shadow-xs">
                     {{ 'projects.open' | t }}
                   </button>
                   <button
                     type="button"
                     (click)="deleteLocalProject(p, $event)"
-                    [class]="themeService.isClassic() ? 'p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer' : 'p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-zinc-700/60 rounded-md transition cursor-pointer'"
+                    [class]="themeService.isClassic() ? 'p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-md transition cursor-pointer' : 'p-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-700/60 rounded-md transition cursor-pointer'"
                     [title]="'projects.deleteLocalTitle' | t">
                     <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                   </button>
@@ -765,7 +790,7 @@
       <div [class]="themeService.isClassic() ? 'mt-3 sm:mt-4 pt-3 border-t border-slate-200 flex items-center justify-between shrink-0' : 'mt-3 sm:mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between shrink-0'">
         <span [class]="themeService.isClassic() ? 'text-[11px] text-slate-500 flex items-center gap-1.5' : 'text-[11px] text-zinc-500 flex items-center gap-1.5'">
           <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span>Supabase: umdcxcjrdyckpxomxlmi.supabase.co</span>
+          <span>Almacenamiento en la nube conectado</span>
         </span>
         <button
           type="button"
@@ -799,7 +824,7 @@
           {{ 'projects.initSqlStepsIntro' | t }}
         </p>
         <ol [class]="themeService.isClassic() ? 'list-decimal list-inside text-xs text-zinc-600 space-y-1 pl-1' : 'list-decimal list-inside text-xs text-zinc-400 space-y-1 pl-1'">
-          <li>{{ 'projects.initSqlStep1' | t }} <a href="https://supabase.com/dashboard/project/umdcxcjrdyckpxomxlmi" target="_blank" rel="noopener noreferrer" class="text-blue-600 font-semibold underline">{{ 'projects.initSqlYourProject' | t }}</a>.</li>
+          <li>{{ 'projects.initSqlStep1' | t }} <a href="https://supabase.com/dashboard/project/umdcxcjrdyckpxomxlmi" target="_blank" rel="noopener noreferrer" class="text-sky-600 font-semibold underline">{{ 'projects.initSqlYourProject' | t }}</a>.</li>
           <li>{{ 'projects.initSqlStep2' | t }} <strong>SQL Editor</strong>.</li>
           <li>{{ 'projects.initSqlStep3' | t }} <strong>RUN</strong>.</li>
         </ol>
@@ -809,7 +834,7 @@
           <button
             type="button"
             (click)="copySqlScript()"
-            class="absolute top-2.5 right-2.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition inline-flex items-center gap-1 shadow-xs cursor-pointer">
+            class="absolute top-2.5 right-2.5 px-3 py-1.5 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition inline-flex items-center gap-1 shadow-xs cursor-pointer">
             <hugeicons-icon [icon]="icons.check" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             <span>{{ sqlCopied() ? ('projects.copied' | t) : ('projects.copySql' | t) }}</span>
           </button>
@@ -817,11 +842,11 @@
       </div>
 
       <div [class]="themeService.isClassic() ? 'mt-3 sm:mt-4 pt-3 border-t border-zinc-200 flex justify-between items-center shrink-0' : 'mt-3 sm:mt-4 pt-3 border-t border-zinc-800 flex justify-between items-center shrink-0'">
-        <span class="text-xs text-zinc-400 font-mono">{{ 'projects.initSqlSingleStep' | t }}</span>
+        <span class="text-xs text-zinc-400 font-sans">{{ 'projects.initSqlSingleStep' | t }}</span>
         <button
           type="button"
           (click)="showSqlModal.set(false); refreshCloud()"
-          class="px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition shadow-xs cursor-pointer">
+          class="px-4 py-2 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition shadow-xs cursor-pointer">
           {{ 'projects.initSqlVerify' | t }}
         </button>
       </div>
@@ -881,7 +906,7 @@
           <button
             type="submit"
             [disabled]="newProjectForm.invalid"
-            class="px-3.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-md transition cursor-pointer shadow-xs">
+            class="px-3.5 py-1.5 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded-md transition cursor-pointer shadow-xs">
             {{ 'projects.createButton' | t }}
           </button>
         </div>
@@ -890,481 +915,12 @@
   </div>
 }
 
-<!-- MODAL: PARÁMETROS DEL PROYECTO, CORTE Y PRESUPUESTO (REDISEÑADO CON INTERFAZ CAD CORPORATIVA) -->
-@if (showSettingsModal()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-950/60 backdrop-blur-xs">
-    <div [class]="themeService.isClassic()
-      ? 'bg-white border border-zinc-200/90 rounded-lg w-full max-w-xl shadow-2xl p-5 sm:p-6 text-zinc-800 max-h-[90dvh] overflow-y-auto scrollbar-thin animate-in fade-in-50 zoom-in-95'
-      : 'bg-zinc-900 border border-zinc-700/80 rounded-lg w-full max-w-xl shadow-2xl p-5 sm:p-6 text-zinc-100 max-h-[90dvh] overflow-y-auto scrollbar-thin animate-in fade-in-50 zoom-in-95'">
-
-      <!-- Cabecera del Modal -->
-      <div [class]="themeService.isClassic() ? 'flex items-center justify-between pb-3.5 border-b border-zinc-200' : 'flex items-center justify-between pb-3.5 border-b border-zinc-800'">
-        <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
-            <hugeicons-icon [icon]="icons.settings" [size]="18" [strokeWidth]="2"></hugeicons-icon>
-          </div>
-          <div>
-            <h3 [class]="themeService.isClassic() ? 'text-sm sm:text-base font-bold text-zinc-900 leading-tight' : 'text-sm sm:text-base font-bold text-white leading-tight'">
-              {{ 'settings.title' | t }}
-            </h3>
-            <p [class]="themeService.isClassic() ? 'text-xs text-zinc-500' : 'text-xs text-zinc-400'">
-              {{ 'settings.subtitle' | t }}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          (click)="showSettingsModal.set(false)"
-          [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 p-1 rounded-md transition cursor-pointer' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 p-1 rounded-md transition cursor-pointer'"
-          [title]="'common.close' | t">
-          <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
-        </button>
-      </div>
-
-      <!-- Banner Explicativo General -->
-      <div [class]="themeService.isClassic()
-        ? 'mt-3.5 p-3 rounded-md bg-zinc-50 border border-zinc-200/90 flex items-start gap-2.5 text-xs text-zinc-600'
-        : 'mt-3.5 p-3 rounded-md bg-zinc-800/50 border border-zinc-700/80 flex items-start gap-2.5 text-xs text-zinc-300'">
-        <hugeicons-icon [icon]="icons.info" [size]="16" [strokeWidth]="2" class="text-zinc-500 shrink-0 mt-0.5"></hugeicons-icon>
-        <p class="leading-relaxed" [innerHTML]="'settings.infoBanner' | t"></p>
-      </div>
-
-      <form [formGroup]="settingsForm" (ngSubmit)="saveSettings()" class="mt-4 space-y-4">
-
-        <!-- SECCIÓN 0: IDIOMA DE LA INTERFAZ (i18n Signals) -->
-        <div [class]="themeService.isClassic() ? 'p-3.5 rounded-md bg-zinc-50/80 border border-zinc-200/90 space-y-2.5' : 'p-3.5 rounded-md bg-zinc-800/40 border border-zinc-800 space-y-2.5'">
-          <div class="flex items-center justify-between">
-            <span [class]="themeService.isClassic() ? 'text-[11px] font-semibold uppercase tracking-wider text-zinc-800' : 'text-[11px] font-semibold uppercase tracking-wider text-zinc-200'">
-              {{ 'settings.languageTitle' | t }}
-            </span>
-            <span [class]="themeService.isClassic() ? 'text-[10px] font-mono text-zinc-400' : 'text-[10px] font-mono text-zinc-500'">i18n</span>
-          </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            @for (lang of i18n.languages; track lang.code) {
-              <button
-                type="button"
-                (click)="settingsForm.patchValue({ interfaceLanguage: lang.code }); selectLanguage(lang.code)"
-                [class]="(settingsForm.get('interfaceLanguage')?.value === lang.code || i18n.currentLang() === lang.code)
-                  ? 'bg-blue-600 text-white font-bold border-blue-600 shadow-xs'
-                  : (themeService.isClassic() ? 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium')"
-                class="text-xs px-2.5 py-2 rounded-md transition cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap">
-                <span class="font-mono font-bold">{{ lang.iso }}</span>
-                <span class="text-xs font-medium">{{ lang.name }}</span>
-              </button>
-            }
-          </div>
-          <p [class]="themeService.isClassic() ? 'text-[10px] text-zinc-500' : 'text-[10px] text-zinc-400'">
-            {{ 'settings.languageHelp' | t }}
-          </p>
-        </div>
-
-        <!-- SECCIÓN 1: CALIBRACIÓN DE MELAMINA Y SIERRA (OPTIMIZADOR 2D) -->
-        <div [class]="themeService.isClassic() ? 'p-3.5 rounded-md bg-zinc-50/80 border border-zinc-200/90 space-y-3' : 'p-3.5 rounded-md bg-zinc-800/40 border border-zinc-800 space-y-3'">
-          <div class="flex items-center justify-between">
-            <span [class]="themeService.isClassic() ? 'text-[11px] font-semibold uppercase tracking-wider text-zinc-800' : 'text-[11px] font-semibold uppercase tracking-wider text-zinc-200'">
-              {{ 'settings.sectionMelamine' | t }}
-            </span>
-            <span [class]="themeService.isClassic() ? 'text-[10px] font-mono text-zinc-400' : 'text-[10px] font-mono text-zinc-500'">{{ 'settings.millimeterPrecision' | t }}</span>
-          </div>
-
-          <!-- ESPESOR DE MELAMINA PREDETERMINADO DEL PROYECTO -->
-          <div [class]="themeService.isClassic() ? 'p-3 rounded-md bg-white border border-zinc-200 shadow-2xs space-y-2' : 'p-3 rounded-md bg-zinc-900 border border-zinc-700 shadow-2xs space-y-2'">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.layers" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-800' : 'text-xs font-semibold text-zinc-100'">
-                  {{ 'settings.defaultThickness' | t }}
-                </span>
-              </div>
-              <div class="relative group/tip inline-flex items-center">
-                <span [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-700 cursor-help p-0.5' : 'text-zinc-400 hover:text-zinc-200 cursor-help p-0.5'">
-                  <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                </span>
-                <div class="pointer-events-none opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 w-72 p-2.5 rounded-md bg-zinc-900 text-white text-[11px] leading-snug shadow-xl z-50 border border-zinc-700">
-                  <strong class="text-zinc-200 block mb-0.5">{{ 'settings.tooltipThicknessTitle' | t }}</strong>
-                  <span [innerHTML]="'settings.tooltipThicknessDesc' | t"></span>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-              <!-- Botones rápidos 15 mm / 18 mm + input numérico -->
-              <div class="flex items-center gap-1.5 flex-1">
-                <button
-                  type="button"
-                  (click)="settingsForm.patchValue({ defaultBoardThickness: 15 })"
-                  [class]="settingsForm.get('defaultBoardThickness')?.value === 15
-                    ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs'
-                    : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border border-zinc-700 font-medium')"
-                  class="flex-1 py-1.5 px-3 rounded-md text-xs transition cursor-pointer flex items-center justify-center gap-1">
-                  <span class="font-mono tabular-nums">15 mm</span>
-                  @if (settingsForm.get('defaultBoardThickness')?.value === 15) {
-                    <span class="text-[9px] opacity-80 font-normal">{{ 'settings.defaultBadge' | t }}</span>
-                  }
-                </button>
-
-                <button
-                  type="button"
-                  (click)="settingsForm.patchValue({ defaultBoardThickness: 18 })"
-                  [class]="settingsForm.get('defaultBoardThickness')?.value === 18
-                    ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs'
-                    : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border border-zinc-700 font-medium')"
-                  class="flex-1 py-1.5 px-3 rounded-md text-xs transition cursor-pointer flex items-center justify-center gap-1">
-                  <span class="font-mono tabular-nums">18 mm</span>
-                  @if (settingsForm.get('defaultBoardThickness')?.value === 18) {
-                    <span class="text-[9px] opacity-80 font-normal">{{ 'settings.selectedBadge' | t }}</span>
-                  }
-                </button>
-
-                <div class="relative w-20 shrink-0">
-                  <input
-                    type="number"
-                    step="1"
-                    min="10"
-                    max="35"
-                    formControlName="defaultBoardThickness"
-                    [class]="themeService.isClassic()
-                      ? 'w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs font-mono tabular-nums font-bold text-zinc-900 text-center focus:outline-hidden focus:border-zinc-900 pr-6'
-                      : 'w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs font-mono tabular-nums font-bold text-white text-center focus:outline-hidden focus:border-zinc-400 pr-6'" />
-                  <span [class]="themeService.isClassic() ? 'absolute right-2 top-2 text-[10px] font-mono text-zinc-400' : 'absolute right-2 top-2 text-[10px] font-mono text-zinc-400'">mm</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Checkbox para actualizar piezas existentes -->
-            <label class="flex items-center gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer text-xs select-none">
-              <input
-                type="checkbox"
-                formControlName="applyThicknessToAllParts"
-                class="w-3.5 h-3.5 rounded cursor-pointer accent-zinc-900" />
-              <span [class]="themeService.isClassic() ? 'text-zinc-600 text-[11px]' : 'text-zinc-400 text-[11px]'">
-                {{ 'settings.applyThicknessToAll' | t }}
-              </span>
-            </label>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <!-- Grosor Sierra / Disco (Kerf) -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-700' : 'text-xs font-semibold text-zinc-200'">
-                  {{ 'settings.sawKerf' | t }}
-                </span>
-                <!-- Tooltip informativo al pasar el mouse -->
-                <div class="relative group/tip inline-flex items-center">
-                  <span [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-700 cursor-help p-0.5' : 'text-zinc-400 hover:text-zinc-200 cursor-help p-0.5'">
-                    <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                  </span>
-                  <div class="pointer-events-none opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 w-60 p-2.5 rounded-md bg-zinc-900 text-white text-[11px] leading-snug shadow-xl z-50 border border-zinc-700">
-                    <strong class="text-zinc-200 block mb-0.5">{{ 'settings.tooltipSawKerfTitle' | t }}</strong>
-                    <span [innerHTML]="'settings.tooltipSawKerfDesc' | t"></span>
-                  </div>
-                </div>
-              </div>
-              <div class="relative">
-                <input
-                  type="number"
-                  step="0.5"
-                  formControlName="sawKerf"
-                  [class]="themeService.isClassic()
-                    ? 'w-full px-3 py-2 bg-white border border-zinc-200 rounded-md text-xs sm:text-sm font-mono tabular-nums font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-11 shadow-2xs'
-                    : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-md text-xs sm:text-sm font-mono tabular-nums font-bold text-white focus:outline-hidden focus:border-zinc-400 pr-11'" />
-                <span [class]="themeService.isClassic() ? 'absolute right-3 top-2.5 text-xs font-mono text-zinc-400' : 'absolute right-3 top-2.5 text-xs font-mono text-zinc-400'">mm</span>
-              </div>
-              <p [class]="themeService.isClassic() ? 'text-[10px] text-zinc-500 mt-1 font-mono' : 'text-[10px] text-zinc-400 mt-1 font-mono'">{{ 'settings.sawKerfNote' | t }}</p>
-            </div>
-
-            <!-- Refilado Perimetral (Trim) -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-700' : 'text-xs font-semibold text-zinc-200'">
-                  {{ 'settings.trimMargin' | t }}
-                </span>
-                <!-- Tooltip informativo al pasar el mouse -->
-                <div class="relative group/tip inline-flex items-center">
-                  <span [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-700 cursor-help p-0.5' : 'text-zinc-400 hover:text-zinc-200 cursor-help p-0.5'">
-                    <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                  </span>
-                  <div class="pointer-events-none opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 w-60 p-2.5 rounded-md bg-zinc-900 text-white text-[11px] leading-snug shadow-xl z-50 border border-zinc-700">
-                    <strong class="text-zinc-200 block mb-0.5">{{ 'settings.tooltipTrimTitle' | t }}</strong>
-                    <span [innerHTML]="'settings.tooltipTrimDesc' | t"></span>
-                  </div>
-                </div>
-              </div>
-              <div class="relative">
-                <input
-                  type="number"
-                  step="1"
-                  formControlName="trimMargin"
-                  [class]="themeService.isClassic()
-                    ? 'w-full px-3 py-2 bg-white border border-zinc-200 rounded-md text-xs sm:text-sm font-mono tabular-nums font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-11 shadow-2xs'
-                    : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-md text-xs sm:text-sm font-mono tabular-nums font-bold text-white focus:outline-hidden focus:border-zinc-400 pr-11'" />
-                <span [class]="themeService.isClassic() ? 'absolute right-3 top-2.5 text-xs font-mono text-zinc-400' : 'absolute right-3 top-2.5 text-xs font-mono text-zinc-400'">mm</span>
-              </div>
-              <p [class]="themeService.isClassic() ? 'text-[10px] text-zinc-500 mt-1 font-mono' : 'text-[10px] text-zinc-400 mt-1 font-mono'">{{ 'settings.trimMarginNote' | t }}</p>
-            </div>
-          </div>
-
-          <!-- Estrategia de Corte -->
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-700' : 'text-xs font-semibold text-zinc-200'">
-                {{ 'settings.optimizationStrategy' | t }}
-              </span>
-              <div class="relative group/tip inline-flex items-center">
-                <span [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-700 cursor-help p-0.5' : 'text-zinc-400 hover:text-zinc-200 cursor-help p-0.5'">
-                  <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                </span>
-                <div class="pointer-events-none opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 w-64 p-2.5 rounded-md bg-zinc-900 text-white text-[11px] leading-snug shadow-xl z-50 border border-zinc-700">
-                  <strong class="text-zinc-200 block mb-0.5">{{ 'settings.tooltipPatternTitle' | t }}</strong>
-                  <span [innerHTML]="'settings.tooltipPatternDesc' | t"></span>
-                </div>
-              </div>
-            </div>
-            <select
-              formControlName="optimizationPreference"
-              [class]="themeService.isClassic()
-                ? 'w-full px-3 py-2 bg-white border border-zinc-200 rounded-md text-xs sm:text-sm font-medium text-zinc-900 focus:outline-hidden focus:border-zinc-900 shadow-2xs cursor-pointer'
-                : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-md text-xs sm:text-sm font-medium text-white focus:outline-hidden focus:border-zinc-400 cursor-pointer'">
-              <option value="best_fit">{{ 'settings.optBestFit' | t }}</option>
-              <option value="guillotine_length">{{ 'settings.optGuillotineLength' | t }}</option>
-              <option value="guillotine_width">{{ 'settings.optGuillotineWidth' | t }}</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- SECCIÓN 2: TAPACANTOS Y MONEDA (PRESUPUESTO) -->
-        <div [class]="themeService.isClassic() ? 'p-3.5 rounded-md bg-zinc-50/80 border border-zinc-200/90 space-y-3' : 'p-3.5 rounded-md bg-zinc-800/40 border border-zinc-800 space-y-3'">
-          <div class="flex items-center justify-between">
-            <span [class]="themeService.isClassic() ? 'text-[11px] font-semibold uppercase tracking-wider text-zinc-800' : 'text-[11px] font-semibold uppercase tracking-wider text-zinc-200'">
-              {{ 'settings.sectionEdgeCurrency' | t }}
-            </span>
-            <span [class]="themeService.isClassic() ? 'text-[10px] font-mono text-zinc-400' : 'text-[10px] font-mono text-zinc-500'">{{ 'settings.perMeter' | t }}</span>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <!-- Costo Canto Delgado -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-700' : 'text-xs font-semibold text-zinc-200'">
-                  {{ 'settings.thinEdgeCost' | t }}
-                </span>
-                <div class="relative group/tip inline-flex items-center">
-                  <span [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-700 cursor-help p-0.5' : 'text-zinc-400 hover:text-zinc-200 cursor-help p-0.5'">
-                    <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                  </span>
-                  <div class="pointer-events-none opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 w-60 p-2.5 rounded-md bg-zinc-900 text-white text-[11px] leading-snug shadow-xl z-50 border border-zinc-700">
-                    <strong class="text-zinc-200 block mb-0.5">{{ 'settings.tooltipThinEdgeTitle' | t }}</strong>
-                    <span [innerHTML]="'settings.tooltipThinEdgeDesc' | t"></span>
-                  </div>
-                </div>
-              </div>
-              <div class="relative">
-                <input
-                  type="number"
-                  step="50"
-                  formControlName="thinEdgeCostPerMeter"
-                  [class]="themeService.isClassic()
-                    ? 'w-full px-3 py-2 bg-white border border-zinc-200 rounded-md text-xs sm:text-sm font-mono tabular-nums font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-16 shadow-2xs'
-                    : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-md text-xs sm:text-sm font-mono tabular-nums font-bold text-white focus:outline-hidden focus:border-zinc-400 pr-16'" />
-                <span [class]="themeService.isClassic() ? 'absolute right-3 top-2.5 text-xs font-mono text-zinc-400' : 'absolute right-3 top-2.5 text-xs font-mono text-zinc-400'">{{ 'settings.perMeter' | t }}</span>
-              </div>
-            </div>
-
-            <!-- Costo Canto Grueso -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-700' : 'text-xs font-semibold text-zinc-200'">
-                  {{ 'settings.thickEdgeCost' | t }}
-                </span>
-                <div class="relative group/tip inline-flex items-center">
-                  <span [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-700 cursor-help p-0.5' : 'text-zinc-400 hover:text-zinc-200 cursor-help p-0.5'">
-                    <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                  </span>
-                  <div class="pointer-events-none opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 w-60 p-2.5 rounded-md bg-zinc-900 text-white text-[11px] leading-snug shadow-xl z-50 border border-zinc-700">
-                    <strong class="text-zinc-200 block mb-0.5">{{ 'settings.tooltipThickEdgeTitle' | t }}</strong>
-                    <span [innerHTML]="'settings.tooltipThickEdgeDesc' | t"></span>
-                  </div>
-                </div>
-              </div>
-              <div class="relative">
-                <input
-                  type="number"
-                  step="50"
-                  formControlName="thickEdgeCostPerMeter"
-                  [class]="themeService.isClassic()
-                    ? 'w-full px-3 py-2 bg-white border border-zinc-200 rounded-md text-xs sm:text-sm font-mono tabular-nums font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-16 shadow-2xs'
-                    : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-md text-xs sm:text-sm font-mono tabular-nums font-bold text-white focus:outline-hidden focus:border-zinc-400 pr-16'" />
-                <span [class]="themeService.isClassic() ? 'absolute right-3 top-2.5 text-xs font-mono text-zinc-400' : 'absolute right-3 top-2.5 text-xs font-mono text-zinc-400'">{{ 'settings.perMeter' | t }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Moneda del Proyecto -->
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-700' : 'text-xs font-semibold text-zinc-200'">
-                {{ 'settings.projectCurrency' | t }}
-              </span>
-              <div class="relative group/tip inline-flex items-center">
-                <span [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-zinc-700 cursor-help p-0.5' : 'text-zinc-400 hover:text-zinc-200 cursor-help p-0.5'">
-                  <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                </span>
-                <div class="pointer-events-none opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 w-60 p-2.5 rounded-md bg-zinc-900 text-white text-[11px] leading-snug shadow-xl z-50 border border-zinc-700">
-                  <strong class="text-zinc-200 block mb-0.5">{{ 'settings.tooltipCurrencyTitle' | t }}</strong>
-                  <span [innerHTML]="'settings.tooltipCurrencyDesc' | t"></span>
-                </div>
-              </div>
-            </div>
-            <select
-              formControlName="currency"
-              [class]="themeService.isClassic()
-                ? 'w-full px-3 py-2 bg-white border border-zinc-200 rounded-md text-xs sm:text-sm font-medium text-zinc-900 focus:outline-hidden focus:border-zinc-900 shadow-2xs cursor-pointer'
-                : 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-md text-xs sm:text-sm font-medium text-white focus:outline-hidden focus:border-zinc-400 cursor-pointer'">
-              <option value="COP">COP ($) - {{ 'settings.currencyCOP' | t }} {{ 'settings.defaultBadge' | t }}</option>
-              <option value="USD">USD ($) - {{ 'settings.currencyUSD' | t }}</option>
-              <option value="EUR">EUR (€) - {{ 'settings.currencyEUR' | t }}</option>
-              <option value="MXN">MXN ($) - {{ 'settings.currencyMXN' | t }}</option>
-              <option value="PEN">PEN (S/) - {{ 'settings.currencyPEN' | t }}</option>
-              <option value="CLP">CLP ($) - {{ 'settings.currencyCLP' | t }}</option>
-              <option value="ARS">ARS ($) - {{ 'settings.currencyARS' | t }}</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- SECCIÓN 3: TAMAÑO DEL ESPACIO DE TRABAJO (ESCENARIO 3D) -->
-        <div [class]="themeService.isClassic() ? 'p-3.5 rounded-md bg-zinc-50/80 border border-zinc-200/90 space-y-3' : 'p-3.5 rounded-md bg-zinc-800/40 border border-zinc-800 space-y-3'">
-          <div class="flex items-center justify-between">
-            <span [class]="themeService.isClassic() ? 'text-[11px] font-semibold uppercase tracking-wider text-zinc-800' : 'text-[11px] font-semibold uppercase tracking-wider text-zinc-200'">
-              {{ 'settings.sectionWorkspace' | t }}
-            </span>
-            <span [class]="themeService.isClassic() ? 'text-[10px] font-mono text-zinc-400' : 'text-[10px] font-mono text-zinc-500'">3D</span>
-          </div>
-
-          <div [class]="themeService.isClassic() ? 'p-3 rounded-md bg-white border border-zinc-200 shadow-2xs space-y-3' : 'p-3 rounded-md bg-zinc-900 border border-zinc-700 shadow-2xs space-y-3'">
-            <div class="flex items-center justify-between">
-              <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-800' : 'text-xs font-semibold text-zinc-100'">
-                {{ 'settings.floorDimensions' | t }}
-              </span>
-              <span class="text-[11px] font-mono font-bold text-sky-600">
-                {{ ((settingsForm.get('floorWidth')?.value || 5000) / 1000).toFixed(1) }} × {{ ((settingsForm.get('floorDepth')?.value || 5000) / 1000).toFixed(1) }} m
-              </span>
-            </div>
-
-            <!-- Botones de Preajuste Rápido en metros -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <button
-                type="button"
-                (click)="setWorkspaceSize(5000, 5000)"
-                [class]="((settingsForm.get('floorWidth')?.value || 5000) === 5000 && (settingsForm.get('floorDepth')?.value || 5000) === 5000)
-                  ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs'
-                  : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border border-zinc-700 font-medium')"
-                class="py-2 px-2.5 rounded-md text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5">
-                <span class="font-mono font-bold text-xs">5 × 5 m</span>
-                <span class="text-[9px] opacity-75">{{ 'settings.sizeStandard' | t }}</span>
-              </button>
-
-              <button
-                type="button"
-                (click)="setWorkspaceSize(8000, 8000)"
-                [class]="((settingsForm.get('floorWidth')?.value || 5000) === 8000 && (settingsForm.get('floorDepth')?.value || 5000) === 8000)
-                  ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs'
-                  : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border border-zinc-700 font-medium')"
-                class="py-2 px-2.5 rounded-md text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5">
-                <span class="font-mono font-bold text-xs">8 × 8 m</span>
-                <span class="text-[9px] opacity-75">{{ 'settings.sizeSpacious' | t }}</span>
-              </button>
-
-              <button
-                type="button"
-                (click)="setWorkspaceSize(10000, 10000)"
-                [class]="((settingsForm.get('floorWidth')?.value || 5000) === 10000 && (settingsForm.get('floorDepth')?.value || 5000) === 10000)
-                  ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs'
-                  : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border border-zinc-700 font-medium')"
-                class="py-2 px-2.5 rounded-md text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5">
-                <span class="font-mono font-bold text-xs">10 × 10 m</span>
-                <span class="text-[9px] opacity-75">{{ 'settings.sizeFloorPlan' | t }}</span>
-              </button>
-
-              <button
-                type="button"
-                (click)="setWorkspaceSize(12000, 12000)"
-                [class]="((settingsForm.get('floorWidth')?.value || 5000) === 12000 && (settingsForm.get('floorDepth')?.value || 5000) === 12000)
-                  ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs'
-                  : (themeService.isClassic() ? 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium' : 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border border-zinc-700 font-medium')"
-                class="py-2 px-2.5 rounded-md text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5">
-                <span class="font-mono font-bold text-xs">12 × 12 m</span>
-                <span class="text-[9px] opacity-75">{{ 'settings.sizeLargeProject' | t }}</span>
-              </button>
-            </div>
-
-            <!-- Inputs numéricos manuales Ancho X y Fondo Z -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-              <div>
-                <div class="flex items-center justify-between mb-1">
-                  <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-700' : 'text-xs font-semibold text-zinc-200'">
-                    {{ 'settings.widthX' | t }}
-                  </span>
-                  <span class="text-[10px] font-mono text-zinc-400">
-                    {{ ((settingsForm.get('floorWidth')?.value || 5000) / 1000).toFixed(1) }} m
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  step="500"
-                  min="2000"
-                  max="25000"
-                  formControlName="floorWidth"
-                  [class]="themeService.isClassic()
-                    ? 'w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs font-mono font-bold text-zinc-900 text-center focus:outline-hidden focus:border-zinc-900'
-                    : 'w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs font-mono font-bold text-white text-center focus:outline-hidden focus:border-zinc-400'" />
-              </div>
-
-              <div>
-                <div class="flex items-center justify-between mb-1">
-                  <span [class]="themeService.isClassic() ? 'text-xs font-semibold text-zinc-700' : 'text-xs font-semibold text-zinc-200'">
-                    {{ 'settings.depthZ' | t }}
-                  </span>
-                  <span class="text-[10px] font-mono text-zinc-400">
-                    {{ ((settingsForm.get('floorDepth')?.value || 5000) / 1000).toFixed(1) }} m
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  step="500"
-                  min="2000"
-                  max="25000"
-                  formControlName="floorDepth"
-                  [class]="themeService.isClassic()
-                    ? 'w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs font-mono font-bold text-zinc-900 text-center focus:outline-hidden focus:border-zinc-900'
-                    : 'w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs font-mono font-bold text-white text-center focus:outline-hidden focus:border-zinc-400'" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Botones de Acción Inferiores -->
-        <div [class]="themeService.isClassic() ? 'pt-3 border-t border-zinc-200 flex items-center justify-end gap-2.5' : 'pt-3 border-t border-zinc-800 flex items-center justify-end gap-2.5'">
-          <button
-            type="button"
-            (click)="showSettingsModal.set(false)"
-            [class]="themeService.isClassic()
-              ? 'px-4 py-2 text-xs font-medium bg-white hover:bg-zinc-50 border border-zinc-200 rounded-md text-zinc-700 transition cursor-pointer'
-              : 'px-4 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-md text-zinc-300 transition cursor-pointer'">
-            {{ 'settings.cancel' | t }}
-          </button>
-          <button
-            type="submit"
-            class="px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition shadow-xs flex items-center gap-1.5 cursor-pointer">
-            <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
-            <span>{{ 'settings.saveSettings' | t }}</span>
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-}
+<!-- CENTRO UNIFICADO DE CUENTA, PREFERENCIAS, TALLER Y FACTURACIÓN -->
+<app-account-settings-modal
+  [isOpen]="isAccountModalOpen()"
+  (closed)="isAccountModalOpen.set(false)"
+  (modalClose)="isAccountModalOpen.set(false)">
+</app-account-settings-modal>
 
 <!-- MODAL: PLANO TÉCNICO 2D DE FABRICACIÓN (TALLER) -->
 @defer (when showTechnicalSheetModal()) {

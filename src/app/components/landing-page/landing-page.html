@@ -54,12 +54,12 @@
 
         <!-- Logo e Identidad del Producto -->
         <a routerLink="/" class="flex items-center gap-2.5 group cursor-pointer" title="Piezo3D Studio">
-          <div class="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-xs group-hover:bg-blue-600 transition-colors">
+          <div class="w-9 h-9 rounded-lg bg-zinc-900 flex items-center justify-center text-white shadow-xs group-hover:bg-zinc-800 transition-colors">
             <hugeicons-icon [icon]="icons.brand" [size]="20" [strokeWidth]="2"></hugeicons-icon>
           </div>
           <div class="flex flex-col">
-            <span class="font-bold tracking-tight text-slate-900 text-base leading-tight">Piezo<span class="text-blue-600">3D</span></span>
-            <span class="text-[10px] font-semibold text-slate-500 tracking-wider uppercase">Studio</span>
+            <span class="font-bold tracking-tight text-zinc-900 text-base leading-tight">Piezo<span class="text-sky-600">3D</span></span>
+            <span class="text-[10px] font-semibold text-zinc-500 tracking-wider uppercase">Studio</span>
           </div>
         </a>
 
@@ -68,31 +68,31 @@
           <button
             type="button"
             (click)="scrollToSection('features')"
-            class="text-xs font-semibold text-slate-600 hover:text-blue-600 transition cursor-pointer">
+            class="text-xs font-semibold text-zinc-600 hover:text-zinc-900 transition cursor-pointer">
             {{ 'landing.nav.features' | t }}
           </button>
           <button
             type="button"
             (click)="scrollToSection('why-us')"
-            class="text-xs font-semibold text-slate-600 hover:text-blue-600 transition cursor-pointer">
+            class="text-xs font-semibold text-zinc-600 hover:text-zinc-900 transition cursor-pointer">
             {{ 'landing.nav.whyUs' | t }}
           </button>
           <button
             type="button"
             (click)="scrollToSection('about-us')"
-            class="text-xs font-semibold text-slate-600 hover:text-blue-600 transition cursor-pointer">
+            class="text-xs font-semibold text-zinc-600 hover:text-zinc-900 transition cursor-pointer">
             {{ 'landing.nav.about' | t }}
           </button>
           <button
             type="button"
             (click)="scrollToSection('pricing')"
-            class="text-xs font-semibold text-slate-600 hover:text-blue-600 transition cursor-pointer">
+            class="text-xs font-semibold text-zinc-600 hover:text-zinc-900 transition cursor-pointer">
             {{ 'landing.nav.pricing' | t }}
           </button>
           <button
             type="button"
             (click)="scrollToSection('testimonials')"
-            class="text-xs font-semibold text-slate-600 hover:text-blue-600 transition cursor-pointer">
+            class="text-xs font-semibold text-zinc-600 hover:text-zinc-900 transition cursor-pointer">
             {{ 'landing.nav.testimonials' | t }}
           </button>
         </nav>
@@ -107,7 +107,7 @@
               (click)="toggleLanguageDropdown($event)"
               class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition cursor-pointer"
               title="{{ 'nav.language' | t }}">
-              <hugeicons-icon [icon]="icons.globe" [size]="14" [strokeWidth]="2" class="text-blue-600"></hugeicons-icon>
+              <hugeicons-icon [icon]="icons.globe" [size]="14" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
               <span>{{ currentLanguageOption().iso }}</span>
               <hugeicons-icon [icon]="icons.arrowDown" [size]="12" [strokeWidth]="2" class="text-slate-400"></hugeicons-icon>
             </button>
@@ -131,19 +131,36 @@
             }
           </div>
 
-          <!-- Botón Iniciar Sesión (Abre Modal Informativo de Fase 1) -->
-          <button
-            type="button"
-            (click)="openLoginModal()"
-            class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer">
-            <hugeicons-icon [icon]="icons.user" [size]="14" [strokeWidth]="2" class="text-slate-500"></hugeicons-icon>
-            <span>{{ 'landing.nav.login' | t }}</span>
-          </button>
+          <!-- Estado de Sesión: Perfil + Cerrar Sesión o Botón Iniciar Sesión -->
+          @if (isAuthenticated()) {
+            <div class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800">
+              <hugeicons-icon [icon]="icons.user" [size]="14" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
+              <span data-testid="landing-user-name" class="max-w-28 truncate">{{ userFirstName() }}</span>
+            </div>
+            <button
+              type="button"
+              data-testid="landing-signout-btn"
+              (click)="signOut()"
+              class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 text-xs font-semibold text-slate-700 hover:text-red-700 transition cursor-pointer">
+              <hugeicons-icon [icon]="icons.logout" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+              <span>{{ 'auth.signOut' | t }}</span>
+            </button>
+          } @else {
+            <a
+              [routerLink]="['/auth']"
+              [queryParams]="{ mode: 'login' }"
+              data-testid="landing-login-link"
+              class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer">
+              <hugeicons-icon [icon]="icons.user" [size]="14" [strokeWidth]="2" class="text-slate-500"></hugeicons-icon>
+              <span>{{ 'landing.nav.login' | t }}</span>
+            </a>
+          }
 
           <!-- Botón Primario: Probar Estudio 3D -->
           <a
-            routerLink="/studio"
-            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold tracking-tight shadow-sm hover:shadow transition transform hover:-translate-y-0.5 cursor-pointer">
+            [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
+            [queryParams]="isAuthenticated() ? null : { mode: 'login' }"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-950 text-white text-xs font-bold tracking-tight shadow-sm hover:shadow transition transform hover:-translate-y-0.5 cursor-pointer">
             <hugeicons-icon [icon]="icons.cube" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             <span>{{ 'landing.nav.openStudio' | t }}</span>
           </a>
@@ -193,16 +210,35 @@
           class="w-full text-left px-3 py-2 rounded-md text-sm font-semibold text-slate-700 hover:bg-slate-50">
           {{ 'landing.nav.testimonials' | t }}
         </button>
-        <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
-          <button
-            type="button"
-            (click)="openLoginModal()"
-            class="text-xs font-semibold text-slate-600 hover:text-slate-900">
-            {{ 'landing.nav.login' | t }}
-          </button>
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+          @if (isAuthenticated()) {
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-800 truncate">
+                <hugeicons-icon [icon]="icons.user" [size]="13" class="text-zinc-900 shrink-0"></hugeicons-icon>
+                <span class="truncate">{{ userFirstName() }}</span>
+              </span>
+              <button
+                type="button"
+                (click)="signOut()"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:text-red-700 hover:bg-red-50">
+                <hugeicons-icon [icon]="icons.logout" [size]="13"></hugeicons-icon>
+                <span>{{ 'auth.signOut' | t }}</span>
+              </button>
+            </div>
+          } @else {
+            <a
+              [routerLink]="['/auth']"
+              [queryParams]="{ mode: 'login' }"
+              (click)="closeMobileMenu()"
+              class="text-xs font-semibold text-slate-600 hover:text-slate-900">
+              {{ 'landing.nav.login' | t }}
+            </a>
+          }
           <a
-            routerLink="/studio"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs font-bold">
+            [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
+            [queryParams]="isAuthenticated() ? null : { mode: 'login' }"
+            (click)="closeMobileMenu()"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold shrink-0">
             <hugeicons-icon [icon]="icons.cube" [size]="14"></hugeicons-icon>
             <span>{{ 'landing.nav.openStudio' | t }}</span>
           </a>
@@ -214,17 +250,13 @@
   <!-- ========================================================= -->
   <!-- 2. SECCIÓN HERO PRINCIPAL + MOCKUP UI EN CSS/HUGEICONS    -->
   <!-- ========================================================= -->
-  <section class="relative pt-12 pb-20 md:pt-16 md:pb-28 overflow-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100">
-    <!-- Círculos decorativos de fondo sutiles -->
-    <div class="absolute top-10 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-blue-100/50 rounded-full blur-3xl pointer-events-none -z-10"></div>
-    <div class="absolute bottom-10 right-10 w-[400px] h-[300px] bg-indigo-100/40 rounded-full blur-2xl pointer-events-none -z-10"></div>
-
+  <section class="relative pt-12 pb-20 md:pt-16 md:pb-28 overflow-hidden bg-zinc-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center max-w-4xl mx-auto">
 
         <!-- Badge Superior Técnico -->
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold shadow-2xs mb-6">
-          <hugeicons-icon [icon]="icons.sparkles" [size]="14" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-800 text-xs font-semibold shadow-2xs mb-6">
+          <hugeicons-icon [icon]="icons.sparkles" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>{{ 'landing.hero.badge' | t }}</span>
         </div>
 
@@ -241,8 +273,9 @@
         <!-- Botones Principales CTA -->
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4">
           <a
-            routerLink="/studio"
-            class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-md bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5 cursor-pointer">
+            [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
+            [queryParams]="isAuthenticated() ? null : { mode: 'login' }"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-md bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-950 text-white font-bold text-sm shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5 cursor-pointer">
             <hugeicons-icon [icon]="icons.rocket" [size]="18" [strokeWidth]="2"></hugeicons-icon>
             <span>{{ 'landing.hero.ctaStudio' | t }}</span>
             <hugeicons-icon [icon]="icons.arrowRight" [size]="16" [strokeWidth]="2"></hugeicons-icon>
@@ -299,35 +332,35 @@
             <button
               type="button"
               (click)="setMockupTab('designer')"
-              [class]="mockupTab() === 'designer' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-600 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
+              [class]="mockupTab() === 'designer' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-800 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
               <hugeicons-icon [icon]="icons.cube" [size]="12"></hugeicons-icon>
               <span>{{ 'landing.mockup.tab3d' | t }}</span>
             </button>
             <button
               type="button"
               (click)="setMockupTab('parts')"
-              [class]="mockupTab() === 'parts' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-600 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
+              [class]="mockupTab() === 'parts' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-800 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
               <hugeicons-icon [icon]="icons.checklist" [size]="12"></hugeicons-icon>
               <span>{{ 'landing.mockup.tabParts' | t }}</span>
             </button>
             <button
               type="button"
               (click)="setMockupTab('optimizer')"
-              [class]="mockupTab() === 'optimizer' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-600 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
+              [class]="mockupTab() === 'optimizer' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-800 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
               <hugeicons-icon [icon]="icons.scissors" [size]="12"></hugeicons-icon>
               <span>{{ 'landing.mockup.tabOptimizer' | t }}</span>
             </button>
             <button
               type="button"
               (click)="setMockupTab('budget')"
-              [class]="mockupTab() === 'budget' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-600 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
+              [class]="mockupTab() === 'budget' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-800 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
               <hugeicons-icon [icon]="icons.tag" [size]="12"></hugeicons-icon>
               <span>{{ 'landing.mockup.tabBudget' | t }}</span>
             </button>
             <button
               type="button"
               (click)="setMockupTab('guide')"
-              [class]="mockupTab() === 'guide' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-600 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
+              [class]="mockupTab() === 'guide' ? 'flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-800 text-white font-semibold transition cursor-pointer' : 'flex items-center gap-1.5 px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer'">
               <hugeicons-icon [icon]="icons.book" [size]="12"></hugeicons-icon>
               <span>{{ 'landing.mockup.tabGuide' | t }}</span>
             </button>
@@ -346,7 +379,7 @@
                   <!-- Cabecera del Módulo -->
                   <div class="flex items-center justify-between text-xs">
                     <div class="flex items-center gap-2">
-                      <span class="px-2 py-0.5 rounded bg-blue-900/60 border border-blue-700/60 text-blue-300 font-bold text-[10px]">{{ 'landing.mockup.moduleTitle' | t }}</span>
+                      <span class="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-bold text-[10px]">{{ 'landing.mockup.moduleTitle' | t }}</span>
                       <span class="text-slate-400 font-normal">{{ 'landing.mockup.moduleSubtitle' | t }}</span>
                     </div>
                     <span class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
@@ -366,28 +399,28 @@
                         </div>
                         <div class="flex items-center justify-between p-1.5 rounded bg-slate-900/80 text-[11px]">
                           <span class="text-slate-200 font-medium">P1: Lateral Izquierdo</span>
-                          <span class="text-blue-300 font-medium">720 × 580 × 18</span>
-                          <span class="px-1.5 py-0.5 rounded bg-blue-950 border border-blue-800 text-[9px] text-blue-300">2.0 mm</span>
+                          <span class="text-zinc-300 font-medium font-mono">720 × 580 × 18</span>
+                          <span class="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[9px] text-zinc-300 font-mono">2.0 mm</span>
                         </div>
                         <div class="flex items-center justify-between p-1.5 rounded bg-slate-900/80 text-[11px]">
                           <span class="text-slate-200 font-medium">P2: Lateral Derecho</span>
-                          <span class="text-blue-300 font-medium">720 × 580 × 18</span>
-                          <span class="px-1.5 py-0.5 rounded bg-blue-950 border border-blue-800 text-[9px] text-blue-300">2.0 mm</span>
+                          <span class="text-zinc-300 font-medium font-mono">720 × 580 × 18</span>
+                          <span class="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[9px] text-zinc-300 font-mono">2.0 mm</span>
                         </div>
                         <div class="flex items-center justify-between p-1.5 rounded bg-slate-900/80 text-[11px]">
                           <span class="text-slate-200 font-medium">P3: Piso Base</span>
-                          <span class="text-blue-300 font-medium">764 × 580 × 18</span>
-                          <span class="px-1.5 py-0.5 rounded bg-blue-950 border border-blue-800 text-[9px] text-blue-300">0.45 mm</span>
+                          <span class="text-zinc-300 font-medium font-mono">764 × 580 × 18</span>
+                          <span class="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[9px] text-zinc-300 font-mono">0.45 mm</span>
                         </div>
                         <div class="flex items-center justify-between p-1.5 rounded bg-slate-900/80 text-[11px]">
                           <span class="text-slate-200 font-medium">P4: Amarres Techo (x2)</span>
-                          <span class="text-blue-300 font-medium">764 × 100 × 18</span>
-                          <span class="px-1.5 py-0.5 rounded bg-blue-950 border border-blue-800 text-[9px] text-blue-300">0.45 mm</span>
+                          <span class="text-zinc-300 font-medium font-mono">764 × 100 × 18</span>
+                          <span class="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[9px] text-zinc-300 font-mono">0.45 mm</span>
                         </div>
                         <div class="flex items-center justify-between p-1.5 rounded bg-slate-900/80 text-[11px]">
                           <span class="text-slate-200 font-medium">P5: Frente de Cajón</span>
-                          <span class="text-blue-300 font-medium">760 × 220 × 18</span>
-                          <span class="px-1.5 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-[9px] text-indigo-300">2.0 mm</span>
+                          <span class="text-zinc-300 font-medium font-mono">760 × 220 × 18</span>
+                          <span class="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[9px] text-zinc-300 font-mono">2.0 mm</span>
                         </div>
                       </div>
                     }
@@ -401,10 +434,10 @@
                         </div>
                         <!-- Gráfico de Corte Guillotina 2D -->
                         <div class="w-full h-32 bg-slate-900 rounded border border-slate-800 p-1.5 grid grid-cols-12 gap-1 relative overflow-hidden">
-                          <div class="col-span-4 bg-blue-600/30 border border-blue-500/50 rounded-xs flex items-center justify-center text-[9px] text-blue-200 font-bold">P1 (Laterales)</div>
-                          <div class="col-span-4 bg-blue-600/30 border border-blue-500/50 rounded-xs flex items-center justify-center text-[9px] text-blue-200 font-bold">P2 (Laterales)</div>
-                          <div class="col-span-4 bg-indigo-600/30 border border-indigo-500/50 rounded-xs flex items-center justify-center text-[9px] text-indigo-200 font-bold">P3 (Piso)</div>
-                          <div class="col-span-6 bg-purple-600/30 border border-purple-500/50 rounded-xs flex items-center justify-center text-[9px] text-purple-200 font-bold">P4 Amarres (x2)</div>
+                          <div class="col-span-4 bg-zinc-700/40 border border-zinc-600/60 rounded-xs flex items-center justify-center text-[9px] text-zinc-200 font-bold">P1 (Laterales)</div>
+                          <div class="col-span-4 bg-zinc-700/40 border border-zinc-600/60 rounded-xs flex items-center justify-center text-[9px] text-zinc-200 font-bold">P2 (Laterales)</div>
+                          <div class="col-span-4 bg-zinc-700/40 border border-zinc-600/60 rounded-xs flex items-center justify-center text-[9px] text-zinc-200 font-bold">P3 (Piso)</div>
+                          <div class="col-span-6 bg-zinc-700/30 border border-zinc-600/50 rounded-xs flex items-center justify-center text-[9px] text-zinc-300 font-bold">P4 Amarres (x2)</div>
                           <div class="col-span-4 bg-emerald-600/30 border border-emerald-500/50 rounded-xs flex items-center justify-center text-[9px] text-emerald-200 font-bold">P5 Frente</div>
                           <div class="col-span-2 bg-rose-600/20 border border-dashed border-rose-500/40 rounded-xs flex items-center justify-center text-[8px] text-rose-300">Sobrante</div>
                         </div>
@@ -522,12 +555,12 @@
                         </div>
 
                         <!-- Cajón Inferior con Smart Cavity Fit -->
-                        <div class="h-10 w-full bg-indigo-500/20 border border-indigo-400/40 rounded-xs flex items-center justify-between px-3 text-[10px] text-indigo-200">
+                        <div class="h-10 w-full bg-sky-500/20 border border-sky-400/40 rounded-xs flex items-center justify-between px-3 text-[10px] text-sky-200">
                           <span class="font-bold flex items-center gap-1.5">
-                            <hugeicons-icon [icon]="icons.cabinet" [size]="13" class="text-indigo-400"></hugeicons-icon>
+                            <hugeicons-icon [icon]="icons.cabinet" [size]="13" class="text-sky-400"></hugeicons-icon>
                             <span>{{ 'landing.mockup.smartDrawer' | t }}</span>
                           </span>
-                          <span class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300 font-semibold">{{ 'landing.mockup.slidesClearance' | t }}</span>
+                          <span class="text-[9px] px-1.5 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-300 font-semibold">{{ 'landing.mockup.slidesClearance' | t }}</span>
                         </div>
 
                         <!-- Base y Zócalo -->
@@ -629,8 +662,8 @@
 
       <!-- Encabezado de Sección -->
       <div class="text-center max-w-3xl mx-auto">
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold mb-3">
-          <hugeicons-icon [icon]="icons.settings" [size]="14" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-700 text-xs font-semibold mb-3">
+          <hugeicons-icon [icon]="icons.settings" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>{{ 'landing.features.badge' | t }}</span>
         </div>
         <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -645,13 +678,13 @@
       <div class="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
 
         <!-- Pilar 1: Diseño Paramétrico + Cajones Inteligentes -->
-        <div class="p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-blue-600/40 transition-colors shadow-2xs flex flex-col justify-between group">
+        <div class="p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between group">
           <div>
             <div class="flex items-center justify-between">
-              <div class="w-11 h-11 rounded-md bg-blue-600/10 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <div class="w-11 h-11 rounded-md bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                 <hugeicons-icon [icon]="icons.cabinet" [size]="22" [strokeWidth]="2"></hugeicons-icon>
               </div>
-              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
                 {{ 'landing.features.f1Tag' | t }}
               </span>
             </div>
@@ -662,20 +695,20 @@
               {{ 'landing.features.f1Desc' | t }}
             </p>
           </div>
-          <div class="mt-5 pt-3 border-t border-slate-200/60 flex items-center text-[11px] font-semibold text-blue-600 gap-1">
+          <div class="mt-5 pt-3 border-t border-zinc-200/60 flex items-center text-[11px] font-semibold text-zinc-900 gap-1">
             <span>{{ 'landing.features.linkF1' | t }}</span>
             <hugeicons-icon [icon]="icons.arrowRight" [size]="12"></hugeicons-icon>
           </div>
         </div>
 
         <!-- Pilar 2: Cotas de Luz Interna HD en Tiempo Real -->
-        <div class="p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-blue-600/40 transition-colors shadow-2xs flex flex-col justify-between group">
+        <div class="p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between group">
           <div>
             <div class="flex items-center justify-between">
-              <div class="w-11 h-11 rounded-md bg-emerald-600/10 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <div class="w-11 h-11 rounded-md bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                 <hugeicons-icon [icon]="icons.ruler" [size]="22" [strokeWidth]="2"></hugeicons-icon>
               </div>
-              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
                 {{ 'landing.features.f2Tag' | t }}
               </span>
             </div>
@@ -686,20 +719,20 @@
               {{ 'landing.features.f2Desc' | t }}
             </p>
           </div>
-          <div class="mt-5 pt-3 border-t border-slate-200/60 flex items-center text-[11px] font-semibold text-emerald-600 gap-1">
+          <div class="mt-5 pt-3 border-t border-zinc-200/60 flex items-center text-[11px] font-semibold text-zinc-900 gap-1">
             <span>{{ 'landing.features.linkF2' | t }}</span>
             <hugeicons-icon [icon]="icons.arrowRight" [size]="12"></hugeicons-icon>
           </div>
         </div>
 
         <!-- Pilar 3: Optimizador de Corte 2D Guillotina Real -->
-        <div class="p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-blue-600/40 transition-colors shadow-2xs flex flex-col justify-between group">
+        <div class="p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between group">
           <div>
             <div class="flex items-center justify-between">
-              <div class="w-11 h-11 rounded-md bg-indigo-600/10 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+              <div class="w-11 h-11 rounded-md bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                 <hugeicons-icon [icon]="icons.scissors" [size]="22" [strokeWidth]="2"></hugeicons-icon>
               </div>
-              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
                 {{ 'landing.features.f3Tag' | t }}
               </span>
             </div>
@@ -710,20 +743,20 @@
               {{ 'landing.features.f3Desc' | t }}
             </p>
           </div>
-          <div class="mt-5 pt-3 border-t border-slate-200/60 flex items-center text-[11px] font-semibold text-indigo-600 gap-1">
+          <div class="mt-5 pt-3 border-t border-zinc-200/60 flex items-center text-[11px] font-semibold text-zinc-900 gap-1">
             <span>{{ 'landing.features.linkF3' | t }}</span>
             <hugeicons-icon [icon]="icons.arrowRight" [size]="12"></hugeicons-icon>
           </div>
         </div>
 
         <!-- Pilar 4: Presupuesto Multimoneda en Vivo -->
-        <div class="p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-blue-600/40 transition-colors shadow-2xs flex flex-col justify-between group">
+        <div class="p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between group">
           <div>
             <div class="flex items-center justify-between">
-              <div class="w-11 h-11 rounded-md bg-amber-600/10 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
+              <div class="w-11 h-11 rounded-md bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                 <hugeicons-icon [icon]="icons.tag" [size]="22" [strokeWidth]="2"></hugeicons-icon>
               </div>
-              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
                 {{ 'landing.features.f4Tag' | t }}
               </span>
             </div>
@@ -734,20 +767,20 @@
               {{ 'landing.features.f4Desc' | t }}
             </p>
           </div>
-          <div class="mt-5 pt-3 border-t border-slate-200/60 flex items-center text-[11px] font-semibold text-amber-600 gap-1">
+          <div class="mt-5 pt-3 border-t border-zinc-200/60 flex items-center text-[11px] font-semibold text-zinc-900 gap-1">
             <span>{{ 'landing.features.linkF4' | t }}</span>
             <hugeicons-icon [icon]="icons.arrowRight" [size]="12"></hugeicons-icon>
           </div>
         </div>
 
         <!-- Pilar 5: Guías de Armado Paso a Paso (Manuales RTA) -->
-        <div class="p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-blue-600/40 transition-colors shadow-2xs flex flex-col justify-between group">
+        <div class="p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between group">
           <div>
             <div class="flex items-center justify-between">
-              <div class="w-11 h-11 rounded-md bg-purple-600/10 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+              <div class="w-11 h-11 rounded-md bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                 <hugeicons-icon [icon]="icons.book" [size]="22" [strokeWidth]="2"></hugeicons-icon>
               </div>
-              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200">
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
                 {{ 'landing.features.f5Tag' | t }}
               </span>
             </div>
@@ -758,20 +791,20 @@
               {{ 'landing.features.f5Desc' | t }}
             </p>
           </div>
-          <div class="mt-5 pt-3 border-t border-slate-200/60 flex items-center text-[11px] font-semibold text-purple-600 gap-1">
+          <div class="mt-5 pt-3 border-t border-zinc-200/60 flex items-center text-[11px] font-semibold text-zinc-900 gap-1">
             <span>{{ 'landing.features.linkF5' | t }}</span>
             <hugeicons-icon [icon]="icons.arrowRight" [size]="12"></hugeicons-icon>
           </div>
         </div>
 
         <!-- Pilar 6: Exportación Industrial (DXF CNC + Modelo 3D .DAE) -->
-        <div class="p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-blue-600/40 transition-colors shadow-2xs flex flex-col justify-between group">
+        <div class="p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between group">
           <div>
             <div class="flex items-center justify-between">
-              <div class="w-11 h-11 rounded-md bg-sky-600/10 text-sky-600 flex items-center justify-center group-hover:bg-sky-600 group-hover:text-white transition-colors">
+              <div class="w-11 h-11 rounded-md bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                 <hugeicons-icon [icon]="icons.download" [size]="22" [strokeWidth]="2"></hugeicons-icon>
               </div>
-              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200">
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
                 {{ 'landing.features.f6Tag' | t }}
               </span>
             </div>
@@ -782,7 +815,7 @@
               {{ 'landing.features.f6Desc' | t }}
             </p>
           </div>
-          <div class="mt-5 pt-3 border-t border-slate-200/60 flex items-center text-[11px] font-semibold text-sky-600 gap-1">
+          <div class="mt-5 pt-3 border-t border-zinc-200/60 flex items-center text-[11px] font-semibold text-zinc-900 gap-1">
             <span>{{ 'landing.features.linkF6' | t }}</span>
             <hugeicons-icon [icon]="icons.arrowRight" [size]="12"></hugeicons-icon>
           </div>
@@ -801,8 +834,8 @@
 
       <!-- Encabezado de Sección -->
       <div class="text-center max-w-3xl mx-auto">
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold mb-3">
-          <hugeicons-icon [icon]="icons.shield" [size]="14" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-700 text-xs font-semibold mb-3">
+          <hugeicons-icon [icon]="icons.shield" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>{{ 'landing.comparison.badge' | t }}</span>
         </div>
         <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -819,13 +852,13 @@
           <thead>
             <tr class="border-b border-slate-200 bg-slate-100/70 text-xs text-slate-700">
               <th class="p-4 sm:p-5 font-bold w-2/5">{{ 'landing.comparison.colFeature' | t }}</th>
-              <th class="p-4 sm:p-5 font-extrabold text-blue-700 bg-blue-50/70 w-1/5 border-x border-blue-200/60 border-t-2 border-t-blue-600 text-center relative">
+              <th class="p-4 sm:p-5 font-extrabold text-zinc-900 bg-zinc-50/80 w-1/5 border-x border-zinc-200 border-t-2 border-t-zinc-900 text-center relative">
                 <div class="flex flex-col items-center justify-center gap-1">
-                  <span class="inline-block px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-blue-600 text-white rounded-md shadow-2xs">
+                  <span class="inline-block px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-zinc-900 text-white rounded-md shadow-2xs">
                     {{ 'landing.comparison.colUsBadge' | t }}
                   </span>
                   <div class="flex items-center justify-center gap-1.5 mt-0.5">
-                    <hugeicons-icon [icon]="icons.brand" [size]="14" class="text-blue-600"></hugeicons-icon>
+                    <hugeicons-icon [icon]="icons.brand" [size]="14" class="text-zinc-900"></hugeicons-icon>
                     <span>{{ 'landing.comparison.colUs' | t }}</span>
                   </div>
                 </div>
@@ -839,9 +872,9 @@
             <!-- Fila 1 -->
             <tr class="hover:bg-slate-50/60 transition">
               <td class="p-4 sm:p-5 font-semibold text-slate-800">{{ 'landing.comparison.r1Title' | t }}</td>
-              <td class="p-4 sm:p-5 bg-blue-50/35 border-x border-blue-200/60 text-center font-bold text-blue-700">
+              <td class="p-4 sm:p-5 bg-zinc-50/80 border-x border-zinc-200 text-center font-bold text-zinc-900">
                 <div class="flex items-center justify-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                   <span>{{ 'landing.comparison.r1Us' | t }}</span>
                 </div>
               </td>
@@ -862,9 +895,9 @@
             <!-- Fila 2 -->
             <tr class="hover:bg-slate-50/60 transition">
               <td class="p-4 sm:p-5 font-semibold text-slate-800">{{ 'landing.comparison.r2Title' | t }}</td>
-              <td class="p-4 sm:p-5 bg-blue-50/35 border-x border-blue-200/60 text-center font-bold text-blue-700">
+              <td class="p-4 sm:p-5 bg-zinc-50/80 border-x border-zinc-200 text-center font-bold text-zinc-900">
                 <div class="flex items-center justify-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                   <span>{{ 'landing.comparison.r2Us' | t }}</span>
                 </div>
               </td>
@@ -885,9 +918,9 @@
             <!-- Fila 3 -->
             <tr class="hover:bg-slate-50/60 transition">
               <td class="p-4 sm:p-5 font-semibold text-slate-800">{{ 'landing.comparison.r3Title' | t }}</td>
-              <td class="p-4 sm:p-5 bg-blue-50/35 border-x border-blue-200/60 text-center font-bold text-blue-700">
+              <td class="p-4 sm:p-5 bg-zinc-50/80 border-x border-zinc-200 text-center font-bold text-zinc-900">
                 <div class="flex items-center justify-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                   <span>{{ 'landing.comparison.r3Us' | t }}</span>
                 </div>
               </td>
@@ -908,9 +941,9 @@
             <!-- Fila 4 -->
             <tr class="hover:bg-slate-50/60 transition">
               <td class="p-4 sm:p-5 font-semibold text-slate-800">{{ 'landing.comparison.r4Title' | t }}</td>
-              <td class="p-4 sm:p-5 bg-blue-50/35 border-x border-blue-200/60 text-center font-bold text-blue-700">
+              <td class="p-4 sm:p-5 bg-zinc-50/80 border-x border-zinc-200 text-center font-bold text-zinc-900">
                 <div class="flex items-center justify-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                   <span>{{ 'landing.comparison.r4Us' | t }}</span>
                 </div>
               </td>
@@ -931,9 +964,9 @@
             <!-- Fila 5 -->
             <tr class="hover:bg-slate-50/60 transition">
               <td class="p-4 sm:p-5 font-semibold text-slate-800">{{ 'landing.comparison.r5Title' | t }}</td>
-              <td class="p-4 sm:p-5 bg-blue-50/35 border-x border-blue-200/60 text-center font-bold text-blue-700">
+              <td class="p-4 sm:p-5 bg-zinc-50/80 border-x border-zinc-200 text-center font-bold text-zinc-900">
                 <div class="flex items-center justify-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                   <span>{{ 'landing.comparison.r5Us' | t }}</span>
                 </div>
               </td>
@@ -954,9 +987,9 @@
             <!-- Fila 6 -->
             <tr class="hover:bg-slate-50/60 transition">
               <td class="p-4 sm:p-5 font-semibold text-slate-800">{{ 'landing.comparison.r6Title' | t }}</td>
-              <td class="p-4 sm:p-5 bg-blue-50/35 border-x border-blue-200/60 text-center font-bold text-blue-700">
+              <td class="p-4 sm:p-5 bg-zinc-50/80 border-x border-zinc-200 text-center font-bold text-zinc-900">
                 <div class="flex items-center justify-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                   <span>{{ 'landing.comparison.r6Us' | t }}</span>
                 </div>
               </td>
@@ -977,9 +1010,9 @@
             <!-- Fila 7 -->
             <tr class="hover:bg-slate-50/60 transition">
               <td class="p-4 sm:p-5 font-semibold text-slate-800">{{ 'landing.comparison.r7Title' | t }}</td>
-              <td class="p-4 sm:p-5 bg-blue-50/35 border-x border-blue-200/60 text-center font-bold text-blue-700">
+              <td class="p-4 sm:p-5 bg-zinc-50/80 border-x border-zinc-200 text-center font-bold text-zinc-900">
                 <div class="flex items-center justify-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.check" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                   <span>{{ 'landing.comparison.r7Us' | t }}</span>
                 </div>
               </td>
@@ -1013,8 +1046,8 @@
 
         <!-- Columna Izquierda: Historia, Enfoque y Bloque Nuestra Misión -->
         <div class="lg:col-span-6 flex flex-col justify-center">
-          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold mb-4 w-fit">
-            <hugeicons-icon [icon]="icons.sparkles" [size]="14" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-800 text-xs font-semibold mb-4 w-fit">
+            <hugeicons-icon [icon]="icons.sparkles" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
             <span>{{ 'landing.about.badge' | t }}</span>
           </div>
 
@@ -1031,9 +1064,9 @@
           </p>
 
           <!-- Bloque Destacado — Nuestra Misión -->
-          <div class="mt-6 p-4 sm:p-5 rounded-xl bg-gradient-to-br from-blue-50/80 to-slate-50 border border-blue-200/80 shadow-2xs flex flex-col gap-2">
-            <div class="flex items-center gap-2 text-blue-900 font-bold text-xs sm:text-sm">
-              <div class="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0">
+          <div class="mt-6 p-4 sm:p-5 rounded-xl bg-zinc-50 border border-zinc-200 shadow-2xs flex flex-col gap-2">
+            <div class="flex items-center gap-2 text-zinc-900 font-bold text-xs sm:text-sm">
+              <div class="w-7 h-7 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 flex items-center justify-center shrink-0">
                 <hugeicons-icon [icon]="icons.rocket" [size]="15" [strokeWidth]="2"></hugeicons-icon>
               </div>
               <span>{{ 'landing.about.missionTitle' | t }}</span>
@@ -1045,8 +1078,9 @@
 
           <div class="mt-8 flex items-center gap-4">
             <a
-              routerLink="/studio"
-              class="inline-flex items-center justify-center gap-2 min-h-11 px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition shadow-sm hover:shadow-md cursor-pointer">
+              [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
+              [queryParams]="isAuthenticated() ? null : { mode: 'login' }"
+              class="inline-flex items-center justify-center gap-2 min-h-11 px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs sm:text-sm font-bold transition shadow-sm hover:shadow-md cursor-pointer">
               <hugeicons-icon [icon]="icons.cube" [size]="16"></hugeicons-icon>
               <span>{{ 'landing.hero.ctaStudio' | t }}</span>
             </a>
@@ -1057,13 +1091,13 @@
         <div class="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
 
           <!-- Pilar 1: 4 Herramientas en 1 -->
-          <div class="p-5 sm:p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-blue-600/40 transition-colors shadow-2xs flex flex-col justify-between h-full group">
+          <div class="p-5 sm:p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between h-full group">
             <div>
               <div class="flex items-center justify-between">
-                <div class="w-10 h-10 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                <div class="w-10 h-10 rounded-lg bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                   <hugeicons-icon [icon]="icons.layers" [size]="20" [strokeWidth]="2"></hugeicons-icon>
                 </div>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-100/70 border border-blue-200/60 text-blue-700 font-bold text-[11px]">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px]">
                   {{ 'landing.about.kpi1Val' | t }}
                 </span>
               </div>
@@ -1077,13 +1111,13 @@
           </div>
 
           <!-- Pilar 2: Cero Plugins ni Instalaciones -->
-          <div class="p-5 sm:p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-emerald-600/40 transition-colors shadow-2xs flex flex-col justify-between h-full group">
+          <div class="p-5 sm:p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between h-full group">
             <div>
               <div class="flex items-center justify-between">
-                <div class="w-10 h-10 rounded-lg bg-emerald-600/10 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <div class="w-10 h-10 rounded-lg bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                   <hugeicons-icon [icon]="icons.cloud" [size]="20" [strokeWidth]="2"></hugeicons-icon>
                 </div>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-emerald-100/70 border border-emerald-200/60 text-emerald-700 font-bold text-[11px]">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px]">
                   {{ 'landing.about.kpi2Val' | t }}
                 </span>
               </div>
@@ -1097,13 +1131,13 @@
           </div>
 
           <!-- Pilar 3: Para Profesionales y Aficionados -->
-          <div class="p-5 sm:p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-purple-600/40 transition-colors shadow-2xs flex flex-col justify-between h-full group">
+          <div class="p-5 sm:p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between h-full group">
             <div>
               <div class="flex items-center justify-between">
-                <div class="w-10 h-10 rounded-lg bg-purple-600/10 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                <div class="w-10 h-10 rounded-lg bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                   <hugeicons-icon [icon]="icons.user" [size]="20" [strokeWidth]="2"></hugeicons-icon>
                 </div>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-purple-100/70 border border-purple-200/60 text-purple-700 font-bold text-[11px]">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px]">
                   {{ 'landing.about.kpi3Val' | t }}
                 </span>
               </div>
@@ -1117,13 +1151,13 @@
           </div>
 
           <!-- Pilar 4: Precisión Real de Taller -->
-          <div class="p-5 sm:p-6 rounded-xl bg-slate-50 border border-slate-200/90 hover:border-amber-600/40 transition-colors shadow-2xs flex flex-col justify-between h-full group">
+          <div class="p-5 sm:p-6 rounded-xl bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 transition-colors shadow-2xs flex flex-col justify-between h-full group">
             <div>
               <div class="flex items-center justify-between">
-                <div class="w-10 h-10 rounded-lg bg-amber-600/10 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                <div class="w-10 h-10 rounded-lg bg-zinc-100 border border-zinc-200/80 text-zinc-900 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-colors">
                   <hugeicons-icon [icon]="icons.ruler" [size]="20" [strokeWidth]="2"></hugeicons-icon>
                 </div>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-amber-100/70 border border-amber-200/60 text-amber-700 font-bold text-[11px]">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px]">
                   {{ 'landing.about.kpi4Val' | t }}
                 </span>
               </div>
@@ -1150,8 +1184,8 @@
 
       <!-- Encabezado de Precios -->
       <div class="text-center max-w-3xl mx-auto">
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold mb-3">
-          <hugeicons-icon [icon]="icons.tag" [size]="14" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-700 text-xs font-semibold mb-3">
+          <hugeicons-icon [icon]="icons.tag" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>{{ 'landing.pricing.badge' | t }}</span>
         </div>
         <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -1265,23 +1299,25 @@
 
           <div class="mt-8 pt-4">
             <a
-              routerLink="/studio"
-              class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-2xs transition cursor-pointer">
+              [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
+              [queryParams]="isAuthenticated() ? null : { mode: 'register' }"
+              data-testid="pricing-cta-starter"
+              class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-2xs transition cursor-pointer">
               <span>{{ 'landing.pricing.planStarterCta' | t }}</span>
             </a>
           </div>
         </div>
 
         <!-- PLAN 2: TALLER PRO (DESTACADO / MÁS POPULAR) -->
-        <div class="p-7 rounded-xl bg-white border-2 border-blue-600 flex flex-col justify-between shadow-xl relative transform lg:-translate-y-2">
+        <div class="p-7 rounded-xl bg-white border-2 border-zinc-900 flex flex-col justify-between shadow-md relative transform lg:-translate-y-2">
           <!-- Badge Superior Destacado -->
-          <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-blue-600 text-white text-[11px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1">
+          <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-zinc-900 text-white text-[11px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1">
             <hugeicons-icon [icon]="icons.sparkles" [size]="12"></hugeicons-icon>
             <span>{{ 'landing.pricing.planProBadge' | t }}</span>
           </div>
 
           <div>
-            <div class="text-[10px] font-bold uppercase tracking-wider text-blue-600 mb-1">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-900 mb-1">
               {{ 'landing.pricing.planProBadge' | t }}
             </div>
             <h3 class="text-xl font-bold text-slate-900">
@@ -1306,9 +1342,9 @@
                 </div>
               }
               @if (getConvertedPrice(billingCycle() === 'monthly' ? pricingConfig().pro.monthly : pricingConfig().pro.yearly); as converted) {
-                <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold">
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-900 text-xs font-semibold">
                   <span>{{ converted }} {{ 'landing.pricing.planProPeriod' | t }}</span>
-                  <span class="text-[10px] text-blue-500/80 font-normal">({{ 'landing.pricing.currencyNotice' | t }})</span>
+                  <span class="text-[10px] text-zinc-500 font-normal">({{ 'landing.pricing.currencyNotice' | t }})</span>
                 </div>
               }
             </div>
@@ -1329,32 +1365,33 @@
                 <span class="leading-snug">{{ 'landing.pricing.planProF2' | t }}</span>
               </div>
               <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planProF3' | t }}</span>
               </div>
               <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planProF4' | t }}</span>
               </div>
               <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planProF5' | t }}</span>
               </div>
               <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planProF6' | t }}</span>
               </div>
             </div>
           </div>
 
           <div class="mt-8 pt-4">
-            <button
-              type="button"
-              (click)="openLoginModal('pro')"
-              class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-md bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold shadow-md hover:shadow-lg transition cursor-pointer">
+            <a
+              [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
+              [queryParams]="isAuthenticated() ? null : { mode: 'register' }"
+              data-testid="pricing-cta-pro"
+              class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-950 text-white text-xs font-bold shadow-md hover:shadow-lg transition cursor-pointer">
               <span>{{ 'landing.pricing.planProCta' | t }}</span>
               <hugeicons-icon [icon]="icons.arrowRight" [size]="14"></hugeicons-icon>
-            </button>
+            </a>
           </div>
         </div>
 
@@ -1395,39 +1432,40 @@
 
             <div class="mt-6 pt-5 border-t border-slate-100 space-y-3 text-xs text-slate-700">
               <div class="flex items-start gap-2.5 font-semibold text-slate-900">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-emerald-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planIndF1' | t }}</span>
               </div>
-              <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+              <div class="flex items-start gap-2.5 font-semibold text-slate-900">
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-emerald-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planIndF2' | t }}</span>
               </div>
               <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planIndF3' | t }}</span>
               </div>
               <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planIndF4' | t }}</span>
               </div>
               <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planIndF5' | t }}</span>
               </div>
               <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
+                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
                 <span class="leading-snug">{{ 'landing.pricing.planIndF6' | t }}</span>
               </div>
             </div>
           </div>
 
           <div class="mt-8 pt-4">
-            <button
-              type="button"
-              (click)="openLoginModal('industrial')"
-              class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-2xs transition cursor-pointer">
+            <a
+              [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
+              [queryParams]="isAuthenticated() ? null : { mode: 'register' }"
+              data-testid="pricing-cta-industrial"
+              class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-2xs transition cursor-pointer">
               <span>{{ 'landing.pricing.planIndCta' | t }}</span>
-            </button>
+            </a>
           </div>
         </div>
 
@@ -1444,8 +1482,8 @@
 
       <!-- Encabezado de Requisitos -->
       <div class="text-center max-w-3xl mx-auto">
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold mb-3">
-          <hugeicons-icon [icon]="icons.laptop" [size]="14" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-700 text-xs font-semibold mb-3">
+          <hugeicons-icon [icon]="icons.laptop" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>{{ 'landing.requirements.badge' | t }}</span>
         </div>
         <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -1537,14 +1575,14 @@
           </div>
         </div>
 
-        <!-- Tarjeta Derecha: Requisitos Recomendados (Destacada con borde sutil azul/pizarra) -->
-        <div class="p-5 sm:p-7 rounded-xl bg-gradient-to-br from-white to-blue-50/30 border-2 border-blue-600/40 shadow-sm hover:shadow-md transition flex flex-col justify-between relative ring-1 ring-blue-500/10">
+        <!-- Tarjeta Derecha: Requisitos Recomendados (Destacada con borde sobrio grafito) -->
+        <div class="p-5 sm:p-7 rounded-xl bg-white border-2 border-zinc-900 shadow-sm hover:shadow-md transition flex flex-col justify-between relative">
           <div>
             <div class="flex flex-wrap items-center justify-between gap-2.5 mb-4">
-              <div class="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <div class="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
                 <hugeicons-icon [icon]="icons.rocket" [size]="20" [strokeWidth]="2"></hugeicons-icon>
               </div>
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-100/80 border border-blue-200 text-blue-700 font-bold text-[11px]">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-800 font-bold text-[11px]">
                 <hugeicons-icon [icon]="icons.sparkles" [size]="12"></hugeicons-icon>
                 <span>{{ 'landing.requirements.recBadge' | t }}</span>
               </span>
@@ -1553,14 +1591,14 @@
             <h3 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
               {{ 'landing.requirements.recTitle' | t }}
             </h3>
-            <p class="mt-1.5 text-xs text-blue-700/80 font-medium leading-relaxed">
+            <p class="mt-1.5 text-xs text-zinc-600 font-medium leading-relaxed">
               {{ 'landing.requirements.recDesc' | t }}
             </p>
 
-            <div class="mt-6 pt-5 border-t border-blue-100 space-y-4 text-xs">
+            <div class="mt-6 pt-5 border-t border-zinc-200 space-y-4 text-xs">
               <!-- RAM -->
               <div class="flex items-start gap-3 text-slate-700">
-                <div class="w-7 h-7 rounded-md bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <div class="w-7 h-7 rounded-md bg-zinc-100 border border-zinc-200 text-sky-600 flex items-center justify-center shrink-0 mt-0.5">
                   <hugeicons-icon [icon]="icons.chip" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 </div>
                 <div>
@@ -1571,7 +1609,7 @@
 
               <!-- CPU & Graphics -->
               <div class="flex items-start gap-3 text-slate-700">
-                <div class="w-7 h-7 rounded-md bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <div class="w-7 h-7 rounded-md bg-zinc-100 border border-zinc-200 text-sky-600 flex items-center justify-center shrink-0 mt-0.5">
                   <hugeicons-icon [icon]="icons.cpu" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 </div>
                 <div>
@@ -1582,7 +1620,7 @@
 
               <!-- Display -->
               <div class="flex items-start gap-3 text-slate-700">
-                <div class="w-7 h-7 rounded-md bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <div class="w-7 h-7 rounded-md bg-zinc-100 border border-zinc-200 text-sky-600 flex items-center justify-center shrink-0 mt-0.5">
                   <hugeicons-icon [icon]="icons.computer" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 </div>
                 <div>
@@ -1593,7 +1631,7 @@
 
               <!-- Peripherals -->
               <div class="flex items-start gap-3 text-slate-700">
-                <div class="w-7 h-7 rounded-md bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <div class="w-7 h-7 rounded-md bg-zinc-100 border border-zinc-200 text-sky-600 flex items-center justify-center shrink-0 mt-0.5">
                   <hugeicons-icon [icon]="icons.mouse" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 </div>
                 <div>
@@ -1604,7 +1642,7 @@
 
               <!-- Connection -->
               <div class="flex items-start gap-3 text-slate-700">
-                <div class="w-7 h-7 rounded-md bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <div class="w-7 h-7 rounded-md bg-zinc-100 border border-zinc-200 text-sky-600 flex items-center justify-center shrink-0 mt-0.5">
                   <hugeicons-icon [icon]="icons.wifi" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                 </div>
                 <div>
@@ -1639,8 +1677,8 @@
 
       <!-- Encabezado de Testimonios -->
       <div class="text-center max-w-3xl mx-auto">
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold mb-3">
-          <hugeicons-icon [icon]="icons.quote" [size]="14" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-700 text-xs font-semibold mb-3">
+          <hugeicons-icon [icon]="icons.quote" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>{{ 'landing.testimonials.badge' | t }}</span>
         </div>
         <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -1784,8 +1822,9 @@
           <span class="text-xs font-bold uppercase tracking-wider text-slate-200">{{ 'landing.footer.productTitle' | t }}</span>
           <div class="flex flex-col gap-2.5">
             <a
-              routerLink="/studio"
-              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition w-fit cursor-pointer">
+              [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
+              [queryParams]="isAuthenticated() ? null : { mode: 'login' }"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition w-fit cursor-pointer">
               <hugeicons-icon [icon]="icons.cube" [size]="15"></hugeicons-icon>
               <span>{{ 'landing.nav.openStudio' | t }}</span>
             </a>
@@ -1811,7 +1850,7 @@
               type="button"
               (click)="selectLanguage(lang.code)"
               class="px-2 py-1 rounded text-[11px] font-bold transition cursor-pointer"
-              [class]="i18n.currentLang() === lang.code ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+              [class]="i18n.currentLang() === lang.code ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
               {{ lang.iso }}
             </button>
           }
@@ -1845,17 +1884,17 @@
           <hugeicons-icon [icon]="icons.cancel" [size]="18"></hugeicons-icon>
         </button>
 
-        <div class="w-12 h-12 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+        <div class="w-12 h-12 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-900 flex items-center justify-center mb-4">
           <hugeicons-icon [icon]="icons.user" [size]="24" [strokeWidth]="2"></hugeicons-icon>
         </div>
 
         @if (selectedPlanKey() === 'pro') {
-          <div class="mb-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold">
+          <div class="mb-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-800 text-xs font-bold">
             <hugeicons-icon [icon]="icons.sparkles" [size]="13"></hugeicons-icon>
             <span>{{ 'landing.auth.planProSelected' | t }}</span>
           </div>
         } @else if (selectedPlanKey() === 'industrial') {
-          <div class="mb-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold">
+          <div class="mb-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-800 text-xs font-bold">
             <hugeicons-icon [icon]="icons.settings" [size]="13"></hugeicons-icon>
             <span>{{ 'landing.auth.planIndSelected' | t }}</span>
           </div>
@@ -1865,7 +1904,7 @@
           {{ 'landing.auth.modalTitle' | t }}
         </h3>
 
-        <div class="text-xs font-semibold text-blue-700 mt-1">
+        <div class="text-xs font-semibold text-zinc-900 mt-1">
           {{ 'landing.auth.modalSubtitle' | t }}
         </div>
 
@@ -1877,7 +1916,7 @@
           <button
             type="button"
             (click)="goToStudio()"
-            class="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow transition cursor-pointer">
+            class="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold shadow transition cursor-pointer">
             <hugeicons-icon [icon]="icons.rocket" [size]="15"></hugeicons-icon>
             <span>{{ 'landing.auth.modalCta' | t }}</span>
           </button>

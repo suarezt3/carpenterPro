@@ -63,7 +63,7 @@
       @if (submitSuccess(); as successData) {
         <!-- ESTADO DE ÉXITO CONFIRMADO -->
         <div class="max-w-2xl mx-auto py-8 px-4 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
-          <div class="w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-blue-50 text-blue-600 border border-blue-200 dark:bg-zinc-800 dark:text-blue-400 dark:border-zinc-700 shadow-sm">
+          <div class="w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-zinc-100 text-zinc-900 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 shadow-sm">
             <hugeicons-icon [icon]="icons.success" [size]="36" [strokeWidth]="2.2"></hugeicons-icon>
           </div>
 
@@ -77,8 +77,8 @@
 
           <!-- Banner de confirmación para testimonios públicos -->
           @if (successData.is_approved_public) {
-            <div class="w-full max-w-md p-3.5 mb-6 rounded-lg border flex items-center gap-3 text-left bg-blue-50/60 dark:bg-zinc-800/60 border-blue-200 dark:border-zinc-700 text-blue-950 dark:text-zinc-200 shadow-xs">
-              <hugeicons-icon [icon]="icons.sparkles" [size]="18" [strokeWidth]="2" class="text-blue-600 dark:text-blue-400 shrink-0"></hugeicons-icon>
+            <div class="w-full max-w-md p-3.5 mb-6 rounded-lg border flex items-center gap-3 text-left bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-200 shadow-xs">
+              <hugeicons-icon [icon]="icons.sparkles" [size]="18" [strokeWidth]="2" class="text-sky-600 dark:text-sky-400 shrink-0"></hugeicons-icon>
               <div class="text-xs">
                 <span class="font-bold block">{{ 'feedback.approvedBadge' | t }}</span>
                 <span>{{ 'feedback.successAutoApproved' | t }}</span>
@@ -90,7 +90,7 @@
             <button
               type="button"
               (click)="resetForm()"
-              class="px-4 py-2 rounded-md font-medium transition cursor-pointer bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5">
+              class="px-4 py-2 rounded-md font-medium transition cursor-pointer bg-zinc-900 hover:bg-zinc-800 text-white shadow-xs flex items-center gap-1.5">
               <hugeicons-icon [icon]="icons.send" [size]="14" [strokeWidth]="2"></hugeicons-icon>
               <span>{{ 'feedback.sendAnotherBtn' | t }}</span>
             </button>
@@ -141,7 +141,7 @@
                   class="p-3 rounded-lg border text-left transition flex flex-col gap-1 cursor-pointer">
                   <div class="flex items-center gap-2">
                     <hugeicons-icon [icon]="getCategoryIcon(cat.id)" [size]="16" [strokeWidth]="2"
-                      [class.text-blue-400]="selectedCategory() !== cat.id"></hugeicons-icon>
+                      [class.text-sky-600]="selectedCategory() !== cat.id"></hugeicons-icon>
                     <span class="font-bold text-xs">{{ cat.labelKey | t }}</span>
                   </div>
                   <span class="text-[10px] opacity-75 line-clamp-2 leading-snug">
@@ -361,14 +361,14 @@
                   [placeholder]="'feedback.emailPlaceholder' | t"
                   class="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border outline-hidden transition"
                   [class]="feedbackForm.controls.contact_email.touched && feedbackForm.controls.contact_email.invalid
-                    ? 'border-rose-500 focus:border-rose-500 bg-rose-50/30'
+                    ? 'border-red-500 focus:border-red-500 bg-red-50/30'
                     : (themeService.isClassic()
                       ? 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-900'
                       : 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-zinc-400')"
                 />
               </div>
               @if (feedbackForm.controls.contact_email.touched && feedbackForm.controls.contact_email.invalid) {
-                <span class="text-[10px] text-rose-500 font-medium">
+                <span class="text-[10px] text-red-500 font-medium">
                   {{ 'feedback.emailInvalid' | t }}
                 </span>
               }
@@ -381,7 +381,7 @@
                 <input
                   type="checkbox"
                   formControlName="allow_public_display"
-                  class="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                  class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 w-4 h-4 cursor-pointer"
                 />
                 <span class="text-xs font-medium">{{ 'feedback.allowPublicLabel' | t }}</span>
               </label>
@@ -389,15 +389,15 @@
 
             <!-- ALERTA DE ERROR -->
             @if (submitError()) {
-              <div class="p-3 rounded-md border flex items-center justify-between gap-2 bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-200">
+              <div class="p-3 rounded-md border flex items-center justify-between gap-2 bg-red-50 border-red-200 text-red-800 dark:bg-red-950/40 dark:border-red-900 dark:text-red-200">
                 <div class="flex items-center gap-2">
-                  <hugeicons-icon [icon]="icons.alert" [size]="16" [strokeWidth]="2" class="text-rose-500 shrink-0"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.alert" [size]="16" [strokeWidth]="2" class="text-red-500 shrink-0"></hugeicons-icon>
                   <span class="text-xs font-medium">{{ submitError() }}</span>
                 </div>
                 <button
                   type="button"
                   (click)="submitError.set(null)"
-                  class="text-rose-600 dark:text-rose-400 hover:opacity-80 transition cursor-pointer">
+                  class="text-red-600 dark:text-red-400 hover:opacity-80 transition cursor-pointer">
                   <hugeicons-icon [icon]="icons.cancel" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                 </button>
               </div>
@@ -408,7 +408,7 @@
               <button
                 type="submit"
                 [disabled]="submitting() || messageCharCount() < 10"
-                class="px-5 py-2.5 rounded-md font-medium text-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs bg-blue-600 hover:bg-blue-700 text-white">
+                class="px-5 py-2.5 rounded-md font-medium text-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs bg-zinc-900 hover:bg-zinc-800 text-white">
                 @if (submitting()) {
                   <hugeicons-icon [icon]="icons.loading" [size]="15" [strokeWidth]="2" class="animate-spin"></hugeicons-icon>
                   <span>{{ 'feedback.submitting' | t }}</span>
@@ -464,7 +464,7 @@
             <button
               type="button"
               (click)="switchSubView('form')"
-              class="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-2 shadow-2xs">
+              class="mt-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-2 shadow-2xs">
               <hugeicons-icon [icon]="icons.send" [size]="14" [strokeWidth]="2"></hugeicons-icon>
               <span>{{ 'feedback.createRequestBtn' | t }}</span>
             </button>
@@ -548,7 +548,7 @@
             <button
               type="button"
               (click)="setCategory('testimonial'); switchSubView('form')"
-              class="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-2 shadow-2xs">
+              class="mt-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-2 shadow-2xs">
               <hugeicons-icon [icon]="icons.sparkles" [size]="14" [strokeWidth]="2"></hugeicons-icon>
               <span>{{ 'feedback.beFirstTestimonial' | t }}</span>
             </button>

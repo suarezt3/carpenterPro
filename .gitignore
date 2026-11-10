@@ -41,6 +41,10 @@ yarn-error.log
 testem.log
 /typings
 __screenshots__/
+.agents/teamwork/
+PROJECT.md
+TEST_INFRA.md
+TEST_READY.md
 
 # System files
 .DS_Store

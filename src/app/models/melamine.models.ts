@@ -1234,6 +1234,7 @@ export interface RoomConfiguration {
   floorMaterial: FloorMaterialType;
   wallMaterial: WallMaterialType;
   showFloorGrid: boolean;      // Rejilla técnica milimétrica superpuesta
+  showClearances?: boolean;    // Visualización de cotas de luz interna por defecto
   showSkirting: boolean;       // Zócalo o rodapié inferior
   wallOffsetX: number;         // Desfase modular X en mm (posición del muro)
   wallOffsetZ: number;         // Desfase modular Z en mm (hacia el fondo)
@@ -1258,6 +1259,7 @@ export const DEFAULT_ROOM_CONFIG: RoomConfiguration = {
   floorMaterial: 'concrete_gray',
   wallMaterial: 'kitchen_backsplash_quartz',
   showFloorGrid: true,
+  showClearances: true,
   showSkirting: true,
   wallOffsetX: 0,
   wallOffsetZ: 0,

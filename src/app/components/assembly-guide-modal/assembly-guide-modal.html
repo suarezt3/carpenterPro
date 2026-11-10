@@ -14,7 +14,7 @@
       <!-- BARRA SUPERIOR DE CONTROL (OCULTA EN @media print) -->
       <header class="assembly-guide-toolbar shrink-0 px-4 sm:px-6 py-3.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/90 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+          <div class="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center shrink-0 shadow-xs">
             <hugeicons-icon [icon]="icons.book" [size]="18" [strokeWidth]="2"></hugeicons-icon>
           </div>
           <div class="min-w-0">
@@ -22,7 +22,7 @@
               <h2 class="text-sm sm:text-base font-bold text-zinc-900 dark:text-white truncate">
                 {{ 'assemblyGuide.title' | t }}
               </h2>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700">
                 RTA Manual
               </span>
             </div>
@@ -42,7 +42,7 @@
               id="moduleGuideSelect"
               [value]="selectedModuleId()"
               (change)="onFilterChange($event)"
-              class="px-2.5 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md text-xs font-medium text-zinc-800 dark:text-zinc-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-2xs">
+              class="px-2.5 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md text-xs font-medium text-zinc-800 dark:text-zinc-200 focus:outline-hidden focus:ring-1 focus:ring-zinc-900 cursor-pointer shadow-2xs">
               <option value="all">{{ 'assemblyGuide.allModules' | t }} ({{ allGuides().length }})</option>
               @for (guide of allGuides(); track guide.moduleId) {
                 <option [value]="guide.moduleId">{{ guide.moduleName }}</option>
@@ -54,7 +54,7 @@
           <button
             type="button"
             (click)="printGuide()"
-            class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer">
+            class="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer">
             <hugeicons-icon [icon]="icons.print" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             <span class="whitespace-nowrap">{{ 'assemblyGuide.printPdf' | t }}</span>
           </button>
@@ -94,62 +94,62 @@
               <section class="p-4 sm:p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 space-y-4 print:border-zinc-900 print:bg-white print:p-4 print:break-inside-avoid">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3 print:border-zinc-900">
                   <div>
-                    <span class="text-[10px] font-mono font-bold tracking-widest text-blue-600 dark:text-blue-400 uppercase">
-                      MANUAL RTA · MUEBLE {{ gIdx + 1 }} DE {{ filteredGuides().length }}
+                    <span class="text-[10px] font-mono font-bold tracking-widest text-sky-600 dark:text-sky-400 uppercase">
+                    MANUAL RTA · MUEBLE {{ gIdx + 1 }} DE {{ filteredGuides().length }}
+                  </span>
+                  <h1 class="text-xl sm:text-2xl font-black text-zinc-950 dark:text-white mt-0.5 print:text-zinc-950">
+                    {{ guide.moduleName }}
+                  </h1>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <!-- Dimensiones Exteriores -->
+                  <div class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 shadow-2xs print:border-zinc-900 print:bg-white">
+                    <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
+                    <span class="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 print:text-zinc-950">
+                      {{ guide.dimensions.width }} × {{ guide.dimensions.height }} × {{ guide.dimensions.depth }} mm
                     </span>
-                    <h1 class="text-xl sm:text-2xl font-black text-zinc-950 dark:text-white mt-0.5 print:text-zinc-950">
-                      {{ guide.moduleName }}
-                    </h1>
                   </div>
 
-                  <div class="flex flex-wrap items-center gap-2">
-                    <!-- Dimensiones Exteriores -->
-                    <div class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 shadow-2xs print:border-zinc-900 print:bg-white">
-                      <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-                      <span class="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 print:text-zinc-950">
-                        {{ guide.dimensions.width }} × {{ guide.dimensions.height }} × {{ guide.dimensions.depth }} mm
-                      </span>
-                    </div>
+                  <!-- Total de Piezas -->
+                  <div class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 shadow-2xs print:border-zinc-900 print:bg-white">
+                    <hugeicons-icon [icon]="icons.layers" [size]="14" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
+                    <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 print:text-zinc-950">
+                      {{ guide.totalPartsCount }} {{ 'assemblyGuide.qty' | t }}
+                    </span>
+                  </div>
 
-                    <!-- Total de Piezas -->
-                    <div class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 shadow-2xs print:border-zinc-900 print:bg-white">
-                      <hugeicons-icon [icon]="icons.layers" [size]="14" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-                      <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 print:text-zinc-950">
-                        {{ guide.totalPartsCount }} {{ 'assemblyGuide.qty' | t }}
-                      </span>
-                    </div>
-
-                    <!-- Tiempo Estimado -->
-                    <div class="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 flex items-center gap-1.5 shadow-2xs print:border-zinc-900 print:bg-white print:text-zinc-950">
-                      <hugeicons-icon [icon]="icons.clock" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                      <span class="text-xs font-bold font-mono">
-                        ~{{ guide.estimatedAssemblyTimeMinutes }} {{ 'assemblyGuide.minutes' | t }}
-                      </span>
-                    </div>
+                  <!-- Tiempo Estimado -->
+                  <div class="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 flex items-center gap-1.5 shadow-2xs print:border-zinc-900 print:bg-white print:text-zinc-950">
+                    <hugeicons-icon [icon]="icons.clock" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    <span class="text-xs font-bold font-mono">
+                      ~{{ guide.estimatedAssemblyTimeMinutes }} {{ 'assemblyGuide.minutes' | t }}
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                <!-- Herramientas Requeridas -->
-                <div class="space-y-1.5">
-                  <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 print:text-zinc-950">
-                    {{ 'assemblyGuide.requiredTools' | t }}
-                  </h3>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                    @for (toolKey of guide.requiredTools; track toolKey) {
-                      <div class="p-2 rounded-lg bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 shadow-2xs print:border-zinc-900 print:bg-white print:text-zinc-950">
-                        <hugeicons-icon [icon]="icons.settings" [size]="14" [strokeWidth]="2" class="text-blue-600 shrink-0"></hugeicons-icon>
-                        <span class="leading-tight">{{ toolKey | t }}</span>
-                      </div>
-                    }
-                  </div>
+              <!-- Herramientas Requeridas -->
+              <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 print:text-zinc-950">
+                  {{ 'assemblyGuide.requiredTools' | t }}
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  @for (toolKey of guide.requiredTools; track toolKey) {
+                    <div class="p-2 rounded-lg bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 shadow-2xs print:border-zinc-900 print:bg-white print:text-zinc-950">
+                      <hugeicons-icon [icon]="icons.settings" [size]="14" [strokeWidth]="2" class="text-zinc-600 dark:text-zinc-400 shrink-0"></hugeicons-icon>
+                      <span class="leading-tight">{{ toolKey | t }}</span>
+                    </div>
+                  }
                 </div>
-              </section>
+              </div>
+            </section>
 
-              <!-- DIAGRAMA GENERAL EXPLOSIVO NUMERADO (CANVAS HIGH-DPI) -->
-              <section class="space-y-2 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 bg-white dark:bg-zinc-900 shadow-xs print:border-zinc-900 print:shadow-none print:break-inside-avoid">
-                <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2 print:border-zinc-900">
-                  <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+            <!-- DIAGRAMA GENERAL EXPLOSIVO NUMERADO (CANVAS HIGH-DPI) -->
+            <section class="space-y-2 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 bg-white dark:bg-zinc-900 shadow-xs print:border-zinc-900 print:shadow-none print:break-inside-avoid">
+              <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2 print:border-zinc-900">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-sky-600"></span>
                     <h3 class="text-sm sm:text-base font-bold text-zinc-900 dark:text-white print:text-zinc-950">
                       {{ 'assemblyGuide.explodedViewTitle' | t }}
                     </h3>
@@ -324,16 +324,16 @@
 
                           <!-- Cotas y Alturas en mm (Si aplica para repisas o rieles de corredera) -->
                           @if (step.measurements && step.measurements.length > 0) {
-                            <div class="p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 space-y-1.5 print:bg-zinc-50 print:border-zinc-900">
-                              <span class="text-[11px] font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300 print:text-zinc-950 flex items-center gap-1.5">
+                            <div class="p-2.5 rounded-lg bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900/60 space-y-1.5 print:bg-zinc-50 print:border-zinc-900">
+                              <span class="text-[11px] font-bold uppercase tracking-wider text-sky-900 dark:text-sky-300 print:text-zinc-950 flex items-center gap-1.5">
                                 <hugeicons-icon [icon]="icons.ruler" [size]="13" [strokeWidth]="2"></hugeicons-icon>
                                 <span>{{ 'assemblyGuide.measurements' | t }}</span>
                               </span>
                               <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                 @for (m of step.measurements; track m.label) {
-                                  <div class="flex items-center justify-between gap-2 px-2 py-1 rounded bg-white dark:bg-zinc-900/90 border border-blue-100 dark:border-blue-900/40 text-xs print:border-zinc-900">
+                                  <div class="flex items-center justify-between gap-2 px-2 py-1 rounded bg-white dark:bg-zinc-900/90 border border-sky-100 dark:border-sky-900/40 text-xs print:border-zinc-900">
                                     <span class="text-zinc-700 dark:text-zinc-300 font-medium truncate print:text-zinc-950">{{ m.label }}</span>
-                                    <span class="font-mono font-black text-blue-700 dark:text-blue-400 print:text-zinc-950 whitespace-nowrap">
+                                    <span class="font-mono font-black text-sky-700 dark:text-sky-400 print:text-zinc-950 whitespace-nowrap">
                                       {{ m.valueMm }} mm
                                     </span>
                                   </div>

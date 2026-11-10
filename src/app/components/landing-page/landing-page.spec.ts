@@ -1,3 +1,4 @@
+import { signal, WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { LandingPageComponent } from './landing-page';
@@ -6,10 +7,16 @@ import { UserFeedbackRecord } from '../../models/feedback.models';
 import { TRANSLATIONS, AppLanguage } from '../../data/i18n-translations.data';
 
 describe('LandingPageComponent', () => {
-  let mockSupabase: { getPublicTestimonials: () => Promise<UserFeedbackRecord[]> };
+  let isAuthSignal: WritableSignal<boolean>;
+  let mockSupabase: {
+    getPublicTestimonials: () => Promise<UserFeedbackRecord[]>;
+    isAuthenticated: WritableSignal<boolean>;
+  };
 
   beforeEach(async () => {
+    isAuthSignal = signal(false);
     mockSupabase = {
+      isAuthenticated: isAuthSignal,
       getPublicTestimonials: vi.fn().mockResolvedValue([
         {
           id: 'test-1',
@@ -102,7 +109,22 @@ describe('LandingPageComponent', () => {
     expect(component.i18n.currentLang()).toBe('es');
   });
 
-  it('debe navegar hacia /studio al invocar goToStudio', () => {
+  it('debe redirigir a /auth?mode=login al invocar goToStudio si no está autenticado', () => {
+    isAuthSignal.set(false);
+    const fixture = TestBed.createComponent(LandingPageComponent);
+    const component = fixture.componentInstance;
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate');
+
+    component.openLoginModal();
+    component.goToStudio();
+
+    expect(component.showLoginModal()).toBe(false);
+    expect(navigateSpy).toHaveBeenCalledWith(['/auth'], { queryParams: { mode: 'login' } });
+  });
+
+  it('debe navegar hacia /studio al invocar goToStudio si está autenticado', () => {
+    isAuthSignal.set(true);
     const fixture = TestBed.createComponent(LandingPageComponent);
     const component = fixture.componentInstance;
     const router = TestBed.inject(Router);

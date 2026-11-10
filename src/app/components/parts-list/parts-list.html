@@ -346,7 +346,7 @@
                     <button
                       type="button"
                       (click)="deletePart(part.id)"
-                      [class]="themeService.isClassic() ? 'p-1 text-zinc-400 hover:text-rose-600 transition cursor-pointer inline-flex items-center justify-center' : 'p-1 text-zinc-400 hover:text-rose-400 transition cursor-pointer inline-flex items-center justify-center'"
+                      [class]="themeService.isClassic() ? 'p-1 text-zinc-400 hover:text-red-600 transition cursor-pointer inline-flex items-center justify-center' : 'p-1 text-zinc-400 hover:text-red-400 transition cursor-pointer inline-flex items-center justify-center'"
                       [title]="'partsList.deletePartTitle' | t">
                       <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                     </button>
@@ -421,7 +421,7 @@
                       <button
                         type="button"
                         (click)="deletePart(part.id)"
-                        class="p-1 text-zinc-400 hover:text-rose-600 transition cursor-pointer"
+                        class="p-1 text-zinc-400 hover:text-red-600 transition cursor-pointer"
                         [title]="'partsList.deleteStonePartTitle' | t">
                         <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                       </button>
@@ -545,7 +545,7 @@
                         type="checkbox"
                         [checked]="app.includeInBudget !== false"
                         (change)="toggleApplianceBudget(app.id, $event)"
-                        class="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer" />
                       <span [class]="app.includeInBudget !== false ? 'text-xs font-semibold text-emerald-600' : 'text-xs text-zinc-400'">
                         {{ app.includeInBudget !== false ? ('partsList.included' | t) : ('budget.excluded' | t) }}
                       </span>
@@ -558,7 +558,7 @@
                     <button
                       type="button"
                       (click)="deleteAppliance(app.id)"
-                      [class]="themeService.isClassic() ? 'p-1 text-zinc-400 hover:text-rose-600 transition cursor-pointer inline-flex items-center justify-center' : 'p-1 text-zinc-400 hover:text-rose-400 transition cursor-pointer inline-flex items-center justify-center'"
+                      [class]="themeService.isClassic() ? 'p-1 text-zinc-400 hover:text-red-600 transition cursor-pointer inline-flex items-center justify-center' : 'p-1 text-zinc-400 hover:text-red-400 transition cursor-pointer inline-flex items-center justify-center'"
                       [title]="'partsList.deleteApplianceTitle' | t">
                       <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
                     </button>
@@ -734,7 +734,7 @@
             <button
               type="submit"
               [disabled]="partForm.invalid"
-              class="px-3.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              class="px-3.5 py-1.5 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
               {{ 'partsList.addToList' | t }}
             </button>
           </div>

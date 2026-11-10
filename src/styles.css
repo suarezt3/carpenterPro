@@ -1,11 +1,47 @@
-/* Fonts: Material Icons + Inter & JetBrains Mono */
-@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+/* Typography: Inter (Interface) & JetBrains Mono (Technical Numerics) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-numeric: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* PALETA OFICIAL MINIMALIST STUDIO (Regla 60-30-10) */
+  /* 60% Fondos y Superficies Neutras */
+  --studio-bg-white: #FFFFFF;
+  --studio-bg-soft: #FAFAFA;
+  --studio-bg-muted: #F4F4F5;
+  /* 30% Estructura, Textos, Pestañas Activas y Botones Principales (Grafito) */
+  --studio-graphite-900: #18181B;
+  --studio-graphite-800: #27272A;
+  --studio-graphite-600: #52525B;
+  --studio-graphite-500: #71717A;
+  --studio-border-subtle: #E4E4E7;
+  --studio-border-strong: #D4D4D8;
+  /* 10% Acento Técnico Puntual (Azul Acero Sobrio) */
+  --studio-accent-sky: #0284C7;
+  --studio-accent-sky-soft: #F0F9FF;
+  /* Colores Semánticos Restringidos */
+  --studio-semantic-red: #DC2626;
+  --studio-semantic-emerald: #059669;
+  --studio-semantic-amber: #D97706;
+}
+
 @theme {
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-numeric: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+html, body {
+  font-family: var(--font-sans) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after,
+button, input, select, textarea, optgroup,
+input::placeholder, textarea::placeholder {
+  font-family: var(--font-sans);
 }
 
 @layer base {
@@ -20,15 +56,16 @@
 
   body {
     @apply bg-zinc-100 text-zinc-900 antialiased selection:bg-zinc-800 selection:text-white;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-sans) !important;
   }
 
   code,
   kbd,
   samp,
   pre,
-  .font-mono {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  .font-mono,
+  .font-numeric {
+    font-family: var(--font-numeric) !important;
     font-variant-numeric: tabular-nums;
   }
 

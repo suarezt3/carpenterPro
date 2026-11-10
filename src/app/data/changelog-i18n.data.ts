@@ -236,7 +236,7 @@ export const RELEASES_ES: ReleaseVersion[] = [
     highlights: [
       'Motor 3D acelerado por WebGL con Three.js',
       'Inserción paramétrica de piezas de melamina en ejes X, Y, Z',
-      'Almacenamiento local de proyectos y persistencia en la nube Supabase'
+      'Almacenamiento local de proyectos y persistencia en la nube'
     ],
     changes: [
       {
@@ -247,7 +247,7 @@ export const RELEASES_ES: ReleaseVersion[] = [
       },
       {
         type: 'feature',
-        title: 'Integración Supabase Cloud',
+        title: 'Integración en la Nube',
         description: 'Guardado seguro de proyectos en la nube con sincronización multi-dispositivo.',
         tag: 'Nube'
       }
@@ -542,7 +542,7 @@ export const RELEASES_EN: ReleaseVersion[] = [
     highlights: [
       'WebGL accelerated 3D engine powered by Three.js',
       'Parametric melamine panel insertion across X, Y, Z axes',
-      'Local project storage and Supabase Cloud persistence'
+      'Local project storage and Cloud persistence'
     ],
     changes: [
       {
@@ -553,7 +553,7 @@ export const RELEASES_EN: ReleaseVersion[] = [
       },
       {
         type: 'feature',
-        title: 'Supabase Cloud Integration',
+        title: 'Cloud Integration',
         description: 'Secure cloud project storage with cross-device sync.',
         tag: 'Cloud'
       }
@@ -848,7 +848,7 @@ export const RELEASES_PT: ReleaseVersion[] = [
     highlights: [
       'Motor 3D acelerado por WebGL com Three.js',
       'Inserção paramétrica de peças nos eixos X, Y, Z',
-      'Armazenamento local e persistência em nuvem Supabase'
+      'Armazenamento local e persistência em nuvem'
     ],
     changes: [
       {
@@ -859,7 +859,7 @@ export const RELEASES_PT: ReleaseVersion[] = [
       },
       {
         type: 'feature',
-        title: 'Integração Supabase Cloud',
+        title: 'Integração em Nuvem',
         description: 'Armazenamento seguro de projetos na nuvem com sincronização entre dispositivos.',
         tag: 'Nuvem'
       }
@@ -1154,7 +1154,7 @@ export const RELEASES_FR: ReleaseVersion[] = [
     highlights: [
       'Moteur 3D accéléré WebGL avec Three.js',
       'Insertion paramétrique de pièces mélaminées sur axes X, Y, Z',
-      'Stockage local et persistance dans le cloud Supabase'
+      'Stockage local et persistance dans le cloud'
     ],
     changes: [
       {
@@ -1165,7 +1165,7 @@ export const RELEASES_FR: ReleaseVersion[] = [
       },
       {
         type: 'feature',
-        title: 'Intégration Supabase Cloud',
+        title: 'Intégration Cloud',
         description: 'Sauvegarde sécurisée dans le cloud et synchronisation multi-appareils.',
         tag: 'Cloud'
       }
@@ -1460,7 +1460,7 @@ export const RELEASES_IT: ReleaseVersion[] = [
     highlights: [
       'Motore 3D accelerato WebGL basato su Three.js',
       'Inserimento parametrico di pannelli nobilitati sugli assi X, Y, Z',
-      'Salvataggio locale e persistenza nel cloud Supabase'
+      'Salvataggio locale e persistenza nel cloud'
     ],
     changes: [
       {
@@ -1471,7 +1471,7 @@ export const RELEASES_IT: ReleaseVersion[] = [
       },
       {
         type: 'feature',
-        title: 'Integrazione Cloud Supabase',
+        title: 'Integrazione Cloud',
         description: 'Salvataggio sicuro dei progetti nel cloud con sincronizzazione tra dispositivi.',
         tag: 'Cloud'
       }
@@ -1766,7 +1766,7 @@ export const RELEASES_DE: ReleaseVersion[] = [
     highlights: [
       'WebGL-beschleunigte 3D-Engine mit Three.js',
       'Parametrische Platzierung von Melaminplatten auf X-, Y-, Z-Achsen',
-      'Lokaler Projektspeicher und Supabase-Cloud-Synchronisation'
+      'Lokaler Projektspeicher und Cloud-Synchronisation'
     ],
     changes: [
       {
@@ -1777,7 +1777,7 @@ export const RELEASES_DE: ReleaseVersion[] = [
       },
       {
         type: 'feature',
-        title: 'Supabase Cloud-Integration',
+        title: 'Cloud-Integration',
         description: 'Sichere Projektspeicherung in der Cloud mit geräteübergreifender Synchronisation.',
         tag: 'Cloud'
       }

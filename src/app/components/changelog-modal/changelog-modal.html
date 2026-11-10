@@ -424,7 +424,7 @@
                       @if (item.progressPercent !== undefined) {
                         <div class="w-full bg-zinc-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden">
                           <div
-                            class="bg-blue-600 h-full rounded-full transition-all duration-500"
+                            class="bg-sky-600 h-full rounded-full transition-all duration-500"
                             [style.width.%]="item.progressPercent">
                           </div>
                         </div>
@@ -497,7 +497,7 @@
         <button
           type="button"
           (click)="close()"
-          class="px-4 py-2 rounded-md font-medium text-white bg-blue-600 hover:bg-blue-700 transition cursor-pointer shadow-xs flex items-center gap-1.5">
+          class="px-4 py-2 rounded-md font-medium text-white bg-zinc-900 hover:bg-zinc-800 transition cursor-pointer shadow-xs flex items-center gap-1.5">
           <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
           <span>{{ 'changelog.understoodBtn' | t }}</span>
         </button>

@@ -380,7 +380,7 @@
                       type="button"
                       (click)="deleteHardwareItem(h.id)"
                       [title]="'budget.deleteHardware' | t"
-                      [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-rose-600 p-0.5 transition cursor-pointer' : 'text-zinc-500 hover:text-rose-400 p-0.5 transition cursor-pointer'">
+                      [class]="themeService.isClassic() ? 'text-zinc-400 hover:text-red-600 p-0.5 transition cursor-pointer' : 'text-zinc-500 hover:text-red-400 p-0.5 transition cursor-pointer'">
                       <hugeicons-icon [icon]="icons.close" [size]="15" [strokeWidth]="2"></hugeicons-icon>
                     </button>
                   </td>
@@ -592,7 +592,7 @@
           <button
             type="button"
             (click)="printQuote()"
-            class="w-full py-2 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer">
+            class="w-full py-2 px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer">
             <hugeicons-icon [icon]="icons.print" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             <span>{{ 'budget.printPdfQuote' | t }}</span>
           </button>
@@ -791,7 +791,7 @@
             <button
               type="submit"
               [disabled]="hardwareForm.invalid"
-              class="px-3.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition shadow-xs cursor-pointer disabled:opacity-50">
+              class="px-3.5 py-1.5 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition shadow-xs cursor-pointer disabled:opacity-50">
               {{ 'budget.addButton' | t }}
             </button>
           </div>

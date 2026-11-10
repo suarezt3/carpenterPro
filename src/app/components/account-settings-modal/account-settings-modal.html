@@ -1,0 +1,939 @@
+@if (isOpen()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-950/60 backdrop-blur-xs font-sans">
+    <div class="bg-white border border-zinc-200/90 rounded-2xl w-full max-w-3xl shadow-2xl text-zinc-900 max-h-[92dvh] flex flex-col overflow-hidden animate-in fade-in-50 zoom-in-95">
+
+      <!-- CABECERA PRINCIPAL DEL MODAL -->
+      <div class="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-200/90 bg-white shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-900 shrink-0 shadow-2xs">
+            <hugeicons-icon [icon]="icons.accountSetting" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-bold text-zinc-900 leading-tight">
+              {{ 'account.modalTitle' | t }}
+            </h3>
+            <p class="text-xs text-zinc-500 mt-0.5">
+              {{ 'account.modalSubtitle' | t }}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          (click)="closeModal()"
+          class="text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 p-2 rounded-lg transition-colors cursor-pointer"
+          [title]="'common.close' | t">
+          <hugeicons-icon [icon]="icons.close" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+        </button>
+      </div>
+
+      <!-- BARRA SUPERIOR DE TOAST NOTIFICATION AMIGABLE Y ELEGANTE -->
+      @if (toastMessage()) {
+        <div
+          role="status"
+          [class]="toastType() === 'error'
+            ? 'bg-rose-50/95 border-b border-rose-200 text-rose-900 px-4 sm:px-6 py-2.5 text-xs font-medium flex items-center justify-between shadow-2xs transition-all duration-200 animate-in fade-in slide-in-from-top-1 shrink-0'
+            : toastType() === 'info'
+            ? 'bg-sky-50/95 border-b border-sky-200 text-sky-900 px-4 sm:px-6 py-2.5 text-xs font-medium flex items-center justify-between shadow-2xs transition-all duration-200 animate-in fade-in slide-in-from-top-1 shrink-0'
+            : 'bg-emerald-50/95 border-b border-emerald-200 text-emerald-900 px-4 sm:px-6 py-2.5 text-xs font-medium flex items-center justify-between shadow-2xs transition-all duration-200 animate-in fade-in slide-in-from-top-1 shrink-0'">
+          <div class="flex items-center gap-2.5">
+            <div
+              [class]="toastType() === 'error'
+                ? 'w-5 h-5 rounded-full bg-rose-100 border border-rose-300/80 flex items-center justify-center text-rose-700 shrink-0'
+                : toastType() === 'info'
+                ? 'w-5 h-5 rounded-full bg-sky-100 border border-sky-300/80 flex items-center justify-center text-sky-700 shrink-0'
+                : 'w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300/80 flex items-center justify-center text-emerald-700 shrink-0'">
+              <hugeicons-icon
+                [icon]="toastType() === 'error' ? icons.info : icons.check"
+                [size]="12"
+                [strokeWidth]="2.5">
+              </hugeicons-icon>
+            </div>
+            <span class="font-semibold">{{ toastMessage() }}</span>
+          </div>
+          <button
+            type="button"
+            (click)="toastMessage.set(null)"
+            [class]="toastType() === 'error'
+              ? 'text-rose-600 hover:text-rose-900 hover:bg-rose-100/70 p-1 rounded-md transition-colors cursor-pointer'
+              : toastType() === 'info'
+              ? 'text-sky-600 hover:text-sky-900 hover:bg-sky-100/70 p-1 rounded-md transition-colors cursor-pointer'
+              : 'text-emerald-600 hover:text-emerald-900 hover:bg-emerald-100/70 p-1 rounded-md transition-colors cursor-pointer'"
+            [title]="'common.close' | t">
+            <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+          </button>
+        </div>
+      }
+
+      <!-- NAVEGACIÓN POR PESTAÑAS (4 TABS) - SEGMENTED CONTROL ESTILO MINIMALIST STUDIO -->
+      <div class="p-3 sm:px-6 sm:pt-4 sm:pb-1 bg-white shrink-0">
+        <div class="flex items-center bg-zinc-100/70 p-1.5 rounded-xl border border-zinc-200/80 gap-1 overflow-x-auto scrollbar-none">
+          
+          <!-- Tab 1: Mi Perfil -->
+          <button
+            type="button"
+            data-testid="account-tab-profile"
+            (click)="selectTab('profile')"
+            [class]="activeTab() === 'profile'
+              ? 'bg-white text-zinc-900 border border-zinc-200/90 shadow-2xs font-semibold rounded-lg'
+              : 'border border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium rounded-lg'"
+            class="tab-nav-btn flex-1 py-2 px-3 sm:px-3.5 text-xs flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer">
+            <hugeicons-icon [icon]="icons.user" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            <span>{{ 'account.tabProfile' | t }}</span>
+          </button>
+
+          <!-- Tab 2: Taller y Proyecto -->
+          <button
+            type="button"
+            data-testid="account-tab-workshop"
+            (click)="selectTab('workshop')"
+            [class]="activeTab() === 'workshop'
+              ? 'bg-white text-zinc-900 border border-zinc-200/90 shadow-2xs font-semibold rounded-lg'
+              : 'border border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium rounded-lg'"
+            class="tab-nav-btn flex-1 py-2 px-3 sm:px-3.5 text-xs flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer">
+            <hugeicons-icon [icon]="icons.settings" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            <span>{{ 'account.tabWorkshop' | t }}</span>
+          </button>
+
+          <!-- Tab 3: Preferencias de Interfaz -->
+          <button
+            type="button"
+            data-testid="account-tab-preferences"
+            (click)="selectTab('preferences')"
+            [class]="activeTab() === 'preferences'
+              ? 'bg-white text-zinc-900 border border-zinc-200/90 shadow-2xs font-semibold rounded-lg'
+              : 'border border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium rounded-lg'"
+            class="tab-nav-btn flex-1 py-2 px-3 sm:px-3.5 text-xs flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer">
+            <hugeicons-icon [icon]="icons.globe" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            <span>{{ 'account.tabPreferences' | t }}</span>
+          </button>
+
+          <!-- Tab 4: Suscripción y Facturación -->
+          <button
+            type="button"
+            data-testid="account-tab-billing"
+            (click)="selectTab('billing')"
+            [class]="activeTab() === 'billing'
+              ? 'bg-white text-zinc-900 border border-zinc-200/90 shadow-2xs font-semibold rounded-lg'
+              : 'border border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium rounded-lg'"
+            class="tab-nav-btn flex-1 py-2 px-3 sm:px-3.5 text-xs flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer">
+            <hugeicons-icon [icon]="icons.creditCard" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+            <span>{{ 'account.tabBilling' | t }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ÁREA DE CONTENIDO SCROLLABLE -->
+      <div class="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin">
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 1: MI PERFIL Y CUENTA (F8) -->
+        <!-- =================================================================== -->
+        @if (activeTab() === 'profile') {
+          <div class="space-y-6">
+
+            <!-- SELECTOR DE AVATAR Y COLOR DE IDENTIDAD -->
+            <div class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-4">
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-900">
+                  {{ 'account.profile.avatarTitle' | t }}
+                </h4>
+                <p class="text-xs text-zinc-500 mt-0.5">
+                  {{ 'account.profile.avatarDesc' | t }}
+                </p>
+              </div>
+
+              <div class="flex flex-col sm:flex-row items-center gap-5">
+                <!-- Avatar Preview -->
+                <div class="flex flex-col items-center gap-2 shrink-0">
+                  @if (avatarType() === 'google' && googlePhotoUrl()) {
+                    <img
+                      [src]="googlePhotoUrl()"
+                      alt="Google Profile"
+                      class="w-16 h-16 rounded-full object-cover ring-4 ring-zinc-200 shadow-xs" />
+                  } @else {
+                    <div
+                      [class]="getAvatarBgClass()"
+                      class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-xs ring-4 ring-zinc-200">
+                      {{ userInitials() }}
+                    </div>
+                  }
+                  <span class="text-[11px] font-semibold text-zinc-500">
+                    {{ userEmail() }}
+                  </span>
+                </div>
+
+                <!-- Paleta de 6 colores de identidad y botón de Google si existe -->
+                <div class="space-y-3 flex-1 w-full">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    @for (col of avatarColors; track col.id) {
+                      <button
+                        type="button"
+                        (click)="selectAvatarColor(col.id)"
+                        [class]="selectedAvatarColor() === col.id && avatarType() === 'color'
+                          ? col.bg + ' ring-2 ring-offset-2 ring-zinc-900 scale-105'
+                          : col.bg + ' hover:opacity-90'"
+                        class="w-8 h-8 rounded-full transition-all cursor-pointer flex items-center justify-center text-white shadow-2xs"
+                        [title]="col.id">
+                        @if (selectedAvatarColor() === col.id && avatarType() === 'color') {
+                          <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="3"></hugeicons-icon>
+                        }
+                      </button>
+                    }
+                  </div>
+
+                  @if (googlePhotoUrl()) {
+                    <div class="pt-2 border-t border-zinc-200 flex items-center gap-2">
+                      <button
+                        type="button"
+                        (click)="setAvatarType('google')"
+                        [class]="avatarType() === 'google'
+                          ? 'bg-zinc-900 text-white font-semibold'
+                          : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300 font-medium'"
+                        class="px-3 py-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.user" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                        <span>{{ 'account.profile.useGooglePhoto' | t }}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="setAvatarType('color')"
+                        [class]="avatarType() === 'color'
+                          ? 'bg-zinc-900 text-white font-semibold'
+                          : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300 font-medium'"
+                        class="px-3 py-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5">
+                        <span>{{ 'account.profile.useInitials' | t }}</span>
+                      </button>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <!-- FORMULARIO DE NOMBRE Y APELLIDOS CONECTADO A USER_PROFILES -->
+            <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-zinc-900 mb-1">
+                    {{ 'account.profile.firstName' | t }} *
+                  </label>
+                  <input
+                    type="text"
+                    formControlName="firstName"
+                    data-testid="account-input-firstname"
+                    placeholder="ej. Juan"
+                    class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 shadow-2xs transition" />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-zinc-900 mb-1">
+                    {{ 'account.profile.lastName' | t }}
+                  </label>
+                  <input
+                    type="text"
+                    formControlName="lastName"
+                    data-testid="account-input-lastname"
+                    placeholder="ej. Pérez"
+                    class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 shadow-2xs transition" />
+                </div>
+              </div>
+
+              <!-- DATOS DE SOLO LECTURA (CORREO Y PLAN) -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label class="block text-xs font-bold text-zinc-900 mb-1">
+                    {{ 'account.profile.email' | t }}
+                  </label>
+                  <div class="w-full px-3 py-2 bg-zinc-100 border border-zinc-200 rounded-lg text-xs text-zinc-700 select-all font-medium">
+                    {{ userEmail() }}
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-zinc-900 mb-1">
+                    {{ 'account.profile.currentPlan' | t }}
+                  </label>
+                  <div class="w-full px-3 py-2 bg-zinc-100 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 flex items-center justify-between">
+                    <span>{{ userPlanTitleKey() | t }}</span>
+                    <span class="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full bg-zinc-900 text-white">
+                      {{ 'account.billing.activeBadge' | t }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- BOTÓN GUARDAR PERFIL -->
+              <div class="pt-3 flex justify-end">
+                <button
+                  type="submit"
+                  data-testid="account-save-profile-btn"
+                  [disabled]="isSavingProfile() || profileForm.invalid"
+                  class="px-5 py-2.5 text-xs font-bold bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded-lg transition shadow-xs flex items-center gap-2 cursor-pointer">
+                  @if (isSavingProfile()) {
+                    <span>{{ 'account.profile.saving' | t }}</span>
+                  } @else {
+                    <hugeicons-icon [icon]="icons.check" [size]="15" [strokeWidth]="2.5"></hugeicons-icon>
+                    <span>{{ 'account.profile.saveBtn' | t }}</span>
+                  }
+                </button>
+              </div>
+            </form>
+
+          </div>
+        }
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 2: PARÁMETROS DEL TALLER Y PROYECTO (F9) -->
+        <!-- =================================================================== -->
+        @if (activeTab() === 'workshop') {
+          <form [formGroup]="workshopForm" (ngSubmit)="saveWorkshopSettings()" class="space-y-5">
+
+            <!-- Banner Explicativo -->
+            <div class="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200/90 flex items-start gap-2.5 text-xs text-zinc-600">
+              <hugeicons-icon [icon]="icons.info" [size]="16" [strokeWidth]="2" class="text-zinc-500 shrink-0 mt-0.5"></hugeicons-icon>
+              <p class="leading-relaxed" [innerHTML]="'settings.infoBanner' | t"></p>
+            </div>
+
+            <!-- ESPESOR DE MELAMINA PREDETERMINADO -->
+            <div class="p-4.5 rounded-xl bg-white border border-zinc-200/90 shadow-2xs space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <hugeicons-icon [icon]="icons.layers" [size]="15" [strokeWidth]="2" class="text-zinc-700 shrink-0"></hugeicons-icon>
+                  <span class="text-xs font-bold text-zinc-900">
+                    {{ 'settings.defaultThickness' | t }}
+                  </span>
+                </div>
+                <span class="text-[11px] text-zinc-500">
+                  {{ 'settings.millimeterPrecision' | t }}
+                </span>
+              </div>
+
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                <div class="flex items-center gap-2 flex-1">
+                  <!-- Botón 15 mm -->
+                  <button
+                    type="button"
+                    (click)="workshopForm.patchValue({ defaultBoardThickness: 15 })"
+                    [class]="workshopForm.get('defaultBoardThickness')?.value === 15
+                      ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                      : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                    class="flex-1 py-2 px-3 rounded-lg text-xs transition cursor-pointer flex items-center justify-center gap-1.5 border">
+                    <span>15 mm</span>
+                    @if (workshopForm.get('defaultBoardThickness')?.value === 15) {
+                      <span class="text-[10px] opacity-80 font-normal">{{ 'settings.defaultBadge' | t }}</span>
+                    }
+                  </button>
+
+                  <!-- Botón 18 mm -->
+                  <button
+                    type="button"
+                    (click)="workshopForm.patchValue({ defaultBoardThickness: 18 })"
+                    [class]="workshopForm.get('defaultBoardThickness')?.value === 18
+                      ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                      : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                    class="flex-1 py-2 px-3 rounded-lg text-xs transition cursor-pointer flex items-center justify-center gap-1.5 border">
+                    <span>18 mm</span>
+                    @if (workshopForm.get('defaultBoardThickness')?.value === 18) {
+                      <span class="text-[10px] opacity-80 font-normal">{{ 'settings.selectedBadge' | t }}</span>
+                    }
+                  </button>
+
+                  <!-- Input numérico personalizado -->
+                  <div class="relative w-24 shrink-0">
+                    <input
+                      type="number"
+                      step="1"
+                      min="10"
+                      max="35"
+                      formControlName="defaultBoardThickness"
+                      class="w-full px-2.5 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 text-center focus:outline-hidden focus:border-zinc-900 pr-7" />
+                    <span class="absolute right-2.5 top-2.5 text-[11px] text-zinc-400">mm</span>
+                  </div>
+                </div>
+              </div>
+
+              <label class="flex items-center gap-2 pt-2 border-t border-zinc-100 cursor-pointer text-xs select-none">
+                <input
+                  type="checkbox"
+                  formControlName="applyThicknessToAllParts"
+                  class="w-4 h-4 rounded-sm cursor-pointer accent-zinc-900" />
+                <span class="text-zinc-700 text-xs font-medium">
+                  {{ 'settings.applyThicknessToAll' | t }}
+                </span>
+              </label>
+            </div>
+
+            <!-- CORTE Y SIERRA: KERF, TRIM, ESTRATEGIA -->
+            <div class="p-4.5 rounded-xl bg-zinc-50/80 border border-zinc-200/90 space-y-3.5">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Disco de Sierra (Kerf) -->
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold text-zinc-900">
+                      {{ 'settings.sawKerf' | t }}
+                    </span>
+                    <span class="text-[10px] text-zinc-500 font-medium">3.5 - 4.5 mm</span>
+                  </div>
+                  <div class="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      formControlName="sawKerf"
+                      class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-11 shadow-2xs" />
+                    <span class="absolute right-3 top-2.5 text-xs text-zinc-400">mm</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-500 mt-1">{{ 'settings.sawKerfNote' | t }}</p>
+                </div>
+
+                <!-- Refilado Perimetral (Trim) -->
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold text-zinc-900">
+                      {{ 'settings.trimMargin' | t }}
+                    </span>
+                    <span class="text-[10px] text-zinc-500 font-medium">10 mm</span>
+                  </div>
+                  <div class="relative">
+                    <input
+                      type="number"
+                      step="1"
+                      formControlName="trimMargin"
+                      class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-11 shadow-2xs" />
+                    <span class="absolute right-3 top-2.5 text-xs text-zinc-400">mm</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-500 mt-1">{{ 'settings.trimMarginNote' | t }}</p>
+                </div>
+              </div>
+
+              <!-- Estrategia de Optimización -->
+              <div>
+                <label class="block text-xs font-bold text-zinc-900 mb-1">
+                  {{ 'settings.optimizationStrategy' | t }}
+                </label>
+                <select
+                  formControlName="optimizationPreference"
+                  class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-medium text-zinc-900 focus:outline-hidden focus:border-zinc-900 shadow-2xs cursor-pointer">
+                  <option value="best_fit">{{ 'settings.optBestFit' | t }}</option>
+                  <option value="guillotine_length">{{ 'settings.optGuillotineLength' | t }}</option>
+                  <option value="guillotine_width">{{ 'settings.optGuillotineWidth' | t }}</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- COSTOS DE TAPACANTO, MARGEN DE GANANCIA Y MONEDA -->
+            <div class="p-4.5 rounded-xl bg-zinc-50/80 border border-zinc-200/90 space-y-3.5">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Canto Delgado (0.45 mm) -->
+                <div>
+                  <span class="block text-xs font-bold text-zinc-900 mb-1">
+                    {{ 'settings.thinEdgeCost' | t }}
+                  </span>
+                  <div class="relative">
+                    <input
+                      type="number"
+                      step="50"
+                      formControlName="thinEdgeCostPerMeter"
+                      class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-16 shadow-2xs" />
+                    <span class="absolute right-3 top-2.5 text-xs text-zinc-400">{{ 'settings.perMeter' | t }}</span>
+                  </div>
+                </div>
+
+                <!-- Canto Grueso (2.0 mm) -->
+                <div>
+                  <span class="block text-xs font-bold text-zinc-900 mb-1">
+                    {{ 'settings.thickEdgeCost' | t }}
+                  </span>
+                  <div class="relative">
+                    <input
+                      type="number"
+                      step="50"
+                      formControlName="thickEdgeCostPerMeter"
+                      class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-16 shadow-2xs" />
+                    <span class="absolute right-3 top-2.5 text-xs text-zinc-400">{{ 'settings.perMeter' | t }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Margen de Ganancia del Proyecto y Moneda -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <span class="block text-xs font-bold text-zinc-900 mb-1">
+                    {{ 'account.workshop.profitMargin' | t }}
+                  </span>
+                  <div class="relative">
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="100"
+                      formControlName="profitMarginPercent"
+                      class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-8 shadow-2xs" />
+                    <span class="absolute right-3 top-2.5 text-xs text-zinc-400">%</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-500 mt-1">
+                    {{ 'account.workshop.profitMarginHelp' | t }}
+                  </p>
+                </div>
+
+                <div>
+                  <span class="block text-xs font-bold text-zinc-900 mb-1">
+                    {{ 'settings.projectCurrency' | t }}
+                  </span>
+                  <select
+                    formControlName="currency"
+                    class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-medium text-zinc-900 focus:outline-hidden focus:border-zinc-900 shadow-2xs cursor-pointer">
+                    <option value="COP">COP ($) - Colombia</option>
+                    <option value="USD">USD ($) - Dólar Estadounidense</option>
+                    <option value="EUR">EUR (€) - Euro</option>
+                    <option value="MXN">MXN ($) - Peso Mexicano</option>
+                    <option value="PEN">PEN (S/) - Sol Peruano</option>
+                    <option value="CLP">CLP ($) - Peso Chileno</option>
+                    <option value="ARS">ARS ($) - Peso Argentino</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- DIMENSIONES DE PLACA POR DEFECTO -->
+            <div class="p-4.5 rounded-xl bg-zinc-50/80 border border-zinc-200/90 space-y-3">
+              <span class="block text-xs font-bold text-zinc-900">
+                {{ 'account.workshop.sheetDimensions' | t }}
+              </span>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[11px] font-bold text-zinc-900 mb-1">
+                    {{ 'account.workshop.sheetLength' | t }}
+                  </label>
+                  <div class="relative">
+                    <input
+                      type="number"
+                      step="10"
+                      min="1000"
+                      max="4000"
+                      formControlName="defaultSheetLength"
+                      class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-11 shadow-2xs" />
+                    <span class="absolute right-3 top-2.5 text-xs text-zinc-400">mm</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-bold text-zinc-900 mb-1">
+                    {{ 'account.workshop.sheetWidth' | t }}
+                  </label>
+                  <div class="relative">
+                    <input
+                      type="number"
+                      step="10"
+                      min="500"
+                      max="3000"
+                      formControlName="defaultSheetWidth"
+                      class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-900 pr-11 shadow-2xs" />
+                    <span class="absolute right-3 top-2.5 text-xs text-zinc-400">mm</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- DIMENSIONES DEL ENTORNO 3D -->
+            <div class="p-4.5 rounded-xl bg-white border border-zinc-200/90 shadow-2xs space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-zinc-900">
+                  {{ 'settings.floorDimensions' | t }}
+                </span>
+                <span class="text-xs font-bold text-sky-600">
+                  {{ ((workshopForm.get('floorWidth')?.value || 5000) / 1000).toFixed(1) }} × {{ ((workshopForm.get('floorDepth')?.value || 5000) / 1000).toFixed(1) }} m
+                </span>
+              </div>
+
+              <!-- Presets en metros -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  (click)="setWorkspacePreset(5000, 5000)"
+                  [class]="((workshopForm.get('floorWidth')?.value || 5000) === 5000 && (workshopForm.get('floorDepth')?.value || 5000) === 5000)
+                    ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                    : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                  class="py-2 px-2.5 rounded-lg text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border">
+                  <span class="font-bold text-xs">5 × 5 m</span>
+                  <span class="text-[10px] opacity-75">{{ 'settings.sizeStandard' | t }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="setWorkspacePreset(8000, 8000)"
+                  [class]="((workshopForm.get('floorWidth')?.value || 5000) === 8000 && (workshopForm.get('floorDepth')?.value || 5000) === 8000)
+                    ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                    : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                  class="py-2 px-2.5 rounded-lg text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border">
+                  <span class="font-bold text-xs">8 × 8 m</span>
+                  <span class="text-[10px] opacity-75">{{ 'settings.sizeSpacious' | t }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="setWorkspacePreset(10000, 10000)"
+                  [class]="((workshopForm.get('floorWidth')?.value || 5000) === 10000 && (workshopForm.get('floorDepth')?.value || 5000) === 10000)
+                    ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                    : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                  class="py-2 px-2.5 rounded-lg text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border">
+                  <span class="font-bold text-xs">10 × 10 m</span>
+                  <span class="text-[10px] opacity-75">{{ 'settings.sizeFloorPlan' | t }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="setWorkspacePreset(12000, 12000)"
+                  [class]="((workshopForm.get('floorWidth')?.value || 5000) === 12000 && (workshopForm.get('floorDepth')?.value || 5000) === 12000)
+                    ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                    : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
+                  class="py-2 px-2.5 rounded-lg text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border">
+                  <span class="font-bold text-xs">12 × 12 m</span>
+                  <span class="text-[10px] opacity-75">{{ 'settings.sizeLargeProject' | t }}</span>
+                </button>
+              </div>
+
+              <!-- Inputs manuales Ancho y Fondo -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-zinc-200">
+                <div>
+                  <label class="block text-[11px] font-bold text-zinc-900 mb-1">
+                    {{ 'settings.widthX' | t }}
+                  </label>
+                  <input
+                    type="number"
+                    step="500"
+                    min="2000"
+                    max="25000"
+                    formControlName="floorWidth"
+                    class="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 text-center focus:outline-hidden focus:border-zinc-900" />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-bold text-zinc-900 mb-1">
+                    {{ 'settings.depthZ' | t }}
+                  </label>
+                  <input
+                    type="number"
+                    step="500"
+                    min="2000"
+                    max="25000"
+                    formControlName="floorDepth"
+                    class="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 text-center focus:outline-hidden focus:border-zinc-900" />
+                </div>
+              </div>
+            </div>
+
+            <!-- BOTÓN GUARDAR PARÁMETROS DEL TALLER -->
+            <div class="pt-3 flex justify-end">
+              <button
+                type="submit"
+                data-testid="account-save-workshop-btn"
+                class="px-5 py-2.5 text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center gap-2 cursor-pointer">
+                <hugeicons-icon [icon]="icons.check" [size]="15" [strokeWidth]="2.5"></hugeicons-icon>
+                <span>{{ 'settings.saveSettings' | t }}</span>
+              </button>
+            </div>
+          </form>
+        }
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 3: PREFERENCIAS DE INTERFAZ (F10) -->
+        <!-- =================================================================== -->
+        @if (activeTab() === 'preferences') {
+          <div class="space-y-6">
+
+            <!-- IDIOMA DE LA APLICACIÓN (6 IDIOMAS) -->
+            <div class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-3">
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-900">
+                  {{ 'account.preferences.languageTitle' | t }}
+                </h4>
+                <p class="text-xs text-zinc-500 mt-0.5">
+                  {{ 'account.preferences.languageDesc' | t }}
+                </p>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                @for (lang of i18n.languages; track lang.code) {
+                  <button
+                    type="button"
+                    (click)="selectLanguage(lang.code)"
+                    [class]="i18n.currentLang() === lang.code
+                      ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                      : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 font-medium'"
+                    class="text-xs px-3 py-2.5 rounded-lg transition cursor-pointer flex items-center justify-center gap-2 border">
+                    <span class="font-bold text-[11px]">{{ lang.iso }}</span>
+                    <span>{{ lang.name }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- MONEDA PREDETERMINADA -->
+            <div class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-3">
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-900">
+                  {{ 'account.preferences.currencyTitle' | t }}
+                </h4>
+                <p class="text-xs text-zinc-500 mt-0.5">
+                  {{ 'account.preferences.currencyDesc' | t }}
+                </p>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                @for (curr of ['COP', 'USD', 'EUR', 'MXN', 'PEN', 'CLP', 'ARS']; track curr) {
+                  <button
+                    type="button"
+                    (click)="setCurrency(curr)"
+                    [class]="workshopForm.get('currency')?.value === curr
+                      ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                      : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 font-medium'"
+                    class="text-xs py-2 px-3 rounded-lg transition cursor-pointer flex items-center justify-center font-bold border">
+                    {{ curr }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- PREFERENCIAS DEL VISOR 3D (CUADRÍCULA, COTAS DE LUZ, TEMA) -->
+            <div class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-4">
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-900">
+                  {{ 'account.preferences.viewer3dTitle' | t }}
+                </h4>
+                <p class="text-xs text-zinc-500 mt-0.5">
+                  {{ 'account.preferences.viewer3dDesc' | t }}
+                </p>
+              </div>
+
+              <div class="space-y-3">
+                <!-- Toggle Piso Grilla -->
+                <label class="flex items-center justify-between p-3.5 rounded-lg bg-white border border-zinc-200 cursor-pointer select-none hover:border-zinc-300 transition-colors shadow-2xs">
+                  <div class="flex items-center gap-2.5">
+                    <hugeicons-icon [icon]="icons.layers" [size]="16" [strokeWidth]="2" class="text-zinc-600"></hugeicons-icon>
+                    <div>
+                      <span class="text-xs font-bold text-zinc-900 block">
+                        {{ 'account.preferences.showFloorGrid' | t }}
+                      </span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    [checked]="showFloorGrid()"
+                    (change)="onFloorGridToggle($event)"
+                    class="w-4 h-4 rounded-sm accent-zinc-900 cursor-pointer" />
+                </label>
+
+                <!-- Toggle Cotas Luz Interna -->
+                <label class="flex items-center justify-between p-3.5 rounded-lg bg-white border border-zinc-200 cursor-pointer select-none hover:border-zinc-300 transition-colors shadow-2xs">
+                  <div class="flex items-center gap-2.5">
+                    <hugeicons-icon [icon]="icons.checkList" [size]="16" [strokeWidth]="2" class="text-zinc-600"></hugeicons-icon>
+                    <div>
+                      <span class="text-xs font-bold text-zinc-900 block">
+                        {{ 'account.preferences.showClearances' | t }}
+                      </span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    [checked]="showClearances()"
+                    (change)="onClearancesToggle($event)"
+                    class="w-4 h-4 rounded-sm accent-zinc-900 cursor-pointer" />
+                </label>
+
+                <!-- Tema 3D: Light Studio vs Dark CAD -->
+                <div class="p-3.5 rounded-lg bg-white border border-zinc-200 space-y-2.5 shadow-2xs">
+                  <span class="text-xs font-bold text-zinc-900 block">
+                    {{ 'account.preferences.theme3d' | t }}
+                  </span>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      (click)="set3DTheme('sketchup_classic')"
+                      [class]="themeService.isClassic()
+                        ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                        : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 font-medium'"
+                      class="px-3 py-2 rounded-lg text-xs transition cursor-pointer flex items-center justify-center gap-2 border">
+                      <hugeicons-icon [icon]="icons.sun" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                      <span>{{ 'account.preferences.themeLight' | t }}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      (click)="set3DTheme('dark')"
+                      [class]="themeService.isDark()
+                        ? 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
+                        : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 font-medium'"
+                      class="px-3 py-2 rounded-lg text-xs transition cursor-pointer flex items-center justify-center gap-2 border">
+                      <hugeicons-icon [icon]="icons.moon" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                      <span>{{ 'account.preferences.themeDark' | t }}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        }
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 4: SUSCRIPCIÓN, MÉTODOS DE PAGO Y FACTURAS (F11) -->
+        <!-- =================================================================== -->
+        @if (activeTab() === 'billing') {
+          <div class="space-y-6">
+
+            <!-- RESUMEN DE PLAN ACTIVO -->
+            <div class="p-5 rounded-xl bg-zinc-50 border border-zinc-200/90 shadow-2xs">
+              <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs uppercase tracking-wider font-bold text-sky-600">
+                      {{ 'account.billing.activePlanTitle' | t }}
+                    </span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-900 text-white">
+                      {{ 'account.billing.activeBadge' | t }}
+                    </span>
+                  </div>
+                  <h4 class="text-xl font-extrabold text-zinc-900 tracking-tight">
+                    {{ userPlanTitleKey() | t }}
+                  </h4>
+                  <p class="text-xs text-zinc-600 max-w-md">
+                    @if (userPlan() === 'industrial') {
+                      {{ 'account.billing.planIndDesc' | t }}
+                    } @else if (userPlan() === 'pro') {
+                      {{ 'account.billing.planProDesc' | t }}
+                    } @else {
+                      {{ 'account.billing.planStarterDesc' | t }}
+                    }
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  data-testid="account-upgrade-plan-btn"
+                  (click)="upgradePlan()"
+                  class="px-4 py-2 text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer">
+                  <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
+                  <span>{{ 'account.billing.upgradeBtn' | t }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- SECCIÓN MÉTODOS DE PAGO VINCULADOS -->
+            <div class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-900">
+                    {{ 'account.billing.paymentMethodsTitle' | t }}
+                  </h4>
+                  <p class="text-xs text-zinc-500 mt-0.5">
+                    {{ 'account.billing.paymentMethodsDesc' | t }}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  data-testid="account-add-payment-btn"
+                  (click)="addPaymentMethod()"
+                  class="px-3 py-1.5 text-xs font-bold text-zinc-900 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-100 transition shadow-2xs flex items-center gap-1 cursor-pointer">
+                  <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.5"></hugeicons-icon>
+                  <span>{{ 'account.billing.addPaymentMethod' | t }}</span>
+                </button>
+              </div>
+
+              <div class="space-y-2 pt-1">
+                @for (pm of paymentMethods(); track pm.id) {
+                  <div class="p-3.5 rounded-lg bg-white border border-zinc-200 flex items-center justify-between gap-3 shadow-2xs">
+                    <div class="flex items-center gap-3">
+                      <div class="w-9 h-9 rounded-md bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-700 shrink-0">
+                        <hugeicons-icon [icon]="icons.creditCard" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+                      </div>
+                      <div>
+                        <div class="flex items-center gap-2">
+                          <span class="text-xs font-bold text-zinc-900 uppercase">
+                            {{ pm.brand }} •••• {{ pm.last4 }}
+                          </span>
+                          @if (pm.isDefault) {
+                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {{ 'account.billing.defaultBadge' | t }}
+                            </span>
+                          }
+                        </div>
+                        <span class="text-[11px] text-zinc-500 font-medium">
+                          {{ 'account.billing.expires' | t }}: {{ pm.expiryMonth }}/{{ pm.expiryYear }} · {{ pm.holderName }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- TABLA HISTORIAL DE FACTURACIÓN Y RECIBOS -->
+            <div class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-3">
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-900">
+                  {{ 'account.billing.invoicesTitle' | t }}
+                </h4>
+                <p class="text-xs text-zinc-500 mt-0.5">
+                  {{ 'account.billing.invoicesDesc' | t }}
+                </p>
+              </div>
+
+              <div class="overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-2xs">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr class="bg-zinc-100 text-zinc-700 font-bold border-b border-zinc-200">
+                      <th class="py-2.5 px-3.5">{{ 'account.billing.thDate' | t }}</th>
+                      <th class="py-2.5 px-3.5">{{ 'account.billing.thDescription' | t }}</th>
+                      <th class="py-2.5 px-3.5">{{ 'account.billing.thAmount' | t }}</th>
+                      <th class="py-2.5 px-3.5">{{ 'account.billing.thStatus' | t }}</th>
+                      <th class="py-2.5 px-3.5 text-right">{{ 'account.billing.thReceipt' | t }}</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-100 bg-white">
+                    @for (inv of invoices(); track inv.id) {
+                      <tr class="hover:bg-zinc-50 transition-colors border-b border-zinc-100 last:border-b-0">
+                        <td class="py-2.5 px-3.5 text-zinc-600 font-medium">
+                          {{ inv.date }}
+                        </td>
+                        <td class="py-2.5 px-3.5 font-semibold text-zinc-900">
+                          {{ inv.description }}
+                        </td>
+                        <td class="py-2.5 px-3.5 font-bold text-zinc-900">
+                          ${{ inv.amountUsd.toFixed(2) }} USD
+                        </td>
+                        <td class="py-2.5 px-3.5">
+                          <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <hugeicons-icon [icon]="icons.check" [size]="10" [strokeWidth]="3"></hugeicons-icon>
+                            <span>{{ 'account.billing.statusPaid' | t }}</span>
+                          </span>
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right">
+                          <button
+                            type="button"
+                            (click)="downloadInvoice(inv)"
+                            class="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer"
+                            [title]="'account.billing.downloadPdf' | t">
+                            <hugeicons-icon [icon]="icons.download" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="text-[11px] text-zinc-400 text-center pt-1">
+                {{ 'account.billing.mockNotice' | t }}
+              </p>
+            </div>
+
+          </div>
+        }
+
+      </div>
+
+    </div>
+  </div>
+}

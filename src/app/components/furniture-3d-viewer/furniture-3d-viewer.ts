@@ -4935,7 +4935,7 @@ private createHandleMesh(
     ctx.shadowBlur = 6;
     ctx.shadowOffsetY = 2;
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 38px "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.font = 'bold 38px "JetBrains Mono", "Inter", -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const textCenterX = showEditIndicator ? width / 2 - 14 : width / 2;
@@ -11972,7 +11972,7 @@ private applyMagneticSnapToPosition(
       ctx.stroke();
 
       ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+      ctx.font = 'bold 22px "Inter", -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, 200, 38);
@@ -12137,7 +12137,7 @@ private applyMagneticSnapToPosition(
       ctx.stroke();
 
       ctx.fillStyle = '#6ee7b7';
-      ctx.font = 'bold 21px system-ui, -apple-system, sans-serif';
+      ctx.font = 'bold 21px "Inter", -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, 230, 38);
@@ -12288,7 +12288,7 @@ private applyMagneticSnapToPosition(
       ctx.stroke();
 
       ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 21px system-ui, -apple-system, sans-serif';
+      ctx.font = 'bold 21px "Inter", -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, 230, 38);

@@ -193,7 +193,7 @@
               <div>
                 <div class="flex items-center justify-between mb-1 text-xs">
                   <label for="width-input-param" class="font-semibold text-zinc-700 flex items-center gap-1">
-                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span class="w-2 h-2 rounded-full bg-red-500"></span>
                     <span>Ancho exterior: (X)</span>
                   </label>
                   <div class="flex items-center gap-1">
@@ -1028,7 +1028,7 @@
             <button
               type="button"
               (click)="onSubmitAssistant()"
-              class="px-5 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-md shadow-xs flex items-center gap-2 transition cursor-pointer">
+              class="px-5 py-2 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 active:scale-98 text-white rounded-md shadow-xs flex items-center gap-2 transition cursor-pointer">
               <hugeicons-icon [icon]="editingGroupId() ? icons.checkCircle : icons.cube3d" [size]="15" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
               <span>{{ editingGroupId() ? 'Guardar Cambios del Módulo' : 'Crear Módulo en 3D' }}</span>
             </button>
@@ -1176,7 +1176,7 @@
                     <button
                       type="button"
                       (click)="onSelectTemplate(tpl, 'replace')"
-                      class="py-1.5 px-3 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
+                      class="py-1.5 px-3 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
                       <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                       <span>Cargar en 3D</span>
                     </button>

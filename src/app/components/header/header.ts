@@ -37,9 +37,12 @@ import {
   Rocket01Icon,
   Globe02Icon,
   CubeIcon,
-  BookOpen01Icon
+  BookOpen01Icon,
+  UserIcon,
+  Login01Icon,
+  Logout01Icon
 } from '@hugeicons/core-free-icons';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
 import { CloudProjectRecord } from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -55,13 +58,13 @@ import { DocumentationModalComponent } from '../documentation-modal/documentatio
 import { ProjectNotesModalComponent } from '../project-notes-modal/project-notes-modal';
 import { ChangelogModalComponent } from '../changelog-modal/changelog-modal';
 import { AssemblyGuideModalComponent } from '../assembly-guide-modal/assembly-guide-modal';
+import { AccountSettingsModalComponent } from '../account-settings-modal/account-settings-modal';
 import { APP_CURRENT_VERSION } from '../../data/changelog.data';
-import { ProjectSettings, DEFAULT_ROOM_CONFIG, RoomConfiguration } from '../../models/melamine.models';
 
 /**
  * Barra de navegación superior global de Piezo3D Studio.
  * Gestiona el cambio de pestañas, edición rápida del nombre del proyecto,
- * historial Undo/Redo, sincronización con Supabase, exportación DXF/PDF/JSON y parámetros de sierra.
+ * historial Undo/Redo, sincronización en la nube, exportación DXF/PDF/JSON y cuenta de usuario.
  */
 @Component({
   selector: 'app-header',
@@ -75,6 +78,7 @@ import { ProjectSettings, DEFAULT_ROOM_CONFIG, RoomConfiguration } from '../../m
     ProjectNotesModalComponent,
     ChangelogModalComponent,
     AssemblyGuideModalComponent,
+    AccountSettingsModalComponent,
     TranslatePipe,
     RouterLink
   ],
@@ -95,6 +99,7 @@ export class HeaderComponent {
   private readonly dxfExporter = inject(DxfExporterService);
   private readonly sketchupExporter = inject(SketchupExporterService);
   private readonly fb = inject(FormBuilder);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   // Registro local de iconos vectoriales de Hugeicons
@@ -127,7 +132,10 @@ export class HeaderComponent {
     megaphone: Megaphone01Icon,
     rocket: Rocket01Icon,
     globe: Globe02Icon,
-    book: BookOpen01Icon
+    book: BookOpen01Icon,
+    user: UserIcon,
+    login: Login01Icon,
+    logout: Logout01Icon
   };
 
   // Versión actual de la aplicación
@@ -142,7 +150,8 @@ export class HeaderComponent {
   readonly isExportDropdownOpen = signal(false);
   readonly isLanguageDropdownOpen = signal(false);
   readonly showProjectsModal = signal(false);
-  readonly showSettingsModal = signal(false);
+  readonly isAccountModalOpen = signal(false);
+  readonly showSettingsModal = this.isAccountModalOpen;
   readonly showNewProjectModal = signal(false);
   readonly showSqlModal = signal(false);
   readonly showTechnicalSheetModal = signal(false);
@@ -156,7 +165,7 @@ export class HeaderComponent {
   readonly projectsTab = signal<'cloud' | 'local'>('cloud');
   readonly sqlCopied = signal(false);
   readonly toastMessage = signal<string | null>(null);
-  readonly showLabelsTab = signal(false);
+  readonly showLabelsTab = signal(true);
 
   readonly pendingNotesCount = computed(() =>
     this.projectService.projectNotes().filter(n => !n.completed).length
@@ -176,6 +185,88 @@ export class HeaderComponent {
   readonly syncStatus = this.supabase.syncStatus;
   readonly lastSyncTime = this.supabase.lastSyncTime;
 
+  readonly isAuthenticated = computed<boolean>(() =>
+    typeof this.supabase.isAuthenticated === 'function' ? this.supabase.isAuthenticated() : false
+  );
+
+  readonly userFirstName = computed<string>(() => {
+    const profile = typeof this.supabase.userProfile === 'function' ? this.supabase.userProfile() : null;
+    if (profile?.first_name && profile.first_name.trim().length > 0) {
+      return profile.first_name.trim();
+    }
+    const user = typeof this.supabase.currentUser === 'function' ? this.supabase.currentUser() : null;
+    const metaFirst = typeof user?.user_metadata?.['first_name'] === 'string'
+      ? user.user_metadata['first_name'].trim()
+      : '';
+    if (metaFirst.length > 0) {
+      return metaFirst;
+    }
+    if (user?.email) {
+      return user.email.split('@')[0] || this.i18n.t('auth.defaultUserName');
+    }
+    return this.i18n.t('auth.defaultUserName');
+  });
+
+  readonly userAvatarUrl = computed<string | null>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const type = window.localStorage.getItem('carpenterpro_avatar_type');
+      if (type === 'color') return null;
+    }
+    const user = typeof this.supabase.currentUser === 'function' ? this.supabase.currentUser() : null;
+    const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
+    if (typeof meta['avatar_url'] === 'string' && meta['avatar_url'].trim()) {
+      return meta['avatar_url'].trim();
+    }
+    if (typeof meta['picture'] === 'string' && meta['picture'].trim()) {
+      return meta['picture'].trim();
+    }
+    return null;
+  });
+
+  readonly userInitials = computed<string>(() => {
+    const profile = typeof this.supabase.userProfile === 'function' ? this.supabase.userProfile() : null;
+    const first = (profile?.first_name || '').trim();
+    const last = (profile?.last_name || '').trim();
+    if (first && last) {
+      return `${first[0]}${last[0]}`.toUpperCase();
+    }
+    if (first) {
+      return first.slice(0, 2).toUpperCase();
+    }
+    const user = typeof this.supabase.currentUser === 'function' ? this.supabase.currentUser() : null;
+    const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
+    const metaFirst = typeof meta['first_name'] === 'string' ? meta['first_name'].trim() : '';
+    const metaLast = typeof meta['last_name'] === 'string' ? meta['last_name'].trim() : '';
+    if (metaFirst && metaLast) {
+      return `${metaFirst[0]}${metaLast[0]}`.toUpperCase();
+    }
+    if (metaFirst) {
+      return metaFirst.slice(0, 2).toUpperCase();
+    }
+    if (user?.email) {
+      return (user.email.slice(0, 2) || 'US').toUpperCase();
+    }
+    return 'US';
+  });
+
+  readonly userAvatarBgClass = computed<string>(() => {
+    const colorMap: Record<string, string> = {
+      graphite: 'bg-zinc-900 text-white',
+      stone: 'bg-zinc-700 text-white',
+      emerald: 'bg-emerald-600 text-white',
+      sky: 'bg-sky-600 text-white',
+      amber: 'bg-amber-600 text-white',
+      zinc: 'bg-zinc-800 text-white'
+    };
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = window.localStorage.getItem('carpenterpro_avatar_color');
+      if (saved && colorMap[saved]) {
+        return colorMap[saved];
+      }
+    }
+    return 'bg-zinc-900 text-white';
+  });
+
   readonly canUndo = this.projectService.canUndo;
   readonly canRedo = this.projectService.canRedo;
   readonly autoSyncEnabled = this.projectService.autoSyncEnabled;
@@ -186,22 +277,6 @@ export class HeaderComponent {
   readonly newProjectForm: FormGroup = this.fb.group({
     name: ['Nuevo Mueble de Cocina', Validators.required],
     clientName: ['']
-  });
-
-  readonly settingsForm: FormGroup = this.fb.group({
-    interfaceLanguage: ['es', Validators.required],
-    sawKerf: [4, [Validators.required, Validators.min(0)]],
-    trimMargin: [10, [Validators.required, Validators.min(0)]],
-    defaultBoardThickness: [15, [Validators.required, Validators.min(10), Validators.max(35)]],
-    applyThicknessToAllParts: [false],
-    thinEdgeThickness: [0.45, [Validators.required, Validators.min(0)]],
-    thickEdgeThickness: [2.0, [Validators.required, Validators.min(0)]],
-    thinEdgeCostPerMeter: [1800, [Validators.required, Validators.min(0)]],
-    thickEdgeCostPerMeter: [4200, [Validators.required, Validators.min(0)]],
-    currency: ['COP', Validators.required],
-    optimizationPreference: ['best_fit', Validators.required],
-    floorWidth: [5000, [Validators.required, Validators.min(2000), Validators.max(25000)]],
-    floorDepth: [5000, [Validators.required, Validators.min(2000), Validators.max(25000)]]
   });
 
   constructor() {
@@ -227,69 +302,13 @@ export class HeaderComponent {
     this.tabChanged.emit(tab);
   }
 
-  openSettings() {
-    const s = this.project().settings;
-    const room = this.project().roomConfig || DEFAULT_ROOM_CONFIG;
-    this.settingsForm.patchValue({
-      interfaceLanguage: this.i18n.currentLang(),
-      sawKerf: s.sawKerf,
-      trimMargin: s.trimMargin,
-      defaultBoardThickness: s.defaultBoardThickness || 15,
-      applyThicknessToAllParts: false,
-      thinEdgeThickness: s.thinEdgeThickness,
-      thickEdgeThickness: s.thickEdgeThickness,
-      thinEdgeCostPerMeter: s.thinEdgeCostPerMeter,
-      thickEdgeCostPerMeter: s.thickEdgeCostPerMeter,
-      currency: s.currency,
-      optimizationPreference: s.optimizationPreference,
-      floorWidth: room.floorWidth || 5000,
-      floorDepth: room.floorDepth || 5000
-    });
-    this.showSettingsModal.set(true);
+  openAccountModal(): void {
+    this.closeDropdowns();
+    this.isAccountModalOpen.set(true);
   }
 
-  setWorkspaceSize(width: number, depth: number) {
-    this.settingsForm.patchValue({
-      floorWidth: width,
-      floorDepth: depth
-    });
-    this.projectService.updateWorkspaceDimensions(width, depth);
-    this.showToast(this.i18n.t('settings.workspaceToast', {
-      width: (width / 1000).toFixed(1),
-      depth: (depth / 1000).toFixed(1)
-    }));
-  }
-
-  saveSettings() {
-    if (this.settingsForm.valid) {
-      const raw = this.settingsForm.value;
-      if (raw.interfaceLanguage) {
-        this.i18n.setLanguage(raw.interfaceLanguage as AppLanguage);
-      }
-      const applyToAll = !!raw.applyThicknessToAllParts;
-      const val: ProjectSettings = {
-        sawKerf: Number(raw.sawKerf),
-        trimMargin: Number(raw.trimMargin),
-        defaultBoardThickness: Number(raw.defaultBoardThickness) || 15,
-        thinEdgeThickness: Number(raw.thinEdgeThickness),
-        thickEdgeThickness: Number(raw.thickEdgeThickness),
-        thinEdgeCostPerMeter: Number(raw.thinEdgeCostPerMeter),
-        thickEdgeCostPerMeter: Number(raw.thickEdgeCostPerMeter),
-        currency: raw.currency,
-        optimizationPreference: raw.optimizationPreference
-      };
-      this.projectService.updateSettings(val, applyToAll);
-
-      if (raw.floorWidth && raw.floorDepth) {
-        this.projectService.updateWorkspaceDimensions(Number(raw.floorWidth), Number(raw.floorDepth));
-      }
-
-      this.showSettingsModal.set(false);
-      this.showToast(applyToAll
-        ? this.i18n.t('settings.configSavedAllToast', { thickness: val.defaultBoardThickness ?? 15 })
-        : this.i18n.t('settings.configSavedToast', { thickness: val.defaultBoardThickness ?? 15 })
-      );
-    }
+  openSettings(): void {
+    this.openAccountModal();
   }
 
   openNewProjectModal() {
@@ -591,5 +610,14 @@ export class HeaderComponent {
   exportSketchup() {
     this.sketchupExporter.exportProjectToSketchUp(this.project());
     this.showToast(this.i18n.t('nav.exportSketchupToast'));
+  }
+
+  async signOutFromStudio(): Promise<void> {
+    this.closeDropdowns();
+    if (typeof this.supabase.signOut === 'function') {
+      await this.supabase.signOut();
+      this.showToast(this.i18n.t('auth.signedOutToast'));
+    }
+    await this.router.navigateByUrl('/');
   }
 }

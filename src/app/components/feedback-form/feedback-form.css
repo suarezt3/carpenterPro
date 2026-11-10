@@ -6,7 +6,7 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family: var(--font-sans) !important;
 }
 
 /* Tipografía estricta Inter en todos los elementos del formulario */
@@ -20,7 +20,7 @@ label,
 h3,
 h4,
 div {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family: var(--font-sans) !important;
 }
 
 /* Estilos de estrellas activas con relleno sólido */

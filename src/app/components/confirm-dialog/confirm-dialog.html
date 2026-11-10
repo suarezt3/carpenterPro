@@ -23,7 +23,7 @@
         <!-- Cabecera con Ícono Vectorial Hugeicons según Severidad -->
         <div class="flex items-start gap-3.5">
           @if (opt.severity === 'danger') {
-            <div class="w-10 h-10 rounded-md bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 shadow-xs">
+            <div class="w-10 h-10 rounded-md bg-red-50 border border-red-200 text-red-600 flex items-center justify-center shrink-0 shadow-xs">
               <hugeicons-icon [icon]="icons.delete" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
             </div>
           } @else if (opt.severity === 'info') {
@@ -80,8 +80,8 @@
             type="button"
             (click)="confirm()"
             [class]="opt.severity === 'danger'
-              ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs'
-              : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'"
+              ? 'bg-red-600 hover:bg-red-700 text-white shadow-xs'
+              : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-xs'"
             class="px-4 py-2 text-xs font-medium rounded-md transition flex items-center gap-1.5 cursor-pointer">
             @if (opt.severity === 'danger') {
               <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="2"></hugeicons-icon>

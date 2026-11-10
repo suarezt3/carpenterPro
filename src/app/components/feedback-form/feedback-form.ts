@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, output, effect } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, NonNullableFormBuilder, Validators } from '@angular/forms';
@@ -102,9 +102,9 @@ export class FeedbackFormComponent {
   // Opciones de Severidad / Prioridad
   readonly severityOptions: FeedbackSeverityOption[] = [
     { id: 'low', labelKey: 'feedback.sevLow', badgeClass: 'text-zinc-600 bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300' },
-    { id: 'medium', labelKey: 'feedback.sevMedium', badgeClass: 'text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300' },
+    { id: 'medium', labelKey: 'feedback.sevMedium', badgeClass: 'text-sky-600 bg-sky-50 dark:bg-sky-950/50 dark:text-sky-300' },
     { id: 'high', labelKey: 'feedback.sevHigh', badgeClass: 'text-amber-600 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300' },
-    { id: 'critical', labelKey: 'feedback.sevCritical', badgeClass: 'text-rose-600 bg-rose-50 dark:bg-rose-950/50 dark:text-rose-300' }
+    { id: 'critical', labelKey: 'feedback.sevCritical', badgeClass: 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-300' }
   ];
 
   // Formulario reactivo fuertemente tipado
@@ -159,6 +159,35 @@ export class FeedbackFormComponent {
     const allowPublic = this.allowPublicValue();
     return isTest && allowPublic && rating >= 4;
   });
+
+  constructor() {
+    effect(() => {
+      const user = typeof this.supabase.currentUser === 'function' ? this.supabase.currentUser() : null;
+      const profile = typeof this.supabase.userProfile === 'function' ? this.supabase.userProfile() : null;
+
+      if (!user) {
+        this.myFeedbackList.set([]);
+        return;
+      }
+
+      if (user.email && !this.feedbackForm.controls.contact_email.value) {
+        this.feedbackForm.controls.contact_email.setValue(user.email, { emitEvent: false });
+      }
+
+      if (!this.feedbackForm.controls.author_name.value) {
+        const profileName = profile
+          ? [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim()
+          : ((user.user_metadata?.['full_name'] as string) || '');
+        if (profileName) {
+          this.feedbackForm.controls.author_name.setValue(profileName, { emitEvent: false });
+        }
+      }
+
+      if (this.activeSubView() === 'history') {
+        void this.loadMyFeedback();
+      }
+    });
+  }
 
   /**
    * Cambia la categoría activa y ajusta valores por defecto dinámicamente.
