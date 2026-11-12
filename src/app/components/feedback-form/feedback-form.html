@@ -431,17 +431,33 @@
     <!-- ========================================== -->
     @if (activeSubView() === 'history') {
       <div class="max-w-3xl mx-auto flex flex-col gap-4">
-        <div>
-          <h3 class="text-base sm:text-lg font-bold tracking-tight" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
-            {{ 'feedback.myHistoryTitle' | t }}
-          </h3>
-          <p class="text-xs" [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">
-            @if (supabase.isAuthenticated()) {
-              <span>{{ 'feedback.activeSession' | t:{ email: (supabase.currentUser()?.email || '') } }}</span>
-            } @else {
-              <span>{{ 'feedback.loginHint' | t }}</span>
-            }
-          </p>
+        <div class="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+          <div>
+            <h3 class="text-base sm:text-lg font-bold tracking-tight" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
+              {{ 'feedback.myHistoryTitle' | t }}
+            </h3>
+            <p class="text-xs" [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">
+              @if (supabase.isAuthenticated()) {
+                <span>{{ 'feedback.activeSession' | t:{ email: (supabase.currentUser()?.email || '') } }}</span>
+              } @else {
+                <span>{{ 'feedback.loginHint' | t }}</span>
+              }
+            </p>
+          </div>
+
+          <button
+            type="button"
+            (click)="loadMyFeedback()"
+            [disabled]="loadingHistory()"
+            data-testid="refresh-history-btn"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer shrink-0 disabled:opacity-50 shadow-2xs"
+            [class]="themeService.isClassic()
+              ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-200'
+              : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border-zinc-700'"
+            title="Actualizar envíos en vivo">
+            <hugeicons-icon [icon]="icons.refresh" [size]="14" [strokeWidth]="2" [class.animate-spin]="loadingHistory()"></hugeicons-icon>
+            <span>Actualizar</span>
+          </button>
         </div>
 
         @if (loadingHistory()) {
@@ -488,7 +504,7 @@
                   </div>
 
                   <div class="flex items-center gap-2">
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border" [class]="getStatusBadgeClass(item.status)">
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold border" [class]="getStatusBadgeClass(item.status)">
                       {{ getStatusLabel(item.status) }}
                     </span>
                     @if (item.is_approved_public) {
@@ -504,10 +520,45 @@
                   {{ item.message }}
                 </p>
 
+                <!-- RESPUESTA / NOTAS DEL ADMINISTRADOR -->
+                @if (item.admin_notes && item.admin_notes.trim().length > 0) {
+                  <div class="mt-1 p-3.5 rounded-lg border flex flex-col gap-1.5 transition-colors"
+                    [class]="themeService.isClassic()
+                      ? 'bg-sky-50/70 border-sky-200/90 text-zinc-900'
+                      : 'bg-zinc-800/80 border-sky-900/60 text-zinc-100'">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                      <div class="flex items-center gap-1.5 text-xs font-bold text-sky-700 dark:text-sky-400">
+                        <hugeicons-icon [icon]="icons.support" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+                        <span>Respuesta del Equipo de Piezo3D Studio:</span>
+                      </div>
+                      @if (item.updated_at) {
+                        <span class="text-[10px] text-zinc-500 dark:text-zinc-400" style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;">
+                          {{ item.updated_at | date:'medium' }}
+                        </span>
+                      }
+                    </div>
+                    <p class="text-xs leading-relaxed text-zinc-800 dark:text-zinc-200 font-normal whitespace-pre-wrap pl-5">
+                      {{ item.admin_notes }}
+                    </p>
+                  </div>
+                } @else if (item.status === 'in_progress' || item.status === 'in_review') {
+                  <div class="mt-1 p-2.5 rounded-lg border flex items-center gap-2 text-xs"
+                    [class]="themeService.isClassic()
+                      ? 'bg-sky-50/50 border-sky-200 text-sky-800'
+                      : 'bg-sky-950/40 border-sky-900 text-sky-300'">
+                    <hugeicons-icon [icon]="icons.support" [size]="14" [strokeWidth]="2" class="shrink-0 text-sky-600 dark:text-sky-400"></hugeicons-icon>
+                    <span class="italic">Nuestro equipo técnico ya está revisando tu reporte.</span>
+                  </div>
+                }
+
                 <div class="flex items-center justify-between text-[10px] pt-1 border-t opacity-75"
                   [class]="themeService.isClassic() ? 'border-zinc-100 text-zinc-500' : 'border-zinc-800/80 text-zinc-400'">
-                  <span>ID: {{ item.id }}</span>
-                  <span>{{ item.created_at | date:'medium' }}</span>
+                  <span style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;" class="font-semibold">
+                    {{ getCaseCode(item.id) }}
+                  </span>
+                  <span style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;">
+                    {{ item.created_at | date:'medium' }}
+                  </span>
                 </div>
               </div>
             }

@@ -16,7 +16,16 @@ export type TargetModule =
 
 export type FeedbackSeverity = 'low' | 'medium' | 'high' | 'critical';
 
-export type FeedbackStatus = 'open' | 'in_review' | 'resolved' | 'archived';
+export type FeedbackStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'resolved'
+  | 'approved'
+  | 'rejected'
+  | 'open'
+  | 'in_review'
+  | 'archived'
+  | 'closed';
 
 export interface UserFeedbackRecord {
   id: string;
@@ -37,7 +46,9 @@ export interface UserFeedbackRecord {
   app_language: string;
   metadata: Record<string, unknown>;
   status: FeedbackStatus;
+  admin_notes?: string | null;
   created_at: string;
+  updated_at?: string | null;
 }
 
 export interface CreateFeedbackPayload {

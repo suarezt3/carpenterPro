@@ -1,6 +1,6 @@
-<div class="min-h-screen bg-zinc-50 text-zinc-900 font-sans flex flex-col">
+<div class="h-screen w-full overflow-hidden flex flex-col bg-zinc-50 text-zinc-900 font-sans">
   <!-- TOP EXECUTIVE HEADER -->
-  <header class="sticky top-0 z-30 bg-white border-b border-zinc-200 px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+  <header class="sticky top-0 z-30 bg-white border-b border-zinc-200 px-4 sm:px-6 lg:px-8 h-16 shrink-0 flex items-center justify-between gap-4">
     <div class="flex items-center gap-3 min-w-0">
       <div class="w-9 h-9 rounded-lg bg-zinc-900 text-white flex items-center justify-center shrink-0">
         <hugeicons-icon [icon]="icons.shield" [size]="18" [strokeWidth]="2"></hugeicons-icon>
@@ -85,9 +85,9 @@
   }
 
   <!-- MAIN WORKSPACE: SIDEBAR + MODULE CONTENT -->
-  <div class="flex-1 flex flex-col lg:flex-row">
+  <div class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
     <!-- LEFT NAVIGATION SIDEBAR -->
-    <aside class="w-full lg:w-64 bg-white border-b lg:border-b-0 lg:border-r border-zinc-200 shrink-0 p-3 sm:p-4 flex flex-col justify-between gap-4">
+    <aside class="w-full lg:w-64 bg-white border-b lg:border-b-0 lg:border-r border-zinc-200 shrink-0 p-3 sm:p-4 flex flex-col justify-between gap-4 overflow-y-auto">
       <nav class="flex lg:flex-col gap-1.5 overflow-x-auto pb-1 lg:pb-0" aria-label="Módulos de administración">
         @for (item of navItems; track item.id) {
           <button
@@ -181,7 +181,7 @@
     </aside>
 
     <!-- MAIN CONTENT AREA -->
-    <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+    <main class="flex-1 h-screen overflow-y-auto overflow-x-hidden p-6 md:p-8 pb-24 space-y-6">
       @if (isLoading()) {
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="admin-loading-skeleton">
           @for (sk of [1, 2, 3, 4]; track sk) {
@@ -1468,12 +1468,15 @@
                         </span>
                         <span
                           class="px-2 py-0.5 rounded-md text-[11px] font-semibold border"
-                          [class.bg-emerald-50]="ticket.status === 'resolved'"
-                          [class.text-emerald-700]="ticket.status === 'resolved'"
-                          [class.border-emerald-200]="ticket.status === 'resolved'"
-                          [class.bg-amber-50]="ticket.status !== 'resolved'"
-                          [class.text-amber-700]="ticket.status !== 'resolved'"
-                          [class.border-amber-200]="ticket.status !== 'resolved'"
+                          [class.bg-emerald-50]="ticket.status === 'resolved' || ticket.status === 'approved'"
+                          [class.text-emerald-700]="ticket.status === 'resolved' || ticket.status === 'approved'"
+                          [class.border-emerald-200]="ticket.status === 'resolved' || ticket.status === 'approved'"
+                          [class.bg-sky-50]="ticket.status === 'in_progress'"
+                          [class.text-sky-700]="ticket.status === 'in_progress'"
+                          [class.border-sky-200]="ticket.status === 'in_progress'"
+                          [class.bg-zinc-100]="ticket.status !== 'resolved' && ticket.status !== 'approved' && ticket.status !== 'in_progress'"
+                          [class.text-zinc-700]="ticket.status !== 'resolved' && ticket.status !== 'approved' && ticket.status !== 'in_progress'"
+                          [class.border-zinc-200]="ticket.status !== 'resolved' && ticket.status !== 'approved' && ticket.status !== 'in_progress'"
                         >
                           {{ getFeedbackStatusLabel(ticket.status) }}
                         </span>
@@ -1518,7 +1521,7 @@
                           [attr.for]="'ticket-notes-' + ticket.id"
                           class="block text-xs font-semibold text-zinc-700 mb-1"
                         >
-                          Notas Internas del Administrador
+                          Respuesta / Notas del Administrador (Visible para el usuario)
                         </label>
                         <input
                           [id]="'ticket-notes-' + ticket.id"
@@ -1537,10 +1540,22 @@
                           (click)="saveTicketChanges(ticket)"
                           [disabled]="updatingFeedbackId() === ticket.id"
                           [attr.data-testid]="'save-ticket-' + ticket.id"
-                          class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 min-h-10 rounded-lg text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+                          class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 min-h-10 rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-2xs text-white"
+                          [class.bg-emerald-600]="savedFeedbackId() === ticket.id"
+                          [class.hover:bg-emerald-700]="savedFeedbackId() === ticket.id"
+                          [class.bg-zinc-900]="savedFeedbackId() !== ticket.id"
+                          [class.hover:bg-zinc-800]="savedFeedbackId() !== ticket.id"
                         >
-                          <hugeicons-icon [icon]="icons.tick" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                          <span>Guardar Nota / Estado</span>
+                          @if (updatingFeedbackId() === ticket.id) {
+                            <hugeicons-icon [icon]="icons.loading" [size]="14" [strokeWidth]="2" class="animate-spin"></hugeicons-icon>
+                            <span>Guardando...</span>
+                          } @else if (savedFeedbackId() === ticket.id) {
+                            <hugeicons-icon [icon]="icons.checkCircle" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                            <span>¡Guardado y notificado al usuario!</span>
+                          } @else {
+                            <hugeicons-icon [icon]="icons.tick" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                            <span>Guardar Nota / Estado</span>
+                          }
                         </button>
                       </div>
                     </div>

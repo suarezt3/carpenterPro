@@ -36,7 +36,7 @@ import { APP_DOC_ARTICLES_BY_LANG, APP_DOC_CATEGORIES_BY_LANG } from '../../data
 import { FeedbackFormComponent } from '../feedback-form/feedback-form';
 
 /**
- * Modal de documentación técnica interactiva y manual de usuario en CarpenterPro.
+ * Modal de documentación técnica interactiva y manual de usuario en Piezo3D Studio.
  * Permite consultar guías paso a paso por categoría, herramientas 3D, mecanizados CNC,
  * cotas HD de luz interna, atajos de teclado y optimización de corte en 6 idiomas.
  */

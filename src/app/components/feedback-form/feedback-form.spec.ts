@@ -127,7 +127,7 @@ describe('FeedbackFormComponent — Soporte, Bugs, Sugerencias y Testimonios con
         user_id: null,
         category: 'testimonial',
         title: 'Excelente software',
-        message: 'CarpenterPro me ayudó muchísimo en mi carpintería!',
+        message: 'Piezo3D Studio me ayudó muchísimo en mi carpintería!',
         rating: 5,
         allow_public_display: true,
         is_approved_public: true,
@@ -145,7 +145,7 @@ describe('FeedbackFormComponent — Soporte, Bugs, Sugerencias y Testimonios con
 
       component.setCategory('testimonial');
       component.feedbackForm.controls.title.setValue('Excelente software');
-      component.feedbackForm.controls.message.setValue('CarpenterPro me ayudó muchísimo en mi carpintería!');
+      component.feedbackForm.controls.message.setValue('Piezo3D Studio me ayudó muchísimo en mi carpintería!');
       component.setRating(5);
       component.feedbackForm.controls.author_name.setValue('Juan Carpintero');
 
@@ -320,6 +320,56 @@ describe('FeedbackFormComponent — Soporte, Bugs, Sugerencias y Testimonios con
       compiled = fixture.nativeElement as HTMLElement;
       expect(compiled.querySelector('.bg-emerald-50')).toBeFalsy();
       expect(compiled.querySelector('.bg-slate-50')).toBeTruthy();
+    });
+
+    it('getStatusBadgeClass y getStatusLabel deben sincronizar estados pending, in_progress y resolved con la paleta oficial', () => {
+      expect(component.getStatusLabel('pending')).toBe('Pendiente de revisión');
+      expect(component.getStatusLabel('open')).toBe('Pendiente de revisión');
+      expect(component.getStatusBadgeClass('pending')).toContain('bg-zinc-100');
+
+      expect(component.getStatusLabel('in_progress')).toBe('En Revisión por Soporte');
+      expect(component.getStatusLabel('in_review')).toBe('En Revisión por Soporte');
+      expect(component.getStatusBadgeClass('in_progress')).toContain('bg-sky-50');
+
+      expect(component.getStatusLabel('resolved')).toBe('Resuelto');
+      expect(component.getStatusLabel('approved')).toBe('Resuelto');
+      expect(component.getStatusBadgeClass('resolved')).toContain('bg-emerald-50');
+    });
+
+    it('getCaseCode debe formatear identificadores alfanuméricos compactos', () => {
+      expect(component.getCaseCode('e5689bb1-c127-4fe7-a435-e83fd79288c6')).toBe('Caso #E5689B');
+      expect(component.getCaseCode(null)).toBe('Caso #000000');
+    });
+
+    it('en la pestaña de historial debe renderizar la respuesta del administrador cuando admin_notes esté presente', async () => {
+      const mockRecord: UserFeedbackRecord = {
+        id: 'e5689bb1-c127-4fe7-a435-e83fd79288c6',
+        category: 'bug',
+        title: 'Reporte de prueba',
+        message: 'Esto es una prueba',
+        contact_email: 'alzatec215@gmail.com',
+        target_module: 'parts_list',
+        severity_or_priority: 'high',
+        status: 'in_progress',
+        admin_notes: 'Estamos revisando',
+        allow_public_display: false,
+        is_approved_public: false,
+        app_version: 'v3.0.0',
+        app_language: 'es',
+        metadata: {},
+        created_at: '2026-11-12T01:23:27Z',
+        updated_at: '2026-11-12T02:00:00Z'
+      };
+
+      supabaseMock.getMyFeedback.mockResolvedValue([mockRecord]);
+      await component.switchSubView('history');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.textContent).toContain('En Revisión por Soporte');
+      expect(compiled.textContent).toContain('Respuesta del Equipo de Piezo3D Studio:');
+      expect(compiled.textContent).toContain('Estamos revisando');
+      expect(compiled.textContent).toContain('Caso #E5689B');
     });
   });
 });

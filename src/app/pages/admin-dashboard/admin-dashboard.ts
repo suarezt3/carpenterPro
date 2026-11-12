@@ -18,6 +18,7 @@ import {
   Cancel01Icon,
   CheckListIcon,
   CheckmarkCircle02Icon,
+  CircleArrowReload01Icon,
   CloudIcon,
   CreditCardIcon,
   CubeIcon,
@@ -129,6 +130,7 @@ export class AdminDashboardComponent implements OnInit {
     alert: AlertCircleIcon,
     arrowRight: ArrowRight01Icon,
     cloud: CloudIcon,
+    loading: CircleArrowReload01Icon,
     rocket: Rocket01Icon,
     sparkles: SparklesIcon,
     globe: Globe02Icon
@@ -172,6 +174,7 @@ export class AdminDashboardComponent implements OnInit {
   readonly showNewTestimonialForm = signal<boolean>(false);
   readonly updatingUserId = signal<string | null>(null);
   readonly updatingFeedbackId = signal<string | null>(null);
+  readonly savedFeedbackId = signal<string | null>(null);
   readonly toastBanner = signal<AdminToastBanner | null>(null);
 
   // Domain Collections
@@ -771,11 +774,21 @@ export class AdminDashboardComponent implements OnInit {
       this.feedbackList.update(list =>
         list.map(item =>
           item.id === ticket.id
-            ? { ...item, status: nextStatus, admin_notes: nextNotes }
+            ? { ...item, status: nextStatus, admin_notes: nextNotes, updated_at: new Date().toISOString() }
             : item
         )
       );
-      this.showToast('Ticket y notas internas guardados correctamente.', 'success');
+      this.adminNotesDraft.update(prev => ({ ...prev, [ticket.id]: nextNotes }));
+      this.ticketStatusDraft.update(prev => ({ ...prev, [ticket.id]: nextStatus }));
+
+      this.savedFeedbackId.set(ticket.id);
+      setTimeout(() => {
+        if (this.savedFeedbackId() === ticket.id) {
+          this.savedFeedbackId.set(null);
+        }
+      }, 4000);
+
+      this.showToast('¡Guardado y notificado al usuario!', 'success');
     } finally {
       this.updatingFeedbackId.set(null);
     }

@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router, UrlTree } from '@angular/router';
+import { User } from '@supabase/supabase-js';
 import { SupabaseService } from '../services/supabase.service';
 
 /**
@@ -11,9 +12,18 @@ export const superAdminGuard: CanActivateFn = async (_route, _state): Promise<bo
   const supabaseService = inject(SupabaseService);
   const router = inject(Router);
 
-  const user = typeof supabaseService.waitForAuthReady === 'function'
-    ? await supabaseService.waitForAuthReady()
-    : (typeof supabaseService.currentUser === 'function' ? supabaseService.currentUser() : null);
+  let user: User | null = null;
+  if (typeof supabaseService.waitForAuthReady === 'function') {
+    user = await supabaseService.waitForAuthReady();
+  } else if (typeof supabaseService.isAuthLoading === 'function' && supabaseService.isAuthLoading()) {
+    if (typeof supabaseService.syncAuthSession === 'function') {
+      user = await supabaseService.syncAuthSession();
+    }
+  }
+
+  if (!user && typeof supabaseService.currentUser === 'function') {
+    user = supabaseService.currentUser();
+  }
 
   if (!user) {
     return router.createUrlTree(['/']);

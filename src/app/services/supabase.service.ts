@@ -87,6 +87,7 @@ export interface PlatformFeedbackRecord {
   is_featured: boolean;
   admin_notes: string | null;
   created_at: string;
+  updated_at?: string | null;
 }
 
 /**
@@ -1595,8 +1596,12 @@ export class SupabaseService {
   async submitFeedback(payload: CreateFeedbackPayload): Promise<{ success: boolean; data?: UserFeedbackRecord; error?: string }> {
     if (!this.isBrowser) return { success: false, error: 'SSR mode' };
 
-    if (!this.currentUser() && this.isAuthLoading()) {
-      await this.syncAuthSession();
+    if (!this.currentUser()) {
+      if (typeof this.waitForAuthReady === 'function') {
+        await this.waitForAuthReady();
+      } else if (this.isAuthLoading()) {
+        await this.syncAuthSession();
+      }
     }
 
     const userId = this.currentUser()?.id || null;
@@ -1646,6 +1651,7 @@ export class SupabaseService {
       const platformStatus: PlatformFeedbackStatus =
         isAutoApprovedCandidate ? 'approved' : 'pending';
       const platformPayload = {
+        ...(clientUuid ? { id: clientUuid } : {}),
         user_id: userId,
         user_name:
           (isTestimonial ? payload.author_name?.trim() : null) ||
@@ -1755,25 +1761,44 @@ export class SupabaseService {
    */
   async getMyFeedback(): Promise<UserFeedbackRecord[]> {
     if (!this.isBrowser) return [];
-    if (!this.currentUser() && this.isAuthLoading()) {
-      await this.syncAuthSession();
+    if (!this.currentUser()) {
+      if (typeof this.waitForAuthReady === 'function') {
+        await this.waitForAuthReady();
+      } else if (this.isAuthLoading()) {
+        await this.syncAuthSession();
+      }
     }
     const user = this.currentUser();
     if (!user) return [];
 
     try {
       if (this.client) {
-        const { data, error } = await this.client
+        let query = this.client
           .from('user_feedback')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(20);
+          .select('*');
 
-        if (error) return [];
+        if (user.email) {
+          query = query.or(`user_id.eq.${user.id},contact_email.ilike.${user.email}`);
+        } else {
+          query = query.eq('user_id', user.id);
+        }
+
+        const { data, error } = await query
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (error) {
+          const { data: fallbackData } = await this.client
+            .from('user_feedback')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(50);
+          return (fallbackData || []) as UserFeedbackRecord[];
+        }
         return (data || []) as UserFeedbackRecord[];
       } else {
-        const url = `${this.config.url}/rest/v1/user_feedback?user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=20`;
+        const url = `${this.config.url}/rest/v1/user_feedback?user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=50`;
         const res = await fetch(url, {
           method: 'GET',
           headers: this.headers
@@ -1917,6 +1942,8 @@ export class SupabaseService {
         status = 'pending';
       } else if (rawStatus === 'closed') {
         status = 'resolved';
+      } else if (rawStatus === 'in_review') {
+        status = 'in_progress';
       } else if (validStatuses.includes(rawStatus as PlatformFeedbackStatus)) {
         status = rawStatus as PlatformFeedbackStatus;
       }
@@ -1960,7 +1987,8 @@ export class SupabaseService {
       status,
       is_featured: isFeatured,
       admin_notes: raw['admin_notes'] ? String(raw['admin_notes']) : null,
-      created_at: String(raw['created_at'] ?? new Date().toISOString())
+      created_at: String(raw['created_at'] ?? new Date().toISOString()),
+      updated_at: raw['updated_at'] ? String(raw['updated_at']) : null
     };
   }
 
@@ -2280,7 +2308,7 @@ export class SupabaseService {
   }
 
   /**
-   * Actualiza el estado, destacado o notas internas de un registro en `user_feedback` y `platform_feedback`.
+   * Actualiza el estado, destacado o notas del administrador de un registro en `user_feedback` y `platform_feedback`.
    */
   async adminUpdateFeedback(
     id: string,
@@ -2290,46 +2318,46 @@ export class SupabaseService {
     if (!this.isBrowser || !this.client) return { success: true };
 
     try {
-      // 1. Actualizar en platform_feedback
-      await this.client
-        .from('platform_feedback')
-        .update(patch)
+      const nowIso = new Date().toISOString();
+      const updatePayload: Record<string, unknown> = {
+        updated_at: nowIso
+      };
+
+      if (patch.status !== undefined) {
+        updatePayload['status'] = patch.status;
+      }
+      if (patch.admin_notes !== undefined) {
+        updatePayload['admin_notes'] = patch.admin_notes;
+      }
+      if (typeof patch.is_featured === 'boolean') {
+        updatePayload['is_featured'] = patch.is_featured;
+        updatePayload['is_approved_public'] = patch.is_featured;
+        updatePayload['allow_public_display'] = patch.is_featured;
+      }
+
+      // 1. Actualizar en user_feedback (tabla principal unificada de soporte, bugs y envíos)
+      const { error: userFeedbackError } = await this.client
+        .from('user_feedback')
+        .update(updatePayload)
         .eq('id', id);
 
-      // 2. Mapear y actualizar en user_feedback (tabla principal de tickets y reportes)
-      const userFeedbackPatch: Record<string, unknown> = {};
-      if (patch.status !== undefined) {
-        userFeedbackPatch['status'] =
-          patch.status === 'pending'
-            ? 'open'
-            : patch.status === 'approved' || patch.status === 'resolved'
-              ? 'resolved'
-              : patch.status === 'rejected'
-                ? 'closed'
-                : patch.status;
+      // 2. Actualizar también en platform_feedback para mantener sincronía
+      try {
+        const platformPayload: Record<string, unknown> = { updated_at: nowIso };
+        if (patch.status !== undefined) platformPayload['status'] = patch.status;
+        if (patch.admin_notes !== undefined) platformPayload['admin_notes'] = patch.admin_notes;
+        if (typeof patch.is_featured === 'boolean') platformPayload['is_featured'] = patch.is_featured;
 
-        if (patch.status === 'approved') {
-          userFeedbackPatch['is_approved_public'] = true;
-          userFeedbackPatch['allow_public_display'] = true;
-        } else if (patch.status === 'rejected') {
-          userFeedbackPatch['is_approved_public'] = false;
-        }
-      }
-
-      if (typeof patch.is_featured === 'boolean') {
-        userFeedbackPatch['is_approved_public'] = patch.is_featured;
-        userFeedbackPatch['allow_public_display'] = patch.is_featured;
-      }
-
-      if (patch.admin_notes !== undefined) {
-        userFeedbackPatch['admin_notes'] = patch.admin_notes;
-      }
-
-      if (Object.keys(userFeedbackPatch).length > 0) {
         await this.client
-          .from('user_feedback')
-          .update(userFeedbackPatch)
+          .from('platform_feedback')
+          .update(platformPayload)
           .eq('id', id);
+      } catch {
+        // Fallback no bloqueante si no existe en platform_feedback
+      }
+
+      if (userFeedbackError) {
+        return { success: false, error: this.cleanErrorMessage(userFeedbackError.message) };
       }
 
       return { success: true };

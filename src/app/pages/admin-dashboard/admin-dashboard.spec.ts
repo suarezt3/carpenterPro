@@ -312,5 +312,6 @@ describe('AdminDashboardComponent', () => {
     });
     expect(component.supportTicketsList()[0].status).toBe('resolved');
     expect(component.supportTicketsList()[0].admin_notes).toBe('Resuelto en revisión v3.0.1');
+    expect(component.savedFeedbackId()).toBe('fb-bug-1');
   });
 });

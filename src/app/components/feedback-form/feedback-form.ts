@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, output, effect } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, output, effect, OnInit } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, NonNullableFormBuilder, Validators } from '@angular/forms';
@@ -48,7 +48,7 @@ import {
   styleUrl: './feedback-form.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class FeedbackFormComponent {
+export class FeedbackFormComponent implements OnInit {
   readonly supabase = inject(SupabaseService);
   readonly i18n = inject(I18nService);
   readonly themeService = inject(ThemeService);
@@ -68,6 +68,7 @@ export class FeedbackFormComponent {
     success: CheckmarkCircle02Icon,
     cancel: Cancel01Icon,
     loading: CircleArrowReload01Icon,
+    refresh: CircleArrowReload01Icon,
     alert: AlertCircleIcon,
     sparkles: SparklesIcon,
     mail: Mail01Icon,
@@ -187,6 +188,12 @@ export class FeedbackFormComponent {
         void this.loadMyFeedback();
       }
     });
+  }
+
+  ngOnInit(): void {
+    if (this.supabase.isAuthenticated()) {
+      void this.loadMyFeedback();
+    }
   }
 
   /**
@@ -324,33 +331,48 @@ export class FeedbackFormComponent {
   }
 
   /**
-   * Obtiene la clase visual de badge para el estado de un feedback.
+   * Obtiene la clase visual de badge para el estado de un feedback sincronizado con el Administrador.
    */
   getStatusBadgeClass(status: string): string {
     switch (status) {
       case 'resolved':
-        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
+      case 'approved':
+        return 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800';
+      case 'in_progress':
       case 'in_review':
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
-      case 'archived':
-        return 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-300 dark:border-zinc-700';
+        return 'bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800';
+      case 'pending':
       case 'open':
       default:
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border-blue-300 dark:border-blue-800';
+        return 'bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700';
     }
   }
 
   /**
-   * Obtiene la etiqueta internacionalizada del estado de un feedback.
+   * Obtiene la etiqueta del estado real sincronizado con el Administrador.
    */
   getStatusLabel(status: string): string {
     switch (status) {
-      case 'open': return this.i18n.t('feedback.statusOpen');
-      case 'in_review': return this.i18n.t('feedback.statusInReview');
-      case 'resolved': return this.i18n.t('feedback.statusResolved');
-      case 'archived': return this.i18n.t('feedback.statusArchived');
-      default: return status;
+      case 'resolved':
+      case 'approved':
+        return 'Resuelto';
+      case 'in_progress':
+      case 'in_review':
+        return 'En Revisión por Soporte';
+      case 'pending':
+      case 'open':
+      default:
+        return 'Pendiente de revisión';
     }
+  }
+
+  /**
+   * Genera un identificador de caso limpio y compacto (ej. Caso #E5689B).
+   */
+  getCaseCode(id?: string | null): string {
+    if (!id) return 'Caso #000000';
+    const clean = id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+    return `Caso #${clean}`;
   }
 
   /**

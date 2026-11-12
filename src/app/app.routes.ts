@@ -75,6 +75,10 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'cutlist',
+        redirectTo: 'parts',
+      },
+      {
         path: 'optimizer',
         loadComponent: () =>
           import('./components/cut-optimizer-view/cut-optimizer-view').then(
@@ -95,6 +99,10 @@ export const routes: Routes = [
             (m) => m.LabelsViewComponent
           ),
       },
+      {
+        path: ':tab',
+        redirectTo: 'designer',
+      },
     ],
   },
   // Redirecciones directas retrocompatibles
@@ -104,6 +112,10 @@ export const routes: Routes = [
   },
   {
     path: 'parts',
+    redirectTo: 'studio/parts',
+  },
+  {
+    path: 'cutlist',
     redirectTo: 'studio/parts',
   },
   {

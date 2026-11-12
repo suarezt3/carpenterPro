@@ -92,7 +92,7 @@ export class StudioWorkspaceComponent {
 
   private syncTabFromUrl(url: string): void {
     if (!url) return;
-    if (url.includes('/parts')) {
+    if (url.includes('/parts') || url.includes('/cutlist')) {
       this.activeTab.set('parts');
     } else if (url.includes('/optimizer')) {
       this.activeTab.set('optimizer');

@@ -12,17 +12,20 @@ export const studioAccessGuard: CanActivateFn = async (_route, _state): Promise<
   const router = inject(Router);
 
   // Esperar obligatoriamente a que SupabaseService termine de restaurar la sesión inicial desde localStorage
+  let user: unknown = null;
   if (typeof supabaseService.waitForAuthReady === 'function') {
-    await supabaseService.waitForAuthReady();
+    user = await supabaseService.waitForAuthReady();
   } else if (typeof supabaseService.isAuthLoading === 'function' && supabaseService.isAuthLoading()) {
     if (typeof supabaseService.syncAuthSession === 'function') {
-      await supabaseService.syncAuthSession();
+      user = await supabaseService.syncAuthSession();
     }
   }
 
-  const isAuth = typeof supabaseService.isAuthenticated === 'function'
-    ? supabaseService.isAuthenticated()
-    : !!(typeof supabaseService.currentUser === 'function' && supabaseService.currentUser());
+  const isAuth =
+    !!user ||
+    (typeof supabaseService.isAuthenticated === 'function'
+      ? supabaseService.isAuthenticated()
+      : !!(typeof supabaseService.currentUser === 'function' && supabaseService.currentUser()));
 
   if (isAuth) {
     return true;
