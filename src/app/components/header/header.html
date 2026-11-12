@@ -1,6 +1,6 @@
 <header [class]="themeService.isClassic() ? 'bg-white border-b border-slate-200 text-slate-800 sticky top-0 z-50 print:hidden w-full shadow-xs' : 'bg-zinc-900 border-b border-zinc-800 text-zinc-100 sticky top-0 z-50 print:hidden w-full'">
-  <div class="w-full max-w-full overflow-visible px-3">
-    <div class="flex items-center justify-between h-11 xl:h-11.5 gap-1.5 flex-nowrap overflow-visible">
+  <div class="w-full max-w-full overflow-visible px-2 sm:px-3">
+    <div class="flex items-center justify-between h-11 xl:h-11.5 gap-1 xl:gap-1.5 flex-nowrap overflow-visible">
 
       <!-- ZONA 1 (IZQUIERDA): Marca e Identificador Editable del Proyecto -->
       <div class="flex items-center gap-1.5 shrink-0">
@@ -137,11 +137,11 @@
           type="button"
           (click)="selectTab('modules')"
           [class]="activeTab() === 'modules'
-            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
-            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
           <hugeicons-icon [icon]="icons.tab3d" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-          <span class="hidden md:inline">{{ 'nav.designer3d' | t }}</span>
-          <span class="md:hidden">{{ 'nav.designer3dShort' | t }}</span>
+          <span class="hidden 2xl:inline">{{ 'nav.designer3d' | t }}</span>
+          <span class="2xl:hidden">{{ 'nav.designer3dShort' | t }}</span>
           <span [class]="activeTab() === 'modules' ? 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-200 font-sans tabular-nums' : (themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-sans tabular-nums' : 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-300 font-sans tabular-nums')">{{ project().modules.length }}</span>
         </button>
 
@@ -150,11 +150,11 @@
           type="button"
           (click)="selectTab('parts')"
           [class]="activeTab() === 'parts'
-            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
-            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
           <hugeicons-icon [icon]="icons.tabParts" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-          <span class="hidden md:inline">{{ 'nav.partsList' | t }}</span>
-          <span class="md:hidden">{{ 'nav.partsListShort' | t }}</span>
+          <span class="hidden 2xl:inline">{{ 'nav.partsList' | t }}</span>
+          <span class="2xl:hidden">{{ 'nav.partsListShort' | t }}</span>
           <span [class]="activeTab() === 'parts' ? 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-200 font-sans tabular-nums' : (themeService.isClassic() ? 'text-[10px] px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-sans tabular-nums' : 'text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-300 font-sans tabular-nums')">{{ partsCount() }}</span>
         </button>
 
@@ -163,11 +163,11 @@
           type="button"
           (click)="selectTab('optimizer')"
           [class]="activeTab() === 'optimizer'
-            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
-            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
           <hugeicons-icon [icon]="icons.tabOptimizer" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-          <span class="hidden md:inline">{{ 'nav.optimizer2d' | t }}</span>
-          <span class="md:hidden">{{ 'nav.optimizer2dShort' | t }}</span>
+          <span class="hidden 2xl:inline">{{ 'nav.optimizer2d' | t }}</span>
+          <span class="2xl:hidden">{{ 'nav.optimizer2dShort' | t }}</span>
         </button>
 
         <!-- 4. Presupuesto -->
@@ -175,11 +175,11 @@
           type="button"
           (click)="selectTab('budget')"
           [class]="activeTab() === 'budget'
-            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
-            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
           <hugeicons-icon [icon]="icons.tabBudget" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-          <span class="hidden md:inline">{{ 'nav.budget' | t }}</span>
-          <span class="md:hidden">{{ 'nav.budgetShort' | t }}</span>
+          <span class="hidden 2xl:inline">{{ 'nav.budget' | t }}</span>
+          <span class="2xl:hidden">{{ 'nav.budgetShort' | t }}</span>
         </button>
 
         <!-- 5. Etiquetas -->
@@ -187,8 +187,8 @@
           type="button"
           (click)="selectTab('labels')"
           [class]="activeTab() === 'labels'
-            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
-            : (themeService.isClassic() ? 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
+            ? (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-900 text-white font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md bg-zinc-100 text-zinc-900 font-medium shadow-xs whitespace-nowrap text-xs transition cursor-pointer shrink-0')
+            : (themeService.isClassic() ? 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0' : 'flex items-center gap-1 px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/70 font-medium whitespace-nowrap text-xs transition cursor-pointer shrink-0')">
           <hugeicons-icon [icon]="icons.tabLabels" [size]="14" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
           <span>{{ 'nav.labels' | t }}</span>
         </button>
@@ -218,11 +218,10 @@
           type="button"
           (click)="showNotesModal.set(true)"
           [class]="themeService.isClassic()
-            ? 'h-7.5 inline-flex items-center gap-1.5 px-2 text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-100 rounded-md border border-zinc-200/90 transition shrink-0 shadow-2xs cursor-pointer'
-            : 'h-7.5 inline-flex items-center gap-1.5 px-2 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition shrink-0 shadow-2xs cursor-pointer'"
+            ? 'h-7.5 inline-flex items-center gap-1 px-2 text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-100 rounded-md border border-zinc-200/90 transition shrink-0 shadow-2xs cursor-pointer'
+            : 'h-7.5 inline-flex items-center gap-1 px-2 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition shrink-0 shadow-2xs cursor-pointer'"
           [title]="'nav.notesTooltip' | t">
           <hugeicons-icon [icon]="icons.note" [size]="14" [strokeWidth]="2" class="text-zinc-600 dark:text-zinc-300 shrink-0"></hugeicons-icon>
-          <span class="whitespace-nowrap hidden 2xl:inline">{{ 'nav.notes' | t }}</span>
           @if (pendingNotesCount() > 0) {
             <span [class]="themeService.isClassic() ? 'px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-zinc-900 text-white font-sans tabular-nums shadow-2xs' : 'px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-zinc-200 text-zinc-800 font-sans tabular-nums shadow-2xs'">
               {{ pendingNotesCount() }}
@@ -263,7 +262,7 @@
               : 'h-7.5 inline-flex items-center gap-1.5 px-2 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
             [title]="'nav.projectMenuTooltip' | t">
             <hugeicons-icon [icon]="icons.project" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-            <span class="whitespace-nowrap hidden sm:inline">{{ 'nav.project' | t }}</span>
+            <span class="whitespace-nowrap hidden xl:inline">{{ 'nav.project' | t }}</span>
             @if (cloudProjects().length > 0) {
               <span class="px-1 text-[10px] font-bold rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 font-sans tabular-nums">
                 {{ cloudProjects().length }}
@@ -354,7 +353,7 @@
               : 'h-7.5 inline-flex items-center gap-1.5 px-2 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition whitespace-nowrap shrink-0 cursor-pointer'"
             [title]="'nav.exportMenuTooltip' | t">
             <hugeicons-icon [icon]="icons.download" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-            <span class="whitespace-nowrap hidden sm:inline">{{ 'nav.export' | t }}</span>
+            <span class="whitespace-nowrap hidden xl:inline">{{ 'nav.export' | t }}</span>
             <hugeicons-icon [icon]="icons.chevronDown" [size]="12" [strokeWidth]="2" class="text-zinc-400"></hugeicons-icon>
           </button>
 
@@ -466,8 +465,8 @@
             type="button"
             (click)="toggleLanguageDropdown($event)"
             [class]="themeService.isClassic()
-              ? 'h-9 px-2.5 shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-700 bg-white hover:bg-zinc-100 rounded-md border border-zinc-200/90 hover:border-zinc-300 transition shadow-2xs cursor-pointer'
-              : 'h-9 px-2.5 shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition cursor-pointer'"
+              ? 'h-9 px-2 shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-zinc-700 bg-white hover:bg-zinc-100 rounded-lg border border-zinc-200/90 hover:border-zinc-300 transition shadow-2xs cursor-pointer'
+              : 'h-9 px-2 shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition cursor-pointer'"
             [title]="'nav.language' | t">
             <hugeicons-icon [icon]="icons.globe" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
             <span class="font-sans text-[11px] font-bold tracking-wider">{{ currentLanguageIso() }}</span>
@@ -506,9 +505,8 @@
               data-testid="header-admin-btn"
               (click)="goToAdmin()"
               title="Panel Ejecutivo Superadmin"
-              class="h-9 px-2 shrink-0 inline-flex items-center gap-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 text-xs font-semibold transition shadow-2xs cursor-pointer whitespace-nowrap font-sans">
-              <hugeicons-icon [icon]="icons.shield" [size]="14" [strokeWidth]="2" class="text-sky-400 shrink-0"></hugeicons-icon>
-              <span class="hidden 2xl:inline">Admin</span>
+              class="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 transition shadow-2xs cursor-pointer">
+              <hugeicons-icon [icon]="icons.shield" [size]="16" [strokeWidth]="2" class="text-sky-400 shrink-0"></hugeicons-icon>
             </button>
           }
 
@@ -518,8 +516,8 @@
             (click)="openAccountModal()"
             [title]="userFirstName()"
             [class]="themeService.isClassic()
-              ? 'flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-100 cursor-pointer transition-colors whitespace-nowrap shrink-0 shadow-2xs'
-              : 'flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-zinc-700 hover:bg-zinc-800 cursor-pointer transition-colors whitespace-nowrap shrink-0'">
+              ? 'h-9 flex items-center gap-1.5 px-2 rounded-lg border border-zinc-200 hover:bg-zinc-100 cursor-pointer transition-colors whitespace-nowrap shrink-0 shadow-2xs'
+              : 'h-9 flex items-center gap-1.5 px-2 rounded-lg border border-zinc-700 hover:bg-zinc-800 cursor-pointer transition-colors whitespace-nowrap shrink-0'">
             @if (userAvatarUrl()) {
               <img [src]="userAvatarUrl()" alt="Avatar" class="w-6 h-6 rounded-full object-cover shrink-0" />
             } @else {

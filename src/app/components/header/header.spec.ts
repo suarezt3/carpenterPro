@@ -194,6 +194,11 @@ describe('HeaderComponent — Milestone 4 (Studio Topbar Reorganization & Overla
 
       const adminBtn = element.querySelector('[data-testid="header-admin-btn"]') as HTMLButtonElement;
       expect(adminBtn).toBeTruthy();
+      expect(adminBtn.className).toContain('w-9');
+      expect(adminBtn.className).toContain('h-9');
+      expect(adminBtn.className).toContain('shrink-0');
+      expect(adminBtn.textContent?.trim()).toBe('');
+      expect(adminBtn.getAttribute('title')).toBe('Panel Ejecutivo Superadmin');
 
       const router = TestBed.inject(Router);
       const navSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
