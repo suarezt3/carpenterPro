@@ -1,0 +1,407 @@
+<div class="min-h-screen w-full bg-zinc-50 text-zinc-900 font-sans antialiased flex flex-col justify-between selection:bg-zinc-900 selection:text-white">
+
+  <!-- CABECERA SUPERIOR EDITORIAL -->
+  <header class="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-zinc-200 shadow-2xs">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+
+      <!-- Identidad de Marca -->
+      <div class="flex items-center gap-3 min-w-0">
+        <a
+          routerLink="/"
+          class="flex items-center gap-2.5 group cursor-pointer shrink-0"
+          title="Piezo3D Studio">
+          <div class="w-9 h-9 rounded-lg bg-zinc-900 flex items-center justify-center text-white shadow-2xs group-hover:bg-zinc-800 transition-colors">
+            <hugeicons-icon [icon]="icons.brand" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+          </div>
+          <div class="flex flex-col">
+            <div class="flex items-center gap-2">
+              <span class="font-bold tracking-tight text-zinc-900 text-base leading-tight">
+                Piezo<span class="text-sky-600">3D</span> Studio
+              </span>
+              <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[10px] font-semibold text-zinc-700">
+                {{ appVersion() }}
+              </span>
+            </div>
+            <span class="text-[11px] font-medium text-zinc-500 truncate">
+              Centro Legal y Transparencia Operativa
+            </span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Acciones de Navegación -->
+      <div class="flex items-center gap-2.5 shrink-0">
+        <a
+          [href]="'mailto:' + supportEmail()"
+          data-testid="legal-header-email"
+          class="hidden md:inline-flex items-center gap-1.5 px-3 min-h-9 rounded-lg bg-zinc-100 hover:bg-zinc-200/80 border border-zinc-200 text-zinc-700 text-xs font-medium transition cursor-pointer">
+          <hugeicons-icon [icon]="icons.mail" [size]="14" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
+          <span>{{ supportEmail() }}</span>
+        </a>
+
+        <a
+          routerLink="/"
+          data-testid="legal-back-home-btn"
+          class="inline-flex items-center gap-1.5 px-3.5 min-h-9 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold shadow-2xs transition cursor-pointer">
+          <hugeicons-icon [icon]="icons.arrowLeft" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+          <span>Volver al Inicio</span>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+
+    <!-- BLOQUE INTRODUCTORIO Y METADATOS DE TRANSPARENCIA -->
+    <section class="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-800 text-xs font-semibold">
+          <hugeicons-icon [icon]="icons.shield" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+          <span>Documentación Oficial del Servicio</span>
+        </div>
+
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-50 border border-zinc-200 text-zinc-600 text-xs font-medium" data-testid="legal-last-updated">
+          <hugeicons-icon [icon]="icons.clock" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+          <span>Última actualización: Noviembre 2026</span>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900">
+          Centro Legal y Transparencia Operativa
+        </h1>
+        <p class="text-xs sm:text-sm text-zinc-600 leading-relaxed max-w-3xl">
+          En <strong>Piezo3D Studio</strong> mantenemos políticas claras, verificables y transparentes sobre el uso de nuestra plataforma de diseño paramétrico 3D, la privacidad de tus proyectos de carpintería y las condiciones de facturación y reembolso.
+        </p>
+      </div>
+
+      <!-- Barra de Contacto Oficial -->
+      <div class="pt-3 border-t border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-zinc-600">
+        <div class="flex items-center gap-2">
+          <hugeicons-icon [icon]="icons.mail" [size]="15" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+          <span>Contacto legal y soporte oficial:</span>
+          <a
+            [href]="'mailto:' + supportEmail()"
+            data-testid="legal-contact-email"
+            class="font-bold text-zinc-900 hover:text-sky-600 underline underline-offset-2 transition">
+            {{ supportEmail() }}
+          </a>
+        </div>
+        <div class="flex items-center gap-1.5 text-zinc-500">
+          <hugeicons-icon [icon]="icons.checkCircle" [size]="14" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+          <span>Cumplimiento comercial e internacional para suscriptores</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- NAVEGACIÓN POR PESTAÑAS (ESTILO MINIMALIST STUDIO) -->
+    <nav
+      aria-label="Secciones legales"
+      class="bg-white border border-zinc-200 rounded-xl p-1.5 shadow-2xs grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+      @for (tab of tabs; track tab.id) {
+        <button
+          type="button"
+          [attr.data-testid]="'legal-tab-' + tab.id"
+          [attr.aria-selected]="activeDoc() === tab.id"
+          (click)="selectDoc(tab.id)"
+          [class]="activeDoc() === tab.id
+            ? 'bg-zinc-900 text-white shadow-xs font-bold rounded-lg px-4 py-3 text-left transition cursor-pointer flex flex-col gap-0.5'
+            : 'bg-white hover:bg-zinc-100 text-zinc-700 font-semibold rounded-lg px-4 py-3 text-left transition cursor-pointer flex flex-col gap-0.5'">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs sm:text-sm">{{ tab.label }}</span>
+            @if (activeDoc() === tab.id) {
+              <span class="w-2 h-2 rounded-full bg-sky-400 shrink-0"></span>
+            }
+          </div>
+          <span [class]="activeDoc() === tab.id ? 'text-[11px] text-zinc-300 font-normal' : 'text-[11px] text-zinc-500 font-normal'">
+            {{ tab.subtitle }}
+          </span>
+        </button>
+      }
+    </nav>
+
+    <!-- DOCUMENTO ACTIVO -->
+    @switch (activeDoc()) {
+
+      <!-- ================================================================= -->
+      <!-- 1. TÉRMINOS Y CONDICIONES (/terms)                                -->
+      <!-- ================================================================= -->
+      @case ('terms') {
+        <article
+          data-testid="legal-content-terms"
+          class="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-6">
+
+          <div class="border-b border-zinc-200 pb-5 flex items-start justify-between gap-4">
+            <div class="space-y-1">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-sky-600">
+                Sección 01 · Condiciones de Uso
+              </span>
+              <h2 class="text-xl sm:text-2xl font-extrabold text-zinc-900">
+                Términos y Condiciones de Servicio
+              </h2>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-900 shrink-0">
+              <hugeicons-icon [icon]="icons.book" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+            </div>
+          </div>
+
+          <div class="space-y-6 text-xs sm:text-sm text-zinc-700 leading-relaxed">
+
+            <section class="space-y-2">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                1. Objeto del Servicio SaaS (Piezo3D Studio)
+              </h3>
+              <p>
+                <strong>Piezo3D Studio</strong> es una aplicación web de software como servicio (SaaS) especializada en el diseño paramétrico 3D de mobiliario en melamina, cálculo automatizado de despiece técnico, optimización de corte 2D en placas comerciales, generación de etiquetas, guías de armado paso a paso y presupuestación de costos de fabricación para talleres de carpintería, arquitectos, diseñadores y fabricantes.
+              </p>
+            </section>
+
+            <section class="space-y-2">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                2. Titularidad y Propiedad Intelectual del Usuario (100%)
+              </h3>
+              <p>
+                El usuario o taller suscriptor conserva en todo momento el <strong>100% de la titularidad y propiedad intelectual</strong> sobre todos los diseños 3D, configuraciones de módulos, planos técnicos, listados de piezas, esquemas de corte, archivos exportados (PDF, DXF, JSON) y presupuestos comerciales generados dentro de la plataforma. Piezo3D Studio no reclama ningún derecho de propiedad sobre los proyectos creados por sus usuarios.
+              </p>
+            </section>
+
+            <section class="p-4 sm:p-5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
+              <div class="flex items-center gap-2 text-zinc-900 font-bold text-sm">
+                <hugeicons-icon [icon]="icons.alert" [size]="16" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
+                <h3>3. Responsabilidad Técnica de Verificación en Obra y Taller</h3>
+              </div>
+              <p class="text-xs sm:text-sm text-zinc-700">
+                Las cotas, despieces y esquemas de optimización generados por el software constituyen herramientas de asistencia técnica basadas en los parámetros introducidos por el usuario. Es <strong>responsabilidad técnica exclusiva del carpintero, técnico o fabricante</strong> verificar físicamente en obra las medidas reales del espacio, desplomes o escuadras de muros, ubicación de instalaciones hidrosanitarias, gas o eléctricas, así como comprobar el calibre real de los tableros, espesores de tapacanto y espesor del disco de corte (kerf) antes de ejecutar el dimensionado de placas o la compra de insumos.
+              </p>
+            </section>
+
+            <section class="space-y-2">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                4. Uso Aceptable de la Cuenta y Seguridad
+              </h3>
+              <p>
+                Cada cuenta registrada es personal e intransferible para el titular o taller suscriptor. Queda estrictamente prohibido compartir credenciales de acceso de forma masiva con terceros ajenos al taller, realizar ingeniería inversa sobre los algoritmos de optimización geométrica o emplear sistemas automatizados de extracción de datos que comprometan la estabilidad del servicio.
+              </p>
+            </section>
+
+            <section class="space-y-3">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                5. Planes de Suscripción, Facturación y Legislación Aplicable
+              </h3>
+              <p>
+                Piezo3D Studio ofrece tres niveles operativos adaptados a la escala de cada usuario:
+              </p>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                <div class="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-1">
+                  <span class="text-xs font-bold text-zinc-900 block">Plan Inicial</span>
+                  <p class="text-xs text-zinc-600">
+                    Acceso gratuito permanente con límite de módulos activos y vista previa del entorno 3D y optimizador.
+                  </p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-1">
+                  <span class="text-xs font-bold text-zinc-900 block">Plan Taller Pro</span>
+                  <p class="text-xs text-zinc-600">
+                    Suscripción profesional mensual o anual con proyectos ilimitados, exportación PDF de taller, etiquetas QR y guía de armado RTA.
+                  </p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-1">
+                  <span class="text-xs font-bold text-zinc-900 block">Plan Industrial &amp; CNC</span>
+                  <p class="text-xs text-zinc-600">
+                    Suscripción avanzada mensual o anual con exportación directa DXF para routers CNC, integración CAD 3D y soporte prioritario.
+                  </p>
+                </div>
+              </div>
+              <p class="text-xs text-zinc-600 pt-1">
+                Los cargos de suscripción se facturan en dólares estadounidenses (USD) en ciclo mensual o anual según la elección del usuario. Cualquier controversia derivada de la prestación del servicio se interpretará conforme a las normas mercantiles aplicables al comercio electrónico internacional de servicios digitales.
+              </p>
+            </section>
+
+          </div>
+        </article>
+      }
+
+      <!-- ================================================================= -->
+      <!-- 2. POLÍTICA DE PRIVACIDAD (/privacy)                              -->
+      <!-- ================================================================= -->
+      @case ('privacy') {
+        <article
+          data-testid="legal-content-privacy"
+          class="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-6">
+
+          <div class="border-b border-zinc-200 pb-5 flex items-start justify-between gap-4">
+            <div class="space-y-1">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-sky-600">
+                Sección 02 · Protección de Datos
+              </span>
+              <h2 class="text-xl sm:text-2xl font-extrabold text-zinc-900">
+                Política de Privacidad y Tratamiento de Datos
+              </h2>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-900 shrink-0">
+              <hugeicons-icon [icon]="icons.lock" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+            </div>
+          </div>
+
+          <div class="space-y-6 text-xs sm:text-sm text-zinc-700 leading-relaxed">
+
+            <section class="space-y-2">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                1. Información y Datos Recopilados
+              </h3>
+              <p>
+                Recopilamos únicamente la información estrictamente necesaria para operar tu estudio de carpintería en la nube: nombre, apellidos, dirección de correo electrónico, parámetros técnicos de calibración del taller (espesores de tablero predeterminados, espesor de sierra <em>kerf</em>, refilado perimetral, costos de tapacanto y márgenes de utilidad) y los proyectos de mobiliario 3D que decidas guardar en tu cuenta.
+              </p>
+            </section>
+
+            <section class="space-y-2">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                2. Seguridad y Almacenamiento Cifrado
+              </h3>
+              <p>
+                Toda la comunicación entre tu navegador y nuestros servidores se realiza bajo cifrado seguro en tránsito (TLS 1.3) y cifrado en reposo. Los proyectos, presupuestos y catálogos de materiales de cada taller se almacenan bajo políticas estrictas de aislamiento por cuenta, garantizando que ningún otro usuario pueda consultar ni modificar tus diseños.
+              </p>
+            </section>
+
+            <section class="p-4 sm:p-5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
+              <div class="flex items-center gap-2 text-zinc-900 font-bold text-sm">
+                <hugeicons-icon [icon]="icons.creditCard" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                <h3>3. Procesamiento de Pagos Certificado PCI-DSS Nivel 1</h3>
+              </div>
+              <p class="text-xs sm:text-sm text-zinc-700">
+                Todas las suscripciones y pagos con tarjeta se procesan a través de nuestra pasarela de pagos internacional certificada bajo el estándar de seguridad <strong>PCI-DSS Nivel 1</strong> (Merchant of Record). <strong>Piezo3D Studio jamás almacena, procesa ni tiene acceso a números completos de tarjetas de crédito, débito ni códigos de seguridad CVV/CVC</strong> en sus servidores.
+              </p>
+            </section>
+
+            <section class="space-y-2">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                4. Uso Exclusivo de Cookies Técnicas Esenciales
+              </h3>
+              <p>
+                Utilizamos exclusivamente almacenamiento local y cookies técnicas esenciales para conservar tu sesión autenticada activa, recordar el idioma de la interfaz y preservar el respaldo local de tus proyectos de trabajo. No utilizamos rastreadores publicitarios de terceros ni vendemos información de nuestros usuarios a redes comerciales externas.
+              </p>
+            </section>
+
+            <section class="space-y-2">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                5. Derechos ARCO y Eliminación Definitiva de Cuenta
+              </h3>
+              <p>
+                Como titular de tus datos personales, puedes ejercer en cualquier momento tus derechos de <strong>Acceso, Rectificación, Cancelación y Oposición (ARCO)</strong>, así como solicitar la exportación o eliminación definitiva de tu cuenta y de todos tus proyectos almacenados escribiendo directamente a nuestro correo oficial de soporte y privacidad:
+                <a [href]="'mailto:' + supportEmail()" class="font-bold text-zinc-900 underline underline-offset-2">{{ supportEmail() }}</a>.
+              </p>
+            </section>
+
+          </div>
+        </article>
+      }
+
+      <!-- ================================================================= -->
+      <!-- 3. POLÍTICA DE REEMBOLSOS Y CANCELACIÓN (/refunds)                -->
+      <!-- ================================================================= -->
+      @case ('refunds') {
+        <article
+          data-testid="legal-content-refunds"
+          class="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-6">
+
+          <div class="border-b border-zinc-200 pb-5 flex items-start justify-between gap-4">
+            <div class="space-y-1">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-sky-600">
+                Sección 03 · Facturación y Garantías
+              </span>
+              <h2 class="text-xl sm:text-2xl font-extrabold text-zinc-900">
+                Política de Reembolsos y Cancelación de Suscripciones
+              </h2>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-900 shrink-0">
+              <hugeicons-icon [icon]="icons.invoice" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+            </div>
+          </div>
+
+          <div class="space-y-6 text-xs sm:text-sm text-zinc-700 leading-relaxed">
+
+            <section class="p-4 sm:p-5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
+              <div class="flex items-center gap-2 text-zinc-900 font-bold text-sm">
+                <hugeicons-icon [icon]="icons.checkCircle" [size]="16" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                <h3>1. Libertad de Cancelación en Cualquier Momento</h3>
+              </div>
+              <p>
+                El usuario puede cancelar la renovación automática de su suscripción (<strong>Plan Taller Pro</strong> o <strong>Plan Industrial &amp; CNC</strong>) en cualquier momento y sin penalizaciones directamente desde el <strong>Centro de Cuenta</strong> de la aplicación o solicitándolo a soporte. Al cancelar, el usuario conservará el acceso completo a todas las funciones pagadas hasta el último día del periodo de facturación mensual o anual ya abonado, pasando posteriormente al Plan Inicial gratuito sin perder sus proyectos guardados.
+              </p>
+            </section>
+
+            <section class="space-y-2">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                2. Garantía de Reembolso de 7 Días Calendario
+              </h3>
+              <p>
+                Ofrecemos una <strong>garantía de reembolso del 100% dentro de los primeros 7 días calendario</strong> posteriores al primer cobro de una suscripción en caso de presentarse fallas técnicas comprobables de la plataforma que impidan el uso normal del software y que no hayan podido ser resueltas por nuestro equipo de ingeniería y soporte técnico.
+              </p>
+              <p>
+                Dado que <strong>Piezo3D Studio</strong> cuenta con un <strong>Plan Inicial gratuito permanente</strong> para evaluar el modelador 3D, el despiece y el optimizador antes de pagar, los reembolsos no aplican sobre renovaciones recurrentes posteriores al periodo inicial de 7 días ni una vez que se hayan descargado lotes masivos de producción CNC/PDF comercializados a terceros, salvo error de cobro duplicado.
+              </p>
+            </section>
+
+            <section class="space-y-3">
+              <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                3. Procedimiento Paso a Paso para Solicitar Soporte o Reembolso
+              </h3>
+              <p>
+                Para gestionar una solicitud de reembolso o reportar un inconveniente de facturación de manera rápida y transparente, sigue estos pasos:
+              </p>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-1.5">
+                  <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-zinc-900 text-white text-xs font-bold">1</span>
+                  <h4 class="text-xs font-bold text-zinc-900">Envía tu Solicitud</h4>
+                  <p class="text-xs text-zinc-600">
+                    Escribe un correo electrónico a <a [href]="'mailto:' + supportEmail()" class="font-bold text-zinc-900 underline">{{ supportEmail() }}</a> con el asunto <em>"Solicitud de Reembolso / Facturación"</em>.
+                  </p>
+                </div>
+                <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-1.5">
+                  <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-zinc-900 text-white text-xs font-bold">2</span>
+                  <h4 class="text-xs font-bold text-zinc-900">Datos de la Cuenta</h4>
+                  <p class="text-xs text-zinc-600">
+                    Indica el correo electrónico de tu cuenta registrada en Piezo3D Studio, la fecha de la transacción y una breve descripción o captura del inconveniente técnico.
+                  </p>
+                </div>
+                <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-1.5">
+                  <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-zinc-900 text-white text-xs font-bold">3</span>
+                  <h4 class="text-xs font-bold text-zinc-900">Resolución en 24-48 h</h4>
+                  <p class="text-xs text-zinc-600">
+                    Nuestro equipo responderá en un plazo máximo de <strong>24 a 48 horas hábiles</strong> confirmando la solución técnica o el procesamiento del reembolso al mismo medio de pago original.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </article>
+      }
+
+    }
+
+  </main>
+
+  <!-- PIE DE PÁGINA DEL CENTRO LEGAL -->
+  <footer class="bg-white border-t border-zinc-200 py-6 text-xs text-zinc-500">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-zinc-900">© Piezo3D Studio</span>
+        <span>·</span>
+        <span>Todos los derechos reservados</span>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-center gap-4">
+        <a routerLink="/terms" class="hover:text-zinc-900 font-medium transition">Términos y Condiciones</a>
+        <span>·</span>
+        <a routerLink="/privacy" class="hover:text-zinc-900 font-medium transition">Política de Privacidad</a>
+        <span>·</span>
+        <a routerLink="/refunds" class="hover:text-zinc-900 font-medium transition">Política de Reembolsos</a>
+        <span>·</span>
+        <a [href]="'mailto:' + supportEmail()" class="text-sky-600 hover:text-sky-700 font-semibold transition">{{ supportEmail() }}</a>
+      </div>
+    </div>
+  </footer>
+
+</div>

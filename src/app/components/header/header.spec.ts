@@ -180,6 +180,26 @@ describe('HeaderComponent — Milestone 4 (Studio Topbar Reorganization & Overla
 
       expect(component.isAccountModalOpen()).toBe(true);
     });
+
+    it('debe mostrar el botón Admin solo si el usuario es super_admin y navegar a /admin al hacer clic', () => {
+      expect(element.querySelector('[data-testid="header-admin-btn"]')).toBeNull();
+
+      mockSupabase.userProfile.set({
+        id: 'usr-admin',
+        email: 'admin@piezo3d.com',
+        role: 'super_admin',
+        plan: 'industrial'
+      } as UserProfile);
+      fixture.detectChanges();
+
+      const adminBtn = element.querySelector('[data-testid="header-admin-btn"]') as HTMLButtonElement;
+      expect(adminBtn).toBeTruthy();
+
+      const router = TestBed.inject(Router);
+      const navSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      adminBtn.click();
+      expect(navSpy).toHaveBeenCalledWith('/admin');
+    });
   });
 
   describe('F7: Botón Minimalista Compacto de Cerrar Sesión', () => {

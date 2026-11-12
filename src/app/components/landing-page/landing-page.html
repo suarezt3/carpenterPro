@@ -13,29 +13,34 @@
   <!-- ========================================================= -->
   @if (systemAnnouncement(); as banner) {
     <div
-      class="w-full text-xs font-medium py-2.5 px-4 transition-colors relative z-50 flex items-center justify-between gap-3 shadow-xs"
+      class="w-full text-xs font-medium py-2 px-4 transition-colors relative z-50 flex items-center justify-between gap-3 shadow-xs"
       [class]="banner.type === 'maintenance'
         ? 'bg-amber-500 text-slate-950 border-b border-amber-600'
         : banner.type === 'warning'
         ? 'bg-rose-500 text-white border-b border-rose-600'
-        : 'bg-blue-600 text-white border-b border-blue-700'"
+        : (banner.badge ? 'bg-zinc-900 text-zinc-100 border-b border-zinc-800' : 'bg-blue-600 text-white border-b border-blue-700')"
       role="alert">
       <div class="max-w-7xl mx-auto w-full flex items-center justify-between gap-3">
-        <div class="flex items-center gap-2 min-w-0">
-          @switch (banner.type) {
-            @case ('maintenance') {
-              <hugeicons-icon [icon]="icons.settings" [size]="16" class="shrink-0 text-slate-950"></hugeicons-icon>
-            }
-            @case ('warning') {
-              <hugeicons-icon [icon]="icons.alertCircle" [size]="16" class="shrink-0 text-white"></hugeicons-icon>
-            }
-            @default {
-              <hugeicons-icon [icon]="icons.infoCircle" [size]="16" class="shrink-0 text-white"></hugeicons-icon>
-            }
+        <div class="flex items-center gap-2.5 min-w-0">
+          @if (banner.badge === 'MANTENIMIENTO' || banner.type === 'maintenance') {
+            <hugeicons-icon [icon]="icons.settings" [size]="15" class="shrink-0 text-amber-400"></hugeicons-icon>
+          } @else {
+            <hugeicons-icon [icon]="icons.sparkles" [size]="15" class="shrink-0 text-sky-400"></hugeicons-icon>
           }
-          <span class="truncate">{{ banner.message }}</span>
+          @if (banner.badge) {
+            <span
+              class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase shrink-0 font-sans"
+              [class]="banner.badge === 'MANTENIMIENTO'
+                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                : (banner.badge === 'LANZAMIENTO' || banner.badge === 'PROMO' || banner.badge === 'PROMOCIÓN' || banner.badge === 'DESCUENTO')
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'bg-sky-500/15 text-sky-400 border border-sky-500/30'">
+              {{ banner.badge }}
+            </span>
+          }
+          <span class="text-xs font-medium text-zinc-200 truncate font-sans">{{ banner.message }}</span>
           @if (banner.timestamp) {
-            <span class="hidden sm:inline-block text-[11px] opacity-80 shrink-0 font-normal">({{ banner.timestamp }})</span>
+            <span class="hidden sm:inline-block text-[11px] text-zinc-400 shrink-0 font-normal">({{ banner.timestamp }})</span>
           }
         </div>
 
@@ -43,7 +48,7 @@
           <button
             type="button"
             (click)="dismissAnnouncement()"
-            class="p-1 rounded hover:bg-black/10 active:bg-black/20 transition cursor-pointer shrink-0"
+            class="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer shrink-0"
             [title]="'landing.announcement.dismiss' | t"
             [attr.aria-label]="'landing.announcement.dismiss' | t">
             <hugeicons-icon [icon]="icons.cancel" [size]="14"></hugeicons-icon>
@@ -1833,10 +1838,14 @@
           }
         </div>
 
-        <div class="flex items-center gap-4">
-          <span class="hover:text-slate-300 transition cursor-default">{{ 'landing.footer.privacy' | t }}</span>
+        <div class="flex items-center gap-3.5 flex-wrap justify-center">
+          <a routerLink="/terms" class="hover:text-white transition cursor-pointer">Términos y Condiciones</a>
           <span>·</span>
-          <span class="hover:text-slate-300 transition cursor-default">{{ 'landing.footer.terms' | t }}</span>
+          <a routerLink="/privacy" class="hover:text-white transition cursor-pointer">Política de Privacidad</a>
+          <span>·</span>
+          <a routerLink="/refunds" class="hover:text-white transition cursor-pointer">Política de Reembolsos</a>
+          <span>·</span>
+          <a [href]="'mailto:' + supportEmail()" class="text-sky-400 hover:text-sky-300 font-medium transition cursor-pointer">{{ supportEmail() }}</a>
         </div>
       </div>
     </div>

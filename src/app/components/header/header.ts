@@ -38,6 +38,7 @@ import {
   Globe02Icon,
   CubeIcon,
   BookOpen01Icon,
+  Shield01Icon,
   UserIcon,
   Login01Icon,
   Logout01Icon
@@ -135,13 +136,23 @@ export class HeaderComponent {
     rocket: Rocket01Icon,
     globe: Globe02Icon,
     book: BookOpen01Icon,
+    shield: Shield01Icon,
     user: UserIcon,
     login: Login01Icon,
     logout: Logout01Icon
   };
 
-  // Versión actual de la aplicación
+  // Versión actual de la aplicación (sincronizada con CMS cuando está disponible)
   readonly appVersion = APP_CURRENT_VERSION;
+  readonly displayAppVersion = computed<string>(() => {
+    const settingsFn = (
+      this.supabase as {
+        platformSettings?: () => { app_version?: string } | null;
+      }
+    ).platformSettings;
+    const cmsVer = typeof settingsFn === 'function' ? settingsFn()?.app_version?.trim() : '';
+    return cmsVer || this.appVersion;
+  });
 
   // Pestaña activa y evento de navegación hacia App
   readonly activeTab = input<'modules' | 'parts' | 'optimizer' | 'budget' | 'labels'>('modules');
@@ -151,6 +162,7 @@ export class HeaderComponent {
   readonly isProjectDropdownOpen = signal(false);
   readonly isExportDropdownOpen = signal(false);
   readonly isLanguageDropdownOpen = signal(false);
+  readonly isUserMenuOpen = signal(false);
   readonly showProjectsModal = signal(false);
   readonly isAccountModalOpen = signal(false);
   readonly showSettingsModal = this.isAccountModalOpen;
@@ -190,6 +202,21 @@ export class HeaderComponent {
   readonly isAuthenticated = computed<boolean>(() =>
     typeof this.supabase.isAuthenticated === 'function' ? this.supabase.isAuthenticated() : false
   );
+
+  readonly isSuperAdmin = computed<boolean>(() => {
+    const profile = typeof this.supabase.userProfile === 'function' ? this.supabase.userProfile() : null;
+    const user = typeof this.supabase.currentUser === 'function' ? this.supabase.currentUser() : null;
+    return (
+      profile?.role === 'super_admin' ||
+      user?.email?.toLowerCase() === 'eydersuarez900@gmail.com'
+    );
+  });
+
+  goToAdmin(): void {
+    this.isUserMenuOpen.set(false);
+    this.closeDropdowns();
+    void this.router.navigateByUrl('/admin');
+  }
 
   readonly userFirstName = computed<string>(() => {
     const profile = typeof this.supabase.userProfile === 'function' ? this.supabase.userProfile() : null;

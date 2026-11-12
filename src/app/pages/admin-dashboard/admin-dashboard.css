@@ -1,0 +1,31 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background-color: #fafafa;
+  color: #18181b;
+  font-family: var(--font-sans, 'Inter', sans-serif);
+}
+
+.admin-numeric {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-scroll-table {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.admin-scroll-table::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.admin-scroll-table::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-scroll-table::-webkit-scrollbar-thumb {
+  background-color: #d4d4d8;
+  border-radius: 9999px;
+}

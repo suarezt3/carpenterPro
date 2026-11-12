@@ -67,6 +67,7 @@ export type AnnouncementType = 'info' | 'warning' | 'maintenance';
 export interface SystemAnnouncement {
   id: string;
   type: AnnouncementType;
+  badge?: string;
   message: string;
   timestamp?: string;
   dismissible?: boolean;
@@ -306,8 +307,26 @@ export class LandingPageComponent implements OnInit {
   readonly supportedLanguages = this.i18n.languages;
   readonly isProcessingAuthCallback = signal<boolean>(false);
 
+  readonly supportEmail = computed<string>(() => {
+    const settingsFn = (
+      this.supabaseService as {
+        platformSettings?: () => { support_email?: string } | null;
+      }
+    ).platformSettings;
+    const dynamicEmail = typeof settingsFn === 'function' ? settingsFn()?.support_email?.trim() : '';
+    return dynamicEmail || 'eydersuarez900@gmail.com';
+  });
+
   ngOnInit(): void {
     this.currencyExchange.initRates();
+    const loadSettingsFn = (
+      this.supabaseService as {
+        loadPlatformSettings?: () => Promise<unknown>;
+      }
+    ).loadPlatformSettings;
+    if (typeof loadSettingsFn === 'function') {
+      void loadSettingsFn.call(this.supabaseService);
+    }
     void this.fetchCommunityTestimonials();
     this.checkAuthCallback();
   }
@@ -348,8 +367,62 @@ export class LandingPageComponent implements OnInit {
   async fetchCommunityTestimonials(): Promise<void> {
     this.isLoadingTestimonials.set(true);
     try {
-      const records = await this.supabaseService.getPublicTestimonials(6);
-      this.cloudTestimonials.set(records || []);
+      let records: UserFeedbackRecord[] = [];
+      if (typeof this.supabaseService.getPublicTestimonials === 'function') {
+        const publicRecords = await this.supabaseService.getPublicTestimonials(6);
+        if (Array.isArray(publicRecords)) {
+          records = [...publicRecords];
+        }
+      }
+
+      const getApprovedFn = (
+        this.supabaseService as {
+          getApprovedPlatformTestimonials?: (limit?: number) => Promise<
+            Array<{
+              id: string;
+              user_id: string | null;
+              user_name: string;
+              user_email: string | null;
+              user_role_title: string | null;
+              subject: string | null;
+              message: string;
+              rating: number | null;
+              created_at: string;
+            }>
+          >;
+        }
+      ).getApprovedPlatformTestimonials;
+
+      if (typeof getApprovedFn === 'function') {
+        const approved = await getApprovedFn.call(this.supabaseService, 6);
+        if (Array.isArray(approved)) {
+          for (const item of approved) {
+            if (!records.some((r) => r.id === item.id)) {
+              records.push({
+                id: item.id,
+                user_id: item.user_id,
+                category: 'testimonial',
+                title: item.subject || 'Testimonio',
+                message: item.message,
+                contact_email: item.user_email || '',
+                rating: item.rating ?? 5,
+                author_name: item.user_name || 'Fabricante Profesional',
+                author_role: item.user_role_title || 'Taller de Carpintería',
+                author_location: 'Taller Verificado',
+                allow_public_display: true,
+                is_approved_public: true,
+                app_version: 'v3.0.0',
+                app_language: 'es',
+                metadata: {},
+                status: 'resolved',
+                created_at: item.created_at || new Date().toISOString()
+              });
+            }
+          }
+        }
+      }
+
+      this.cloudTestimonials.set(records);
     } catch {
       this.cloudTestimonials.set([]);
     } finally {
@@ -517,6 +590,53 @@ export class LandingPageComponent implements OnInit {
         : false;
       if (isRecovery) {
         void this.router.navigateByUrl('/auth?mode=reset');
+      }
+    });
+
+    effect(() => {
+      const settingsFn = (
+        this.supabaseService as {
+          platformSettings?: () => {
+            pro_monthly_usd?: number;
+            pro_annual_monthly_usd?: number;
+            pro_annual_total_usd?: number;
+            industrial_monthly_usd?: number;
+            industrial_annual_monthly_usd?: number;
+            industrial_annual_total_usd?: number;
+            announcement_enabled?: boolean;
+            announcement_text?: string;
+            announcement_badge?: string;
+          } | null;
+        }
+      ).platformSettings;
+
+      if (typeof settingsFn === 'function') {
+        const s = settingsFn();
+        if (s) {
+          this.pricingConfig.set({
+            starter: { monthly: 0, yearly: 0 },
+            pro: {
+              monthly: Number(s.pro_monthly_usd ?? 15),
+              yearly: Number(s.pro_annual_monthly_usd ?? 12)
+            },
+            industrial: {
+              monthly: Number(s.industrial_monthly_usd ?? 29),
+              yearly: Number(s.industrial_annual_monthly_usd ?? 23)
+            }
+          });
+
+          if (s.announcement_enabled && s.announcement_text && s.announcement_text.trim().length > 0) {
+            this.systemAnnouncement.set({
+              id: 'cms-global-announcement',
+              type: s.announcement_badge?.toUpperCase() === 'MANTENIMIENTO' ? 'maintenance' : 'info',
+              badge: s.announcement_badge?.trim() || 'NOVEDAD',
+              message: s.announcement_text.trim(),
+              dismissible: true
+            });
+          } else {
+            this.systemAnnouncement.set(null);
+          }
+        }
       }
     });
   }

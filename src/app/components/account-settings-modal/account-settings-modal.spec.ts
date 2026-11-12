@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ComponentRef, computed, signal } from '@angular/core';
+import { provideRouter, Router } from '@angular/router';
 import { User } from '@supabase/supabase-js';
 import { AccountSettingsModalComponent } from './account-settings-modal';
 import { SupabaseService, UserProfile } from '../../services/supabase.service';
@@ -135,6 +136,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
     await TestBed.configureTestingModule({
       imports: [AccountSettingsModalComponent],
       providers: [
+        provideRouter([]),
         { provide: SupabaseService, useValue: supabaseMock },
         {
           provide: PaymentService,
@@ -464,6 +466,30 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       component.closeModal();
       expect(closedSpy).toHaveBeenCalled();
       expect(modalCloseSpy).toHaveBeenCalled();
+    });
+
+    it('debe mostrar el botón Panel Admin solo a superadmin y navegar a /admin al hacer clic', () => {
+      expect(fixture.nativeElement.querySelector('[data-testid="account-modal-admin-btn"]')).toBeNull();
+
+      (supabaseMock.userProfile as ReturnType<typeof signal<UserProfile | null>>).set({
+        id: 'u-admin',
+        email: 'admin@taller.com',
+        first_name: 'Super',
+        last_name: 'Admin',
+        role: 'super_admin',
+        plan: 'industrial',
+        created_at: '2026-11-10',
+        updated_at: '2026-11-10'
+      });
+      fixture.detectChanges();
+
+      const adminBtn = fixture.nativeElement.querySelector('[data-testid="account-modal-admin-btn"]') as HTMLButtonElement;
+      expect(adminBtn).toBeTruthy();
+
+      const router = TestBed.inject(Router);
+      const navSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      adminBtn.click();
+      expect(navSpy).toHaveBeenCalledWith('/admin');
     });
   });
 });

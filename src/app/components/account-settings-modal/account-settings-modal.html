@@ -18,13 +18,26 @@
           </div>
         </div>
 
-        <button
-          type="button"
-          (click)="closeModal()"
-          class="text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 p-2 rounded-lg transition-colors cursor-pointer"
-          [title]="'common.close' | t">
-          <hugeicons-icon [icon]="icons.close" [size]="18" [strokeWidth]="2"></hugeicons-icon>
-        </button>
+        <div class="flex items-center gap-2">
+          @if (isSuperAdmin()) {
+            <button
+              type="button"
+              data-testid="account-modal-admin-btn"
+              (click)="goToAdminPanel()"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold shadow-2xs transition cursor-pointer whitespace-nowrap">
+              <hugeicons-icon [icon]="icons.shield" [size]="14" [strokeWidth]="2" class="text-sky-400 shrink-0"></hugeicons-icon>
+              <span>Panel Admin</span>
+            </button>
+          }
+
+          <button
+            type="button"
+            (click)="closeModal()"
+            class="text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 p-2 rounded-lg transition-colors cursor-pointer"
+            [title]="'common.close' | t">
+            <hugeicons-icon [icon]="icons.close" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+          </button>
+        </div>
       </div>
 
       <!-- BARRA SUPERIOR DE TOAST NOTIFICATION AMIGABLE Y ELEGANTE -->
@@ -922,7 +935,7 @@
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs font-bold text-zinc-900">{{ 'account.billing.planProTitle' | t }}</span>
                         <span class="text-xs font-extrabold text-zinc-900">
-                          {{ billingCycleSelect() === 'annual' ? '$12 USD / mes' : '$15 USD / mes' }}
+                          {{ billingCycleSelect() === 'annual' ? '$' + planPrices().pro_annual_monthly_usd + ' USD / mes' : '$' + planPrices().pro_monthly_usd + ' USD / mes' }}
                         </span>
                       </div>
                       <p class="text-[11px] text-zinc-500 mt-1">
@@ -936,7 +949,7 @@
                         (click)="selectPlanCheckout('pro')"
                         class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.rocket" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'landing.pricing.planProCta' | t }} ({{ billingCycleSelect() === 'annual' ? '$144 USD / año' : '$15 USD' }})</span>
+                        <span>{{ 'landing.pricing.planProCta' | t }} ({{ billingCycleSelect() === 'annual' ? '$' + planPrices().pro_annual_total_usd + ' USD / año' : '$' + planPrices().pro_monthly_usd + ' USD' }})</span>
                       </button>
                     } @else if (userPlan() === 'pro' && currentBillingCycle() === 'monthly' && billingCycleSelect() === 'annual') {
                       <button
@@ -945,7 +958,7 @@
                         (click)="selectPlanCheckout('pro', 'annual')"
                         class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} ($144 USD / año)</span>
+                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} (${{ planPrices().pro_annual_total_usd }} USD / año)</span>
                       </button>
                     } @else if (userPlan() === 'pro') {
                       <button
@@ -972,7 +985,7 @@
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs font-bold text-zinc-900">{{ 'account.billing.planIndTitle' | t }}</span>
                         <span class="text-xs font-extrabold text-zinc-900">
-                          {{ billingCycleSelect() === 'annual' ? '$23 USD / mes' : '$29 USD / mes' }}
+                          {{ billingCycleSelect() === 'annual' ? '$' + planPrices().industrial_annual_monthly_usd + ' USD / mes' : '$' + planPrices().industrial_monthly_usd + ' USD / mes' }}
                         </span>
                       </div>
                       <p class="text-[11px] text-zinc-500 mt-1">
@@ -986,7 +999,7 @@
                         (click)="selectPlanCheckout('industrial')"
                         class="w-full py-2 px-3 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.arrowRight" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }} ({{ billingCycleSelect() === 'annual' ? '$276 USD / año' : '$29 USD' }})</span>
+                        <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }} ({{ billingCycleSelect() === 'annual' ? '$' + planPrices().industrial_annual_total_usd + ' USD / año' : '$' + planPrices().industrial_monthly_usd + ' USD' }})</span>
                       </button>
                     } @else if (userPlan() === 'industrial' && currentBillingCycle() === 'monthly' && billingCycleSelect() === 'annual') {
                       <button
@@ -995,7 +1008,7 @@
                         (click)="selectPlanCheckout('industrial', 'annual')"
                         class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} ($276 USD / año)</span>
+                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} (${{ planPrices().industrial_annual_total_usd }} USD / año)</span>
                       </button>
                     } @else {
                       <button

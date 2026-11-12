@@ -818,6 +818,17 @@ describe('LandingPageComponent', () => {
       fixture.detectChanges();
       expect(section?.textContent).toContain('Rendimiento en Navegador');
     });
+
+    it('debe renderizar enlaces legales en el footer hacia /terms, /privacy, /refunds y el correo de soporte', () => {
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('a[routerLink="/terms"]')).toBeTruthy();
+      expect(compiled.querySelector('a[routerLink="/privacy"]')).toBeTruthy();
+      expect(compiled.querySelector('a[routerLink="/refunds"]')).toBeTruthy();
+      expect(compiled.textContent).toContain('eydersuarez900@gmail.com');
+    });
   });
 });
 

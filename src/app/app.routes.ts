@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { studioAccessGuard } from './guards/studio-access.guard';
+import { superAdminGuard } from './guards/super-admin.guard';
 
 export const routes: Routes = [
   {
@@ -15,6 +16,35 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./components/auth-page/auth-page').then(
         (m) => m.AuthPageComponent
+      ),
+  },
+  {
+    path: 'admin',
+    canActivate: [superAdminGuard],
+    loadComponent: () =>
+      import('./pages/admin-dashboard/admin-dashboard').then(
+        (m) => m.AdminDashboardComponent
+      ),
+  },
+  {
+    path: 'terms',
+    loadComponent: () =>
+      import('./pages/legal-page/legal-page').then(
+        (m) => m.LegalPageComponent
+      ),
+  },
+  {
+    path: 'privacy',
+    loadComponent: () =>
+      import('./pages/legal-page/legal-page').then(
+        (m) => m.LegalPageComponent
+      ),
+  },
+  {
+    path: 'refunds',
+    loadComponent: () =>
+      import('./pages/legal-page/legal-page').then(
+        (m) => m.LegalPageComponent
       ),
   },
   {

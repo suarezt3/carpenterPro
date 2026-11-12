@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   AccountSetting01Icon,
@@ -29,6 +30,7 @@ import {
   Moon02Icon,
   Rocket01Icon,
   Settings01Icon,
+  Shield01Icon,
   Sun01Icon,
   Tick02Icon,
   UserIcon
@@ -100,6 +102,7 @@ export class AccountSettingsModalComponent {
   readonly themeService = inject(ThemeService);
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router, { optional: true });
 
   // Active Tab
   readonly activeTab = signal<AccountModalTab>('profile');
@@ -109,6 +112,7 @@ export class AccountSettingsModalComponent {
     user: UserIcon,
     accountSetting: AccountSetting01Icon,
     settings: Settings01Icon,
+    shield: Shield01Icon,
     layers: Layers01Icon,
     globe: Globe02Icon,
     creditCard: CreditCardIcon,
@@ -133,6 +137,43 @@ export class AccountSettingsModalComponent {
 
   readonly currentUser = this.supabase.currentUser;
   readonly userProfile = this.supabase.userProfile;
+
+  readonly isSuperAdmin = computed(() => {
+    const role = typeof this.userProfile === 'function' ? this.userProfile()?.role : undefined;
+    const email = typeof this.currentUser === 'function' ? this.currentUser()?.email?.toLowerCase() : undefined;
+    return role === 'super_admin' || email === 'eydersuarez900@gmail.com';
+  });
+
+  readonly planPrices = computed(() => {
+    const settingsFn = (
+      this.supabase as {
+        platformSettings?: () => {
+          pro_monthly_usd?: number;
+          pro_annual_monthly_usd?: number;
+          pro_annual_total_usd?: number;
+          industrial_monthly_usd?: number;
+          industrial_annual_monthly_usd?: number;
+          industrial_annual_total_usd?: number;
+        } | null;
+      }
+    ).platformSettings;
+    const s = typeof settingsFn === 'function' ? settingsFn() : null;
+    return {
+      pro_monthly_usd: Number(s?.pro_monthly_usd ?? 15),
+      pro_annual_monthly_usd: Number(s?.pro_annual_monthly_usd ?? 12),
+      pro_annual_total_usd: Number(s?.pro_annual_total_usd ?? 144),
+      industrial_monthly_usd: Number(s?.industrial_monthly_usd ?? 29),
+      industrial_annual_monthly_usd: Number(s?.industrial_annual_monthly_usd ?? 23),
+      industrial_annual_total_usd: Number(s?.industrial_annual_total_usd ?? 276)
+    };
+  });
+
+  goToAdminPanel(): void {
+    this.closeModal();
+    if (this.router) {
+      void this.router.navigateByUrl('/admin');
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // TAB 1: MI PERFIL Y CUENTA (F8)

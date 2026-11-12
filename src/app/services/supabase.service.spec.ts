@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { SupabaseService, SUPABASE_SQL_SETUP, SUPABASE_CONFIG } from './supabase.service';
+import { SupabaseService, SUPABASE_SQL_SETUP, SUPABASE_CONFIG, UserProfile } from './supabase.service';
 import { Project, ProjectSettings } from '../models/melamine.models';
 
 const testSettings: ProjectSettings = {
@@ -494,6 +494,207 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         const res = await service.updateUserProfile({ first_name: 'Fallo' });
         expect(res.success).toBe(false);
         expect(res.errorKey).toBe('account.profileUpdateError');
+      });
+    });
+
+    describe('Superadministrador y CMS Global (platform_settings y platform_feedback)', () => {
+      it('SUPABASE_SUPERADMIN_SQL_SETUP debe incluir platform_settings, platform_feedback y función is_super_admin', async () => {
+        const { SUPABASE_SUPERADMIN_SQL_SETUP } = await import('./supabase.service');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.platform_settings');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.platform_feedback');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE OR REPLACE FUNCTION public.is_super_admin()');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('eydersuarez900@gmail.com');
+      });
+
+      it('buildFallbackProfile debe asignar rol super_admin y plan industrial a la cuenta propietaria', () => {
+        const ownerUser = {
+          id: 'owner-1',
+          email: 'eydersuarez900@gmail.com',
+          app_metadata: {},
+          user_metadata: { first_name: 'Eyder', last_name: 'Suárez' },
+          aud: 'authenticated',
+          created_at: '2026-11-01T00:00:00Z'
+        };
+        const profile = service.buildFallbackProfile(ownerUser);
+        expect(profile.role).toBe('super_admin');
+        expect(profile.plan).toBe('industrial');
+        expect(profile.subscription_status).toBe('active');
+        expect(profile.is_suspended).toBe(false);
+      });
+
+      it('isSuperAdmin debe ser true si el rol es super_admin o el email es el propietario', () => {
+        service.currentUser.set(null);
+        service.userProfile.set(null);
+        expect(service.isSuperAdmin()).toBe(false);
+
+        service.currentUser.set({
+          id: 'owner-id',
+          email: 'eydersuarez900@gmail.com',
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated',
+          created_at: ''
+        });
+        expect(service.isSuperAdmin()).toBe(true);
+
+        service.currentUser.set({
+          id: 'admin-id',
+          email: 'admin@taller.com',
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated',
+          created_at: ''
+        });
+        service.userProfile.set({
+          id: 'admin-id',
+          email: 'admin@taller.com',
+          first_name: 'Admin',
+          last_name: 'General',
+          role: 'super_admin',
+          plan: 'industrial',
+          created_at: '',
+          updated_at: ''
+        });
+        expect(service.isSuperAdmin()).toBe(true);
+      });
+
+      it('loadPlatformSettings debe retornar la configuración por defecto y actualizar la señal', async () => {
+        const settings = await service.loadPlatformSettings();
+        expect(settings.id).toBe(1);
+        expect(settings.app_version).toBe('v3.0.0');
+        expect(settings.support_email).toBe('eydersuarez900@gmail.com');
+        expect(service.platformSettings().pro_monthly_usd).toBe(15);
+      });
+
+      it('updatePlatformSettings debe actualizar la señal platformSettings localmente y llamar a la base de datos', async () => {
+        const mockEq = vi.fn().mockResolvedValue({ error: null });
+        const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const res = await service.updatePlatformSettings({
+          pro_monthly_usd: 19,
+          announcement_enabled: true,
+          announcement_text: 'Oferta Especial'
+        });
+
+        expect(res.success).toBe(true);
+        expect(service.platformSettings().pro_monthly_usd).toBe(19);
+        expect(service.platformSettings().announcement_enabled).toBe(true);
+        expect(service.platformSettings().announcement_text).toBe('Oferta Especial');
+        expect(mockFrom).toHaveBeenCalledWith('platform_settings');
+        expect(mockEq).toHaveBeenCalledWith('id', 1);
+      });
+
+      it('adminGetAllProfiles debe retornar lista de perfiles mapeados', async () => {
+        const mockProfiles = [
+          {
+            id: 'u-1',
+            email: 'user1@test.com',
+            first_name: 'User',
+            last_name: 'Uno',
+            role: 'user',
+            plan: 'free',
+            billing_cycle: 'monthly',
+            subscription_status: 'free',
+            is_suspended: false,
+            created_at: '2026-11-01T00:00:00Z',
+            updated_at: '2026-11-01T00:00:00Z'
+          }
+        ];
+        const mockOrder = vi.fn().mockResolvedValue({ data: mockProfiles, error: null });
+        const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
+        const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const list = await service.adminGetAllProfiles();
+        expect(list.length).toBe(1);
+        expect(list[0].email).toBe('user1@test.com');
+        expect(mockFrom).toHaveBeenCalledWith('user_profiles');
+      });
+
+      it('adminUpdateUserProfile debe actualizar perfil y sincronizar perfil local si es el usuario actual', async () => {
+        const currentU = {
+          id: 'user-me',
+          email: 'me@test.com',
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated',
+          created_at: ''
+        };
+        service.currentUser.set(currentU);
+        const initialProfile: UserProfile = {
+          id: 'user-me',
+          email: 'me@test.com',
+          first_name: 'Yo',
+          last_name: 'Mismo',
+          role: 'user',
+          plan: 'free',
+          created_at: '',
+          updated_at: ''
+        };
+        service.userProfile.set(initialProfile);
+
+        const mockEq = vi.fn().mockResolvedValue({ error: null });
+        const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const res = await service.adminUpdateUserProfile('user-me', {
+          plan: 'pro',
+          role: 'super_admin'
+        });
+
+        expect(res.success).toBe(true);
+        expect(service.userProfile()?.plan).toBe('pro');
+        expect(service.userProfile()?.role).toBe('super_admin');
+        expect(mockEq).toHaveBeenCalledWith('id', 'user-me');
+      });
+
+      it('adminCreateTestimonial debe insertar un testimonio aprobado', async () => {
+        const mockSingle = vi.fn().mockResolvedValue({
+          data: {
+            id: 'testimonio-1',
+            user_name: 'Carpintería Moderna',
+            user_role_title: 'Taller',
+            category: 'testimonial',
+            message: 'Excelente herramienta para despieces.',
+            rating: 5,
+            status: 'approved',
+            is_featured: true,
+            created_at: '2026-11-10T00:00:00Z'
+          },
+          error: null
+        });
+        const mockSelect = vi.fn().mockReturnValue({ maybeSingle: mockSingle });
+        const mockInsert = vi.fn().mockReturnValue({ select: mockSelect });
+        const mockFrom = vi.fn().mockReturnValue({ insert: mockInsert });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const res = await service.adminCreateTestimonial({
+          user_name: 'Carpintería Moderna',
+          user_role_title: 'Taller',
+          message: 'Excelente herramienta para despieces.',
+          rating: 5,
+          is_featured: true
+        });
+
+        expect(res.success).toBe(true);
+        expect(res.data?.user_name).toBe('Carpintería Moderna');
+        expect(res.data?.rating).toBe(5);
+        expect(mockFrom).toHaveBeenCalledWith('platform_feedback');
+      });
+
+      it('adminDeleteFeedback debe eliminar el registro en platform_feedback', async () => {
+        const mockEq = vi.fn().mockResolvedValue({ error: null });
+        const mockDelete = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ delete: mockDelete });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const res = await service.adminDeleteFeedback('feed-123');
+        expect(res.success).toBe(true);
+        expect(mockFrom).toHaveBeenCalledWith('platform_feedback');
+        expect(mockEq).toHaveBeenCalledWith('id', 'feed-123');
       });
     });
   });

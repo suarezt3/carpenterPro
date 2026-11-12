@@ -1,0 +1,1556 @@
+<div class="min-h-screen bg-zinc-50 text-zinc-900 font-sans flex flex-col">
+  <!-- TOP EXECUTIVE HEADER -->
+  <header class="sticky top-0 z-30 bg-white border-b border-zinc-200 px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-9 h-9 rounded-lg bg-zinc-900 text-white flex items-center justify-center shrink-0">
+        <hugeicons-icon [icon]="icons.shield" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <h1 class="text-sm sm:text-base font-bold tracking-tight text-zinc-900 truncate">
+            Piezo3D Studio · Centro de Mando Ejecutivo
+          </h1>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-zinc-900 text-white border border-zinc-900">
+            <hugeicons-icon [icon]="icons.shield" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+            Super Admin
+          </span>
+          <span
+            class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-sky-50 text-sky-600 border border-sky-200"
+            style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+          >
+            {{ currentSettings().app_version }}
+          </span>
+        </div>
+        <p class="text-xs text-zinc-500 hidden sm:block truncate">
+          Administración integral de cuentas, suscripciones, precios dinámicos y soporte técnico
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2.5 shrink-0">
+      <button
+        type="button"
+        (click)="reloadAllData()"
+        [disabled]="isLoading()"
+        data-testid="admin-refresh-btn"
+        class="inline-flex items-center gap-2 px-3.5 py-2 min-h-10 rounded-lg text-xs font-semibold bg-zinc-100 text-zinc-900 hover:bg-zinc-200 border border-zinc-200 transition-colors disabled:opacity-50 cursor-pointer"
+      >
+        <hugeicons-icon [icon]="icons.cloud" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+        <span>Actualizar Datos</span>
+      </button>
+
+      <a
+        routerLink="/studio"
+        data-testid="admin-back-to-studio-btn"
+        class="inline-flex items-center gap-2 px-3.5 py-2 min-h-10 rounded-lg text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+      >
+        <hugeicons-icon [icon]="icons.cube" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+        <span>Volver al Estudio 3D</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- TOAST FEEDBACK BANNER -->
+  @if (toastBanner(); as banner) {
+    <div class="px-4 sm:px-6 lg:px-8 pt-4">
+      <div
+        role="status"
+        data-testid="admin-toast-banner"
+        class="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-xs sm:text-sm font-medium"
+        [class.bg-emerald-50]="banner.type === 'success'"
+        [class.text-emerald-700]="banner.type === 'success'"
+        [class.border-emerald-200]="banner.type === 'success'"
+        [class.bg-red-50]="banner.type === 'error'"
+        [class.text-red-700]="banner.type === 'error'"
+        [class.border-red-200]="banner.type === 'error'"
+      >
+        <div class="flex items-center gap-2.5">
+          <hugeicons-icon
+            [icon]="banner.type === 'success' ? icons.checkCircle : icons.alert"
+            [size]="18"
+            [strokeWidth]="2"
+          ></hugeicons-icon>
+          <span>{{ banner.text }}</span>
+        </div>
+        <button
+          type="button"
+          (click)="dismissToast()"
+          class="p-1 rounded-md hover:bg-black/5 transition-colors cursor-pointer"
+          aria-label="Cerrar notificación"
+        >
+          <hugeicons-icon [icon]="icons.cancel" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- MAIN WORKSPACE: SIDEBAR + MODULE CONTENT -->
+  <div class="flex-1 flex flex-col lg:flex-row">
+    <!-- LEFT NAVIGATION SIDEBAR -->
+    <aside class="w-full lg:w-64 bg-white border-b lg:border-b-0 lg:border-r border-zinc-200 shrink-0 p-3 sm:p-4 flex flex-col justify-between gap-4">
+      <nav class="flex lg:flex-col gap-1.5 overflow-x-auto pb-1 lg:pb-0" aria-label="Módulos de administración">
+        @for (item of navItems; track item.id) {
+          <button
+            type="button"
+            (click)="setSection(item.id)"
+            [attr.data-testid]="'admin-nav-' + item.id"
+            class="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-left transition-colors shrink-0 lg:w-full cursor-pointer border"
+            [class.bg-zinc-900]="activeSection() === item.id"
+            [class.text-white]="activeSection() === item.id"
+            [class.border-zinc-900]="activeSection() === item.id"
+            [class.bg-white]="activeSection() !== item.id"
+            [class.text-zinc-700]="activeSection() !== item.id"
+            [class.border-transparent]="activeSection() !== item.id"
+            [class.hover:bg-zinc-100]="activeSection() !== item.id"
+          >
+            <div class="flex items-center gap-3 min-w-0">
+              @switch (item.id) {
+                @case ('overview') {
+                  <hugeicons-icon [icon]="icons.layers" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                }
+                @case ('users') {
+                  <hugeicons-icon [icon]="icons.user" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                }
+                @case ('cms') {
+                  <hugeicons-icon [icon]="icons.settings" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                }
+                @case ('testimonials') {
+                  <hugeicons-icon [icon]="icons.star" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                }
+                @case ('support') {
+                  <hugeicons-icon [icon]="icons.checkList" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                }
+              }
+              <div class="min-w-0">
+                <div class="text-xs sm:text-sm font-semibold leading-tight truncate">{{ item.label }}</div>
+                <div
+                  class="text-[11px] hidden lg:block truncate mt-0.5"
+                  [class.text-zinc-300]="activeSection() === item.id"
+                  [class.text-zinc-500]="activeSection() !== item.id"
+                >
+                  {{ item.subtitle }}
+                </div>
+              </div>
+            </div>
+
+            @if (item.id === 'users') {
+              <span
+                class="px-2 py-0.5 rounded-md text-[11px] font-semibold"
+                [class.bg-zinc-800]="activeSection() === item.id"
+                [class.text-zinc-100]="activeSection() === item.id"
+                [class.bg-zinc-100]="activeSection() !== item.id"
+                [class.text-zinc-700]="activeSection() !== item.id"
+                style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+              >
+                {{ totalUsersCount() }}
+              </span>
+            }
+            @if (item.id === 'support' && pendingSupportCount() > 0) {
+              <span
+                class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200"
+                style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+              >
+                {{ pendingSupportCount() }}
+              </span>
+            }
+          </button>
+        }
+      </nav>
+
+      <!-- SIDEBAR FOOTER SUMMARY -->
+      <div class="hidden lg:block p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-zinc-500 font-medium">Canal de Soporte</span>
+          <span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+            Activo
+          </span>
+        </div>
+        <div class="text-xs font-semibold text-zinc-900 truncate">
+          {{ currentSettings().support_email }}
+        </div>
+        <div class="text-[11px] text-zinc-500">
+          Límite Plan Inicial:
+          <span
+            class="font-semibold text-zinc-800"
+            style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+          >
+            {{ currentSettings().free_max_modules }} módulos
+          </span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+      @if (isLoading()) {
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="admin-loading-skeleton">
+          @for (sk of [1, 2, 3, 4]; track sk) {
+            <div class="bg-white rounded-xl border border-zinc-200 p-5 space-y-3 animate-pulse">
+              <div class="h-3.5 w-28 bg-zinc-200 rounded"></div>
+              <div class="h-7 w-20 bg-zinc-200 rounded"></div>
+              <div class="h-3 w-36 bg-zinc-100 rounded"></div>
+            </div>
+          }
+        </div>
+      }
+
+      @switch (activeSection()) {
+        <!-- ========================================================== -->
+        <!-- MÓDULO 1: RESUMEN EJECUTIVO Y FINANZAS (OVERVIEW)          -->
+        <!-- ========================================================== -->
+        @case ('overview') {
+          <section class="space-y-6" data-testid="admin-section-overview">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 class="text-lg sm:text-xl font-bold text-zinc-900">
+                  Resumen Ejecutivo y Métricas Financieras
+                </h2>
+                <p class="text-xs sm:text-sm text-zinc-600">
+                  Monitoreo en tiempo real de usuarios registrados, ingresos recurrentes y actividad comercial.
+                </p>
+              </div>
+            </div>
+
+            <!-- 4 KPI CARDS -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <!-- KPI 1: Total Usuarios Registrados -->
+              <article class="bg-white rounded-xl border border-zinc-200 p-5 flex flex-col justify-between gap-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    Total Usuarios Registrados
+                  </span>
+                  <div class="w-8 h-8 rounded-lg bg-zinc-100 text-zinc-800 flex items-center justify-center">
+                    <hugeicons-icon [icon]="icons.user" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                </div>
+                <div
+                  data-testid="kpi-total-users"
+                  class="text-2xl sm:text-3xl font-bold text-zinc-900"
+                  style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                >
+                  {{ totalUsersCount() }}
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span
+                    class="px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200 font-medium"
+                    style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                  >
+                    Inicial: {{ freeUsersCount() }}
+                  </span>
+                  <span
+                    class="px-2 py-0.5 rounded-md bg-sky-50 text-sky-600 border border-sky-200 font-medium"
+                    style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                  >
+                    Taller Pro: {{ proUsersCount() }}
+                  </span>
+                  <span
+                    class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium"
+                    style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                  >
+                    Industrial: {{ industrialUsersCount() }}
+                  </span>
+                </div>
+              </article>
+
+              <!-- KPI 2: Suscripciones de Pago Activas -->
+              <article class="bg-white rounded-xl border border-zinc-200 p-5 flex flex-col justify-between gap-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    Suscripciones Activas
+                  </span>
+                  <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                    <hugeicons-icon [icon]="icons.checkCircle" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                </div>
+                <div
+                  data-testid="kpi-active-paid"
+                  class="text-2xl sm:text-3xl font-bold text-zinc-900"
+                  style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                >
+                  {{ activePaidSubscriptionsCount() }}
+                </div>
+                <p class="text-xs text-zinc-500">
+                  Cuentas en planes <strong class="text-zinc-800">Taller Pro</strong> e <strong class="text-zinc-800">Industrial</strong> con estado activo.
+                </p>
+              </article>
+
+              <!-- KPI 3: Ingreso Mensual Recurrente Estimado (MRR en USD) -->
+              <article class="bg-white rounded-xl border border-zinc-200 p-5 flex flex-col justify-between gap-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    MRR Estimado (USD)
+                  </span>
+                  <div class="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
+                    <hugeicons-icon [icon]="icons.creditCard" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                </div>
+                <div
+                  data-testid="kpi-mrr-usd"
+                  class="text-2xl sm:text-3xl font-bold text-zinc-900"
+                  style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                >
+                  ${{ estimatedMrrUsd() }} USD
+                </div>
+                <p class="text-xs text-zinc-500">
+                  Calculado según tarifas vigentes de planes activos mensuales y anuales.
+                </p>
+              </article>
+
+              <!-- KPI 4: Tickets / Bugs Pendientes y Testimonios por Aprobar -->
+              <article class="bg-white rounded-xl border border-zinc-200 p-5 flex flex-col justify-between gap-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    Bandeja por Atender
+                  </span>
+                  <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
+                    <hugeicons-icon [icon]="icons.checkList" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                </div>
+                <div
+                  data-testid="kpi-pending-items"
+                  class="text-2xl sm:text-3xl font-bold text-zinc-900"
+                  style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                >
+                  {{ pendingAttentionCount() }}
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span
+                    class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium"
+                    style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                  >
+                    Soporte/Bugs: {{ pendingSupportCount() }}
+                  </span>
+                  <span
+                    class="px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200 font-medium"
+                    style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                  >
+                    Testimonios: {{ pendingTestimonialsCount() }}
+                  </span>
+                </div>
+              </article>
+            </div>
+
+            <!-- TWO EXECUTIVE TABLES: RECENT INVOICES & RECENT USERS -->
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <!-- Últimas Transacciones / Facturas -->
+              <div class="bg-white rounded-xl border border-zinc-200 overflow-hidden flex flex-col">
+                <div class="px-5 py-4 border-b border-zinc-200 flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <hugeicons-icon [icon]="icons.invoice" [size]="18" [strokeWidth]="2" class="text-zinc-700"></hugeicons-icon>
+                    <h3 class="text-sm font-bold text-zinc-900">Últimas Transacciones y Facturas</h3>
+                  </div>
+                  <span
+                    class="text-xs font-medium text-zinc-500"
+                    style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                  >
+                    {{ invoices().length }} registros
+                  </span>
+                </div>
+
+                @if (recentInvoices().length === 0) {
+                  <div class="p-8 text-center space-y-2">
+                    <div class="w-10 h-10 rounded-full bg-zinc-100 text-zinc-500 flex items-center justify-center mx-auto">
+                      <hugeicons-icon [icon]="icons.invoice" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                    </div>
+                    <p class="text-xs sm:text-sm font-medium text-zinc-700">Sin transacciones registradas</p>
+                    <p class="text-xs text-zinc-500">Los recibos de suscripciones procesados aparecerán aquí.</p>
+                  </div>
+                } @else {
+                  <div class="overflow-x-auto admin-scroll-table">
+                    <table class="w-full text-left border-collapse">
+                      <thead>
+                        <tr class="bg-zinc-50 border-b border-zinc-200 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+                          <th class="py-2.5 px-4">Fecha</th>
+                          <th class="py-2.5 px-4">Plan</th>
+                          <th class="py-2.5 px-4">Ciclo</th>
+                          <th class="py-2.5 px-4">Monto USD</th>
+                          <th class="py-2.5 px-4">Estado</th>
+                          <th class="py-2.5 px-4 text-right">Recibo</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200 text-xs">
+                        @for (inv of recentInvoices(); track inv.id) {
+                          <tr class="hover:bg-zinc-50 transition-colors">
+                            <td
+                              class="py-3 px-4 text-zinc-600 whitespace-nowrap"
+                              style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                            >
+                              {{ formatShortDate(inv.created_at) }}
+                            </td>
+                            <td class="py-3 px-4 font-semibold text-zinc-900">
+                              {{ getPlanLabel(inv.plan) }}
+                            </td>
+                            <td class="py-3 px-4 text-zinc-600">
+                              {{ getCycleLabel(inv.billing_cycle) }}
+                            </td>
+                            <td
+                              class="py-3 px-4 font-semibold text-zinc-900"
+                              style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                            >
+                              ${{ inv.amount_usd }} USD
+                            </td>
+                            <td class="py-3 px-4">
+                              <span
+                                class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border"
+                                [class.bg-emerald-50]="inv.status === 'paid' || inv.status === 'active'"
+                                [class.text-emerald-700]="inv.status === 'paid' || inv.status === 'active'"
+                                [class.border-emerald-200]="inv.status === 'paid' || inv.status === 'active'"
+                                [class.bg-amber-50]="inv.status !== 'paid' && inv.status !== 'active'"
+                                [class.text-amber-700]="inv.status !== 'paid' && inv.status !== 'active'"
+                                [class.border-amber-200]="inv.status !== 'paid' && inv.status !== 'active'"
+                              >
+                                {{ inv.status === 'paid' ? 'Pagado' : inv.status }}
+                              </span>
+                            </td>
+                            <td class="py-3 px-4 text-right">
+                              @if (inv.invoice_url) {
+                                <a
+                                  [href]="inv.invoice_url"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  class="inline-flex items-center gap-1 text-sky-600 hover:underline font-medium"
+                                >
+                                  <span>Ver</span>
+                                  <hugeicons-icon [icon]="icons.arrowRight" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                                </a>
+                              } @else {
+                                <span class="text-zinc-400">—</span>
+                              }
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+
+              <!-- Últimos Usuarios Registrados -->
+              <div class="bg-white rounded-xl border border-zinc-200 overflow-hidden flex flex-col">
+                <div class="px-5 py-4 border-b border-zinc-200 flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <hugeicons-icon [icon]="icons.user" [size]="18" [strokeWidth]="2" class="text-zinc-700"></hugeicons-icon>
+                    <h3 class="text-sm font-bold text-zinc-900">Últimos Usuarios Registrados</h3>
+                  </div>
+                  <button
+                    type="button"
+                    (click)="setSection('users')"
+                    class="text-xs font-semibold text-sky-600 hover:underline cursor-pointer"
+                  >
+                    Gestionar todos
+                  </button>
+                </div>
+
+                @if (recentUsers().length === 0) {
+                  <div class="p-8 text-center space-y-2">
+                    <div class="w-10 h-10 rounded-full bg-zinc-100 text-zinc-500 flex items-center justify-center mx-auto">
+                      <hugeicons-icon [icon]="icons.user" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                    </div>
+                    <p class="text-xs sm:text-sm font-medium text-zinc-700">No hay usuarios cargados</p>
+                  </div>
+                } @else {
+                  <div class="overflow-x-auto admin-scroll-table">
+                    <table class="w-full text-left border-collapse">
+                      <thead>
+                        <tr class="bg-zinc-50 border-b border-zinc-200 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+                          <th class="py-2.5 px-4">Nombre</th>
+                          <th class="py-2.5 px-4">Correo</th>
+                          <th class="py-2.5 px-4">Plan</th>
+                          <th class="py-2.5 px-4">Rol</th>
+                          <th class="py-2.5 px-4">Fecha</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200 text-xs">
+                        @for (u of recentUsers(); track u.id) {
+                          <tr class="hover:bg-zinc-50 transition-colors">
+                            <td class="py-3 px-4 font-semibold text-zinc-900 whitespace-nowrap">
+                              {{ u.first_name }} {{ u.last_name }}
+                            </td>
+                            <td class="py-3 px-4 text-zinc-600">
+                              {{ u.email }}
+                            </td>
+                            <td class="py-3 px-4">
+                              <span
+                                class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border"
+                                [class.bg-emerald-50]="u.plan === 'industrial'"
+                                [class.text-emerald-700]="u.plan === 'industrial'"
+                                [class.border-emerald-200]="u.plan === 'industrial'"
+                                [class.bg-sky-50]="u.plan === 'pro'"
+                                [class.text-sky-600]="u.plan === 'pro'"
+                                [class.border-sky-200]="u.plan === 'pro'"
+                                [class.bg-zinc-100]="u.plan === 'free'"
+                                [class.text-zinc-700]="u.plan === 'free'"
+                                [class.border-zinc-200]="u.plan === 'free'"
+                              >
+                                {{ getPlanLabel(u.plan) }}
+                              </span>
+                            </td>
+                            <td class="py-3 px-4">
+                              @if (u.role === 'super_admin') {
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-zinc-900 text-white">
+                                  Super Admin
+                                </span>
+                              } @else {
+                                <span class="text-zinc-600">Usuario</span>
+                              }
+                            </td>
+                            <td
+                              class="py-3 px-4 text-zinc-500 whitespace-nowrap"
+                              style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                            >
+                              {{ formatShortDate(u.created_at) }}
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+            </div>
+          </section>
+        }
+
+        <!-- ========================================================== -->
+        <!-- MÓDULO 2: GESTIÓN DE USUARIOS Y PLANES (CRM)               -->
+        <!-- ========================================================== -->
+        @case ('users') {
+          <section class="space-y-6" data-testid="admin-section-users">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-lg sm:text-xl font-bold text-zinc-900">
+                  Gestión de Usuarios y Asignación Manual de Planes
+                </h2>
+                <p class="text-xs sm:text-sm text-zinc-600">
+                  Administra membresías, ciclos de cobro, permisos ejecutivos y estado de cuenta en tiempo real.
+                </p>
+              </div>
+            </div>
+
+            <!-- SEARCH & FILTER BAR -->
+            <div class="bg-white rounded-xl border border-zinc-200 p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+              <div class="relative flex-1">
+                <input
+                  type="text"
+                  [ngModel]="searchQuery()"
+                  (ngModelChange)="onSearchQueryInput($event)"
+                  data-testid="admin-users-search"
+                  placeholder="Buscar usuario por nombre o correo electrónico..."
+                  class="w-full pl-3.5 pr-4 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-900 focus:bg-white transition-colors"
+                />
+              </div>
+
+              <div class="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  (click)="setUserFilter('all')"
+                  data-testid="filter-users-all"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="userFilter() === 'all'"
+                  [class.text-white]="userFilter() === 'all'"
+                  [class.border-zinc-900]="userFilter() === 'all'"
+                  [class.bg-zinc-50]="userFilter() !== 'all'"
+                  [class.text-zinc-700]="userFilter() !== 'all'"
+                  [class.border-zinc-200]="userFilter() !== 'all'"
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  (click)="setUserFilter('free')"
+                  data-testid="filter-users-free"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="userFilter() === 'free'"
+                  [class.text-white]="userFilter() === 'free'"
+                  [class.border-zinc-900]="userFilter() === 'free'"
+                  [class.bg-zinc-50]="userFilter() !== 'free'"
+                  [class.text-zinc-700]="userFilter() !== 'free'"
+                  [class.border-zinc-200]="userFilter() !== 'free'"
+                >
+                  Free
+                </button>
+                <button
+                  type="button"
+                  (click)="setUserFilter('pro')"
+                  data-testid="filter-users-pro"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="userFilter() === 'pro'"
+                  [class.text-white]="userFilter() === 'pro'"
+                  [class.border-zinc-900]="userFilter() === 'pro'"
+                  [class.bg-zinc-50]="userFilter() !== 'pro'"
+                  [class.text-zinc-700]="userFilter() !== 'pro'"
+                  [class.border-zinc-200]="userFilter() !== 'pro'"
+                >
+                  Taller Pro
+                </button>
+                <button
+                  type="button"
+                  (click)="setUserFilter('industrial')"
+                  data-testid="filter-users-industrial"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="userFilter() === 'industrial'"
+                  [class.text-white]="userFilter() === 'industrial'"
+                  [class.border-zinc-900]="userFilter() === 'industrial'"
+                  [class.bg-zinc-50]="userFilter() !== 'industrial'"
+                  [class.text-zinc-700]="userFilter() !== 'industrial'"
+                  [class.border-zinc-200]="userFilter() !== 'industrial'"
+                >
+                  Industrial
+                </button>
+                <button
+                  type="button"
+                  (click)="setUserFilter('super_admin')"
+                  data-testid="filter-users-super-admin"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="userFilter() === 'super_admin'"
+                  [class.text-white]="userFilter() === 'super_admin'"
+                  [class.border-zinc-900]="userFilter() === 'super_admin'"
+                  [class.bg-zinc-50]="userFilter() !== 'super_admin'"
+                  [class.text-zinc-700]="userFilter() !== 'super_admin'"
+                  [class.border-zinc-200]="userFilter() !== 'super_admin'"
+                >
+                  Super Admin
+                </button>
+                <button
+                  type="button"
+                  (click)="setUserFilter('suspended')"
+                  data-testid="filter-users-suspended"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="userFilter() === 'suspended'"
+                  [class.text-white]="userFilter() === 'suspended'"
+                  [class.border-zinc-900]="userFilter() === 'suspended'"
+                  [class.bg-zinc-50]="userFilter() !== 'suspended'"
+                  [class.text-zinc-700]="userFilter() !== 'suspended'"
+                  [class.border-zinc-200]="userFilter() !== 'suspended'"
+                >
+                  Suspendidos
+                </button>
+              </div>
+            </div>
+
+            <!-- USERS CRM TABLE -->
+            <div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+              @if (filteredUsers().length === 0) {
+                <div class="p-10 text-center space-y-2">
+                  <div class="w-10 h-10 rounded-full bg-zinc-100 text-zinc-500 flex items-center justify-center mx-auto">
+                    <hugeicons-icon [icon]="icons.user" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                  <p class="text-sm font-semibold text-zinc-800">No se encontraron usuarios con ese criterio</p>
+                  <p class="text-xs text-zinc-500">Prueba cambiando el filtro activo o el término de búsqueda.</p>
+                </div>
+              } @else {
+                <div class="overflow-x-auto admin-scroll-table">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="bg-zinc-50 border-b border-zinc-200 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+                        <th class="py-3 px-4">Usuario / Correo</th>
+                        <th class="py-3 px-4">Plan Asignado</th>
+                        <th class="py-3 px-4">Ciclo</th>
+                        <th class="py-3 px-4">Estado Suscripción</th>
+                        <th class="py-3 px-4">Rol de Sistema</th>
+                        <th class="py-3 px-4">Estado Cuenta</th>
+                        <th class="py-3 px-4">Registro</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200 text-xs">
+                      @for (user of filteredUsers(); track user.id) {
+                        <tr class="hover:bg-zinc-50/80 transition-colors">
+                          <td class="py-3.5 px-4">
+                            <div class="font-semibold text-zinc-900">
+                              {{ user.first_name }} {{ user.last_name }}
+                            </div>
+                            <div class="text-zinc-500">{{ user.email }}</div>
+                          </td>
+
+                          <!-- Plan Selector -->
+                          <td class="py-3.5 px-4">
+                            <select
+                              [ngModel]="user.plan"
+                              (ngModelChange)="onUserPlanChange(user, $event)"
+                              [disabled]="updatingUserId() === user.id"
+                              [attr.data-testid]="'user-plan-select-' + user.id"
+                              aria-label="Cambiar plan de usuario"
+                              class="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white text-xs font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 cursor-pointer"
+                            >
+                              <option value="free">Inicial (Free)</option>
+                              <option value="pro">Taller Pro</option>
+                              <option value="industrial">Industrial &amp; CNC</option>
+                            </select>
+                          </td>
+
+                          <!-- Billing Cycle Selector -->
+                          <td class="py-3.5 px-4">
+                            <select
+                              [ngModel]="user.billing_cycle || 'monthly'"
+                              (ngModelChange)="onUserCycleChange(user, $event)"
+                              [disabled]="updatingUserId() === user.id"
+                              [attr.data-testid]="'user-cycle-select-' + user.id"
+                              aria-label="Cambiar ciclo de facturación"
+                              class="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white text-xs font-medium text-zinc-800 focus:outline-none focus:border-zinc-900 cursor-pointer"
+                            >
+                              <option value="monthly">Mensual</option>
+                              <option value="annual">Anual</option>
+                            </select>
+                          </td>
+
+                          <!-- Subscription Status Selector -->
+                          <td class="py-3.5 px-4">
+                            <select
+                              [ngModel]="user.subscription_status || 'free'"
+                              (ngModelChange)="onUserStatusChange(user, $event)"
+                              [disabled]="updatingUserId() === user.id"
+                              [attr.data-testid]="'user-status-select-' + user.id"
+                              aria-label="Cambiar estado de suscripción"
+                              class="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white text-xs font-medium text-zinc-800 focus:outline-none focus:border-zinc-900 cursor-pointer"
+                            >
+                              <option value="free">Gratuita (Free)</option>
+                              <option value="active">Activa</option>
+                              <option value="cancelled">Cancelada</option>
+                            </select>
+                          </td>
+
+                          <!-- Role Toggle Button -->
+                          <td class="py-3.5 px-4">
+                            <button
+                              type="button"
+                              (click)="toggleUserRole(user)"
+                              [disabled]="updatingUserId() === user.id"
+                              [attr.data-testid]="'user-role-toggle-' + user.id"
+                              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                              [class.bg-zinc-900]="user.role === 'super_admin'"
+                              [class.text-white]="user.role === 'super_admin'"
+                              [class.border-zinc-900]="user.role === 'super_admin'"
+                              [class.bg-zinc-100]="user.role !== 'super_admin'"
+                              [class.text-zinc-700]="user.role !== 'super_admin'"
+                              [class.border-zinc-200]="user.role !== 'super_admin'"
+                            >
+                              <hugeicons-icon [icon]="icons.shield" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                              <span>{{ user.role === 'super_admin' ? 'Super Admin' : 'Usuario' }}</span>
+                            </button>
+                          </td>
+
+                          <!-- Account Suspension Toggle -->
+                          <td class="py-3.5 px-4">
+                            <button
+                              type="button"
+                              (click)="toggleUserSuspension(user)"
+                              [disabled]="updatingUserId() === user.id"
+                              [attr.data-testid]="'user-suspend-toggle-' + user.id"
+                              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                              [class.bg-red-50]="user.is_suspended"
+                              [class.text-red-700]="user.is_suspended"
+                              [class.border-red-200]="user.is_suspended"
+                              [class.bg-emerald-50]="!user.is_suspended"
+                              [class.text-emerald-700]="!user.is_suspended"
+                              [class.border-emerald-200]="!user.is_suspended"
+                            >
+                              <hugeicons-icon
+                                [icon]="user.is_suspended ? icons.cancel : icons.tick"
+                                [size]="13"
+                                [strokeWidth]="2"
+                              ></hugeicons-icon>
+                              <span>{{ user.is_suspended ? 'Suspendida' : 'Activa' }}</span>
+                            </button>
+                          </td>
+
+                          <!-- Created Date -->
+                          <td
+                            class="py-3.5 px-4 text-zinc-500 whitespace-nowrap"
+                            style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                          >
+                            {{ formatShortDate(user.created_at) }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- ========================================================== -->
+        <!-- MÓDULO 3: CMS DE PRECIOS, VERSIÓN Y BANNER GLOBAL          -->
+        <!-- ========================================================== -->
+        @case ('cms') {
+          <section class="space-y-6" data-testid="admin-section-cms">
+            <div>
+              <h2 class="text-lg sm:text-xl font-bold text-zinc-900">
+                CMS de Precios, Versión y Banner Global
+              </h2>
+              <p class="text-xs sm:text-sm text-zinc-600">
+                Ajusta las tarifas oficiales en USD, límites operativos del plan gratuito y el cintillo informativo de portada.
+              </p>
+            </div>
+
+            <form [formGroup]="cmsForm" (ngSubmit)="saveCmsSettings()" class="space-y-6">
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Precios Plan Taller Pro -->
+                <div class="bg-white rounded-xl border border-zinc-200 p-5 space-y-4">
+                  <div class="flex items-center justify-between border-b border-zinc-200 pb-3">
+                    <div>
+                      <h3 class="text-sm font-bold text-zinc-900">Precios Plan Taller Pro</h3>
+                      <p class="text-xs text-zinc-500">Tarifas públicas en USD para talleres profesionales</p>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-sky-50 text-sky-600 border border-sky-200">
+                      Taller Pro
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label for="pro_monthly_usd" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Mensual (USD)
+                      </label>
+                      <input
+                        id="pro_monthly_usd"
+                        type="number"
+                        formControlName="pro_monthly_usd"
+                        data-testid="cms-pro-monthly-input"
+                        style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label for="pro_annual_monthly_usd" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Anual / Mes (USD)
+                      </label>
+                      <input
+                        id="pro_annual_monthly_usd"
+                        type="number"
+                        formControlName="pro_annual_monthly_usd"
+                        data-testid="cms-pro-annual-monthly-input"
+                        style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label for="pro_annual_total_usd" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Total Anual (USD)
+                      </label>
+                      <input
+                        id="pro_annual_total_usd"
+                        type="number"
+                        formControlName="pro_annual_total_usd"
+                        data-testid="cms-pro-annual-total-input"
+                        style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Precios Plan Industrial & CNC -->
+                <div class="bg-white rounded-xl border border-zinc-200 p-5 space-y-4">
+                  <div class="flex items-center justify-between border-b border-zinc-200 pb-3">
+                    <div>
+                      <h3 class="text-sm font-bold text-zinc-900">Precios Plan Industrial &amp; CNC</h3>
+                      <p class="text-xs text-zinc-500">Tarifas públicas en USD para plantas y producción continua</p>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Industrial
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label for="industrial_monthly_usd" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Mensual (USD)
+                      </label>
+                      <input
+                        id="industrial_monthly_usd"
+                        type="number"
+                        formControlName="industrial_monthly_usd"
+                        data-testid="cms-industrial-monthly-input"
+                        style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label for="industrial_annual_monthly_usd" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Anual / Mes (USD)
+                      </label>
+                      <input
+                        id="industrial_annual_monthly_usd"
+                        type="number"
+                        formControlName="industrial_annual_monthly_usd"
+                        data-testid="cms-industrial-annual-monthly-input"
+                        style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label for="industrial_annual_total_usd" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Total Anual (USD)
+                      </label>
+                      <input
+                        id="industrial_annual_total_usd"
+                        type="number"
+                        formControlName="industrial_annual_total_usd"
+                        data-testid="cms-industrial-annual-total-input"
+                        style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Límites y Configuración General -->
+              <div class="bg-white rounded-xl border border-zinc-200 p-5 space-y-4">
+                <div class="border-b border-zinc-200 pb-3">
+                  <h3 class="text-sm font-bold text-zinc-900">Límites y Parámetros Generales del Sistema</h3>
+                  <p class="text-xs text-zinc-500">Versión visible en el Estudio 3D, correo oficial de contacto y límite gratuito</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label for="free_max_modules" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                      Máximo de Módulos (Plan Inicial)
+                    </label>
+                    <input
+                      id="free_max_modules"
+                      type="number"
+                      formControlName="free_max_modules"
+                      data-testid="cms-free-max-modules-input"
+                      style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                      class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label for="app_version" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                      Versión Activa del Sistema
+                    </label>
+                    <input
+                      id="app_version"
+                      type="text"
+                      formControlName="app_version"
+                      data-testid="cms-app-version-input"
+                      style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                      class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label for="support_email" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                      Correo Oficial de Soporte
+                    </label>
+                    <input
+                      id="support_email"
+                      type="email"
+                      formControlName="support_email"
+                      data-testid="cms-support-email-input"
+                      class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Banner Global de Anuncio / Promoción -->
+              <div class="bg-white rounded-xl border border-zinc-200 p-5 space-y-4">
+                <div class="flex items-center justify-between border-b border-zinc-200 pb-3">
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900">Banner Global de Anuncio o Promoción</h3>
+                    <p class="text-xs text-zinc-500">Cintillo superior mostrado en la página principal de Piezo3D Studio</p>
+                  </div>
+                  <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      formControlName="announcement_enabled"
+                      data-testid="cms-announcement-enabled-checkbox"
+                      class="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                    />
+                    <span class="text-xs font-semibold text-zinc-800">Mostrar Banner</span>
+                  </label>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div class="sm:col-span-1">
+                    <label for="announcement_badge" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                      Tipo de Anuncio (Badge)
+                    </label>
+                    <select
+                      id="announcement_badge"
+                      formControlName="announcement_badge"
+                      data-testid="cms-announcement-badge-input"
+                      class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-xs sm:text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white cursor-pointer"
+                    >
+                      @for (opt of announcementBadgeOptions; track opt.value) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                      }
+                    </select>
+                  </div>
+
+                  <div class="sm:col-span-3">
+                    <label for="announcement_text" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                      Mensaje del Anuncio Público
+                    </label>
+                    <input
+                      id="announcement_text"
+                      type="text"
+                      formControlName="announcement_text"
+                      data-testid="cms-announcement-text-input"
+                      placeholder="Ej. Lanzamiento oficial de optimización CNC y exportación DXF paramétrica."
+                      class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <!-- Vista Previa en Tiempo Real del Banner -->
+                @if (cmsForm.get('announcement_enabled')?.value) {
+                  <div class="mt-3 p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Vista Previa del Cintillo (Minimalist Studio):</span>
+                      <span class="text-[10px] text-zinc-400">Visible en la portada principal</span>
+                    </div>
+                    <div class="w-full bg-zinc-900 text-white rounded-lg px-4 py-2.5 flex items-center justify-between gap-3 shadow-xs border border-zinc-800">
+                      <div class="flex items-center gap-2.5 min-w-0">
+                        <hugeicons-icon [icon]="icons.sparkles" [size]="14" class="text-sky-400 shrink-0"></hugeicons-icon>
+                        <span
+                          class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase shrink-0 font-sans"
+                          [class]="cmsForm.get('announcement_badge')?.value === 'MANTENIMIENTO'
+                            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                            : (cmsForm.get('announcement_badge')?.value === 'LANZAMIENTO' || cmsForm.get('announcement_badge')?.value === 'PROMO' || cmsForm.get('announcement_badge')?.value === 'PROMOCIÓN' || cmsForm.get('announcement_badge')?.value === 'DESCUENTO')
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-sky-500/15 text-sky-400 border border-sky-500/30'"
+                        >
+                          {{ cmsForm.get('announcement_badge')?.value || 'NOVEDAD' }}
+                        </span>
+                        <span class="text-xs font-medium text-zinc-200 truncate font-sans">
+                          {{ cmsForm.get('announcement_text')?.value || 'Mensaje de ejemplo para los visitantes...' }}
+                        </span>
+                      </div>
+                      <div class="p-1 rounded text-zinc-400">
+                        <hugeicons-icon [icon]="icons.cancel" [size]="14"></hugeicons-icon>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <!-- Submit Action -->
+              <div class="flex justify-end">
+                <button
+                  type="submit"
+                  [disabled]="isSavingCms()"
+                  data-testid="admin-save-cms-btn"
+                  class="inline-flex items-center gap-2 px-5 py-2.5 min-h-11 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <hugeicons-icon [icon]="icons.tick" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+                  <span>Guardar Configuración Global</span>
+                </button>
+              </div>
+            </form>
+          </section>
+        }
+
+        <!-- ========================================================== -->
+        <!-- MÓDULO 4: MODERACIÓN DE TESTIMONIOS                        -->
+        <!-- ========================================================== -->
+        @case ('testimonials') {
+          <section class="space-y-6" data-testid="admin-section-testimonials">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-lg sm:text-xl font-bold text-zinc-900">
+                  Moderación de Testimonios y Prueba Social
+                </h2>
+                <p class="text-xs sm:text-sm text-zinc-600">
+                  Aprueba reseñas enviadas por usuarios o publica testimonios verificados en la portada oficial.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                (click)="toggleNewTestimonialModal()"
+                data-testid="admin-new-testimonial-btn"
+                class="inline-flex items-center gap-2 px-4 py-2.5 min-h-11 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+              >
+                <hugeicons-icon [icon]="icons.add" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+                <span>+ Crear Testimonio Destacado</span>
+              </button>
+            </div>
+
+            <!-- INLINE FORM FOR NEW TESTIMONIAL -->
+            @if (showNewTestimonialForm()) {
+              <form
+                [formGroup]="newTestimonialForm"
+                (ngSubmit)="createTestimonial()"
+                data-testid="admin-new-testimonial-form"
+                class="bg-white rounded-xl border border-zinc-300 p-5 space-y-4"
+              >
+                <div class="flex items-center justify-between border-b border-zinc-200 pb-3">
+                  <div class="flex items-center gap-2">
+                    <hugeicons-icon [icon]="icons.quote" [size]="18" [strokeWidth]="2" class="text-zinc-900"></hugeicons-icon>
+                    <h3 class="text-sm font-bold text-zinc-900">Nuevo Testimonio Verificado</h3>
+                  </div>
+                  <button
+                    type="button"
+                    (click)="toggleNewTestimonialModal()"
+                    class="text-xs text-zinc-500 hover:text-zinc-900 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label for="test_user_name" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                      Nombre del Profesional
+                    </label>
+                    <input
+                      id="test_user_name"
+                      type="text"
+                      formControlName="user_name"
+                      data-testid="new-testimonial-name-input"
+                      placeholder="Ej. Carlos Mendoza"
+                      class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label for="test_user_role" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                      Cargo / Nombre del Taller
+                    </label>
+                    <input
+                      id="test_user_role"
+                      type="text"
+                      formControlName="user_role_title"
+                      data-testid="new-testimonial-role-input"
+                      placeholder="Ej. Maestro Carpintero · Maderas del Sur"
+                      class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <span class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                      Calificación (1 a 5 Estrellas)
+                    </span>
+                    <div class="flex items-center gap-1.5 pt-1">
+                      @for (star of starScale; track star) {
+                        <button
+                          type="button"
+                          (click)="setNewTestimonialRating(star)"
+                          class="p-1.5 rounded-lg border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 cursor-pointer"
+                          [class.text-amber-500]="newTestimonialForm.controls.rating.value >= star"
+                          [class.text-zinc-300]="newTestimonialForm.controls.rating.value < star"
+                        >
+                          <hugeicons-icon [icon]="icons.star" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+                        </button>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label for="test_message" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                    Reseña o Testimonio
+                  </label>
+                  <textarea
+                    id="test_message"
+                    rows="3"
+                    formControlName="message"
+                    data-testid="new-testimonial-message-input"
+                    placeholder="Describe el impacto del software en el despiece y optimización del taller..."
+                    class="w-full px-3 py-2 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                  ></textarea>
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                  <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      formControlName="is_featured"
+                      class="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                    />
+                    <span class="text-xs font-semibold text-zinc-700">Publicar como testimonio destacado en portada</span>
+                  </label>
+
+                  <button
+                    type="submit"
+                    [disabled]="isCreatingTestimonial()"
+                    data-testid="admin-submit-testimonial-btn"
+                    class="inline-flex items-center gap-2 px-4 py-2 min-h-10 rounded-lg text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+                  >
+                    <hugeicons-icon [icon]="icons.tick" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+                    <span>Publicar Testimonio</span>
+                  </button>
+                </div>
+              </form>
+            }
+
+            <!-- TESTIMONIALS LIST -->
+            @if (testimonialsList().length === 0) {
+              <div class="bg-white rounded-xl border border-zinc-200 p-10 text-center space-y-2">
+                <div class="w-10 h-10 rounded-full bg-zinc-100 text-zinc-500 flex items-center justify-center mx-auto">
+                  <hugeicons-icon [icon]="icons.star" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+                </div>
+                <p class="text-sm font-semibold text-zinc-800">No hay testimonios registrados</p>
+                <p class="text-xs text-zinc-500">Utiliza el botón superior para agregar un testimonio verificado.</p>
+              </div>
+            } @else {
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                @for (item of testimonialsList(); track item.id) {
+                  <article class="bg-white rounded-xl border border-zinc-200 p-5 flex flex-col justify-between gap-4">
+                    <div class="space-y-3">
+                      <div class="flex items-start justify-between gap-3">
+                        <div>
+                          <div class="text-sm font-bold text-zinc-900">{{ item.user_name }}</div>
+                          <div class="text-xs text-zinc-500">{{ item.user_role_title || 'Taller de Carpintería' }}</div>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                          @if (item.is_featured) {
+                            <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-50 text-sky-600 border border-sky-200">
+                              Destacado
+                            </span>
+                          }
+                          <span
+                            class="px-2 py-0.5 rounded-md text-[11px] font-semibold border"
+                            [class.bg-emerald-50]="item.status === 'approved'"
+                            [class.text-emerald-700]="item.status === 'approved'"
+                            [class.border-emerald-200]="item.status === 'approved'"
+                            [class.bg-amber-50]="item.status === 'pending' || item.status === 'in_progress'"
+                            [class.text-amber-700]="item.status === 'pending' || item.status === 'in_progress'"
+                            [class.border-amber-200]="item.status === 'pending' || item.status === 'in_progress'"
+                            [class.bg-red-50]="item.status === 'rejected'"
+                            [class.text-red-700]="item.status === 'rejected'"
+                            [class.border-red-200]="item.status === 'rejected'"
+                          >
+                            {{ getFeedbackStatusLabel(item.status) }}
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- 5 Star Amber Rating -->
+                      <div class="flex items-center gap-1 text-amber-500">
+                        @for (star of starScale; track star) {
+                          <hugeicons-icon
+                            [icon]="icons.star"
+                            [size]="14"
+                            [strokeWidth]="2"
+                            [class.text-amber-500]="(item.rating || 5) >= star"
+                            [class.text-zinc-300]="(item.rating || 5) < star"
+                          ></hugeicons-icon>
+                        }
+                        <span
+                          class="ml-1.5 text-xs text-zinc-500"
+                          style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                        >
+                          {{ formatShortDate(item.created_at) }}
+                        </span>
+                      </div>
+
+                      <p class="text-xs sm:text-sm text-zinc-700 leading-relaxed">
+                        "{{ item.message }}"
+                      </p>
+                    </div>
+
+                    <div class="pt-3 border-t border-zinc-200 flex flex-wrap items-center justify-between gap-2">
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          (click)="approveTestimonial(item)"
+                          [disabled]="updatingFeedbackId() === item.id"
+                          [attr.data-testid]="'approve-testimonial-' + item.id"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+                        >
+                          <hugeicons-icon [icon]="icons.tick" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                          <span>Aprobar / Publicar</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          (click)="toggleTestimonialFeatured(item)"
+                          [disabled]="updatingFeedbackId() === item.id"
+                          [attr.data-testid]="'feature-testimonial-' + item.id"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 text-zinc-800 hover:bg-zinc-200 border border-zinc-200 transition-colors cursor-pointer"
+                        >
+                          <hugeicons-icon [icon]="icons.star" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                          <span>{{ item.is_featured ? 'Quitar Destacado' : 'Destacar' }}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          (click)="rejectTestimonial(item)"
+                          [disabled]="updatingFeedbackId() === item.id"
+                          [attr.data-testid]="'reject-testimonial-' + item.id"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 text-zinc-700 hover:bg-zinc-200 border border-zinc-200 transition-colors cursor-pointer"
+                        >
+                          <hugeicons-icon [icon]="icons.cancel" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                          <span>Ocultar</span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        (click)="deleteFeedbackItem(item)"
+                        [disabled]="updatingFeedbackId() === item.id"
+                        [attr.data-testid]="'delete-testimonial-' + item.id"
+                        class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer"
+                      >
+                        <hugeicons-icon [icon]="icons.cancel" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                        <span>Eliminar</span>
+                      </button>
+                    </div>
+                  </article>
+                }
+              </div>
+            }
+          </section>
+        }
+
+        <!-- ========================================================== -->
+        <!-- MÓDULO 5: BANDEJA DE SOPORTE TÉCNICO Y REPORTES DE BUGS    -->
+        <!-- ========================================================== -->
+        @case ('support') {
+          <section class="space-y-6" data-testid="admin-section-support">
+            <div>
+              <h2 class="text-lg sm:text-xl font-bold text-zinc-900">
+                Bandeja de Soporte Técnico y Reportes de Bugs
+              </h2>
+              <p class="text-xs sm:text-sm text-zinc-600">
+                Gestiona incidencias técnicas, dudas operativas y notas de seguimiento interno.
+              </p>
+            </div>
+
+            <!-- FILTERS BY CATEGORY AND STATUS -->
+            <div class="bg-white rounded-xl border border-zinc-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-xs font-semibold text-zinc-500 mr-1">Categoría:</span>
+                <button
+                  type="button"
+                  (click)="setSupportCategoryFilter('all')"
+                  data-testid="filter-support-cat-all"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="supportCategoryFilter() === 'all'"
+                  [class.text-white]="supportCategoryFilter() === 'all'"
+                  [class.border-zinc-900]="supportCategoryFilter() === 'all'"
+                  [class.bg-zinc-50]="supportCategoryFilter() !== 'all'"
+                  [class.text-zinc-700]="supportCategoryFilter() !== 'all'"
+                  [class.border-zinc-200]="supportCategoryFilter() !== 'all'"
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  (click)="setSupportCategoryFilter('support')"
+                  data-testid="filter-support-cat-support"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="supportCategoryFilter() === 'support'"
+                  [class.text-white]="supportCategoryFilter() === 'support'"
+                  [class.border-zinc-900]="supportCategoryFilter() === 'support'"
+                  [class.bg-zinc-50]="supportCategoryFilter() !== 'support'"
+                  [class.text-zinc-700]="supportCategoryFilter() !== 'support'"
+                  [class.border-zinc-200]="supportCategoryFilter() !== 'support'"
+                >
+                  Soporte
+                </button>
+                <button
+                  type="button"
+                  (click)="setSupportCategoryFilter('bug')"
+                  data-testid="filter-support-cat-bug"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="supportCategoryFilter() === 'bug'"
+                  [class.text-white]="supportCategoryFilter() === 'bug'"
+                  [class.border-zinc-900]="supportCategoryFilter() === 'bug'"
+                  [class.bg-zinc-50]="supportCategoryFilter() !== 'bug'"
+                  [class.text-zinc-700]="supportCategoryFilter() !== 'bug'"
+                  [class.border-zinc-200]="supportCategoryFilter() !== 'bug'"
+                >
+                  Bug
+                </button>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-xs font-semibold text-zinc-500 mr-1">Estado:</span>
+                <button
+                  type="button"
+                  (click)="setSupportStatusFilter('all')"
+                  data-testid="filter-support-status-all"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="supportStatusFilter() === 'all'"
+                  [class.text-white]="supportStatusFilter() === 'all'"
+                  [class.border-zinc-900]="supportStatusFilter() === 'all'"
+                  [class.bg-zinc-50]="supportStatusFilter() !== 'all'"
+                  [class.text-zinc-700]="supportStatusFilter() !== 'all'"
+                  [class.border-zinc-200]="supportStatusFilter() !== 'all'"
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  (click)="setSupportStatusFilter('pending')"
+                  data-testid="filter-support-status-pending"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="supportStatusFilter() === 'pending'"
+                  [class.text-white]="supportStatusFilter() === 'pending'"
+                  [class.border-zinc-900]="supportStatusFilter() === 'pending'"
+                  [class.bg-zinc-50]="supportStatusFilter() !== 'pending'"
+                  [class.text-zinc-700]="supportStatusFilter() !== 'pending'"
+                  [class.border-zinc-200]="supportStatusFilter() !== 'pending'"
+                >
+                  Pendiente
+                </button>
+                <button
+                  type="button"
+                  (click)="setSupportStatusFilter('in_progress')"
+                  data-testid="filter-support-status-in-progress"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="supportStatusFilter() === 'in_progress'"
+                  [class.text-white]="supportStatusFilter() === 'in_progress'"
+                  [class.border-zinc-900]="supportStatusFilter() === 'in_progress'"
+                  [class.bg-zinc-50]="supportStatusFilter() !== 'in_progress'"
+                  [class.text-zinc-700]="supportStatusFilter() !== 'in_progress'"
+                  [class.border-zinc-200]="supportStatusFilter() !== 'in_progress'"
+                >
+                  En Revisión
+                </button>
+                <button
+                  type="button"
+                  (click)="setSupportStatusFilter('resolved')"
+                  data-testid="filter-support-status-resolved"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                  [class.bg-zinc-900]="supportStatusFilter() === 'resolved'"
+                  [class.text-white]="supportStatusFilter() === 'resolved'"
+                  [class.border-zinc-900]="supportStatusFilter() === 'resolved'"
+                  [class.bg-zinc-50]="supportStatusFilter() !== 'resolved'"
+                  [class.text-zinc-700]="supportStatusFilter() !== 'resolved'"
+                  [class.border-zinc-200]="supportStatusFilter() !== 'resolved'"
+                >
+                  Resuelto
+                </button>
+              </div>
+            </div>
+
+            <!-- TICKETS LIST -->
+            @if (supportTicketsList().length === 0) {
+              <div class="bg-white rounded-xl border border-zinc-200 p-10 text-center space-y-2">
+                <div class="w-10 h-10 rounded-full bg-zinc-100 text-zinc-500 flex items-center justify-center mx-auto">
+                  <hugeicons-icon [icon]="icons.checkList" [size]="20" [strokeWidth]="2"></hugeicons-icon>
+                </div>
+                <p class="text-sm font-semibold text-zinc-800">Sin tickets ni reportes en esta vista</p>
+                <p class="text-xs text-zinc-500">Todos los casos de soporte o bugs han sido atendidos.</p>
+              </div>
+            } @else {
+              <div class="space-y-4">
+                @for (ticket of supportTicketsList(); track ticket.id) {
+                  <article class="bg-white rounded-xl border border-zinc-200 p-5 space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 pb-3">
+                      <div class="flex items-center gap-2.5 flex-wrap">
+                        <span
+                          class="px-2.5 py-0.5 rounded-md text-xs font-semibold border"
+                          [class.bg-red-50]="ticket.category === 'bug'"
+                          [class.text-red-700]="ticket.category === 'bug'"
+                          [class.border-red-200]="ticket.category === 'bug'"
+                          [class.bg-sky-50]="ticket.category === 'support'"
+                          [class.text-sky-600]="ticket.category === 'support'"
+                          [class.border-sky-200]="ticket.category === 'support'"
+                        >
+                          {{ getCategoryLabel(ticket.category) }}
+                        </span>
+                        <h3 class="text-sm font-bold text-zinc-900">
+                          {{ ticket.subject || 'Consulta Técnica del Estudio' }}
+                        </h3>
+                      </div>
+
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="text-xs text-zinc-500"
+                          style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
+                        >
+                          {{ formatShortDate(ticket.created_at) }}
+                        </span>
+                        <span
+                          class="px-2 py-0.5 rounded-md text-[11px] font-semibold border"
+                          [class.bg-emerald-50]="ticket.status === 'resolved'"
+                          [class.text-emerald-700]="ticket.status === 'resolved'"
+                          [class.border-emerald-200]="ticket.status === 'resolved'"
+                          [class.bg-amber-50]="ticket.status !== 'resolved'"
+                          [class.text-amber-700]="ticket.status !== 'resolved'"
+                          [class.border-amber-200]="ticket.status !== 'resolved'"
+                        >
+                          {{ getFeedbackStatusLabel(ticket.status) }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div class="space-y-2">
+                      <div class="text-xs text-zinc-500">
+                        Remitente: <strong class="text-zinc-800">{{ ticket.user_name }}</strong>
+                        @if (ticket.user_email) {
+                          <span> ({{ ticket.user_email }})</span>
+                        }
+                      </div>
+                      <p class="text-xs sm:text-sm text-zinc-800 bg-zinc-50 p-3.5 rounded-lg border border-zinc-200">
+                        {{ ticket.message }}
+                      </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end pt-2">
+                      <div class="lg:col-span-3">
+                        <label
+                          [attr.for]="'ticket-status-' + ticket.id"
+                          class="block text-xs font-semibold text-zinc-700 mb-1"
+                        >
+                          Estado del Caso
+                        </label>
+                        <select
+                          [id]="'ticket-status-' + ticket.id"
+                          [ngModel]="getTicketDraftStatus(ticket)"
+                          (ngModelChange)="setTicketDraftStatus(ticket.id, $event)"
+                          [attr.data-testid]="'ticket-status-select-' + ticket.id"
+                          class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-white text-xs font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 cursor-pointer"
+                        >
+                          <option value="pending">Pendiente</option>
+                          <option value="in_progress">En Revisión</option>
+                          <option value="resolved">Resuelto</option>
+                        </select>
+                      </div>
+
+                      <div class="lg:col-span-6">
+                        <label
+                          [attr.for]="'ticket-notes-' + ticket.id"
+                          class="block text-xs font-semibold text-zinc-700 mb-1"
+                        >
+                          Notas Internas del Administrador
+                        </label>
+                        <input
+                          [id]="'ticket-notes-' + ticket.id"
+                          type="text"
+                          [ngModel]="getTicketDraftNotes(ticket)"
+                          (ngModelChange)="setTicketDraftNotes(ticket.id, $event)"
+                          [attr.data-testid]="'ticket-notes-input-' + ticket.id"
+                          placeholder="Escribe diagnóstico, acuerdo con el usuario o solución aplicada..."
+                          class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                        />
+                      </div>
+
+                      <div class="lg:col-span-3 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          (click)="saveTicketChanges(ticket)"
+                          [disabled]="updatingFeedbackId() === ticket.id"
+                          [attr.data-testid]="'save-ticket-' + ticket.id"
+                          class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 min-h-10 rounded-lg text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+                        >
+                          <hugeicons-icon [icon]="icons.tick" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                          <span>Guardar Nota / Estado</span>
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                }
+              </div>
+            }
+          </section>
+        }
+      }
+    </main>
+  </div>
+</div>

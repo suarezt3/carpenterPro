@@ -104,6 +104,16 @@ export class AuthPageComponent {
   readonly supportedLanguages = this.i18n.languages;
   readonly currentLanguageOption = this.i18n.currentLanguageOption;
 
+  readonly supportEmail = computed<string>(() => {
+    const settingsFn = (
+      this.supabaseService as {
+        platformSettings?: () => { support_email?: string } | null;
+      }
+    ).platformSettings;
+    const dynamicEmail = typeof settingsFn === 'function' ? settingsFn()?.support_email?.trim() : '';
+    return dynamicEmail || 'eydersuarez900@gmail.com';
+  });
+
   // Estados de envío y notificaciones amigables (claves i18n)
   readonly isSubmitting = signal<boolean>(false);
   readonly isGoogleSubmitting = signal<boolean>(false);

@@ -619,6 +619,14 @@ describe('AuthPageComponent', () => {
       fixture.detectChanges();
       expect(component.pwHasSpecialChar()).toBe(true);
     });
+
+    it('debe renderizar enlaces legales en el footer hacia /terms, /privacy, /refunds y el correo de soporte', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('a[routerLink="/terms"]')).toBeTruthy();
+      expect(el.querySelector('a[routerLink="/privacy"]')).toBeTruthy();
+      expect(el.querySelector('a[routerLink="/refunds"]')).toBeTruthy();
+      expect(el.textContent).toContain(component.supportEmail());
+    });
   });
 });
 

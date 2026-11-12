@@ -19,15 +19,17 @@
             [class]="themeService.isClassic()
               ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-50 hover:bg-zinc-100 text-zinc-800 border border-zinc-200 text-xs font-medium transition cursor-pointer shadow-2xs whitespace-nowrap shrink-0'
               : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800/90 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-medium transition cursor-pointer shadow-2xs whitespace-nowrap shrink-0'"
-            [title]="'nav.changelogTooltip' | t:{ version: appVersion }">
+            [title]="'nav.changelogTooltip' | t:{ version: displayAppVersion() }">
             <span class="w-1.5 h-1.5 rounded-full bg-sky-600 shrink-0"></span>
-            <span class="whitespace-nowrap">{{ appVersion }}</span>
+            <span class="whitespace-nowrap">{{ displayAppVersion() }}</span>
           </button>
 
           <span [class]="themeService.isClassic() ? 'text-slate-300 hidden md:inline' : 'text-zinc-600 hidden md:inline'">·</span>
 
           <!-- Botón y Popover para Editar Nombre del Proyecto y Cliente -->
-          <div class="relative hidden md:flex items-center min-w-[120px] max-w-[180px] 2xl:max-w-[230px] truncate shrink-0">
+          <div
+            class="relative hidden md:flex items-center min-w-[120px] max-w-[180px] 2xl:max-w-[230px] truncate shrink-0"
+            [class.overflow-visible]="isEditingTitle()">
             <button
               type="button"
               (click)="startEditingTitle($event)"
@@ -498,14 +500,26 @@
 
         <!-- Estado de Sesión de Usuario: Botón Interactivo de Cuenta & Configuración + Botón Compacto de Cerrar Sesión -->
         @if (isAuthenticated()) {
+          @if (isSuperAdmin()) {
+            <button
+              type="button"
+              data-testid="header-admin-btn"
+              (click)="goToAdmin()"
+              title="Panel Ejecutivo Superadmin"
+              class="h-9 px-2 shrink-0 inline-flex items-center gap-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 text-xs font-semibold transition shadow-2xs cursor-pointer whitespace-nowrap font-sans">
+              <hugeicons-icon [icon]="icons.shield" [size]="14" [strokeWidth]="2" class="text-sky-400 shrink-0"></hugeicons-icon>
+              <span class="hidden 2xl:inline">Admin</span>
+            </button>
+          }
+
           <!-- Botón Interactivo de Cuenta y Configuración -->
           <button
             type="button"
             (click)="openAccountModal()"
             [title]="userFirstName()"
             [class]="themeService.isClassic()
-              ? 'flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-100 cursor-pointer transition-colors whitespace-nowrap shrink-0 shadow-2xs'
-              : 'flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-700 hover:bg-zinc-800 cursor-pointer transition-colors whitespace-nowrap shrink-0'">
+              ? 'flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-100 cursor-pointer transition-colors whitespace-nowrap shrink-0 shadow-2xs'
+              : 'flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-zinc-700 hover:bg-zinc-800 cursor-pointer transition-colors whitespace-nowrap shrink-0'">
             @if (userAvatarUrl()) {
               <img [src]="userAvatarUrl()" alt="Avatar" class="w-6 h-6 rounded-full object-cover shrink-0" />
             } @else {
@@ -513,7 +527,7 @@
                 {{ userInitials() }}
               </div>
             }
-            <span data-testid="studio-user-name" class="max-w-24 truncate text-xs font-semibold font-sans" [class]="themeService.isClassic() ? 'text-zinc-800' : 'text-zinc-200'">{{ userFirstName() }}</span>
+            <span data-testid="studio-user-name" class="max-w-16 xl:max-w-24 truncate text-xs font-semibold font-sans" [class]="themeService.isClassic() ? 'text-zinc-800' : 'text-zinc-200'">{{ userFirstName() }}</span>
             <hugeicons-icon [icon]="icons.chevronDown" [size]="12" [strokeWidth]="2" [class]="themeService.isClassic() ? 'text-zinc-400 shrink-0' : 'text-zinc-500 shrink-0'"></hugeicons-icon>
           </button>
 

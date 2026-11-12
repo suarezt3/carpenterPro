@@ -21,6 +21,7 @@ export interface CloudProjectRecord {
 
 export type UserRole = 'user' | 'super_admin';
 export type UserPlan = 'free' | 'pro' | 'industrial';
+export type SubscriptionPlan = UserPlan;
 export type BillingCycle = 'monthly' | 'annual';
 export type SubscriptionStatus = 'free' | 'active' | 'on_trial' | 'past_due' | 'cancelled' | 'expired';
 
@@ -41,8 +42,51 @@ export interface UserProfile {
   variant_id?: string | null;
   current_period_end?: string | null;
   customer_portal_url?: string | null;
+  is_suspended?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Configuración global de plataforma y CMS (`public.platform_settings`).
+ */
+export interface PlatformSettingsRecord {
+  id: number;
+  app_version: string;
+  support_email: string;
+  pro_monthly_usd: number;
+  pro_annual_monthly_usd: number;
+  pro_annual_total_usd: number;
+  industrial_monthly_usd: number;
+  industrial_annual_monthly_usd: number;
+  industrial_annual_total_usd: number;
+  announcement_enabled: boolean;
+  announcement_text: string;
+  announcement_badge: string;
+  free_max_modules: number;
+  updated_at: string;
+}
+
+export type PlatformFeedbackCategory = 'support' | 'bug' | 'testimonial';
+export type PlatformFeedbackStatus = 'pending' | 'in_progress' | 'resolved' | 'approved' | 'rejected';
+
+/**
+ * Registro administrativo de soporte, bugs y testimonios (`public.platform_feedback`).
+ */
+export interface PlatformFeedbackRecord {
+  id: string;
+  user_id: string | null;
+  user_name: string;
+  user_email: string | null;
+  user_role_title: string | null;
+  category: PlatformFeedbackCategory;
+  subject: string | null;
+  message: string;
+  rating: number | null;
+  status: PlatformFeedbackStatus;
+  is_featured: boolean;
+  admin_notes: string | null;
+  created_at: string;
 }
 
 /**
@@ -346,6 +390,141 @@ CREATE TRIGGER trg_on_auth_user_created
   EXECUTE FUNCTION public.fn_handle_new_auth_user();
 `;
 
+/**
+ * Script SQL para configuración de Superadministrador, CMS y tabla platform_settings / platform_feedback.
+ */
+export const SUPABASE_SUPERADMIN_SQL_SETUP = `-- ==========================================
+-- SCRIPT DE CONFIGURACIÓN SUPERADMINISTRADOR Y CMS GLOBAL
+-- ==========================================
+
+-- 1. Asegurar columnas administrativas en user_profiles
+ALTER TABLE public.user_profiles
+  ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'super_admin')),
+  ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN NOT NULL DEFAULT false;
+
+-- 2. Elevar automáticamente la cuenta propietaria a super_admin e industrial
+UPDATE public.user_profiles
+SET role = 'super_admin', plan = 'industrial', subscription_status = 'active'
+WHERE lower(email) = 'eydersuarez900@gmail.com';
+
+-- 3. Función SECURITY DEFINER para verificar super_admin sin recursión infinita en RLS
+CREATE OR REPLACE FUNCTION public.is_super_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_profiles
+    WHERE id = auth.uid() AND role = 'super_admin'
+  );
+$$;
+
+-- 4. Políticas RLS en user_profiles y subscription_invoices para el Superadmin
+DROP POLICY IF EXISTS "Super admins can view all profiles" ON public.user_profiles;
+CREATE POLICY "Super admins can view all profiles"
+  ON public.user_profiles FOR SELECT
+  TO authenticated
+  USING (auth.uid() = id OR public.is_super_admin());
+
+DROP POLICY IF EXISTS "Super admins can update all profiles" ON public.user_profiles;
+CREATE POLICY "Super admins can update all profiles"
+  ON public.user_profiles FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = id OR public.is_super_admin())
+  WITH CHECK (auth.uid() = id OR public.is_super_admin());
+
+DROP POLICY IF EXISTS "Super admins can view all invoices" ON public.subscription_invoices;
+CREATE POLICY "Super admins can view all invoices"
+  ON public.subscription_invoices FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id OR public.is_super_admin());
+
+-- 5. Tabla Singleton de Configuración Global y CMS (platform_settings)
+CREATE TABLE IF NOT EXISTS public.platform_settings (
+  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  app_version TEXT NOT NULL DEFAULT 'v3.0.0',
+  support_email TEXT NOT NULL DEFAULT 'eydersuarez900@gmail.com',
+  pro_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 15,
+  pro_annual_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 12,
+  pro_annual_total_usd NUMERIC(10,2) NOT NULL DEFAULT 144,
+  industrial_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 29,
+  industrial_annual_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 23,
+  industrial_annual_total_usd NUMERIC(10,2) NOT NULL DEFAULT 276,
+  announcement_enabled BOOLEAN NOT NULL DEFAULT false,
+  announcement_text TEXT NOT NULL DEFAULT '',
+  announcement_badge TEXT NOT NULL DEFAULT 'NOVEDAD',
+  free_max_modules INTEGER NOT NULL DEFAULT 3,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO public.platform_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can read platform settings" ON public.platform_settings;
+CREATE POLICY "Anyone can read platform settings"
+  ON public.platform_settings FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "Super admins can update platform settings" ON public.platform_settings;
+CREATE POLICY "Super admins can update platform settings"
+  ON public.platform_settings FOR UPDATE
+  TO authenticated
+  USING (public.is_super_admin())
+  WITH CHECK (public.is_super_admin());
+
+-- 6. Asegurar políticas de Superadmin sobre tablas de soporte/feedback/testimonios
+CREATE TABLE IF NOT EXISTS public.platform_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  user_name TEXT NOT NULL DEFAULT 'Usuario',
+  user_email TEXT,
+  user_role_title TEXT DEFAULT 'Taller de Carpintería',
+  category TEXT NOT NULL DEFAULT 'support' CHECK (category IN ('support', 'bug', 'testimonial')),
+  subject TEXT,
+  message TEXT NOT NULL,
+  rating INTEGER DEFAULT 5 CHECK (rating >= 1 AND rating <= 5),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'resolved', 'approved', 'rejected')),
+  is_featured BOOLEAN NOT NULL DEFAULT false,
+  admin_notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.platform_feedback ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can read approved testimonials" ON public.platform_feedback;
+CREATE POLICY "Public can read approved testimonials"
+  ON public.platform_feedback FOR SELECT
+  TO anon, authenticated
+  USING (category = 'testimonial' AND status = 'approved' OR auth.uid() = user_id OR public.is_super_admin());
+
+DROP POLICY IF EXISTS "Authenticated users can insert feedback" ON public.platform_feedback;
+CREATE POLICY "Authenticated users can insert feedback"
+  ON public.platform_feedback FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Super admins can update feedback" ON public.platform_feedback;
+CREATE POLICY "Super admins can update feedback"
+  ON public.platform_feedback FOR UPDATE
+  TO authenticated
+  USING (public.is_super_admin())
+  WITH CHECK (public.is_super_admin());
+
+DROP POLICY IF EXISTS "Super admins can delete feedback" ON public.platform_feedback;
+CREATE POLICY "Super admins can delete feedback"
+  ON public.platform_feedback FOR DELETE
+  TO authenticated
+  USING (public.is_super_admin());
+
+GRANT SELECT ON public.platform_settings TO anon, authenticated;
+GRANT UPDATE ON public.platform_settings TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.platform_feedback TO anon, authenticated;
+`;
+
 @Injectable({
   providedIn: 'root'
 })
@@ -371,6 +550,30 @@ export class SupabaseService {
   readonly isAuthLoading = signal<boolean>(true);
   readonly isPasswordRecoveryMode = signal<boolean>(false);
 
+  // Configuración global del CMS y verificación de Superadmin
+  readonly platformSettings = signal<PlatformSettingsRecord>({
+    id: 1,
+    app_version: 'v3.0.0',
+    support_email: 'eydersuarez900@gmail.com',
+    pro_monthly_usd: 15,
+    pro_annual_monthly_usd: 12,
+    pro_annual_total_usd: 144,
+    industrial_monthly_usd: 29,
+    industrial_annual_monthly_usd: 23,
+    industrial_annual_total_usd: 276,
+    announcement_enabled: false,
+    announcement_text: '',
+    announcement_badge: 'NOVEDAD',
+    free_max_modules: 3,
+    updated_at: new Date().toISOString()
+  });
+
+  readonly isSuperAdmin = computed<boolean>(
+    () =>
+      this.userProfile()?.role === 'super_admin' ||
+      this.currentUser()?.email?.toLowerCase() === 'eydersuarez900@gmail.com'
+  );
+
   /**
    * Construye los encabezados HTTP para las peticiones REST.
    * Si el usuario inició sesión, envía su token JWT personal (`session.access_token`)
@@ -390,7 +593,14 @@ export class SupabaseService {
     // Solo inicializamos cliente y cargamos proyectos si estamos en el navegador (evita fallos en SSR)
     if (this.isBrowser) {
       this.initSupabaseClient();
-      void this.refreshProjects();
+      const isTestEnv = Boolean(
+        (globalThis as unknown as Record<string, unknown>)['__vitest_worker__'] ||
+        (globalThis as unknown as { process?: { env?: Record<string, string> } }).process?.env?.['NODE_ENV'] === 'test'
+      );
+      if (!isTestEnv) {
+        void this.refreshProjects();
+        void this.loadPlatformSettings();
+      }
     } else {
       this.isAuthLoading.set(false);
     }
@@ -506,21 +716,23 @@ export class SupabaseService {
       firstName = user.email.split('@')[0] || 'Usuario';
     }
 
+    const isOwnerEmail = (user.email ?? '').trim().toLowerCase() === 'eydersuarez900@gmail.com';
     const nowIso = new Date().toISOString();
     return {
       id: user.id,
       email: user.email ?? '',
       first_name: firstName || 'Usuario',
       last_name: lastName,
-      role: 'user',
-      plan: 'free',
+      role: isOwnerEmail ? 'super_admin' : 'user',
+      plan: isOwnerEmail ? 'industrial' : 'free',
       billing_cycle: 'monthly',
-      subscription_status: 'free',
+      subscription_status: isOwnerEmail ? 'active' : 'free',
       subscription_id: null,
       customer_id: null,
       variant_id: null,
       current_period_end: null,
       customer_portal_url: null,
+      is_suspended: false,
       created_at: user.created_at || nowIso,
       updated_at: user.updated_at || user.created_at || nowIso
     };
@@ -545,33 +757,39 @@ export class SupabaseService {
     try {
       const { data, error } = await this.client
         .from('user_profiles')
-        .select('id, email, first_name, last_name, role, plan, billing_cycle, subscription_status, subscription_id, customer_id, variant_id, current_period_end, customer_portal_url, created_at, updated_at')
+        .select('id, email, first_name, last_name, role, plan, billing_cycle, subscription_status, subscription_id, customer_id, variant_id, current_period_end, customer_portal_url, is_suspended, created_at, updated_at')
         .eq('id', targetUser.id)
         .maybeSingle();
 
       if (!error && data) {
         const record = data as Record<string, unknown>;
+        const recordEmail = String(record['email'] ?? targetUser.email ?? '');
+        const isOwner = recordEmail.trim().toLowerCase() === 'eydersuarez900@gmail.com';
         const rawCycle = record['billing_cycle'];
         const rawStatus = record['subscription_status'];
         const validStatuses: SubscriptionStatus[] = ['free', 'active', 'on_trial', 'past_due', 'cancelled', 'expired'];
+        const resolvedPlan: UserPlan = record['plan'] === 'pro' || record['plan'] === 'industrial'
+          ? record['plan']
+          : (isOwner ? 'industrial' : 'free');
         const parsedStatus: SubscriptionStatus = typeof rawStatus === 'string' && validStatuses.includes(rawStatus as SubscriptionStatus)
           ? (rawStatus as SubscriptionStatus)
-          : (record['plan'] === 'pro' || record['plan'] === 'industrial' ? 'active' : 'free');
+          : (resolvedPlan === 'pro' || resolvedPlan === 'industrial' ? 'active' : 'free');
 
         const profile: UserProfile = {
           id: String(record['id'] ?? targetUser.id),
-          email: String(record['email'] ?? targetUser.email ?? ''),
+          email: recordEmail,
           first_name: String(record['first_name'] || fallback.first_name),
           last_name: String(record['last_name'] ?? fallback.last_name),
-          role: record['role'] === 'super_admin' ? 'super_admin' : 'user',
-          plan: record['plan'] === 'pro' || record['plan'] === 'industrial' ? record['plan'] : 'free',
+          role: (record['role'] === 'super_admin' || isOwner) ? 'super_admin' : 'user',
+          plan: resolvedPlan,
           billing_cycle: rawCycle === 'annual' ? 'annual' : 'monthly',
-          subscription_status: parsedStatus,
+          subscription_status: isOwner && parsedStatus === 'free' ? 'active' : parsedStatus,
           subscription_id: record['subscription_id'] ? String(record['subscription_id']) : null,
           customer_id: record['customer_id'] ? String(record['customer_id']) : null,
           variant_id: record['variant_id'] ? String(record['variant_id']) : null,
           current_period_end: record['current_period_end'] ? String(record['current_period_end']) : null,
           customer_portal_url: record['customer_portal_url'] ? String(record['customer_portal_url']) : null,
+          is_suspended: Boolean(record['is_suspended']),
           created_at: String(record['created_at'] ?? fallback.created_at),
           updated_at: String(record['updated_at'] ?? fallback.updated_at)
         };
@@ -587,10 +805,11 @@ export class SupabaseService {
             email: fallback.email,
             first_name: fallback.first_name,
             last_name: fallback.last_name,
-            plan: 'free',
-            billing_cycle: 'monthly',
-            subscription_status: 'free',
-            role: 'user',
+            plan: fallback.plan,
+            billing_cycle: fallback.billing_cycle ?? 'monthly',
+            subscription_status: fallback.subscription_status ?? 'free',
+            role: fallback.role,
+            is_suspended: false,
             updated_at: new Date().toISOString()
           }, { onConflict: 'id' });
         } catch {
@@ -1415,6 +1634,42 @@ export class SupabaseService {
     // 2. Testimonios públicos auto-aprobados (category='testimonial' AND allow_public_display=true AND is_approved_public=true)
     const canSelectPostInsert = Boolean(userId || isAutoApprovedCandidate);
 
+    // Sincronización secundaria no bloqueante con public.platform_feedback para la bandeja del Superadmin
+    if (this.client) {
+      const profile = this.userProfile();
+      const platformCategory: PlatformFeedbackCategory =
+        payload.category === 'bug'
+          ? 'bug'
+          : payload.category === 'testimonial'
+            ? 'testimonial'
+            : 'support';
+      const platformStatus: PlatformFeedbackStatus =
+        isAutoApprovedCandidate ? 'approved' : 'pending';
+      const platformPayload = {
+        user_id: userId,
+        user_name:
+          (isTestimonial ? payload.author_name?.trim() : null) ||
+          [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim() ||
+          'Usuario',
+        user_email: record.contact_email,
+        user_role_title:
+          (isTestimonial ? payload.author_role?.trim() : null) || 'Taller de Carpintería',
+        category: platformCategory,
+        subject: record.title,
+        message: record.message,
+        rating: ratingVal ?? 5,
+        status: platformStatus,
+        is_featured: isAutoApprovedCandidate
+      };
+      try {
+        void Promise.resolve(this.client.from('platform_feedback').insert(platformPayload)).catch(() => {
+          // Best-effort non-blocking insert
+        });
+      } catch {
+        // Ignorar errores secundarios
+      }
+    }
+
     try {
       if (this.client) {
         if (canSelectPostInsert) {
@@ -1569,6 +1824,684 @@ export class SupabaseService {
    */
   async getPublicTestimonials(limit = 10): Promise<UserFeedbackRecord[]> {
     return this.getPublicApprovedTestimonials(limit);
+  }
+
+  /**
+   * Alias de compatibilidad para envío de feedback de usuario.
+   */
+  async submitUserFeedback(payload: CreateFeedbackPayload): Promise<{ success: boolean; data?: UserFeedbackRecord; error?: string }> {
+    return this.submitFeedback(payload);
+  }
+
+  // ==========================================
+  // OPERACIONES DE SUPERADMINISTRADOR Y CMS GLOBAL
+  // ==========================================
+
+  private normalizePlatformSettings(
+    raw: Record<string, unknown>,
+    fallback: PlatformSettingsRecord
+  ): PlatformSettingsRecord {
+    return {
+      id: 1,
+      app_version:
+        typeof raw['app_version'] === 'string' && raw['app_version'].trim()
+          ? raw['app_version'].trim()
+          : fallback.app_version,
+      support_email:
+        typeof raw['support_email'] === 'string' && raw['support_email'].trim()
+          ? raw['support_email'].trim()
+          : fallback.support_email,
+      pro_monthly_usd:
+        raw['pro_monthly_usd'] !== undefined && raw['pro_monthly_usd'] !== null
+          ? Number(raw['pro_monthly_usd'])
+          : fallback.pro_monthly_usd,
+      pro_annual_monthly_usd:
+        raw['pro_annual_monthly_usd'] !== undefined && raw['pro_annual_monthly_usd'] !== null
+          ? Number(raw['pro_annual_monthly_usd'])
+          : fallback.pro_annual_monthly_usd,
+      pro_annual_total_usd:
+        raw['pro_annual_total_usd'] !== undefined && raw['pro_annual_total_usd'] !== null
+          ? Number(raw['pro_annual_total_usd'])
+          : fallback.pro_annual_total_usd,
+      industrial_monthly_usd:
+        raw['industrial_monthly_usd'] !== undefined && raw['industrial_monthly_usd'] !== null
+          ? Number(raw['industrial_monthly_usd'])
+          : fallback.industrial_monthly_usd,
+      industrial_annual_monthly_usd:
+        raw['industrial_annual_monthly_usd'] !== undefined &&
+        raw['industrial_annual_monthly_usd'] !== null
+          ? Number(raw['industrial_annual_monthly_usd'])
+          : fallback.industrial_annual_monthly_usd,
+      industrial_annual_total_usd:
+        raw['industrial_annual_total_usd'] !== undefined &&
+        raw['industrial_annual_total_usd'] !== null
+          ? Number(raw['industrial_annual_total_usd'])
+          : fallback.industrial_annual_total_usd,
+      announcement_enabled:
+        typeof raw['announcement_enabled'] === 'boolean'
+          ? raw['announcement_enabled']
+          : fallback.announcement_enabled,
+      announcement_text:
+        typeof raw['announcement_text'] === 'string'
+          ? raw['announcement_text']
+          : fallback.announcement_text,
+      announcement_badge:
+        typeof raw['announcement_badge'] === 'string' && raw['announcement_badge'].trim()
+          ? raw['announcement_badge'].trim()
+          : fallback.announcement_badge,
+      free_max_modules:
+        raw['free_max_modules'] !== undefined && raw['free_max_modules'] !== null
+          ? Number(raw['free_max_modules'])
+          : fallback.free_max_modules,
+      updated_at:
+        typeof raw['updated_at'] === 'string' ? raw['updated_at'] : fallback.updated_at
+    };
+  }
+
+  private normalizePlatformFeedbackRecord(raw: Record<string, unknown>): PlatformFeedbackRecord {
+    const rawCat = raw['category'];
+    const category: PlatformFeedbackCategory =
+      rawCat === 'bug' ? 'bug' : rawCat === 'testimonial' ? 'testimonial' : 'support';
+
+    const rawStatus = raw['status'];
+    const validStatuses: PlatformFeedbackStatus[] = [
+      'pending',
+      'in_progress',
+      'resolved',
+      'approved',
+      'rejected'
+    ];
+    let status: PlatformFeedbackStatus = 'pending';
+    if (typeof rawStatus === 'string') {
+      if (rawStatus === 'open') {
+        status = 'pending';
+      } else if (rawStatus === 'closed') {
+        status = 'resolved';
+      } else if (validStatuses.includes(rawStatus as PlatformFeedbackStatus)) {
+        status = rawStatus as PlatformFeedbackStatus;
+      }
+    }
+    if (category === 'testimonial' && Boolean(raw['is_approved_public'] || raw['is_featured'])) {
+      status = 'approved';
+    }
+
+    const userName = String(
+      raw['author_name'] ||
+        raw['user_name'] ||
+        (raw['contact_email'] ? String(raw['contact_email']).split('@')[0] : 'Usuario')
+    );
+    const userEmail = raw['contact_email']
+      ? String(raw['contact_email'])
+      : raw['user_email']
+        ? String(raw['user_email'])
+        : null;
+    const userRoleTitle = raw['author_role']
+      ? String(raw['author_role'])
+      : raw['user_role_title']
+        ? String(raw['user_role_title'])
+        : 'Taller de Carpintería';
+    const subject = raw['title']
+      ? String(raw['title'])
+      : raw['subject']
+        ? String(raw['subject'])
+        : null;
+    const isFeatured = Boolean(raw['is_featured'] || raw['is_approved_public']);
+
+    return {
+      id: String(raw['id'] ?? ''),
+      user_id: raw['user_id'] ? String(raw['user_id']) : null,
+      user_name: userName,
+      user_email: userEmail,
+      user_role_title: userRoleTitle,
+      category,
+      subject,
+      message: String(raw['message'] ?? ''),
+      rating: raw['rating'] !== undefined && raw['rating'] !== null ? Number(raw['rating']) : null,
+      status,
+      is_featured: isFeatured,
+      admin_notes: raw['admin_notes'] ? String(raw['admin_notes']) : null,
+      created_at: String(raw['created_at'] ?? new Date().toISOString())
+    };
+  }
+
+  /**
+   * Carga la configuración global del CMS desde `public.platform_settings` (id = 1).
+   */
+  async loadPlatformSettings(): Promise<PlatformSettingsRecord> {
+    const fallback = this.platformSettings();
+    if (!this.isBrowser) return fallback;
+
+    try {
+      const isTestEnv = Boolean(
+        (globalThis as unknown as Record<string, unknown>)['__vitest_worker__'] ||
+        (globalThis as unknown as { process?: { env?: Record<string, string> } }).process?.env?.['NODE_ENV'] === 'test'
+      );
+
+      if (this.client && !isTestEnv) {
+        const { data, error } = await this.client
+          .from('platform_settings')
+          .select('*')
+          .eq('id', 1)
+          .maybeSingle();
+
+        if (!error && data) {
+          const normalized = this.normalizePlatformSettings(
+            data as Record<string, unknown>,
+            fallback
+          );
+          this.platformSettings.set(normalized);
+          return normalized;
+        }
+      }
+
+      const url = `${this.config.url}/rest/v1/platform_settings?id=eq.1&select=*&limit=1`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: this.headers
+      });
+
+      if (!res.ok) return fallback;
+      const rows = (await res.json()) as Array<Record<string, unknown>>;
+      if (Array.isArray(rows) && rows.length > 0 && rows[0]) {
+        const normalized = this.normalizePlatformSettings(rows[0], fallback);
+        this.platformSettings.set(normalized);
+        return normalized;
+      }
+    } catch {
+      // Mantiene fallback local seguro
+    }
+
+    return fallback;
+  }
+
+  /**
+   * Actualiza la configuración global del CMS en `public.platform_settings` (id = 1).
+   */
+  async updatePlatformSettings(
+    patch: Partial<PlatformSettingsRecord>
+  ): Promise<{ success: boolean; data?: PlatformSettingsRecord; error?: string }> {
+    const nowIso = new Date().toISOString();
+    const current = this.platformSettings();
+    const nextSettings: PlatformSettingsRecord = this.normalizePlatformSettings(
+      { ...current, ...patch, id: 1, updated_at: nowIso },
+      current
+    );
+
+    if (!this.isBrowser || !this.client) {
+      this.platformSettings.set(nextSettings);
+      return { success: true, data: nextSettings };
+    }
+
+    try {
+      const payload: Record<string, unknown> = {
+        ...patch,
+        updated_at: nowIso
+      };
+      delete payload['id'];
+
+      const { error } = await this.client
+        .from('platform_settings')
+        .update(payload)
+        .eq('id', 1);
+
+      if (error) {
+        return { success: false, error: this.cleanErrorMessage(error.message) };
+      }
+
+      this.platformSettings.set(nextSettings);
+      return { success: true, data: nextSettings };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: this.cleanErrorMessage(msg) };
+    }
+  }
+
+  /**
+   * Obtiene todos los perfiles de usuarios registrados ordenados por fecha de creación descendente.
+   */
+  async adminGetAllProfiles(): Promise<UserProfile[]> {
+    if (!this.isBrowser || !this.client) return [];
+
+    try {
+      const { data, error } = await this.client
+        .from('user_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error || !Array.isArray(data)) return [];
+
+      return data.map((row) => {
+        const record = row as Record<string, unknown>;
+        const email = String(record['email'] ?? '');
+        const isOwner = email.trim().toLowerCase() === 'eydersuarez900@gmail.com';
+        const rawStatus = record['subscription_status'];
+        const validStatuses: SubscriptionStatus[] = [
+          'free',
+          'active',
+          'on_trial',
+          'past_due',
+          'cancelled',
+          'expired'
+        ];
+        const plan: UserPlan =
+          record['plan'] === 'pro' || record['plan'] === 'industrial'
+            ? record['plan']
+            : isOwner
+              ? 'industrial'
+              : 'free';
+        const parsedStatus: SubscriptionStatus =
+          typeof rawStatus === 'string' && validStatuses.includes(rawStatus as SubscriptionStatus)
+            ? (rawStatus as SubscriptionStatus)
+            : plan === 'pro' || plan === 'industrial'
+              ? 'active'
+              : 'free';
+
+        return {
+          id: String(record['id'] ?? ''),
+          email,
+          first_name: String(record['first_name'] || 'Usuario'),
+          last_name: String(record['last_name'] ?? ''),
+          role: record['role'] === 'super_admin' || isOwner ? 'super_admin' : 'user',
+          plan,
+          billing_cycle: record['billing_cycle'] === 'annual' ? 'annual' : 'monthly',
+          subscription_status: parsedStatus,
+          subscription_id: record['subscription_id'] ? String(record['subscription_id']) : null,
+          customer_id: record['customer_id'] ? String(record['customer_id']) : null,
+          variant_id: record['variant_id'] ? String(record['variant_id']) : null,
+          current_period_end: record['current_period_end']
+            ? String(record['current_period_end'])
+            : null,
+          customer_portal_url: record['customer_portal_url']
+            ? String(record['customer_portal_url'])
+            : null,
+          is_suspended: Boolean(record['is_suspended']),
+          created_at: String(record['created_at'] ?? new Date().toISOString()),
+          updated_at: String(record['updated_at'] ?? new Date().toISOString())
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Actualiza manualmente el plan, ciclo, estado, rol o suspensión de un usuario desde el CRM de Superadmin.
+   */
+  async adminUpdateUserProfile(
+    userId: string,
+    patch: {
+      plan?: SubscriptionPlan;
+      billing_cycle?: BillingCycle;
+      subscription_status?: SubscriptionStatus;
+      role?: 'user' | 'super_admin';
+      is_suspended?: boolean;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!userId) return { success: false, error: 'Identificador de usuario requerido.' };
+    const nowIso = new Date().toISOString();
+    const isTargetCurrent = this.currentUser()?.id === userId || this.userProfile()?.id === userId;
+    const targetUser = this.currentUser()?.id === userId ? this.currentUser() : null;
+    const prevProfile = this.userProfile();
+
+    if (this.isBrowser && this.client) {
+      try {
+        const { error } = await this.client
+          .from('user_profiles')
+          .update({
+            ...patch,
+            updated_at: nowIso
+          })
+          .eq('id', userId);
+
+        if (error) {
+          return { success: false, error: this.cleanErrorMessage(error.message) };
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { success: false, error: this.cleanErrorMessage(msg) };
+      }
+    }
+
+    if (isTargetCurrent) {
+      this.userProfile.update((curr) => {
+        const base = curr ?? prevProfile ?? (targetUser ? this.buildFallbackProfile(targetUser) : null);
+        return base
+          ? {
+              ...base,
+              ...patch,
+              updated_at: nowIso
+            }
+          : null;
+      });
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Obtiene todas las facturas/transacciones registradas en `public.subscription_invoices` para el Superadmin.
+   */
+  async adminGetAllInvoices(limit = 50): Promise<SubscriptionInvoice[]> {
+    if (!this.isBrowser || !this.client) return [];
+
+    try {
+      const ordered = this.client
+        .from('subscription_invoices')
+        .select('*')
+        .order('created_at', { ascending: false });
+      const query =
+        typeof (ordered as unknown as { limit?: unknown }).limit === 'function'
+          ? ordered.limit(limit)
+          : ordered;
+
+      const { data, error } = await query;
+      if (error || !Array.isArray(data)) return [];
+
+      return data.map((row) => {
+        const record = row as Record<string, unknown>;
+        return {
+          id: String(record['id'] ?? ''),
+          user_id: String(record['user_id'] ?? ''),
+          subscription_id: record['subscription_id'] ? String(record['subscription_id']) : null,
+          plan:
+            record['plan'] === 'industrial'
+              ? 'industrial'
+              : record['plan'] === 'pro'
+                ? 'pro'
+                : 'free',
+          billing_cycle: record['billing_cycle'] === 'annual' ? 'annual' : 'monthly',
+          amount_usd: Number(record['amount_usd'] ?? 0),
+          status: String(record['status'] ?? 'paid'),
+          invoice_url: record['invoice_url'] ? String(record['invoice_url']) : null,
+          created_at: String(record['created_at'] ?? new Date().toISOString())
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Obtiene todos los tickets de soporte, reportes de bugs y testimonios desde `public.user_feedback` y `public.platform_feedback`.
+   */
+  async adminGetAllFeedback(): Promise<PlatformFeedbackRecord[]> {
+    if (!this.isBrowser || !this.client) return [];
+
+    try {
+      const records: PlatformFeedbackRecord[] = [];
+      const seenIds = new Set<string>();
+
+      // 1. Obtener reportes reales de user_feedback (tickets de soporte, bugs y envíos de usuarios como Camilo Alzate)
+      try {
+        const { data: userFeedbackRows } = await this.client
+          .from('user_feedback')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (Array.isArray(userFeedbackRows)) {
+          for (const row of userFeedbackRows) {
+            const item = this.normalizePlatformFeedbackRecord(row as Record<string, unknown>);
+            if (item.id && !seenIds.has(item.id)) {
+              seenIds.add(item.id);
+              records.push(item);
+            }
+          }
+        }
+      } catch {
+        // En caso de que falle la consulta de user_feedback, continúa con platform_feedback
+      }
+
+      // 2. Obtener registros de platform_feedback (testimonios o tickets registrados vía CMS)
+      try {
+        const { data: platformRows } = await this.client
+          .from('platform_feedback')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (Array.isArray(platformRows)) {
+          for (const row of platformRows) {
+            const item = this.normalizePlatformFeedbackRecord(row as Record<string, unknown>);
+            if (item.id && !seenIds.has(item.id)) {
+              seenIds.add(item.id);
+              records.push(item);
+            }
+          }
+        }
+      } catch {
+        // Ignora fallos secundarios en platform_feedback
+      }
+
+      return records.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Actualiza el estado, destacado o notas internas de un registro en `user_feedback` y `platform_feedback`.
+   */
+  async adminUpdateFeedback(
+    id: string,
+    patch: Partial<Pick<PlatformFeedbackRecord, 'status' | 'is_featured' | 'admin_notes'>>
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!id) return { success: false, error: 'Identificador requerido.' };
+    if (!this.isBrowser || !this.client) return { success: true };
+
+    try {
+      // 1. Actualizar en platform_feedback
+      await this.client
+        .from('platform_feedback')
+        .update(patch)
+        .eq('id', id);
+
+      // 2. Mapear y actualizar en user_feedback (tabla principal de tickets y reportes)
+      const userFeedbackPatch: Record<string, unknown> = {};
+      if (patch.status !== undefined) {
+        userFeedbackPatch['status'] =
+          patch.status === 'pending'
+            ? 'open'
+            : patch.status === 'approved' || patch.status === 'resolved'
+              ? 'resolved'
+              : patch.status === 'rejected'
+                ? 'closed'
+                : patch.status;
+
+        if (patch.status === 'approved') {
+          userFeedbackPatch['is_approved_public'] = true;
+          userFeedbackPatch['allow_public_display'] = true;
+        } else if (patch.status === 'rejected') {
+          userFeedbackPatch['is_approved_public'] = false;
+        }
+      }
+
+      if (typeof patch.is_featured === 'boolean') {
+        userFeedbackPatch['is_approved_public'] = patch.is_featured;
+        userFeedbackPatch['allow_public_display'] = patch.is_featured;
+      }
+
+      if (patch.admin_notes !== undefined) {
+        userFeedbackPatch['admin_notes'] = patch.admin_notes;
+      }
+
+      if (Object.keys(userFeedbackPatch).length > 0) {
+        await this.client
+          .from('user_feedback')
+          .update(userFeedbackPatch)
+          .eq('id', id);
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: this.cleanErrorMessage(msg) };
+    }
+  }
+
+  /**
+   * Crea un nuevo testimonio aprobado directamente desde el panel de Superadministrador.
+   */
+  async adminCreateTestimonial(payload: {
+    user_name: string;
+    user_role_title: string;
+    message: string;
+    rating: number;
+    is_featured: boolean;
+  }): Promise<{ success: boolean; data?: PlatformFeedbackRecord; error?: string }> {
+    const nowIso = new Date().toISOString();
+    const insertPayload = {
+      user_id: this.currentUser()?.id ?? null,
+      user_name: payload.user_name.trim() || 'Usuario',
+      user_email: this.currentUser()?.email ?? null,
+      user_role_title: payload.user_role_title.trim() || 'Taller de Carpintería',
+      category: 'testimonial' as const,
+      subject: null,
+      message: payload.message.trim(),
+      rating: Math.min(5, Math.max(1, Number(payload.rating) || 5)),
+      status: 'approved' as const,
+      is_featured: Boolean(payload.is_featured),
+      admin_notes: null
+    };
+
+    const fallbackRecord: PlatformFeedbackRecord = {
+      id:
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `testimonial-${Date.now()}`,
+      ...insertPayload,
+      created_at: nowIso
+    };
+
+    if (!this.isBrowser || !this.client) {
+      return { success: true, data: fallbackRecord };
+    }
+
+    try {
+      const insertBuilder = this.client.from('platform_feedback').insert(insertPayload);
+      if (typeof (insertBuilder as unknown as { select?: unknown }).select === 'function') {
+        const selected = insertBuilder.select();
+        const finalQuery =
+          typeof (selected as unknown as { maybeSingle?: unknown }).maybeSingle === 'function'
+            ? selected.maybeSingle()
+            : typeof (selected as unknown as { single?: unknown }).single === 'function'
+              ? selected.single()
+              : selected;
+        const { data, error } = await finalQuery;
+        if (error) {
+          return { success: false, error: this.cleanErrorMessage(error.message) };
+        }
+        if (data && !Array.isArray(data)) {
+          return {
+            success: true,
+            data: this.normalizePlatformFeedbackRecord(data as Record<string, unknown>)
+          };
+        }
+      } else {
+        const { error } = await insertBuilder;
+        if (error) {
+          return { success: false, error: this.cleanErrorMessage(error.message) };
+        }
+      }
+
+      // También registrar en user_feedback para compatibilidad directa con Landing Page
+      try {
+        await this.client.from('user_feedback').insert({
+          user_id: this.currentUser()?.id ?? null,
+          category: 'testimonial',
+          author_name: payload.user_name.trim() || 'Usuario',
+          author_role: payload.user_role_title.trim() || 'Taller de Carpintería',
+          contact_email: this.currentUser()?.email ?? null,
+          title: 'Testimonio de cliente',
+          message: payload.message.trim(),
+          rating: Math.min(5, Math.max(1, Number(payload.rating) || 5)),
+          allow_public_display: true,
+          is_approved_public: Boolean(payload.is_featured),
+          status: 'resolved',
+          app_version: 'v3.0.0',
+          app_language: 'es',
+          metadata: {}
+        });
+      } catch {
+        // Inserción secundaria no bloqueante
+      }
+
+      return { success: true, data: fallbackRecord };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: this.cleanErrorMessage(msg) };
+    }
+  }
+
+  /**
+   * Elimina un registro de feedback o testimonio de `public.platform_feedback` y `public.user_feedback`.
+   */
+  async adminDeleteFeedback(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!id) return { success: false, error: 'Identificador requerido.' };
+    if (!this.isBrowser || !this.client) return { success: true };
+
+    try {
+      const { error } = await this.client
+        .from('platform_feedback')
+        .delete()
+        .eq('id', id);
+
+      // También eliminar de user_feedback
+      try {
+        await this.client
+          .from('user_feedback')
+          .delete()
+          .eq('id', id);
+      } catch {
+        // Ignorar fallo secundario si el registro no existía en user_feedback
+      }
+
+      if (error) {
+        return { success: false, error: this.cleanErrorMessage(error.message) };
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: this.cleanErrorMessage(msg) };
+    }
+  }
+
+  /**
+   * Consulta los testimonios aprobados en `public.platform_feedback` para mostrarlos en la Landing Page.
+   */
+  async getApprovedPlatformTestimonials(limit = 10): Promise<PlatformFeedbackRecord[]> {
+    if (!this.isBrowser || !this.client) return [];
+
+    try {
+      const baseQuery = this.client
+        .from('platform_feedback')
+        .select('*')
+        .eq('category', 'testimonial')
+        .eq('status', 'approved');
+
+      const orderedFeatured =
+        typeof (baseQuery as unknown as { order?: unknown }).order === 'function'
+          ? baseQuery.order('is_featured', { ascending: false })
+          : baseQuery;
+      const orderedDate =
+        typeof (orderedFeatured as unknown as { order?: unknown }).order === 'function'
+          ? orderedFeatured.order('created_at', { ascending: false })
+          : orderedFeatured;
+      const limitedQuery =
+        typeof (orderedDate as unknown as { limit?: unknown }).limit === 'function'
+          ? orderedDate.limit(limit)
+          : orderedDate;
+
+      const { data, error } = await limitedQuery;
+      if (error || !Array.isArray(data)) return [];
+
+      return data.map((row) =>
+        this.normalizePlatformFeedbackRecord(row as Record<string, unknown>)
+      );
+    } catch {
+      return [];
+    }
   }
 
   /**
