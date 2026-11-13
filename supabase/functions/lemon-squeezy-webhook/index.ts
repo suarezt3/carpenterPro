@@ -172,9 +172,16 @@ Deno.serve(async (req: Request) => {
     const renewsAt = typeof attributes['renews_at'] === 'string'
       ? attributes['renews_at']
       : (typeof attributes['ends_at'] === 'string' ? attributes['ends_at'] : null);
+    const updatePaymentUrl = typeof urls['update_payment_method'] === 'string'
+      ? urls['update_payment_method']
+      : null;
     const customerPortalUrl = typeof urls['customer_portal'] === 'string'
       ? urls['customer_portal']
-      : (typeof urls['update_payment_method'] === 'string' ? urls['update_payment_method'] : null);
+      : updatePaymentUrl;
+    const rawCardBrand = typeof attributes['card_brand'] === 'string' ? attributes['card_brand'].trim() : '';
+    const cardBrand = rawCardBrand ? rawCardBrand.toUpperCase() : null;
+    const rawCardLastFour = typeof attributes['card_last_four'] === 'string' ? attributes['card_last_four'].trim() : '';
+    const cardLastFour = /^\d{4}$/.test(rawCardLastFour) ? rawCardLastFour : null;
 
     if (
       eventName === 'subscription_created' ||
@@ -205,6 +212,12 @@ Deno.serve(async (req: Request) => {
       if (customerPortalUrl) {
         updatePayload['customer_portal_url'] = customerPortalUrl;
       }
+      if (cardBrand) {
+        updatePayload['card_brand'] = cardBrand;
+      }
+      if (cardLastFour) {
+        updatePayload['card_last_four'] = cardLastFour;
+      }
 
       const { error: updateErr } = await supabase
         .from('user_profiles')
@@ -223,6 +236,9 @@ Deno.serve(async (req: Request) => {
         .update({
           subscription_status: 'cancelled',
           ...(renewsAt ? { current_period_end: renewsAt } : {}),
+          ...(customerPortalUrl ? { customer_portal_url: customerPortalUrl } : {}),
+          ...(cardBrand ? { card_brand: cardBrand } : {}),
+          ...(cardLastFour ? { card_last_four: cardLastFour } : {}),
           updated_at: new Date().toISOString()
         })
         .eq('id', userId);

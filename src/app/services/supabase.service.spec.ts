@@ -1,13 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import {
   AVATAR_COLOR_PRESETS,
+  BillingPortalResult,
   normalizeAvatarColorHex,
   resolveAvatarBgClass,
   resolveAvatarColorId,
+  SubscriptionMutationResult,
   SupabaseService,
   SUPABASE_SQL_SETUP,
   SUPABASE_CONFIG,
-  UserPaymentMethod,
   UserProfile
 } from './supabase.service';
 import { Project, ProjectSettings } from '../models/melamine.models';
@@ -918,7 +919,7 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(resolveAvatarBgClass('#999999')).toBe('bg-zinc-900');
       });
 
-      it('buildFallbackProfile y loadUserProfile deben incluir avatar_color y avatar_mode', async () => {
+      it('buildFallbackProfile y loadUserProfile deben incluir avatar_color, avatar_mode, card_brand y card_last_four', async () => {
         const googleUser = createAuthUser({
           user_metadata: {
             first_name: 'Ana',
@@ -928,6 +929,8 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         const fallback = service.buildFallbackProfile(googleUser);
         expect(fallback.avatar_color).toBe('#18181B');
         expect(fallback.avatar_mode).toBe('google');
+        expect(fallback.card_brand).toBeNull();
+        expect(fallback.card_last_four).toBeNull();
 
         const mockMaybeSingle = vi.fn().mockResolvedValue({
           data: {
@@ -939,6 +942,8 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
             plan: 'pro',
             billing_cycle: 'annual',
             subscription_status: 'active',
+            card_brand: '  visa ',
+            card_last_four: '**** 4242',
             avatar_color: '#0284c7',
             avatar_mode: 'color',
             created_at: '2026-11-01T00:00:00Z',
@@ -954,8 +959,12 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         const loaded = await service.loadUserProfile(googleUser);
         expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('avatar_color'));
         expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('avatar_mode'));
+        expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('card_brand'));
+        expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('card_last_four'));
         expect(loaded?.avatar_color).toBe('#0284C7');
         expect(loaded?.avatar_mode).toBe('color');
+        expect(loaded?.card_brand).toBe('VISA');
+        expect(loaded?.card_last_four).toBe('4242');
       });
 
       it('loadUserProfile debe incluir avatar_color y avatar_mode en el upsert inicial si no existe registro', async () => {
@@ -1074,159 +1083,215 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(service.userProfile()?.subscription_status).toBe('active');
       });
 
-      it('getPaymentMethods debe consultar user_payment_methods ordenado por is_default DESC y created_at DESC', async () => {
+      it('getBillingPortalUrl debe invocar la Edge Function, sincronizar userProfile y manejar caché/errores', async () => {
         service.currentUser.set(null);
-        expect(await service.getPaymentMethods()).toEqual([]);
+        const unauthRes: BillingPortalResult = await service.getBillingPortalUrl();
+        expect(unauthRes.success).toBe(false);
+        expect(unauthRes.errorKey).toBe('account.profileUpdateNoUser');
 
         const user = createAuthUser();
+        const initialProfile = createUserProfile({
+          plan: 'pro',
+          subscription_status: 'active',
+          subscription_id: 'sub_ls_100',
+          customer_portal_url: 'https://app.lemonsqueezy.com/my-orders/cached'
+        });
         service.currentUser.set(user);
+        service.userProfile.set(initialProfile);
 
-        const rows: UserPaymentMethod[] = [
-          {
-            id: 'pm-1',
-            user_id: user.id,
-            brand: 'VISA',
-            last4: '4242',
-            exp_month: 8,
-            exp_year: 2028,
-            holder_name: 'Carlos Mendoza',
-            is_default: true,
-            created_at: '2026-11-10T00:00:00Z'
-          }
-        ];
-
-        const mockOrderCreated = vi.fn().mockResolvedValue({ data: rows, error: null });
-        const mockOrderDefault = vi.fn().mockReturnValue({ order: mockOrderCreated });
-        const mockEq = vi.fn().mockReturnValue({ order: mockOrderDefault });
-        const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
-        const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
-
-        const list = await service.getPaymentMethods();
-        expect(list.length).toBe(1);
-        expect(list[0].last4).toBe('4242');
-        expect(mockFrom).toHaveBeenCalledWith('user_payment_methods');
-        expect(mockEq).toHaveBeenCalledWith('user_id', user.id);
-        expect(mockOrderDefault).toHaveBeenCalledWith('is_default', { ascending: false });
-        expect(mockOrderCreated).toHaveBeenCalledWith('created_at', { ascending: false });
-      });
-
-      it('addPaymentMethod debe validar campos, desmarcar principal previo y no enviar PAN ni CVC', async () => {
-        const user = createAuthUser();
-        service.currentUser.set(user);
-
-        const badLast4 = await service.addPaymentMethod({
-          brand: 'VISA',
-          last4: '42',
-          exp_month: 8,
-          exp_year: 2028,
-          holder_name: 'Carlos Mendoza',
-          is_default: true
-        });
-        expect(badLast4.success).toBe(false);
-        expect(badLast4.errorKey).toBe('account.billing.cardInvalidNumber');
-
-        const badExpiry = await service.addPaymentMethod({
-          brand: 'VISA',
-          last4: '4242',
-          exp_month: 13,
-          exp_year: 2028,
-          holder_name: 'Carlos Mendoza',
-          is_default: true
-        });
-        expect(badExpiry.success).toBe(false);
-        expect(badExpiry.errorKey).toBe('account.billing.cardInvalidExpiry');
-
-        const badHolder = await service.addPaymentMethod({
-          brand: 'VISA',
-          last4: '4242',
-          exp_month: 8,
-          exp_year: 2028,
-          holder_name: '   ',
-          is_default: true
-        });
-        expect(badHolder.success).toBe(false);
-        expect(badHolder.errorKey).toBe('account.billing.cardInvalidHolder');
-
-        const mockUnsetEq = vi.fn().mockResolvedValue({ error: null });
-        const mockUnsetUpdate = vi.fn().mockReturnValue({ eq: mockUnsetEq });
-        const mockInsertSingle = vi.fn().mockResolvedValue({
+        const mockInvoke = vi.fn().mockResolvedValue({
           data: {
-            id: 'pm-new-1',
-            user_id: user.id,
-            brand: 'MASTERCARD',
-            last4: '5511',
-            exp_month: 11,
-            exp_year: 2029,
-            holder_name: 'Carlos Mendoza',
-            is_default: true,
-            created_at: '2026-11-12T00:00:00Z'
+            success: true,
+            source: 'lemon_squeezy_api',
+            portalUrl: 'https://app.lemonsqueezy.com/my-orders/live-update',
+            updatePaymentMethodUrl: 'https://app.lemonsqueezy.com/my-orders/live-update',
+            customerPortalUrl: 'https://app.lemonsqueezy.com/my-orders/customer',
+            subscription_status: 'active',
+            current_period_end: '2027-01-15T00:00:00Z',
+            cardBrand: 'mastercard',
+            cardLastFour: '5511'
           },
           error: null
         });
-        const mockInsertSelect = vi.fn().mockReturnValue({ single: mockInsertSingle });
-        const mockInsert = vi.fn().mockReturnValue({ select: mockInsertSelect });
-        const mockFrom = vi.fn().mockReturnValue({
-          update: mockUnsetUpdate,
-          insert: mockInsert
-        });
-        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+        (service as unknown as { client: { functions: { invoke: typeof mockInvoke } } }).client = {
+          functions: { invoke: mockInvoke }
+        };
 
-        const res = await service.addPaymentMethod({
-          brand: 'MASTERCARD',
-          last4: '5511',
-          exp_month: 11,
-          exp_year: 2029,
-          holder_name: 'Carlos Mendoza',
-          is_default: true
+        const liveRes = await service.getBillingPortalUrl();
+        expect(mockInvoke).toHaveBeenCalledWith('lemon-squeezy-manage-subscription', {
+          body: { action: 'get_portal_url' }
         });
+        expect(liveRes.success).toBe(true);
+        expect(liveRes.source).toBe('lemon_squeezy_api');
+        expect(liveRes.portalUrl).toBe('https://app.lemonsqueezy.com/my-orders/live-update');
+        expect(liveRes.cardBrand).toBe('MASTERCARD');
+        expect(liveRes.cardLastFour).toBe('5511');
+        expect(service.userProfile()).not.toBe(initialProfile);
+        expect(service.userProfile()?.customer_portal_url).toBe('https://app.lemonsqueezy.com/my-orders/customer');
+        expect(service.userProfile()?.current_period_end).toBe('2027-01-15T00:00:00Z');
+        expect(service.userProfile()?.card_brand).toBe('MASTERCARD');
+        expect(service.userProfile()?.card_last_four).toBe('5511');
 
-        expect(res.success).toBe(true);
-        expect(res.data?.brand).toBe('MASTERCARD');
-        expect(res.data?.last4).toBe('5511');
-        expect(mockUnsetUpdate).toHaveBeenCalledWith({ is_default: false });
-        expect(mockUnsetEq).toHaveBeenCalledWith('user_id', user.id);
-        const inserted = mockInsert.mock.calls[0]?.[0] as Record<string, unknown>;
-        expect(inserted['cardNumber']).toBeUndefined();
-        expect(inserted['cvc']).toBeUndefined();
-        expect(inserted['last4']).toBe('5511');
+        // Fallback seguro a customer_portal_url cacheada cuando falla la Edge Function
+        mockInvoke.mockResolvedValueOnce({
+          data: { success: false, code: 'LEMON_API_KEY_MISSING' },
+          error: null
+        });
+        const cachedRes = await service.getBillingPortalUrl();
+        expect(cachedRes.success).toBe(true);
+        expect(cachedRes.source).toBe('cached_portal_url');
+        expect(cachedRes.portalUrl).toBe('https://app.lemonsqueezy.com/my-orders/customer');
+
+        // Sin caché: LEMON_API_KEY_MISSING y error genérico devuelven claves i18n precisas
+        service.userProfile.set({ ...initialProfile, customer_portal_url: null });
+        mockInvoke.mockResolvedValueOnce({
+          data: { success: false, code: 'LEMON_API_KEY_MISSING' },
+          error: null
+        });
+        const missingKeyRes = await service.getBillingPortalUrl();
+        expect(missingKeyRes.success).toBe(false);
+        expect(missingKeyRes.errorCode).toBe('LEMON_API_KEY_MISSING');
+        expect(missingKeyRes.errorKey).toBe('account.billing.gatewayKeyMissingError');
+
+        mockInvoke.mockResolvedValueOnce({
+          data: null,
+          error: { message: 'Function failed' }
+        });
+        const genericErrRes = await service.getBillingPortalUrl();
+        expect(genericErrRes.success).toBe(false);
+        expect(genericErrRes.errorCode).toBe('EDGE_INVOKE_ERROR');
+        expect(genericErrRes.errorKey).toBe('account.billing.portalUnavailableToast');
       });
 
-      it('setDefaultPaymentMethod y deletePaymentMethod deben actualizar y eliminar registros de forma segura', async () => {
+      it('cancelSubscription y reactivateSubscription vía functions.invoke deben sincronizar éxito y rechazar errores sin falsos positivos', async () => {
         const user = createAuthUser();
+        const activeExtProfile = createUserProfile({
+          plan: 'pro',
+          subscription_status: 'active',
+          subscription_id: 'sub_ls_200',
+          customer_portal_url: 'https://app.lemonsqueezy.com/my-orders/sub200'
+        });
         service.currentUser.set(user);
+        service.userProfile.set(activeExtProfile);
 
-        const mockUnsetEq = vi.fn().mockResolvedValue({ error: null });
-        const mockSetUserEq = vi.fn().mockResolvedValue({ error: null });
-        const mockSetIdEq = vi.fn().mockReturnValue({ eq: mockSetUserEq });
-        let updateCall = 0;
-        const mockUpdate = vi.fn().mockImplementation(() => {
-          updateCall++;
-          return updateCall === 1 ? { eq: mockUnsetEq } : { eq: mockSetIdEq };
+        // Si subscription_id existe y no hay functions.invoke, no finge cancelación ni muta estado
+        (service as unknown as { client: { from: ReturnType<typeof vi.fn> } }).client = {
+          from: vi.fn()
+        };
+        const noEdgeRes: SubscriptionMutationResult = await service.cancelSubscription({ immediate: false });
+        expect(noEdgeRes.success).toBe(false);
+        expect(noEdgeRes.errorCode).toBe('EDGE_CLIENT_UNAVAILABLE');
+        expect(noEdgeRes.errorKey).toBe('account.billing.cancelErrorToast');
+        expect(service.userProfile()).toBe(activeExtProfile);
+
+        const mockInvoke = vi.fn();
+        (service as unknown as { client: { functions: { invoke: typeof mockInvoke } } }).client = {
+          functions: { invoke: mockInvoke }
+        };
+
+        // LEMON_API_KEY_MISSING jamás finge éxito ni altera userProfile
+        mockInvoke.mockResolvedValueOnce({
+          data: {
+            success: false,
+            code: 'LEMON_API_KEY_MISSING',
+            portalUrl: 'https://app.lemonsqueezy.com/my-orders/sub200'
+          },
+          error: null
         });
-
-        const mockDeleteUserEq = vi.fn().mockResolvedValue({ error: null });
-        const mockDeleteIdEq = vi.fn().mockReturnValue({ eq: mockDeleteUserEq });
-        const mockDelete = vi.fn().mockReturnValue({ eq: mockDeleteIdEq });
-
-        const mockFrom = vi.fn().mockReturnValue({
-          update: mockUpdate,
-          delete: mockDelete
+        const missingKeyCancel = await service.cancelSubscription({ immediate: false, reason: 'cost' });
+        expect(mockInvoke).toHaveBeenCalledWith('lemon-squeezy-manage-subscription', {
+          body: { action: 'cancel', immediate: false, reason: 'cost' }
         });
-        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+        expect(missingKeyCancel.success).toBe(false);
+        expect(missingKeyCancel.errorCode).toBe('LEMON_API_KEY_MISSING');
+        expect(missingKeyCancel.errorKey).toBe('account.billing.gatewayKeyMissingError');
+        expect(missingKeyCancel.portalUrl).toBe('https://app.lemonsqueezy.com/my-orders/sub200');
+        expect(service.userProfile()).toBe(activeExtProfile);
+        expect(service.userProfile()?.subscription_status).toBe('active');
 
-        const defRes = await service.setDefaultPaymentMethod('pm-2');
-        expect(defRes.success).toBe(true);
-        expect(mockUpdate).toHaveBeenNthCalledWith(1, { is_default: false });
-        expect(mockUnsetEq).toHaveBeenCalledWith('user_id', user.id);
-        expect(mockUpdate).toHaveBeenNthCalledWith(2, { is_default: true });
-        expect(mockSetIdEq).toHaveBeenCalledWith('id', 'pm-2');
-        expect(mockSetUserEq).toHaveBeenCalledWith('user_id', user.id);
+        // Error de Edge Function tampoco finge éxito
+        mockInvoke.mockResolvedValueOnce({
+          data: { success: false, code: 'LEMON_API_ERROR' },
+          error: null
+        });
+        const apiErrCancel = await service.cancelSubscription({ immediate: true });
+        expect(apiErrCancel.success).toBe(false);
+        expect(apiErrCancel.errorCode).toBe('LEMON_API_ERROR');
+        expect(apiErrCancel.errorKey).toBe('account.billing.cancelErrorToast');
+        expect(service.userProfile()?.subscription_status).toBe('active');
 
-        const delRes = await service.deletePaymentMethod('pm-2');
-        expect(delRes.success).toBe(true);
-        expect(mockDeleteIdEq).toHaveBeenCalledWith('id', 'pm-2');
-        expect(mockDeleteUserEq).toHaveBeenCalledWith('user_id', user.id);
+        // Cancelación real exitosa sincroniza metadatos
+        mockInvoke.mockResolvedValueOnce({
+          data: {
+            success: true,
+            mode: 'lemon_squeezy',
+            subscription_status: 'cancelled',
+            current_period_end: '2027-02-01T00:00:00Z',
+            customerPortalUrl: 'https://app.lemonsqueezy.com/my-orders/sub200-new',
+            cardBrand: 'visa',
+            cardLastFour: '1111'
+          },
+          error: null
+        });
+        const okCancel = await service.cancelSubscription({ immediate: false, reason: 'paused' });
+        expect(okCancel.success).toBe(true);
+        const afterCancelProfile = service.userProfile();
+        expect(afterCancelProfile).not.toBe(activeExtProfile);
+        expect(afterCancelProfile?.subscription_status).toBe('cancelled');
+        expect(afterCancelProfile?.plan).toBe('pro');
+        expect(afterCancelProfile?.card_brand).toBe('VISA');
+        expect(afterCancelProfile?.card_last_four).toBe('1111');
+        expect(afterCancelProfile?.customer_portal_url).toBe('https://app.lemonsqueezy.com/my-orders/sub200-new');
+
+        // Reactivación fallida por falta de API Key no muta estado cancelado
+        mockInvoke.mockResolvedValueOnce({
+          data: { success: false, code: 'LEMON_API_KEY_MISSING' },
+          error: null
+        });
+        const failResume = await service.reactivateSubscription();
+        expect(mockInvoke).toHaveBeenLastCalledWith('lemon-squeezy-manage-subscription', {
+          body: { action: 'resume' }
+        });
+        expect(failResume.success).toBe(false);
+        expect(failResume.errorCode).toBe('LEMON_API_KEY_MISSING');
+        expect(failResume.errorKey).toBe('account.billing.gatewayKeyMissingError');
+        expect(service.userProfile()?.subscription_status).toBe('cancelled');
+
+        // Reactivación real exitosa restaura active
+        mockInvoke.mockResolvedValueOnce({
+          data: {
+            success: true,
+            mode: 'lemon_squeezy',
+            subscription_status: 'active',
+            current_period_end: '2027-03-01T00:00:00Z'
+          },
+          error: null
+        });
+        const okResume = await service.reactivateSubscription();
+        expect(okResume.success).toBe(true);
+        expect(service.userProfile()?.subscription_status).toBe('active');
+        expect(service.userProfile()?.current_period_end).toBe('2027-03-01T00:00:00Z');
+
+        // Plan manual local sin subscription_id vía Edge Function degrada a free con immediate=true
+        const localManualProfile = createUserProfile({
+          plan: 'industrial',
+          subscription_status: 'active',
+          subscription_id: null
+        });
+        service.userProfile.set(localManualProfile);
+        mockInvoke.mockResolvedValueOnce({
+          data: {
+            success: true,
+            mode: 'local_profile',
+            plan: 'free',
+            subscription_status: 'free'
+          },
+          error: null
+        });
+        const localImmediateCancel = await service.cancelSubscription({ immediate: true });
+        expect(localImmediateCancel.success).toBe(true);
+        expect(service.userProfile()?.plan).toBe('free');
+        expect(service.userProfile()?.subscription_status).toBe('free');
       });
     });
   });

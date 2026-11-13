@@ -10,27 +10,22 @@ import {
   signal,
   untracked
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
-  AbstractControl,
   NonNullableFormBuilder,
   ReactiveFormsModule,
-  ValidationErrors,
   Validators
 } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   AccountSetting01Icon,
-  Add01Icon,
   Alert02Icon,
   ArrowRight01Icon,
   Cancel01Icon,
   CheckListIcon,
   CheckmarkCircle02Icon,
   CreditCardIcon,
-  Delete02Icon,
   Download01Icon,
   Globe02Icon,
   InformationCircleIcon,
@@ -41,6 +36,7 @@ import {
   Rocket01Icon,
   Settings01Icon,
   Shield01Icon,
+  ShieldCheckIcon,
   Sun01Icon,
   Tick02Icon,
   UserIcon
@@ -49,10 +45,8 @@ import {
 import {
   AVATAR_COLOR_PRESETS,
   AvatarMode,
-  PaymentCardBrand,
   SubscriptionInvoice,
   SupabaseService,
-  UserPaymentMethod,
   normalizeAvatarColorHex,
   resolveAvatarBgClass
 } from '../../services/supabase.service';
@@ -81,109 +75,6 @@ export interface InvoiceMock {
   amountUsd: number;
   status: 'paid';
   invoiceUrl?: string | null;
-}
-
-/**
- * Detecta la marca comercial de una tarjeta según su dígito inicial (VISA: 4, MASTERCARD: 5, AMEX: 3).
- */
-export function detectPaymentCardBrand(rawValue: string): PaymentCardBrand | null {
-  const digits = rawValue.replace(/\D/g, '');
-  if (!digits) {
-    return null;
-  }
-  if (digits.startsWith('4')) {
-    return 'VISA';
-  }
-  if (digits.startsWith('5')) {
-    return 'MASTERCARD';
-  }
-  if (digits.startsWith('3')) {
-    return 'AMEX';
-  }
-  return null;
-}
-
-/**
- * Formatea los dígitos ingresados de tarjeta en bloques legibles de 4 dígitos.
- */
-export function formatCardNumberDisplay(rawValue: string): string {
-  const digitsOnly = rawValue.replace(/\D/g, '');
-  const maxLen = digitsOnly.startsWith('3') ? 15 : 16;
-  const trimmed = digitsOnly.slice(0, maxLen);
-  return trimmed.replace(/(\d{4})(?=\d)/g, '$1 ');
-}
-
-/**
- * Formatea la fecha de vencimiento de tarjeta con máscara MM / AAAA.
- */
-export function formatCardExpiryDisplay(rawValue: string): string {
-  const digits = rawValue.replace(/\D/g, '').slice(0, 6);
-  if (digits.length <= 2) {
-    return digits;
-  }
-  return `${digits.slice(0, 2)} / ${digits.slice(2)}`;
-}
-
-/**
- * Parsea y valida una fecha de expiración MM / AAAA verificando que no esté vencida.
- */
-export function parseCardExpiry(rawValue: string): { month: number; year: number } | null {
-  const trimmed = rawValue.trim();
-  const slashMatch = /^(\d{1,2})\s*\/\s*(\d{4})$/.exec(trimmed);
-  let month: number;
-  let year: number;
-
-  if (slashMatch) {
-    month = Number(slashMatch[1]);
-    year = Number(slashMatch[2]);
-  } else {
-    const digits = trimmed.replace(/\D/g, '');
-    if (digits.length !== 6) {
-      return null;
-    }
-    month = Number(digits.slice(0, 2));
-    year = Number(digits.slice(2, 6));
-  }
-
-  if (!Number.isInteger(month) || month < 1 || month > 12) {
-    return null;
-  }
-  if (!Number.isInteger(year) || year < 2024 || year > 2100) {
-    return null;
-  }
-
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  if (year < currentYear || (year === currentYear && month < currentMonth)) {
-    return null;
-  }
-
-  return { month, year };
-}
-
-function trimmedMinLength2Validator(control: AbstractControl<string>): ValidationErrors | null {
-  const trimmed = String(control.value ?? '').trim();
-  return trimmed.length >= 2 ? null : { invalidHolder: true };
-}
-
-function cardNumberValidator(control: AbstractControl<string>): ValidationErrors | null {
-  const digits = String(control.value ?? '').replace(/\D/g, '');
-  const brand = detectPaymentCardBrand(digits);
-  if (!brand) {
-    return { invalidCardNumber: true };
-  }
-  const expectedLength = brand === 'AMEX' ? 15 : 16;
-  return digits.length === expectedLength ? null : { invalidCardNumber: true };
-}
-
-function cardExpiryValidator(control: AbstractControl<string>): ValidationErrors | null {
-  return parseCardExpiry(String(control.value ?? '')) ? null : { invalidExpiry: true };
-}
-
-function cardCvcValidator(control: AbstractControl<string>): ValidationErrors | null {
-  const digits = String(control.value ?? '').trim();
-  return /^\d{3,4}$/.test(digits) ? null : { invalidCvc: true };
 }
 
 @Component({
@@ -225,10 +116,11 @@ export class AccountSettingsModalComponent {
     accountSetting: AccountSetting01Icon,
     settings: Settings01Icon,
     shield: Shield01Icon,
+    shieldCheck: ShieldCheckIcon,
     layers: Layers01Icon,
     globe: Globe02Icon,
     creditCard: CreditCardIcon,
-    delete: Delete02Icon,
+    externalLink: ArrowRight01Icon,
     invoice: Invoice01Icon,
     checkList: CheckListIcon,
     checkCircle: CheckmarkCircle02Icon,
@@ -237,7 +129,6 @@ export class AccountSettingsModalComponent {
     alert: Alert02Icon,
     info: InformationCircleIcon,
     download: Download01Icon,
-    add: Add01Icon,
     arrowRight: ArrowRight01Icon,
     rocket: Rocket01Icon,
     refresh: RefreshIcon,
@@ -416,35 +307,47 @@ export class AccountSettingsModalComponent {
     immediate: [false]
   });
 
-  readonly isLoadingPaymentMethods = signal<boolean>(false);
-  readonly isAddingPaymentMethod = signal<boolean>(false);
-  readonly isSavingPaymentMethod = signal<boolean>(false);
-  readonly processingPaymentMethodId = signal<string | null>(null);
-  readonly paymentMethods = signal<UserPaymentMethod[]>([]);
+  readonly isOpeningPortal = signal<boolean>(false);
+  readonly fallbackPortalUrl = signal<string | null>(null);
 
-  readonly paymentMethodForm = this.fb.group({
-    holderName: ['', [Validators.required, trimmedMinLength2Validator]],
-    cardNumber: ['', [Validators.required, cardNumberValidator]],
-    expiry: ['', [Validators.required, cardExpiryValidator]],
-    cvc: ['', [Validators.required, cardCvcValidator]],
-    isDefault: [false]
+  readonly isPaidPlan = computed<boolean>(() => {
+    const plan = this.userPlan();
+    return plan === 'pro' || plan === 'industrial';
   });
 
-  private readonly cardNumberValue = signal<string>('');
-  readonly detectedCardBrand = computed<PaymentCardBrand | null>(() =>
-    detectPaymentCardBrand(this.cardNumberValue())
-  );
+  readonly hasExternalSubscription = computed<boolean>(() => {
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    return Boolean(profile?.subscription_id?.trim());
+  });
 
-  readonly primaryPaymentMethod = computed<UserPaymentMethod | null>(() => {
-    const methods = this.paymentMethods();
-    if (methods.length === 0) {
-      return null;
-    }
-    return methods.find((pm) => pm.is_default) ?? null;
+  readonly canOpenExternalPortal = computed<boolean>(() => {
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    return Boolean(
+      profile?.subscription_id?.trim() ||
+        profile?.customer_portal_url?.trim() ||
+        this.fallbackPortalUrl()
+    );
+  });
+
+  readonly hasBillingPortalAccess = computed<boolean>(() => {
+    return this.canOpenExternalPortal() || this.isPaidPlan();
+  });
+
+  readonly cardBrand = computed<string | null>(() => {
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    const brand = profile?.card_brand?.trim();
+    return brand ? brand.toUpperCase() : null;
+  });
+
+  readonly cardLastFour = computed<string | null>(() => {
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    const last4 = profile?.card_last_four?.trim();
+    return last4 && /^\d{4}$/.test(last4) ? last4 : null;
   });
 
   readonly subscriptionStatusKey = computed<string>(() => {
-    const status = this.userProfile()?.subscription_status;
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    const status = profile?.subscription_status;
     if (status === 'on_trial') return 'account.billing.statusTrial';
     if (status === 'cancelled') return 'account.billing.statusCancelledUntilEnd';
     if (status === 'past_due') return 'account.billing.statusPastDue';
@@ -454,7 +357,8 @@ export class AccountSettingsModalComponent {
   });
 
   readonly subscriptionStatusPillClass = computed<string>(() => {
-    const status = this.userProfile()?.subscription_status;
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    const status = profile?.subscription_status;
     if (status === 'cancelled' || status === 'past_due') {
       return 'bg-amber-50 text-amber-700 border border-amber-200';
     }
@@ -468,12 +372,14 @@ export class AccountSettingsModalComponent {
     if (this.userPlan() === 'free') {
       return 'account.billing.cycleStarter';
     }
-    const cycle = this.userProfile()?.billing_cycle;
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    const cycle = profile?.billing_cycle;
     return cycle === 'annual' ? 'account.billing.cycleAnnual' : 'account.billing.cycleMonthly';
   });
 
   readonly formattedRenewalDate = computed<string | null>(() => {
-    const rawDate = this.userProfile()?.current_period_end;
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    const rawDate = profile?.current_period_end;
     if (!rawDate) return null;
     const parsed = new Date(rawDate);
     if (Number.isNaN(parsed.getTime())) return null;
@@ -485,7 +391,8 @@ export class AccountSettingsModalComponent {
   });
 
   readonly customerPortalUrl = computed<string | null>(() => {
-    const url = this.userProfile()?.customer_portal_url;
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    const url = profile?.customer_portal_url;
     return typeof url === 'string' && url.trim().length > 0 ? url.trim() : null;
   });
 
@@ -548,12 +455,6 @@ export class AccountSettingsModalComponent {
       }
     });
 
-    this.paymentMethodForm.controls.cardNumber.valueChanges
-      .pipe(takeUntilDestroyed())
-      .subscribe((val) => {
-        this.cardNumberValue.set(val);
-      });
-
     // Sincronizar tab inicial y datos SOLO cuando el modal transita de false a true
     effect(() => {
       const open = this.isOpen();
@@ -563,9 +464,9 @@ export class AccountSettingsModalComponent {
           this.showManageBillingNotice.set(false);
           this.isManagingSubscription.set(false);
           this.isConfirmingCancel.set(false);
-          this.isAddingPaymentMethod.set(false);
+          this.isOpeningPortal.set(false);
+          this.fallbackPortalUrl.set(null);
           this.cancelSubscriptionForm.reset({ reason: '', immediate: false });
-          this.resetPaymentMethodForm();
           this.loadProfileData();
           this.loadWorkshopData();
           this.loadPreferencesData();
@@ -573,15 +474,14 @@ export class AccountSettingsModalComponent {
         });
       } else if (!open && this.previousIsOpen) {
         untracked(() => {
-          this.isAddingPaymentMethod.set(false);
           this.isConfirmingCancel.set(false);
-          this.resetPaymentMethodForm();
+          this.isOpeningPortal.set(false);
         });
       }
       this.previousIsOpen = open;
     });
 
-    // Recargar facturas y pagos automáticamente si se completa un Checkout.Success mientras el modal está abierto
+    // Recargar facturas automáticamente si se completa un Checkout.Success mientras el modal está abierto
     effect(() => {
       const successAt = this.paymentService.lastCheckoutSuccessAt?.() ?? null;
       if (successAt && this.isOpen()) {
@@ -603,9 +503,8 @@ export class AccountSettingsModalComponent {
   }
 
   closeModal(): void {
-    this.isAddingPaymentMethod.set(false);
     this.isConfirmingCancel.set(false);
-    this.resetPaymentMethodForm();
+    this.isOpeningPortal.set(false);
     this.closed.emit();
     this.modalClose.emit();
   }
@@ -892,52 +791,27 @@ export class AccountSettingsModalComponent {
   }
 
   // ---------------------------------------------------------------------------
-  // LÓGICA TAB 4: SUSCRIPCIÓN, MÉTODOS DE PAGO Y FACTURAS
+  // LÓGICA TAB 4: SUSCRIPCIÓN, PORTAL DE PAGOS Y FACTURAS
   // ---------------------------------------------------------------------------
   async loadBillingData(): Promise<void> {
-    const profileCycle = this.userProfile()?.billing_cycle;
+    const profile = typeof this.userProfile === 'function' ? this.userProfile() : null;
+    const profileCycle = profile?.billing_cycle;
     if (profileCycle === 'annual' || profileCycle === 'monthly') {
       this.billingCycleSelect.set(profileCycle);
     }
 
-    const tasks: Promise<void>[] = [];
-
     if (typeof this.supabase.getSubscriptionInvoices === 'function') {
       this.isLoadingInvoices.set(true);
-      tasks.push(
-        this.supabase
-          .getSubscriptionInvoices(20)
-          .then((records) => {
-            this.cloudInvoices.set(records);
-            this.hasLoadedCloudInvoices.set(true);
-          })
-          .catch(() => {
-            // Conservar estado previo si falla la red
-          })
-          .finally(() => {
-            this.isLoadingInvoices.set(false);
-          })
-      );
+      try {
+        const records = await this.supabase.getSubscriptionInvoices(20);
+        this.cloudInvoices.set(records);
+        this.hasLoadedCloudInvoices.set(true);
+      } catch {
+        // Conservar estado previo si falla la red
+      } finally {
+        this.isLoadingInvoices.set(false);
+      }
     }
-
-    if (typeof this.supabase.getPaymentMethods === 'function') {
-      this.isLoadingPaymentMethods.set(true);
-      tasks.push(
-        this.supabase
-          .getPaymentMethods()
-          .then((methods) => {
-            this.paymentMethods.set(Array.isArray(methods) ? methods : []);
-          })
-          .catch(() => {
-            // Conservar estado previo si falla la red
-          })
-          .finally(() => {
-            this.isLoadingPaymentMethods.set(false);
-          })
-      );
-    }
-
-    await Promise.all(tasks);
   }
 
   setBillingCycleSelect(cycle: 'monthly' | 'annual'): void {
@@ -951,8 +825,7 @@ export class AccountSettingsModalComponent {
   }
 
   openCustomerPortal(): void {
-    const plan = this.userPlan();
-    if (plan === 'pro' || plan === 'industrial') {
+    if (this.isPaidPlan()) {
       this.showManageBillingNotice.set(false);
       this.isManagingSubscription.update((open) => {
         const next = !open;
@@ -992,26 +865,34 @@ export class AccountSettingsModalComponent {
 
     this.isCancellingSubscription.set(true);
     const { reason, immediate } = this.cancelSubscriptionForm.getRawValue();
+    const effectiveImmediate = this.hasExternalSubscription() ? false : immediate;
     const trimmedReason = reason.trim();
 
     try {
       const result = await this.supabase.cancelSubscription({
-        immediate,
+        immediate: effectiveImmediate,
         reason: trimmedReason ? trimmedReason : undefined
       });
 
       if (result.success) {
         this.isConfirmingCancel.set(false);
         this.cancelSubscriptionForm.reset({ reason: '', immediate: false });
-        if (immediate) {
+        if (effectiveImmediate) {
           this.isManagingSubscription.set(false);
           this.showToast(this.i18n.t('account.billing.cancelImmediateSuccessToast'), 'success');
         } else {
           this.showToast(this.i18n.t('account.billing.cancelSuccessToast'), 'info');
         }
       } else {
-        const msg = result.errorKey ? this.i18n.t(result.errorKey) : this.i18n.t('account.billing.cancelErrorToast');
-        this.showToast(msg, 'error');
+        const portalUrl = this.sanitizeExternalUrl(result.portalUrl);
+        if (portalUrl) {
+          this.fallbackPortalUrl.set(portalUrl);
+        }
+        const msgKey =
+          result.errorCode === 'LEMON_API_KEY_MISSING'
+            ? 'account.billing.gatewayKeyMissingError'
+            : (result.errorKey ?? 'account.billing.cancelErrorToast');
+        this.showToast(this.i18n.t(msgKey), 'error');
       }
     } catch {
       this.showToast(this.i18n.t('account.billing.cancelErrorToast'), 'error');
@@ -1031,8 +912,15 @@ export class AccountSettingsModalComponent {
       if (result.success) {
         this.showToast(this.i18n.t('account.billing.reactivateSuccessToast'), 'success');
       } else {
-        const msg = result.errorKey ? this.i18n.t(result.errorKey) : this.i18n.t('account.billing.reactivateErrorToast');
-        this.showToast(msg, 'error');
+        const portalUrl = this.sanitizeExternalUrl(result.portalUrl);
+        if (portalUrl) {
+          this.fallbackPortalUrl.set(portalUrl);
+        }
+        const msgKey =
+          result.errorCode === 'LEMON_API_KEY_MISSING'
+            ? 'account.billing.gatewayKeyMissingError'
+            : (result.errorKey ?? 'account.billing.reactivateErrorToast');
+        this.showToast(this.i18n.t(msgKey), 'error');
       }
     } catch {
       this.showToast(this.i18n.t('account.billing.reactivateErrorToast'), 'error');
@@ -1041,188 +929,88 @@ export class AccountSettingsModalComponent {
     }
   }
 
+  async openBillingPortal(): Promise<void> {
+    if (!this.canOpenExternalPortal()) {
+      this.scrollToBillingPlans();
+      this.showToast(this.i18n.t('account.billing.portalUnavailableToast'), 'info');
+      return;
+    }
+
+    if (typeof this.supabase.getBillingPortalUrl !== 'function') {
+      const fallbackUrl = this.sanitizeExternalUrl(this.fallbackPortalUrl() ?? this.customerPortalUrl());
+      if (fallbackUrl) {
+        this.openSafePortalTab(fallbackUrl);
+        return;
+      }
+      this.showToast(this.i18n.t('account.billing.portalUnavailableToast'), 'error');
+      return;
+    }
+
+    this.isOpeningPortal.set(true);
+    try {
+      const result = await this.supabase.getBillingPortalUrl();
+      const safeUrl = this.sanitizeExternalUrl(result.portalUrl);
+      if (result.success && safeUrl) {
+        this.fallbackPortalUrl.set(safeUrl);
+        this.openSafePortalTab(safeUrl);
+        return;
+      }
+
+      const recoveryUrl =
+        result.errorCode === 'LEMON_API_KEY_MISSING'
+          ? this.sanitizeExternalUrl(this.fallbackPortalUrl() ?? this.customerPortalUrl())
+          : null;
+      if (recoveryUrl) {
+        this.openSafePortalTab(recoveryUrl);
+        return;
+      }
+
+      const msgKey =
+        result.errorCode === 'LEMON_API_KEY_MISSING'
+          ? 'account.billing.gatewayKeyMissingError'
+          : (result.errorKey ?? 'account.billing.portalUnavailableToast');
+      this.showToast(this.i18n.t(msgKey), 'error');
+    } catch {
+      this.showToast(this.i18n.t('account.billing.portalUnavailableToast'), 'error');
+    } finally {
+      this.isOpeningPortal.set(false);
+    }
+  }
+
+  private scrollToBillingPlans(): void {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    const targetEl = document.getElementById('account-billing-plans-section');
+    if (targetEl && typeof targetEl.scrollIntoView === 'function') {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  private sanitizeExternalUrl(rawUrl?: string | null): string | null {
+    if (typeof rawUrl !== 'string') {
+      return null;
+    }
+    const trimmed = rawUrl.trim();
+    if (!trimmed) {
+      return null;
+    }
+    return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+  }
+
+  private openSafePortalTab(url: string): void {
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+    this.showToast(this.i18n.t('account.billing.portalOpenedToast'), 'success');
+  }
+
   upgradePlan(plan?: PaidPlan, cycleOverride?: 'monthly' | 'annual'): void {
     this.showToast(this.i18n.t('account.billing.upgradeMockToast'));
     const targetPlan: PaidPlan = plan ?? (this.userPlan() === 'pro' ? 'industrial' : 'pro');
     const cycle = cycleOverride ?? this.billingCycleSelect();
     this.billingCycleSelect.set(cycle);
     void this.paymentService.openCheckout(targetPlan, cycle);
-  }
-
-  addPaymentMethod(): void {
-    this.openAddPaymentForm();
-  }
-
-  openAddPaymentForm(): void {
-    this.resetPaymentMethodForm(this.paymentMethods().length === 0);
-    this.isAddingPaymentMethod.set(true);
-  }
-
-  cancelAddPaymentForm(): void {
-    this.isAddingPaymentMethod.set(false);
-    this.resetPaymentMethodForm(false);
-  }
-
-  private resetPaymentMethodForm(defaultFlag = false): void {
-    this.paymentMethodForm.reset({
-      holderName: '',
-      cardNumber: '',
-      expiry: '',
-      cvc: '',
-      isDefault: defaultFlag
-    });
-    this.paymentMethodForm.markAsPristine();
-    this.paymentMethodForm.markAsUntouched();
-    this.cardNumberValue.set('');
-  }
-
-  onCardNumberInput(event: Event): void {
-    const inputEl = event.target as HTMLInputElement | null;
-    if (!inputEl) {
-      return;
-    }
-    const formatted = formatCardNumberDisplay(inputEl.value);
-    inputEl.value = formatted;
-    this.paymentMethodForm.controls.cardNumber.setValue(formatted);
-  }
-
-  onExpiryInput(event: Event): void {
-    const inputEl = event.target as HTMLInputElement | null;
-    if (!inputEl) {
-      return;
-    }
-    const formatted = formatCardExpiryDisplay(inputEl.value);
-    inputEl.value = formatted;
-    this.paymentMethodForm.controls.expiry.setValue(formatted);
-  }
-
-  onCvcInput(event: Event): void {
-    const inputEl = event.target as HTMLInputElement | null;
-    if (!inputEl) {
-      return;
-    }
-    const digits = inputEl.value.replace(/\D/g, '').slice(0, 4);
-    inputEl.value = digits;
-    this.paymentMethodForm.controls.cvc.setValue(digits);
-  }
-
-  async savePaymentMethod(): Promise<void> {
-    if (this.paymentMethodForm.invalid) {
-      this.paymentMethodForm.markAllAsTouched();
-      return;
-    }
-
-    if (typeof this.supabase.addPaymentMethod !== 'function') {
-      return;
-    }
-
-    const raw = this.paymentMethodForm.getRawValue();
-    const digits = raw.cardNumber.replace(/\D/g, '');
-    const brand = detectPaymentCardBrand(digits);
-    const parsedExpiry = parseCardExpiry(raw.expiry);
-    const trimmedHolder = raw.holderName.trim();
-
-    if (!brand || !parsedExpiry || trimmedHolder.length < 2) {
-      this.paymentMethodForm.markAllAsTouched();
-      return;
-    }
-
-    // Seguridad: solo enviar marca, últimos 4 dígitos, expiración, titular y predeterminada (NUNCA PAN ni CVC)
-    const last4 = digits.slice(-4);
-    const isDefault =
-      this.paymentMethods().length === 0 && !this.paymentMethodForm.controls.isDefault.dirty
-        ? true
-        : raw.isDefault;
-
-    this.isSavingPaymentMethod.set(true);
-    try {
-      const result = await this.supabase.addPaymentMethod({
-        brand,
-        last4,
-        exp_month: parsedExpiry.month,
-        exp_year: parsedExpiry.year,
-        holder_name: trimmedHolder,
-        is_default: isDefault
-      });
-
-      if (result.success) {
-        if (result.data) {
-          const savedCard = result.data;
-          this.paymentMethods.update((list) => {
-            const base = savedCard.is_default
-              ? list.map((item) => ({ ...item, is_default: false }))
-              : [...list];
-            return [savedCard, ...base].sort((a, b) => Number(b.is_default) - Number(a.is_default));
-          });
-        } else if (typeof this.supabase.getPaymentMethods === 'function') {
-          const refreshed = await this.supabase.getPaymentMethods();
-          this.paymentMethods.set(Array.isArray(refreshed) ? refreshed : []);
-        }
-
-        this.isAddingPaymentMethod.set(false);
-        this.resetPaymentMethodForm(false);
-        this.showToast(this.i18n.t('account.billing.cardSavedToast'), 'success');
-      } else {
-        const msg = result.errorKey ? this.i18n.t(result.errorKey) : this.i18n.t('account.billing.cardSaveErrorToast');
-        this.showToast(msg, 'error');
-      }
-    } catch {
-      this.showToast(this.i18n.t('account.billing.cardSaveErrorToast'), 'error');
-    } finally {
-      this.isSavingPaymentMethod.set(false);
-    }
-  }
-
-  async setDefaultPaymentMethod(methodId: string): Promise<void> {
-    if (typeof this.supabase.setDefaultPaymentMethod !== 'function') {
-      return;
-    }
-
-    this.processingPaymentMethodId.set(methodId);
-    try {
-      const result = await this.supabase.setDefaultPaymentMethod(methodId);
-      if (result.success) {
-        this.paymentMethods.update((list) =>
-          list
-            .map((item) => ({ ...item, is_default: item.id === methodId }))
-            .sort((a, b) => Number(b.is_default) - Number(a.is_default))
-        );
-        this.showToast(this.i18n.t('account.billing.cardDefaultSuccessToast'), 'success');
-      } else {
-        const msg = result.errorKey ? this.i18n.t(result.errorKey) : this.i18n.t('account.billing.cardActionErrorToast');
-        this.showToast(msg, 'error');
-      }
-    } catch {
-      this.showToast(this.i18n.t('account.billing.cardActionErrorToast'), 'error');
-    } finally {
-      this.processingPaymentMethodId.set(null);
-    }
-  }
-
-  async deletePaymentMethod(methodId: string): Promise<void> {
-    if (typeof this.supabase.deletePaymentMethod !== 'function') {
-      return;
-    }
-
-    this.processingPaymentMethodId.set(methodId);
-    try {
-      const result = await this.supabase.deletePaymentMethod(methodId);
-      if (result.success) {
-        this.paymentMethods.update((list) => list.filter((item) => item.id !== methodId));
-        this.showToast(this.i18n.t('account.billing.cardDeleteSuccessToast'), 'success');
-      } else {
-        const msg = result.errorKey ? this.i18n.t(result.errorKey) : this.i18n.t('account.billing.cardActionErrorToast');
-        this.showToast(msg, 'error');
-      }
-    } catch {
-      this.showToast(this.i18n.t('account.billing.cardActionErrorToast'), 'error');
-    } finally {
-      this.processingPaymentMethodId.set(null);
-    }
-  }
-
-  formatExpiryMonthYear(expMonth: number, expYear: number): string {
-    return `${String(expMonth).padStart(2, '0')} / ${expYear}`;
   }
 
   downloadInvoice(invoice: InvoiceMock): void {

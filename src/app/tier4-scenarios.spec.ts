@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlTree } from '@angular/router';
 import { signal, WritableSignal } from '@angular/core';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, ActivatedRouteSnapshot, RouterStateSnapshot, convertToParamMap } from '@angular/router';
 import { User } from '@supabase/supabase-js';
 
 import { of } from 'rxjs';
@@ -47,23 +47,11 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       sendPasswordResetEmail: vi.fn(),
       updateUserPassword: vi.fn(),
       updateUserProfile: vi.fn().mockResolvedValue({ success: true }),
-      getPaymentMethods: vi.fn().mockResolvedValue([]),
-      addPaymentMethod: vi.fn().mockImplementation(async (input) => ({
+      getBillingPortalUrl: vi.fn().mockResolvedValue({
         success: true,
-        data: {
-          id: 'pm-real-1',
-          user_id: 'usr-eyder',
-          brand: input.brand,
-          last4: input.last4,
-          exp_month: input.exp_month,
-          exp_year: input.exp_year,
-          holder_name: input.holder_name,
-          is_default: input.is_default,
-          created_at: new Date().toISOString()
-        }
-      })),
-      setDefaultPaymentMethod: vi.fn().mockResolvedValue({ success: true }),
-      deletePaymentMethod: vi.fn().mockResolvedValue({ success: true }),
+        portalUrl: 'https://piezo3d.lemonsqueezy.com/billing',
+        source: 'lemon_squeezy_api'
+      }),
       cancelSubscription: vi.fn().mockResolvedValue({ success: true }),
       reactivateSubscription: vi.fn().mockResolvedValue({ success: true }),
       signOut: vi.fn().mockImplementation(async () => {
@@ -230,7 +218,7 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       currentUserSig.set(null);
 
       const result = await TestBed.runInInjectionContext(() =>
-        studioAccessGuard({} as any, { url: '/studio' } as any)
+        studioAccessGuard({} as ActivatedRouteSnapshot, { url: '/studio' } as RouterStateSnapshot)
       );
 
       expect(result instanceof UrlTree).toBe(true);
@@ -242,7 +230,7 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       isAuthSig.set(false);
 
       const guardPromise = TestBed.runInInjectionContext(() =>
-        studioAccessGuard({} as any, { url: '/studio' } as any)
+        studioAccessGuard({} as ActivatedRouteSnapshot, { url: '/studio' } as RouterStateSnapshot)
       );
 
       // syncAuthSession fue invocado
@@ -486,39 +474,89 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       expect(projectService.currentProject().roomConfig?.showClearances).toBe(false);
     });
 
-    it('Step 4.4: Pestaña 4 (Facturación) despliega formulario real de método de pago y persiste tarjeta sin exponer PAN/CVC', async () => {
+    it('Step 4.4: Pestaña 4 (Facturación) muestra portal alojado sin capturar PAN/CVC, sincroniza tarjeta y gestiona cancelación externa', async () => {
       modalComponent.selectTab('billing');
       await modalComponent.loadBillingData();
       modalFixture.detectChanges();
 
+      const el = modalFixture.nativeElement as HTMLElement;
       expect(modalComponent.activeTab()).toBe('billing');
-      expect(mockSupabase.getPaymentMethods).toHaveBeenCalled();
-      expect(modalComponent.paymentMethods().length).toBe(0);
       expect(modalComponent.invoices().length).toBe(3);
 
-      modalComponent.addPaymentMethod();
-      expect(modalComponent.isAddingPaymentMethod()).toBe(true);
+      // Cero captura local de tarjetas o CVC en el DOM
+      expect(el.querySelector('input[autocomplete="cc-number"]')).toBeNull();
+      expect(el.querySelector('input[autocomplete="cc-csc"]')).toBeNull();
+      expect(el.querySelector('input[autocomplete="cc-exp"]')).toBeNull();
+      expect(el.querySelector('[data-testid="account-add-payment-form"]')).toBeNull();
+      expect(el.querySelector('[data-testid="account-payment-methods-empty"]')).toBeTruthy();
 
-      modalComponent.paymentMethodForm.setValue({
-        holderName: 'Eyder Suarez',
-        cardNumber: '4242 4242 4242 4242',
-        expiry: '12 / 2028',
-        cvc: '123',
-        isDefault: true
+      // Sincronizar tarjeta y suscripción externa desde la nube
+      userProfileSig.set({
+        id: 'usr-eyder',
+        email: 'eyder@carpenterpro.com',
+        first_name: 'Eyder',
+        last_name: 'Suarez',
+        role: 'user',
+        plan: 'pro',
+        billing_cycle: 'monthly',
+        subscription_status: 'active',
+        subscription_id: 'ls-sub-401',
+        customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+        card_brand: 'Visa',
+        card_last_four: '4242',
+        current_period_end: '2027-02-01T00:00:00Z',
+        created_at: '2026-11-10T00:00:00Z',
+        updated_at: '2026-11-12T00:00:00Z'
       });
-      await modalComponent.savePaymentMethod();
+      modalFixture.detectChanges();
 
-      expect(mockSupabase.addPaymentMethod).toHaveBeenCalledWith({
-        brand: 'VISA',
-        last4: '4242',
-        exp_month: 12,
-        exp_year: 2028,
-        holder_name: 'Eyder Suarez',
-        is_default: true
+      const cardOnFile = el.querySelector('[data-testid="account-card-on-file"]') as HTMLElement;
+      expect(cardOnFile).toBeTruthy();
+      expect(cardOnFile.textContent).toContain('VISA');
+      expect(cardOnFile.textContent).toContain('4242');
+      expect(cardOnFile.querySelector('.font-numeric')?.textContent).toContain('4242');
+
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      try {
+        const portalBtn = el.querySelector('[data-testid="account-open-billing-portal-btn"]') as HTMLButtonElement;
+        portalBtn.click();
+        await modalFixture.whenStable();
+        modalFixture.detectChanges();
+
+        expect(mockSupabase.getBillingPortalUrl).toHaveBeenCalledTimes(1);
+        expect(openSpy).toHaveBeenCalledWith(
+          'https://piezo3d.lemonsqueezy.com/billing',
+          '_blank',
+          'noopener,noreferrer'
+        );
+        expect(modalComponent.toastType()).toBe('success');
+        expect(modalComponent.toastMessage()).toBe(TestBed.inject(I18nService).t('account.billing.portalOpenedToast'));
+      } finally {
+        openSpy.mockRestore();
+      }
+
+      // Panel de gestión con suscripción externa: oculta cancelación inmediata y maneja error de API key faltante
+      (el.querySelector('[data-testid="account-customer-portal-btn"]') as HTMLButtonElement).click();
+      modalFixture.detectChanges();
+      (el.querySelector('[data-testid="account-cancel-subscription-btn"]') as HTMLButtonElement).click();
+      modalFixture.detectChanges();
+
+      expect(el.querySelector('[data-testid="account-cancel-immediate-checkbox"]')).toBeNull();
+      expect(el.querySelector('[data-testid="account-cancel-grace-only-note"]')).toBeTruthy();
+
+      (mockSupabase.cancelSubscription as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        success: false,
+        errorCode: 'LEMON_API_KEY_MISSING',
+        errorKey: 'account.billing.gatewayKeyMissingError',
+        portalUrl: 'https://piezo3d.lemonsqueezy.com/billing'
       });
-      expect(modalComponent.paymentMethods().length).toBe(1);
-      expect(modalComponent.paymentMethods()[0].last4).toBe('4242');
-      expect(modalComponent.isAddingPaymentMethod()).toBe(false);
+
+      (el.querySelector('[data-testid="account-confirm-cancel-btn"]') as HTMLButtonElement).click();
+      await modalFixture.whenStable();
+      modalFixture.detectChanges();
+
+      expect(modalComponent.toastType()).toBe('error');
+      expect(modalComponent.toastMessage()).toBe(TestBed.inject(I18nService).t('account.billing.gatewayKeyMissingError'));
     });
   });
 
@@ -527,7 +565,6 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
   // ===========================================================================
   describe('Scenario 5: Logout from studio navigates to landing page and locks /studio (F7, F12, F13)', () => {
     let headerFixture: ComponentFixture<HeaderComponent>;
-    let headerComponent: HeaderComponent;
     let headerElement: HTMLElement;
 
     beforeEach(async () => {
@@ -555,7 +592,6 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
 
       router = TestBed.inject(Router);
       headerFixture = TestBed.createComponent(HeaderComponent);
-      headerComponent = headerFixture.componentInstance;
       headerFixture.detectChanges();
       headerElement = headerFixture.nativeElement as HTMLElement;
     });
@@ -587,7 +623,7 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       userProfileSig.set(null);
 
       const guardResult = await TestBed.runInInjectionContext(() =>
-        studioAccessGuard({} as any, { url: '/studio' } as any)
+        studioAccessGuard({} as ActivatedRouteSnapshot, { url: '/studio' } as RouterStateSnapshot)
       );
 
       expect(guardResult instanceof UrlTree).toBe(true);

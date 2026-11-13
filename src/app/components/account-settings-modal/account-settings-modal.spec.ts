@@ -5,7 +5,6 @@ import { User } from '@supabase/supabase-js';
 import { AccountSettingsModalComponent } from './account-settings-modal';
 import {
   SupabaseService,
-  UserPaymentMethod,
   UserProfile
 } from '../../services/supabase.service';
 import { PaymentService } from '../../services/payment.service';
@@ -67,10 +66,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
     updateUserProfile: ReturnType<typeof vi.fn>;
     cancelSubscription: ReturnType<typeof vi.fn>;
     reactivateSubscription: ReturnType<typeof vi.fn>;
-    getPaymentMethods: ReturnType<typeof vi.fn>;
-    addPaymentMethod: ReturnType<typeof vi.fn>;
-    setDefaultPaymentMethod: ReturnType<typeof vi.fn>;
-    deletePaymentMethod: ReturnType<typeof vi.fn>;
+    getBillingPortalUrl: ReturnType<typeof vi.fn>;
   };
   let projectServiceMock: Partial<ProjectStorageService>;
   let i18nMock: Partial<I18nService>;
@@ -111,25 +107,13 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       updateUserProfile: vi.fn().mockResolvedValue({ success: true }),
       refreshUserProfile: vi.fn().mockResolvedValue(mockProfile),
       getSubscriptionInvoices: vi.fn().mockResolvedValue([]),
+      getBillingPortalUrl: vi.fn().mockResolvedValue({
+        success: true,
+        portalUrl: 'https://piezo3d.lemonsqueezy.com/billing',
+        source: 'lemon_squeezy_api'
+      }),
       cancelSubscription: vi.fn().mockResolvedValue({ success: true }),
       reactivateSubscription: vi.fn().mockResolvedValue({ success: true }),
-      getPaymentMethods: vi.fn().mockResolvedValue([]),
-      addPaymentMethod: vi.fn().mockImplementation(async (input) => ({
-        success: true,
-        data: {
-          id: 'pm-new-1',
-          user_id: 'u-1',
-          brand: input.brand,
-          last4: input.last4,
-          exp_month: input.exp_month,
-          exp_year: input.exp_year,
-          holder_name: input.holder_name,
-          is_default: input.is_default,
-          created_at: '2026-11-12T00:00:00Z'
-        } as UserPaymentMethod
-      })),
-      setDefaultPaymentMethod: vi.fn().mockResolvedValue({ success: true }),
-      deletePaymentMethod: vi.fn().mockResolvedValue({ success: true }),
       buildFallbackProfile: vi.fn().mockReturnValue(mockProfile)
     };
 
@@ -433,63 +417,49 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       fixture.detectChanges();
     });
 
-    it('debe iniciar sin tarjetas mockeadas y cargar métodos de pago reales desde el servicio', async () => {
-      const realMethods: UserPaymentMethod[] = [
-        {
-          id: 'pm-real-1',
-          user_id: 'u-1',
-          brand: 'VISA',
-          last4: '4242',
-          exp_month: 8,
-          exp_year: 2028,
-          holder_name: 'Eyder Suarez',
-          is_default: true,
-          created_at: '2026-11-10T00:00:00Z'
-        }
-      ];
-      supabaseMock.getPaymentMethods.mockResolvedValueOnce(realMethods);
-
-      await component.loadBillingData();
-      fixture.detectChanges();
-
-      expect(component.paymentMethods().length).toBe(1);
-      expect(component.paymentMethods()[0].id).toBe('pm-real-1');
-      expect(component.paymentMethods()[0].last4).toBe('4242');
-      expect(component.paymentMethods()[0].is_default).toBe(true);
+    it('no debe renderizar ningún input de número de tarjeta, expiración ni CVC en el DOM', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('input[autocomplete="cc-number"]')).toBeNull();
+      expect(el.querySelector('input[autocomplete="cc-csc"]')).toBeNull();
+      expect(el.querySelector('input[autocomplete="cc-exp"]')).toBeNull();
+      expect(el.querySelector('[data-testid="account-add-payment-form"]')).toBeNull();
+      expect(el.querySelector('[data-testid="account-hosted-billing-badge"]')).toBeTruthy();
     });
 
-    it('debe mostrar estado de carga animate-pulse mientras carga métodos de pago y estado vacío cuando no hay tarjetas', () => {
-      component.paymentMethods.set([]);
-      component.isLoadingPaymentMethods.set(true);
-      fixture.detectChanges();
-
+    it('debe mostrar estado vacío sobrio sin tarjeta sincronizada y tarjeta resumida cuando card_last_four está presente', () => {
       const el = fixture.nativeElement as HTMLElement;
-      const loadingEl = el.querySelector('[data-testid="account-payment-methods-loading"]');
-      expect(loadingEl).toBeTruthy();
-      expect(loadingEl?.innerHTML).toContain('animate-pulse');
+      expect(el.querySelector('[data-testid="account-payment-methods-empty"]')).toBeTruthy();
+      expect(el.querySelector('[data-testid="account-card-on-file"]')).toBeNull();
 
-      component.isLoadingPaymentMethods.set(false);
+      supabaseMock.userProfile.set({
+        id: 'u-1',
+        email: 'eyder@taller.com',
+        first_name: 'Eyder',
+        last_name: 'Suarez',
+        role: 'user',
+        plan: 'pro',
+        billing_cycle: 'monthly',
+        subscription_status: 'active',
+        subscription_id: 'ls-sub-1',
+        customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+        card_brand: 'Mastercard',
+        card_last_four: '8812',
+        created_at: '2026-11-10T00:00:00Z',
+        updated_at: '2026-11-12T00:00:00Z'
+      });
       fixture.detectChanges();
 
-      expect(el.querySelector('[data-testid="account-payment-methods-loading"]')).toBeNull();
-      expect(el.querySelector('[data-testid="account-payment-methods-empty"]')).toBeTruthy();
+      expect(el.querySelector('[data-testid="account-payment-methods-empty"]')).toBeNull();
+      const cardEl = el.querySelector('[data-testid="account-card-on-file"]') as HTMLElement;
+      expect(cardEl).toBeTruthy();
+      expect(cardEl.textContent).toContain('MASTERCARD');
+      expect(cardEl.querySelector('.font-numeric')?.textContent).toContain('•••• 8812');
     });
 
     it('debe mostrar la lista de facturas simuladas cuando no hay facturas en la nube', () => {
       expect(component.invoices().length).toBe(3);
       expect(component.invoices()[0].invoiceNumber).toBe('INV-2026-011');
       expect(component.invoices()[0].status).toBe('paid');
-    });
-
-    it('debe abrir el formulario inline al presionar agregar método de pago sin mostrar toast falso', () => {
-      const addBtn = fixture.nativeElement.querySelector('[data-testid="account-add-payment-btn"]') as HTMLButtonElement;
-      addBtn.click();
-      fixture.detectChanges();
-
-      expect(component.isAddingPaymentMethod()).toBe(true);
-      expect(component.toastMessage()).toBeNull();
-      expect(fixture.nativeElement.querySelector('[data-testid="account-add-payment-form"]')).toBeTruthy();
-      expect(component.paymentMethodForm.controls.isDefault.value).toBe(true);
     });
 
     it('debe emitir feedback al solicitar mejorar de plan', () => {
@@ -618,20 +588,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       expect(fixture.nativeElement.querySelector('[data-testid="account-manage-billing-notice"]')).toBeTruthy();
     });
 
-    it('debe mapear subscription_status === cancelled a statusCancelledUntilEnd con pastilla ámbar y permitir cancelar/reactivar', async () => {
-      component.paymentMethods.set([
-        {
-          id: 'pm-1',
-          user_id: 'u-1',
-          brand: 'VISA',
-          last4: '4242',
-          exp_month: 8,
-          exp_year: 2028,
-          holder_name: 'Eyder Suarez',
-          is_default: true,
-          created_at: '2026-11-10T00:00:00Z'
-        }
-      ]);
+    it('debe mapear subscription_status === cancelled a statusCancelledUntilEnd con pastilla ámbar, ocultar cancelación inmediata en suscripción externa y permitir reactivar', async () => {
       component.userProfile.set({
         id: 'u-1',
         email: 'eyder@taller.com',
@@ -641,6 +598,10 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
         plan: 'pro',
         billing_cycle: 'monthly',
         subscription_status: 'active',
+        subscription_id: 'ls-sub-1',
+        customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+        card_brand: 'VISA',
+        card_last_four: '4242',
         current_period_end: '2027-01-15T00:00:00Z',
         created_at: '2026-11-10T00:00:00Z',
         updated_at: '2026-11-10T00:00:00Z'
@@ -654,12 +615,15 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
 
       expect(el.querySelector('[data-testid="account-manage-primary-method"]')?.textContent).toContain('VISA');
       expect(el.querySelector('[data-testid="account-manage-primary-method"]')?.textContent).toContain('4242');
+      expect(el.querySelector('[data-testid="account-manage-portal-btn"]')).toBeTruthy();
 
       const cancelInitBtn = el.querySelector('[data-testid="account-cancel-subscription-btn"]') as HTMLButtonElement;
       cancelInitBtn.click();
       fixture.detectChanges();
 
       expect(el.querySelector('[data-testid="account-cancel-confirm-box"]')).toBeTruthy();
+      expect(el.querySelector('[data-testid="account-cancel-immediate-checkbox"]')).toBeNull();
+      expect(el.querySelector('[data-testid="account-cancel-grace-only-note"]')).toBeTruthy();
 
       const keepBtn = el.querySelector('[data-testid="account-keep-plan-btn"]') as HTMLButtonElement;
       keepBtn.click();
@@ -695,6 +659,10 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
         plan: 'pro',
         billing_cycle: 'monthly',
         subscription_status: 'cancelled',
+        subscription_id: 'ls-sub-1',
+        customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+        card_brand: 'VISA',
+        card_last_four: '4242',
         current_period_end: '2027-01-15T00:00:00Z',
         created_at: '2026-11-10T00:00:00Z',
         updated_at: '2026-11-12T00:00:00Z'
@@ -750,132 +718,139 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       });
     });
 
-    it('debe validar el formulario de tarjeta, detectar marcas en vivo y enviar solo metadatos seguros sin PAN ni CVC', async () => {
-      component.openAddPaymentForm();
-      fixture.detectChanges();
-
+    it('debe abrir el portal alojado en pestaña segura con window.open y manejar URLs inseguras o plan gratuito', async () => {
       const el = fixture.nativeElement as HTMLElement;
-      const numberInput = el.querySelector('[data-testid="account-payment-number-input"]') as HTMLInputElement;
-      const expiryInput = el.querySelector('[data-testid="account-payment-expiry-input"]') as HTMLInputElement;
-      const cvcInput = el.querySelector('[data-testid="account-payment-cvc-input"]') as HTMLInputElement;
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
-      expect(numberInput.className).toContain('font-numeric');
-      expect(expiryInput.className).toContain('font-numeric');
-      expect(cvcInput.className).toContain('font-numeric');
+      try {
+        // Caso 1: Plan gratuito sin suscripción externa -> dirige a planes y no llama al servicio
+        supabaseMock.userProfile.set({
+          id: 'u-1',
+          email: 'eyder@taller.com',
+          first_name: 'Eyder',
+          last_name: 'Suarez',
+          role: 'user',
+          plan: 'free',
+          created_at: '2026-11-10T00:00:00Z',
+          updated_at: '2026-11-12T00:00:00Z'
+        });
+        fixture.detectChanges();
 
-      // Probar detección de marca en vivo y validación por prefijo
-      numberInput.value = '6011000000000000';
-      numberInput.dispatchEvent(new Event('input'));
-      fixture.detectChanges();
-      expect(component.detectedCardBrand()).toBeNull();
-      expect(component.paymentMethodForm.controls.cardNumber.invalid).toBe(true);
+        expect(component.canOpenExternalPortal()).toBe(false);
+        const freeBtn = el.querySelector('[data-testid="account-open-billing-portal-btn"]') as HTMLButtonElement;
+        expect(freeBtn).toBeTruthy();
+        freeBtn.click();
+        await fixture.whenStable();
+        fixture.detectChanges();
 
-      numberInput.value = '5500000000008812';
-      numberInput.dispatchEvent(new Event('input'));
-      fixture.detectChanges();
-      expect(component.detectedCardBrand()).toBe('MASTERCARD');
-      expect(el.querySelector('[data-testid="account-payment-brand-pill"]')?.textContent?.trim()).toBe('MASTERCARD');
-      expect(component.paymentMethodForm.controls.cardNumber.valid).toBe(true);
+        expect(supabaseMock.getBillingPortalUrl).not.toHaveBeenCalled();
+        expect(openSpy).not.toHaveBeenCalled();
+        expect(component.toastMessage()).toBe('account.billing.portalUnavailableToast');
 
-      numberInput.value = '378282246310005';
-      numberInput.dispatchEvent(new Event('input'));
-      fixture.detectChanges();
-      expect(component.detectedCardBrand()).toBe('AMEX');
-      expect(component.paymentMethodForm.controls.cardNumber.valid).toBe(true);
+        // Caso 2: Suscripción activa -> abre portal alojado de forma segura
+        supabaseMock.userProfile.set({
+          id: 'u-1',
+          email: 'eyder@taller.com',
+          first_name: 'Eyder',
+          last_name: 'Suarez',
+          role: 'user',
+          plan: 'pro',
+          billing_cycle: 'monthly',
+          subscription_status: 'active',
+          subscription_id: 'ls-sub-202',
+          customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+          card_brand: 'Visa',
+          card_last_four: '4242',
+          created_at: '2026-11-10T00:00:00Z',
+          updated_at: '2026-11-12T00:00:00Z'
+        });
+        fixture.detectChanges();
 
-      // Fecha expirada o inválida rechazada
-      expiryInput.value = '012024';
-      expiryInput.dispatchEvent(new Event('input'));
-      fixture.detectChanges();
-      expect(expiryInput.value).toBe('01 / 2024');
-      expect(component.paymentMethodForm.controls.expiry.invalid).toBe(true);
+        expect(component.canOpenExternalPortal()).toBe(true);
+        const portalBtn = el.querySelector('[data-testid="account-open-billing-portal-btn"]') as HTMLButtonElement;
+        expect(portalBtn.className).toContain('bg-zinc-900');
+        portalBtn.click();
+        await fixture.whenStable();
+        fixture.detectChanges();
 
-      // CVC inválido rechazado
-      cvcInput.value = '12';
-      cvcInput.dispatchEvent(new Event('input'));
-      fixture.detectChanges();
-      expect(component.paymentMethodForm.controls.cvc.invalid).toBe(true);
+        expect(supabaseMock.getBillingPortalUrl).toHaveBeenCalledTimes(1);
+        expect(openSpy).toHaveBeenCalledWith(
+          'https://piezo3d.lemonsqueezy.com/billing',
+          '_blank',
+          'noopener,noreferrer'
+        );
+        expect(component.toastType()).toBe('success');
+        expect(component.toastMessage()).toBe('account.billing.portalOpenedToast');
 
-      // Datos válidos completos para VISA
-      component.paymentMethodForm.patchValue({
-        holderName: '  Eyder Suarez  ',
-        cardNumber: '4111 1111 1111 4242',
-        expiry: '08 / 2028',
-        cvc: '123',
-        isDefault: true
-      });
-      fixture.detectChanges();
+        // Caso 3: URL insegura devuelta por el backend -> bloqueada y muestra toast de error
+        openSpy.mockClear();
+        supabaseMock.getBillingPortalUrl.mockResolvedValueOnce({
+          success: true,
+          portalUrl: 'javascript:alert(1)'
+        });
+        await component.openBillingPortal();
+        fixture.detectChanges();
 
-      expect(component.paymentMethodForm.valid).toBe(true);
-      await component.savePaymentMethod();
-      fixture.detectChanges();
-
-      expect(supabaseMock.addPaymentMethod).toHaveBeenCalledTimes(1);
-      const sentPayload = supabaseMock.addPaymentMethod.mock.calls[0][0] as Record<string, unknown>;
-      expect(sentPayload).toEqual({
-        brand: 'VISA',
-        last4: '4242',
-        exp_month: 8,
-        exp_year: 2028,
-        holder_name: 'Eyder Suarez',
-        is_default: true
-      });
-      expect('cardNumber' in sentPayload).toBe(false);
-      expect('cvc' in sentPayload).toBe(false);
-      expect(JSON.stringify(sentPayload)).not.toContain('4111');
-      expect(component.isAddingPaymentMethod()).toBe(false);
-      expect(component.paymentMethods().length).toBe(1);
-      expect(component.toastMessage()).toBe('account.billing.cardSavedToast');
+        expect(openSpy).not.toHaveBeenCalled();
+        expect(component.toastType()).toBe('error');
+        expect(component.toastMessage()).toBe('account.billing.portalUnavailableToast');
+      } finally {
+        openSpy.mockRestore();
+      }
     });
 
-    it('debe permitir marcar una tarjeta como principal y eliminar una tarjeta guardada', async () => {
-      component.paymentMethods.set([
-        {
-          id: 'pm-1',
-          user_id: 'u-1',
-          brand: 'VISA',
-          last4: '4242',
-          exp_month: 8,
-          exp_year: 2028,
-          holder_name: 'Eyder Suarez',
-          is_default: true,
-          created_at: '2026-11-10T00:00:00Z'
-        },
-        {
-          id: 'pm-2',
-          user_id: 'u-1',
-          brand: 'MASTERCARD',
-          last4: '8812',
-          exp_month: 11,
-          exp_year: 2027,
-          holder_name: 'Eyder Suarez',
-          is_default: false,
-          created_at: '2026-11-11T00:00:00Z'
-        }
-      ]);
+    it('debe mostrar error de pasarela y conservar fallback de portal cuando cancelación o reactivación externa devuelve LEMON_API_KEY_MISSING', async () => {
+      supabaseMock.userProfile.set({
+        id: 'u-1',
+        email: 'eyder@taller.com',
+        first_name: 'Eyder',
+        last_name: 'Suarez',
+        role: 'user',
+        plan: 'pro',
+        billing_cycle: 'monthly',
+        subscription_status: 'active',
+        subscription_id: 'ls-sub-303',
+        created_at: '2026-11-10T00:00:00Z',
+        updated_at: '2026-11-12T00:00:00Z'
+      });
       fixture.detectChanges();
+
+      supabaseMock.cancelSubscription.mockResolvedValueOnce({
+        success: false,
+        errorCode: 'LEMON_API_KEY_MISSING',
+        errorKey: 'account.billing.gatewayKeyMissingError',
+        portalUrl: 'https://piezo3d.lemonsqueezy.com/billing'
+      });
 
       const el = fixture.nativeElement as HTMLElement;
-      const setDefaultBtns = el.querySelectorAll('[data-testid="account-set-default-payment-btn"]');
-      expect(setDefaultBtns.length).toBe(1);
-
-      (setDefaultBtns[0] as HTMLButtonElement).click();
+      (el.querySelector('[data-testid="account-customer-portal-btn"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      (el.querySelector('[data-testid="account-cancel-subscription-btn"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="account-cancel-immediate-checkbox"]')).toBeNull();
+      (el.querySelector('[data-testid="account-confirm-cancel-btn"]') as HTMLButtonElement).click();
       await fixture.whenStable();
       fixture.detectChanges();
 
-      expect(supabaseMock.setDefaultPaymentMethod).toHaveBeenCalledWith('pm-2');
-      expect(component.paymentMethods().find((pm) => pm.id === 'pm-2')?.is_default).toBe(true);
-      expect(component.paymentMethods().find((pm) => pm.id === 'pm-1')?.is_default).toBe(false);
+      expect(supabaseMock.cancelSubscription).toHaveBeenCalledWith({
+        immediate: false,
+        reason: undefined
+      });
+      expect(component.toastType()).toBe('error');
+      expect(component.toastMessage()).toBe('account.billing.gatewayKeyMissingError');
+      expect(component.fallbackPortalUrl()).toBe('https://piezo3d.lemonsqueezy.com/billing');
+      expect(component.canOpenExternalPortal()).toBe(true);
 
-      const deleteBtns = el.querySelectorAll('[data-testid="account-delete-payment-btn"]');
-      expect(deleteBtns.length).toBe(2);
-      (deleteBtns[1] as HTMLButtonElement).click();
-      await fixture.whenStable();
+      supabaseMock.reactivateSubscription.mockResolvedValueOnce({
+        success: false,
+        errorCode: 'LEMON_API_KEY_MISSING'
+      });
+
+      await component.reactivateSubscription();
       fixture.detectChanges();
 
-      expect(supabaseMock.deletePaymentMethod).toHaveBeenCalledWith('pm-1');
-      expect(component.paymentMethods().length).toBe(1);
-      expect(component.paymentMethods()[0].id).toBe('pm-2');
+      expect(component.toastType()).toBe('error');
+      expect(component.toastMessage()).toBe('account.billing.gatewayKeyMissingError');
     });
   });
 

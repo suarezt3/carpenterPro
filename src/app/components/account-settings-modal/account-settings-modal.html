@@ -939,16 +939,18 @@
                       data-testid="account-manage-primary-method"
                       class="p-3 rounded-lg bg-zinc-50 border border-zinc-200/80">
                       <span class="block text-[11px] font-medium text-zinc-500 font-sans">
-                        {{ 'account.billing.primaryMethodLabel' | t }}
+                        {{ 'account.billing.cardOnFileLabel' | t }}
                       </span>
-                      @if (primaryPaymentMethod(); as primaryPm) {
+                      @if (cardLastFour(); as last4) {
                         <span class="text-xs font-bold text-zinc-900 mt-0.5 inline-flex items-center gap-1.5 font-sans">
-                          <span>{{ primaryPm.brand }}</span>
-                          <span class="font-numeric">•••• {{ primaryPm.last4 }}</span>
+                          @if (cardBrand(); as brand) {
+                            <span>{{ brand }}</span>
+                          }
+                          <span class="font-numeric">•••• {{ last4 }}</span>
                         </span>
                       } @else {
                         <span class="text-xs font-medium text-zinc-500 mt-0.5 block font-sans">
-                          {{ 'account.billing.noPrimaryMethod' | t }}
+                          {{ 'account.billing.noCardOnFile' | t }}
                         </span>
                       }
                     </div>
@@ -958,7 +960,7 @@
                         <span class="block text-[11px] font-medium text-zinc-500 font-sans">
                           {{ 'account.billing.periodEndLabel' | t }}
                         </span>
-                        <span class="text-xs font-bold text-zinc-900 mt-0.5 block font-sans">
+                        <span class="text-xs font-bold text-zinc-900 mt-0.5 block font-numeric">
                           {{ renewalDate }}
                         </span>
                       </div>
@@ -989,7 +991,20 @@
                     </div>
                   } @else {
                     @if (!isConfirmingCancel()) {
-                      <div class="flex justify-end pt-1">
+                      <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+                        @if (canOpenExternalPortal()) {
+                          <button
+                            type="button"
+                            data-testid="account-manage-portal-btn"
+                            [disabled]="isOpeningPortal()"
+                            (click)="openBillingPortal()"
+                            class="px-3.5 py-2 text-xs font-semibold bg-white border border-zinc-200 text-zinc-800 hover:bg-zinc-50 disabled:opacity-50 rounded-lg transition flex items-center gap-1.5 cursor-pointer font-sans">
+                            <hugeicons-icon [icon]="icons.externalLink" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                            <span>
+                              {{ (isOpeningPortal() ? 'account.billing.openingPortalBtn' : 'account.billing.openBillingPortalBtn') | t }}
+                            </span>
+                          </button>
+                        }
                         <button
                           type="button"
                           data-testid="account-cancel-subscription-btn"
@@ -1032,17 +1047,26 @@
                             </select>
                           </div>
 
-                          <label for="account-cancel-immediate" class="flex items-start gap-2 cursor-pointer select-none">
-                            <input
-                              id="account-cancel-immediate"
-                              data-testid="account-cancel-immediate-checkbox"
-                              type="checkbox"
-                              formControlName="immediate"
-                              class="w-4 h-4 mt-0.5 rounded-sm accent-red-600 cursor-pointer shrink-0" />
-                            <span class="text-xs text-zinc-700 font-medium leading-snug font-sans">
-                              {{ 'account.billing.cancelImmediateCheck' | t }}
-                            </span>
-                          </label>
+                          @if (hasExternalSubscription()) {
+                            <div
+                              data-testid="account-cancel-grace-only-note"
+                              class="p-2.5 rounded-lg bg-white border border-zinc-200 text-xs text-zinc-700 font-medium flex items-start gap-2 font-sans">
+                              <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
+                              <span>{{ 'account.billing.cancelGraceOnlyNote' | t }}</span>
+                            </div>
+                          } @else {
+                            <label for="account-cancel-immediate" class="flex items-start gap-2 cursor-pointer select-none">
+                              <input
+                                id="account-cancel-immediate"
+                                data-testid="account-cancel-immediate-checkbox"
+                                type="checkbox"
+                                formControlName="immediate"
+                                class="w-4 h-4 mt-0.5 rounded-sm accent-red-600 cursor-pointer shrink-0" />
+                              <span class="text-xs text-zinc-700 font-medium leading-snug font-sans">
+                                {{ 'account.billing.cancelImmediateCheck' | t }}
+                              </span>
+                            </label>
+                          }
 
                           <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
                             <button
@@ -1202,265 +1226,93 @@
               </div>
             </div>
 
-            <!-- SECCIÓN MÉTODOS DE PAGO VINCULADOS -->
-            <div id="account-payment-methods-section" class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-3.5">
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <div>
+            <!-- SECCIÓN PORTAL ALOJADO SEGURO DE PAGOS Y FACTURACIÓN -->
+            <div id="account-payment-methods-section" class="p-4.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-4 font-sans">
+              <div class="space-y-1">
+                <div class="flex flex-wrap items-center gap-2">
                   <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-900 font-sans">
-                    {{ 'account.billing.paymentMethodsTitle' | t }}
+                    {{ 'account.billing.hostedBillingTitle' | t }}
                   </h4>
-                  <p class="text-xs text-zinc-500 mt-0.5 font-sans">
-                    {{ 'account.billing.paymentMethodsDesc' | t }}
-                  </p>
+                  <span
+                    data-testid="account-hosted-billing-badge"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-600 border border-sky-200 font-sans">
+                    <hugeicons-icon [icon]="icons.shieldCheck" [size]="11" [strokeWidth]="2.2"></hugeicons-icon>
+                    <span>{{ 'account.billing.hostedBillingBadge' | t }}</span>
+                  </span>
                 </div>
-
-                <button
-                  type="button"
-                  data-testid="account-add-payment-btn"
-                  (click)="addPaymentMethod()"
-                  class="px-3 py-1.5 text-xs font-bold text-zinc-900 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-100 transition shadow-2xs flex items-center gap-1 cursor-pointer self-start sm:self-auto font-sans">
-                  <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.5"></hugeicons-icon>
-                  <span>{{ 'account.billing.addPaymentMethod' | t }}</span>
-                </button>
+                <p class="text-xs text-zinc-500 leading-relaxed font-sans">
+                  {{ 'account.billing.hostedBillingDesc' | t }}
+                </p>
               </div>
 
-              <!-- FORMULARIO INLINE PARA AGREGAR MÉTODO DE PAGO -->
-              @if (isAddingPaymentMethod()) {
-                <form
-                  [formGroup]="paymentMethodForm"
-                  (ngSubmit)="savePaymentMethod()"
-                  data-testid="account-add-payment-form"
-                  class="p-4 rounded-xl bg-white border border-zinc-200 shadow-2xs space-y-3.5 font-sans animate-in fade-in duration-150">
-                  <div class="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-100">
-                    <div>
-                      <h5 class="text-xs font-bold text-zinc-900 font-sans">
-                        {{ 'account.billing.paymentFormTitle' | t }}
-                      </h5>
-                      <p class="text-[11px] text-zinc-500 mt-0.5 font-sans">
-                        {{ 'account.billing.paymentFormDesc' | t }}
-                      </p>
+              @if (cardLastFour(); as last4) {
+                <div
+                  data-testid="account-card-on-file"
+                  class="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-800 shrink-0">
+                      <hugeicons-icon [icon]="icons.creditCard" [size]="18" [strokeWidth]="2"></hugeicons-icon>
                     </div>
-                    @if (detectedCardBrand(); as brand) {
-                      <span
-                        data-testid="account-payment-brand-pill"
-                        class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 shrink-0 font-sans">
-                        {{ brand }}
+                    <div>
+                      <span class="block text-[11px] font-medium text-zinc-500 font-sans">
+                        {{ 'account.billing.cardOnFileLabel' | t }}
                       </span>
-                    }
-                  </div>
-
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label for="payment-holder-name" class="block text-xs font-bold text-zinc-900 mb-1 font-sans">
-                        {{ 'account.billing.cardHolderLabel' | t }}
-                      </label>
-                      <input
-                        id="payment-holder-name"
-                        type="text"
-                        formControlName="holderName"
-                        data-testid="account-payment-holder-input"
-                        autocomplete="cc-name"
-                        [placeholder]="'account.billing.cardHolderPlaceholder' | t"
-                        class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 shadow-2xs transition font-sans" />
-                      @if (paymentMethodForm.controls.holderName.invalid && (paymentMethodForm.controls.holderName.touched || paymentMethodForm.controls.holderName.dirty)) {
-                        <p class="text-[11px] text-red-600 mt-1 font-medium font-sans">
-                          {{ 'account.billing.cardInvalidHolder' | t }}
-                        </p>
-                      }
-                    </div>
-
-                    <div>
-                      <label for="payment-card-number" class="block text-xs font-bold text-zinc-900 mb-1 font-sans">
-                        {{ 'account.billing.cardNumberLabel' | t }}
-                      </label>
-                      <input
-                        id="payment-card-number"
-                        type="text"
-                        inputmode="numeric"
-                        autocomplete="cc-number"
-                        maxlength="19"
-                        formControlName="cardNumber"
-                        data-testid="account-payment-number-input"
-                        (input)="onCardNumberInput($event)"
-                        placeholder="0000 0000 0000 0000"
-                        class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 shadow-2xs transition font-numeric" />
-                      @if (paymentMethodForm.controls.cardNumber.invalid && (paymentMethodForm.controls.cardNumber.touched || paymentMethodForm.controls.cardNumber.dirty)) {
-                        <p class="text-[11px] text-red-600 mt-1 font-medium font-sans">
-                          {{ 'account.billing.cardInvalidNumber' | t }}
-                        </p>
-                      }
-                    </div>
-                  </div>
-
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label for="payment-card-expiry" class="block text-xs font-bold text-zinc-900 mb-1 font-sans">
-                        {{ 'account.billing.cardExpiryLabel' | t }}
-                      </label>
-                      <input
-                        id="payment-card-expiry"
-                        type="text"
-                        inputmode="numeric"
-                        autocomplete="cc-exp"
-                        maxlength="9"
-                        formControlName="expiry"
-                        data-testid="account-payment-expiry-input"
-                        (input)="onExpiryInput($event)"
-                        placeholder="MM / AAAA"
-                        class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 shadow-2xs transition font-numeric" />
-                      @if (paymentMethodForm.controls.expiry.invalid && (paymentMethodForm.controls.expiry.touched || paymentMethodForm.controls.expiry.dirty)) {
-                        <p class="text-[11px] text-red-600 mt-1 font-medium font-sans">
-                          {{ 'account.billing.cardInvalidExpiry' | t }}
-                        </p>
-                      }
-                    </div>
-
-                    <div>
-                      <label for="payment-card-cvc" class="block text-xs font-bold text-zinc-900 mb-1 font-sans">
-                        {{ 'account.billing.cardCvcLabel' | t }}
-                      </label>
-                      <input
-                        id="payment-card-cvc"
-                        type="password"
-                        inputmode="numeric"
-                        autocomplete="cc-csc"
-                        maxlength="4"
-                        formControlName="cvc"
-                        data-testid="account-payment-cvc-input"
-                        (input)="onCvcInput($event)"
-                        placeholder="123"
-                        class="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 shadow-2xs transition font-numeric" />
-                      @if (paymentMethodForm.controls.cvc.invalid && (paymentMethodForm.controls.cvc.touched || paymentMethodForm.controls.cvc.dirty)) {
-                        <p class="text-[11px] text-red-600 mt-1 font-medium font-sans">
-                          {{ 'account.billing.cardInvalidCvc' | t }}
-                        </p>
-                      }
-                    </div>
-                  </div>
-
-                  <label for="payment-card-default" class="flex items-center gap-2 pt-1 cursor-pointer select-none">
-                    <input
-                      id="payment-card-default"
-                      type="checkbox"
-                      formControlName="isDefault"
-                      data-testid="account-payment-default-checkbox"
-                      class="w-4 h-4 rounded-sm accent-zinc-900 cursor-pointer" />
-                    <span class="text-xs font-medium text-zinc-700 font-sans">
-                      {{ 'account.billing.cardDefaultLabel' | t }}
-                    </span>
-                  </label>
-
-                  <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
-                    <button
-                      type="button"
-                      data-testid="account-cancel-payment-btn"
-                      [disabled]="isSavingPaymentMethod()"
-                      (click)="cancelAddPaymentForm()"
-                      class="px-3.5 py-2 text-xs font-semibold bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-lg transition cursor-pointer font-sans">
-                      {{ 'common.cancel' | t }}
-                    </button>
-                    <button
-                      type="submit"
-                      data-testid="account-save-payment-btn"
-                      [disabled]="isSavingPaymentMethod()"
-                      class="px-4 py-2 text-xs font-bold bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer font-sans">
-                      <hugeicons-icon [icon]="icons.check" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
-                      <span>
-                        {{ (isSavingPaymentMethod() ? 'account.billing.savingCardBtn' : 'account.billing.saveCardBtn') | t }}
-                      </span>
-                    </button>
-                  </div>
-                </form>
-              }
-
-              <!-- ESTADO DE CARGA / VACÍO / LISTADO DE MÉTODOS DE PAGO -->
-              @if (isLoadingPaymentMethods()) {
-                <div data-testid="account-payment-methods-loading" class="space-y-2 pt-1">
-                  <div class="p-3.5 rounded-lg bg-white border border-zinc-200 flex items-center justify-between gap-3 animate-pulse">
-                    <div class="flex items-center gap-3 flex-1">
-                      <div class="w-9 h-9 rounded-md bg-zinc-200 shrink-0"></div>
-                      <div class="space-y-1.5 flex-1">
-                        <div class="h-3 w-36 bg-zinc-200 rounded"></div>
-                        <div class="h-2.5 w-48 bg-zinc-100 rounded"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="p-3.5 rounded-lg bg-white border border-zinc-200 flex items-center justify-between gap-3 animate-pulse">
-                    <div class="flex items-center gap-3 flex-1">
-                      <div class="w-9 h-9 rounded-md bg-zinc-200 shrink-0"></div>
-                      <div class="space-y-1.5 flex-1">
-                        <div class="h-3 w-32 bg-zinc-200 rounded"></div>
-                        <div class="h-2.5 w-44 bg-zinc-100 rounded"></div>
+                      <div class="flex items-center gap-2 flex-wrap mt-0.5">
+                        <span class="text-xs font-bold text-zinc-900 uppercase font-sans">
+                          @if (cardBrand(); as brand) {
+                            <span>{{ brand }}</span>
+                          }
+                          <span class="font-numeric">•••• {{ last4 }}</span>
+                        </span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-sans">
+                          {{ 'account.billing.activeBadge' | t }}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
-              } @else if (paymentMethods().length === 0 && !isAddingPaymentMethod()) {
+              } @else {
                 <div
                   data-testid="account-payment-methods-empty"
-                  class="p-6 rounded-lg border border-zinc-200 bg-white text-center space-y-1.5 shadow-2xs">
-                  <div class="w-9 h-9 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500 mx-auto">
+                  class="p-5 rounded-xl border border-zinc-200 bg-white flex items-start gap-3 shadow-2xs">
+                  <div class="w-10 h-10 rounded-lg bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500 shrink-0">
                     <hugeicons-icon [icon]="icons.creditCard" [size]="18" [strokeWidth]="2"></hugeicons-icon>
                   </div>
-                  <p class="text-xs font-bold text-zinc-800 font-sans">
-                    {{ 'account.billing.noPaymentMethodsTitle' | t }}
-                  </p>
-                  <p class="text-[11px] text-zinc-500 font-sans">
-                    {{ 'account.billing.noPaymentMethodsDesc' | t }}
-                  </p>
-                </div>
-              } @else if (paymentMethods().length > 0) {
-                <div class="space-y-2 pt-1">
-                  @for (pm of paymentMethods(); track pm.id) {
-                    <div
-                      data-testid="account-payment-method-card"
-                      class="p-3.5 rounded-lg bg-white border border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-                      <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-md bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-700 shrink-0">
-                          <hugeicons-icon [icon]="icons.creditCard" [size]="16" [strokeWidth]="2"></hugeicons-icon>
-                        </div>
-                        <div>
-                          <div class="flex items-center gap-2 flex-wrap">
-                            <span class="text-xs font-bold text-zinc-900 uppercase font-sans">
-                              {{ pm.brand }} <span class="font-numeric">•••• {{ pm.last4 }}</span>
-                            </span>
-                            @if (pm.is_default) {
-                              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-sans">
-                                {{ 'account.billing.defaultBadge' | t }}
-                              </span>
-                            }
-                          </div>
-                          <span class="text-[11px] text-zinc-500 font-medium font-sans block mt-0.5">
-                            {{ 'account.billing.expires' | t }}: <span class="font-numeric">{{ formatExpiryMonthYear(pm.exp_month, pm.exp_year) }}</span> · {{ pm.holder_name }}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div class="flex items-center gap-2 self-end sm:self-center">
-                        @if (!pm.is_default) {
-                          <button
-                            type="button"
-                            data-testid="account-set-default-payment-btn"
-                            [disabled]="processingPaymentMethodId() === pm.id"
-                            (click)="setDefaultPaymentMethod(pm.id)"
-                            class="px-2.5 py-1.5 text-[11px] font-semibold text-zinc-700 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 disabled:opacity-50 rounded-md transition cursor-pointer font-sans">
-                            {{ 'account.billing.setDefaultBtn' | t }}
-                          </button>
-                        }
-                        <button
-                          type="button"
-                          data-testid="account-delete-payment-btn"
-                          [disabled]="processingPaymentMethodId() === pm.id"
-                          (click)="deletePaymentMethod(pm.id)"
-                          [title]="'account.billing.deleteCardTitle' | t"
-                          class="p-1.5 rounded-md text-zinc-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 transition cursor-pointer">
-                          <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="2"></hugeicons-icon>
-                        </button>
-                      </div>
-                    </div>
-                  }
+                  <div class="space-y-0.5">
+                    <p class="text-xs font-bold text-zinc-900 font-sans">
+                      {{ 'account.billing.noCardOnFile' | t }}
+                    </p>
+                    <p class="text-[11px] text-zinc-500 leading-relaxed font-sans">
+                      {{ 'account.billing.noCardOnFileHint' | t }}
+                    </p>
+                  </div>
                 </div>
               }
+
+              <div class="flex items-center justify-end">
+                @if (canOpenExternalPortal()) {
+                  <button
+                    type="button"
+                    data-testid="account-open-billing-portal-btn"
+                    [disabled]="isOpeningPortal()"
+                    (click)="openBillingPortal()"
+                    class="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer font-sans">
+                    <hugeicons-icon [icon]="icons.externalLink" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    <span>
+                      {{ (isOpeningPortal() ? 'account.billing.openingPortalBtn' : 'account.billing.openBillingPortalBtn') | t }}
+                    </span>
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    data-testid="account-open-billing-portal-btn"
+                    (click)="openBillingPortal()"
+                    class="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 rounded-lg transition shadow-2xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer font-sans">
+                    <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    <span>{{ (userPlan() === 'free' ? 'account.billing.choosePlanForPaymentBtn' : 'account.billing.openBillingPortalBtn') | t }}</span>
+                  </button>
+                }
+              </div>
             </div>
 
             <!-- TABLA HISTORIAL DE FACTURACIÓN Y RECIBOS -->

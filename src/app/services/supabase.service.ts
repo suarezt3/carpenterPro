@@ -25,7 +25,44 @@ export type SubscriptionPlan = UserPlan;
 export type BillingCycle = 'monthly' | 'annual';
 export type SubscriptionStatus = 'free' | 'active' | 'on_trial' | 'past_due' | 'cancelled' | 'expired';
 export type AvatarMode = 'color' | 'google';
-export type PaymentCardBrand = 'VISA' | 'MASTERCARD' | 'AMEX';
+
+const VALID_SUBSCRIPTION_STATUSES: readonly SubscriptionStatus[] = [
+  'free',
+  'active',
+  'on_trial',
+  'past_due',
+  'cancelled',
+  'expired'
+];
+
+function normalizeCardBrand(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
+function normalizeCardLastFour(raw: unknown): string | null {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+  const digits = String(raw).replace(/\D/g, '');
+  if (digits.length < 4) return null;
+  const lastFour = digits.slice(-4);
+  return /^\d{4}$/.test(lastFour) ? lastFour : null;
+}
+
+function sanitizePortalUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed || !/^https?:\/\/\S+$/i.test(trimmed)) return null;
+  return trimmed;
+}
+
+function parseSubscriptionStatus(raw: unknown): SubscriptionStatus | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim().toLowerCase();
+  return VALID_SUBSCRIPTION_STATUSES.includes(trimmed as SubscriptionStatus)
+    ? (trimmed as SubscriptionStatus)
+    : null;
+}
 
 /**
  * Preset oficial de color de identidad para el avatar del usuario.
@@ -103,6 +140,8 @@ export interface UserProfile {
   variant_id?: string | null;
   current_period_end?: string | null;
   customer_portal_url?: string | null;
+  card_brand?: string | null;
+  card_last_four?: string | null;
   is_suspended?: boolean;
   avatar_color?: string | null;
   avatar_mode?: AvatarMode | null;
@@ -111,18 +150,28 @@ export interface UserProfile {
 }
 
 /**
- * Método de pago guardado (solo metadatos no sensibles) en `public.user_payment_methods`.
+ * Resultado de consulta del portal seguro de pagos en la pasarela externa.
  */
-export interface UserPaymentMethod {
-  id: string;
-  user_id: string;
-  brand: PaymentCardBrand;
-  last4: string;
-  exp_month: number;
-  exp_year: number;
-  holder_name: string;
-  is_default: boolean;
-  created_at: string;
+export interface BillingPortalResult {
+  success: boolean;
+  portalUrl?: string | null;
+  updatePaymentMethodUrl?: string | null;
+  customerPortalUrl?: string | null;
+  cardBrand?: string | null;
+  cardLastFour?: string | null;
+  source?: 'lemon_squeezy_api' | 'cached_portal_url';
+  errorKey?: string;
+  errorCode?: string;
+}
+
+/**
+ * Resultado de mutaciones de suscripción (cancelación o reactivación) vía función segura.
+ */
+export interface SubscriptionMutationResult {
+  success: boolean;
+  errorKey?: string;
+  errorCode?: string;
+  portalUrl?: string | null;
 }
 
 /**
@@ -345,6 +394,8 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   variant_id TEXT,
   current_period_end TIMESTAMPTZ,
   customer_portal_url TEXT,
+  card_brand TEXT,
+  card_last_four TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -908,6 +959,8 @@ export class SupabaseService {
       variant_id: null,
       current_period_end: null,
       customer_portal_url: null,
+      card_brand: null,
+      card_last_four: null,
       is_suspended: false,
       avatar_color: normalizeAvatarColorHex(rawMetaColor),
       avatar_mode: fallbackAvatarMode,
@@ -960,7 +1013,7 @@ export class SupabaseService {
       const { data, error } = await this.runWithTimeout(
         this.client
           .from('user_profiles')
-          .select('id, email, first_name, last_name, role, plan, billing_cycle, subscription_status, subscription_id, customer_id, variant_id, current_period_end, customer_portal_url, is_suspended, avatar_color, avatar_mode, created_at, updated_at')
+          .select('id, email, first_name, last_name, role, plan, billing_cycle, subscription_status, subscription_id, customer_id, variant_id, current_period_end, customer_portal_url, card_brand, card_last_four, is_suspended, avatar_color, avatar_mode, created_at, updated_at')
           .eq('id', targetUser.id)
           .maybeSingle()
       );
@@ -972,13 +1025,11 @@ export class SupabaseService {
         const rawCycle = record['billing_cycle'];
         const rawStatus = record['subscription_status'];
         const rawAvatarMode = record['avatar_mode'];
-        const validStatuses: SubscriptionStatus[] = ['free', 'active', 'on_trial', 'past_due', 'cancelled', 'expired'];
         const resolvedPlan: UserPlan = record['plan'] === 'pro' || record['plan'] === 'industrial'
           ? record['plan']
           : (isOwner ? 'industrial' : 'free');
-        const parsedStatus: SubscriptionStatus = typeof rawStatus === 'string' && validStatuses.includes(rawStatus as SubscriptionStatus)
-          ? (rawStatus as SubscriptionStatus)
-          : (resolvedPlan === 'pro' || resolvedPlan === 'industrial' ? 'active' : 'free');
+        const parsedStatus: SubscriptionStatus = parseSubscriptionStatus(rawStatus)
+          ?? (resolvedPlan === 'pro' || resolvedPlan === 'industrial' ? 'active' : 'free');
         const resolvedAvatarMode: AvatarMode =
           rawAvatarMode === 'google' || rawAvatarMode === 'color'
             ? rawAvatarMode
@@ -998,6 +1049,8 @@ export class SupabaseService {
           variant_id: record['variant_id'] ? String(record['variant_id']) : null,
           current_period_end: record['current_period_end'] ? String(record['current_period_end']) : null,
           customer_portal_url: record['customer_portal_url'] ? String(record['customer_portal_url']) : null,
+          card_brand: normalizeCardBrand(record['card_brand']),
+          card_last_four: normalizeCardLastFour(record['card_last_four']),
           is_suspended: Boolean(record['is_suspended']),
           avatar_color: typeof record['avatar_color'] === 'string'
             ? normalizeAvatarColorHex(record['avatar_color'])
@@ -1162,339 +1215,310 @@ export class SupabaseService {
     return { success: true };
   }
 
-  /**
-   * Cancela la renovación automática de la suscripción o aplica cambio inmediato al plan gratuito.
-   * Nota: `public.user_profiles` no almacena columna `reason`, por lo que nunca se envía a la tabla.
-   */
-  async cancelSubscription(options?: {
+  private applyBillingSyncToProfile(
+    user: User,
+    payload: Record<string, unknown>,
+    defaults?: { plan?: UserPlan; subscription_status?: SubscriptionStatus }
+  ): void {
+    const base = this.userProfile() ?? this.buildFallbackProfile(user);
+    const rawPlan = payload['plan'];
+    const parsedPlan: UserPlan | undefined =
+      rawPlan === 'free' || rawPlan === 'pro' || rawPlan === 'industrial' ? rawPlan : undefined;
+    const nextPlan = parsedPlan ?? defaults?.plan ?? base.plan;
+    const nextStatus =
+      parseSubscriptionStatus(payload['subscription_status']) ??
+      defaults?.subscription_status ??
+      base.subscription_status;
+    const rawPeriodEnd = payload['current_period_end'];
+    const nextPeriodEnd =
+      typeof rawPeriodEnd === 'string' && rawPeriodEnd.trim()
+        ? rawPeriodEnd.trim()
+        : (base.current_period_end ?? null);
+    const nextPortalUrl =
+      sanitizePortalUrl(payload['customerPortalUrl'] ?? payload['customer_portal_url'] ?? payload['portalUrl']) ??
+      base.customer_portal_url ??
+      null;
+    const nextCardBrand =
+      normalizeCardBrand(payload['cardBrand'] ?? payload['card_brand']) ?? base.card_brand ?? null;
+    const nextCardLastFour =
+      normalizeCardLastFour(payload['cardLastFour'] ?? payload['card_last_four']) ??
+      base.card_last_four ??
+      null;
+
+    this.userProfile.set({
+      ...base,
+      plan: nextPlan,
+      subscription_status: nextStatus,
+      current_period_end: nextPeriodEnd,
+      customer_portal_url: nextPortalUrl,
+      card_brand: nextCardBrand,
+      card_last_four: nextCardLastFour,
+      updated_at: new Date().toISOString()
+    });
+  }
+
+  private async invokeSubscriptionMutation(params: {
+    action: 'cancel' | 'resume';
     immediate?: boolean;
     reason?: string;
-  }): Promise<{ success: boolean; errorKey?: string }> {
+    fallbackErrorKey: string;
+    defaultLocalUpdate: { plan?: UserPlan; subscription_status: SubscriptionStatus };
+  }): Promise<SubscriptionMutationResult> {
     const user = this.currentUser();
     if (!user) {
-      return { success: false, errorKey: 'account.profileUpdateNoUser' };
+      return {
+        success: false,
+        errorCode: 'UNAUTHENTICATED',
+        errorKey: 'account.profileUpdateNoUser'
+      };
     }
 
-    const isImmediate = Boolean(options?.immediate);
-    const nowIso = new Date().toISOString();
-    const payload = isImmediate
-      ? { plan: 'free' as const, subscription_status: 'free' as const, updated_at: nowIso }
-      : { subscription_status: 'cancelled' as const, updated_at: nowIso };
+    const isConfigured = Boolean(this.config.url && this.config.publishableKey);
+    const cachedPortalUrl = sanitizePortalUrl(this.userProfile()?.customer_portal_url);
+    const hasExternalSubscription = Boolean(this.userProfile()?.subscription_id?.trim());
 
-    if (this.isBrowser && this.client) {
+    if (
+      this.isBrowser &&
+      isConfigured &&
+      this.client &&
+      typeof this.client.functions?.invoke === 'function'
+    ) {
       try {
-        const { error } = await this.client
-          .from('user_profiles')
-          .update(payload)
-          .eq('id', user.id);
+        const body =
+          params.action === 'cancel'
+            ? { action: 'cancel', immediate: Boolean(params.immediate), reason: params.reason }
+            : { action: 'resume' };
 
-        if (error) {
-          return { success: false, errorKey: 'account.billing.cancelErrorToast' };
+        const { data, error } = await this.client.functions.invoke('lemon-squeezy-manage-subscription', {
+          body
+        });
+        const payload = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+
+        if (!error && payload['success'] === true) {
+          const isLocalDowngrade = params.action === 'cancel' && Boolean(params.immediate) && !hasExternalSubscription;
+          const defaults: { plan?: UserPlan; subscription_status: SubscriptionStatus } = {
+            subscription_status: isLocalDowngrade ? 'free' : params.defaultLocalUpdate.subscription_status,
+            ...(isLocalDowngrade ? { plan: 'free' } : {})
+          };
+          this.applyBillingSyncToProfile(user, payload, defaults);
+          return { success: true };
         }
+
+        const rawCode = payload['code'];
+        const errorCode =
+          typeof rawCode === 'string' && rawCode.trim()
+            ? rawCode.trim()
+            : error
+              ? 'EDGE_INVOKE_ERROR'
+              : 'EDGE_ERROR';
+        const errorKey =
+          errorCode === 'LEMON_API_KEY_MISSING'
+            ? 'account.billing.gatewayKeyMissingError'
+            : params.fallbackErrorKey;
+        const portalUrl =
+          sanitizePortalUrl(payload['portalUrl'] ?? payload['customerPortalUrl']) ?? cachedPortalUrl;
+
+        return { success: false, errorCode, errorKey, portalUrl };
       } catch {
-        return { success: false, errorKey: 'account.billing.cancelErrorToast' };
+        return {
+          success: false,
+          errorCode: 'EDGE_INVOKE_EXCEPTION',
+          errorKey: params.fallbackErrorKey,
+          portalUrl: cachedPortalUrl
+        };
       }
     }
 
-    const base = this.userProfile() ?? this.buildFallbackProfile(user);
-    this.userProfile.set(
-      isImmediate
-        ? {
-            ...base,
-            plan: 'free',
-            subscription_status: 'free',
-            updated_at: nowIso
-          }
-        : {
-            ...base,
-            subscription_status: 'cancelled',
-            updated_at: nowIso
-          }
-    );
-
-    return { success: true };
-  }
-
-  /**
-   * Reactiva la renovación automática de una suscripción previamente marcada como cancelada.
-   */
-  async reactivateSubscription(): Promise<{ success: boolean; errorKey?: string }> {
-    const user = this.currentUser();
-    if (!user) {
-      return { success: false, errorKey: 'account.profileUpdateNoUser' };
+    if (hasExternalSubscription) {
+      return {
+        success: false,
+        errorCode: 'EDGE_CLIENT_UNAVAILABLE',
+        errorKey: params.fallbackErrorKey,
+        portalUrl: cachedPortalUrl
+      };
     }
 
     const nowIso = new Date().toISOString();
-    const payload = { subscription_status: 'active' as const, updated_at: nowIso };
+    const localPayload = { ...params.defaultLocalUpdate, updated_at: nowIso };
 
     if (this.isBrowser && this.client) {
       try {
         const { error } = await this.client
           .from('user_profiles')
-          .update(payload)
+          .update(localPayload)
           .eq('id', user.id);
 
         if (error) {
-          return { success: false, errorKey: 'account.billing.reactivateErrorToast' };
+          return {
+            success: false,
+            errorCode: 'PROFILE_UPDATE_FAILED',
+            errorKey: params.fallbackErrorKey
+          };
         }
       } catch {
-        return { success: false, errorKey: 'account.billing.reactivateErrorToast' };
+        return {
+          success: false,
+          errorCode: 'PROFILE_UPDATE_FAILED',
+          errorKey: params.fallbackErrorKey
+        };
       }
     }
 
     const base = this.userProfile() ?? this.buildFallbackProfile(user);
     this.userProfile.set({
       ...base,
-      subscription_status: 'active',
+      ...params.defaultLocalUpdate,
       updated_at: nowIso
     });
 
     return { success: true };
   }
 
-  private normalizePaymentMethodRecord(row: Record<string, unknown>, fallbackUserId: string): UserPaymentMethod {
-    const rawBrand = row['brand'];
-    const brand: PaymentCardBrand =
-      rawBrand === 'MASTERCARD' || rawBrand === 'AMEX' ? rawBrand : 'VISA';
-
-    return {
-      id: String(row['id'] ?? ''),
-      user_id: String(row['user_id'] ?? fallbackUserId),
-      brand,
-      last4: String(row['last4'] ?? '').slice(-4),
-      exp_month: Number(row['exp_month'] ?? 1),
-      exp_year: Number(row['exp_year'] ?? 2024),
-      holder_name: String(row['holder_name'] ?? ''),
-      is_default: Boolean(row['is_default']),
-      created_at: String(row['created_at'] ?? new Date().toISOString())
-    };
-  }
-
   /**
-   * Obtiene los métodos de pago guardados del usuario autenticado ordenados por principal y fecha.
+   * Obtiene la URL segura del portal alojado de pagos para gestionar tarjetas,
+   * facturas y suscripción en la pasarela externa, sincronizando metadatos en perfil.
    */
-  async getPaymentMethods(): Promise<UserPaymentMethod[]> {
-    if (!this.isBrowser) return [];
-    const user = this.currentUser();
-    if (!user || !this.client) return [];
-
-    try {
-      const { data, error } = await this.client
-        .from('user_payment_methods')
-        .select('id, user_id, brand, last4, exp_month, exp_year, holder_name, is_default, created_at')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error || !Array.isArray(data)) {
-        return [];
-      }
-
-      return data.map((row) => this.normalizePaymentMethodRecord(row as Record<string, unknown>, user.id));
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * Registra un nuevo método de pago guardando únicamente marca, últimos 4 dígitos, vencimiento y titular.
-   * Jamás acepta ni transmite número completo de tarjeta ni CVC.
-   */
-  async addPaymentMethod(input: {
-    brand: PaymentCardBrand;
-    last4: string;
-    exp_month: number;
-    exp_year: number;
-    holder_name: string;
-    is_default: boolean;
-  }): Promise<{ success: boolean; data?: UserPaymentMethod; errorKey?: string }> {
+  async getBillingPortalUrl(): Promise<BillingPortalResult> {
     const user = this.currentUser();
     if (!user) {
-      return { success: false, errorKey: 'account.profileUpdateNoUser' };
-    }
-
-    const validBrands: readonly PaymentCardBrand[] = ['VISA', 'MASTERCARD', 'AMEX'];
-    if (!validBrands.includes(input.brand)) {
-      return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
-    }
-
-    const normalizedLast4 = String(input.last4 ?? '').trim();
-    if (!/^\d{4}$/.test(normalizedLast4)) {
-      return { success: false, errorKey: 'account.billing.cardInvalidNumber' };
-    }
-
-    const expMonth = Number(input.exp_month);
-    const expYear = Number(input.exp_year);
-    if (
-      !Number.isInteger(expMonth) ||
-      expMonth < 1 ||
-      expMonth > 12 ||
-      !Number.isInteger(expYear) ||
-      expYear < 2024 ||
-      expYear > 2100
-    ) {
-      return { success: false, errorKey: 'account.billing.cardInvalidExpiry' };
-    }
-
-    const normalizedHolder = String(input.holder_name ?? '').trim();
-    if (!normalizedHolder) {
-      return { success: false, errorKey: 'account.billing.cardInvalidHolder' };
-    }
-
-    const isDefault = Boolean(input.is_default);
-    const nowIso = new Date().toISOString();
-    const fallbackRecord: UserPaymentMethod = {
-      id:
-        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : `pm-${Date.now()}`,
-      user_id: user.id,
-      brand: input.brand,
-      last4: normalizedLast4,
-      exp_month: expMonth,
-      exp_year: expYear,
-      holder_name: normalizedHolder,
-      is_default: isDefault,
-      created_at: nowIso
-    };
-
-    if (!this.isBrowser || !this.client) {
-      return { success: true, data: fallbackRecord };
-    }
-
-    try {
-      if (isDefault) {
-        const { error: unsetError } = await this.client
-          .from('user_payment_methods')
-          .update({ is_default: false })
-          .eq('user_id', user.id);
-
-        if (unsetError) {
-          return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
-        }
-      }
-
-      const insertPayload = {
-        user_id: user.id,
-        brand: input.brand,
-        last4: normalizedLast4,
-        exp_month: expMonth,
-        exp_year: expYear,
-        holder_name: normalizedHolder,
-        is_default: isDefault
+      return {
+        success: false,
+        errorCode: 'UNAUTHENTICATED',
+        errorKey: 'account.profileUpdateNoUser'
       };
+    }
 
-      const insertBuilder = this.client.from('user_payment_methods').insert(insertPayload);
-      if (typeof (insertBuilder as unknown as { select?: unknown }).select === 'function') {
-        const selected = insertBuilder.select('id, user_id, brand, last4, exp_month, exp_year, holder_name, is_default, created_at');
-        const finalQuery =
-          typeof (selected as unknown as { single?: unknown }).single === 'function'
-            ? selected.single()
-            : typeof (selected as unknown as { maybeSingle?: unknown }).maybeSingle === 'function'
-              ? selected.maybeSingle()
-              : selected;
-        const { data, error } = await finalQuery;
+    const isConfigured = Boolean(this.config.url && this.config.publishableKey);
+    const cachedPortalUrl = sanitizePortalUrl(this.userProfile()?.customer_portal_url);
 
-        if (error) {
-          return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
-        }
+    const buildCachedFallback = (): BillingPortalResult => ({
+      success: true,
+      portalUrl: cachedPortalUrl,
+      customerPortalUrl: cachedPortalUrl,
+      updatePaymentMethodUrl: null,
+      cardBrand: this.userProfile()?.card_brand ?? null,
+      cardLastFour: this.userProfile()?.card_last_four ?? null,
+      source: 'cached_portal_url'
+    });
 
-        if (data && !Array.isArray(data)) {
-          return {
-            success: true,
-            data: this.normalizePaymentMethodRecord(data as Record<string, unknown>, user.id)
-          };
-        }
-      } else {
-        const { error } = await insertBuilder;
-        if (error) {
-          return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
-        }
+    if (!this.isBrowser || !isConfigured || !this.client) {
+      if (cachedPortalUrl) {
+        return buildCachedFallback();
+      }
+      return {
+        success: false,
+        errorCode: 'CLIENT_UNAVAILABLE',
+        errorKey: 'account.billing.portalUnavailableToast'
+      };
+    }
+
+    if (typeof this.client.functions?.invoke !== 'function') {
+      if (cachedPortalUrl) {
+        return buildCachedFallback();
+      }
+      return {
+        success: false,
+        errorCode: 'EDGE_CLIENT_UNAVAILABLE',
+        errorKey: 'account.billing.portalUnavailableToast'
+      };
+    }
+
+    try {
+      const { data, error } = await this.client.functions.invoke('lemon-squeezy-manage-subscription', {
+        body: { action: 'get_portal_url' }
+      });
+      const payload = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+      const portalUrl = sanitizePortalUrl(payload['portalUrl']);
+
+      if (!error && payload['success'] === true && portalUrl) {
+        this.applyBillingSyncToProfile(user, payload);
+        const customerPortalUrl = sanitizePortalUrl(
+          payload['customerPortalUrl'] ?? payload['customer_portal_url']
+        );
+        const updatePaymentMethodUrl = sanitizePortalUrl(payload['updatePaymentMethodUrl']);
+        const cardBrand =
+          normalizeCardBrand(payload['cardBrand'] ?? payload['card_brand']) ??
+          this.userProfile()?.card_brand ??
+          null;
+        const cardLastFour =
+          normalizeCardLastFour(payload['cardLastFour'] ?? payload['card_last_four']) ??
+          this.userProfile()?.card_last_four ??
+          null;
+        const source = payload['source'] === 'cached_portal_url' ? 'cached_portal_url' : 'lemon_squeezy_api';
+
+        return {
+          success: true,
+          portalUrl,
+          updatePaymentMethodUrl,
+          customerPortalUrl: customerPortalUrl ?? (source === 'cached_portal_url' ? portalUrl : null),
+          cardBrand,
+          cardLastFour,
+          source
+        };
       }
 
-      return { success: true, data: fallbackRecord };
+      if (cachedPortalUrl) {
+        return buildCachedFallback();
+      }
+
+      const rawCode = payload['code'];
+      const errorCode =
+        typeof rawCode === 'string' && rawCode.trim()
+          ? rawCode.trim()
+          : error
+            ? 'EDGE_INVOKE_ERROR'
+            : 'PORTAL_UNAVAILABLE';
+      const errorKey =
+        errorCode === 'LEMON_API_KEY_MISSING'
+          ? 'account.billing.gatewayKeyMissingError'
+          : 'account.billing.portalUnavailableToast';
+
+      return { success: false, errorCode, errorKey };
     } catch {
-      return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
+      if (cachedPortalUrl) {
+        return buildCachedFallback();
+      }
+      return {
+        success: false,
+        errorCode: 'EDGE_INVOKE_EXCEPTION',
+        errorKey: 'account.billing.portalUnavailableToast'
+      };
     }
   }
 
   /**
-   * Marca un método de pago como principal desmarcando los anteriores del usuario autenticado.
+   * Cancela la renovación automática de la suscripción vía Edge Function segura o aplica
+   * cambio inmediato al plan gratuito únicamente en suscripciones locales sin pasarela externa.
    */
-  async setDefaultPaymentMethod(methodId: string): Promise<{ success: boolean; errorKey?: string }> {
-    const user = this.currentUser();
-    if (!user) {
-      return { success: false, errorKey: 'account.profileUpdateNoUser' };
-    }
+  async cancelSubscription(options?: {
+    immediate?: boolean;
+    reason?: string;
+  }): Promise<SubscriptionMutationResult> {
+    const isImmediate = Boolean(options?.immediate);
+    const hasExternalSubscription = Boolean(this.userProfile()?.subscription_id?.trim());
+    const defaultLocalUpdate =
+      isImmediate && !hasExternalSubscription
+        ? { plan: 'free' as const, subscription_status: 'free' as const }
+        : { subscription_status: 'cancelled' as const };
 
-    const trimmedId = String(methodId ?? '').trim();
-    if (!trimmedId) {
-      return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
-    }
-
-    if (!this.isBrowser || !this.client) {
-      return { success: true };
-    }
-
-    try {
-      const { error: unsetError } = await this.client
-        .from('user_payment_methods')
-        .update({ is_default: false })
-        .eq('user_id', user.id);
-
-      if (unsetError) {
-        return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
-      }
-
-      const { error: setError } = await this.client
-        .from('user_payment_methods')
-        .update({ is_default: true })
-        .eq('id', trimmedId)
-        .eq('user_id', user.id);
-
-      if (setError) {
-        return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
-      }
-
-      return { success: true };
-    } catch {
-      return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
-    }
+    return this.invokeSubscriptionMutation({
+      action: 'cancel',
+      immediate: isImmediate,
+      reason: options?.reason,
+      fallbackErrorKey: 'account.billing.cancelErrorToast',
+      defaultLocalUpdate
+    });
   }
 
   /**
-   * Elimina un método de pago guardado perteneciente al usuario autenticado.
+   * Reactiva la renovación automática de una suscripción previamente marcada como cancelada.
    */
-  async deletePaymentMethod(methodId: string): Promise<{ success: boolean; errorKey?: string }> {
-    const user = this.currentUser();
-    if (!user) {
-      return { success: false, errorKey: 'account.profileUpdateNoUser' };
-    }
-
-    const trimmedId = String(methodId ?? '').trim();
-    if (!trimmedId) {
-      return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
-    }
-
-    if (!this.isBrowser || !this.client) {
-      return { success: true };
-    }
-
-    try {
-      const { error } = await this.client
-        .from('user_payment_methods')
-        .delete()
-        .eq('id', trimmedId)
-        .eq('user_id', user.id);
-
-      if (error) {
-        return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
-      }
-
-      return { success: true };
-    } catch {
-      return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
-    }
+  async reactivateSubscription(): Promise<SubscriptionMutationResult> {
+    return this.invokeSubscriptionMutation({
+      action: 'resume',
+      fallbackErrorKey: 'account.billing.reactivateErrorToast',
+      defaultLocalUpdate: { subscription_status: 'active' }
+    });
   }
 
   /**
@@ -2763,6 +2787,8 @@ export class SupabaseService {
           customer_portal_url: record['customer_portal_url']
             ? String(record['customer_portal_url'])
             : null,
+          card_brand: normalizeCardBrand(record['card_brand']),
+          card_last_four: normalizeCardLastFour(record['card_last_four']),
           is_suspended: Boolean(record['is_suspended']),
           avatar_color: typeof record['avatar_color'] === 'string'
             ? normalizeAvatarColorHex(record['avatar_color'])
