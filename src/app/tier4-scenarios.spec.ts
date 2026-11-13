@@ -47,6 +47,25 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       sendPasswordResetEmail: vi.fn(),
       updateUserPassword: vi.fn(),
       updateUserProfile: vi.fn().mockResolvedValue({ success: true }),
+      getPaymentMethods: vi.fn().mockResolvedValue([]),
+      addPaymentMethod: vi.fn().mockImplementation(async (input) => ({
+        success: true,
+        data: {
+          id: 'pm-real-1',
+          user_id: 'usr-eyder',
+          brand: input.brand,
+          last4: input.last4,
+          exp_month: input.exp_month,
+          exp_year: input.exp_year,
+          holder_name: input.holder_name,
+          is_default: input.is_default,
+          created_at: new Date().toISOString()
+        }
+      })),
+      setDefaultPaymentMethod: vi.fn().mockResolvedValue({ success: true }),
+      deletePaymentMethod: vi.fn().mockResolvedValue({ success: true }),
+      cancelSubscription: vi.fn().mockResolvedValue({ success: true }),
+      reactivateSubscription: vi.fn().mockResolvedValue({ success: true }),
       signOut: vi.fn().mockImplementation(async () => {
         isAuthSig.set(false);
         currentUserSig.set(null);
@@ -415,7 +434,9 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
 
       expect(mockSupabase.updateUserProfile).toHaveBeenCalledWith({
         first_name: 'Eyder Alexander',
-        last_name: 'Suarez Peña'
+        last_name: 'Suarez Peña',
+        avatar_color: '#18181B',
+        avatar_mode: 'color'
       });
       expect(modalComponent.toastMessage()).toBeTruthy();
       expect(modalComponent.toastMessage()).toContain('Perfil actualizado');
@@ -465,17 +486,39 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       expect(projectService.currentProject().roomConfig?.showClearances).toBe(false);
     });
 
-    it('Step 4.4: Pestaña 4 (Facturación) renderiza métodos de pago mock y facturas', () => {
+    it('Step 4.4: Pestaña 4 (Facturación) despliega formulario real de método de pago y persiste tarjeta sin exponer PAN/CVC', async () => {
       modalComponent.selectTab('billing');
+      await modalComponent.loadBillingData();
       modalFixture.detectChanges();
 
       expect(modalComponent.activeTab()).toBe('billing');
-      expect(modalComponent.paymentMethods().length).toBe(2);
+      expect(mockSupabase.getPaymentMethods).toHaveBeenCalled();
+      expect(modalComponent.paymentMethods().length).toBe(0);
       expect(modalComponent.invoices().length).toBe(3);
 
       modalComponent.addPaymentMethod();
-      expect(modalComponent.toastMessage()).toBeTruthy();
-      expect(modalComponent.toastMessage()).toContain('método de pago');
+      expect(modalComponent.isAddingPaymentMethod()).toBe(true);
+
+      modalComponent.paymentMethodForm.setValue({
+        holderName: 'Eyder Suarez',
+        cardNumber: '4242 4242 4242 4242',
+        expiry: '12 / 2028',
+        cvc: '123',
+        isDefault: true
+      });
+      await modalComponent.savePaymentMethod();
+
+      expect(mockSupabase.addPaymentMethod).toHaveBeenCalledWith({
+        brand: 'VISA',
+        last4: '4242',
+        exp_month: 12,
+        exp_year: 2028,
+        holder_name: 'Eyder Suarez',
+        is_default: true
+      });
+      expect(modalComponent.paymentMethods().length).toBe(1);
+      expect(modalComponent.paymentMethods()[0].last4).toBe('4242');
+      expect(modalComponent.isAddingPaymentMethod()).toBe(false);
     });
   });
 

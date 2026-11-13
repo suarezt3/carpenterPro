@@ -24,6 +24,67 @@ export type UserPlan = 'free' | 'pro' | 'industrial';
 export type SubscriptionPlan = UserPlan;
 export type BillingCycle = 'monthly' | 'annual';
 export type SubscriptionStatus = 'free' | 'active' | 'on_trial' | 'past_due' | 'cancelled' | 'expired';
+export type AvatarMode = 'color' | 'google';
+export type PaymentCardBrand = 'VISA' | 'MASTERCARD' | 'AMEX';
+
+/**
+ * Preset oficial de color de identidad para el avatar del usuario.
+ */
+export interface AvatarColorPreset {
+  id: string;
+  hex: string;
+  bgClass: string;
+  ringClass: string;
+}
+
+export const AVATAR_COLOR_PRESETS: readonly AvatarColorPreset[] = [
+  { id: 'graphite', hex: '#18181B', bgClass: 'bg-zinc-900', ringClass: 'ring-zinc-900' },
+  { id: 'stone', hex: '#52525B', bgClass: 'bg-zinc-700', ringClass: 'ring-zinc-700' },
+  { id: 'sky', hex: '#0284C7', bgClass: 'bg-sky-600', ringClass: 'ring-sky-600' },
+  { id: 'emerald', hex: '#059669', bgClass: 'bg-emerald-600', ringClass: 'ring-emerald-600' },
+  { id: 'amber', hex: '#D97706', bgClass: 'bg-amber-600', ringClass: 'ring-amber-600' },
+  { id: 'zinc', hex: '#27272A', bgClass: 'bg-zinc-800', ringClass: 'ring-zinc-800' }
+] as const;
+
+const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
+
+function findAvatarPreset(colorOrId?: string | null): AvatarColorPreset | undefined {
+  if (typeof colorOrId !== 'string') return undefined;
+  const trimmed = colorOrId.trim();
+  if (!trimmed) return undefined;
+  const lower = trimmed.toLowerCase();
+  const upper = trimmed.toUpperCase();
+  return AVATAR_COLOR_PRESETS.find(
+    (preset) => preset.id.toLowerCase() === lower || preset.hex.toUpperCase() === upper
+  );
+}
+
+/**
+ * Normaliza un ID de preset o código hexadecimal a `#RRGGBB` en mayúsculas.
+ */
+export function normalizeAvatarColorHex(colorOrId?: string | null): string {
+  if (typeof colorOrId !== 'string') return '#18181B';
+  const trimmed = colorOrId.trim();
+  if (!trimmed) return '#18181B';
+  const preset = findAvatarPreset(trimmed);
+  if (preset) return preset.hex;
+  if (HEX_COLOR_PATTERN.test(trimmed)) return trimmed.toUpperCase();
+  return '#18181B';
+}
+
+/**
+ * Resuelve el identificador de preset correspondiente a un ID o hexadecimal.
+ */
+export function resolveAvatarColorId(colorOrId?: string | null): string {
+  return findAvatarPreset(colorOrId)?.id ?? 'graphite';
+}
+
+/**
+ * Resuelve la clase de fondo Tailwind correspondiente a un ID o hexadecimal.
+ */
+export function resolveAvatarBgClass(colorOrId?: string | null): string {
+  return findAvatarPreset(colorOrId)?.bgClass ?? 'bg-zinc-900';
+}
 
 /**
  * Perfil de usuario sincronizado con `public.user_profiles` y `auth.users`.
@@ -43,8 +104,25 @@ export interface UserProfile {
   current_period_end?: string | null;
   customer_portal_url?: string | null;
   is_suspended?: boolean;
+  avatar_color?: string | null;
+  avatar_mode?: AvatarMode | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Método de pago guardado (solo metadatos no sensibles) en `public.user_payment_methods`.
+ */
+export interface UserPaymentMethod {
+  id: string;
+  user_id: string;
+  brand: PaymentCardBrand;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  holder_name: string;
+  is_default: boolean;
+  created_at: string;
 }
 
 /**
@@ -806,6 +884,15 @@ export class SupabaseService {
     }
 
     const isOwnerEmail = (user.email ?? '').trim().toLowerCase() === 'eydersuarez900@gmail.com';
+    const hasGooglePhoto =
+      (typeof meta['avatar_url'] === 'string' && !!meta['avatar_url'].trim()) ||
+      (typeof meta['picture'] === 'string' && !!meta['picture'].trim());
+    const rawMetaColor = typeof meta['avatar_color'] === 'string' ? meta['avatar_color'] : null;
+    const rawMetaMode = meta['avatar_mode'];
+    const fallbackAvatarMode: AvatarMode =
+      rawMetaMode === 'google' || rawMetaMode === 'color'
+        ? rawMetaMode
+        : (hasGooglePhoto ? 'google' : 'color');
     const nowIso = new Date().toISOString();
     return {
       id: user.id,
@@ -822,6 +909,8 @@ export class SupabaseService {
       current_period_end: null,
       customer_portal_url: null,
       is_suspended: false,
+      avatar_color: normalizeAvatarColorHex(rawMetaColor),
+      avatar_mode: fallbackAvatarMode,
       created_at: user.created_at || nowIso,
       updated_at: user.updated_at || user.created_at || nowIso
     };
@@ -871,7 +960,7 @@ export class SupabaseService {
       const { data, error } = await this.runWithTimeout(
         this.client
           .from('user_profiles')
-          .select('id, email, first_name, last_name, role, plan, billing_cycle, subscription_status, subscription_id, customer_id, variant_id, current_period_end, customer_portal_url, is_suspended, created_at, updated_at')
+          .select('id, email, first_name, last_name, role, plan, billing_cycle, subscription_status, subscription_id, customer_id, variant_id, current_period_end, customer_portal_url, is_suspended, avatar_color, avatar_mode, created_at, updated_at')
           .eq('id', targetUser.id)
           .maybeSingle()
       );
@@ -882,6 +971,7 @@ export class SupabaseService {
         const isOwner = recordEmail.trim().toLowerCase() === 'eydersuarez900@gmail.com';
         const rawCycle = record['billing_cycle'];
         const rawStatus = record['subscription_status'];
+        const rawAvatarMode = record['avatar_mode'];
         const validStatuses: SubscriptionStatus[] = ['free', 'active', 'on_trial', 'past_due', 'cancelled', 'expired'];
         const resolvedPlan: UserPlan = record['plan'] === 'pro' || record['plan'] === 'industrial'
           ? record['plan']
@@ -889,6 +979,10 @@ export class SupabaseService {
         const parsedStatus: SubscriptionStatus = typeof rawStatus === 'string' && validStatuses.includes(rawStatus as SubscriptionStatus)
           ? (rawStatus as SubscriptionStatus)
           : (resolvedPlan === 'pro' || resolvedPlan === 'industrial' ? 'active' : 'free');
+        const resolvedAvatarMode: AvatarMode =
+          rawAvatarMode === 'google' || rawAvatarMode === 'color'
+            ? rawAvatarMode
+            : (fallback.avatar_mode ?? 'color');
 
         const profile: UserProfile = {
           id: String(record['id'] ?? targetUser.id),
@@ -905,6 +999,10 @@ export class SupabaseService {
           current_period_end: record['current_period_end'] ? String(record['current_period_end']) : null,
           customer_portal_url: record['customer_portal_url'] ? String(record['customer_portal_url']) : null,
           is_suspended: Boolean(record['is_suspended']),
+          avatar_color: typeof record['avatar_color'] === 'string'
+            ? normalizeAvatarColorHex(record['avatar_color'])
+            : (fallback.avatar_color ?? '#18181B'),
+          avatar_mode: resolvedAvatarMode,
           created_at: String(record['created_at'] ?? fallback.created_at),
           updated_at: String(record['updated_at'] ?? fallback.updated_at)
         };
@@ -928,6 +1026,8 @@ export class SupabaseService {
               subscription_status: fallback.subscription_status ?? 'free',
               role: fallback.role,
               is_suspended: false,
+              avatar_color: fallback.avatar_color ?? '#18181B',
+              avatar_mode: fallback.avatar_mode ?? 'color',
               updated_at: new Date().toISOString()
             }, { onConflict: 'id' })
           );
@@ -992,11 +1092,16 @@ export class SupabaseService {
   }
 
   /**
-   * Actualiza el perfil de usuario (nombre y apellido) en `public.user_profiles`
+   * Actualiza el perfil de usuario (nombre, apellido y configuración de avatar) en `public.user_profiles`
    * respetando la política RLS (`auth.uid() = id`).
-   * Al completarse con éxito, actualiza de inmediato la señal reactiva `userProfile`.
+   * Al completarse con éxito, reemplaza la señal reactiva `userProfile` con una referencia inmutable nueva.
    */
-  async updateUserProfile(updates: { first_name?: string; last_name?: string }): Promise<{ success: boolean; errorKey?: string }> {
+  async updateUserProfile(updates: {
+    first_name?: string;
+    last_name?: string;
+    avatar_color?: string;
+    avatar_mode?: AvatarMode;
+  }): Promise<{ success: boolean; errorKey?: string }> {
     const user = this.currentUser();
     if (!user) {
       return { success: false, errorKey: 'account.profileUpdateNoUser' };
@@ -1004,6 +1109,13 @@ export class SupabaseService {
 
     const trimmedFirstName = updates.first_name !== undefined ? updates.first_name.trim() : undefined;
     const trimmedLastName = updates.last_name !== undefined ? updates.last_name.trim() : undefined;
+    const normalizedColor = updates.avatar_color !== undefined
+      ? normalizeAvatarColorHex(updates.avatar_color)
+      : undefined;
+    const normalizedMode: AvatarMode | undefined =
+      updates.avatar_mode === 'google' || updates.avatar_mode === 'color'
+        ? updates.avatar_mode
+        : undefined;
     const nowIso = new Date().toISOString();
 
     const payload: Record<string, unknown> = {
@@ -1014,6 +1126,12 @@ export class SupabaseService {
     }
     if (trimmedLastName !== undefined) {
       payload['last_name'] = trimmedLastName;
+    }
+    if (normalizedColor !== undefined) {
+      payload['avatar_color'] = normalizedColor;
+    }
+    if (normalizedMode !== undefined) {
+      payload['avatar_mode'] = normalizedMode;
     }
 
     if (this.isBrowser && this.client) {
@@ -1031,17 +1149,352 @@ export class SupabaseService {
       }
     }
 
-    this.userProfile.update((current) => {
-      const fallback = current ?? this.buildFallbackProfile(user);
-      return {
-        ...fallback,
-        first_name: trimmedFirstName !== undefined ? trimmedFirstName : fallback.first_name,
-        last_name: trimmedLastName !== undefined ? trimmedLastName : fallback.last_name,
-        updated_at: nowIso
-      };
+    const base = this.userProfile() ?? this.buildFallbackProfile(user);
+    this.userProfile.set({
+      ...base,
+      first_name: trimmedFirstName !== undefined ? trimmedFirstName : base.first_name,
+      last_name: trimmedLastName !== undefined ? trimmedLastName : base.last_name,
+      avatar_color: normalizedColor !== undefined ? normalizedColor : (base.avatar_color ?? '#18181B'),
+      avatar_mode: normalizedMode !== undefined ? normalizedMode : (base.avatar_mode ?? 'color'),
+      updated_at: nowIso
     });
 
     return { success: true };
+  }
+
+  /**
+   * Cancela la renovación automática de la suscripción o aplica cambio inmediato al plan gratuito.
+   * Nota: `public.user_profiles` no almacena columna `reason`, por lo que nunca se envía a la tabla.
+   */
+  async cancelSubscription(options?: {
+    immediate?: boolean;
+    reason?: string;
+  }): Promise<{ success: boolean; errorKey?: string }> {
+    const user = this.currentUser();
+    if (!user) {
+      return { success: false, errorKey: 'account.profileUpdateNoUser' };
+    }
+
+    const isImmediate = Boolean(options?.immediate);
+    const nowIso = new Date().toISOString();
+    const payload = isImmediate
+      ? { plan: 'free' as const, subscription_status: 'free' as const, updated_at: nowIso }
+      : { subscription_status: 'cancelled' as const, updated_at: nowIso };
+
+    if (this.isBrowser && this.client) {
+      try {
+        const { error } = await this.client
+          .from('user_profiles')
+          .update(payload)
+          .eq('id', user.id);
+
+        if (error) {
+          return { success: false, errorKey: 'account.billing.cancelErrorToast' };
+        }
+      } catch {
+        return { success: false, errorKey: 'account.billing.cancelErrorToast' };
+      }
+    }
+
+    const base = this.userProfile() ?? this.buildFallbackProfile(user);
+    this.userProfile.set(
+      isImmediate
+        ? {
+            ...base,
+            plan: 'free',
+            subscription_status: 'free',
+            updated_at: nowIso
+          }
+        : {
+            ...base,
+            subscription_status: 'cancelled',
+            updated_at: nowIso
+          }
+    );
+
+    return { success: true };
+  }
+
+  /**
+   * Reactiva la renovación automática de una suscripción previamente marcada como cancelada.
+   */
+  async reactivateSubscription(): Promise<{ success: boolean; errorKey?: string }> {
+    const user = this.currentUser();
+    if (!user) {
+      return { success: false, errorKey: 'account.profileUpdateNoUser' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const payload = { subscription_status: 'active' as const, updated_at: nowIso };
+
+    if (this.isBrowser && this.client) {
+      try {
+        const { error } = await this.client
+          .from('user_profiles')
+          .update(payload)
+          .eq('id', user.id);
+
+        if (error) {
+          return { success: false, errorKey: 'account.billing.reactivateErrorToast' };
+        }
+      } catch {
+        return { success: false, errorKey: 'account.billing.reactivateErrorToast' };
+      }
+    }
+
+    const base = this.userProfile() ?? this.buildFallbackProfile(user);
+    this.userProfile.set({
+      ...base,
+      subscription_status: 'active',
+      updated_at: nowIso
+    });
+
+    return { success: true };
+  }
+
+  private normalizePaymentMethodRecord(row: Record<string, unknown>, fallbackUserId: string): UserPaymentMethod {
+    const rawBrand = row['brand'];
+    const brand: PaymentCardBrand =
+      rawBrand === 'MASTERCARD' || rawBrand === 'AMEX' ? rawBrand : 'VISA';
+
+    return {
+      id: String(row['id'] ?? ''),
+      user_id: String(row['user_id'] ?? fallbackUserId),
+      brand,
+      last4: String(row['last4'] ?? '').slice(-4),
+      exp_month: Number(row['exp_month'] ?? 1),
+      exp_year: Number(row['exp_year'] ?? 2024),
+      holder_name: String(row['holder_name'] ?? ''),
+      is_default: Boolean(row['is_default']),
+      created_at: String(row['created_at'] ?? new Date().toISOString())
+    };
+  }
+
+  /**
+   * Obtiene los métodos de pago guardados del usuario autenticado ordenados por principal y fecha.
+   */
+  async getPaymentMethods(): Promise<UserPaymentMethod[]> {
+    if (!this.isBrowser) return [];
+    const user = this.currentUser();
+    if (!user || !this.client) return [];
+
+    try {
+      const { data, error } = await this.client
+        .from('user_payment_methods')
+        .select('id, user_id, brand, last4, exp_month, exp_year, holder_name, is_default, created_at')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error || !Array.isArray(data)) {
+        return [];
+      }
+
+      return data.map((row) => this.normalizePaymentMethodRecord(row as Record<string, unknown>, user.id));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Registra un nuevo método de pago guardando únicamente marca, últimos 4 dígitos, vencimiento y titular.
+   * Jamás acepta ni transmite número completo de tarjeta ni CVC.
+   */
+  async addPaymentMethod(input: {
+    brand: PaymentCardBrand;
+    last4: string;
+    exp_month: number;
+    exp_year: number;
+    holder_name: string;
+    is_default: boolean;
+  }): Promise<{ success: boolean; data?: UserPaymentMethod; errorKey?: string }> {
+    const user = this.currentUser();
+    if (!user) {
+      return { success: false, errorKey: 'account.profileUpdateNoUser' };
+    }
+
+    const validBrands: readonly PaymentCardBrand[] = ['VISA', 'MASTERCARD', 'AMEX'];
+    if (!validBrands.includes(input.brand)) {
+      return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
+    }
+
+    const normalizedLast4 = String(input.last4 ?? '').trim();
+    if (!/^\d{4}$/.test(normalizedLast4)) {
+      return { success: false, errorKey: 'account.billing.cardInvalidNumber' };
+    }
+
+    const expMonth = Number(input.exp_month);
+    const expYear = Number(input.exp_year);
+    if (
+      !Number.isInteger(expMonth) ||
+      expMonth < 1 ||
+      expMonth > 12 ||
+      !Number.isInteger(expYear) ||
+      expYear < 2024 ||
+      expYear > 2100
+    ) {
+      return { success: false, errorKey: 'account.billing.cardInvalidExpiry' };
+    }
+
+    const normalizedHolder = String(input.holder_name ?? '').trim();
+    if (!normalizedHolder) {
+      return { success: false, errorKey: 'account.billing.cardInvalidHolder' };
+    }
+
+    const isDefault = Boolean(input.is_default);
+    const nowIso = new Date().toISOString();
+    const fallbackRecord: UserPaymentMethod = {
+      id:
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `pm-${Date.now()}`,
+      user_id: user.id,
+      brand: input.brand,
+      last4: normalizedLast4,
+      exp_month: expMonth,
+      exp_year: expYear,
+      holder_name: normalizedHolder,
+      is_default: isDefault,
+      created_at: nowIso
+    };
+
+    if (!this.isBrowser || !this.client) {
+      return { success: true, data: fallbackRecord };
+    }
+
+    try {
+      if (isDefault) {
+        const { error: unsetError } = await this.client
+          .from('user_payment_methods')
+          .update({ is_default: false })
+          .eq('user_id', user.id);
+
+        if (unsetError) {
+          return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
+        }
+      }
+
+      const insertPayload = {
+        user_id: user.id,
+        brand: input.brand,
+        last4: normalizedLast4,
+        exp_month: expMonth,
+        exp_year: expYear,
+        holder_name: normalizedHolder,
+        is_default: isDefault
+      };
+
+      const insertBuilder = this.client.from('user_payment_methods').insert(insertPayload);
+      if (typeof (insertBuilder as unknown as { select?: unknown }).select === 'function') {
+        const selected = insertBuilder.select('id, user_id, brand, last4, exp_month, exp_year, holder_name, is_default, created_at');
+        const finalQuery =
+          typeof (selected as unknown as { single?: unknown }).single === 'function'
+            ? selected.single()
+            : typeof (selected as unknown as { maybeSingle?: unknown }).maybeSingle === 'function'
+              ? selected.maybeSingle()
+              : selected;
+        const { data, error } = await finalQuery;
+
+        if (error) {
+          return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
+        }
+
+        if (data && !Array.isArray(data)) {
+          return {
+            success: true,
+            data: this.normalizePaymentMethodRecord(data as Record<string, unknown>, user.id)
+          };
+        }
+      } else {
+        const { error } = await insertBuilder;
+        if (error) {
+          return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
+        }
+      }
+
+      return { success: true, data: fallbackRecord };
+    } catch {
+      return { success: false, errorKey: 'account.billing.cardSaveErrorToast' };
+    }
+  }
+
+  /**
+   * Marca un método de pago como principal desmarcando los anteriores del usuario autenticado.
+   */
+  async setDefaultPaymentMethod(methodId: string): Promise<{ success: boolean; errorKey?: string }> {
+    const user = this.currentUser();
+    if (!user) {
+      return { success: false, errorKey: 'account.profileUpdateNoUser' };
+    }
+
+    const trimmedId = String(methodId ?? '').trim();
+    if (!trimmedId) {
+      return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
+    }
+
+    if (!this.isBrowser || !this.client) {
+      return { success: true };
+    }
+
+    try {
+      const { error: unsetError } = await this.client
+        .from('user_payment_methods')
+        .update({ is_default: false })
+        .eq('user_id', user.id);
+
+      if (unsetError) {
+        return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
+      }
+
+      const { error: setError } = await this.client
+        .from('user_payment_methods')
+        .update({ is_default: true })
+        .eq('id', trimmedId)
+        .eq('user_id', user.id);
+
+      if (setError) {
+        return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
+      }
+
+      return { success: true };
+    } catch {
+      return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
+    }
+  }
+
+  /**
+   * Elimina un método de pago guardado perteneciente al usuario autenticado.
+   */
+  async deletePaymentMethod(methodId: string): Promise<{ success: boolean; errorKey?: string }> {
+    const user = this.currentUser();
+    if (!user) {
+      return { success: false, errorKey: 'account.profileUpdateNoUser' };
+    }
+
+    const trimmedId = String(methodId ?? '').trim();
+    if (!trimmedId) {
+      return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
+    }
+
+    if (!this.isBrowser || !this.client) {
+      return { success: true };
+    }
+
+    try {
+      const { error } = await this.client
+        .from('user_payment_methods')
+        .delete()
+        .eq('id', trimmedId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
+      }
+
+      return { success: true };
+    } catch {
+      return { success: false, errorKey: 'account.billing.cardActionErrorToast' };
+    }
   }
 
   /**
@@ -2197,7 +2650,7 @@ export class SupabaseService {
       });
 
       if (!res.ok) return fallback;
-      const rows = (await res.json()) as Array<Record<string, unknown>>;
+      const rows = (await res.json()) as Record<string, unknown>[];
       if (Array.isArray(rows) && rows.length > 0 && rows[0]) {
         const normalized = this.normalizePlatformSettings(rows[0], fallback);
         this.platformSettings.set(normalized);
@@ -2311,6 +2764,10 @@ export class SupabaseService {
             ? String(record['customer_portal_url'])
             : null,
           is_suspended: Boolean(record['is_suspended']),
+          avatar_color: typeof record['avatar_color'] === 'string'
+            ? normalizeAvatarColorHex(record['avatar_color'])
+            : '#18181B',
+          avatar_mode: record['avatar_mode'] === 'google' ? 'google' : 'color',
           created_at: String(record['created_at'] ?? new Date().toISOString()),
           updated_at: String(record['updated_at'] ?? new Date().toISOString())
         };

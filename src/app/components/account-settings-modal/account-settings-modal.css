@@ -42,3 +42,8 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.font-numeric {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}

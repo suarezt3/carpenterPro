@@ -287,4 +287,168 @@ describe('HeaderComponent — Milestone 4 (Studio Topbar Reorganization & Overla
       expect(clientInput).toBeTruthy();
     });
   });
+
+  describe('AJUSTE 1: Sincronización Reactiva de Avatar en Header', () => {
+    beforeEach(() => {
+      window.localStorage.removeItem('carpenterpro_avatar_type');
+      window.localStorage.removeItem('carpenterpro_avatar_color');
+    });
+
+    afterEach(() => {
+      window.localStorage.removeItem('carpenterpro_avatar_type');
+      window.localStorage.removeItem('carpenterpro_avatar_color');
+    });
+
+    it('debe actualizar reactivamente el color del avatar en el DOM al cambiar userProfile sin localStorage ni recarga', () => {
+      const baseProfile = mockSupabase.userProfile()!;
+      const userButton = element.querySelector('[data-testid="studio-user-name"]')?.closest('button') as HTMLButtonElement;
+      expect(userButton).toBeTruthy();
+
+      mockSupabase.userProfile.set({
+        ...baseProfile,
+        avatar_color: '#0284C7',
+        avatar_mode: 'color'
+      });
+      fixture.detectChanges();
+
+      expect(userButton.querySelector('img[alt="Avatar"]')).toBeNull();
+      const skyCircle = userButton.querySelector('div.rounded-full') as HTMLElement;
+      expect(skyCircle).toBeTruthy();
+      expect(skyCircle.textContent?.trim()).toBe('EG');
+      expect(skyCircle.className).toContain('bg-sky-600');
+      expect(skyCircle.className).toContain('text-white');
+      expect(component.userAvatarStyleColor()).toBeNull();
+      expect(skyCircle.style.backgroundColor).toBe('');
+
+      mockSupabase.userProfile.set({
+        ...baseProfile,
+        avatar_color: '#059669',
+        avatar_mode: 'color'
+      });
+      fixture.detectChanges();
+
+      const emeraldCircle = userButton.querySelector('div.rounded-full') as HTMLElement;
+      expect(emeraldCircle).toBeTruthy();
+      expect(emeraldCircle.className).toContain('bg-emerald-600');
+      expect(emeraldCircle.className).not.toContain('bg-sky-600');
+      expect(emeraldCircle.className).toContain('text-white');
+      expect(component.userAvatarStyleColor()).toBeNull();
+    });
+
+    it('debe alternar reactivamente entre avatar_mode "google" y "color" ignorando localStorage obsoleto', () => {
+      const baseProfile = mockSupabase.userProfile()!;
+      const userButton = element.querySelector('[data-testid="studio-user-name"]')?.closest('button') as HTMLButtonElement;
+
+      window.localStorage.setItem('carpenterpro_avatar_type', 'color');
+      window.localStorage.setItem('carpenterpro_avatar_color', 'amber');
+
+      mockSupabase.currentUser.set({
+        ...mockSupabase.currentUser()!,
+        user_metadata: {
+          first_name: 'Eyder',
+          avatar_url: 'https://lh3.googleusercontent.com/test-avatar.png'
+        }
+      } as User);
+      mockSupabase.userProfile.set({
+        ...baseProfile,
+        avatar_color: '#0284C7',
+        avatar_mode: 'google'
+      });
+      fixture.detectChanges();
+
+      const avatarImg = userButton.querySelector('img[alt="Avatar"]') as HTMLImageElement;
+      expect(avatarImg).toBeTruthy();
+      expect(avatarImg.getAttribute('src')).toBe('https://lh3.googleusercontent.com/test-avatar.png');
+      expect(userButton.querySelector('div.rounded-full')).toBeNull();
+
+      mockSupabase.userProfile.set({
+        ...baseProfile,
+        avatar_color: '#0284C7',
+        avatar_mode: 'color'
+      });
+      fixture.detectChanges();
+
+      expect(userButton.querySelector('img[alt="Avatar"]')).toBeNull();
+      const initialsCircle = userButton.querySelector('div.rounded-full') as HTMLElement;
+      expect(initialsCircle).toBeTruthy();
+      expect(initialsCircle.className).toContain('bg-sky-600');
+      expect(initialsCircle.className).not.toContain('bg-amber-600');
+    });
+
+    it('debe soportar user_metadata.picture en avatar_mode "google" y caer a iniciales si no hay foto', () => {
+      const baseProfile = mockSupabase.userProfile()!;
+      const userButton = element.querySelector('[data-testid="studio-user-name"]')?.closest('button') as HTMLButtonElement;
+
+      mockSupabase.currentUser.set({
+        ...mockSupabase.currentUser()!,
+        user_metadata: {
+          first_name: 'Eyder',
+          picture: 'https://example.com/picture-fallback.png'
+        }
+      } as User);
+      mockSupabase.userProfile.set({
+        ...baseProfile,
+        avatar_color: '#18181B',
+        avatar_mode: 'google'
+      });
+      fixture.detectChanges();
+
+      const avatarImg = userButton.querySelector('img[alt="Avatar"]') as HTMLImageElement;
+      expect(avatarImg).toBeTruthy();
+      expect(avatarImg.getAttribute('src')).toBe('https://example.com/picture-fallback.png');
+
+      mockSupabase.currentUser.set({
+        ...mockSupabase.currentUser()!,
+        user_metadata: { first_name: 'Eyder' }
+      } as User);
+      fixture.detectChanges();
+
+      expect(userButton.querySelector('img[alt="Avatar"]')).toBeNull();
+      expect(userButton.querySelector('div.rounded-full')).toBeTruthy();
+    });
+
+    it('debe aplicar [style.background-color] cuando avatar_color es un hex personalizado fuera de los 6 presets', () => {
+      const baseProfile = mockSupabase.userProfile()!;
+      const userButton = element.querySelector('[data-testid="studio-user-name"]')?.closest('button') as HTMLButtonElement;
+
+      mockSupabase.userProfile.set({
+        ...baseProfile,
+        avatar_color: '#0e7490',
+        avatar_mode: 'color'
+      });
+      fixture.detectChanges();
+
+      const customCircle = userButton.querySelector('div.rounded-full') as HTMLElement;
+      expect(customCircle).toBeTruthy();
+      expect(component.userAvatarStyleColor()).toBe('#0E7490');
+      expect(['rgb(14, 116, 144)', '#0e7490', '#0E7490']).toContain(customCircle.style.backgroundColor);
+    });
+
+    it('debe usar localStorage solo como respaldo cuando profile.avatar_mode o avatar_color es null/undefined', () => {
+      const baseProfile = mockSupabase.userProfile()!;
+      const userButton = element.querySelector('[data-testid="studio-user-name"]')?.closest('button') as HTMLButtonElement;
+
+      window.localStorage.setItem('carpenterpro_avatar_type', 'color');
+      window.localStorage.setItem('carpenterpro_avatar_color', 'emerald');
+
+      mockSupabase.currentUser.set({
+        ...mockSupabase.currentUser()!,
+        user_metadata: {
+          first_name: 'Eyder',
+          avatar_url: 'https://lh3.googleusercontent.com/ignored-by-localstorage.png'
+        }
+      } as User);
+      mockSupabase.userProfile.set({
+        ...baseProfile,
+        avatar_color: null,
+        avatar_mode: null
+      });
+      fixture.detectChanges();
+
+      expect(userButton.querySelector('img[alt="Avatar"]')).toBeNull();
+      const fallbackCircle = userButton.querySelector('div.rounded-full') as HTMLElement;
+      expect(fallbackCircle).toBeTruthy();
+      expect(fallbackCircle.className).toContain('bg-emerald-600');
+    });
+  });
 });

@@ -521,7 +521,10 @@
             @if (userAvatarUrl()) {
               <img [src]="userAvatarUrl()" alt="Avatar" class="w-6 h-6 rounded-full object-cover shrink-0" />
             } @else {
-              <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 font-sans" [class]="userAvatarBgClass()">
+              <div
+                class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 font-sans"
+                [class]="userAvatarBgClass()"
+                [style.background-color]="userAvatarStyleColor()">
                 {{ userInitials() }}
               </div>
             }

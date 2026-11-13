@@ -45,7 +45,12 @@ import {
 } from '@hugeicons/core-free-icons';
 import { RouterLink, Router } from '@angular/router';
 import { ProjectStorageService, ProjectMeta } from '../../services/project-storage.service';
-import { CloudProjectRecord } from '../../services/supabase.service';
+import {
+  AVATAR_COLOR_PRESETS,
+  CloudProjectRecord,
+  normalizeAvatarColorHex,
+  resolveAvatarBgClass
+} from '../../services/supabase.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { DxfExporterService } from '../../services/dxf-exporter.service';
 import { SketchupExporterService } from '../../services/sketchup-exporter.service';
@@ -236,11 +241,7 @@ export class HeaderComponent {
     return this.i18n.t('auth.defaultUserName');
   });
 
-  readonly userAvatarUrl = computed<string | null>(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const type = window.localStorage.getItem('carpenterpro_avatar_type');
-      if (type === 'color') return null;
-    }
+  private getGoogleAvatarUrl(): string | null {
     const user = typeof this.supabase.currentUser === 'function' ? this.supabase.currentUser() : null;
     const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
     if (typeof meta['avatar_url'] === 'string' && meta['avatar_url'].trim()) {
@@ -250,6 +251,23 @@ export class HeaderComponent {
       return meta['picture'].trim();
     }
     return null;
+  }
+
+  readonly userAvatarUrl = computed<string | null>(() => {
+    const profile = typeof this.supabase.userProfile === 'function' ? this.supabase.userProfile() : null;
+    if (profile?.avatar_mode === 'color') {
+      return null;
+    }
+    if (profile?.avatar_mode === 'google') {
+      return this.getGoogleAvatarUrl();
+    }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const type = window.localStorage.getItem('carpenterpro_avatar_type');
+      if (type === 'color') {
+        return null;
+      }
+    }
+    return this.getGoogleAvatarUrl();
   });
 
   readonly userInitials = computed<string>(() => {
@@ -279,21 +297,31 @@ export class HeaderComponent {
   });
 
   readonly userAvatarBgClass = computed<string>(() => {
-    const colorMap: Record<string, string> = {
-      graphite: 'bg-zinc-900 text-white',
-      stone: 'bg-zinc-700 text-white',
-      emerald: 'bg-emerald-600 text-white',
-      sky: 'bg-sky-600 text-white',
-      amber: 'bg-amber-600 text-white',
-      zinc: 'bg-zinc-800 text-white'
-    };
+    const profile = typeof this.supabase.userProfile === 'function' ? this.supabase.userProfile() : null;
+    const rawColor = profile?.avatar_color;
+    if (rawColor !== null && rawColor !== undefined) {
+      return `${resolveAvatarBgClass(rawColor)} text-white`;
+    }
     if (typeof window !== 'undefined' && window.localStorage) {
       const saved = window.localStorage.getItem('carpenterpro_avatar_color');
-      if (saved && colorMap[saved]) {
-        return colorMap[saved];
+      if (saved) {
+        return `${resolveAvatarBgClass(saved)} text-white`;
       }
     }
-    return 'bg-zinc-900 text-white';
+    return `${resolveAvatarBgClass(null)} text-white`;
+  });
+
+  readonly userAvatarStyleColor = computed<string | null>(() => {
+    const profile = typeof this.supabase.userProfile === 'function' ? this.supabase.userProfile() : null;
+    const rawColor = profile?.avatar_color?.trim();
+    if (!rawColor || !/^#[0-9a-fA-F]{6}$/.test(rawColor)) {
+      return null;
+    }
+    const normalized = normalizeAvatarColorHex(rawColor);
+    const matchesPreset = AVATAR_COLOR_PRESETS.some(
+      preset => preset.hex.toUpperCase() === normalized.toUpperCase()
+    );
+    return matchesPreset ? null : normalized;
   });
 
   readonly canUndo = this.projectService.canUndo;

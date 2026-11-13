@@ -1,5 +1,15 @@
 import { TestBed } from '@angular/core/testing';
-import { SupabaseService, SUPABASE_SQL_SETUP, SUPABASE_CONFIG, UserProfile } from './supabase.service';
+import {
+  AVATAR_COLOR_PRESETS,
+  normalizeAvatarColorHex,
+  resolveAvatarBgClass,
+  resolveAvatarColorId,
+  SupabaseService,
+  SUPABASE_SQL_SETUP,
+  SUPABASE_CONFIG,
+  UserPaymentMethod,
+  UserProfile
+} from './supabase.service';
 import { Project, ProjectSettings } from '../models/melamine.models';
 
 const testSettings: ProjectSettings = {
@@ -155,7 +165,7 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
       // Usuario autenticado
       service.currentUser.set({ id: 'usr-123', email: 'test@example.com', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '' });
 
-      const payloadsSent: Array<Record<string, unknown>> = [];
+      const payloadsSent: Record<string, unknown>[] = [];
       let callCount = 0;
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
@@ -842,7 +852,7 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
       it('no debe quedar colgado si getSession() nunca resuelve y supera el tiempo límite', async () => {
         vi.useFakeTimers();
         try {
-          const mockGetSession = vi.fn().mockReturnValue(new Promise<never>(() => {}));
+          const mockGetSession = vi.fn().mockReturnValue(new Promise<never>(() => undefined));
           (service as unknown as {
             client: { auth: { getSession: typeof mockGetSession } };
           }).client = {
@@ -859,6 +869,364 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         } finally {
           vi.useRealTimers();
         }
+      });
+    });
+
+    describe('Avatar helpers, perfil extendido, suscripción y métodos de pago', () => {
+      const createAuthUser = (overrides?: Partial<import('@supabase/supabase-js').User>) => ({
+        id: 'user-billing-1',
+        email: 'carlos@taller.com',
+        app_metadata: {},
+        user_metadata: { first_name: 'Carlos', last_name: 'Mendoza' },
+        aud: 'authenticated',
+        created_at: '2026-11-01T00:00:00Z',
+        ...overrides
+      }) as unknown as import('@supabase/supabase-js').User;
+
+      const createUserProfile = (overrides?: Partial<UserProfile>): UserProfile => ({
+        id: 'user-billing-1',
+        email: 'carlos@taller.com',
+        first_name: 'Carlos',
+        last_name: 'Mendoza',
+        role: 'user',
+        plan: 'pro',
+        billing_cycle: 'monthly',
+        subscription_status: 'active',
+        avatar_color: '#18181B',
+        avatar_mode: 'color',
+        created_at: '2026-11-01T00:00:00Z',
+        updated_at: '2026-11-01T00:00:00Z',
+        ...overrides
+      });
+
+      it('los helpers de color de avatar deben normalizar presets y hexadecimales de forma segura', () => {
+        expect(AVATAR_COLOR_PRESETS.length).toBe(6);
+        expect(normalizeAvatarColorHex('sky')).toBe('#0284C7');
+        expect(normalizeAvatarColorHex('EMERALD')).toBe('#059669');
+        expect(normalizeAvatarColorHex('#0284c7')).toBe('#0284C7');
+        expect(normalizeAvatarColorHex('#1a2b3c')).toBe('#1A2B3C');
+        expect(normalizeAvatarColorHex('invalido')).toBe('#18181B');
+        expect(normalizeAvatarColorHex(null)).toBe('#18181B');
+
+        expect(resolveAvatarColorId('#059669')).toBe('emerald');
+        expect(resolveAvatarColorId('STONE')).toBe('stone');
+        expect(resolveAvatarColorId('#1A2B3C')).toBe('graphite');
+        expect(resolveAvatarColorId(undefined)).toBe('graphite');
+
+        expect(resolveAvatarBgClass('#0284c7')).toBe('bg-sky-600');
+        expect(resolveAvatarBgClass('amber')).toBe('bg-amber-600');
+        expect(resolveAvatarBgClass('#999999')).toBe('bg-zinc-900');
+      });
+
+      it('buildFallbackProfile y loadUserProfile deben incluir avatar_color y avatar_mode', async () => {
+        const googleUser = createAuthUser({
+          user_metadata: {
+            first_name: 'Ana',
+            avatar_url: 'https://example.com/photo.jpg'
+          }
+        });
+        const fallback = service.buildFallbackProfile(googleUser);
+        expect(fallback.avatar_color).toBe('#18181B');
+        expect(fallback.avatar_mode).toBe('google');
+
+        const mockMaybeSingle = vi.fn().mockResolvedValue({
+          data: {
+            id: 'user-billing-1',
+            email: 'carlos@taller.com',
+            first_name: 'Carlos',
+            last_name: 'Mendoza',
+            role: 'user',
+            plan: 'pro',
+            billing_cycle: 'annual',
+            subscription_status: 'active',
+            avatar_color: '#0284c7',
+            avatar_mode: 'color',
+            created_at: '2026-11-01T00:00:00Z',
+            updated_at: '2026-11-02T00:00:00Z'
+          },
+          error: null
+        });
+        const mockEq = vi.fn().mockReturnValue({ maybeSingle: mockMaybeSingle });
+        const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const loaded = await service.loadUserProfile(googleUser);
+        expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('avatar_color'));
+        expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('avatar_mode'));
+        expect(loaded?.avatar_color).toBe('#0284C7');
+        expect(loaded?.avatar_mode).toBe('color');
+      });
+
+      it('loadUserProfile debe incluir avatar_color y avatar_mode en el upsert inicial si no existe registro', async () => {
+        const user = createAuthUser();
+        const mockMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+        const mockEq = vi.fn().mockReturnValue({ maybeSingle: mockMaybeSingle });
+        const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockUpsert = vi.fn().mockResolvedValue({ error: null });
+        const mockFrom = vi.fn().mockReturnValue({
+          select: mockSelect,
+          upsert: mockUpsert
+        });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        await service.loadUserProfile(user);
+        expect(mockUpsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            avatar_color: '#18181B',
+            avatar_mode: 'color'
+          }),
+          { onConflict: 'id' }
+        );
+      });
+
+      it('updateUserProfile debe normalizar avatar_color, persistir avatar_mode y reemplazar userProfile con nueva referencia inmutable', async () => {
+        const user = createAuthUser();
+        const initialProfile = createUserProfile();
+        service.currentUser.set(user);
+        service.userProfile.set(initialProfile);
+
+        const mockEq = vi.fn().mockResolvedValue({ error: null });
+        const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const res = await service.updateUserProfile({
+          first_name: 'Carlos',
+          last_name: 'Mendoza',
+          avatar_color: 'emerald',
+          avatar_mode: 'color'
+        });
+
+        expect(res.success).toBe(true);
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+          avatar_color: '#059669',
+          avatar_mode: 'color'
+        }));
+        const nextProfile = service.userProfile();
+        expect(nextProfile).not.toBe(initialProfile);
+        expect(nextProfile?.avatar_color).toBe('#059669');
+        expect(nextProfile?.avatar_mode).toBe('color');
+      });
+
+      it('cancelSubscription debe cancelar al fin del periodo sin enviar reason ni alterar el plan', async () => {
+        const user = createAuthUser();
+        const initialProfile = createUserProfile({ plan: 'pro', subscription_status: 'active' });
+        service.currentUser.set(user);
+        service.userProfile.set(initialProfile);
+
+        const mockEq = vi.fn().mockResolvedValue({ error: null });
+        const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const res = await service.cancelSubscription({ immediate: false, reason: 'cost' });
+
+        expect(res.success).toBe(true);
+        const sentPayload = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(sentPayload['subscription_status']).toBe('cancelled');
+        expect(sentPayload['plan']).toBeUndefined();
+        expect(sentPayload['reason']).toBeUndefined();
+        expect(service.userProfile()).not.toBe(initialProfile);
+        expect(service.userProfile()?.subscription_status).toBe('cancelled');
+        expect(service.userProfile()?.plan).toBe('pro');
+      });
+
+      it('cancelSubscription con immediate=true debe bajar a plan free y status free sin enviar reason', async () => {
+        const user = createAuthUser();
+        const initialProfile = createUserProfile({ plan: 'industrial', subscription_status: 'active' });
+        service.currentUser.set(user);
+        service.userProfile.set(initialProfile);
+
+        const mockEq = vi.fn().mockResolvedValue({ error: null });
+        const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const res = await service.cancelSubscription({ immediate: true, reason: 'alternative' });
+
+        expect(res.success).toBe(true);
+        const sentPayload = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(sentPayload['plan']).toBe('free');
+        expect(sentPayload['subscription_status']).toBe('free');
+        expect(sentPayload['reason']).toBeUndefined();
+        expect(service.userProfile()).not.toBe(initialProfile);
+        expect(service.userProfile()?.plan).toBe('free');
+        expect(service.userProfile()?.subscription_status).toBe('free');
+      });
+
+      it('reactivateSubscription debe restaurar subscription_status a active con nueva referencia inmutable', async () => {
+        const user = createAuthUser();
+        const initialProfile = createUserProfile({ plan: 'pro', subscription_status: 'cancelled' });
+        service.currentUser.set(user);
+        service.userProfile.set(initialProfile);
+
+        const mockEq = vi.fn().mockResolvedValue({ error: null });
+        const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const res = await service.reactivateSubscription();
+
+        expect(res.success).toBe(true);
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ subscription_status: 'active' }));
+        expect(service.userProfile()).not.toBe(initialProfile);
+        expect(service.userProfile()?.subscription_status).toBe('active');
+      });
+
+      it('getPaymentMethods debe consultar user_payment_methods ordenado por is_default DESC y created_at DESC', async () => {
+        service.currentUser.set(null);
+        expect(await service.getPaymentMethods()).toEqual([]);
+
+        const user = createAuthUser();
+        service.currentUser.set(user);
+
+        const rows: UserPaymentMethod[] = [
+          {
+            id: 'pm-1',
+            user_id: user.id,
+            brand: 'VISA',
+            last4: '4242',
+            exp_month: 8,
+            exp_year: 2028,
+            holder_name: 'Carlos Mendoza',
+            is_default: true,
+            created_at: '2026-11-10T00:00:00Z'
+          }
+        ];
+
+        const mockOrderCreated = vi.fn().mockResolvedValue({ data: rows, error: null });
+        const mockOrderDefault = vi.fn().mockReturnValue({ order: mockOrderCreated });
+        const mockEq = vi.fn().mockReturnValue({ order: mockOrderDefault });
+        const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const list = await service.getPaymentMethods();
+        expect(list.length).toBe(1);
+        expect(list[0].last4).toBe('4242');
+        expect(mockFrom).toHaveBeenCalledWith('user_payment_methods');
+        expect(mockEq).toHaveBeenCalledWith('user_id', user.id);
+        expect(mockOrderDefault).toHaveBeenCalledWith('is_default', { ascending: false });
+        expect(mockOrderCreated).toHaveBeenCalledWith('created_at', { ascending: false });
+      });
+
+      it('addPaymentMethod debe validar campos, desmarcar principal previo y no enviar PAN ni CVC', async () => {
+        const user = createAuthUser();
+        service.currentUser.set(user);
+
+        const badLast4 = await service.addPaymentMethod({
+          brand: 'VISA',
+          last4: '42',
+          exp_month: 8,
+          exp_year: 2028,
+          holder_name: 'Carlos Mendoza',
+          is_default: true
+        });
+        expect(badLast4.success).toBe(false);
+        expect(badLast4.errorKey).toBe('account.billing.cardInvalidNumber');
+
+        const badExpiry = await service.addPaymentMethod({
+          brand: 'VISA',
+          last4: '4242',
+          exp_month: 13,
+          exp_year: 2028,
+          holder_name: 'Carlos Mendoza',
+          is_default: true
+        });
+        expect(badExpiry.success).toBe(false);
+        expect(badExpiry.errorKey).toBe('account.billing.cardInvalidExpiry');
+
+        const badHolder = await service.addPaymentMethod({
+          brand: 'VISA',
+          last4: '4242',
+          exp_month: 8,
+          exp_year: 2028,
+          holder_name: '   ',
+          is_default: true
+        });
+        expect(badHolder.success).toBe(false);
+        expect(badHolder.errorKey).toBe('account.billing.cardInvalidHolder');
+
+        const mockUnsetEq = vi.fn().mockResolvedValue({ error: null });
+        const mockUnsetUpdate = vi.fn().mockReturnValue({ eq: mockUnsetEq });
+        const mockInsertSingle = vi.fn().mockResolvedValue({
+          data: {
+            id: 'pm-new-1',
+            user_id: user.id,
+            brand: 'MASTERCARD',
+            last4: '5511',
+            exp_month: 11,
+            exp_year: 2029,
+            holder_name: 'Carlos Mendoza',
+            is_default: true,
+            created_at: '2026-11-12T00:00:00Z'
+          },
+          error: null
+        });
+        const mockInsertSelect = vi.fn().mockReturnValue({ single: mockInsertSingle });
+        const mockInsert = vi.fn().mockReturnValue({ select: mockInsertSelect });
+        const mockFrom = vi.fn().mockReturnValue({
+          update: mockUnsetUpdate,
+          insert: mockInsert
+        });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const res = await service.addPaymentMethod({
+          brand: 'MASTERCARD',
+          last4: '5511',
+          exp_month: 11,
+          exp_year: 2029,
+          holder_name: 'Carlos Mendoza',
+          is_default: true
+        });
+
+        expect(res.success).toBe(true);
+        expect(res.data?.brand).toBe('MASTERCARD');
+        expect(res.data?.last4).toBe('5511');
+        expect(mockUnsetUpdate).toHaveBeenCalledWith({ is_default: false });
+        expect(mockUnsetEq).toHaveBeenCalledWith('user_id', user.id);
+        const inserted = mockInsert.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(inserted['cardNumber']).toBeUndefined();
+        expect(inserted['cvc']).toBeUndefined();
+        expect(inserted['last4']).toBe('5511');
+      });
+
+      it('setDefaultPaymentMethod y deletePaymentMethod deben actualizar y eliminar registros de forma segura', async () => {
+        const user = createAuthUser();
+        service.currentUser.set(user);
+
+        const mockUnsetEq = vi.fn().mockResolvedValue({ error: null });
+        const mockSetUserEq = vi.fn().mockResolvedValue({ error: null });
+        const mockSetIdEq = vi.fn().mockReturnValue({ eq: mockSetUserEq });
+        let updateCall = 0;
+        const mockUpdate = vi.fn().mockImplementation(() => {
+          updateCall++;
+          return updateCall === 1 ? { eq: mockUnsetEq } : { eq: mockSetIdEq };
+        });
+
+        const mockDeleteUserEq = vi.fn().mockResolvedValue({ error: null });
+        const mockDeleteIdEq = vi.fn().mockReturnValue({ eq: mockDeleteUserEq });
+        const mockDelete = vi.fn().mockReturnValue({ eq: mockDeleteIdEq });
+
+        const mockFrom = vi.fn().mockReturnValue({
+          update: mockUpdate,
+          delete: mockDelete
+        });
+        (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+        const defRes = await service.setDefaultPaymentMethod('pm-2');
+        expect(defRes.success).toBe(true);
+        expect(mockUpdate).toHaveBeenNthCalledWith(1, { is_default: false });
+        expect(mockUnsetEq).toHaveBeenCalledWith('user_id', user.id);
+        expect(mockUpdate).toHaveBeenNthCalledWith(2, { is_default: true });
+        expect(mockSetIdEq).toHaveBeenCalledWith('id', 'pm-2');
+        expect(mockSetUserEq).toHaveBeenCalledWith('user_id', user.id);
+
+        const delRes = await service.deletePaymentMethod('pm-2');
+        expect(delRes.success).toBe(true);
+        expect(mockDeleteIdEq).toHaveBeenCalledWith('id', 'pm-2');
+        expect(mockDeleteUserEq).toHaveBeenCalledWith('user_id', user.id);
       });
     });
   });
