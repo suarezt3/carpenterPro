@@ -1,9 +1,31 @@
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, Router, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
-import { signal, WritableSignal } from '@angular/core';
+import { ActivatedRouteSnapshot, Route, Router, RouterStateSnapshot, Routes, UrlTree, provideRouter } from '@angular/router';
+import { Component, signal, WritableSignal } from '@angular/core';
 import { User } from '@supabase/supabase-js';
 import { studioAccessGuard } from './studio-access.guard';
-import { SupabaseService } from '../services/supabase.service';
+import { SupabaseService, UserProfile } from '../services/supabase.service';
+import { routes } from '../app.routes';
+
+@Component({
+  selector: 'app-test-route-stub',
+  standalone: true,
+  template: ''
+})
+class TestRouteStubComponent {}
+
+function cloneRoutesWithStubs(sourceRoutes: Routes): Routes {
+  return sourceRoutes.map((route): Route => {
+    const cloned: Route = { ...route };
+    if (cloned.loadComponent) {
+      cloned.component = TestRouteStubComponent;
+      delete cloned.loadComponent;
+    }
+    if (cloned.children) {
+      cloned.children = cloneRoutesWithStubs(cloned.children);
+    }
+    return cloned;
+  });
+}
 
 describe('studioAccessGuard', () => {
   let isAuthSig: WritableSignal<boolean>;
@@ -85,6 +107,113 @@ describe('studioAccessGuard', () => {
 
     const router = TestBed.inject(Router);
     expect(router.serializeUrl(result as UrlTree)).toBe('/auth?mode=login');
+  });
+
+  it('debe esperar a waitForAuthReady() al recargar /studio/designer y permitir permanecer en la ruta con sesión persistida', async () => {
+    const persistedUser = { id: 'usr-reload', email: 'carpintero@taller.com' } as User;
+    const waitForAuthReadySpy = vi.fn().mockImplementation(async () => {
+      await Promise.resolve();
+      currentUserSig.set(persistedUser);
+      isAuthSig.set(true);
+      isLoadingSig.set(false);
+      return persistedUser;
+    });
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(cloneRoutesWithStubs(routes)),
+        {
+          provide: SupabaseService,
+          useValue: {
+            isAuthenticated: isAuthSig,
+            isAuthLoading: isLoadingSig,
+            currentUser: currentUserSig,
+            userProfile: signal<UserProfile | null>(null),
+            waitForAuthReady: waitForAuthReadySpy
+          }
+        }
+      ]
+    });
+
+    const router = TestBed.inject(Router);
+    const navigated = await router.navigateByUrl('/studio/designer');
+    expect(navigated).toBe(true);
+    expect(waitForAuthReadySpy).toHaveBeenCalledTimes(1);
+    expect(router.url).toBe('/studio/designer');
+  });
+
+  it('debe conservar /studio/parts, /studio/optimizer, /studio/budget y /studio/labels y redirigir /studio/:tab hacia /studio/designer sin bucles', async () => {
+    const persistedUser = { id: 'usr-tabs', email: 'tabs@taller.com' } as User;
+    isAuthSig.set(true);
+    currentUserSig.set(persistedUser);
+    const waitForAuthReadySpy = vi.fn().mockResolvedValue(persistedUser);
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(cloneRoutesWithStubs(routes)),
+        {
+          provide: SupabaseService,
+          useValue: {
+            isAuthenticated: isAuthSig,
+            isAuthLoading: isLoadingSig,
+            currentUser: currentUserSig,
+            userProfile: signal<UserProfile | null>(null),
+            waitForAuthReady: waitForAuthReadySpy
+          }
+        }
+      ]
+    });
+
+    const router = TestBed.inject(Router);
+
+    await router.navigateByUrl('/studio/parts');
+    expect(router.url).toBe('/studio/parts');
+
+    await router.navigateByUrl('/studio/cutlist');
+    expect(router.url).toBe('/studio/parts');
+
+    await router.navigateByUrl('/studio/optimizer');
+    expect(router.url).toBe('/studio/optimizer');
+
+    await router.navigateByUrl('/studio/budget');
+    expect(router.url).toBe('/studio/budget');
+
+    await router.navigateByUrl('/studio/labels');
+    expect(router.url).toBe('/studio/labels');
+
+    await router.navigateByUrl('/studio/desconocida');
+    expect(router.url).toBe('/studio/designer');
+
+    await router.navigateByUrl('/studio');
+    expect(router.url).toBe('/studio/designer');
+  });
+
+  it('debe redirigir a /auth?mode=login al recargar /studio/designer sin sesión o si waitForAuthReady falla', async () => {
+    const waitForAuthReadySpy = vi.fn().mockRejectedValue(new Error('Auth timeout'));
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(cloneRoutesWithStubs(routes)),
+        {
+          provide: SupabaseService,
+          useValue: {
+            isAuthenticated: isAuthSig,
+            isAuthLoading: isLoadingSig,
+            currentUser: currentUserSig,
+            userProfile: signal<UserProfile | null>(null),
+            waitForAuthReady: waitForAuthReadySpy
+          }
+        }
+      ]
+    });
+
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/studio/designer');
+    expect(waitForAuthReadySpy).toHaveBeenCalledTimes(1);
+    expect(router.url).toBe('/auth?mode=login');
   });
 });
 

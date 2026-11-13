@@ -1,9 +1,31 @@
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, Router, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
-import { signal, WritableSignal } from '@angular/core';
+import { ActivatedRouteSnapshot, Route, Router, RouterStateSnapshot, Routes, UrlTree, provideRouter } from '@angular/router';
+import { Component, signal, WritableSignal } from '@angular/core';
 import { User } from '@supabase/supabase-js';
 import { superAdminGuard } from './super-admin.guard';
 import { SupabaseService, UserProfile } from '../services/supabase.service';
+import { routes } from '../app.routes';
+
+@Component({
+  selector: 'app-admin-route-stub',
+  standalone: true,
+  template: ''
+})
+class AdminRouteStubComponent {}
+
+function cloneRoutesWithAdminStubs(sourceRoutes: Routes): Routes {
+  return sourceRoutes.map((route): Route => {
+    const cloned: Route = { ...route };
+    if (cloned.loadComponent) {
+      cloned.component = AdminRouteStubComponent;
+      delete cloned.loadComponent;
+    }
+    if (cloned.children) {
+      cloned.children = cloneRoutesWithAdminStubs(cloned.children);
+    }
+    return cloned;
+  });
+}
 
 describe('superAdminGuard', () => {
   let userProfileSig: WritableSignal<UserProfile | null>;
@@ -97,5 +119,65 @@ describe('superAdminGuard', () => {
 
     const result = await TestBed.runInInjectionContext(() => superAdminGuard(dummyRoute, dummyState));
     expect(result).toBe(true);
+  });
+
+  it('debe esperar a que waitForAuthReady() hidrate sesión y perfil al recargar /admin y conservar la ruta exacta', async () => {
+    const adminUser = { id: 'u-admin-reload', email: 'director@piezo3d.com' } as User;
+    waitForAuthReadySpy.mockImplementation(async () => {
+      await Promise.resolve();
+      currentUserSig.set(adminUser);
+      userProfileSig.set({
+        id: 'u-admin-reload',
+        email: 'director@piezo3d.com',
+        first_name: 'Directora',
+        last_name: 'General',
+        role: 'super_admin',
+        plan: 'industrial',
+        created_at: '2026-11-10T00:00:00Z',
+        updated_at: '2026-11-12T00:00:00Z'
+      });
+      return adminUser;
+    });
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(cloneRoutesWithAdminStubs(routes)),
+        { provide: SupabaseService, useValue: mockSupabase }
+      ]
+    });
+
+    const router = TestBed.inject(Router);
+    const navigated = await router.navigateByUrl('/admin');
+    expect(navigated).toBe(true);
+    expect(waitForAuthReadySpy).toHaveBeenCalledTimes(1);
+    expect(router.url).toBe('/admin');
+  });
+
+  it('debe resolver rutas públicas (auth, terms, privacy, refunds) y fallback ** sin errores', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(cloneRoutesWithAdminStubs(routes)),
+        { provide: SupabaseService, useValue: mockSupabase }
+      ]
+    });
+
+    const router = TestBed.inject(Router);
+
+    await router.navigateByUrl('/auth?mode=login');
+    expect(router.url).toBe('/auth?mode=login');
+
+    await router.navigateByUrl('/terms');
+    expect(router.url).toBe('/terms');
+
+    await router.navigateByUrl('/privacy');
+    expect(router.url).toBe('/privacy');
+
+    await router.navigateByUrl('/refunds');
+    expect(router.url).toBe('/refunds');
+
+    await router.navigateByUrl('/ruta-inexistente-404');
+    expect(router.url).toBe('/');
   });
 });

@@ -697,6 +697,170 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(mockEq).toHaveBeenCalledWith('id', 'feed-123');
       });
     });
+
+    describe('Hidratación de sesión y perfil en recarga F5 (waitForAuthReady)', () => {
+      it('debe esperar a que terminen TANTO getSession() como loadUserProfile() antes de resolver', async () => {
+        const persistedUser = {
+          id: 'u-reload-1',
+          email: 'gerencia@carpenterpro.com',
+          app_metadata: {},
+          user_metadata: { first_name: 'Sofía' },
+          aud: 'authenticated',
+          created_at: '2026-11-01T00:00:00Z'
+        } as unknown as import('@supabase/supabase-js').User;
+
+        let resolveSession!: (val: { data: { session: { user: typeof persistedUser; access_token: string } | null } }) => void;
+        const sessionPromise = new Promise<{ data: { session: { user: typeof persistedUser; access_token: string } | null } }>((resolve) => {
+          resolveSession = resolve;
+        });
+
+        let resolveProfile!: (val: { data: Record<string, unknown> | null; error: null }) => void;
+        const profilePromise = new Promise<{ data: Record<string, unknown> | null; error: null }>((resolve) => {
+          resolveProfile = resolve;
+        });
+
+        const mockMaybeSingle = vi.fn().mockReturnValue(profilePromise);
+        const mockEq = vi.fn().mockReturnValue({ maybeSingle: mockMaybeSingle });
+        const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+        const mockGetSession = vi.fn().mockReturnValue(sessionPromise);
+
+        (service as unknown as {
+          client: {
+            auth: { getSession: typeof mockGetSession };
+            from: typeof mockFrom;
+          };
+        }).client = {
+          auth: { getSession: mockGetSession },
+          from: mockFrom
+        };
+
+        let readyResolved = false;
+        const readyPromise = service.waitForAuthReady().then((u) => {
+          readyResolved = true;
+          return u;
+        });
+
+        // Mientras getSession() no resuelve, waitForAuthReady sigue esperando
+        await Promise.resolve();
+        expect(readyResolved).toBe(false);
+
+        // Resuelve getSession(), pero loadUserProfile() aún está pendiente
+        resolveSession({
+          data: {
+            session: {
+              user: persistedUser,
+              access_token: 'jwt-persisted'
+            }
+          }
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(readyResolved).toBe(false);
+
+        // Resuelve loadUserProfile() con rol super_admin y plan industrial
+        resolveProfile({
+          data: {
+            id: 'u-reload-1',
+            email: 'gerencia@carpenterpro.com',
+            first_name: 'Sofía',
+            last_name: 'Admin',
+            role: 'super_admin',
+            plan: 'industrial',
+            billing_cycle: 'annual',
+            subscription_status: 'active',
+            is_suspended: false,
+            created_at: '2026-11-01T00:00:00Z',
+            updated_at: '2026-11-12T00:00:00Z'
+          },
+          error: null
+        });
+
+        const hydratedUser = await readyPromise;
+        expect(readyResolved).toBe(true);
+        expect(hydratedUser?.id).toBe('u-reload-1');
+        expect(service.isAuthenticated()).toBe(true);
+        expect(service.userProfile()?.role).toBe('super_admin');
+        expect(service.userProfile()?.plan).toBe('industrial');
+        expect(service.isAuthLoading()).toBe(false);
+      });
+
+      it('debe resolver de forma segura con perfil de respaldo si loadUserProfile falla o excede el tiempo', async () => {
+        const persistedUser = {
+          id: 'u-fallback-1',
+          email: 'taller@carpenterpro.com',
+          app_metadata: {},
+          user_metadata: { first_name: 'Mateo' },
+          aud: 'authenticated',
+          created_at: '2026-11-01T00:00:00Z'
+        } as unknown as import('@supabase/supabase-js').User;
+
+        const mockMaybeSingle = vi.fn().mockRejectedValue(new Error('Network down'));
+        const mockEq = vi.fn().mockReturnValue({ maybeSingle: mockMaybeSingle });
+        const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+        const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+        const mockGetSession = vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              user: persistedUser,
+              access_token: 'jwt-token'
+            }
+          }
+        });
+
+        (service as unknown as {
+          client: {
+            auth: { getSession: typeof mockGetSession };
+            from: typeof mockFrom;
+          };
+        }).client = {
+          auth: { getSession: mockGetSession },
+          from: mockFrom
+        };
+
+        const hydratedUser = await service.waitForAuthReady();
+        expect(hydratedUser?.id).toBe('u-fallback-1');
+        expect(service.isAuthenticated()).toBe(true);
+        expect(service.userProfile()?.first_name).toBe('Mateo');
+        expect(service.isAuthLoading()).toBe(false);
+      });
+
+      it('no debe quedar colgado si getSession() lanza error durante la hidratación', async () => {
+        const mockGetSession = vi.fn().mockRejectedValue(new Error('Storage unavailable'));
+        (service as unknown as {
+          client: { auth: { getSession: typeof mockGetSession } };
+        }).client = {
+          auth: { getSession: mockGetSession }
+        };
+
+        const hydratedUser = await service.waitForAuthReady();
+        expect(hydratedUser).toBeNull();
+        expect(service.isAuthenticated()).toBe(false);
+        expect(service.isAuthLoading()).toBe(false);
+      });
+
+      it('no debe quedar colgado si getSession() nunca resuelve y supera el tiempo límite', async () => {
+        vi.useFakeTimers();
+        try {
+          const mockGetSession = vi.fn().mockReturnValue(new Promise<never>(() => {}));
+          (service as unknown as {
+            client: { auth: { getSession: typeof mockGetSession } };
+          }).client = {
+            auth: { getSession: mockGetSession }
+          };
+
+          const readyPromise = service.waitForAuthReady();
+          await vi.advanceTimersByTimeAsync(8500);
+
+          const hydratedUser = await readyPromise;
+          expect(hydratedUser).toBeNull();
+          expect(service.isAuthenticated()).toBe(false);
+          expect(service.isAuthLoading()).toBe(false);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
   });
 });
 

@@ -5,20 +5,24 @@ import { SupabaseService } from '../services/supabase.service';
 
 /**
  * Guardia de seguridad exclusivo para el Panel de Superadministrador (/admin).
- * Verifica la sesión activa y valida que el perfil tenga rol `super_admin`
- * o corresponda a la cuenta propietaria principal.
+ * Espera a que finalice la hidratación de sesión y perfil antes de validar
+ * el rol `super_admin` o la cuenta propietaria principal.
  */
 export const superAdminGuard: CanActivateFn = async (_route, _state): Promise<boolean | UrlTree> => {
   const supabaseService = inject(SupabaseService);
   const router = inject(Router);
 
   let user: User | null = null;
-  if (typeof supabaseService.waitForAuthReady === 'function') {
-    user = await supabaseService.waitForAuthReady();
-  } else if (typeof supabaseService.isAuthLoading === 'function' && supabaseService.isAuthLoading()) {
-    if (typeof supabaseService.syncAuthSession === 'function') {
-      user = await supabaseService.syncAuthSession();
+  try {
+    if (typeof supabaseService.waitForAuthReady === 'function') {
+      user = await supabaseService.waitForAuthReady();
+    } else if (typeof supabaseService.isAuthLoading === 'function' && supabaseService.isAuthLoading()) {
+      if (typeof supabaseService.syncAuthSession === 'function') {
+        user = await supabaseService.syncAuthSession();
+      }
     }
+  } catch {
+    user = null;
   }
 
   if (!user && typeof supabaseService.currentUser === 'function') {
@@ -29,12 +33,24 @@ export const superAdminGuard: CanActivateFn = async (_route, _state): Promise<bo
     return router.createUrlTree(['/']);
   }
 
-  if (!supabaseService.userProfile() && typeof supabaseService.loadUserProfile === 'function') {
-    await supabaseService.loadUserProfile(user);
+  const currentProfile = typeof supabaseService.userProfile === 'function'
+    ? supabaseService.userProfile()
+    : null;
+
+  if ((!currentProfile || currentProfile.id !== user.id) && typeof supabaseService.loadUserProfile === 'function') {
+    try {
+      await supabaseService.loadUserProfile(user);
+    } catch {
+      // Continuar con evaluación segura si el perfil no pudo recargarse
+    }
   }
 
+  const resolvedProfile = typeof supabaseService.userProfile === 'function'
+    ? supabaseService.userProfile()
+    : null;
+
   const isSuper =
-    supabaseService.userProfile()?.role === 'super_admin' ||
+    resolvedProfile?.role === 'super_admin' ||
     user.email?.toLowerCase() === 'eydersuarez900@gmail.com';
 
   if (isSuper) {

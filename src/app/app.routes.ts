@@ -103,6 +103,10 @@ export const routes: Routes = [
         path: ':tab',
         redirectTo: 'designer',
       },
+      {
+        path: '**',
+        redirectTo: 'designer',
+      },
     ],
   },
   // Redirecciones directas retrocompatibles

@@ -608,6 +608,83 @@ export class SupabaseService {
   }
 
   private authInitPromise: Promise<void> | null = null;
+  private initClientRef: SupabaseClient | null = null;
+  private isAuthInitSettled = false;
+  private inFlightSyncPromise: Promise<User | null> | null = null;
+  private inFlightProfilePromise: Promise<UserProfile | null> | null = null;
+  private inFlightProfileUserId: string | null = null;
+  private hydratedProfileUserId: string | null = null;
+  private isTempFallbackProfile = false;
+  private readonly authOperationTimeoutMs = 8000;
+
+  /**
+   * Ejecuta una promesa o thenable con límite de tiempo seguro para evitar bloqueos infinitos
+   * durante la hidratación de sesión o carga de perfil en recargas del navegador.
+   */
+  private runWithTimeout<T>(operation: PromiseLike<T>, timeoutMs = this.authOperationTimeoutMs): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error('Auth hydration timeout'));
+      }, timeoutMs);
+
+      Promise.resolve(operation).then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (err: unknown) => {
+          clearTimeout(timer);
+          reject(err);
+        }
+      );
+    });
+  }
+
+  /**
+   * Hidrata la sesión inicial desde `localStorage` (`getSession`) y espera
+   * a que finalice la carga de perfil (`loadUserProfile`) antes de liberar los guardias.
+   */
+  private async hydrateInitialSession(initialProjectsSyncedRef: { synced: boolean }): Promise<void> {
+    if (!this.client) {
+      this.isAuthInitSettled = true;
+      this.isAuthLoading.set(false);
+      return;
+    }
+
+    try {
+      const { data } = await this.runWithTimeout(this.client.auth.getSession());
+      const activeSession = data?.session ?? null;
+      const user = activeSession?.user ?? null;
+
+      if (user) {
+        this.session.set(activeSession);
+        this.currentUser.set(user);
+        if (!this.userProfile() || this.userProfile()?.id !== user.id) {
+          this.userProfile.set(this.buildFallbackProfile(user));
+          this.isTempFallbackProfile = true;
+          this.hydratedProfileUserId = null;
+        }
+        if (!initialProjectsSyncedRef.synced) {
+          initialProjectsSyncedRef.synced = true;
+          void this.refreshProjects();
+        }
+        await this.loadUserProfile(user);
+      } else {
+        this.session.set(null);
+        if (this.hydratedProfileUserId !== null) {
+          this.currentUser.set(null);
+          this.userProfile.set(null);
+          this.hydratedProfileUserId = null;
+          this.isTempFallbackProfile = false;
+        }
+      }
+    } catch {
+      // Garantiza que la inicialización resuelva de forma segura sin colgar la navegación
+    } finally {
+      this.isAuthInitSettled = true;
+      this.isAuthLoading.set(false);
+    }
+  }
 
   /**
    * Inicializa el cliente oficial y escucha cambios de sesión en tiempo real
@@ -619,7 +696,8 @@ export class SupabaseService {
         this.isPasswordRecoveryMode.set(true);
       }
 
-      let initialAuthProjectsSynced = false;
+      const initialProjectsSyncedRef = { synced: false };
+      this.isAuthInitSettled = false;
 
       this.client = createClient(this.config.url, this.config.publishableKey, {
         auth: {
@@ -628,25 +706,10 @@ export class SupabaseService {
           detectSessionInUrl: true
         }
       });
+      this.initClientRef = this.client;
 
-      // Recuperar sesión activa guardada en localStorage al abrir la aplicación
-      this.authInitPromise = this.client.auth.getSession()
-        .then(async ({ data }) => {
-          if (data?.session?.user) {
-            this.session.set(data.session);
-            this.currentUser.set(data.session.user);
-            this.userProfile.set(this.buildFallbackProfile(data.session.user));
-            if (!initialAuthProjectsSynced) {
-              initialAuthProjectsSynced = true;
-              void this.refreshProjects();
-            }
-            await this.loadUserProfile(data.session.user);
-          }
-          this.isAuthLoading.set(false);
-        })
-        .catch(() => {
-          this.isAuthLoading.set(false);
-        });
+      // Recuperar sesión activa guardada en localStorage + perfil antes de resolver waitForAuthReady()
+      this.authInitPromise = this.hydrateInitialSession(initialProjectsSyncedRef);
 
       // Suscribirse a cambios de estado de autenticación en tiempo real
       const { data: authListener } = this.client.auth.onAuthStateChange((event, newSession) => {
@@ -654,27 +717,49 @@ export class SupabaseService {
           this.isPasswordRecoveryMode.set(true);
         }
 
-        this.session.set(newSession);
         const user = newSession?.user ?? null;
-        this.currentUser.set(user);
 
         if (user) {
-          this.userProfile.set(this.buildFallbackProfile(user));
-          const shouldRefreshProjects =
-            event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && !initialAuthProjectsSynced);
-          if (shouldRefreshProjects) {
-            initialAuthProjectsSynced = true;
+          this.session.set(newSession);
+          this.currentUser.set(user);
+
+          if (!this.userProfile() || this.userProfile()?.id !== user.id) {
+            this.userProfile.set(this.buildFallbackProfile(user));
+            this.isTempFallbackProfile = true;
+            this.hydratedProfileUserId = null;
           }
+
+          const shouldRefreshProjects =
+            event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && !initialProjectsSyncedRef.synced);
+          if (shouldRefreshProjects) {
+            initialProjectsSyncedRef.synced = true;
+          }
+
+          const shouldLoadProfile =
+            event !== 'INITIAL_SESSION' ||
+            this.hydratedProfileUserId !== user.id ||
+            this.isTempFallbackProfile;
+
           // Ejecutar consultas secundarias fuera del callback síncrono para evitar bloqueo del lock interno de sesión
           setTimeout(() => {
-            void this.loadUserProfile(user);
+            if (shouldLoadProfile) {
+              void this.loadUserProfile(user);
+            }
             if (shouldRefreshProjects) {
               void this.refreshProjects();
             }
           }, 0);
         } else {
-          this.userProfile.set(null);
-          if (event === 'SIGNED_OUT') {
+          const isExplicitSignOut = event === 'SIGNED_OUT';
+          const hadActiveSession = this.session() !== null;
+          if (isExplicitSignOut || hadActiveSession) {
+            this.session.set(null);
+            this.currentUser.set(null);
+            this.userProfile.set(null);
+            this.hydratedProfileUserId = null;
+            this.isTempFallbackProfile = false;
+          }
+          if (isExplicitSignOut) {
             this.cloudProjects.set([]);
             setTimeout(() => {
               void this.refreshProjects();
@@ -682,7 +767,9 @@ export class SupabaseService {
           }
         }
 
-        this.isAuthLoading.set(false);
+        if (this.isAuthInitSettled || event !== 'INITIAL_SESSION') {
+          this.isAuthLoading.set(false);
+        }
       });
 
       // Evitar fugas de memoria cancelando la suscripción al destruir el servicio
@@ -691,6 +778,7 @@ export class SupabaseService {
       });
     } catch (err) {
       console.warn('Auth client init warning:', err);
+      this.isAuthInitSettled = true;
       this.isAuthLoading.set(false);
     }
   }
@@ -741,26 +829,52 @@ export class SupabaseService {
 
   /**
    * Carga el perfil del usuario desde `public.user_profiles` respetando RLS (`auth.uid() = id`).
+   * Deduplica llamadas concurrentes para el mismo usuario y nunca bloquea indefinidamente.
    */
   async loadUserProfile(user?: User | null): Promise<UserProfile | null> {
     const targetUser = user ?? this.currentUser();
     if (!targetUser) {
       this.userProfile.set(null);
+      this.hydratedProfileUserId = null;
+      this.isTempFallbackProfile = false;
       return null;
     }
 
+    if (this.inFlightProfilePromise && this.inFlightProfileUserId === targetUser.id) {
+      return this.inFlightProfilePromise;
+    }
+
+    const loadPromise = this.executeLoadUserProfile(targetUser);
+    this.inFlightProfileUserId = targetUser.id;
+    this.inFlightProfilePromise = loadPromise;
+
+    try {
+      return await loadPromise;
+    } finally {
+      if (this.inFlightProfilePromise === loadPromise) {
+        this.inFlightProfilePromise = null;
+        this.inFlightProfileUserId = null;
+      }
+    }
+  }
+
+  private async executeLoadUserProfile(targetUser: User): Promise<UserProfile> {
     const fallback = this.buildFallbackProfile(targetUser);
-    if (!this.isBrowser || !this.client) {
+    if (!this.isBrowser || !this.client || typeof this.client.from !== 'function') {
       this.userProfile.set(fallback);
+      this.hydratedProfileUserId = targetUser.id;
+      this.isTempFallbackProfile = false;
       return fallback;
     }
 
     try {
-      const { data, error } = await this.client
-        .from('user_profiles')
-        .select('id, email, first_name, last_name, role, plan, billing_cycle, subscription_status, subscription_id, customer_id, variant_id, current_period_end, customer_portal_url, is_suspended, created_at, updated_at')
-        .eq('id', targetUser.id)
-        .maybeSingle();
+      const { data, error } = await this.runWithTimeout(
+        this.client
+          .from('user_profiles')
+          .select('id, email, first_name, last_name, role, plan, billing_cycle, subscription_status, subscription_id, customer_id, variant_id, current_period_end, customer_portal_url, is_suspended, created_at, updated_at')
+          .eq('id', targetUser.id)
+          .maybeSingle()
+      );
 
       if (!error && data) {
         const record = data as Record<string, unknown>;
@@ -795,24 +909,28 @@ export class SupabaseService {
           updated_at: String(record['updated_at'] ?? fallback.updated_at)
         };
         this.userProfile.set(profile);
+        this.hydratedProfileUserId = targetUser.id;
+        this.isTempFallbackProfile = false;
         return profile;
       }
 
       if (!error && !data) {
         // Auto-crear perfil inicial si no existe en user_profiles (OAuth con Google o confirmación de correo)
         try {
-          await this.client.from('user_profiles').upsert({
-            id: targetUser.id,
-            email: fallback.email,
-            first_name: fallback.first_name,
-            last_name: fallback.last_name,
-            plan: fallback.plan,
-            billing_cycle: fallback.billing_cycle ?? 'monthly',
-            subscription_status: fallback.subscription_status ?? 'free',
-            role: fallback.role,
-            is_suspended: false,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'id' });
+          await this.runWithTimeout(
+            this.client.from('user_profiles').upsert({
+              id: targetUser.id,
+              email: fallback.email,
+              first_name: fallback.first_name,
+              last_name: fallback.last_name,
+              plan: fallback.plan,
+              billing_cycle: fallback.billing_cycle ?? 'monthly',
+              subscription_status: fallback.subscription_status ?? 'free',
+              role: fallback.role,
+              is_suspended: false,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'id' })
+          );
         } catch {
           // Si falla RLS o la conexión, se mantiene el fallback local seguro
         }
@@ -822,6 +940,8 @@ export class SupabaseService {
     }
 
     this.userProfile.set(fallback);
+    this.hydratedProfileUserId = targetUser.id;
+    this.isTempFallbackProfile = false;
     return fallback;
   }
 
@@ -934,29 +1054,47 @@ export class SupabaseService {
       return this.currentUser();
     }
 
-    try {
-      const { data } = await this.client.auth.getSession();
-      const activeSession = data?.session ?? null;
-      this.session.set(activeSession);
-      const user = activeSession?.user ?? null;
-      this.currentUser.set(user);
-      if (user) {
-        if (!this.userProfile() || this.userProfile()?.id !== user.id) {
-          await this.loadUserProfile(user);
+    if (this.inFlightSyncPromise) {
+      return this.inFlightSyncPromise;
+    }
+
+    const syncPromise = (async (): Promise<User | null> => {
+      try {
+        const { data } = await this.runWithTimeout(this.client!.auth.getSession());
+        const activeSession = data?.session ?? null;
+        this.session.set(activeSession);
+        const user = activeSession?.user ?? null;
+        this.currentUser.set(user);
+        if (user) {
+          if (!this.userProfile() || this.userProfile()?.id !== user.id || this.isTempFallbackProfile) {
+            await this.loadUserProfile(user);
+          }
+        } else {
+          this.userProfile.set(null);
+          this.hydratedProfileUserId = null;
+          this.isTempFallbackProfile = false;
         }
-      } else {
-        this.userProfile.set(null);
+        return user;
+      } catch {
+        return this.currentUser();
+      } finally {
+        this.isAuthLoading.set(false);
       }
-      return user;
-    } catch {
-      return this.currentUser();
+    })();
+
+    this.inFlightSyncPromise = syncPromise;
+    try {
+      return await syncPromise;
     } finally {
-      this.isAuthLoading.set(false);
+      if (this.inFlightSyncPromise === syncPromise) {
+        this.inFlightSyncPromise = null;
+      }
     }
   }
 
   /**
-   * Espera a que termine de restaurarse la sesión inicial desde `localStorage` antes de evaluar guardias de ruta.
+   * Espera a que termine de restaurarse la sesión inicial desde `localStorage` (`getSession`)
+   * Y a que concluya la hidratación de `userProfile` (`loadUserProfile`) antes de evaluar guardias de ruta.
    */
   async waitForAuthReady(): Promise<User | null> {
     if (this.authInitPromise) {
@@ -966,9 +1104,37 @@ export class SupabaseService {
         // Ignorar errores de inicialización y continuar con sincronización directa
       }
     }
-    if (this.isAuthLoading() || !this.currentUser()) {
-      return this.syncAuthSession();
+
+    const clientChanged = this.client !== this.initClientRef;
+    if (this.isAuthLoading() || (!this.currentUser() && (!this.authInitPromise || clientChanged))) {
+      const syncedUser = await this.syncAuthSession();
+      if (syncedUser && this.inFlightProfilePromise && this.inFlightProfileUserId === syncedUser.id) {
+        try {
+          await this.inFlightProfilePromise;
+        } catch {
+          // Respaldo manejado internamente en loadUserProfile
+        }
+      }
+      return syncedUser;
     }
+
+    const activeUser = this.currentUser();
+    if (activeUser) {
+      if (this.inFlightProfilePromise && this.inFlightProfileUserId === activeUser.id) {
+        try {
+          await this.inFlightProfilePromise;
+        } catch {
+          // Respaldo manejado internamente en loadUserProfile
+        }
+      } else if (
+        !this.userProfile() ||
+        this.userProfile()?.id !== activeUser.id ||
+        this.isTempFallbackProfile
+      ) {
+        await this.loadUserProfile(activeUser);
+      }
+    }
+
     return this.currentUser();
   }
 
@@ -1317,6 +1483,8 @@ export class SupabaseService {
     this.session.set(null);
     this.currentUser.set(null);
     this.userProfile.set(null);
+    this.hydratedProfileUserId = null;
+    this.isTempFallbackProfile = false;
     this.isPasswordRecoveryMode.set(false);
     this.cloudProjects.set([]);
     await this.refreshProjects();
