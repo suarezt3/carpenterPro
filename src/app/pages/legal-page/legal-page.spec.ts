@@ -173,17 +173,35 @@ describe('LegalPageComponent (Centro Legal Público: /terms, /privacy, /refunds)
     expect(el.scrollTop).toBe(0);
   });
 
-  it('debe mantener estructura de scroll sin overflow-hidden ni h-screen restrictivo, cabecera sticky e iconos Hugeicons puros', () => {
+  it('debe mantener estructura de scroll fluida sin pb-28 ni espacio vacío inferior, cierre limpio del footer, cabecera sticky e iconos Hugeicons puros', () => {
     const el = fixture.nativeElement as HTMLElement;
     const container = el.querySelector<HTMLElement>('[data-testid="legal-page-container"]');
     const header = el.querySelector<HTMLElement>('header');
+    const main = el.querySelector<HTMLElement>('main');
+    const footer = el.querySelector<HTMLElement>('[data-testid="legal-footer"]');
 
     expect(container).toBeTruthy();
     expect(container?.classList.contains('overflow-hidden')).toBe(false);
     expect(container?.classList.contains('h-screen')).toBe(false);
-    expect(container?.classList.contains('min-h-screen')).toBe(true);
+    expect(container?.classList.contains('pb-28')).toBe(false);
+    expect(container?.classList.contains('min-h-full')).toBe(true);
     expect(container?.classList.contains('w-full')).toBe(true);
-    expect(container?.classList.contains('pb-28')).toBe(true);
+    expect(container?.classList.contains('flex')).toBe(true);
+    expect(container?.classList.contains('flex-col')).toBe(true);
+
+    expect(main).toBeTruthy();
+    expect(main?.classList.contains('flex-1')).toBe(true);
+    expect(main?.classList.contains('pb-8')).toBe(true);
+    expect(main?.classList.contains('sm:pb-10')).toBe(true);
+    expect(main?.classList.contains('pb-16')).toBe(false);
+    expect(main?.classList.contains('sm:pb-20')).toBe(false);
+
+    expect(footer).toBeTruthy();
+    expect(footer?.classList.contains('border-t')).toBe(true);
+    expect(footer?.classList.contains('border-zinc-200')).toBe(true);
+    expect(footer?.classList.contains('border-y')).toBe(false);
+    expect(footer?.classList.contains('mt-auto')).toBe(true);
+    expect(footer?.classList.contains('py-6')).toBe(true);
 
     expect(header?.classList.contains('sticky')).toBe(true);
     expect(header?.classList.contains('top-0')).toBe(true);
