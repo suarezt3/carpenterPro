@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   OnInit,
   computed,
   inject,
@@ -13,6 +14,7 @@ import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   AlertCircleIcon,
   ArrowLeft01Icon,
+  ArrowUp01Icon,
   BookOpen01Icon,
   CheckListIcon,
   CheckmarkCircle02Icon,
@@ -47,10 +49,12 @@ export interface LegalTabItem {
 export class LegalPageComponent implements OnInit {
   readonly supabaseService = inject(SupabaseService);
   private readonly router = inject(Router);
+  private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly icons = {
     brand: Compass01Icon,
     arrowLeft: ArrowLeft01Icon,
+    arrowUp: ArrowUp01Icon,
     shield: Shield01Icon,
     book: BookOpen01Icon,
     checklist: CheckListIcon,
@@ -117,6 +121,7 @@ export class LegalPageComponent implements OnInit {
       )
       .subscribe((event) => {
         this.syncDocFromUrl(event.urlAfterRedirects || event.url);
+        this.scrollToTop();
       });
   }
 
@@ -138,6 +143,24 @@ export class LegalPageComponent implements OnInit {
     if (!this.router.url.startsWith(targetUrl)) {
       void this.router.navigateByUrl(targetUrl);
     }
+    this.scrollToTop();
+  }
+
+  onFooterLinkClick(doc: LegalDocType): void {
+    this.activeDoc.set(doc);
+    this.scrollToTop();
+  }
+
+  scrollToTop(): void {
+    const hostEl = this.elementRef.nativeElement;
+    if (!hostEl) {
+      return;
+    }
+    if (typeof hostEl.scrollTo === 'function') {
+      hostEl.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    hostEl.scrollTop = 0;
   }
 
   private syncDocFromUrl(url: string): void {

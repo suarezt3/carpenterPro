@@ -1,7 +1,9 @@
-<div class="min-h-screen w-full bg-zinc-50 text-zinc-900 font-sans antialiased flex flex-col justify-between selection:bg-zinc-900 selection:text-white">
+<div
+  data-testid="legal-page-container"
+  class="min-h-screen w-full pb-28 bg-zinc-50 text-zinc-900 font-sans antialiased flex flex-col justify-between selection:bg-zinc-900 selection:text-white">
 
   <!-- CABECERA SUPERIOR EDITORIAL -->
-  <header class="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-zinc-200 shadow-2xs">
+  <header class="sticky top-0 z-30 w-full bg-white/95 backdrop-blur-xs border-b border-zinc-200 shadow-2xs">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
 
       <!-- Identidad de Marca -->
@@ -52,7 +54,7 @@
   </header>
 
   <!-- CONTENIDO PRINCIPAL -->
-  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 sm:pt-12 sm:pb-20 space-y-8">
 
     <!-- BLOQUE INTRODUCTORIO Y METADATOS DE TRANSPARENCIA -->
     <section class="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-5">
@@ -384,23 +386,66 @@
   </main>
 
   <!-- PIE DE PÁGINA DEL CENTRO LEGAL -->
-  <footer class="bg-white border-t border-zinc-200 py-6 text-xs text-zinc-500">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-2">
-        <span class="font-bold text-zinc-900">© Piezo3D Studio</span>
-        <span>·</span>
-        <span>Todos los derechos reservados</span>
+  <footer data-testid="legal-footer" class="bg-white border-y border-zinc-200 py-8 text-xs text-zinc-500">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span class="font-bold text-zinc-900">© Piezo3D Studio</span>
+          <span aria-hidden="true">·</span>
+          <span>Todos los derechos reservados</span>
+          <span aria-hidden="true">·</span>
+          <a
+            [href]="'mailto:' + supportEmail()"
+            data-testid="legal-footer-email"
+            class="text-sky-600 hover:text-sky-700 font-semibold transition">
+            {{ supportEmail() }}
+          </a>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            (click)="scrollToTop()"
+            data-testid="legal-back-to-top-btn"
+            class="inline-flex items-center justify-center gap-1.5 px-3.5 min-h-9 rounded-lg bg-zinc-100 hover:bg-zinc-200/80 border border-zinc-200 text-zinc-800 text-xs font-semibold transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.arrowUp" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+            <span>Volver arriba</span>
+          </button>
+
+          <a
+            routerLink="/"
+            data-testid="legal-footer-home-btn"
+            class="inline-flex items-center justify-center gap-1.5 px-3.5 min-h-9 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold shadow-2xs transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.arrowLeft" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+            <span>Volver al Inicio</span>
+          </a>
+        </div>
       </div>
 
-      <div class="flex flex-wrap items-center justify-center gap-4">
-        <a routerLink="/terms" class="hover:text-zinc-900 font-medium transition">Términos y Condiciones</a>
-        <span>·</span>
-        <a routerLink="/privacy" class="hover:text-zinc-900 font-medium transition">Política de Privacidad</a>
-        <span>·</span>
-        <a routerLink="/refunds" class="hover:text-zinc-900 font-medium transition">Política de Reembolsos</a>
-        <span>·</span>
-        <a [href]="'mailto:' + supportEmail()" class="text-sky-600 hover:text-sky-700 font-semibold transition">{{ supportEmail() }}</a>
+      <div class="pt-5 border-t border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <nav aria-label="Enlaces directos a secciones legales" class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          @for (tab of tabs; track tab.id; let isLast = $last) {
+            <a
+              [routerLink]="tab.route"
+              [attr.data-testid]="'legal-footer-link-' + tab.id"
+              (click)="onFooterLinkClick(tab.id)"
+              [class]="activeDoc() === tab.id
+                ? 'text-zinc-900 font-bold underline decoration-sky-600 underline-offset-4 transition cursor-pointer'
+                : 'text-zinc-600 hover:text-zinc-900 font-medium transition cursor-pointer'">
+              {{ tab.label }}
+            </a>
+            @if (!isLast) {
+              <span aria-hidden="true" class="text-zinc-300">·</span>
+            }
+          }
+        </nav>
+
+        <span class="text-[11px] text-zinc-500">
+          Centro Legal · {{ appVersion() }}
+        </span>
       </div>
+
     </div>
   </footer>
 
