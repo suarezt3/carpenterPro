@@ -607,9 +607,9 @@ describe('ProjectStorageService - Duplicación Inteligente y Restricciones Espac
       expect(frontPart).toBeDefined();
       expect(frontPart.length).toBe(596); // 600 - 4mm (en vertical_xy length mapea al ancho horizontal X)
 
-      // Verificar que la cara trasera del frente solapado está a +0.5mm delante de los laterales del módulo
+      // Verificar que la cara trasera del frente solapado está a +2.0mm delante de los laterales del módulo (gap anti-colisión > 1.5mm)
       const frontBounds = partGeometry.getWorldAABB(frontPart);
-      expect(frontBounds.minZ).toBeCloseTo(cavity.frontPlaneZ + 0.5, 1);
+      expect(frontBounds.minZ).toBeCloseTo(cavity.frontPlaneZ + 2, 1);
 
       // Cero colisiones en JoineryEngineService.detectCollisions()
       const collisions = joineryEngine.detectCollisions(allParts);
@@ -665,10 +665,10 @@ describe('ProjectStorageService - Duplicación Inteligente y Restricciones Espac
       const frontBounds = partGeometry.getWorldAABB(frontPart);
       expect(frontBounds.maxZ).toBeCloseTo(cavity.frontPlaneZ, 1);
 
-      // Retraso automático de la caja interna por espesorFrente (18mm)
+      // Retraso automático de la caja interna por espesorFrente (18mm) + 2.0mm de gap anti-colisión
       const sidePart = drawerParts.find(p => p.name.includes('Lateral Izq'))!;
       const sideBounds = partGeometry.getWorldAABB(sidePart);
-      expect(sideBounds.maxZ).toBeCloseTo(cavity.frontPlaneZ - 18, 1);
+      expect(sideBounds.maxZ).toBeCloseTo(cavity.frontPlaneZ - 20, 1);
 
       // Cero colisiones en JoineryEngineService.detectCollisions()
       const collisions = joineryEngine.detectCollisions(allParts);

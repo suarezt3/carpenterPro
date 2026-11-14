@@ -57,6 +57,7 @@ import {
   RoomConfiguration,
   RoomWallInstance,
   getResolvedRoomWalls,
+  getWallHalfSpans,
   DEFAULT_ROOM_CONFIG,
   ApplianceItem,
   ModuleCavityInfo,
@@ -110,6 +111,16 @@ interface GizmoHitData {
   posAxisW?: 'posX' | 'posY' | 'posZ';
   worldHitPos?: THREE.Vector3;
   cursor?: string;
+}
+
+interface WallGizmoHitData {
+  isWallGizmo: boolean;
+  type: 'wall_move' | 'wall_stretch' | 'wall_stretch_height';
+  gizmoType?: 'wall_move' | 'wall_stretch' | 'wall_stretch_height';
+  axis?: 'x' | 'y' | 'z';
+  wallTarget?: string;
+  wallId?: string;
+  endSign?: 1 | -1;
 }
 
 interface PartStretchAxesConfig {
@@ -903,12 +914,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private wallGizmoGroup = new THREE.Group();
   private wallGizmoHitMeshes: THREE.Mesh[] = [];
   private isWallGizmoDragging = false;
-  private activeWallGizmoHit: {
-    isWallGizmo: boolean;
-    type: 'wall_move' | 'wall_stretch' | 'wall_stretch_height';
-    axis?: 'x' | 'y' | 'z';
-    wallTarget?: string;
-  } | null = null;
+  private activeWallGizmoHit: WallGizmoHitData | null = null;
+  private activeWallStretchEndSign: 1 | -1 = 1;
+  private wallHeightDragPlane = new THREE.Plane();
+  private wallHeightDragStartPoint = new THREE.Vector3();
   private initialWallLength = 0;
   private initialWallHeight = 0;
   private pendingWallUpdates: { wallId: string; updates: Partial<RoomWallInstance> } | null = null;
@@ -1049,7 +1058,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const config = this.roomConfig();
       const mode = this.workspaceMode();
       if (this.scene) {
-        this.updateWallGizmo(wallType, config, mode);
+        const activeOverride =
+          (this.isWallDragging || this.isWallGizmoDragging) &&
+          this.pendingWallUpdates &&
+          this.pendingWallUpdates.wallId === wallType
+            ? this.pendingWallUpdates.updates
+            : undefined;
+        this.updateWallGizmo(wallType, config, mode, activeOverride);
         this.requestRender(8);
       }
     });
@@ -1091,13 +1106,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (!this.scene || this.pieceObjects.length === 0) return;
       let changed = false;
       for (const g of groups) {
-        if (g.type === 'drawer' || g.subType === 'drawer' || g.templateId === 'modular_drawer') {
+        if (this.isModularDrawerGroup(g.id)) {
           const ext = g.slideExtension !== undefined ? g.slideExtension : (g.isOpen ? 1 : 0);
           for (const p of this.pieceObjects) {
             if (p.part.groupId === g.id) {
               const prev = this.openTargetMap.get(p.part.id) ?? 0;
-              const curAnim = this.openCurrentMap.get(p.part.id) ?? 0;
-              if (Math.abs(prev - ext) > 0.005 || Math.abs(curAnim - ext) > 0.005) {
+              if (Math.abs(prev - ext) > 0.005) {
                 this.openTargetMap.set(p.part.id, ext);
                 changed = true;
               }
@@ -1323,6 +1337,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.isWhiteTheme.update(v => !v);
     this.applyThemeColors();
     this.updateReferenceGuideScene();
+    if (this.scene) {
+      this.updateSelectionHighlights(this.activeSelectedIds(), this.materials(), this.isXRay());
+    }
     this.requestRender(8);
   }
 
@@ -4894,88 +4911,85 @@ private createHandleMesh(
     isHovered = false,
     showEditIndicator = true
   ) {
-    const x = 6;
-    const y = 6;
-    const w = width - 12;
-    const h = height - 12;
-    const r = 24;
+    const isWhite = this.isWhiteTheme();
+    const accentColor = borderColor === '#10b981'
+      ? (isWhite ? '#059669' : '#34d399')
+      : (isWhite ? '#0284c7' : '#38bdf8');
+    const textColor = isHovered
+      ? accentColor
+      : (isWhite ? '#18181b' : '#f8fafc');
+    const haloColor = isWhite
+      ? 'rgba(255, 255, 255, 0.96)'
+      : 'rgba(24, 24, 27, 0.94)';
 
-    const baseBorderColor = isHovered
-      ? (borderColor === '#10b981' ? '#34d399' : '#60a5fa')
-      : borderColor;
-
-    // Fondo gris pizarra oscuro enterprise de alto contraste (#0f172a, 92-98% opacidad)
+    // Tipografía CAD limpia flotando directamente sobre las líneas punteadas (sin caja/pastilla opaca)
     ctx.save();
-    ctx.fillStyle = isHovered ? 'rgba(15, 23, 42, 0.98)' : 'rgba(15, 23, 42, 0.92)';
-    ctx.strokeStyle = baseBorderColor;
-    ctx.lineWidth = isHovered ? 6 : 5; // 2.5px aparente en escala retina
-    if (isHovered) {
-      ctx.shadowColor = baseBorderColor;
-      ctx.shadowBlur = 10;
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.arcTo(x + w, y, x + w, y + r, r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-    ctx.lineTo(x + r, y + h);
-    ctx.arcTo(x, y + h, x, y + h - r, r);
-    ctx.lineTo(x, y + r);
-    ctx.arcTo(x, y, x + r, y, r);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    // Número grande protagonista en negrita con sombra suave
-    ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 2;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 38px "JetBrains Mono", "Inter", -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.font = '700 38px "JetBrains Mono", "Inter", -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const textCenterX = showEditIndicator ? width / 2 - 14 : width / 2;
-    ctx.fillText(text, textCenterX, height / 2 + 1);
+    const textCenterX = (isHovered && showEditIndicator) ? width / 2 - 14 : width / 2;
+    const textCenterY = height / 2 + 1;
+
+    if (typeof ctx.strokeText === 'function') {
+      ctx.strokeStyle = haloColor;
+      ctx.lineWidth = 8;
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      ctx.strokeText(text, textCenterX, textCenterY);
+    }
+
+    ctx.fillStyle = textColor;
+    ctx.fillText(text, textCenterX, textCenterY);
+
+    const measuredW = typeof ctx.measureText === 'function'
+      ? Math.min(width - (showEditIndicator ? 96 : 48), Math.max(96, Math.round(ctx.measureText(text).width)))
+      : Math.min(width - 96, Math.max(100, text.length * 22));
     ctx.restore();
 
-    // Indicador sutil de cota clicable/editable (mini icono vector de edición)
-    if (showEditIndicator) {
+    // En hover, subrayado fino limpio e icono sutil de edición si aplica
+    if (isHovered) {
       ctx.save();
-      ctx.strokeStyle = baseBorderColor;
-      ctx.fillStyle = baseBorderColor;
-      ctx.lineWidth = 3;
+      const underlineY = textCenterY + 24;
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 3.5;
       ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      const px = width - 52;
-      const py = height / 2 - 8;
       ctx.beginPath();
-      ctx.moveTo(px, py + 12);
-      ctx.lineTo(px + 12, py);
-      ctx.lineTo(px + 16, py + 4);
-      ctx.lineTo(px + 4, py + 16);
-      ctx.closePath();
+      ctx.moveTo(textCenterX - measuredW / 2, underlineY);
+      ctx.lineTo(textCenterX + measuredW / 2, underlineY);
       ctx.stroke();
 
-      ctx.beginPath();
-      ctx.moveTo(px, py + 12);
-      ctx.lineTo(px - 3, py + 18);
-      ctx.lineTo(px + 4, py + 16);
-      ctx.closePath();
-      ctx.fill();
+      if (showEditIndicator) {
+        const px = width - 52;
+        const py = height / 2 - 8;
+        ctx.fillStyle = accentColor;
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(px, py + 12);
+        ctx.lineTo(px + 12, py);
+        ctx.lineTo(px + 16, py + 4);
+        ctx.lineTo(px + 4, py + 16);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(px, py + 12);
+        ctx.lineTo(px - 3, py + 18);
+        ctx.lineTo(px + 4, py + 16);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.restore();
     }
   }
 
   // Generates 3D billboard sprite with high-res text (cached in badgeSpriteCache LRU to avoid allocations and leaks)
   private createTextSprite(text: string): THREE.Sprite {
-    const idleMat = this.getCachedBadgeMaterial(`dim_sprite_hd_${text}_idle`, 512, 136, (ctx) => {
+    const themeKey = this.isWhiteTheme() ? 'light' : 'dark';
+    const idleMat = this.getCachedBadgeMaterial(`dim_sprite_hd_${themeKey}_${text}_idle`, 512, 136, (ctx) => {
       this.drawEnterprisePillBadge(ctx, 512, 136, text, '#3b82f6', false, true);
     });
-    const hoverMat = this.getCachedBadgeMaterial(`dim_sprite_hd_${text}_hover`, 512, 136, (ctx) => {
+    const hoverMat = this.getCachedBadgeMaterial(`dim_sprite_hd_${themeKey}_${text}_hover`, 512, 136, (ctx) => {
       this.drawEnterprisePillBadge(ctx, 512, 136, text, '#3b82f6', true, true);
     });
 
@@ -5038,11 +5052,12 @@ private createHandleMesh(
 
   // Generates Emerald Green 3D billboard sprite for Clearance Dimensions (Luz Libre)
   private createClearanceSprite(text: string, isEditable = true): THREE.Sprite {
-    const idleMat = this.getCachedBadgeMaterial(`clearance_hd_${text}_idle_${isEditable ? 'e' : 'r'}`, 512, 136, (ctx) => {
+    const themeKey = this.isWhiteTheme() ? 'light' : 'dark';
+    const idleMat = this.getCachedBadgeMaterial(`clearance_hd_${themeKey}_${text}_idle_${isEditable ? 'e' : 'r'}`, 512, 136, (ctx) => {
       this.drawEnterprisePillBadge(ctx, 512, 136, text, '#10b981', false, isEditable);
     });
     const hoverMat = isEditable
-      ? this.getCachedBadgeMaterial(`clearance_hd_${text}_hover`, 512, 136, (ctx) => {
+      ? this.getCachedBadgeMaterial(`clearance_hd_${themeKey}_${text}_hover`, 512, 136, (ctx) => {
           this.drawEnterprisePillBadge(ctx, 512, 136, text, '#10b981', true, true);
         })
       : idleMat;
@@ -5140,7 +5155,52 @@ private createHandleMesh(
     };
   }
 
+  private isDrawerSubPartName(name: string | undefined): boolean {
+    const uName = (name || '').toUpperCase();
+    return (
+      uName.includes('FONDO MDF') ||
+      uName.includes('FRENTE CAJ') ||
+      uName.includes('TRASERA CAJ') ||
+      uName.includes('CONTRA-FRENTE') ||
+      uName.includes('CONTRAFRENTE')
+    );
+  }
+
+  private isDrawerSubPartRole(part: Part): boolean {
+    return (
+      part.componentRole === 'drawer_box' ||
+      part.componentRole === 'drawer_front' ||
+      part.componentRole === 'drawer_bottom' ||
+      part.componentRole === 'drawer_lateral' ||
+      this.isDrawerSubPartName(part.name)
+    );
+  }
+
+  private isModularDrawerGroup(groupId: string | undefined): boolean {
+    if (!groupId) return false;
+    const grp = this.partGroups().find(g => g.id === groupId);
+    if (
+      grp &&
+      (grp.type === 'drawer' ||
+        grp.subType === 'drawer' ||
+        grp.templateId === 'modular_drawer' ||
+        !!grp.drawerConfig)
+    ) {
+      return true;
+    }
+    const groupParts = this.parts().filter(p => p.groupId === groupId);
+    if (groupParts.length === 0) return false;
+    return groupParts.every(p => this.isDrawerSubPartRole(p));
+  }
+
+  private isModularDrawerPart(part: Part): boolean {
+    if (!part) return false;
+    if (this.isDrawerSubPartRole(part)) return true;
+    return !!part.groupId && this.isModularDrawerGroup(part.groupId);
+  }
+
   isInternalShelf(part: Part): boolean {
+    if (this.isModularDrawerPart(part)) return false;
     return this.partGeometry.isInternalShelf(part);
   }
 
@@ -5287,11 +5347,12 @@ private createHandleMesh(
   private createInternalClearanceBadge(text: string, isWide = false, isEditable = true): THREE.Sprite {
     const w = 512;
     const h = 136;
-    const idleMat = this.getCachedBadgeMaterial(`internal_clr_hd_${text}_idle_${isEditable ? 'e' : 'r'}`, w, h, (ctx) => {
+    const themeKey = this.isWhiteTheme() ? 'light' : 'dark';
+    const idleMat = this.getCachedBadgeMaterial(`internal_clr_hd_${themeKey}_${text}_idle_${isEditable ? 'e' : 'r'}`, w, h, (ctx) => {
       this.drawEnterprisePillBadge(ctx, w, h, text, '#10b981', false, isEditable);
     });
     const hoverMat = isEditable
-      ? this.getCachedBadgeMaterial(`internal_clr_hd_${text}_hover`, w, h, (ctx) => {
+      ? this.getCachedBadgeMaterial(`internal_clr_hd_${themeKey}_${text}_hover`, w, h, (ctx) => {
           this.drawEnterprisePillBadge(ctx, w, h, text, '#10b981', true, true);
         })
       : idleMat;
@@ -5313,6 +5374,7 @@ private createHandleMesh(
   ) {
     this.disposeGroup(this.internalClearanceGroup);
     if (!this.showClearances()) return;
+    if (this.isModularDrawerGroup(groupId)) return;
 
     const moduleParts = this.parts().filter(
       p => p.groupId === groupId && !this.hiddenPartIds().has(p.id)
@@ -5444,9 +5506,9 @@ private createHandleMesh(
       const bayWidth = col.shelfBoundsList.length > 0
         ? col.shelfBoundsList[0].bounds.sx
         : (leftInnerX !== null && rightInnerX !== null ? Math.abs(rightInnerX - leftInnerX) : 400);
-      const lateralOffset = Math.max(35, Math.min(110, bayWidth * 0.20));
+      const lateralOffset = Math.max(48, Math.min(125, bayWidth * 0.24));
       const refX = col.refX + lateralOffset;
-      const refZ = Math.max(col.frontZ, maxModuleZ) + 26;
+      const refZ = Math.max(col.frontZ, maxModuleZ) + 28;
       const shelfBoundsList = col.shelfBoundsList;
 
       interface VerticalBay {
@@ -5587,13 +5649,13 @@ private createHandleMesh(
       }
     }
 
-    // 7. Cota Horizontal de Luz Interna (Ancho Útil) Limpia
+    // 7. Cota Horizontal de Luz Interna (Ancho Útil) Limpia separada de cotas verticales y manijas
     if (leftInnerX !== null && rightInnerX !== null) {
       const innerWidth = Math.round(rightInnerX - leftInnerX);
       if (innerWidth > 40) {
         const maxZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
-        const refZ = maxZ + 26;
-        const yLine = floorTopY + 28;
+        const refZ = maxZ + 46;
+        const yLine = floorTopY >= 24 ? floorTopY - 12 : floorTopY + 14;
         const pLeft = new THREE.Vector3(leftInnerX, yLine, refZ);
         const pRight = new THREE.Vector3(rightInnerX, yLine, refZ);
         const horizGeo = new THREE.BufferGeometry().setFromPoints([pLeft, pRight]);
@@ -5632,8 +5694,10 @@ private createHandleMesh(
         this.internalClearanceGroup.add(tL, tR);
 
         const midX = (leftInnerX + rightInnerX) / 2;
+        const badgeOffsetX = floorTopY >= 24 ? 0 : -Math.min(55, innerWidth * 0.14);
+        const badgeY = floorTopY >= 24 ? yLine - 18 : yLine + 16;
         const horizBadge = this.createInternalClearanceBadge(`↔ ${innerWidth} mm`, true, false);
-        horizBadge.position.set(midX, yLine + 22, refZ + 12);
+        horizBadge.position.set(midX + badgeOffsetX, badgeY, refZ + 10);
         this.internalClearanceGroup.add(horizBadge);
       }
     }
@@ -5659,14 +5723,17 @@ private createHandleMesh(
       depthTest: false
     });
     const tickMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2, depthTest: false });
-    const lateralOffset = Math.max(30, Math.min(100, selBounds.sx * 0.20));
+    const lateralOffset = Math.max(42, Math.min(115, selBounds.sx * 0.22));
+    const vertZ = selBounds.pz + selBounds.sz / 2 + 30;
+    const horizY = Math.max(24, selBounds.py - Math.min(26, selBounds.sy * 0.25));
+    const horizZ = selBounds.pz + selBounds.sz / 2 + 46;
 
     // Render Vertical Top Clearance Line
     if (clr.topClearance !== null && clr.topClearance > 5) {
       const topY = selBounds.maxY + clr.topClearance;
       const midY = (selBounds.maxY + topY) / 2;
       const x = selBounds.px + lateralOffset;
-      const z = selBounds.pz + selBounds.sz / 2 + 28;
+      const z = vertZ;
 
       const p1 = new THREE.Vector3(x, selBounds.maxY, z);
       const p2 = new THREE.Vector3(x, topY, z);
@@ -5712,7 +5779,7 @@ private createHandleMesh(
       const botY = selBounds.minY - clr.bottomClearance;
       const midY = (selBounds.minY + botY) / 2;
       const x = selBounds.px + lateralOffset;
-      const z = selBounds.pz + selBounds.sz / 2 + 28;
+      const z = vertZ;
 
       const p1 = new THREE.Vector3(x, botY, z);
       const p2 = new THREE.Vector3(x, selBounds.minY, z);
@@ -5752,12 +5819,12 @@ private createHandleMesh(
       this.dimensionGroup.add(sprite);
     }
 
-    // Render Horizontal Left Clearance Line
+    // Render Horizontal Left Clearance Line (separada en altura y profundidad respecto a cotas verticales/manijas)
     if (clr.leftClearance !== null && clr.leftClearance > 5) {
       const leftX = selBounds.minX - clr.leftClearance;
       const midX = (selBounds.minX + leftX) / 2;
-      const y = selBounds.py;
-      const z = selBounds.pz + selBounds.sz / 2 + 28;
+      const y = horizY;
+      const z = horizZ;
 
       const p1 = new THREE.Vector3(leftX, y, z);
       const p2 = new THREE.Vector3(selBounds.minX, y, z);
@@ -5766,8 +5833,19 @@ private createHandleMesh(
       dashedLine.computeLineDistances();
       this.dimensionGroup.add(dashedLine);
 
+      const tickH = 14;
+      const t1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(leftX, y - tickH, z),
+        new THREE.Vector3(leftX, y + tickH, z)
+      ]), tickMat);
+      const t2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(selBounds.minX, y - tickH, z),
+        new THREE.Vector3(selBounds.minX, y + tickH, z)
+      ]), tickMat);
+      this.dimensionGroup.add(t1, t2);
+
       const sprite = this.createClearanceSprite(`↔ ${clr.leftClearance} mm`, false);
-      sprite.position.set(midX, y + 25, z + 12);
+      sprite.position.set(midX, y + 20, z + 10);
       sprite.userData = {
         ...sprite.userData,
         baseScaleX: 140,
@@ -5780,8 +5858,8 @@ private createHandleMesh(
     if (clr.rightClearance !== null && clr.rightClearance > 5) {
       const rightX = selBounds.maxX + clr.rightClearance;
       const midX = (selBounds.maxX + rightX) / 2;
-      const y = selBounds.py;
-      const z = selBounds.pz + selBounds.sz / 2 + 28;
+      const y = horizY;
+      const z = horizZ;
 
       const p1 = new THREE.Vector3(selBounds.maxX, y, z);
       const p2 = new THREE.Vector3(rightX, y, z);
@@ -5790,8 +5868,19 @@ private createHandleMesh(
       dashedLine.computeLineDistances();
       this.dimensionGroup.add(dashedLine);
 
+      const tickH = 14;
+      const t1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(selBounds.maxX, y - tickH, z),
+        new THREE.Vector3(selBounds.maxX, y + tickH, z)
+      ]), tickMat);
+      const t2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(rightX, y - tickH, z),
+        new THREE.Vector3(rightX, y + tickH, z)
+      ]), tickMat);
+      this.dimensionGroup.add(t1, t2);
+
       const sprite = this.createClearanceSprite(`↔ ${clr.rightClearance} mm`, false);
-      sprite.position.set(midX, y + 25, z + 12);
+      sprite.position.set(midX, y + 20, z + 10);
       sprite.userData = {
         ...sprite.userData,
         baseScaleX: 140,
@@ -6346,16 +6435,13 @@ private createHandleMesh(
       const wallGizmoIntersects = this.raycaster.intersectObjects(this.wallGizmoHitMeshes, true);
       if (wallGizmoIntersects.length > 0) {
         const hitObj = wallGizmoIntersects[0].object;
-        const hitData = hitObj.userData as {
-          isWallGizmo: boolean;
-          type: 'wall_move' | 'wall_stretch' | 'wall_stretch_height';
-          axis?: 'x' | 'y' | 'z';
-          wallTarget?: string;
-        };
-        if (hitData && hitData.isWallGizmo && hitData.wallTarget) {
+        const hitData = hitObj.userData as WallGizmoHitData;
+        const gizmoType = hitData?.gizmoType || hitData?.type;
+        const wallTarget = hitData?.wallTarget || hitData?.wallId;
+        if (hitData && hitData.isWallGizmo && wallTarget && gizmoType) {
           const cfg = this.roomConfig();
-          const targetWall = getResolvedRoomWalls(cfg).find(w => w.id === hitData.wallTarget);
-          const isLocked = !targetWall || !!cfg.isWallsLocked || !!targetWall.isLocked || !!cfg.lockedWalls?.[hitData.wallTarget];
+          const targetWall = getResolvedRoomWalls(cfg).find(w => w.id === wallTarget);
+          const isLocked = !targetWall || !!cfg.isWallsLocked || !!targetWall.isLocked || !!cfg.lockedWalls?.[wallTarget];
           if (isLocked || !targetWall) {
             e.preventDefault();
             e.stopPropagation();
@@ -6363,24 +6449,62 @@ private createHandleMesh(
           }
 
           this.isWallGizmoDragging = true;
-          this.activeWallGizmoHit = hitData;
-          this.activeWallTarget = hitData.wallTarget;
+          this.activeWallGizmoHit = {
+            ...hitData,
+            type: gizmoType,
+            gizmoType,
+            wallTarget,
+            wallId: wallTarget
+          };
+          this.activeWallTarget = wallTarget;
+          this.activeWallStretchEndSign = hitData.endSign === -1 ? -1 : 1;
           this.dragStartPointer = { x: e.clientX, y: e.clientY };
           this.initialWallPosX = targetWall.posX;
           this.initialWallPosZ = targetWall.posZ;
           this.initialWallLength = targetWall.length;
           this.initialWallHeight = targetWall.height;
-          this.dragPlane.set(new THREE.Vector3(0, 1, 0), 0);
+          this.pendingWallUpdates = null;
+
+          if (gizmoType === 'wall_move') {
+            this.dragPlane.set(new THREE.Vector3(0, 1, 0), -(targetWall.height + 120));
+          } else if (gizmoType === 'wall_stretch') {
+            this.dragPlane.set(new THREE.Vector3(0, 1, 0), -(targetWall.height / 2));
+          } else if (gizmoType === 'wall_stretch_height') {
+            const camDir = new THREE.Vector3();
+            this.camera.getWorldDirection(camDir);
+            camDir.y = 0;
+            if (camDir.lengthSq() < 1e-6) {
+              camDir.set(0, 0, -1);
+            } else {
+              camDir.normalize();
+            }
+            const topAnchor = new THREE.Vector3(
+              this.initialWallPosX,
+              this.initialWallHeight,
+              this.initialWallPosZ
+            );
+            this.wallHeightDragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), topAnchor);
+            if (!this.raycaster.ray.intersectPlane(this.wallHeightDragPlane, this.wallHeightDragStartPoint)) {
+              this.wallHeightDragStartPoint.copy(topAnchor);
+            }
+            this.dragPlane.set(new THREE.Vector3(0, 1, 0), -this.initialWallHeight);
+          }
+
           const startHit = new THREE.Vector3();
           if (this.raycaster.ray.intersectPlane(this.dragPlane, startHit)) {
             this.dragPlaneIntersectionStart.copy(startHit);
           } else {
-            this.dragPlaneIntersectionStart.set(targetWall.posX, 0, targetWall.posZ);
+            const fallbackY = gizmoType === 'wall_move'
+              ? targetWall.height + 120
+              : gizmoType === 'wall_stretch'
+                ? targetWall.height / 2
+                : targetWall.height;
+            this.dragPlaneIntersectionStart.set(targetWall.posX, fallbackY, targetWall.posZ);
           }
           this.controls.enabled = false;
-          canvas.style.cursor = hitData.type === 'wall_stretch_height'
+          canvas.style.cursor = gizmoType === 'wall_stretch_height'
             ? 'ns-resize'
-            : hitData.type === 'wall_stretch'
+            : gizmoType === 'wall_stretch'
               ? 'ew-resize'
               : 'grabbing';
           e.preventDefault();
@@ -6522,10 +6646,13 @@ private createHandleMesh(
       }
     }
 
+    // Pre-evaluar intersección con muros en modo habitación para evitar seleccionar objetos detrás de un muro
+    const wallHit = this.findNearestWallHit();
+
     // 1.5 Check if clicking on an Appliance in 3D (Select & Free Mouse Drag)
     if (this.appliancesGroup.children.length > 0) {
       const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
-      if (appIntersects.length > 0) {
+      if (appIntersects.length > 0 && (!wallHit || appIntersects[0].distance <= wallHit.distance)) {
         const resolved = this.resolveApplianceFromObject(appIntersects[0].object);
         if (resolved) {
           const targetApp = resolved.app;
@@ -6605,7 +6732,7 @@ private createHandleMesh(
     if (this.showReferenceGuide() && this.referenceGuideGroup.children.length > 0) {
       const guideIntersects = this.raycaster.intersectObjects(this.referenceGuideGroup.children, true);
       const hitGuide = guideIntersects.find(h => h.object.userData?.['isReferenceGuide']);
-      if (hitGuide) {
+      if (hitGuide && (!wallHit || hitGuide.distance <= wallHit.distance)) {
         this.ngZone.run(() => {
           this.isReferenceGuideSelected.set(true);
           this.partSelected.emit(null);
@@ -6642,6 +6769,44 @@ private createHandleMesh(
 
     const intersects = this.raycaster.intersectObjects(targets, true);
 
+    if (wallHit && (intersects.length === 0 || wallHit.distance < intersects[0].distance)) {
+      const wallId = this.resolveWallIdFromObject(wallHit.object);
+      if (wallId) {
+        this.ngZone.run(() => {
+          this.selectedWallType.set(wallId);
+          this.wallSelected.emit(wallId);
+        });
+        const cfg = this.roomConfig();
+        const targetWall = getResolvedRoomWalls(cfg).find(w => w.id === wallId);
+        const isLocked = !targetWall || !!cfg.isWallsLocked || !!targetWall.isLocked || !!cfg.lockedWalls?.[wallId];
+        const canDragTool = this.activeTool() === 'select' || this.activeTool() === 'move';
+        if (e.button === 0 && canDragTool && !isLocked && targetWall) {
+          this.isWallDragging = true;
+          this.activeWallTarget = wallId;
+          this.dragStartPointer = { x: e.clientX, y: e.clientY };
+          this.initialWallPosX = targetWall.posX;
+          this.initialWallPosZ = targetWall.posZ;
+          this.initialWallLength = targetWall.length;
+          this.initialWallHeight = targetWall.height;
+          this.pendingWallUpdates = null;
+          this.dragPlane.set(new THREE.Vector3(0, 1, 0), -wallHit.point.y);
+          const startHit = new THREE.Vector3();
+          if (this.raycaster.ray.intersectPlane(this.dragPlane, startHit)) {
+            this.dragPlaneIntersectionStart.copy(startHit);
+          } else {
+            this.dragPlaneIntersectionStart.copy(wallHit.point);
+          }
+          this.controls.enabled = false;
+          canvas.style.cursor = 'move';
+          e.preventDefault();
+          e.stopPropagation();
+        } else {
+          this.isWallDragging = false;
+        }
+        return;
+      }
+    }
+
     if (intersects.length > 0) {
       const topHit = intersects[0].object as THREE.Mesh;
       let part = topHit.userData['part'] as Part | undefined;
@@ -6663,21 +6828,66 @@ private createHandleMesh(
 
       if (part) {
         const hitPart = part;
+        const isModularDrawer = !!hitPart.groupId && this.isModularDrawerGroup(hitPart.groupId);
+
         if (isHandle) {
-          this.ngZone.run(() => this.togglePartOpen(hitPart.id));
+          this.isDragging = false;
+          this.isDirectPieceDrag = false;
+          this.directPieceDragThresholdPassed = false;
+          this.activeGizmoHit = null;
+
+          this.ngZone.run(() => {
+            this.togglePartOpen(hitPart.id);
+
+            const curIds = this.activeSelectedIds();
+            if (isModularDrawer && hitPart.groupId) {
+              const drawerParts = this.parts().filter(p => p.groupId === hitPart.groupId);
+              const targetIds = drawerParts.length > 0 ? drawerParts.map(p => p.id) : [hitPart.id];
+              const alreadyFullDrawerSelected =
+                targetIds.length > 0 &&
+                targetIds.every(id => curIds.includes(id)) &&
+                curIds.length === targetIds.length;
+              if (!alreadyFullDrawerSelected) {
+                this.partsSelected.emit(targetIds);
+                this.partSelected.emit(hitPart);
+              }
+            } else if (!curIds.includes(hitPart.id)) {
+              if (hitPart.groupId) {
+                const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
+                const targetIds = groupParts.length > 0 ? groupParts.map(p => p.id) : [hitPart.id];
+                this.partsSelected.emit(targetIds);
+              } else {
+                this.partsSelected.emit([hitPart.id]);
+              }
+              this.partSelected.emit(hitPart);
+            }
+          });
+          return;
         }
+
         if (e.shiftKey) {
           this.ngZone.run(() => {
             const cur = [...this.activeSelectedIds()];
-            const idx = cur.indexOf(hitPart.id);
-            if (idx >= 0) {
-              cur.splice(idx, 1);
+            const idsToToggle = isModularDrawer && hitPart.groupId
+              ? this.parts().filter(p => p.groupId === hitPart.groupId).map(p => p.id)
+              : [hitPart.id];
+            const effectiveIds = idsToToggle.length > 0 ? idsToToggle : [hitPart.id];
+            const allPresent = effectiveIds.every(id => cur.includes(id));
+            if (allPresent) {
+              for (const id of effectiveIds) {
+                const idx = cur.indexOf(id);
+                if (idx >= 0) cur.splice(idx, 1);
+              }
             } else {
-              cur.push(hitPart.id);
+              for (const id of effectiveIds) {
+                if (!cur.includes(id)) cur.push(id);
+              }
             }
             this.partsSelected.emit(cur);
             if (cur.length === 0) {
               this.partSelected.emit(null);
+            } else if (!allPresent) {
+              this.partSelected.emit(hitPart);
             }
           });
         } else {
@@ -6693,7 +6903,13 @@ private createHandleMesh(
           const isCountertopUnit = hitPart.componentRole === 'countertop' || hitPart.componentRole === 'backsplash';
 
           this.ngZone.run(() => {
-            if (curIds.includes(hitPart.id) && curIds.length > 1) {
+            if (isModularDrawer && hitPart.groupId) {
+              // Cajón modular indivisible: cualquier clic (simple, re-clic o doble clic) sobre cualquiera de sus piezas selecciona todo el grupo
+              const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
+              partsToSelect = groupParts.length > 0 ? groupParts : [hitPart];
+              this.partsSelected.emit(partsToSelect.map(p => p.id));
+              this.partSelected.emit(hitPart);
+            } else if (curIds.includes(hitPart.id) && curIds.length > 1) {
               partsToSelect = this.parts().filter(p => curIds.includes(p.id));
               this.partsSelected.emit(curIds);
               this.partSelected.emit(hitPart);
@@ -6796,39 +7012,6 @@ private createHandleMesh(
         }
       }
     } else {
-      if (this.workspaceMode() === 'room') {
-        const roomHits = this.raycaster.intersectObjects(this.roomGroup.children, true);
-        const wallHit = roomHits.find(h => h.object.userData?.['isWall']);
-        if (wallHit) {
-          const wallId = (wallHit.object.userData['wallId'] || wallHit.object.userData['wallType']) as string;
-          this.ngZone.run(() => {
-            this.selectedWallType.set(wallId);
-            this.wallSelected.emit(wallId);
-          });
-          const cfg = this.roomConfig();
-          const targetWall = getResolvedRoomWalls(cfg).find(w => w.id === wallId);
-          const isLocked = !targetWall || !!cfg.isWallsLocked || !!targetWall.isLocked || !!cfg.lockedWalls?.[wallId];
-          if (!isLocked && targetWall) {
-            this.isWallDragging = true;
-            this.activeWallTarget = wallId;
-            this.dragStartPointer = { x: e.clientX, y: e.clientY };
-            this.initialWallPosX = targetWall.posX;
-            this.initialWallPosZ = targetWall.posZ;
-            this.dragPlane.set(new THREE.Vector3(0, 1, 0), 0);
-            const startHit = new THREE.Vector3();
-            if (this.raycaster.ray.intersectPlane(this.dragPlane, startHit)) {
-              this.dragPlaneIntersectionStart.copy(startHit);
-            } else {
-              this.dragPlaneIntersectionStart.set(targetWall.posX, 0, targetWall.posZ);
-            }
-            this.controls.enabled = false;
-            if (canvas) canvas.style.cursor = 'move';
-          } else {
-            this.isWallDragging = false;
-          }
-          return;
-        }
-      }
       this.ngZone.run(() => {
         this.selectedWallType.set(null);
         this.wallSelected.emit(null);
@@ -7088,6 +7271,12 @@ private createHandleMesh(
 
     // Direct Room Wall Dragging (X / Z translation)
     if (this.isWallDragging && this.activeWallTarget) {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
       const cfg = this.roomConfig();
       const allWalls = getResolvedRoomWalls(cfg);
       const activeWall = allWalls.find(w => w.id === this.activeWallTarget);
@@ -7096,143 +7285,114 @@ private createHandleMesh(
         return;
       }
 
-      let moveX = 0;
-      let moveZ = 0;
-      if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
-        const deltaX = this.scratchCurrentIntersection.x - this.dragPlaneIntersectionStart.x;
-        const deltaZ = this.scratchCurrentIntersection.z - this.dragPlaneIntersectionStart.z;
-        moveX = Math.round(deltaX / 50) * 50;
-        moveZ = Math.round(deltaZ / 50) * 50;
-      } else {
-        const dx = (e.clientX - this.dragStartPointer.x) * 1.5;
-        const dy = (e.clientY - this.dragStartPointer.y) * 1.5;
-        const camAngle = this.controls.getAzimuthalAngle();
-        const sin = Math.sin(camAngle);
-        const cos = Math.cos(camAngle);
-        moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
-        moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
-      }
-
-      let candX = this.initialWallPosX + moveX;
-      let candZ = this.initialWallPosZ + moveZ;
-
-      // Clamping dentro del piso de la habitación
-      const floorW = cfg.floorWidth || 5000;
-      const floorD = cfg.floorDepth || 5000;
-      const isHoriz = activeWall.rotationY === 0 || activeWall.rotationY === 180;
-      const halfSpanX = isHoriz ? activeWall.length / 2 : activeWall.thickness / 2;
-      const halfSpanZ = isHoriz ? activeWall.thickness / 2 : activeWall.length / 2;
-      const minFloorX = -(floorW / 2) + halfSpanX;
-      const maxFloorX = (floorW / 2) - halfSpanX;
-      const minFloorZ = -(floorD / 2) + halfSpanZ;
-      const maxFloorZ = (floorD / 2) - halfSpanZ;
-
-      candX = Math.max(minFloorX, Math.min(maxFloorX, candX));
-      candZ = Math.max(minFloorZ, Math.min(maxFloorZ, candZ));
-
-      // Imán Muro a Muro (Wall-to-Wall Snap)
-      const snapRes = this.calculateWallToWallSnap(activeWall, candX, candZ, allWalls);
-      if (snapRes.isSnapped) {
-        candX = snapRes.snappedX;
-        candZ = snapRes.snappedZ;
-        this.renderWallToWallSnapGuide(snapRes);
-      } else {
-        this.clearWallSnapGuides();
-      }
-
-      this.updateLiveWallTransform(activeWall.id, candX, candZ);
-      this.pendingWallUpdates = { wallId: activeWall.id, updates: { posX: candX, posZ: candZ } };
-      this.requestRender(2);
+      const { deltaX, deltaZ } = this.getWallPlaneDeltaXZ(e);
+      const moveX = Math.round(deltaX / 10) * 10;
+      const moveZ = Math.round(deltaZ / 10) * 10;
+      this.applyLiveWallTranslation(
+        activeWall,
+        cfg,
+        allWalls,
+        this.initialWallPosX + moveX,
+        this.initialWallPosZ + moveZ
+      );
       return;
     }
 
     // Direct Wall Gizmo Dragging (Axis Translation, Edge Stretch or Height Stretch)
     if (this.isWallGizmoDragging && this.activeWallGizmoHit) {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
       const hit = this.activeWallGizmoHit;
+      const gizmoType = hit.gizmoType || hit.type;
+      const wallTarget = hit.wallTarget || hit.wallId;
       const cfg = this.roomConfig();
       const allWalls = getResolvedRoomWalls(cfg);
-      const activeWall = allWalls.find(w => w.id === hit.wallTarget);
+      const activeWall = allWalls.find(w => w.id === wallTarget);
       if (!activeWall || activeWall.isLocked || cfg.isWallsLocked || cfg.lockedWalls?.[activeWall.id]) {
         this.isWallGizmoDragging = false;
         return;
       }
 
-      const dx = (e.clientX - this.dragStartPointer.x) * 1.5;
-      const dy = (e.clientY - this.dragStartPointer.y) * 1.5;
-      const camAngle = this.controls.getAzimuthalAngle();
-      const sin = Math.sin(camAngle);
-      const cos = Math.cos(camAngle);
-
       const floorW = cfg.floorWidth || 5000;
       const floorD = cfg.floorDepth || 5000;
 
-      if (hit.type === 'wall_move') {
-        let moveX = 0;
-        let moveZ = 0;
-        if (this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
-          const deltaX = this.scratchCurrentIntersection.x - this.dragPlaneIntersectionStart.x;
-          const deltaZ = this.scratchCurrentIntersection.z - this.dragPlaneIntersectionStart.z;
-          moveX = Math.round(deltaX / 50) * 50;
-          moveZ = Math.round(deltaZ / 50) * 50;
-        } else {
-          moveX = Math.round((dx * cos + dy * sin) / 50) * 50;
-          moveZ = Math.round((-dx * sin + dy * cos) / 50) * 50;
+      if (gizmoType === 'wall_move') {
+        const { deltaX, deltaZ } = this.getWallPlaneDeltaXZ(e);
+        const moveX = Math.round(deltaX / 10) * 10;
+        const moveZ = Math.round(deltaZ / 10) * 10;
+        const candX = hit.axis === 'x' ? this.initialWallPosX + moveX : this.initialWallPosX;
+        const candZ = hit.axis === 'z' ? this.initialWallPosZ + moveZ : this.initialWallPosZ;
+        this.applyLiveWallTranslation(activeWall, cfg, allWalls, candX, candZ);
+      } else if (gizmoType === 'wall_stretch') {
+        const endSign: 1 | -1 = this.activeWallStretchEndSign;
+        const rotRad = -((activeWall.rotationY || 0) * Math.PI) / 180;
+        const cosR = Math.cos(rotRad);
+        const sinR = Math.sin(rotRad);
+        const { deltaX, deltaZ } = this.getWallPlaneDeltaXZ(e);
+        const proj = (deltaX * cosR - deltaZ * sinR) * endSign;
+
+        const anchorX = this.initialWallPosX - endSign * (this.initialWallLength / 2) * cosR;
+        const anchorZ = this.initialWallPosZ + endSign * (this.initialWallLength / 2) * sinR;
+
+        const dirX = endSign * cosR;
+        const dirZ = -endSign * sinR;
+        const wallThick = activeWall.thickness || cfg.wallThickness || 150;
+        const halfThickX = Math.abs(sinR) * (wallThick / 2);
+        const halfThickZ = Math.abs(cosR) * (wallThick / 2);
+        const minFloorX = -(floorW / 2) + halfThickX;
+        const maxFloorX = (floorW / 2) - halfThickX;
+        const minFloorZ = -(floorD / 2) + halfThickZ;
+        const maxFloorZ = (floorD / 2) - halfThickZ;
+
+        let maxAllowableLength = Infinity;
+        if (dirX > 1e-6) {
+          maxAllowableLength = Math.min(maxAllowableLength, (maxFloorX - anchorX) / dirX);
+        } else if (dirX < -1e-6) {
+          maxAllowableLength = Math.min(maxAllowableLength, (minFloorX - anchorX) / dirX);
         }
-
-        let candX = activeWall.posX;
-        let candZ = activeWall.posZ;
-        if (hit.axis === 'x') {
-          candX = this.initialWallPosX + moveX;
-        } else {
-          candZ = this.initialWallPosZ + moveZ;
+        if (dirZ > 1e-6) {
+          maxAllowableLength = Math.min(maxAllowableLength, (maxFloorZ - anchorZ) / dirZ);
+        } else if (dirZ < -1e-6) {
+          maxAllowableLength = Math.min(maxAllowableLength, (minFloorZ - anchorZ) / dirZ);
         }
-
-        const isHoriz = activeWall.rotationY === 0 || activeWall.rotationY === 180;
-        const halfSpanX = isHoriz ? activeWall.length / 2 : activeWall.thickness / 2;
-        const halfSpanZ = isHoriz ? activeWall.thickness / 2 : activeWall.length / 2;
-        candX = Math.max(-(floorW / 2) + halfSpanX, Math.min((floorW / 2) - halfSpanX, candX));
-        candZ = Math.max(-(floorD / 2) + halfSpanZ, Math.min((floorD / 2) - halfSpanZ, candZ));
-
-        const snapRes = this.calculateWallToWallSnap(activeWall, candX, candZ, allWalls);
-        if (snapRes.isSnapped) {
-          candX = snapRes.snappedX;
-          candZ = snapRes.snappedZ;
-          this.renderWallToWallSnapGuide(snapRes);
-        } else {
-          this.clearWallSnapGuides();
+        if (!Number.isFinite(maxAllowableLength)) {
+          maxAllowableLength = Math.max(floorW, floorD);
         }
+        maxAllowableLength = Math.max(400, Math.floor(maxAllowableLength + 1e-6));
 
-        this.updateLiveWallTransform(activeWall.id, candX, candZ);
-        this.pendingWallUpdates = { wallId: activeWall.id, updates: { posX: candX, posZ: candZ } };
+        const stretch = Math.round(proj / 10) * 10;
+        const nextL = Math.round(Math.max(400, Math.min(maxAllowableLength, this.initialWallLength + stretch)) * 100) / 100;
+        const actualDeltaL = nextL - this.initialWallLength;
+        const nextPosX = Math.round((this.initialWallPosX + endSign * (actualDeltaL / 2) * cosR) * 100) / 100;
+        const nextPosZ = Math.round((this.initialWallPosZ - endSign * (actualDeltaL / 2) * sinR) * 100) / 100;
+
+        this.pendingWallUpdates = {
+          wallId: activeWall.id,
+          updates: { length: nextL, posX: nextPosX, posZ: nextPosZ }
+        };
+        this.updateLiveWallGeometryAndGizmo(activeWall, {
+          length: nextL,
+          posX: nextPosX,
+          posZ: nextPosZ
+        });
         this.requestRender(2);
-      } else if (hit.type === 'wall_stretch') {
-        const rotRad = -((activeWall.rotationY || 0) * (Math.PI / 180));
-        const worldDx = dx * cos + dy * sin;
-        const worldDz = -dx * sin + dy * cos;
-        const proj = worldDx * Math.cos(rotRad) - worldDz * Math.sin(rotRad);
-        const stretch = Math.round(proj / 50) * 50;
-        const maxLen = Math.max(floorW, floorD);
-        const nextL = Math.max(400, Math.min(maxLen, this.initialWallLength + stretch));
-        const wallMesh = this.roomGroup.children.find(
-          c => c.userData?.['isWall'] && (c.userData?.['wallId'] === activeWall.id || c.userData?.['wallType'] === activeWall.id)
-        );
-        if (wallMesh && this.initialWallLength > 0) {
-          wallMesh.scale.x = nextL / this.initialWallLength;
+      } else if (gizmoType === 'wall_stretch_height') {
+        let deltaY = 0;
+        const canIntersectHeight = Math.abs(this.raycaster.ray.direction.dot(this.wallHeightDragPlane.normal)) > 0.05;
+        if (canIntersectHeight && this.raycaster.ray.intersectPlane(this.wallHeightDragPlane, this.scratchCurrentIntersection)) {
+          deltaY = this.scratchCurrentIntersection.y - this.wallHeightDragStartPoint.y;
+        } else {
+          deltaY = -(e.clientY - this.dragStartPointer.y) * 2.0;
         }
-        this.pendingWallUpdates = { wallId: activeWall.id, updates: { length: nextL } };
-        this.requestRender(2);
-      } else if (hit.type === 'wall_stretch_height') {
-        const vertDy = -(e.clientY - this.dragStartPointer.y) * 2.0;
-        const stretchY = Math.round(vertDy / 10) * 10;
+        const stretchY = Math.round(deltaY / 10) * 10;
         const nextH = Math.max(400, Math.min(4500, this.initialWallHeight + stretchY));
-        const wallMesh = this.roomGroup.children.find(
-          c => c.userData?.['isWall'] && (c.userData?.['wallId'] === activeWall.id || c.userData?.['wallType'] === activeWall.id)
-        );
-        if (wallMesh && this.initialWallHeight > 0) {
-          wallMesh.scale.y = nextH / this.initialWallHeight;
-          wallMesh.position.y = nextH / 2;
-        }
+
         this.pendingWallUpdates = { wallId: activeWall.id, updates: { height: nextH } };
+        this.updateLiveWallGeometryAndGizmo(activeWall, { height: nextH });
         this.requestRender(2);
       }
       return;
@@ -8192,10 +8352,11 @@ private createHandleMesh(
     if (this.workspaceMode() === 'room' && this.wallGizmoHitMeshes.length > 0) {
       const wallGizmoIntersects = this.raycaster.intersectObjects(this.wallGizmoHitMeshes, true);
       if (wallGizmoIntersects.length > 0) {
-        const hit = wallGizmoIntersects[0].object.userData as { type?: string };
-        if (hit.type === 'wall_stretch_height') {
+        const hit = wallGizmoIntersects[0].object.userData as { type?: string; gizmoType?: string };
+        const gType = hit.gizmoType || hit.type;
+        if (gType === 'wall_stretch_height') {
           canvas.style.cursor = 'ns-resize';
-        } else if (hit.type === 'wall_stretch') {
+        } else if (gType === 'wall_stretch') {
           canvas.style.cursor = 'ew-resize';
         } else {
           canvas.style.cursor = 'grab';
@@ -8220,10 +8381,12 @@ private createHandleMesh(
       }
     }
 
+    const hoverWallHit = this.findNearestWallHit();
+
     // Hover feedback for appliances
     if (this.appliancesGroup.children.length > 0) {
       const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
-      if (appIntersects.length > 0) {
+      if (appIntersects.length > 0 && (!hoverWallHit || appIntersects[0].distance <= hoverWallHit.distance)) {
         canvas.style.cursor = 'grab';
         return;
       }
@@ -8233,6 +8396,14 @@ private createHandleMesh(
       this.raycastablePieceMeshes,
       false
     );
+    if (hoverWallHit && (pieceIntersects.length === 0 || hoverWallHit.distance < pieceIntersects[0].distance)) {
+      const wId = this.resolveWallIdFromObject(hoverWallHit.object);
+      const cfg = this.roomConfig();
+      const wall = wId ? getResolvedRoomWalls(cfg).find(w => w.id === wId) : undefined;
+      const isLocked = !wall || !!cfg.isWallsLocked || !!wall.isLocked || !!cfg.lockedWalls?.[wall.id];
+      canvas.style.cursor = isLocked ? 'pointer' : 'grab';
+      return;
+    }
     if (pieceIntersects.length > 0) {
       const topObj = pieceIntersects[0].object;
       const topPart = topObj.userData?.['part'] as Part | undefined;
@@ -8923,30 +9094,27 @@ private createHandleMesh(
     }
 
     if (this.isWallDragging || this.isWallGizmoDragging) {
-      if (this.pendingWallUpdates) {
-        const { wallId, updates } = this.pendingWallUpdates;
-        const wallMesh = this.roomGroup.children.find(
-          c => c.userData?.['isWall'] && (c.userData?.['wallId'] === wallId || c.userData?.['wallType'] === wallId)
-        );
-        if (wallMesh) {
-          wallMesh.scale.set(1, 1, 1);
-        }
+      const committedUpdate = this.pendingWallUpdates;
+      this.pendingWallUpdates = null;
+      this.isWallDragging = false;
+      this.isWallGizmoDragging = false;
+      this.activeWallTarget = null;
+      this.activeWallGizmoHit = null;
+      this.activeWallStretchEndSign = 1;
+      this.clearWallSnapGuides();
+      this.controls.enabled = true;
+      const canvas = this.canvasRef()?.nativeElement;
+      if (canvas) canvas.style.cursor = 'default';
+
+      if (committedUpdate) {
+        const { wallId, updates } = committedUpdate;
         const cfg = this.roomConfig();
         const allWalls = getResolvedRoomWalls(cfg);
         const updatedWalls = allWalls.map(w => w.id === wallId ? { ...w, ...updates } : w);
         this.ngZone.run(() => {
           this.roomConfigModified.emit({ walls: updatedWalls, recordHistory: true });
         });
-        this.pendingWallUpdates = null;
       }
-      this.isWallDragging = false;
-      this.isWallGizmoDragging = false;
-      this.activeWallTarget = null;
-      this.activeWallGizmoHit = null;
-      this.clearWallSnapGuides();
-      this.controls.enabled = true;
-      const canvas = this.canvasRef()?.nativeElement;
-      if (canvas) canvas.style.cursor = 'default';
     }
 
     if (this.isDragging) {
@@ -10443,6 +10611,8 @@ private createHandleMesh(
     this.activeWallTarget = null;
     this.isWallGizmoDragging = false;
     this.activeWallGizmoHit = null;
+    this.activeWallStretchEndSign = 1;
+    this.pendingWallUpdates = null;
     this.clearWallSnapGuides();
     this.isApplianceDragging = false;
     this.isApplianceResizing = false;
@@ -10853,13 +11023,17 @@ private createHandleMesh(
     requestAnimationFrame(animateFocus);
   }
 
-  toggleGroupAnimation(groupId: string) {
+  toggleGroupAnimation(groupId: string, forceOpen?: boolean) {
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length > 0) {
+      const grp = this.partGroups().find(g => g.id === groupId);
       const movableObj = this.pieceObjects.find(po => po.part.groupId === groupId && (po.isDoor || po.isDrawer));
       const refId = movableObj ? movableObj.part.id : grpParts[0].id;
-      const cur = this.openTargetMap.get(refId) || 0;
-      const next = cur > 0.5 ? 0 : 1;
+      let cur = this.openTargetMap.get(refId);
+      if (cur === undefined && grp) {
+        cur = grp.slideExtension !== undefined ? grp.slideExtension : (grp.isOpen ? 1 : 0);
+      }
+      const next = forceOpen !== undefined ? (forceOpen ? 1 : 0) : ((cur ?? 0) > 0.5 ? 0 : 1);
       for (const gp of grpParts) {
         this.openTargetMap.set(gp.id, next);
       }
@@ -10867,6 +11041,9 @@ private createHandleMesh(
         if (p.part.groupId === groupId) {
           this.openTargetMap.set(p.part.id, next);
         }
+      }
+      if (this.isModularDrawerGroup(groupId) || !!movableObj) {
+        this.projectStorage.setGroupSlideExtension(groupId, next);
       }
       this.requestRender(60);
     }
@@ -11400,23 +11577,131 @@ private applyMagneticSnapToPosition(
     });
   }
 
-  private updateLiveWallTransform(wallId: string, posX: number, posZ: number) {
+  private findNearestWallHit(): THREE.Intersection | undefined {
+    if (this.workspaceMode() !== 'room' || this.roomGroup.children.length === 0) {
+      return undefined;
+    }
+    const roomHits = this.raycaster.intersectObjects(this.roomGroup.children, true);
+    return roomHits.find(
+      h => Boolean(h.object.userData?.['isWall'] || h.object.parent?.userData?.['isWall'])
+    );
+  }
+
+  private resolveWallIdFromObject(obj: THREE.Object3D): string | undefined {
+    const ownId = obj.userData?.['wallId'] || obj.userData?.['wallType'];
+    if (typeof ownId === 'string' && ownId.length > 0) return ownId;
+    const parentId = obj.parent?.userData?.['wallId'] || obj.parent?.userData?.['wallType'];
+    return typeof parentId === 'string' && parentId.length > 0 ? parentId : undefined;
+  }
+
+  private getWallPlaneDeltaXZ(e: PointerEvent): { deltaX: number; deltaZ: number } {
+    const canIntersect = Math.abs(this.raycaster.ray.direction.y) > 0.03;
+    if (canIntersect && this.raycaster.ray.intersectPlane(this.dragPlane, this.scratchCurrentIntersection)) {
+      return {
+        deltaX: this.scratchCurrentIntersection.x - this.dragPlaneIntersectionStart.x,
+        deltaZ: this.scratchCurrentIntersection.z - this.dragPlaneIntersectionStart.z
+      };
+    }
+    const dx = (e.clientX - this.dragStartPointer.x) * 1.5;
+    const dy = (e.clientY - this.dragStartPointer.y) * 1.5;
+    const camAngle = this.controls.getAzimuthalAngle();
+    const sin = Math.sin(camAngle);
+    const cos = Math.cos(camAngle);
+    return {
+      deltaX: dx * cos + dy * sin,
+      deltaZ: -dx * sin + dy * cos
+    };
+  }
+
+  private applyLiveWallTranslation(
+    activeWall: RoomWallInstance,
+    cfg: RoomConfiguration,
+    allWalls: RoomWallInstance[],
+    rawCandX: number,
+    rawCandZ: number
+  ) {
+    const floorW = cfg.floorWidth || 5000;
+    const floorD = cfg.floorDepth || 5000;
+    const wallThick = activeWall.thickness || cfg.wallThickness || 150;
+    const { halfSpanX, halfSpanZ } = getWallHalfSpans(activeWall.length, wallThick, activeWall.rotationY || 0);
+    const minFloorX = -(floorW / 2) + halfSpanX;
+    const maxFloorX = (floorW / 2) - halfSpanX;
+    const minFloorZ = -(floorD / 2) + halfSpanZ;
+    const maxFloorZ = (floorD / 2) - halfSpanZ;
+
+    let candX = minFloorX <= maxFloorX ? Math.max(minFloorX, Math.min(maxFloorX, rawCandX)) : 0;
+    let candZ = minFloorZ <= maxFloorZ ? Math.max(minFloorZ, Math.min(maxFloorZ, rawCandZ)) : 0;
+
+    const snapRes = this.calculateWallToWallSnap(activeWall, candX, candZ, allWalls);
+    if (snapRes.isSnapped) {
+      candX = minFloorX <= maxFloorX ? Math.max(minFloorX, Math.min(maxFloorX, snapRes.snappedX)) : 0;
+      candZ = minFloorZ <= maxFloorZ ? Math.max(minFloorZ, Math.min(maxFloorZ, snapRes.snappedZ)) : 0;
+      this.renderWallToWallSnapGuide(snapRes);
+    } else {
+      this.clearWallSnapGuides();
+    }
+
+    candX = Math.round(candX);
+    candZ = Math.round(candZ);
+
+    this.updateLiveWallTransform(activeWall.id, candX, candZ, activeWall.height);
+    this.pendingWallUpdates = { wallId: activeWall.id, updates: { posX: candX, posZ: candZ } };
+    this.requestRender(2);
+  }
+
+  private updateLiveWallTransform(wallId: string, posX: number, posZ: number, wallHeight?: number) {
     const wallMesh = this.roomGroup.children.find(
       child => child.userData?.['isWall'] && (child.userData?.['wallId'] === wallId || child.userData?.['wallType'] === wallId)
     );
     if (wallMesh) {
-      const dx = posX - wallMesh.position.x;
-      const dz = posZ - wallMesh.position.z;
       wallMesh.position.x = posX;
+      if (wallHeight !== undefined) {
+        wallMesh.position.y = wallHeight / 2;
+      }
       wallMesh.position.z = posZ;
+      wallMesh.updateMatrixWorld(true);
 
       if (this.selectedWallType() === wallId) {
-        for (const child of this.wallGizmoGroup.children) {
-          child.position.x += dx;
-          child.position.z += dz;
-        }
+        this.updateWallGizmo(wallId, this.roomConfig(), this.workspaceMode(), {
+          posX,
+          posZ,
+          ...(wallHeight !== undefined ? { height: wallHeight } : {})
+        });
       }
     }
+  }
+
+  private updateLiveWallGeometryAndGizmo(
+    activeWall: RoomWallInstance,
+    overrides: Partial<RoomWallInstance>
+  ) {
+    const wallMesh = this.roomGroup.children.find(
+      child => child.userData?.['isWall'] && (child.userData?.['wallId'] === activeWall.id || child.userData?.['wallType'] === activeWall.id)
+    ) as THREE.Mesh | undefined;
+    if (wallMesh) {
+      const baseL = (wallMesh.userData['initialGeoLength'] as number) || this.initialWallLength || activeWall.length;
+      const baseH = (wallMesh.userData['initialGeoHeight'] as number) || this.initialWallHeight || activeWall.height;
+      const nextL = overrides.length ?? activeWall.length;
+      const nextH = overrides.height ?? activeWall.height;
+      const nextPosX = overrides.posX ?? activeWall.posX;
+      const nextPosZ = overrides.posZ ?? activeWall.posZ;
+
+      const scaleX = baseL > 0 ? nextL / baseL : 1;
+      const scaleY = baseH > 0 ? nextH / baseH : 1;
+      wallMesh.scale.set(scaleX, scaleY, 1);
+      wallMesh.position.set(nextPosX, nextH / 2, nextPosZ);
+
+      const skirtingH = (wallMesh.userData['skirtingHeight'] as number) || 100;
+      for (const child of wallMesh.children) {
+        if (child.userData?.['isSkirting'] && scaleY > 0) {
+          child.scale.set(1, 1 / scaleY, 1);
+          child.position.y = -baseH / 2 + skirtingH / (2 * scaleY);
+        }
+      }
+      wallMesh.updateMatrixWorld(true);
+    }
+
+    this.updateWallGizmo(activeWall.id, this.roomConfig(), this.workspaceMode(), overrides);
   }
 
   private calculateWallToWallSnap(
@@ -11437,14 +11722,24 @@ private applyMagneticSnapToPosition(
     let isSnapped = false;
     let snapGuide: WallToWallSnapGuide | null = null;
 
-    const isMovingHoriz = movingWall.rotationY === 0 || movingWall.rotationY === 180;
+    const movingRot = (((movingWall.rotationY || 0) % 360) + 360) % 360;
+    const isMovingHoriz = movingRot === 0 || movingRot === 180;
+    const isMovingVert = movingRot === 90 || movingRot === 270;
+    if (!isMovingHoriz && !isMovingVert) {
+      return { isSnapped: false, snappedX: candX, snappedZ: candZ, guide: null };
+    }
+
     const movingHalfL = movingWall.length / 2;
     const movingHalfT = movingWall.thickness / 2;
 
     const otherWalls = allWalls.filter(w => w.id !== movingWall.id && !w.isHidden);
 
     for (const other of otherWalls) {
-      const isOtherHoriz = other.rotationY === 0 || other.rotationY === 180;
+      const otherRot = (((other.rotationY || 0) % 360) + 360) % 360;
+      const isOtherHoriz = otherRot === 0 || otherRot === 180;
+      const isOtherVert = otherRot === 90 || otherRot === 270;
+      if (!isOtherHoriz && !isOtherVert) continue;
+
       const otherHalfL = other.length / 2;
       const otherHalfT = other.thickness / 2;
 
@@ -11693,7 +11988,11 @@ private applyMagneticSnapToPosition(
     let suggestedFacing: 'front' | 'right' | 'back' | 'left' | undefined = undefined;
 
     for (const wall of walls) {
-      const isHoriz = wall.rotationY === 0 || wall.rotationY === 180;
+      const wallRot = (((wall.rotationY || 0) % 360) + 360) % 360;
+      const isHoriz = wallRot === 0 || wallRot === 180;
+      const isVert = wallRot === 90 || wallRot === 270;
+      if (!isHoriz && !isVert) continue;
+
       const halfL = wall.length / 2;
       const halfT = wall.thickness / 2;
 
@@ -12677,26 +12976,38 @@ private applyMagneticSnapToPosition(
   }
 
   togglePartOpen(partId: string) {
-    const cur = this.openTargetMap.get(partId) || 0;
-    const next = cur > 0.5 ? 0 : 1;
+    const targetPiece = this.pieceObjects.find(p => p.part.id === partId);
+    const targetPart = targetPiece?.part ?? this.parts().find(p => p.id === partId);
+
+    let cur = this.openTargetMap.get(partId);
+    if (cur === undefined && targetPart?.groupId && this.isModularDrawerGroup(targetPart.groupId)) {
+      const grp = this.partGroups().find(g => g.id === targetPart.groupId);
+      if (grp) {
+        cur = grp.slideExtension !== undefined ? grp.slideExtension : (grp.isOpen ? 1 : 0);
+      }
+    }
+    const next = (cur ?? 0) > 0.5 ? 0 : 1;
     this.openTargetMap.set(partId, next);
 
-    const targetPiece = this.pieceObjects.find(p => p.part.id === partId);
-    if (targetPiece) {
-      // 1. If part belongs to an explicit modular drawer sub-group, synchronize parts in that drawer group only
-      const isDedicatedDrawerGroup = !!targetPiece.part.groupId &&
-        this.partGroups().some(g => g.id === targetPiece.part.groupId && g.type === 'drawer');
+    if (targetPart) {
+      // 1. If part belongs to a modular drawer group, synchronize all parts in that drawer group AND persist in store
+      const gId = targetPart.groupId;
+      const isDedicatedDrawerGroup = !!gId && this.isModularDrawerGroup(gId);
 
-      if (isDedicatedDrawerGroup) {
-        const gId = targetPiece.part.groupId;
+      if (isDedicatedDrawerGroup && gId) {
+        for (const gp of this.parts()) {
+          if (gp.groupId === gId) {
+            this.openTargetMap.set(gp.id, next);
+          }
+        }
         for (const p of this.pieceObjects) {
           if (p.part.groupId === gId) {
             this.openTargetMap.set(p.part.id, next);
           }
         }
-      } else if (targetPiece.isDrawer) {
+        this.projectStorage.setGroupSlideExtension(gId, next);
+      } else if (targetPiece?.isDrawer) {
         const targetY = targetPiece.originalPos.y;
-        const targetPart = targetPiece.part;
 
         // Extract drawer instance identifier prefix if present
         const boxSubKeywords = ['_frente', '_lat_izq', '_lat_der', '_contrafrente', '_trasera', '_frente_int', '_fondo'];
@@ -12930,7 +13241,8 @@ private applyMagneticSnapToPosition(
     for (const wall of resolvedWalls) {
       if (wall.isHidden) continue;
 
-      const wallGeo = new THREE.BoxGeometry(wall.length, wall.height, wall.thickness);
+      const wallThickness = wall.thickness || config.wallThickness || 150;
+      const wallGeo = new THREE.BoxGeometry(wall.length, wall.height, wallThickness);
       const wallMat = ProceduralTextureFactory.getWallMaterial(
         wall.material || config.wallMaterial,
         wall.length,
@@ -12942,29 +13254,51 @@ private applyMagneticSnapToPosition(
       wallMesh.position.set(wall.posX, wall.height / 2, wall.posZ);
       wallMesh.castShadow = true;
       wallMesh.receiveShadow = true;
-      wallMesh.userData = { isWall: true, wallId: wall.id, wallType: wall.id };
+
+      const hasSkirting = wall.showSkirting ?? showSkirting;
+      const skirtingH = 100;
+      const skirtingT = 16;
+      wallMesh.userData = {
+        isWall: true,
+        wallId: wall.id,
+        wallType: wall.id,
+        initialGeoLength: wall.length,
+        initialGeoHeight: wall.height,
+        initialGeoThickness: wallThickness,
+        ...(hasSkirting ? { skirtingHeight: skirtingH } : {})
+      };
       this.roomGroup.add(wallMesh);
 
       // Zócalo / Rodapié inferior (Frontal y Trasero)
-      const hasSkirting = wall.showSkirting ?? showSkirting;
       if (hasSkirting) {
-        const skirtingH = 100;
-        const skirtingT = 16;
-
         // Zócalo frontal (+Z local)
         const frontSkirtingGeo = new THREE.BoxGeometry(wall.length, skirtingH, skirtingT);
         const frontSkirting = new THREE.Mesh(frontSkirtingGeo, skirtingMat);
-        frontSkirting.position.set(0, -wall.height / 2 + skirtingH / 2, wall.thickness / 2 + skirtingT / 2);
+        frontSkirting.position.set(0, -wall.height / 2 + skirtingH / 2, wallThickness / 2 + skirtingT / 2);
         frontSkirting.castShadow = true;
         frontSkirting.receiveShadow = true;
+        frontSkirting.userData = {
+          isWall: true,
+          wallId: wall.id,
+          wallType: wall.id,
+          isSkirting: true,
+          side: 'front'
+        };
         wallMesh.add(frontSkirting);
 
         // Zócalo posterior (-Z local)
         const backSkirtingGeo = new THREE.BoxGeometry(wall.length, skirtingH, skirtingT);
         const backSkirting = new THREE.Mesh(backSkirtingGeo, skirtingMat);
-        backSkirting.position.set(0, -wall.height / 2 + skirtingH / 2, -wall.thickness / 2 - skirtingT / 2);
+        backSkirting.position.set(0, -wall.height / 2 + skirtingH / 2, -wallThickness / 2 - skirtingT / 2);
         backSkirting.castShadow = true;
         backSkirting.receiveShadow = true;
+        backSkirting.userData = {
+          isWall: true,
+          wallId: wall.id,
+          wallType: wall.id,
+          isSkirting: true,
+          side: 'back'
+        };
         wallMesh.add(backSkirting);
       }
     }
@@ -13019,7 +13353,8 @@ private applyMagneticSnapToPosition(
   private updateWallGizmo(
     wallType: string | null,
     config: RoomConfiguration,
-    mode: WorkspaceMode
+    mode: WorkspaceMode,
+    liveOverride?: Partial<RoomWallInstance>
   ) {
     // Clear previous wall gizmos recursively
     this.disposeGroup(this.wallGizmoGroup);
@@ -13031,19 +13366,21 @@ private applyMagneticSnapToPosition(
     }
 
     const walls = getResolvedRoomWalls(config);
-    const wall = walls.find(w => w.id === wallType);
-    if (!wall || wall.isHidden || config.hiddenWalls?.[wallType]) {
+    const baseWall = walls.find(w => w.id === wallType);
+    if (!baseWall || baseWall.isHidden || config.hiddenWalls?.[wallType]) {
       this.requestRender(4);
       return;
     }
 
+    const wall: RoomWallInstance = liveOverride ? { ...baseWall, ...liveOverride } : baseWall;
+    const wallThickness = wall.thickness || config.wallThickness || 150;
     const rotRad = -((wall.rotationY || 0) * (Math.PI / 180));
     const posX = wall.posX;
     const posY = wall.height / 2;
     const posZ = wall.posZ;
 
     // 1. Highlight Outline Mesh around selected wall (Sky Blue)
-    const outlineGeo = new THREE.BoxGeometry(wall.length + 8, wall.height + 8, wall.thickness + 8);
+    const outlineGeo = new THREE.BoxGeometry(wall.length + 6, wall.height + 6, wallThickness + 6);
     const edgesGeo = new THREE.EdgesGeometry(outlineGeo);
     outlineGeo.dispose();
     const lineMat = new THREE.LineBasicMaterial({
@@ -13060,6 +13397,7 @@ private applyMagneticSnapToPosition(
     // Si el muro está congelado / fijo, bloqueamos sus controles interactivos y mostramos únicamente el outline
     const isWallLocked = !!config.isWallsLocked || !!wall.isLocked || !!config.lockedWalls?.[wallType];
     if (isWallLocked) {
+      this.wallGizmoGroup.updateMatrixWorld(true);
       this.requestRender(4);
       return;
     }
@@ -13103,29 +13441,41 @@ private applyMagneticSnapToPosition(
         head.position.z = arrowLen + arrowHeadLen / 2;
       }
 
+      const arrowUserData: WallGizmoHitData = {
+        isWallGizmo: true,
+        type: 'wall_move',
+        gizmoType: 'wall_move',
+        axis,
+        wallTarget: wall.id,
+        wallId: wall.id
+      };
+      shaft.userData = arrowUserData;
+      shaft.renderOrder = 999;
+      head.userData = arrowUserData;
+      head.renderOrder = 999;
       arrowGroup.add(shaft, head);
 
-      // Hit collider box
+      // Transparent raycastable hit collider (transparent: true, opacity: 0 — visible: false is ignored by Raycaster)
       const hitBoxGeo = new THREE.BoxGeometry(
-        axis === 'x' ? arrowLen + arrowHeadLen : 40,
-        40,
-        axis === 'z' ? arrowLen + arrowHeadLen : 40
+        axis === 'x' ? arrowLen + arrowHeadLen + 24 : 56,
+        56,
+        axis === 'z' ? arrowLen + arrowHeadLen + 24 : 56
       );
-      const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+      const hitMat = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false
+      });
       const hitMesh = new THREE.Mesh(hitBoxGeo, hitMat);
       hitMesh.position.set(
         axis === 'x' ? (arrowLen + arrowHeadLen) / 2 : 0,
         0,
         axis === 'z' ? (arrowLen + arrowHeadLen) / 2 : 0
       );
-      hitMesh.userData = {
-        isWallGizmo: true,
-        type: 'wall_move',
-        axis,
-        wallTarget: wall.id
-      };
+      hitMesh.userData = arrowUserData;
+      hitMesh.renderOrder = 999;
       arrowGroup.add(hitMesh);
-      this.wallGizmoHitMeshes.push(hitMesh);
+      this.wallGizmoHitMeshes.push(shaft, head, hitMesh);
 
       return arrowGroup;
     };
@@ -13135,68 +13485,89 @@ private applyMagneticSnapToPosition(
     const arrowZ = createArrowMesh(0x0284c7, 'z', gizmoAnchor);
     this.wallGizmoGroup.add(arrowX, arrowZ);
 
-    // 3. Stretch Handle at free end of wall (Cube handle - Emerald)
     const handleSize = 36;
-    const handleGeo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
-    const handleMat = new THREE.MeshStandardMaterial({
-      color: 0x10b981,
-      emissive: 0x10b981,
-      emissiveIntensity: 0.4,
-      roughness: 0.2,
-      depthTest: false
-    });
-    const handleMesh = new THREE.Mesh(handleGeo, handleMat);
-    const handleEdge = new THREE.LineSegments(
-      new THREE.EdgesGeometry(handleGeo),
-      new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
-    );
-    handleMesh.add(handleEdge);
+    const hitSize = handleSize + 36;
+    const addCubeHandleWithCollider = (
+      colorHex: number,
+      emissiveIntensity: number,
+      position: THREE.Vector3,
+      rotationY: number,
+      userData: WallGizmoHitData
+    ) => {
+      const handleGeo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
+      const handleMat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity,
+        roughness: 0.2,
+        depthTest: false
+      });
+      const handleMesh = new THREE.Mesh(handleGeo, handleMat);
+      const handleEdge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(handleGeo),
+        new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
+      );
+      handleMesh.add(handleEdge);
+      handleMesh.position.copy(position);
+      handleMesh.rotation.y = rotationY;
+      handleMesh.userData = userData;
+      handleMesh.renderOrder = 999;
 
-    const endDist = wall.length / 2 + handleSize / 2 + 10;
-    const handleX = posX + endDist * Math.cos(rotRad);
-    const handleZ = posZ - endDist * Math.sin(rotRad);
-    handleMesh.position.set(handleX, posY, handleZ);
-    handleMesh.rotation.y = rotRad;
+      const hitGeo = new THREE.BoxGeometry(hitSize, hitSize, hitSize);
+      const hitMat = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false
+      });
+      const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+      hitMesh.position.copy(position);
+      hitMesh.rotation.y = rotationY;
+      hitMesh.userData = userData;
+      hitMesh.renderOrder = 999;
 
-    handleMesh.userData = {
-      isWallGizmo: true,
-      type: 'wall_stretch',
-      axis: 'x',
-      wallTarget: wall.id
+      this.wallGizmoGroup.add(handleMesh, hitMesh);
+      this.wallGizmoHitMeshes.push(handleMesh, hitMesh);
     };
-    handleMesh.renderOrder = 999;
-    this.wallGizmoGroup.add(handleMesh);
-    this.wallGizmoHitMeshes.push(handleMesh);
+
+    // 3. Dual Stretch Handles at both ends of the wall (+1 right, -1 left - Emerald)
+    const endDist = wall.length / 2 + handleSize / 2 + 10;
+    for (const endSign of [1, -1] as const) {
+      const handleX = posX + endSign * endDist * Math.cos(rotRad);
+      const handleZ = posZ - endSign * endDist * Math.sin(rotRad);
+      addCubeHandleWithCollider(
+        0x10b981,
+        0.4,
+        new THREE.Vector3(handleX, posY, handleZ),
+        rotRad,
+        {
+          isWallGizmo: true,
+          type: 'wall_stretch',
+          gizmoType: 'wall_stretch',
+          axis: 'x',
+          endSign,
+          wallTarget: wall.id,
+          wallId: wall.id
+        }
+      );
+    }
 
     // 4. Tirante 3D Superior de Altura (Cube handle - Amber / Eje Y)
-    const topHandleGeo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
-    const topHandleMat = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b,
-      emissive: 0xf59e0b,
-      emissiveIntensity: 0.45,
-      roughness: 0.2,
-      depthTest: false
-    });
-    const topHandleMesh = new THREE.Mesh(topHandleGeo, topHandleMat);
-    const topHandleEdge = new THREE.LineSegments(
-      new THREE.EdgesGeometry(topHandleGeo),
-      new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
+    addCubeHandleWithCollider(
+      0xf59e0b,
+      0.45,
+      new THREE.Vector3(posX, wall.height + handleSize / 2 + 8, posZ),
+      0,
+      {
+        isWallGizmo: true,
+        type: 'wall_stretch_height',
+        gizmoType: 'wall_stretch_height',
+        axis: 'y',
+        wallTarget: wall.id,
+        wallId: wall.id
+      }
     );
-    topHandleMesh.add(topHandleEdge);
-    topHandleMesh.position.set(
-      posX,
-      wall.height + handleSize / 2 + 8,
-      posZ
-    );
-    topHandleMesh.userData = {
-      isWallGizmo: true,
-      type: 'wall_stretch_height',
-      axis: 'y',
-      wallTarget: wall.id
-    };
-    topHandleMesh.renderOrder = 999;
-    this.wallGizmoGroup.add(topHandleMesh);
-    this.wallGizmoHitMeshes.push(topHandleMesh);
+
+    this.wallGizmoGroup.updateMatrixWorld(true);
     this.requestRender(8);
   }
 

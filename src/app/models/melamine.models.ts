@@ -1212,7 +1212,7 @@ export interface RoomWallInstance {
   thickness: number;           // Espesor en mm
   posX: number;                // Posición central X en mm
   posZ: number;                // Posición central Z en mm
-  rotationY: number;           // Giro sobre su propio eje en grados (0, 90, 180, 270)
+  rotationY: number;           // Giro sobre su propio eje en grados (0° a 360°, ej. 0, 45, 90, 180, 270)
   material?: WallMaterialType;
   showSkirting?: boolean;
   isLocked?: boolean;
@@ -1269,8 +1269,60 @@ export const DEFAULT_ROOM_CONFIG: RoomConfiguration = {
 };
 
 /**
+ * Calcula los semi-ejes (half-spans) proyectados en el plano XZ de un muro
+ * considerando su longitud, espesor y ángulo de rotación sobre el eje Y (en grados).
+ */
+export function getWallHalfSpans(
+  length: number,
+  thickness: number,
+  rotationY = 0
+): { halfSpanX: number; halfSpanZ: number } {
+  const rad = ((rotationY || 0) * Math.PI) / 180;
+  const absCos = Math.abs(Math.cos(rad));
+  const absSin = Math.abs(Math.sin(rad));
+  return {
+    halfSpanX: (absCos * length + absSin * thickness) / 2,
+    halfSpanZ: (absSin * length + absCos * thickness) / 2
+  };
+}
+
+/**
+ * Calcula la longitud máxima permitida para un muro dado su espesor, ángulo de rotación
+ * y dimensiones del piso, garantizando que el muro permanezca contenido dentro del piso.
+ */
+export function getMaxWallLengthForAngle(
+  floorWidth: number,
+  floorDepth: number,
+  thickness: number,
+  rotationY = 0
+): number {
+  const rad = ((rotationY || 0) * Math.PI) / 180;
+  const absCos = Math.abs(Math.cos(rad));
+  const absSin = Math.abs(Math.sin(rad));
+  const maxLenX =
+    absCos > 1e-6
+      ? Math.max(400, (floorWidth - absSin * thickness) / absCos)
+      : Number.POSITIVE_INFINITY;
+  const maxLenZ =
+    absSin > 1e-6
+      ? Math.max(400, (floorDepth - absCos * thickness) / absSin)
+      : Number.POSITIVE_INFINITY;
+  return Math.max(400, Math.floor(Math.min(maxLenX, maxLenZ)));
+}
+
+function clampWallCoord(value: number, maxAbs: number): number {
+  const safeMax = Math.max(0, maxAbs);
+  const clamped = Math.max(-safeMax, Math.min(safeMax, value));
+  const rounded = Math.round(clamped * 100) / 100;
+  if (Math.abs(rounded) > safeMax) {
+    return Math.sign(rounded) * (Math.floor(safeMax * 100) / 100);
+  }
+  return rounded === 0 ? 0 : rounded;
+}
+
+/**
  * Redimensiona y reubica proporcionalmente los muros cuando el tamaño del entorno cambia,
- * garantizando que los muros a ras se mantengan alineados y ningún muro quede por fuera del piso.
+ * garantizando que los muros a ras se mantengan alineados y ningún muro rotado o libre quede por fuera del piso.
  */
 export function rescaleWallsToFloor(
   walls: RoomWallInstance[],
@@ -1286,83 +1338,104 @@ export function rescaleWallsToFloor(
   const safePrevD = Math.max(1000, prevFloorD || 5000);
   const sx = newFloorW / safePrevW;
   const sz = newFloorD / safePrevD;
+  const halfPrevW = safePrevW / 2;
+  const halfPrevD = safePrevD / 2;
   const halfNewW = newFloorW / 2;
   const halfNewD = newFloorD / 2;
-  const maxSideL = Math.max(600, newFloorD - wallThickness);
 
   return walls.map(w => {
+    const thick = Math.max(50, Math.min(600, w.thickness || wallThickness));
     const rot = ((w.rotationY || 0) % 360 + 360) % 360;
-    const isHoriz = rot === 0 || rot === 180;
-    const isVert = rot === 90 || rot === 270;
+    const isHoriz = Math.abs(rot) < 0.01 || Math.abs(rot - 180) < 0.01;
+    const isVert = Math.abs(rot - 90) < 0.01 || Math.abs(rot - 270) < 0.01;
+    const maxSideL = Math.max(600, newFloorD - thick);
 
-    if (w.id === 'main') {
-      const wasFull = w.length >= safePrevW * 0.85;
-      const newL = wasFull ? newFloorW : Math.min(newFloorW, Math.max(600, Math.round(w.length * sx)));
-      const baseRearZ = -halfNewD + offZ + wallThickness / 2;
-      const baseLeftX = -halfNewW + offX + newL / 2;
-      return {
-        ...w,
-        length: newL,
-        posX: Math.round(Math.max(-halfNewW + newL / 2, Math.min(halfNewW - newL / 2, baseLeftX))),
-        posZ: Math.round(Math.max(-halfNewD + wallThickness / 2, Math.min(halfNewD - wallThickness / 2, baseRearZ)))
-      };
+    if (w.id === 'main' && isHoriz) {
+      const prevRearZ = -halfPrevD + offZ + thick / 2;
+      const prevLeftX = -halfPrevW + offX + w.length / 2;
+      if (Math.abs(w.posZ - prevRearZ) <= 5 && Math.abs(w.posX - prevLeftX) <= 5) {
+        const wasFull = w.length >= safePrevW * 0.85;
+        const newL = wasFull ? newFloorW : Math.min(newFloorW, Math.max(400, Math.round(w.length * sx)));
+        const { halfSpanX, halfSpanZ } = getWallHalfSpans(newL, thick, rot);
+        const maxPosX = Math.max(0, halfNewW - halfSpanX);
+        const maxPosZ = Math.max(0, halfNewD - halfSpanZ);
+        const baseRearZ = -halfNewD + offZ + thick / 2;
+        const baseLeftX = -halfNewW + offX + newL / 2;
+        return {
+          ...w,
+          length: newL,
+          posX: clampWallCoord(baseLeftX, maxPosX),
+          posZ: clampWallCoord(baseRearZ, maxPosZ)
+        };
+      }
     }
 
-    if (w.id === 'side') {
-      const wasFull = w.length >= (safePrevD - wallThickness) * 0.85;
-      const newL = wasFull ? maxSideL : Math.min(maxSideL, Math.max(600, Math.round(w.length * sz)));
-      const baseLeftX = -halfNewW + offX + wallThickness / 2;
-      const baseRearZ = -halfNewD + offZ + wallThickness + newL / 2;
-      return {
-        ...w,
-        length: newL,
-        posX: Math.round(Math.max(-halfNewW + wallThickness / 2, Math.min(halfNewW - wallThickness / 2, baseLeftX))),
-        posZ: Math.round(Math.max(-halfNewD + wallThickness + newL / 2, Math.min(halfNewD - newL / 2, baseRearZ)))
-      };
+    if (w.id === 'side' && isVert) {
+      const prevLeftX = -halfPrevW + offX + thick / 2;
+      const prevRearZ = -halfPrevD + offZ + thick + w.length / 2;
+      if (Math.abs(w.posX - prevLeftX) <= 5 && Math.abs(w.posZ - prevRearZ) <= 5) {
+        const wasFull = w.length >= (safePrevD - thick) * 0.85;
+        const newL = wasFull ? maxSideL : Math.min(maxSideL, Math.max(400, Math.round(w.length * sz)));
+        const { halfSpanX, halfSpanZ } = getWallHalfSpans(newL, thick, rot);
+        const maxPosX = Math.max(0, halfNewW - halfSpanX);
+        const maxPosZ = Math.max(0, halfNewD - halfSpanZ);
+        const baseLeftX = -halfNewW + offX + thick / 2;
+        const baseRearZ = -halfNewD + offZ + thick + newL / 2;
+        return {
+          ...w,
+          length: newL,
+          posX: clampWallCoord(baseLeftX, maxPosX),
+          posZ: clampWallCoord(baseRearZ, maxPosZ)
+        };
+      }
     }
 
-    if (w.id === 'right_side') {
-      const wasFull = w.length >= (safePrevD - wallThickness) * 0.85;
-      const newL = wasFull ? maxSideL : Math.min(maxSideL, Math.max(600, Math.round(w.length * sz)));
-      const baseRightX = halfNewW + offX - wallThickness / 2;
-      const baseRearZ = -halfNewD + offZ + wallThickness + newL / 2;
-      return {
-        ...w,
-        length: newL,
-        posX: Math.round(Math.max(-halfNewW + wallThickness / 2, Math.min(halfNewW - wallThickness / 2, baseRightX))),
-        posZ: Math.round(Math.max(-halfNewD + wallThickness + newL / 2, Math.min(halfNewD - newL / 2, baseRearZ)))
-      };
+    if (w.id === 'right_side' && isVert) {
+      const prevRearZ = -halfPrevD + offZ + thick + w.length / 2;
+      const isAtRightSide = Math.abs(w.posZ - prevRearZ) <= 5 && w.posX > 0;
+      if (isAtRightSide) {
+        const wasFull = w.length >= (safePrevD - thick) * 0.85;
+        const newL = wasFull ? maxSideL : Math.min(maxSideL, Math.max(400, Math.round(w.length * sz)));
+        const { halfSpanX, halfSpanZ } = getWallHalfSpans(newL, thick, rot);
+        const maxPosX = Math.max(0, halfNewW - halfSpanX);
+        const maxPosZ = Math.max(0, halfNewD - halfSpanZ);
+        const wasAtFloorRightEdge = Math.abs(w.posX - (halfPrevW + offX - thick / 2)) <= 5;
+        const targetX = wasAtFloorRightEdge ? halfNewW + offX - thick / 2 : Math.round(w.posX * sx);
+        const baseRearZ = -halfNewD + offZ + thick + newL / 2;
+        return {
+          ...w,
+          length: newL,
+          posX: clampWallCoord(targetX, maxPosX),
+          posZ: clampWallCoord(baseRearZ, maxPosZ)
+        };
+      }
     }
 
-    // Muros divisorios / independientes
-    let newL = w.length;
-    if (isHoriz) {
-      newL = Math.min(newFloorW, Math.max(400, Math.round(w.length * sx)));
-    } else if (isVert) {
-      newL = Math.min(newFloorD, Math.max(400, Math.round(w.length * sz)));
-    } else {
-      newL = Math.min(Math.max(newFloorW, newFloorD), Math.max(400, Math.round(w.length * Math.min(sx, sz))));
-    }
+    // Muros libres, divisorios o rotados (cualquier ángulo 0°, 45°, 90°, libre)
+    const rad = (rot * Math.PI) / 180;
+    const scaleFactor = Math.hypot(Math.cos(rad) * sx, Math.sin(rad) * sz);
+    const maxLenForAngle = getMaxWallLengthForAngle(newFloorW, newFloorD, thick, rot);
+    const newL = Math.min(maxLenForAngle, Math.max(400, Math.round(w.length * scaleFactor)));
 
-    const halfSpanX = isHoriz ? newL / 2 : wallThickness / 2;
-    const halfSpanZ = isHoriz ? wallThickness / 2 : newL / 2;
+    const { halfSpanX, halfSpanZ } = getWallHalfSpans(newL, thick, rot);
+    const maxPosX = Math.max(0, halfNewW - halfSpanX);
+    const maxPosZ = Math.max(0, halfNewD - halfSpanZ);
     const scaledX = Math.round(w.posX * sx);
     const scaledZ = Math.round(w.posZ * sz);
-    const clampedX = Math.max(-halfNewW + halfSpanX, Math.min(halfNewW - halfSpanX, scaledX));
-    const clampedZ = Math.max(-halfNewD + halfSpanZ, Math.min(halfNewD - halfSpanZ, scaledZ));
 
     return {
       ...w,
       length: newL,
-      posX: clampedX,
-      posZ: clampedZ
+      posX: clampWallCoord(scaledX, maxPosX),
+      posZ: clampWallCoord(scaledZ, maxPosZ)
     };
   });
 }
 
 /**
  * Resuelve la lista de muros independientes de la habitación.
- * Si ya existen en config.walls, se retornan adaptados y validados estrictamente dentro del piso.
+ * Si ya existen en config.walls, se retornan validados dentro de los límites del piso para su ángulo
+ * preservando libremente la posición (posX, posZ) y rotación de cualquier muro.
  * De lo contrario, se sintetizan a partir de la distribución base (main, side, right_side)
  * preservando la alineación exacta a los bordes y las dimensiones del espacio.
  */
@@ -1376,39 +1449,55 @@ export function getResolvedRoomWalls(config: RoomConfiguration): RoomWallInstanc
   const halfFloorD = effectiveFloorDepth / 2;
 
   if (config.walls && config.walls.length > 0) {
-    const maxSideL = Math.max(600, effectiveFloorDepth - wallThickness);
+    const baseX = -halfFloorW + offX;
+    const baseZ = -halfFloorD + offZ;
+    const effMainL = Math.min(effectiveFloorWidth, Math.max(600, config.mainWallLength || effectiveFloorWidth));
+
     return config.walls.map(w => {
-      let len = w.length;
+      const defaultRot = w.id === 'side' || w.id === 'right_side' ? 90 : 0;
+      const rawRot = typeof w.rotationY === 'number' && Number.isFinite(w.rotationY) ? w.rotationY : defaultRot;
+      const rot = ((rawRot % 360) + 360) % 360;
+      const thick = Math.round(Math.max(50, Math.min(600, w.thickness || wallThickness)));
+      const height = Math.round(Math.max(400, Math.min(4500, w.height || config.wallHeight || 2600)));
+
+      const maxLenForAngle = getMaxWallLengthForAngle(effectiveFloorWidth, effectiveFloorDepth, thick, rot);
+      const len = Math.round(Math.max(400, Math.min(maxLenForAngle, w.length || 2400)));
+
+      const { halfSpanX, halfSpanZ } = getWallHalfSpans(len, thick, rot);
+      const maxPosX = Math.max(0, halfFloorW - halfSpanX);
+      const maxPosZ = Math.max(0, halfFloorD - halfSpanZ);
+
       let px = w.posX;
       let pz = w.posZ;
-      const rot = ((w.rotationY || 0) % 360 + 360) % 360;
-      const isHoriz = rot === 0 || rot === 180;
-      const isVert = rot === 90 || rot === 270;
-
-      if (w.id === 'main') {
-        len = Math.min(effectiveFloorWidth, Math.max(600, len));
-        const halfSpanX = len / 2;
-        px = Math.max(-halfFloorW + halfSpanX, Math.min(halfFloorW - halfSpanX, px));
-        pz = Math.max(-halfFloorD + wallThickness / 2, Math.min(halfFloorD - wallThickness / 2, pz));
-      } else if (w.id === 'side' || w.id === 'right_side') {
-        len = Math.min(maxSideL, Math.max(600, len));
-        const halfSpanZ = len / 2;
-        px = Math.max(-halfFloorW + wallThickness / 2, Math.min(halfFloorW - wallThickness / 2, px));
-        pz = Math.max(-halfFloorD + wallThickness + halfSpanZ, Math.min(halfFloorD - halfSpanZ, pz));
-      } else {
-        const maxLen = isHoriz ? effectiveFloorWidth : (isVert ? effectiveFloorDepth : Math.max(effectiveFloorWidth, effectiveFloorDepth));
-        len = Math.min(maxLen, Math.max(400, len));
-        const halfSpanX = isHoriz ? len / 2 : wallThickness / 2;
-        const halfSpanZ = isHoriz ? wallThickness / 2 : len / 2;
-        px = Math.max(-halfFloorW + halfSpanX, Math.min(halfFloorW - halfSpanX, px));
-        pz = Math.max(-halfFloorD + halfSpanZ, Math.min(halfFloorD - halfSpanZ, pz));
+      if (typeof px !== 'number' || !Number.isFinite(px)) {
+        if (w.id === 'main') {
+          px = baseX + len / 2;
+        } else if (w.id === 'side') {
+          px = baseX + thick / 2;
+        } else if (w.id === 'right_side') {
+          px = baseX + effMainL - thick / 2;
+        } else {
+          px = 0;
+        }
+      }
+      if (typeof pz !== 'number' || !Number.isFinite(pz)) {
+        if (w.id === 'main') {
+          pz = baseZ + thick / 2;
+        } else if (w.id === 'side' || w.id === 'right_side') {
+          pz = baseZ + thick + len / 2;
+        } else {
+          pz = 0;
+        }
       }
 
       return {
         ...w,
-        length: Math.round(len),
-        posX: Math.round(px),
-        posZ: Math.round(pz)
+        length: len,
+        height,
+        thickness: thick,
+        rotationY: Math.round(rot * 100) / 100,
+        posX: clampWallCoord(px, maxPosX),
+        posZ: clampWallCoord(pz, maxPosZ)
       };
     });
   }

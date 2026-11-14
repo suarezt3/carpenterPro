@@ -56,6 +56,8 @@ import {
   RoomConfiguration,
   RoomWallInstance,
   getResolvedRoomWalls,
+  getWallHalfSpans,
+  getMaxWallLengthForAngle,
   RoomLayoutType,
   FloorMaterialType,
   WallMaterialType,
@@ -1133,7 +1135,11 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   readonly showDrawerWizard = signal<boolean>(false);
   readonly drawerWizardTargetModuleId = signal<string>('floor');
   readonly drawerWizardTargetCavityId = signal<string>('');
-  readonly drawerWizardCount = signal<1 | 2 | 3 | 4>(1);
+  readonly drawerWizardCount = signal<1 | 2 | 3 | 4 | 5 | 6>(1);
+  readonly showUpperCabinetsInDrawerWizard = signal<boolean>(false);
+  readonly clearCoveringDoorsInDrawerWizard = signal<boolean>(true);
+  readonly drawerWizardCountOptions: readonly (1 | 2 | 3 | 4 | 5 | 6)[] = [1, 2, 3, 4, 5, 6];
+  readonly drawerWizardSlideOptions: readonly number[] = [200, 250, 300, 350, 400, 450, 500];
 
   readonly drawerForm = signal<ParametricDrawerConfig>({
     name: 'Cajón 1',
@@ -1156,21 +1162,118 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     rotationY: 0
   });
 
+  private isLooseStructureCavity(cavity: ModuleCavityInfo): boolean {
+    return cavity.groupId === '__loose_structure__' || cavity.moduleId === '__loose_structure__';
+  }
+
+  private getCavitiesForDrawerModuleId(modId: string): ModuleCavityInfo[] {
+    if (!modId || modId === 'floor') return [];
+    const parts = this.currentParts();
+    const apps = this.appliances();
+    if (modId === '__loose_structure__') {
+      return this.partGeometry
+        .detectAllSceneCavities(parts, this.groups(), apps)
+        .filter(c => this.isLooseStructureCavity(c) && !c.isOccupiedByAppliance);
+    }
+    const grp = this.groups().find(g => g.id === modId);
+    return this.partGeometry
+      .detectModuleCavities(modId, parts, grp || 'Módulo', apps)
+      .filter(c => !c.isOccupiedByAppliance);
+  }
+
   readonly availableCabinetModulesForDrawer = computed<PartGroup[]>(() => {
     const grps = this.groups();
     const parts = this.currentParts();
-    return grps.filter(g => {
+    const apps = this.appliances();
+    const showUpper = this.showUpperCabinetsInDrawerWizard();
+    const allCavities = this.partGeometry.detectAllSceneCavities(parts, grps, apps);
+
+    const cabinetModules = grps.filter(g => {
       if (this.isCountertopGroup(g.id) || this.isModularDrawerGroup(g.id)) return false;
-      const cavities = this.partGeometry.detectModuleCavities(g.id, parts, g.name);
-      return cavities.length > 0;
+      const modCavities = allCavities.filter(c => c.moduleId === g.id && !c.isOccupiedByAppliance);
+      if (modCavities.length === 0) return false;
+      if (!showUpper && modCavities.every(c => c.isUpperCabinet === true)) {
+        return false;
+      }
+      return true;
     });
+
+    const hasLooseStructureCavities = allCavities.some(
+      c => this.isLooseStructureCavity(c) && !c.isOccupiedByAppliance
+    );
+    if (hasLooseStructureCavities) {
+      return [
+        ...cabinetModules,
+        {
+          id: '__loose_structure__',
+          name: 'Estructura de Piezas Sueltas (Hueco Detectado)',
+          type: 'custom'
+        }
+      ];
+    }
+    return cabinetModules;
   });
 
   readonly availableCavitiesForDrawerModule = computed<ModuleCavityInfo[]>(() => {
-    const modId = this.drawerWizardTargetModuleId();
-    if (!modId || modId === 'floor') return [];
-    const grp = this.groups().find(g => g.id === modId);
-    return this.partGeometry.detectModuleCavities(modId, this.currentParts(), grp?.name || 'Módulo');
+    return this.getCavitiesForDrawerModuleId(this.drawerWizardTargetModuleId());
+  });
+
+  readonly selectedPartSurroundingCavity = computed<ModuleCavityInfo | null>(() => {
+    const part = this.selectedPart();
+    if (!part) return null;
+    if (part.groupId && (this.isModularDrawerGroup(part.groupId) || this.isCountertopGroup(part.groupId))) {
+      return null;
+    }
+
+    const allCavities = this.partGeometry
+      .detectAllSceneCavities(this.currentParts(), this.groups(), this.appliances())
+      .filter(c => !c.isOccupiedByAppliance);
+    if (allCavities.length === 0) return null;
+
+    const delimitingMatch = allCavities.find(
+      c =>
+        c.leftPartId === part.id ||
+        c.rightPartId === part.id ||
+        c.topPartId === part.id ||
+        c.bottomPartId === part.id
+    );
+    if (delimitingMatch) return delimitingMatch;
+
+    const px = part.posX ?? 0;
+    const py = part.posY ?? 0;
+    const pz = part.posZ ?? 0;
+    const interiorMatch = allCavities.find(c => {
+      const sideFacing = c.facingDirection === 'left' || c.facingDirection === 'right';
+      const halfX = (sideFacing ? c.internalDepth : c.internalWidth) / 2;
+      const halfZ = (sideFacing ? c.internalWidth : c.internalDepth) / 2;
+      return (
+        px >= c.centerX - halfX - 25 &&
+        px <= c.centerX + halfX + 25 &&
+        py >= c.minY - 25 &&
+        py <= c.maxY + 25 &&
+        pz >= c.centerZ - halfZ - 25 &&
+        pz <= c.centerZ + halfZ + 25
+      );
+    });
+    return interiorMatch || null;
+  });
+
+  readonly drawerWizardMaxSafeSlideLength = computed<number | null>(() => {
+    const cav = this.selectedDrawerWizardCavity();
+    if (!cav) return null;
+    const form = this.drawerForm();
+    const mount = form.frontMountType ?? 'overlay';
+    const frontT = form.frontThickness || 15;
+    const hasCoveringDoor = (cav.coveringDoorIds?.length ?? 0) > 0;
+    const setback =
+      mount === 'inset'
+        ? Math.max(12, frontT) + 2
+        : mount === 'none'
+          ? (hasCoveringDoor ? 22 : 5)
+          : !this.clearCoveringDoorsInDrawerWizard() && hasCoveringDoor
+            ? 22
+            : 0;
+    return Math.max(150, Math.floor(cav.internalDepth - setback - 5));
   });
 
   readonly selectedDrawerWizardCavity = computed<ModuleCavityInfo | null>(() => {
@@ -2390,6 +2493,11 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   onSelectPartFrom3D(part: Part | null) {
     if (part) {
       this.selectedWall.set(null);
+      if (part.groupId && this.isModularDrawerGroup(part.groupId)) {
+        this.selectEntireGroup(part.groupId, part.id);
+        return;
+      }
+
       // Si ya hay una multiselección activa que contiene a esta pieza (por Shift+Clic, Todo o lazo),
       // la preservamos intacta y solo actualizamos la pieza activa en el inspector
       if (this.selectedPartIds().length > 1 && this.selectedPartIds().includes(part.id)) {
@@ -2412,14 +2520,13 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
         this.activeDockTab.set('piece');
         return;
       }
-      this.selectedPartId.set(part.id);
       if (part.groupId) {
-        const groupParts = this.currentParts().filter(p => p.groupId === part.groupId);
-        this.selectedPartIds.set(groupParts.map(p => p.id));
+        this.selectEntireGroup(part.groupId, part.id);
       } else {
+        this.selectedPartId.set(part.id);
         this.selectedPartIds.set([part.id]);
+        this.activeDockTab.set('piece');
       }
-      this.activeDockTab.set('piece');
     } else {
       this.selectedPartId.set(null);
       this.selectedPartIds.set([]);
@@ -2467,12 +2574,12 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   selectSinglePartById(id: string, event?: Event) {
     event?.stopPropagation();
     const targetPart = this.currentParts().find(p => p.id === id);
-    if (targetPart?.groupId && this.isCountertopGroup(targetPart.groupId)) {
-      // Mesón y salpicadero forman una unidad rígida monolítica indivisible
-      const groupParts = this.currentParts().filter(p => p.groupId === targetPart.groupId);
-      this.selectedPartId.set(id);
-      this.selectedPartIds.set(groupParts.map(p => p.id));
-      this.activeDockTab.set('piece');
+    if (
+      targetPart?.groupId &&
+      (this.isCountertopGroup(targetPart.groupId) || this.isModularDrawerGroup(targetPart.groupId))
+    ) {
+      // Mesones y cajones modulares forman una unidad indivisible en el visor 3D
+      this.selectEntireGroup(targetPart.groupId, id);
       return;
     }
     this.selectedPartId.set(id);
@@ -2506,14 +2613,17 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
         this.activeDockTab.set('piece');
       }
     } else {
-      this.selectedPartId.set(id);
-      if (targetPart?.groupId && !this.isCountertopGroup(targetPart.groupId)) {
-        const groupParts = this.currentParts().filter(p => p.groupId === targetPart.groupId);
-        this.selectedPartIds.set(groupParts.map(p => p.id));
-      } else {
-        this.selectedPartIds.set([id]);
+      if (targetPart?.groupId && this.isModularDrawerGroup(targetPart.groupId)) {
+        this.selectEntireGroup(targetPart.groupId, id);
+        return;
       }
-      this.activeDockTab.set('piece');
+      if (targetPart?.groupId && !this.isCountertopGroup(targetPart.groupId)) {
+        this.selectEntireGroup(targetPart.groupId, id);
+      } else {
+        this.selectedPartId.set(id);
+        this.selectedPartIds.set([id]);
+        this.activeDockTab.set('piece');
+      }
     }
   }
 
@@ -4102,21 +4212,41 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
   // --- ASISTENTE DE CAJÓN MODULAR (SMART CAVITY FIT + MONTAJE SOLAPADO/A RAS + APERTURA PUSH/UÑERO) ---
 
-  openDrawerWizard(preselectedModuleId?: string, preselectedPartId?: string) {
+  openDrawerWizard(preselectedModuleId?: string, preselectedPartId?: string, preselectedCavityId?: string) {
     const uniqueName = this.getNextUniqueGroupName('Cajón');
     const defaultMat = this.materials()[0];
     const mdfMat = this.materials().find(m => m.thickness === 3) || defaultMat;
     const defaultT = this.defaultBoardThickness();
 
-    // Detectar si el usuario tiene seleccionado un módulo de gabinete o entrepaño
+    this.clearCoveringDoorsInDrawerWizard.set(true);
+
+    // Detectar si el usuario tiene seleccionado un módulo de gabinete o hueco en piezas sueltas
     let targetModId = preselectedModuleId || 'floor';
+    let fallbackCavityId = preselectedCavityId;
     if (targetModId === 'floor') {
       const activeGid = this.activeSelectedGroupId() || this.selectedPart()?.groupId;
       if (activeGid && !this.isCountertopGroup(activeGid) && !this.isModularDrawerGroup(activeGid)) {
-        const modCavities = this.partGeometry.detectModuleCavities(activeGid, this.currentParts());
-        if (modCavities.length > 0) {
+        const modCavities = this.getCavitiesForDrawerModuleId(activeGid);
+        const isOnlyUpper = modCavities.length > 0 && modCavities.every(c => c.isUpperCabinet === true);
+        if (modCavities.length > 0 && (!isOnlyUpper || this.showUpperCabinetsInDrawerWizard())) {
           targetModId = activeGid;
         }
+      }
+      if (targetModId === 'floor') {
+        const surrounding = this.selectedPartSurroundingCavity();
+        if (surrounding) {
+          targetModId = this.isLooseStructureCavity(surrounding)
+            ? '__loose_structure__'
+            : (surrounding.moduleId || surrounding.groupId);
+          fallbackCavityId = fallbackCavityId || surrounding.id;
+        }
+      }
+    } else {
+      const preCavs = this.getCavitiesForDrawerModuleId(targetModId);
+      if (preCavs.length === 0) {
+        targetModId = 'floor';
+      } else if (preCavs.every(c => c.isUpperCabinet === true)) {
+        this.showUpperCabinetsInDrawerWizard.set(true);
       }
     }
 
@@ -4124,47 +4254,45 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.drawerWizardCount.set(1);
 
     if (targetModId !== 'floor') {
-      const grp = this.groups().find(g => g.id === targetModId);
-      const cavities = this.partGeometry.detectModuleCavities(targetModId, this.currentParts(), grp?.name || 'Módulo');
+      const cavities = this.getCavitiesForDrawerModuleId(targetModId);
       if (cavities.length > 0) {
-        let chosenCavity = cavities[0];
-        const refPartId = preselectedPartId || this.selectedPartId();
-        if (refPartId) {
-          const refPart = this.currentParts().find(p => p.id === refPartId);
-          if (refPart) {
-            const py = refPart.posY ?? 0;
-            const match = cavities.find(c => py >= c.minY - 25 && py <= c.maxY + 25);
-            if (match) chosenCavity = match;
+        let chosenCavity = (fallbackCavityId && cavities.find(c => c.id === fallbackCavityId)) || cavities[0];
+        if (!fallbackCavityId) {
+          const refPartId = preselectedPartId || this.selectedPartId();
+          if (refPartId) {
+            const refPart = this.currentParts().find(p => p.id === refPartId);
+            if (refPart) {
+              const py = refPart.posY ?? 0;
+              const match = cavities.find(c => py >= c.minY - 25 && py <= c.maxY + 25);
+              if (match) chosenCavity = match;
+            }
           }
         }
-        this.drawerWizardTargetCavityId.set(chosenCavity.id);
-        const frontW = Math.round(chosenCavity.internalWidth + 2 * chosenCavity.sideThickness - 4);
-        const boxH = Math.max(80, Math.min(160, Math.round(chosenCavity.internalHeight - 40)));
-        const frontH = Math.max(100, Math.min(200, Math.round(chosenCavity.internalHeight - 6)));
         this.drawerForm.set({
           name: uniqueName,
           outerWidth: chosenCavity.internalWidth,
           slideLength: chosenCavity.optimalSlideLength,
-          boxHeight: boxH,
+          boxHeight: 140,
           boxThickness: defaultT,
           bottomThickness: 3,
           slideGap: 26,
           includeFront: true,
           frontMountType: 'overlay',
           handleType: 'handle',
-          frontHeight: frontH,
-          frontWidth: frontW,
+          frontHeight: 180,
+          frontWidth: chosenCavity.internalWidth,
           frontThickness: defaultT,
           sideThickness: chosenCavity.sideThickness,
           posX: chosenCavity.centerX,
           posY: Math.round(chosenCavity.minY + 2),
           posZ: chosenCavity.centerZ,
           rotationY: chosenCavity.rotationY,
-          targetModuleId: targetModId,
+          targetModuleId: chosenCavity.moduleId,
           targetCavityId: chosenCavity.id,
           materialId: defaultMat ? defaultMat.id : 'mat-1',
           bottomMaterialId: mdfMat ? mdfMat.id : 'mat_mdf_3'
         });
+        this.applyCavityToDrawerWizardForm(chosenCavity);
         this.showDrawerWizard.set(true);
         return;
       }
@@ -4197,8 +4325,15 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.showDrawerWizard.set(true);
   }
 
-  openDrawerWizardForCavity(event: { groupId: string; partId?: string }) {
-    this.openDrawerWizard(event.groupId, event.partId);
+  openDrawerWizardForCavity(target: ModuleCavityInfo | { groupId: string; partId?: string }) {
+    if ('internalWidth' in target) {
+      const modId = this.isLooseStructureCavity(target)
+        ? '__loose_structure__'
+        : (target.moduleId || target.groupId);
+      this.openDrawerWizard(modId, undefined, target.id);
+      return;
+    }
+    this.openDrawerWizard(target.groupId, target.partId);
   }
 
   closeDrawerWizard() {
@@ -4209,14 +4344,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const modId = (event.target as HTMLSelectElement).value || 'floor';
     this.drawerWizardTargetModuleId.set(modId);
     if (modId === 'floor') {
-      this.drawerWizardTargetCavityId.set('');
-      this.drawerWizardCount.set(1);
-      this.drawerForm.update(cur => ({
-        ...cur,
-        targetModuleId: undefined,
-        targetCavityId: undefined,
-        rotationY: 0
-      }));
+      this.resetDrawerWizardToFloor();
       return;
     }
     const cavities = this.availableCavitiesForDrawerModule();
@@ -4238,11 +4366,16 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const cur = this.drawerForm();
     const mount = cur.frontMountType ?? 'overlay';
     const frontT = cur.frontThickness || 15;
-    const optSlide = this.partGeometry.getOptimalCommercialSlideLength(
-      cavity.internalDepth,
-      mount,
-      frontT
-    );
+    const hasCoveringDoor = (cavity.coveringDoorIds?.length ?? 0) > 0;
+    const optSlide =
+      mount === 'overlay' && this.clearCoveringDoorsInDrawerWizard() && cavity.optimalSlideLength
+        ? cavity.optimalSlideLength
+        : this.partGeometry.getOptimalCommercialSlideLength(
+            cavity.internalDepth,
+            mount,
+            frontT,
+            (mount === 'none' || !this.clearCoveringDoorsInDrawerWizard()) && hasCoveringDoor
+          );
     const frontW = mount === 'inset'
       ? Math.max(80, Math.round(cavity.internalWidth - 4))
       : Math.max(80, Math.round(cavity.internalWidth + 2 * cavity.sideThickness - 4));
@@ -4272,8 +4405,41 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     }));
   }
 
-  setDrawerWizardCount(count: 1 | 2 | 3 | 4) {
+  setDrawerWizardCount(count: 1 | 2 | 3 | 4 | 5 | 6) {
     this.drawerWizardCount.set(count);
+    const cav = this.selectedDrawerWizardCavity();
+    if (cav) {
+      this.applyCavityToDrawerWizardForm(cav);
+    }
+  }
+
+  toggleShowUpperCabinetsInDrawerWizard(checked: boolean) {
+    this.showUpperCabinetsInDrawerWizard.set(checked);
+    if (!checked) {
+      const currentTarget = this.drawerWizardTargetModuleId();
+      if (
+        currentTarget !== 'floor' &&
+        !this.availableCabinetModulesForDrawer().some(g => g.id === currentTarget)
+      ) {
+        this.drawerWizardTargetModuleId.set('floor');
+        this.resetDrawerWizardToFloor();
+      }
+    }
+  }
+
+  private resetDrawerWizardToFloor(): void {
+    this.drawerWizardTargetCavityId.set('');
+    this.drawerForm.update(cur => ({
+      ...cur,
+      slideLength: cur.slideLength < 300 ? 450 : cur.slideLength,
+      targetModuleId: undefined,
+      targetCavityId: undefined,
+      rotationY: 0
+    }));
+  }
+
+  toggleClearCoveringDoorsInDrawerWizard(checked: boolean) {
+    this.clearCoveringDoorsInDrawerWizard.set(checked);
     const cav = this.selectedDrawerWizardCavity();
     if (cav) {
       this.applyCavityToDrawerWizardForm(cav);
@@ -4290,10 +4456,12 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       : Math.max(80, Math.round(outerW + 2 * sideT - 4));
     let slideLen = cur.slideLength;
     if (cav) {
+      const hasCoveringDoor = (cav.coveringDoorIds?.length ?? 0) > 0;
       slideLen = this.partGeometry.getOptimalCommercialSlideLength(
         cav.internalDepth,
         mountType,
-        cur.frontThickness || 15
+        cur.frontThickness || 15,
+        (mountType === 'none' || !this.clearCoveringDoorsInDrawerWizard()) && hasCoveringDoor
       );
     }
     this.drawerForm.update(prev => ({
@@ -4371,6 +4539,9 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
         {
           ...config,
           name: cleanName
+        },
+        {
+          clearCoveringDoors: this.clearCoveringDoorsInDrawerWizard()
         }
       );
       this.showDrawerWizard.set(false);
@@ -4391,18 +4562,183 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       return;
     }
 
-    const grp = this.projectService.addParametricDrawer({ ...config, name: cleanName });
+    const createdFloorGroups = this.projectService.addParametricDrawerStackOnFloor(
+      { ...config, name: cleanName },
+      count
+    );
     this.showDrawerWizard.set(false);
-    this.selectEntireGroup(grp.id);
-    this.openGroupCardIds.update(s => new Set(s).add(grp.id));
-    this.showToast(`${grp.name} generado con piezas ensambladas`);
+    const primaryGrp = this.selectAndExpandCreatedDrawerGroups(createdFloorGroups);
+    if (primaryGrp) {
+      const toastMsg =
+        createdFloorGroups.length > 1
+          ? `Torre de ${createdFloorGroups.length} cajones generada con piezas ensambladas`
+          : `${primaryGrp.name} generado con piezas ensambladas`;
+      this.showToast(toastMsg);
+    }
+  }
+
+  /** Selects the primary created drawer group and expands all generated cards in the tree. */
+  private selectAndExpandCreatedDrawerGroups(createdGroups: PartGroup[]): PartGroup | null {
+    if (createdGroups.length === 0) return null;
+    const primaryGroup = createdGroups[createdGroups.length - 1] ?? createdGroups[0];
+    this.selectEntireGroup(primaryGroup.id);
+    this.openGroupCardIds.update(s => {
+      const next = new Set(s);
+      for (const g of createdGroups) {
+        next.add(g.id);
+      }
+      return next;
+    });
+    return primaryGroup;
+  }
+
+  readonly selectedModuleCavities = computed<ModuleCavityInfo[]>(() => {
+    if (!this.isParametricCabinetGroup()) return [];
+    const gId = this.activeSelectedGroupId();
+    if (!gId || this.isModularDrawerGroup(gId) || this.isCountertopGroup(gId)) return [];
+    const grp = this.groups().find(g => g.id === gId);
+    return this.partGeometry
+      .detectModuleCavities(gId, this.currentParts(), grp || 'Módulo', this.appliances())
+      .filter(c => !c.isOccupiedByAppliance);
+  });
+
+  quickFillCavityWithDrawers(
+    cavity: ModuleCavityInfo,
+    count: number,
+    frontMountType: DrawerFrontMountType = 'overlay'
+  ): void {
+    const hasCoveringDoor = (cavity.coveringDoorIds?.length ?? 0) > 0;
+    const slideLength = this.partGeometry.getOptimalCommercialSlideLength(
+      cavity.internalDepth,
+      frontMountType,
+      15,
+      frontMountType === 'none' && hasCoveringDoor
+    );
+    const boxHeight = Math.max(
+      80,
+      Math.min(180, Math.floor(cavity.internalHeight / Math.max(1, count) - 38))
+    );
+
+    const createdGroups = this.projectService.addParametricDrawersToCavity(
+      cavity,
+      count,
+      {
+        name: count > 1 ? 'Cajón' : 'Cajón Modular',
+        frontMountType,
+        handleType: 'handle',
+        boxHeight,
+        boxThickness: 15,
+        frontThickness: 15,
+        bottomThickness: 3,
+        slideLength,
+        includeFront: frontMountType !== 'none'
+      },
+      {
+        clearCoveringDoors: frontMountType !== 'none',
+        fillFullCavityHeight: count === 1
+      }
+    );
+
+    const targetGroup = this.selectAndExpandCreatedDrawerGroups(createdGroups);
+    if (targetGroup) {
+      const modeLabel =
+        frontMountType === 'none'
+          ? 'interno de closet'
+          : frontMountType === 'inset'
+            ? 'a ras'
+            : 'solapado';
+      const msg =
+        createdGroups.length > 1
+          ? `${createdGroups.length} cajones (${modeLabel}) integrados en ${cavity.label}`
+          : `${targetGroup.name} (${modeLabel}) integrado en ${cavity.label}`;
+      this.showToast(msg);
+    } else {
+      this.showToast('No hay espacio útil suficiente en este vano para insertar cajones');
+    }
+  }
+
+  quickSplitCavityHorizontally(cavity: ModuleCavityInfo): void {
+    const createdShelf = this.projectService.splitCavityWithShelf(cavity);
+    if (createdShelf) {
+      if (cavity.moduleId && cavity.moduleId !== '__loose_structure__') {
+        this.selectEntireGroup(cavity.moduleId, createdShelf.id);
+      } else {
+        this.selectPartById(createdShelf.id);
+      }
+      this.showToast(`Entrepaño añadido en ${cavity.label}`);
+    } else {
+      this.showToast('El vano no tiene altura útil suficiente para dividir con entrepaño');
+    }
+  }
+
+  quickSplitCavityVertically(cavity: ModuleCavityInfo): void {
+    const createdDivider = this.projectService.splitCavityWithVerticalDivider(cavity);
+    if (createdDivider) {
+      if (cavity.moduleId && cavity.moduleId !== '__loose_structure__') {
+        this.selectEntireGroup(cavity.moduleId, createdDivider.id);
+      } else {
+        this.selectPartById(createdDivider.id);
+      }
+      this.showToast(`División vertical añadida en ${cavity.label}`);
+    } else {
+      this.showToast('El vano no tiene ancho útil suficiente para dividir verticalmente');
+    }
+  }
+
+  readonly canConvertSelectedPartToDrawer = computed<boolean>(() => {
+    const part = this.selectedPart();
+    if (!part) return false;
+    const role = part.componentRole;
+    if (!role) return false;
+    if (part.groupId) {
+      const grp = this.groups().find(g => g.id === part.groupId);
+      if (grp?.templateId === 'modular_drawer' || this.isCountertopGroup(part.groupId)) {
+        return false;
+      }
+    }
+    const allowedRoles = new Set<string>([
+      'free',
+      'drawer_front',
+      'shelf',
+      'door',
+      'bottom',
+      'top'
+    ]);
+    return allowedRoles.has(role);
+  });
+
+  convertSelectedPartToDrawer(
+    count = 1,
+    frontMountType: DrawerFrontMountType = 'overlay'
+  ): void {
+    const part = this.selectedPart();
+    if (!part || !this.canConvertSelectedPartToDrawer()) return;
+
+    const createdGroups = this.projectService.convertPartToModularDrawer(
+      part.id,
+      count,
+      frontMountType
+    );
+    const primaryGroup = this.selectAndExpandCreatedDrawerGroups(createdGroups);
+    if (primaryGroup) {
+      const modeLabel = frontMountType === 'none' ? 'interno de closet' : 'con frente';
+      const msg =
+        createdGroups.length > 1
+          ? `Pieza convertida en ${createdGroups.length} cajones modulares (${modeLabel})`
+          : `Pieza convertida en ${primaryGroup.name}`;
+      this.showToast(msg);
+    } else {
+      this.showToast('No se pudo convertir la pieza seleccionada en cajón modular');
+    }
   }
 
   // --- INSPECTOR CONTEXTUAL EXCLUSIVO PARA CAJÓN MODULAR ---
 
   toggleSelectedModularDrawerOpen(groupId: string) {
-    this.projectService.toggleGroupOpen(groupId);
-    this.viewer3d()?.toggleGroupAnimation(groupId);
+    const grp = this.groups().find(g => g.id === groupId);
+    const nextOpen = !(grp?.isOpen ?? (this.viewer3d()?.isGroupOpen(groupId) ?? false));
+    this.projectService.setGroupSlideExtension(groupId, nextOpen ? 1 : 0);
+    this.viewer3d()?.toggleGroupAnimation(groupId, nextOpen);
   }
 
   onSelectedModularDrawerSlideInput(groupId: string, event: Event) {
@@ -4590,11 +4926,12 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.projectService.setGroupSlideExtension(groupId, val);
   }
 
-  selectEntireGroup(groupId: string) {
+  selectEntireGroup(groupId: string, preferredPartId?: string) {
     const groupParts = this.currentParts().filter(p => p.groupId === groupId);
     const ids = groupParts.map(p => p.id);
     this.selectedPartIds.set(ids);
-    this.selectedPartId.set(ids[0] || null);
+    const activeId = preferredPartId && ids.includes(preferredPartId) ? preferredPartId : (ids[0] || null);
+    this.selectedPartId.set(activeId);
     this.activeDockTab.set('piece');
   }
 
@@ -4612,15 +4949,19 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   toggleSelectedGroupOpen() {
     const gId = this.activeSelectedGroupId();
     if (gId) {
-      this.viewer3d()?.toggleGroupAnimation(gId);
-      this.projectService.toggleGroupOpen(gId);
+      const grp = this.groups().find(g => g.id === gId);
+      const nextOpen = !(grp?.isOpen ?? (this.viewer3d()?.isGroupOpen(gId) ?? false));
+      this.projectService.setGroupSlideExtension(gId, nextOpen ? 1 : 0);
+      this.viewer3d()?.toggleGroupAnimation(gId, nextOpen);
       return;
     }
     const ids = this.selectedPartIds();
     const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId) || this.selectedPart();
     if (part?.groupId) {
-      this.viewer3d()?.toggleGroupAnimation(part.groupId);
-      this.projectService.toggleGroupOpen(part.groupId);
+      const grp = this.groups().find(g => g.id === part.groupId);
+      const nextOpen = !(grp?.isOpen ?? (this.viewer3d()?.isGroupOpen(part.groupId) ?? false));
+      this.projectService.setGroupSlideExtension(part.groupId, nextOpen ? 1 : 0);
+      this.viewer3d()?.toggleGroupAnimation(part.groupId, nextOpen);
     } else if (part) {
       this.viewer3d()?.togglePartOpen(part.id);
     }
@@ -5222,6 +5563,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
   onWallSelected(wall: string | null) {
     this.selectedWall.set(wall);
+    this.viewer3d()?.selectedWallType.set(wall);
     if (wall) {
       this.roomDockSubTab.set('wall');
       this.activeDockTab.set('piece');
@@ -5231,7 +5573,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       this.projectService.selectAppliances([]);
       const inst = this.getWallInstance(wall);
       const wallName = inst ? inst.name : wall;
-      this.showToast(`🧱 Seleccionado: ${wallName}`);
+      this.showToast(`Seleccionado: ${wallName}`);
     }
   }
 
@@ -5306,18 +5648,100 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.showToast(cur ? `👁️ ${wallName} visible` : `🙈 ${wallName} oculto`);
   }
 
-  setWallLength(wallId: string, length: number) {
+  private clampWallCoordinate(value: number, maxAbs: number): number {
+    const safeMax = Math.max(0, maxAbs);
+    const clamped = Math.max(-safeMax, Math.min(safeMax, value));
+    const rounded = Math.round(clamped * 100) / 100;
+    if (Math.abs(rounded) > safeMax) {
+      return Math.sign(rounded) * (Math.floor(safeMax * 100) / 100);
+    }
+    return rounded === 0 ? 0 : rounded;
+  }
+
+  private updateWallClamped(
+    wallId: string,
+    buildPatch: (wall: RoomWallInstance) => Partial<RoomWallInstance> | null
+  ): RoomWallInstance | null {
     const cfg = this.roomConfig();
     const floorW = cfg.floorWidth || 5000;
     const floorD = cfg.floorDepth || 5000;
-    const maxLen = Math.max(floorW, floorD);
-    const val = Math.max(400, Math.min(maxLen, length));
+    const halfFloorW = floorW / 2;
+    const halfFloorD = floorD / 2;
     const walls = getResolvedRoomWalls(cfg);
+    let updatedTarget: RoomWallInstance | null = null;
+
     const updatedWalls = walls.map(w => {
-      if (w.id === wallId) return { ...w, length: val };
-      return w;
+      if (w.id !== wallId) return w;
+      const patch = buildPatch(w);
+      if (!patch) return w;
+
+      const merged: RoomWallInstance = { ...w, ...patch };
+      const rot = ((merged.rotationY || 0) % 360 + 360) % 360;
+      const thick = Math.round(Math.max(50, Math.min(600, merged.thickness || cfg.wallThickness || 150)));
+      const height = Math.round(Math.max(400, Math.min(4500, merged.height || cfg.wallHeight || 2600)));
+      const maxLen = getMaxWallLengthForAngle(floorW, floorD, thick, rot);
+      const length = Math.round(Math.max(400, Math.min(maxLen, merged.length || 2400)));
+      const { halfSpanX, halfSpanZ } = getWallHalfSpans(length, thick, rot);
+      const maxPosX = Math.max(0, halfFloorW - halfSpanX);
+      const maxPosZ = Math.max(0, halfFloorD - halfSpanZ);
+      const posX = this.clampWallCoordinate(merged.posX, maxPosX);
+      const posZ = this.clampWallCoordinate(merged.posZ, maxPosZ);
+
+      updatedTarget = {
+        ...merged,
+        rotationY: Math.round(rot * 100) / 100,
+        thickness: thick,
+        height,
+        length,
+        posX,
+        posZ
+      };
+      return updatedTarget;
     });
+
+    if (!updatedTarget) return null;
     this.updateRoomConfig({ walls: updatedWalls });
+    return updatedTarget;
+  }
+
+  onWallNumericInput(
+    wallId: string,
+    field: 'length' | 'height' | 'thickness' | 'posX' | 'posZ' | 'rotationY',
+    rawValue: string
+  ) {
+    const trimmed = rawValue.trim();
+    if (!trimmed || trimmed === '-' || trimmed === '+') return;
+    const num = Number(trimmed);
+    if (!Number.isFinite(num)) return;
+
+    switch (field) {
+      case 'length':
+        if (num < 400) return;
+        this.setWallLength(wallId, num);
+        break;
+      case 'height':
+        if (num < 400) return;
+        this.setWallHeight(wallId, num);
+        break;
+      case 'thickness':
+        if (num < 50) return;
+        this.setWallThickness(wallId, num);
+        break;
+      case 'posX':
+        this.setWallPosX(wallId, num);
+        break;
+      case 'posZ':
+        this.setWallPosZ(wallId, num);
+        break;
+      case 'rotationY':
+        this.setWallRotation(wallId, num);
+        break;
+    }
+  }
+
+  setWallLength(wallId: string, length: number) {
+    if (!Number.isFinite(length)) return;
+    this.updateWallClamped(wallId, () => ({ length }));
   }
 
   nudgeWallLength(wallId: string, delta: number) {
@@ -5326,14 +5750,8 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   setWallHeight(wallId: string, height: number) {
-    const val = Math.max(400, Math.min(4500, height));
-    const cfg = this.roomConfig();
-    const walls = getResolvedRoomWalls(cfg);
-    const updatedWalls = walls.map(w => {
-      if (w.id === wallId) return { ...w, height: val };
-      return w;
-    });
-    this.updateRoomConfig({ walls: updatedWalls });
+    if (!Number.isFinite(height)) return;
+    this.updateWallClamped(wallId, () => ({ height }));
   }
 
   nudgeWallHeight(wallId: string, delta: number) {
@@ -5342,18 +5760,15 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   setWallRotation(wallId: string, rotationDeg: number) {
-    const normalized = ((rotationDeg % 360) + 360) % 360;
-    const cfg = this.roomConfig();
-    const walls = getResolvedRoomWalls(cfg);
-    const updatedWalls = walls.map(w => {
-      if (w.id === wallId) return { ...w, rotationY: normalized };
-      return w;
-    });
-    this.updateRoomConfig({ walls: updatedWalls });
-    this.showToast(`🔄 Giro de muro: ${normalized}°`);
+    if (!Number.isFinite(rotationDeg)) return;
+    const updated = this.updateWallClamped(wallId, () => ({ rotationY: rotationDeg }));
+    if (updated) {
+      this.showToast(`Giro de muro: ${updated.rotationY}°`);
+    }
   }
 
   rotateWall(wallId: string, deltaDeg = 90) {
+    if (!Number.isFinite(deltaDeg)) return;
     const cur = this.getWallRotation(wallId);
     this.setWallRotation(wallId, cur + deltaDeg);
   }
@@ -5362,49 +5777,116 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.setWallRotation(wallId, orientation === 'horizontal' ? 0 : 90);
   }
 
+  private activateSelectableWallInViewer(wallId: string) {
+    const viewer = this.viewer3d();
+    if (!viewer) return;
+    const activeTool = viewer.activeTool();
+    if (activeTool !== 'select' && activeTool !== 'move') {
+      viewer.setActiveTool('select');
+    }
+    viewer.selectedWallType.set(wallId);
+  }
+
   addRoomWall() {
+    if (this.workspaceMode() !== 'room') {
+      this.projectService.setWorkspaceMode('room');
+    }
     const cfg = this.roomConfig();
+    const floorW = cfg.floorWidth || 5000;
+    const floorD = cfg.floorDepth || 5000;
+    const halfFloorW = floorW / 2;
+    const halfFloorD = floorD / 2;
     const current = getResolvedRoomWalls(cfg);
-    const newId = 'wall_' + Date.now();
+    const thick = Math.round(Math.max(50, Math.min(600, cfg.wallThickness || 150)));
+    const height = Math.round(Math.max(400, Math.min(4500, cfg.wallHeight || 2600)));
+    const maxLen = getMaxWallLengthForAngle(floorW, floorD, thick, 0);
+    const length = Math.round(Math.max(400, Math.min(maxLen, 2400)));
+    const { halfSpanX, halfSpanZ } = getWallHalfSpans(length, thick, 0);
+    const maxPosX = Math.max(0, halfFloorW - halfSpanX);
+    const maxPosZ = Math.max(0, halfFloorD - halfSpanZ);
+
+    let posZ = 0;
+    for (const candZ of [0, 350, -350, 700, -700, 1050, -1050]) {
+      const clampedCandZ = this.clampWallCoordinate(candZ, maxPosZ);
+      const isOccupied = current.some(
+        w => !w.isHidden && Math.abs(w.posX) < 120 && Math.abs(w.posZ - clampedCandZ) < 120
+      );
+      if (!isOccupied) {
+        posZ = clampedCandZ;
+        break;
+      }
+    }
+    const posX = this.clampWallCoordinate(0, maxPosX);
+    posZ = this.clampWallCoordinate(posZ, maxPosZ);
+
+    let suffix = Date.now();
+    let newId = `wall_${suffix}`;
+    while (current.some(w => w.id === newId)) {
+      suffix++;
+      newId = `wall_${suffix}`;
+    }
+
     const newWall: RoomWallInstance = {
       id: newId,
       name: `Muro Divisorio ${current.length + 1}`,
-      length: 2400,
-      height: cfg.wallHeight || 2600,
-      thickness: cfg.wallThickness || 150,
-      posX: 0,
-      posZ: 0,
+      length,
+      height,
+      thickness: thick,
+      posX,
+      posZ,
       rotationY: 0,
       material: cfg.wallMaterial,
       showSkirting: cfg.showSkirting,
       isLocked: false,
       isHidden: false
     };
+
     this.updateRoomConfig({ walls: [...current, newWall] });
+    this.isSidebarCollapsed.set(false);
     this.onWallSelected(newId);
-    this.showToast(`🧱 Creado "${newWall.name}". Puedes arrastrarlo libremente o girarlo con 'R'`);
+    this.activateSelectableWallInViewer(newId);
+    this.showToast(`Creado "${newWall.name}". Arrástralo libremente en 3D o gíralo con R`);
   }
 
   duplicateWall(wallId?: string) {
     const targetId = wallId || this.selectedWall();
     if (!targetId) return;
     const cfg = this.roomConfig();
+    const floorW = cfg.floorWidth || 5000;
+    const floorD = cfg.floorDepth || 5000;
+    const halfFloorW = floorW / 2;
+    const halfFloorD = floorD / 2;
     const current = getResolvedRoomWalls(cfg);
     const original = current.find(w => w.id === targetId);
     if (!original) return;
-    const newId = 'wall_' + Date.now();
+
+    const { halfSpanX, halfSpanZ } = getWallHalfSpans(original.length, original.thickness, original.rotationY || 0);
+    const maxPosX = Math.max(0, halfFloorW - halfSpanX);
+    const maxPosZ = Math.max(0, halfFloorD - halfSpanZ);
+    const candX = original.posX + 200 <= maxPosX ? original.posX + 200 : original.posX - 200;
+    const candZ = original.posZ + 200 <= maxPosZ ? original.posZ + 200 : original.posZ - 200;
+
+    let suffix = Date.now();
+    let newId = `wall_${suffix}`;
+    while (current.some(w => w.id === newId)) {
+      suffix++;
+      newId = `wall_${suffix}`;
+    }
+
     const clonedWall: RoomWallInstance = {
       ...original,
       id: newId,
       name: `${original.name} (Copia)`,
-      posX: original.posX + 200,
-      posZ: original.posZ + 200,
+      posX: this.clampWallCoordinate(candX, maxPosX),
+      posZ: this.clampWallCoordinate(candZ, maxPosZ),
       isLocked: false,
       isHidden: false
     };
     this.updateRoomConfig({ walls: [...current, clonedWall] });
+    this.isSidebarCollapsed.set(false);
     this.onWallSelected(newId);
-    this.showToast(`📋 Duplicado "${clonedWall.name}"`);
+    this.activateSelectableWallInViewer(newId);
+    this.showToast(`Duplicado "${clonedWall.name}"`);
   }
 
   deleteWall(wallId?: string) {
@@ -5417,60 +5899,34 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const remaining = current.filter(w => w.id !== targetId);
     this.updateRoomConfig({ walls: remaining });
     if (this.selectedWall() === targetId) {
-      this.selectedWall.set(remaining.length > 0 ? remaining[0].id : null);
+      const nextWallId = remaining.length > 0 ? remaining[0].id : null;
+      this.selectedWall.set(nextWallId);
+      this.viewer3d()?.selectedWallType.set(nextWallId);
     }
-    this.showToast(`🗑️ "${wallName}" eliminado`);
+    this.showToast(`"${wallName}" eliminado`);
   }
 
   nudgeWallPos(wallId: string, axis: 'x' | 'z', delta: number) {
-    const cfg = this.roomConfig();
-    const walls = getResolvedRoomWalls(cfg);
-    const updatedWalls = walls.map(w => {
-      if (w.id === wallId) {
-        return {
-          ...w,
-          posX: axis === 'x' ? w.posX + delta : w.posX,
-          posZ: axis === 'z' ? w.posZ + delta : w.posZ
-        };
-      }
-      return w;
-    });
-    this.updateRoomConfig({ walls: updatedWalls });
+    if (!Number.isFinite(delta)) return;
+    this.updateWallClamped(wallId, w => ({
+      posX: axis === 'x' ? w.posX + delta : w.posX,
+      posZ: axis === 'z' ? w.posZ + delta : w.posZ
+    }));
   }
 
   setWallThickness(wallId: string, thickness: number) {
-    const val = Math.max(50, Math.min(600, thickness));
-    const cfg = this.roomConfig();
-    const walls = getResolvedRoomWalls(cfg);
-    const updatedWalls = walls.map(w => {
-      if (w.id === wallId) return { ...w, thickness: val };
-      return w;
-    });
-    this.updateRoomConfig({ walls: updatedWalls });
+    if (!Number.isFinite(thickness)) return;
+    this.updateWallClamped(wallId, () => ({ thickness }));
   }
 
   setWallPosX(wallId: string, posX: number) {
-    const cfg = this.roomConfig();
-    const floorW = cfg.floorWidth || 5000;
-    const val = Math.max(-floorW / 2, Math.min(floorW / 2, posX));
-    const walls = getResolvedRoomWalls(cfg);
-    const updatedWalls = walls.map(w => {
-      if (w.id === wallId) return { ...w, posX: val };
-      return w;
-    });
-    this.updateRoomConfig({ walls: updatedWalls });
+    if (!Number.isFinite(posX)) return;
+    this.updateWallClamped(wallId, () => ({ posX }));
   }
 
   setWallPosZ(wallId: string, posZ: number) {
-    const cfg = this.roomConfig();
-    const floorD = cfg.floorDepth || 5000;
-    const val = Math.max(-floorD / 2, Math.min(floorD / 2, posZ));
-    const walls = getResolvedRoomWalls(cfg);
-    const updatedWalls = walls.map(w => {
-      if (w.id === wallId) return { ...w, posZ: val };
-      return w;
-    });
-    this.updateRoomConfig({ walls: updatedWalls });
+    if (!Number.isFinite(posZ)) return;
+    this.updateWallClamped(wallId, () => ({ posZ }));
   }
 
   updateWallName(wallId: string, name: string) {

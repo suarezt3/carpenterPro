@@ -1,12 +1,29 @@
 import { Injectable } from '@angular/core';
 import * as THREE from 'three';
 import {
+  ApplianceItem,
   DrawerFrontMountType,
   ModuleCavityInfo,
   Part,
   PartCornerCutConfig,
   PartGroup
 } from '../models/melamine.models';
+
+declare module '../models/melamine.models' {
+  interface Part {
+    type?: string;
+  }
+  interface ModuleCavityInfo {
+    isUpperCabinet?: boolean;
+    isOccupiedByAppliance?: boolean;
+    existingDrawerCount?: number;
+    coveringDoorIds?: string[];
+    bottomPartId?: string;
+    topPartId?: string;
+    leftPartId?: string;
+    rightPartId?: string;
+  }
+}
 
 export interface PartLocalDimensions {
   sx: number;
@@ -933,6 +950,15 @@ export class PartGeometryService {
   isInternalShelf(part: Part): boolean {
     if (!part?.groupId) return false;
     const role = part.componentRole;
+    if (
+      role === 'drawer_box' ||
+      role === 'drawer_front' ||
+      role === 'drawer_bottom' ||
+      role === 'drawer_lateral' ||
+      /fondo\s*mdf|frente\s*caj|trasera\s*caj|contra[- ]?frente/i.test(part.name || '')
+    ) {
+      return false;
+    }
     if (role === 'shelf') return true;
     if (
       role === 'top' ||
@@ -957,12 +983,6 @@ export class PartGeometryService {
       name.includes('estante') ||
       name.includes('balda') ||
       name.includes('shelf')
-    ) {
-      return true;
-    }
-    if (
-      part.orientation === 'horizontal' &&
-      (role === 'drawer_box' || name.includes('cajón') || name.includes('cajon'))
     ) {
       return true;
     }
@@ -1406,99 +1426,501 @@ export class PartGeometryService {
   }
 
   /**
-   * Calcula el largo óptimo de corredera comercial (300, 350, 400, 450 o 500 mm)
-   * que cabe en la profundidad interna útil sin chocar con el fondo trasero,
-   * descontando el espesor del frente cuando el montaje es a ras ('inset').
+   * Calcula el largo óptimo de corredera comercial (550, 500, 450, 400, 350, 300, 250 o 200 mm)
+   * que cabe en la profundidad interna útil sin chocar con el fondo trasero ranurado,
+   * descontando el retranqueo frontal y al menos 5 mm de holgura trasera.
    */
   getOptimalCommercialSlideLength(
     internalDepth: number,
     frontMountOrSetback: DrawerFrontMountType | number = 'overlay',
-    frontThickness = 15
+    frontThickness = 15,
+    hasCoveringDoor = false
   ): number {
-    const commercialSizes = [500, 450, 400, 350, 300];
+    const commercialSizes = [550, 500, 450, 400, 350, 300, 250, 200];
     const setback =
       typeof frontMountOrSetback === 'number'
-        ? frontMountOrSetback
+        ? Math.max(0, frontMountOrSetback)
         : frontMountOrSetback === 'inset'
-          ? Math.max(12, frontThickness || 15)
+          ? Math.max(12, frontThickness || 15) + 2
           : frontMountOrSetback === 'none'
-            ? 5
+            ? (hasCoveringDoor ? 22 : 5)
             : 0;
-    const maxSafeLength = internalDepth - setback - 3;
+    const maxAllowedLength = Math.max(150, Math.floor(internalDepth - setback - 5));
     for (const size of commercialSizes) {
-      if (size <= maxSafeLength) {
+      if (size <= maxAllowedLength) {
         return size;
       }
     }
-    const maxExactLength = internalDepth - setback;
-    for (const size of commercialSizes) {
-      if (size <= maxExactLength) {
-        return size;
-      }
-    }
-    return 300;
+    return Math.max(150, Math.floor(maxAllowedLength / 10) * 10);
   }
 
-  /**
-   * Detecta automáticamente todas las cavidades/vanos verticales libres (Luces Internas)
-   * dentro de un módulo existente, soportando divisiones verticales, entrepaños y las 4 orientaciones.
-   */
-  detectModuleCavities(
-    groupOrId: string | PartGroup,
-    allParts: Part[],
-    groupOrName?: PartGroup | string
-  ): ModuleCavityInfo[] {
-    const groupId = typeof groupOrId === 'string' ? groupOrId : groupOrId?.id;
-    const group: PartGroup | undefined =
-      typeof groupOrId === 'object'
-        ? groupOrId
-        : typeof groupOrName === 'object'
-          ? groupOrName
-          : undefined;
-    const customModuleName = typeof groupOrName === 'string' ? groupOrName : undefined;
+  private isEmbeddedAppliancePart(part: Part): boolean {
+    const role = (part.componentRole as string | undefined) ?? '';
+    if (role === 'oven' || role === 'microwave' || role === 'sink') {
+      return true;
+    }
+    const nonApplianceRoles = new Set<string>([
+      'top',
+      'bottom',
+      'side_left',
+      'side_right',
+      'divider',
+      'shelf',
+      'back',
+      'front',
+      'door',
+      'drawer_front',
+      'drawer_box',
+      'drawer_bottom',
+      'drawer_lateral',
+      'plinth',
+      'tie',
+      'countertop',
+      'backsplash'
+    ]);
+    if (role && nonApplianceRoles.has(role)) {
+      return false;
+    }
+    const name = part.name || '';
+    if (/\b(soporte|repisa|bandeja|amarre|z[oó]calo|puerta|lateral|fondo|frente|costado)\b/i.test(name)) {
+      return false;
+    }
+    return /\b(horno|oven|microondas?|microwave|fregadero|sink|lavaplatos|tarja)\b/i.test(name);
+  }
 
-    if (!groupId) return [];
-    if (
-      group &&
-      (group.type === 'drawer' ||
-        group.subType === 'drawer' ||
-        group.templateId === 'modular_drawer')
-    ) {
-      return [];
+  private getApplianceBounds(
+    allParts: Part[],
+    appliances?: ApplianceItem[]
+  ): { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number; groupId?: string }[] {
+    const boxes: {
+      minX: number;
+      maxX: number;
+      minY: number;
+      maxY: number;
+      minZ: number;
+      maxZ: number;
+      groupId?: string;
+    }[] = [];
+
+    for (const part of allParts) {
+      if (!this.isEmbeddedAppliancePart(part)) continue;
+      const aabb = this.getWorldAABB(part);
+      boxes.push({
+        minX: aabb.minX,
+        maxX: aabb.maxX,
+        minY: aabb.minY,
+        maxY: aabb.maxY,
+        minZ: aabb.minZ,
+        maxZ: aabb.maxZ,
+        groupId: part.groupId
+      });
     }
 
-    const groupParts = allParts.filter(p => p.groupId === groupId);
-    if (groupParts.length < 2) return [];
+    if (appliances?.length) {
+      for (const app of appliances) {
+        if (app.type !== 'oven' && app.type !== 'microwave' && app.type !== 'sink') {
+          continue;
+        }
+        const halfW = (app.width || 600) / 2;
+        const halfD = (app.depth || 560) / 2;
+        const rotRad = -((app.rotation || 0) * Math.PI) / 180;
+        const absCos = Math.abs(Math.cos(rotRad));
+        const absSin = Math.abs(Math.sin(rotRad));
+        const halfExtentX = halfW * absCos + halfD * absSin;
+        const halfExtentZ = halfW * absSin + halfD * absCos;
+        const cx = app.position?.x ?? 0;
+        const cz = app.position?.z ?? 0;
+        const baseY = app.position?.y ?? 0;
+        const sinkDrop = app.type === 'sink' && app.mountType === 'countertop' ? Math.min(app.height || 200, 180) : 0;
+        boxes.push({
+          minX: cx - halfExtentX,
+          maxX: cx + halfExtentX,
+          minY: baseY - sinkDrop,
+          maxY: baseY + (app.height || 595),
+          minZ: cz - halfExtentZ,
+          maxZ: cz + halfExtentZ,
+          groupId: app.groupId
+        });
+      }
+    }
 
-    // Excluir grupos que solo contienen piezas de cajón
-    const nonDrawerParts = groupParts.filter(
-      p =>
-        p.componentRole !== 'drawer_box' &&
-        p.componentRole !== 'drawer_front' &&
-        p.componentRole !== 'drawer_bottom' &&
-        p.componentRole !== 'drawer_lateral'
-    );
+    return boxes;
+  }
+
+  private isRegionOccupiedByAppliance(
+    region: { spanMin: number; spanMax: number; minY: number; maxY: number; minDepth: number; maxDepth: number },
+    isWidthZ: boolean,
+    hostGroupId: string,
+    applianceBoxes: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number; groupId?: string }[]
+  ): boolean {
+    const minX = isWidthZ ? region.minDepth : region.spanMin;
+    const maxX = isWidthZ ? region.maxDepth : region.spanMax;
+    const minZ = isWidthZ ? region.spanMin : region.minDepth;
+    const maxZ = isWidthZ ? region.spanMax : region.maxDepth;
+
+    for (const app of applianceBoxes) {
+      const overlapX = Math.min(maxX, app.maxX) - Math.max(minX, app.minX);
+      const overlapY = Math.min(region.maxY, app.maxY) - Math.max(region.minY, app.minY);
+      const overlapZ = Math.min(maxZ, app.maxZ) - Math.max(minZ, app.minZ);
+      if (app.groupId && app.groupId === hostGroupId) {
+        const overlapSpan = isWidthZ ? overlapZ : overlapX;
+        if (overlapSpan > 20 && overlapY > 20) {
+          return true;
+        }
+      } else if (overlapX > 20 && overlapY > 20 && overlapZ > 20) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private collectCoveringDoorIds(
+    doorItems: { part: Part; aabb: PartWorldAABB }[],
+    isWidthZ: boolean,
+    spanMin: number,
+    spanMax: number,
+    minY: number,
+    maxY: number
+  ): string[] {
+    const ids: string[] = [];
+    for (const door of doorItems) {
+      const doorMin = isWidthZ ? door.aabb.minZ : door.aabb.minX;
+      const doorMax = isWidthZ ? door.aabb.maxZ : door.aabb.maxX;
+      const overlapSpan = Math.min(spanMax, doorMax) - Math.max(spanMin, doorMin);
+      const overlapY = Math.min(maxY, door.aabb.maxY) - Math.max(minY, door.aabb.minY);
+      if (overlapSpan > 20 && overlapY > 20) {
+        ids.push(door.part.id);
+      }
+    }
+    return ids;
+  }
+
+  private countExistingDrawersInBox(
+    drawerItems: { part: Part; aabb: PartWorldAABB }[],
+    hostGroupId: string,
+    isWidthZ: boolean,
+    spanMin: number,
+    spanMax: number,
+    minY: number,
+    maxY: number,
+    minDepth: number,
+    maxDepth: number
+  ): number {
+    const matching = drawerItems.filter(item => {
+      const itemSpanMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
+      const itemSpanMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
+      const itemDepthMin = isWidthZ ? item.aabb.minX : item.aabb.minZ;
+      const itemDepthMax = isWidthZ ? item.aabb.maxX : item.aabb.maxZ;
+      const itemSpanCenter = (itemSpanMin + itemSpanMax) / 2;
+      const itemCenterY = (item.aabb.minY + item.aabb.maxY) / 2;
+      const itemDepthCenter = (itemDepthMin + itemDepthMax) / 2;
+      const overlapSpan = Math.min(spanMax, itemSpanMax) - Math.max(spanMin, itemSpanMin);
+      const overlapY = Math.min(maxY, item.aabb.maxY) - Math.max(minY, item.aabb.minY);
+      const overlapDepth = Math.min(maxDepth + 30, itemDepthMax) - Math.max(minDepth - 30, itemDepthMin);
+      return (
+        itemSpanCenter > spanMin &&
+        itemSpanCenter < spanMax &&
+        itemCenterY >= minY - 5 &&
+        itemCenterY <= maxY + 5 &&
+        itemDepthCenter >= minDepth - 30 &&
+        itemDepthCenter <= maxDepth + 30 &&
+        overlapSpan > 2 &&
+        overlapY > 2 &&
+        overlapDepth > 2
+      );
+    });
+
+    if (matching.length === 0) return 0;
+
+    const separateGroupIds = new Set<string>();
+    const inlineFronts: number[] = [];
+    const inlineBoxes: number[] = [];
+
+    for (const item of matching) {
+      const gid = item.part.groupId;
+      if (gid && gid !== hostGroupId) {
+        separateGroupIds.add(gid);
+      } else if (item.part.componentRole === 'drawer_front') {
+        inlineFronts.push((item.aabb.minY + item.aabb.maxY) / 2);
+      } else {
+        inlineBoxes.push((item.aabb.minY + item.aabb.maxY) / 2);
+      }
+    }
+
+    let count = separateGroupIds.size + inlineFronts.length;
+    const clusteredBoxYs: number[] = [];
+    for (const boxY of inlineBoxes) {
+      const coveredByFront = inlineFronts.some(fy => Math.abs(fy - boxY) <= 35);
+      if (coveredByFront) continue;
+      const sameCluster = clusteredBoxYs.some(cy => Math.abs(cy - boxY) <= 30);
+      if (!sameCluster) {
+        clusteredBoxYs.push(boxY);
+      }
+    }
+    count += clusteredBoxYs.length;
+    return count;
+  }
+
+  private subdivideCavityRegion(
+    region: {
+      spanMin: number;
+      spanMax: number;
+      minY: number;
+      maxY: number;
+      leftPanel: { part: Part; aabb: PartWorldAABB };
+      rightPanel: { part: Part; aabb: PartWorldAABB };
+      bottomPartId?: string;
+      topPartId?: string;
+    },
+    dividers: { part: Part; aabb: PartWorldAABB }[],
+    shelves: { part: Part; aabb: PartWorldAABB }[],
+    isWidthZ: boolean,
+    depth = 0
+  ): {
+    spanMin: number;
+    spanMax: number;
+    minY: number;
+    maxY: number;
+    leftPanel: { part: Part; aabb: PartWorldAABB };
+    rightPanel: { part: Part; aabb: PartWorldAABB };
+    bottomPartId?: string;
+    topPartId?: string;
+  }[] {
+    const regionWidth = region.spanMax - region.spanMin;
+    const regionHeight = region.maxY - region.minY;
+    if (regionWidth < 120 || regionHeight < 70 || depth > 8) {
+      return regionWidth >= 120 && regionHeight >= 70 ? [region] : [];
+    }
+
+    const fullHeightDividers = dividers
+      .filter(item => {
+        if (item.part.id === region.leftPanel.part.id || item.part.id === region.rightPanel.part.id) {
+          return false;
+        }
+        const divMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
+        const divMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
+        const overlapY = Math.min(region.maxY, item.aabb.maxY) - Math.max(region.minY, item.aabb.minY);
+        return (
+          divMin > region.spanMin + 20 &&
+          divMax < region.spanMax - 20 &&
+          overlapY >= regionHeight * 0.72
+        );
+      })
+      .sort((a, b) =>
+        isWidthZ
+          ? (a.aabb.minZ + a.aabb.maxZ) / 2 - (b.aabb.minZ + b.aabb.maxZ) / 2
+          : (a.aabb.minX + a.aabb.maxX) / 2 - (b.aabb.minX + b.aabb.maxX) / 2
+      );
+
+    if (fullHeightDividers.length > 0) {
+      const colBoundaries = [region.leftPanel, ...fullHeightDividers, region.rightPanel];
+      const leaves: (typeof region)[] = [];
+      for (let i = 0; i < colBoundaries.length - 1; i++) {
+        const leftP = colBoundaries[i];
+        const rightP = colBoundaries[i + 1];
+        const subMin = isWidthZ ? leftP.aabb.maxZ : leftP.aabb.maxX;
+        const subMax = isWidthZ ? rightP.aabb.minZ : rightP.aabb.minX;
+        leaves.push(
+          ...this.subdivideCavityRegion(
+            {
+              spanMin: subMin,
+              spanMax: subMax,
+              minY: region.minY,
+              maxY: region.maxY,
+              leftPanel: leftP,
+              rightPanel: rightP,
+              bottomPartId: region.bottomPartId,
+              topPartId: region.topPartId
+            },
+            dividers,
+            shelves,
+            isWidthZ,
+            depth + 1
+          )
+        );
+      }
+      return leaves;
+    }
+
+    const fullSpanShelves = shelves
+      .filter(item => {
+        const shMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
+        const shMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
+        const overlapSpan = Math.min(region.spanMax, shMax) - Math.max(region.spanMin, shMin);
+        return (
+          item.aabb.minY > region.minY + 30 &&
+          item.aabb.maxY < region.maxY - 30 &&
+          overlapSpan >= regionWidth * 0.72
+        );
+      })
+      .sort((a, b) => a.aabb.minY - b.aabb.minY);
+
+    if (fullSpanShelves.length > 0) {
+      const leaves: (typeof region)[] = [];
+      let curMinY = region.minY;
+      let curBottomId = region.bottomPartId;
+      for (const shelf of fullSpanShelves) {
+        if (shelf.aabb.minY - curMinY >= 70) {
+          leaves.push(
+            ...this.subdivideCavityRegion(
+              {
+                spanMin: region.spanMin,
+                spanMax: region.spanMax,
+                minY: curMinY,
+                maxY: shelf.aabb.minY,
+                leftPanel: region.leftPanel,
+                rightPanel: region.rightPanel,
+                bottomPartId: curBottomId,
+                topPartId: shelf.part.id
+              },
+              dividers,
+              shelves,
+              isWidthZ,
+              depth + 1
+            )
+          );
+        }
+        curMinY = shelf.aabb.maxY;
+        curBottomId = shelf.part.id;
+      }
+      if (region.maxY - curMinY >= 70) {
+        leaves.push(
+          ...this.subdivideCavityRegion(
+            {
+              spanMin: region.spanMin,
+              spanMax: region.spanMax,
+              minY: curMinY,
+              maxY: region.maxY,
+              leftPanel: region.leftPanel,
+              rightPanel: region.rightPanel,
+              bottomPartId: curBottomId,
+              topPartId: region.topPartId
+            },
+            dividers,
+            shelves,
+            isWidthZ,
+            depth + 1
+          )
+        );
+      }
+      return leaves;
+    }
+
+    return [region];
+  }
+
+  private isLooseStructuralCandidate(part: Part): boolean {
+    if (part.groupId) return false;
+    if (part.type === 'wall' || part.type === 'door' || part.type === 'hardware') {
+      return false;
+    }
+    const role = (part.componentRole as string | undefined) ?? '';
+    if (
+      role === 'door' ||
+      role === 'oven' ||
+      role === 'microwave' ||
+      role === 'sink' ||
+      role === 'drawer_box' ||
+      role === 'drawer_front' ||
+      role === 'drawer_bottom' ||
+      role === 'drawer_lateral' ||
+      role === 'plinth' ||
+      role === 'countertop' ||
+      role === 'backsplash'
+    ) {
+      return false;
+    }
+    return !this.isEmbeddedAppliancePart(part);
+  }
+
+  private clusterPartsByProximity(
+    items: { part: Part; aabb: PartWorldAABB }[],
+    maxGapMm = 60
+  ): { part: Part; aabb: PartWorldAABB }[][] {
+    const n = items.length;
+    const visited = new Array<boolean>(n).fill(false);
+    const clusters: { part: Part; aabb: PartWorldAABB }[][] = [];
+
+    for (let i = 0; i < n; i++) {
+      if (visited[i]) continue;
+      visited[i] = true;
+      const queue: number[] = [i];
+      const cluster: { part: Part; aabb: PartWorldAABB }[] = [];
+
+      while (queue.length > 0) {
+        const currIdx = queue.shift()!;
+        const curr = items[currIdx];
+        cluster.push(curr);
+
+        for (let j = 0; j < n; j++) {
+          if (visited[j]) continue;
+          const other = items[j];
+          const gapX = Math.max(0, curr.aabb.minX - other.aabb.maxX, other.aabb.minX - curr.aabb.maxX);
+          const gapY = Math.max(0, curr.aabb.minY - other.aabb.maxY, other.aabb.minY - curr.aabb.maxY);
+          const gapZ = Math.max(0, curr.aabb.minZ - other.aabb.maxZ, other.aabb.minZ - curr.aabb.maxZ);
+          if (gapX <= maxGapMm && gapY <= maxGapMm && gapZ <= maxGapMm) {
+            visited[j] = true;
+            queue.push(j);
+          }
+        }
+      }
+
+      clusters.push(cluster);
+    }
+
+    return clusters;
+  }
+
+  private buildCavitiesFromStructuralCluster(params: {
+    groupId: string;
+    moduleName: string;
+    allParts: Part[];
+    nonDrawerParts: Part[];
+    doorItems: { part: Part; aabb: PartWorldAABB }[];
+    appliances?: ApplianceItem[];
+    group?: PartGroup;
+    isLooseCluster: boolean;
+    clusterIndex?: number;
+  }): ModuleCavityInfo[] {
+    const {
+      groupId,
+      moduleName,
+      allParts,
+      nonDrawerParts,
+      doorItems,
+      appliances,
+      group,
+      isLooseCluster,
+      clusterIndex = 0
+    } = params;
+
     if (nonDrawerParts.length < 2) return [];
 
     const sLeft = nonDrawerParts.find(p => p.componentRole === 'side_left');
     const sRight = nonDrawerParts.find(p => p.componentRole === 'side_right');
 
+    const isAllowedVertical = (p: Part): boolean => {
+      if (!isLooseCluster) {
+        return (
+          p.componentRole !== 'plinth' &&
+          p.componentRole !== 'back' &&
+          p.componentRole !== 'door' &&
+          p.componentRole !== 'backsplash'
+        );
+      }
+      const r = p.componentRole;
+      if (r !== undefined && r !== 'side_left' && r !== 'side_right' && r !== 'divider' && r !== 'free') {
+        return false;
+      }
+      return !((p.thickness || 18) <= 6 && /(fondo|trasera)/i.test(p.name || ''));
+    };
+
     // Determinar si el ancho del módulo corre en X (lados en vertical_yz) o en Z (lados en vertical_xy)
     const yzStructural = nonDrawerParts.filter(
-      p =>
-        p.orientation === 'vertical_yz' &&
-        p.componentRole !== 'plinth' &&
-        p.componentRole !== 'back' &&
-        p.componentRole !== 'door' &&
-        p.componentRole !== 'backsplash'
+      p => p.orientation === 'vertical_yz' && isAllowedVertical(p)
     );
     const xyStructural = nonDrawerParts.filter(
-      p =>
-        p.orientation === 'vertical_xy' &&
-        p.componentRole !== 'plinth' &&
-        p.componentRole !== 'back' &&
-        p.componentRole !== 'door' &&
-        p.componentRole !== 'backsplash'
+      p => p.orientation === 'vertical_xy' && isAllowedVertical(p)
     );
 
     let isWidthZ = false;
@@ -1527,8 +1949,8 @@ export class PartGeometryService {
     const backPart = nonDrawerParts.find(
       p =>
         p.componentRole === 'back' ||
-        p.name.toLowerCase().includes('fondo') ||
-        p.name.toLowerCase().includes('trasera')
+        (p.orientation !== 'horizontal' &&
+          (p.name.toLowerCase().includes('fondo') || p.name.toLowerCase().includes('trasera')))
     );
     const backAABB = backPart ? this.getWorldAABB(backPart) : null;
 
@@ -1556,142 +1978,313 @@ export class PartGeometryService {
             ? 270
             : 0;
 
-    const moduleName = customModuleName || group?.name || 'Módulo';
+    const outerLeft = panelBounds[0];
+    const outerRight = panelBounds[panelBounds.length - 1];
+    const outerSpanMin = isWidthZ ? outerLeft.aabb.maxZ : outerLeft.aabb.maxX;
+    const outerSpanMax = isWidthZ ? outerRight.aabb.minZ : outerRight.aabb.minX;
+    if (outerSpanMax - outerSpanMin < 120) return [];
+
+    const sideDepthMin = Math.max(
+      isWidthZ ? outerLeft.aabb.minX : outerLeft.aabb.minZ,
+      isWidthZ ? outerRight.aabb.minX : outerRight.aabb.minZ
+    );
+    const sideDepthMax = Math.min(
+      isWidthZ ? outerLeft.aabb.maxX : outerLeft.aabb.maxZ,
+      isWidthZ ? outerRight.aabb.maxX : outerRight.aabb.maxZ
+    );
+    if (isLooseCluster && sideDepthMax - sideDepthMin < 60) return [];
+
+    const horizPartsInModule = nonDrawerParts
+      .filter(p => {
+        if (p.orientation !== 'horizontal') return false;
+        if (!isLooseCluster) {
+          return p.componentRole !== 'plinth' && p.componentRole !== 'countertop';
+        }
+        const r = p.componentRole;
+        return (
+          r === undefined ||
+          r === 'top' ||
+          r === 'shelf' ||
+          r === 'bottom' ||
+          r === 'free' ||
+          r === 'tie'
+        );
+      })
+      .map(p => ({ part: p, aabb: this.getWorldAABB(p) }))
+      .filter(item => {
+        const itemSpanMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
+        const itemSpanMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
+        const spanOverlap = Math.min(outerSpanMax, itemSpanMax) - Math.max(outerSpanMin, itemSpanMin);
+        if (isLooseCluster) {
+          if (spanOverlap < 20) return false;
+          const itemDepthMin = isWidthZ ? item.aabb.minX : item.aabb.minZ;
+          const itemDepthMax = isWidthZ ? item.aabb.maxX : item.aabb.maxZ;
+          const depthOverlap = Math.min(sideDepthMax, itemDepthMax) - Math.max(sideDepthMin, itemDepthMin);
+          return depthOverlap >= 20;
+        }
+        return spanOverlap > 20;
+      });
+
+    if (isLooseCluster && horizPartsInModule.length === 0) {
+      return [];
+    }
+
+    const outerMinY = Math.max(outerLeft.aabb.minY, outerRight.aabb.minY);
+    const outerMaxY = Math.min(outerLeft.aabb.maxY, outerRight.aabb.maxY);
+    const looseSupportY = Math.max(0, Math.round(Math.min(outerLeft.aabb.minY, outerRight.aabb.minY)));
+    const looseWallHeight = outerMaxY - looseSupportY;
+    const isNamedShelf = (p: Part): boolean =>
+      /repisa|entrepa[ñn]o|estante|balda|shelf/i.test(p.name || '');
+
+    const bottomCandidates = horizPartsInModule
+      .filter(item => {
+        if (!isLooseCluster) {
+          return (
+            item.part.componentRole === 'bottom' ||
+            (!this.isInternalShelf(item.part) &&
+              item.part.componentRole !== 'top' &&
+              item.part.componentRole !== 'tie')
+          );
+        }
+        const r = item.part.componentRole;
+        if (r === 'bottom') return true;
+        if (r === 'top' || r === 'tie' || r === 'shelf' || isNamedShelf(item.part)) {
+          return false;
+        }
+        return item.aabb.maxY <= looseSupportY + looseWallHeight * 0.35;
+      })
+      .sort((a, b) => a.aabb.minY - b.aabb.minY);
+
+    const bottomPart = bottomCandidates.length > 0 ? bottomCandidates[0] : undefined;
+    const floorTopY = bottomPart
+      ? Math.max(isLooseCluster ? looseSupportY : outerMinY, bottomPart.aabb.maxY)
+      : isLooseCluster
+        ? looseSupportY
+        : outerMinY;
+
+    const topCandidates = horizPartsInModule
+      .filter(item => {
+        if (item.part.id === bottomPart?.part.id) return false;
+        if (!isLooseCluster) {
+          return (
+            item.part.componentRole === 'top' ||
+            item.part.componentRole === 'tie' ||
+            (!this.isInternalShelf(item.part) && item.part.componentRole !== 'bottom')
+          );
+        }
+        const r = item.part.componentRole;
+        if (r === 'bottom') return false;
+        if (r === 'top' || r === 'tie') return true;
+        if (r === 'shelf' || isNamedShelf(item.part)) {
+          return item.aabb.maxY >= outerMaxY - 40;
+        }
+        return item.aabb.minY >= looseSupportY + looseWallHeight * 0.5 - 20;
+      })
+      .sort((a, b) => b.aabb.maxY - a.aabb.maxY);
+
+    const topPart =
+      topCandidates.length > 0 && topCandidates[0].aabb.minY > floorTopY + 60
+        ? topCandidates[0]
+        : undefined;
+    const roofBottomY = topPart ? Math.min(outerMaxY, topPart.aabb.minY) : outerMaxY;
+
+    if (roofBottomY - floorTopY < 70) return [];
+
+    const carcassParts = nonDrawerParts.filter(p => p.componentRole !== 'door' && p.componentRole !== 'plinth');
+    const carcassMinY =
+      carcassParts.length > 0
+        ? Math.min(...carcassParts.map(p => this.getWorldAABB(p).minY))
+        : Math.min(outerLeft.aabb.minY, outerRight.aabb.minY);
+    const groupModuleType =
+      (group as (PartGroup & { moduleType?: string }) | undefined)?.moduleType ??
+      group?.parametricConfig?.moduleType;
+    const isUpperCabinet = isLooseCluster
+      ? floorTopY >= 1200
+      : groupModuleType === 'wall_cabinet' ||
+        /alacena|a[eé]re[oa]|colgante|superior/i.test(moduleName) ||
+        carcassMinY >= 1200;
+
+    const shelves = horizPartsInModule
+      .filter(
+        item =>
+          item.part.id !== bottomPart?.part.id &&
+          item.part.id !== topPart?.part.id &&
+          (isLooseCluster || this.isInternalShelf(item.part)) &&
+          item.aabb.minY > floorTopY + 30 &&
+          item.aabb.maxY < roofBottomY - 30
+      )
+      .sort((a, b) => a.aabb.minY - b.aabb.minY);
+
+    const dividers = panelBounds
+      .slice(1, -1)
+      .filter(
+        item =>
+          this.isInternalDivider(item.part) ||
+          (item.part.componentRole !== 'side_left' && item.part.componentRole !== 'side_right')
+      );
+
+    const rawRegions = this.subdivideCavityRegion(
+      {
+        spanMin: outerSpanMin,
+        spanMax: outerSpanMax,
+        minY: floorTopY,
+        maxY: roofBottomY,
+        leftPanel: outerLeft,
+        rightPanel: outerRight,
+        bottomPartId: bottomPart?.part.id,
+        topPartId: topPart?.part.id
+      },
+      dividers,
+      shelves,
+      isWidthZ
+    );
+
+    const applianceBoxes = this.getApplianceBounds(allParts, appliances);
+    const drawerItems = allParts
+      .filter(p => p.componentRole === 'drawer_front' || p.componentRole === 'drawer_box')
+      .map(p => ({ part: p, aabb: this.getWorldAABB(p) }));
+
+    // Agrupar hojas por rango horizontal para asignar bayIndex / verticalIndex consistentes
+    const sortedLeaves = [...rawRegions].sort((a, b) => {
+      if (Math.abs(a.spanMin - b.spanMin) > 5) return a.spanMin - b.spanMin;
+      if (Math.abs(a.spanMax - b.spanMax) > 5) return a.spanMax - b.spanMax;
+      return a.minY - b.minY;
+    });
+
+    const columnGroups: (typeof sortedLeaves)[] = [];
+    for (const leaf of sortedLeaves) {
+      const existingGroup = columnGroups.find(
+        col =>
+          Math.abs(col[0].spanMin - leaf.spanMin) <= 5 &&
+          Math.abs(col[0].spanMax - leaf.spanMax) <= 5
+      );
+      if (existingGroup) {
+        existingGroup.push(leaf);
+      } else {
+        columnGroups.push([leaf]);
+      }
+    }
+
     const cavities: ModuleCavityInfo[] = [];
 
-    // Recorrer cada columna horizontal formada por pares adyacentes de paneles verticales (laterales y divisores)
-    for (let colIdx = 0; colIdx < panelBounds.length - 1; colIdx++) {
-      const leftPanel = panelBounds[colIdx];
-      const rightPanel = panelBounds[colIdx + 1];
+    columnGroups.forEach((colLeaves, colIdx) => {
+      const sample = colLeaves[0];
+      const innerWidth = Math.round((sample.spanMax - sample.spanMin) * 10) / 10;
+      const leftSideThickness = Math.round((isWidthZ ? sample.leftPanel.aabb.sz : sample.leftPanel.aabb.sx) * 10) / 10;
+      const rightSideThickness = Math.round((isWidthZ ? sample.rightPanel.aabb.sz : sample.rightPanel.aabb.sx) * 10) / 10;
 
-      const spanMin = isWidthZ ? leftPanel.aabb.maxZ : leftPanel.aabb.maxX;
-      const spanMax = isWidthZ ? rightPanel.aabb.minZ : rightPanel.aabb.minX;
-      const innerWidth = Math.round((spanMax - spanMin) * 10) / 10;
-      if (innerWidth < 120) continue;
-
-      const leftSideThickness = Math.round((isWidthZ ? leftPanel.aabb.sz : leftPanel.aabb.sx) * 10) / 10;
-      const rightSideThickness = Math.round((isWidthZ ? rightPanel.aabb.sz : rightPanel.aabb.sx) * 10) / 10;
-
-      // Coordenadas de profundidad en esta columna
       let frontEdgeCoord = 0;
       let backInnerCoord = 0;
       if (facingDirection === 'front') {
-        frontEdgeCoord = Math.max(leftPanel.aabb.maxZ, rightPanel.aabb.maxZ);
-        const sideMinZ = Math.min(leftPanel.aabb.minZ, rightPanel.aabb.minZ);
+        frontEdgeCoord = Math.max(sample.leftPanel.aabb.maxZ, sample.rightPanel.aabb.maxZ);
+        const sideMinZ = Math.min(sample.leftPanel.aabb.minZ, sample.rightPanel.aabb.minZ);
         backInnerCoord = backAABB ? Math.max(sideMinZ, backAABB.maxZ) : sideMinZ;
       } else if (facingDirection === 'back') {
-        frontEdgeCoord = Math.min(leftPanel.aabb.minZ, rightPanel.aabb.minZ);
-        const sideMaxZ = Math.max(leftPanel.aabb.maxZ, rightPanel.aabb.maxZ);
+        frontEdgeCoord = Math.min(sample.leftPanel.aabb.minZ, sample.rightPanel.aabb.minZ);
+        const sideMaxZ = Math.max(sample.leftPanel.aabb.maxZ, sample.rightPanel.aabb.maxZ);
         backInnerCoord = backAABB ? Math.min(sideMaxZ, backAABB.minZ) : sideMaxZ;
       } else if (facingDirection === 'right') {
-        frontEdgeCoord = Math.max(leftPanel.aabb.maxX, rightPanel.aabb.maxX);
-        const sideMinX = Math.min(leftPanel.aabb.minX, rightPanel.aabb.minX);
+        frontEdgeCoord = Math.max(sample.leftPanel.aabb.maxX, sample.rightPanel.aabb.maxX);
+        const sideMinX = Math.min(sample.leftPanel.aabb.minX, sample.rightPanel.aabb.minX);
         backInnerCoord = backAABB ? Math.max(sideMinX, backAABB.maxX) : sideMinX;
       } else {
-        frontEdgeCoord = Math.min(leftPanel.aabb.minX, rightPanel.aabb.minX);
-        const sideMaxX = Math.max(leftPanel.aabb.maxX, rightPanel.aabb.maxX);
+        frontEdgeCoord = Math.min(sample.leftPanel.aabb.minX, sample.rightPanel.aabb.minX);
+        const sideMaxX = Math.max(sample.leftPanel.aabb.maxX, sample.rightPanel.aabb.maxX);
         backInnerCoord = backAABB ? Math.min(sideMaxX, backAABB.minX) : sideMaxX;
       }
 
+      const minDepth = Math.min(frontEdgeCoord, backInnerCoord);
+      const maxDepth = Math.max(frontEdgeCoord, backInnerCoord);
       const internalDepth = Math.round(Math.max(150, Math.abs(frontEdgeCoord - backInnerCoord)));
       const optimalSlideLength = this.getOptimalCommercialSlideLength(internalDepth, 'overlay', leftSideThickness);
 
-      // Encontrar piezas horizontales que se solapan con esta columna
-      const horizPartsInCol = nonDrawerParts
-        .filter(
-          p =>
-            p.orientation === 'horizontal' &&
-            p.componentRole !== 'plinth' &&
-            p.componentRole !== 'countertop'
-        )
-        .map(p => ({ part: p, aabb: this.getWorldAABB(p) }))
-        .filter(item => {
-          const itemMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
-          const itemMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
-          const overlap = Math.min(spanMax, itemMax) - Math.max(spanMin, itemMin);
-          return overlap > 20;
-        });
-
-      const bottomCandidates = horizPartsInCol
-        .filter(item => item.part.componentRole === 'bottom' || (!this.isInternalShelf(item.part) && item.part.componentRole !== 'top' && item.part.componentRole !== 'tie'))
-        .sort((a, b) => a.aabb.minY - b.aabb.minY);
-
-      const topCandidates = horizPartsInCol
-        .filter(item => item.part.componentRole === 'top' || item.part.componentRole === 'tie' || (!this.isInternalShelf(item.part) && item.part.componentRole !== 'bottom'))
-        .sort((a, b) => b.aabb.maxY - a.aabb.maxY);
-
-      const panelMinY = Math.max(leftPanel.aabb.minY, rightPanel.aabb.minY);
-      const panelMaxY = Math.min(leftPanel.aabb.maxY, rightPanel.aabb.maxY);
-
-      const floorTopY =
-        bottomCandidates.length > 0
-          ? Math.max(panelMinY, bottomCandidates[0].aabb.maxY)
-          : panelMinY;
-
-      const roofBottomY =
-        topCandidates.length > 0 && topCandidates[0].aabb.minY > floorTopY + 60
-          ? Math.min(panelMaxY, topCandidates[0].aabb.minY)
-          : panelMaxY;
-
-      if (roofBottomY - floorTopY < 70) continue;
-
-      // Entrepaños internos en esta columna
-      const shelvesInCol = horizPartsInCol
-        .filter(
-          item =>
-            this.isInternalShelf(item.part) &&
-            item.aabb.minY > floorTopY + 30 &&
-            item.aabb.maxY < roofBottomY - 30
-        )
-        .sort((a, b) => a.aabb.minY - b.aabb.minY);
-
-      const yIntervals: { minY: number; maxY: number }[] = [];
-      if (shelvesInCol.length === 0) {
-        yIntervals.push({ minY: floorTopY, maxY: roofBottomY });
-      } else {
-        yIntervals.push({ minY: floorTopY, maxY: shelvesInCol[0].aabb.minY });
-        for (let i = 0; i < shelvesInCol.length - 1; i++) {
-          yIntervals.push({
-            minY: shelvesInCol[i].aabb.maxY,
-            maxY: shelvesInCol[i + 1].aabb.minY
-          });
-        }
-        yIntervals.push({
-          minY: shelvesInCol[shelvesInCol.length - 1].aabb.maxY,
-          maxY: roofBottomY
-        });
-      }
-
-      const spanCenter = Math.round(((spanMin + spanMax) / 2) * 10) / 10;
+      const spanCenter = Math.round(((sample.spanMin + sample.spanMax) / 2) * 10) / 10;
       const depthCenter = Math.round(((frontEdgeCoord + backInnerCoord) / 2) * 10) / 10;
       const centerX = isWidthZ ? depthCenter : spanCenter;
       const centerZ = isWidthZ ? spanCenter : depthCenter;
+      const roundedFrontEdge = Math.round(frontEdgeCoord * 10) / 10;
 
-      const validIntervals = yIntervals.filter(iv => iv.maxY - iv.minY >= 70);
-      validIntervals.forEach((iv, rowIdx) => {
-        const minY = Math.round(iv.minY * 10) / 10;
-        const maxY = Math.round(iv.maxY * 10) / 10;
+      colLeaves.forEach((leaf, rowIdx) => {
+        const minY = Math.round(leaf.minY * 10) / 10;
+        const maxY = Math.round(leaf.maxY * 10) / 10;
         const height = Math.round((maxY - minY) * 10) / 10;
-        const colLabel = panelBounds.length > 2 ? `Col ${colIdx + 1} · ` : '';
+
+        const occupiedByAppliance = this.isRegionOccupiedByAppliance(
+          {
+            spanMin: leaf.spanMin,
+            spanMax: leaf.spanMax,
+            minY,
+            maxY,
+            minDepth,
+            maxDepth
+          },
+          isWidthZ,
+          groupId,
+          applianceBoxes
+        );
+        if (occupiedByAppliance) {
+          return;
+        }
+
+        if (group?.parametricConfig?.category === 'oven_base') {
+          return;
+        }
+
+        const isFilledByIntegratedFrontOrDrawer = drawerItems.some(item => {
+          if (item.part.groupId !== groupId) return false;
+          const itemSpanMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
+          const itemSpanMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
+          const overlapSpan = Math.min(leaf.spanMax, itemSpanMax) - Math.max(leaf.spanMin, itemSpanMin);
+          if (overlapSpan <= 20) return false;
+          const overlapY = Math.min(maxY, item.aabb.maxY) - Math.max(minY, item.aabb.minY);
+          if (overlapY <= 0) return false;
+          return overlapY >= height * 0.6 || height - overlapY < 70;
+        });
+        if (isFilledByIntegratedFrontOrDrawer) {
+          return;
+        }
+
+        const coveringDoorIds = this.collectCoveringDoorIds(
+          doorItems,
+          isWidthZ,
+          leaf.spanMin,
+          leaf.spanMax,
+          minY,
+          maxY
+        );
+        const existingDrawerCount = this.countExistingDrawersInBox(
+          drawerItems,
+          groupId,
+          isWidthZ,
+          leaf.spanMin,
+          leaf.spanMax,
+          minY,
+          maxY,
+          minDepth,
+          maxDepth
+        );
+
+        const colLabel = columnGroups.length > 1 ? `Col ${colIdx + 1} · ` : '';
         const rowLabel =
-          validIntervals.length === 1
+          colLeaves.length === 1
             ? 'Vano Principal'
             : rowIdx === 0
               ? 'Vano Inferior'
-              : rowIdx === validIntervals.length - 1
+              : rowIdx === colLeaves.length - 1
                 ? 'Vano Superior'
                 : `Vano Central ${rowIdx}`;
 
-        const roundedFrontEdge = Math.round(frontEdgeCoord * 10) / 10;
         cavities.push({
-          id: `${groupId}_cav_${colIdx}_${rowIdx}`,
+          id: isLooseCluster
+            ? `${groupId}_c${clusterIndex}_cav_${colIdx}_${rowIdx}`
+            : `${groupId}_cav_${colIdx}_${rowIdx}`,
           groupId,
           moduleId: groupId,
           moduleName,
           groupName: moduleName,
           bayIndex: colIdx,
           verticalIndex: rowIdx,
-          totalInBay: validIntervals.length,
+          totalInBay: colLeaves.length,
           label: `${colLabel}${rowLabel} (${Math.round(innerWidth)} × ${Math.round(height)} × ${Math.round(internalDepth)} mm)`,
           centerX,
           centerY: Math.round(((minY + maxY) / 2) * 10) / 10,
@@ -1712,30 +2305,142 @@ export class PartGeometryService {
           frontPlaneZ: roundedFrontEdge,
           backInnerCoord: Math.round(backInnerCoord * 10) / 10,
           facingDirection,
-          rotationY
+          rotationY,
+          isUpperCabinet,
+          isOccupiedByAppliance: false,
+          existingDrawerCount,
+          coveringDoorIds,
+          bottomPartId: leaf.bottomPartId,
+          topPartId: leaf.topPartId,
+          leftPartId: leaf.leftPanel.part.id,
+          rightPartId: leaf.rightPanel.part.id
         });
       });
-    }
+    });
 
     return cavities;
   }
 
   /**
-   * Detecta todas las cavidades/vanos de todos los muebles de la escena actual.
+   * Detecta automáticamente todas las cavidades/vanos libres dentro de un módulo existente
+   * o en estructuras formadas por piezas sueltas (`__loose_structure__`),
+   * soportando entrepaños horizontales, divisiones verticales internas, electrodomésticos empotrados,
+   * puertas frontales, cajones existentes y las 4 orientaciones.
    */
-  detectAllSceneCavities(allParts: Part[], groups: PartGroup[]): ModuleCavityInfo[] {
+  detectModuleCavities(
+    groupOrId: string | PartGroup,
+    allParts: Part[],
+    groupOrName?: PartGroup | string,
+    appliances?: ApplianceItem[]
+  ): ModuleCavityInfo[] {
+    const groupId = typeof groupOrId === 'string' ? groupOrId : groupOrId?.id;
+    const group: PartGroup | undefined =
+      typeof groupOrId === 'object'
+        ? groupOrId
+        : typeof groupOrName === 'object'
+          ? groupOrName
+          : undefined;
+    const customModuleName = typeof groupOrName === 'string' ? groupOrName : undefined;
+
+    if (!groupId) return [];
+
+    if (groupId === '__loose_structure__') {
+      const looseStructuralItems = allParts
+        .filter(p => this.isLooseStructuralCandidate(p))
+        .map(p => ({ part: p, aabb: this.getWorldAABB(p) }));
+
+      if (looseStructuralItems.length < 3) return [];
+
+      const clusters = this.clusterPartsByProximity(looseStructuralItems, 60);
+      const moduleName = customModuleName || 'Estructura de Piezas Sueltas';
+      const looseCavities: ModuleCavityInfo[] = [];
+
+      clusters.forEach((cluster, clusterIdx) => {
+        if (cluster.length < 3) return;
+        const clusterCavities = this.buildCavitiesFromStructuralCluster({
+          groupId: '__loose_structure__',
+          moduleName,
+          allParts,
+          nonDrawerParts: cluster.map(item => item.part),
+          doorItems: [],
+          appliances,
+          isLooseCluster: true,
+          clusterIndex: clusterIdx
+        });
+        looseCavities.push(...clusterCavities);
+      });
+
+      return looseCavities;
+    }
+
+    if (
+      group &&
+      (group.type === 'drawer' ||
+        group.subType === 'drawer' ||
+        group.templateId === 'modular_drawer')
+    ) {
+      return [];
+    }
+
+    const groupParts = allParts.filter(p => p.groupId === groupId);
+    if (groupParts.length < 2) return [];
+
+    // Excluir piezas de cajón y electrodomésticos al analizar el casco estructural
+    const nonDrawerParts = groupParts.filter(
+      p =>
+        p.componentRole !== 'drawer_box' &&
+        p.componentRole !== 'drawer_front' &&
+        p.componentRole !== 'drawer_bottom' &&
+        p.componentRole !== 'drawer_lateral' &&
+        !this.isEmbeddedAppliancePart(p)
+    );
+    if (nonDrawerParts.length < 2) return [];
+
+    const doorItems = groupParts
+      .filter(p => p.componentRole === 'door')
+      .map(p => ({ part: p, aabb: this.getWorldAABB(p) }));
+
+    return this.buildCavitiesFromStructuralCluster({
+      groupId,
+      moduleName: customModuleName || group?.name || 'Módulo',
+      allParts,
+      nonDrawerParts,
+      doorItems,
+      appliances,
+      group,
+      isLooseCluster: false
+    });
+  }
+
+  /**
+   * Detecta todas las cavidades/vanos de todos los muebles de la escena actual,
+   * incluyendo estructuras válidas formadas por piezas sueltas (`__loose_structure__`).
+   */
+  detectAllSceneCavities(
+    allParts: Part[],
+    groups: PartGroup[],
+    appliances?: ApplianceItem[]
+  ): ModuleCavityInfo[] {
     const result: ModuleCavityInfo[] = [];
     for (const group of groups) {
       if (
+        group.id === '__loose_structure__' ||
         group.type === 'drawer' ||
         group.subType === 'drawer' ||
         group.templateId === 'modular_drawer'
       ) {
         continue;
       }
-      const groupCavities = this.detectModuleCavities(group.id, allParts, group);
+      const groupCavities = this.detectModuleCavities(group.id, allParts, group, appliances);
       result.push(...groupCavities);
     }
+    const looseCavities = this.detectModuleCavities(
+      '__loose_structure__',
+      allParts,
+      undefined,
+      appliances
+    );
+    result.push(...looseCavities);
     return result;
   }
 }

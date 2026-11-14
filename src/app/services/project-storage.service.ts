@@ -36,6 +36,14 @@ import { SupabaseService, CloudProjectRecord } from './supabase.service';
 import { FurnitureTemplate } from './templates-catalog.service';
 import { MELAMINE_MATERIALS_CATALOG } from '../data/melamine-catalog.data';
 
+declare module '../models/melamine.models' {
+  interface ParametricDrawerConfig {
+    recessBehindDoor?: boolean;
+  }
+}
+
+export type ModularDrawerConfig = ParametricDrawerConfig;
+
 const STORAGE_KEY = 'melamipro_current_project';
 const PROJECTS_LIST_KEY = 'melamipro_saved_projects_meta';
 
@@ -1747,10 +1755,10 @@ export class ProjectStorageService {
     });
   }
 
-  toggleGroupOpen(groupId: string) {
+  toggleGroupOpen(groupId: string, forceState?: boolean) {
     const group = (this.groupsList()).find(g => g.id === groupId);
     if (!group) return;
-    const nextState = !group.isOpen;
+    const nextState = forceState !== undefined ? forceState : !group.isOpen;
     this.updateGroup(groupId, {
       isOpen: nextState,
       slideExtension: nextState ? 1 : 0
@@ -2739,16 +2747,6 @@ export class ProjectStorageService {
   ): { parts: Part[]; normalizedConfig: ParametricDrawerConfig } {
     const currentProj = this.currentProject();
     const materials = this.materialsList();
-    const defaultMat =
-      materials.find(m => m.id === cfg.materialId) ||
-      materials.find(m => m.thickness >= 15) ||
-      materials[0];
-    const frontMat =
-      materials.find(m => m.id === (cfg.frontMaterialId || cfg.materialId)) ||
-      defaultMat;
-    const mdfMat =
-      materials.find(m => m.id === cfg.bottomMaterialId || m.thickness === 3) ||
-      defaultMat;
 
     const frontMountType: DrawerFrontMountType =
       cfg.frontMountType ?? (cfg.includeFront === false ? 'none' : 'overlay');
@@ -2769,18 +2767,20 @@ export class ProjectStorageService {
       const cavs = this.partGeometry.detectModuleCavities(
         effectiveHostGroupId,
         currentProj?.parts || [],
-        hostGrp
+        hostGrp,
+        currentProj?.appliances
       );
       matchedCavity =
         (effectiveHostCavityId ? cavs.find(c => c.id === effectiveHostCavityId) : undefined) ||
         cavs[0];
-    } else if (cfg.frontEdgeCoord === undefined && currentProj) {
+    } else if (cfg.hostGroupId !== 'floor' && cfg.frontEdgeCoord === undefined && currentProj) {
       const reqX = cfg.posX ?? 0;
       const reqY = cfg.posY ?? 100;
       const reqZ = cfg.posZ ?? 0;
       const allCavs = this.partGeometry.detectAllSceneCavities(
         currentProj.parts || [],
-        currentProj.groups || []
+        currentProj.groups || [],
+        currentProj.appliances
       );
       matchedCavity = allCavs.find(c => {
         const isWZ = c.facingDirection === 'right' || c.facingDirection === 'left';
@@ -2794,6 +2794,64 @@ export class ProjectStorageService {
         );
       });
     }
+
+    const projParts = currentProj?.parts || [];
+    const cavRefPart = matchedCavity
+      ? projParts.find(p => p.id === matchedCavity.leftPartId) ||
+        projParts.find(p => p.id === matchedCavity.rightPartId) ||
+        projParts.find(p => p.id === matchedCavity.topPartId) ||
+        projParts.find(p => p.id === matchedCavity.bottomPartId)
+      : undefined;
+
+    const requestedMatId = cfg.materialId || cavRefPart?.materialId;
+    const requestedFrontMatId = cfg.frontMaterialId || cfg.materialId || cavRefPart?.materialId;
+    const matchedMat = requestedMatId ? materials.find(m => m.id === requestedMatId) : undefined;
+    const matchedFrontMat = requestedFrontMatId
+      ? materials.find(m => m.id === requestedFrontMatId)
+      : undefined;
+
+    const refMaterialFallback: Material | undefined = cavRefPart
+      ? {
+          id: cavRefPart.materialId,
+          name: cavRefPart.materialName,
+          colorHex: cavRefPart.colorHex ?? '#f8fafc',
+          thickness: cavRefPart.thickness || 18,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 45000,
+          hasGrain: cavRefPart.grain !== 'none'
+        }
+      : undefined;
+
+    const resolvedBoxMat =
+      matchedMat && cavRefPart?.colorHex && (!cfg.materialId || cfg.materialId === cavRefPart.materialId)
+        ? { ...matchedMat, colorHex: cavRefPart.colorHex }
+        : matchedMat;
+
+    const defaultMat =
+      resolvedBoxMat ||
+      (!cfg.materialId || cfg.materialId === cavRefPart?.materialId ? refMaterialFallback : undefined) ||
+      materials.find(m => m.thickness >= 15) ||
+      materials[0];
+
+    const resolvedFrontMat =
+      matchedFrontMat &&
+      cavRefPart?.colorHex &&
+      (!cfg.frontMaterialId || cfg.frontMaterialId === cavRefPart.materialId) &&
+      (!cfg.materialId || cfg.materialId === cavRefPart.materialId)
+        ? { ...matchedFrontMat, colorHex: cavRefPart.colorHex }
+        : matchedFrontMat;
+
+    const frontMat =
+      resolvedFrontMat ||
+      (!cfg.frontMaterialId && (!cfg.materialId || cfg.materialId === cavRefPart?.materialId)
+        ? refMaterialFallback
+        : undefined) ||
+      defaultMat;
+
+    const mdfMat =
+      materials.find(m => m.id === cfg.bottomMaterialId || m.thickness === 3) ||
+      defaultMat;
 
     const facingDirection: 'front' | 'right' | 'back' | 'left' =
       cfg.facingDirection ?? matchedCavity?.facingDirection ?? 'front';
@@ -2812,18 +2870,33 @@ export class ProjectStorageService {
           (matchedCavity.innerWidth + matchedCavity.leftSideThickness + matchedCavity.rightSideThickness)
       ) <= 6;
     let outerWidth = Math.max(140, rawRequestedWidth || matchedCavity?.innerWidth || 564);
-    if (matchedCavity && (rawRequestedWidth <= 0 || isOuterCabinetWidth)) {
-      outerWidth = matchedCavity.innerWidth;
+    if (matchedCavity) {
+      if (rawRequestedWidth <= 0 || isOuterCabinetWidth) {
+        outerWidth = matchedCavity.innerWidth;
+      } else if (outerWidth > matchedCavity.innerWidth) {
+        outerWidth = matchedCavity.innerWidth;
+      }
     }
+
+    const isRecessedBehindDoor =
+      frontMountType === 'none' &&
+      (cfg.recessBehindDoor ?? ((matchedCavity?.coveringDoorIds?.length ?? 0) > 0));
 
     let slideLength = cfg.slideLength || 450;
     if (matchedCavity) {
-      const setback = frontMountType === 'inset' ? ft : frontMountType === 'none' ? 5 : 0;
-      if (slideLength + setback > matchedCavity.internalDepth) {
+      const setback =
+        frontMountType === 'inset'
+          ? ft + 2
+          : frontMountType === 'none'
+            ? (isRecessedBehindDoor ? 22 : 5)
+            : 0;
+      const maxAllowedLength = Math.max(150, Math.floor(matchedCavity.internalDepth - setback - 5));
+      if (slideLength > maxAllowedLength) {
         slideLength = this.partGeometry.getOptimalCommercialSlideLength(
           matchedCavity.internalDepth,
           frontMountType,
-          ft
+          ft,
+          isRecessedBehindDoor
         );
       }
     }
@@ -2833,23 +2906,17 @@ export class ProjectStorageService {
 
     const nominalFrontH = Math.max(80, Math.round(cfg.frontHeight || (cfg.boxHeight || 140) + bT + 30));
     // Si es Uñero / Gola ('finger_pull'), descontar automáticamente 28 mm en el borde superior del frente
-    const effFrontH =
+    let effFrontH =
       handleType === 'finger_pull' && frontMountType !== 'none'
         ? Math.max(60, nominalFrontH - 28)
         : nominalFrontH;
 
-    const rawBoxH = Math.max(50, Math.round(cfg.boxHeight || 140));
-    const effBoxH =
-      frontMountType !== 'none'
-        ? Math.max(50, Math.min(rawBoxH, effFrontH - bT - 6))
-        : rawBoxH;
-
     // Ancho del frente según tipo de montaje:
-    // - 'inset': anchoInterno - 4 mm (2 mm de holgura por lado para 0 colisiones contra laterales)
+    // - 'inset': anchoInterno - 4 mm (2 mm de holgura por lado en [minX + 2, maxX - 2])
     // - 'overlay': anchoInterno + 2 * espesorLateral - 4 mm (cubre ambos cantos con 2 mm de margen exterior)
     const frontWidth =
       frontMountType === 'inset'
-        ? Math.max(100, Math.round((outerWidth - 4) * 10) / 10)
+        ? Math.max(100, Math.min(Math.round((outerWidth - 4) * 10) / 10, matchedCavity ? Math.round((matchedCavity.innerWidth - 4) * 10) / 10 : Infinity))
         : cfg.frontWidth && cfg.frontMountType === 'overlay' && Math.abs(cfg.frontWidth - outerWidth) > 2
           ? Math.round(cfg.frontWidth * 10) / 10
           : Math.max(100, Math.round((outerWidth + 2 * st - 4) * 10) / 10);
@@ -2857,8 +2924,31 @@ export class ProjectStorageService {
     const basePosX = matchedCavity && !isWidthZ ? matchedCavity.centerX : (cfg.posX ?? 0);
     const basePosZ = matchedCavity && isWidthZ ? matchedCavity.centerZ : (cfg.posZ ?? 0);
     let basePosY = cfg.posY ?? (matchedCavity ? matchedCavity.minY + 2 : 100);
-    if (matchedCavity && basePosY < matchedCavity.minY + 1.5 && basePosY >= matchedCavity.minY - 10) {
-      basePosY = matchedCavity.minY + 2;
+    if (matchedCavity) {
+      if (frontMountType === 'inset') {
+        const maxInsetFrontH = Math.max(60, Math.floor(matchedCavity.height - 4));
+        if (effFrontH > maxInsetFrontH) {
+          effFrontH = maxInsetFrontH;
+        }
+        basePosY = Math.max(matchedCavity.minY + 2, Math.min(basePosY, matchedCavity.maxY - 2 - effFrontH));
+      } else if (basePosY < matchedCavity.minY + 1.5 && basePosY >= matchedCavity.minY - 10) {
+        basePosY = matchedCavity.minY + 2;
+      }
+    }
+
+    const rawBoxH = Math.max(50, Math.round(cfg.boxHeight || 140));
+    let effBoxH =
+      frontMountType !== 'none'
+        ? Math.max(40, Math.min(rawBoxH, effFrontH - bT - 6))
+        : rawBoxH;
+
+    // Garantizar que la caja interna quede estrictamente dentro de [minY + 4, maxY - 4]
+    const boxBottomY = matchedCavity
+      ? Math.max(basePosY, matchedCavity.minY + 4)
+      : basePosY;
+    if (matchedCavity) {
+      const maxSafeBoxH = Math.max(40, Math.floor((matchedCavity.maxY - 4) - (boxBottomY + bT)));
+      effBoxH = Math.min(effBoxH, maxSafeBoxH);
     }
 
     // Coordenada del plano frontal de los laterales del mueble
@@ -2866,17 +2956,17 @@ export class ProjectStorageService {
     const frontEdgeCoord =
       cfg.frontEdgeCoord ??
       matchedCavity?.frontEdgeCoord ??
-      Math.round((defaultDepthCenter + dirSign * (slideLength / 2 + (frontMountType === 'inset' ? ft : 0))) * 10) / 10;
+      Math.round((defaultDepthCenter + dirSign * (slideLength / 2 + (frontMountType === 'inset' ? ft + 2 : 0))) * 10) / 10;
 
-    // Posicionamiento en el eje de profundidad:
-    // - 'overlay': frente 0.5 mm por delante del borde de los laterales; caja interna llega hasta frontEdgeCoord
-    // - 'inset': cara exterior del frente exactamente a ras (en frontEdgeCoord); caja interna retrasada por espesorFrente (ft)
-    // - 'none': sin frente; caja interna retrasada 5 mm dentro del vano
+    // Separación geométrica anti-colisión (tolerancia JoineryEngineService = 1.5 mm):
+    // - 'overlay': cara interior del frente a +2.0 mm hacia afuera del casco/caja
+    // - 'inset': cara exterior a ras en frontEdgeCoord y caja retrasada (ft + 2.0) mm
+    // - 'none': caja retrasada 22 mm detrás de puerta cubriendo, o 5 mm libre
     const boxFrontEdge =
       frontMountType === 'inset'
-        ? frontEdgeCoord - dirSign * ft
+        ? frontEdgeCoord - dirSign * (ft + 2.0)
         : frontMountType === 'none'
-          ? frontEdgeCoord - dirSign * 5
+          ? frontEdgeCoord - dirSign * (isRecessedBehindDoor ? 22 : 5)
           : frontEdgeCoord;
 
     const boxDepthCenter = Math.round((boxFrontEdge - dirSign * (slideLength / 2)) * 10) / 10;
@@ -2885,10 +2975,10 @@ export class ProjectStorageService {
     const frontDepthPos =
       frontMountType === 'inset'
         ? Math.round((frontEdgeCoord - dirSign * (ft / 2)) * 10) / 10
-        : Math.round((frontEdgeCoord + dirSign * (0.5 + ft / 2)) * 10) / 10;
+        : Math.round((frontEdgeCoord + dirSign * (2.0 + ft / 2)) * 10) / 10;
 
-    const boxCenterY = Math.round((basePosY + bT + effBoxH / 2) * 10) / 10;
-    const fondoCenterY = Math.round((basePosY + bT / 2) * 10) / 10;
+    const boxCenterY = Math.round((boxBottomY + bT + effBoxH / 2) * 10) / 10;
+    const fondoCenterY = Math.round((boxBottomY + bT / 2) * 10) / 10;
     const frontCenterY = Math.round((basePosY + effFrontH / 2) * 10) / 10;
 
     const spanCenter = isWidthZ ? basePosZ : basePosX;
@@ -3100,7 +3190,8 @@ export class ProjectStorageService {
       frontEdgeCoord,
       hostGroupId: effectiveHostGroupId ?? matchedCavity?.groupId,
       hostCavityId: effectiveHostCavityId ?? matchedCavity?.id,
-      drawersCount: 1
+      drawersCount: 1,
+      ...(frontMountType === 'none' ? { recessBehindDoor: isRecessedBehindDoor } : {})
     };
 
     return { parts, normalizedConfig };
@@ -3199,13 +3290,113 @@ export class ProjectStorageService {
   }
 
   /**
-   * Inserta 1, 2, 3 o 4 cajones modulares perfectamente encajados en una cavidad/vano
-   * de un mueble existente, dividiendo automáticamente la luz vertical cuando son 2, 3 o 4 cajones.
+   * Elimina o recorta limpiamente las puertas frontales que cubren una cavidad
+   * al insertar cajones exteriores o embutidos, manteniendo >= 2 mm de luz y limpiando herrajes.
+   */
+  private resolveCoveringDoorsForCavity(cavity: ModuleCavityInfo): void {
+    const doorIds = cavity.coveringDoorIds || [];
+    if (doorIds.length === 0) return;
+
+    const proj = this.currentProject();
+    if (!proj) return;
+
+    const cavityHeight = cavity.internalHeight || cavity.height || (cavity.maxY - cavity.minY);
+    const cavityMidY = (cavity.minY + cavity.maxY) / 2;
+    const doorIdsToDelete = new Set<string>();
+    const doorPatches = new Map<string, Partial<Part>>();
+
+    for (const doorId of doorIds) {
+      const door = proj.parts.find(p => p.id === doorId);
+      if (!door) continue;
+
+      const doorAABB = this.partGeometry.getWorldAABB(door);
+      const doorMinY = doorAABB.minY;
+      const doorMaxY = doorAABB.maxY;
+      const doorHeight = doorMaxY - doorMinY;
+      const doorMidY = (doorMinY + doorMaxY) / 2;
+
+      const coversWholeDoorVertically =
+        cavityHeight >= doorHeight * 0.72 ||
+        (Math.abs(doorMinY - cavity.minY) <= 45 && Math.abs(doorMaxY - cavity.maxY) <= 45);
+
+      if (coversWholeDoorVertically) {
+        doorIdsToDelete.add(door.id);
+        continue;
+      }
+
+      // Recortar puerta de cuerpo completo dejando 2 mm libres respecto al borde del vano
+      let newMinY = doorMinY;
+      let newMaxY = doorMaxY;
+      if (cavityMidY <= doorMidY) {
+        newMinY = Math.round((cavity.maxY + 2) * 10) / 10;
+      } else {
+        newMaxY = Math.round((cavity.minY - 2) * 10) / 10;
+      }
+
+      const newHeight = Math.round((newMaxY - newMinY) * 10) / 10;
+      if (newHeight < 80) {
+        doorIdsToDelete.add(door.id);
+        continue;
+      }
+
+      const newCenterY = Math.round(((newMinY + newMaxY) / 2) * 10) / 10;
+      const dims = this.partGeometry.getLocalDimensions(door);
+      const updatedHw = door.hardwareConfig
+        ? {
+            ...door.hardwareConfig,
+            hingeCount: newHeight >= 1500 ? 4 : newHeight >= 900 ? 3 : 2
+          }
+        : undefined;
+
+      doorPatches.set(door.id, {
+        posY: newCenterY,
+        ...(dims.lengthLocalAxis === 'y'
+          ? { length: newHeight }
+          : dims.widthLocalAxis === 'y'
+            ? { width: newHeight }
+            : { length: newHeight }),
+        ...(updatedHw ? { hardwareConfig: updatedHw } : {})
+      });
+    }
+
+    if (doorIdsToDelete.size === 0 && doorPatches.size === 0) return;
+
+    this.updateProject(p => {
+      const nextParts = p.parts
+        .filter(pt => !doorIdsToDelete.has(pt.id))
+        .map(pt => {
+          const patch = doorPatches.get(pt.id);
+          return patch ? { ...pt, ...patch } : pt;
+        });
+
+      const usedGroupIds = new Set(nextParts.map(pt => pt.groupId).filter(Boolean));
+      const nextGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
+      const nextHardware = (p.hardware || []).filter(hw => {
+        if (doorIdsToDelete.has(hw.id)) return false;
+        for (const deletedId of doorIdsToDelete) {
+          if (hw.notes?.includes(deletedId)) return false;
+        }
+        return true;
+      });
+
+      return {
+        ...p,
+        parts: nextParts,
+        groups: nextGroups,
+        hardware: nextHardware
+      };
+    });
+  }
+
+  /**
+   * Inserta 1 a 6 cajones modulares perfectamente encajados en una cavidad/vano
+   * de un mueble existente, resolviendo puertas frontales cubiertas y dividiendo la luz vertical.
    */
   addParametricDrawersToCavity(
     arg1: (Partial<ParametricDrawerConfig> & Pick<ParametricDrawerConfig, 'slideLength' | 'boxHeight' | 'bottomThickness' | 'includeFront'>) | ModuleCavityInfo,
     arg2?: ModuleCavityInfo | number,
-    arg3?: number | (Partial<ParametricDrawerConfig> & Pick<ParametricDrawerConfig, 'slideLength' | 'boxHeight' | 'bottomThickness' | 'includeFront'>)
+    arg3?: number | (Partial<ParametricDrawerConfig> & Pick<ParametricDrawerConfig, 'slideLength' | 'boxHeight' | 'bottomThickness' | 'includeFront'>),
+    options?: { clearCoveringDoors?: boolean; fillFullCavityHeight?: boolean }
   ): PartGroup[] {
     let cfg: Partial<ParametricDrawerConfig> & Pick<ParametricDrawerConfig, 'slideLength' | 'boxHeight' | 'bottomThickness' | 'includeFront'>;
     let cavity: ModuleCavityInfo | undefined;
@@ -3231,7 +3422,7 @@ export class ProjectStorageService {
       }
     }
 
-    const count = Math.max(1, Math.min(4, Math.round(rawCount || 1))) as 1 | 2 | 3 | 4;
+    const count = Math.max(1, Math.min(6, Math.round(rawCount || 1)));
     const currentProj = this.currentProject();
 
     const effectiveHostGroupId = cfg.hostGroupId || cfg.targetModuleId;
@@ -3242,33 +3433,23 @@ export class ProjectStorageService {
       const cavs = this.partGeometry.detectModuleCavities(
         effectiveHostGroupId,
         currentProj.parts || [],
-        hostGrp
+        hostGrp,
+        currentProj.appliances
       );
       cavity =
         (effectiveHostCavityId ? cavs.find(c => c.id === effectiveHostCavityId) : undefined) || cavs[0];
     }
 
     if (!cavity) {
-      if (count === 1) {
-        return [this.addParametricDrawer(cfg)];
-      }
-      const created: PartGroup[] = [];
-      const fH = Math.max(100, cfg.frontHeight || 173);
-      const handleType = cfg.handleType ?? 'handle';
-      const stepY =
-        handleType === 'finger_pull' ? Math.max(60, fH - 28) + 28 : fH + 3;
-      const baseY = cfg.posY ?? 100;
-      for (let i = 0; i < count; i++) {
-        created.push(
-          this.addParametricDrawer({
-            ...cfg,
-            name: cfg.name ? `${cfg.name} (${i + 1}/${count})` : undefined,
-            posY: Math.round((baseY + i * stepY) * 10) / 10,
-            drawersCount: 1
-          })
-        );
-      }
-      return created;
+      return this.addParametricDrawerStackOnFloor(
+        {
+          ...cfg,
+          name: cfg.name?.trim() || 'Cajón',
+          posX: cfg.posX ?? 0,
+          posZ: cfg.posZ ?? 0
+        },
+        count
+      );
     }
 
     const frontMountType: DrawerFrontMountType =
@@ -3277,32 +3458,74 @@ export class ProjectStorageService {
     const ft = Math.max(12, cfg.frontThickness || cfg.boxThickness || cfg.thickness || 15);
     const bT = Math.max(3, cfg.bottomThickness || 3);
 
+    const willClearDoors = frontMountType !== 'none' && options?.clearCoveringDoors !== false;
+    if (willClearDoors && cavity.coveringDoorIds?.length) {
+      this.resolveCoveringDoorsForCavity(cavity);
+    }
+
+    const isRecessedBehindDoor =
+      frontMountType === 'none' &&
+      (cfg.recessBehindDoor ?? ((cavity.coveringDoorIds?.length ?? 0) > 0 && !willClearDoors));
+
     const optimalSlide = this.partGeometry.getOptimalCommercialSlideLength(
       cavity.internalDepth,
       frontMountType,
-      ft
+      ft,
+      isRecessedBehindDoor
     );
-    const setback = frontMountType === 'inset' ? ft : frontMountType === 'none' ? 5 : 0;
+    const setback =
+      frontMountType === 'inset'
+        ? ft + 2
+        : frontMountType === 'none'
+          ? (isRecessedBehindDoor ? 22 : 5)
+          : 0;
+    const maxAllowedLength = Math.max(150, Math.floor(cavity.internalDepth - setback - 5));
     const safeSlideLength =
-      cfg.slideLength && cfg.slideLength + setback <= cavity.internalDepth
+      cfg.slideLength && cfg.slideLength <= maxAllowedLength
         ? cfg.slideLength
         : optimalSlide;
 
+    const totalFrontSpan = cavity.height;
+    const projParts = currentProj?.parts || [];
+    const cavityRefPart =
+      projParts.find(p => p.id === cavity.leftPartId) ||
+      projParts.find(p => p.id === cavity.rightPartId) ||
+      projParts.find(p => p.id === cavity.topPartId) ||
+      projParts.find(p => p.id === cavity.bottomPartId);
+    const inheritedMaterialId = cfg.materialId || cavityRefPart?.materialId;
+    const inheritedFrontMaterialId =
+      cfg.frontMaterialId || cfg.materialId || cavityRefPart?.materialId;
+
     if (count === 1) {
-      const singleY =
-        cfg.posY !== undefined && cfg.posY >= cavity.minY && cfg.posY <= cavity.maxY - 60
-          ? Math.max(cavity.minY + 2, cfg.posY)
-          : cavity.minY + 2;
+      const maxCavityFrontH = Math.max(80, Math.round(totalFrontSpan - 4));
+      const slotFrontH =
+        !options?.fillFullCavityHeight && cfg.frontHeight && cfg.frontHeight > 0
+          ? Math.max(60, Math.min(Math.round(cfg.frontHeight), maxCavityFrontH))
+          : maxCavityFrontH;
+      const effSlotFrontH =
+        handleType === 'finger_pull' && frontMountType !== 'none'
+          ? Math.max(60, slotFrontH - 28)
+          : slotFrontH;
+      const maxSafeBoxH = Math.max(40, Math.floor(cavity.height - 8 - bT));
+      const slotBoxH = Math.max(
+        40,
+        Math.min(cfg.boxHeight || 140, effSlotFrontH - bT - 6, maxSafeBoxH)
+      );
       return [
         this.addParametricDrawer({
           ...cfg,
+          materialId: inheritedMaterialId,
+          frontMaterialId: inheritedFrontMaterialId,
           outerWidth: cavity.innerWidth,
           slideLength: safeSlideLength,
+          boxHeight: slotBoxH,
+          frontHeight: slotFrontH,
           sideThickness: cavity.leftSideThickness,
           frontMountType,
           handleType,
+          recessBehindDoor: frontMountType === 'none' ? isRecessedBehindDoor : cfg.recessBehindDoor,
           posX: cavity.centerX,
-          posY: Math.round(singleY * 10) / 10,
+          posY: Math.round((cavity.minY + 2) * 10) / 10,
           posZ: cavity.centerZ,
           facingDirection: cavity.facingDirection,
           frontEdgeCoord: cavity.frontEdgeCoord,
@@ -3313,26 +3536,28 @@ export class ProjectStorageService {
       ];
     }
 
-    // Batería de 2, 3 o 4 cajones: dividir automáticamente la luz vertical de la cavidad en partes iguales
+    // Batería de 2 a 6 cajones: dividir automáticamente la luz vertical de la cavidad
     const interGap = 3;
-    const usableHeight = Math.max(count * 80, cavity.height - 4 - (count - 1) * interGap);
-    const slotNominalFrontH = Math.max(80, Math.floor(usableHeight / count));
+    const usableHeight = Math.max(count * 40, totalFrontSpan - 4 - (count - 1) * interGap);
+    const slotNominalFrontH = Math.max(40, Math.floor(usableHeight / count));
     const effFrontH =
       handleType === 'finger_pull' && frontMountType !== 'none'
-        ? Math.max(60, slotNominalFrontH - 28)
+        ? Math.max(30, slotNominalFrontH - 28)
         : slotNominalFrontH;
     const slotBoxH = Math.max(
-      50,
-      Math.min(cfg.boxHeight || 140, effFrontH - bT - 12)
+      35,
+      Math.min(cfg.boxHeight || 140, effFrontH - bT - 6, Math.floor(slotNominalFrontH - bT - 6))
     );
 
     const createdGroups: PartGroup[] = [];
     for (let i = 0; i < count; i++) {
       const slotPosY = Math.round((cavity.minY + 2 + i * (slotNominalFrontH + interGap)) * 10) / 10;
-      const baseName = cfg.name?.trim() || `Cajón`;
+      const baseName = cfg.name?.trim() || 'Cajón';
       const itemGroup = this.addParametricDrawer({
         ...cfg,
         name: `${baseName} ${i + 1}`,
+        materialId: inheritedMaterialId,
+        frontMaterialId: inheritedFrontMaterialId,
         outerWidth: cavity.innerWidth,
         slideLength: safeSlideLength,
         boxHeight: slotBoxH,
@@ -3340,6 +3565,7 @@ export class ProjectStorageService {
         sideThickness: cavity.leftSideThickness,
         frontMountType,
         handleType,
+        recessBehindDoor: frontMountType === 'none' ? isRecessedBehindDoor : cfg.recessBehindDoor,
         posX: cavity.centerX,
         posY: slotPosY,
         posZ: cavity.centerZ,
@@ -3466,7 +3692,8 @@ export class ProjectStorageService {
       const cavs = this.partGeometry.detectModuleCavities(
         hostGroupId,
         proj.parts || [],
-        hostGrp
+        hostGrp,
+        proj.appliances
       );
       const cav = (hostCavityId ? cavs.find(c => c.id === hostCavityId) : undefined) || cavs[0];
       if (cav) {
@@ -3632,7 +3859,8 @@ export class ProjectStorageService {
     if (!cavity) {
       const allCavities = this.partGeometry.detectAllSceneCavities(
         proj.parts || [],
-        proj.groups || []
+        proj.groups || [],
+        proj.appliances
       );
       if (allCavities.length === 0) return null;
 
@@ -3745,7 +3973,8 @@ export class ProjectStorageService {
       const cavs = this.partGeometry.detectModuleCavities(
         baseCfg.hostGroupId,
         proj.parts || [],
-        hostGrp
+        hostGrp,
+        proj.appliances
       );
       matchedCavity =
         (baseCfg.hostCavityId ? cavs.find(c => c.id === baseCfg.hostCavityId) : undefined) ||
@@ -3812,6 +4041,439 @@ export class ProjectStorageService {
       name: `${cleanBase} ${existingCount + 1}`,
       posY: candidateMinY
     });
+  }
+
+  private findFreeFloorPosition(
+    outerWidth: number,
+    depth: number,
+    baseY: number,
+    totalHeight: number,
+    requestedX?: number,
+    requestedZ?: number
+  ): { posX: number; posZ: number } {
+    if (requestedX !== undefined || requestedZ !== undefined) {
+      return {
+        posX: requestedX ?? 0,
+        posZ: requestedZ ?? 0
+      };
+    }
+
+    const parts = this.currentProject()?.parts || [];
+    const posZ = 0;
+    let candX = 0;
+    const minY = baseY;
+    const maxY = baseY + totalHeight;
+    const minZ = posZ - depth / 2 - 15;
+    const maxZ = posZ + depth / 2 + 15;
+
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const minX = candX - outerWidth / 2 - 15;
+      const maxX = candX + outerWidth / 2 + 15;
+      let maxBlockingX = -Infinity;
+      let hasOverlap = false;
+
+      for (const pt of parts) {
+        const b = this.partGeometry.getWorldAABB(pt);
+        const overlapsY = Math.min(maxY, b.maxY) - Math.max(minY, b.minY) > 1;
+        const overlapsZ = Math.min(maxZ, b.maxZ) - Math.max(minZ, b.minZ) > 1;
+        const overlapsX = Math.min(maxX, b.maxX) - Math.max(minX, b.minX) > 1;
+        if (overlapsX && overlapsY && overlapsZ) {
+          hasOverlap = true;
+          if (b.maxX > maxBlockingX) {
+            maxBlockingX = b.maxX;
+          }
+        }
+      }
+
+      if (!hasOverlap) {
+        return { posX: Math.round(candX * 10) / 10, posZ };
+      }
+      candX = maxBlockingX + outerWidth / 2 + 80;
+    }
+
+    return { posX: Math.round(candX * 10) / 10, posZ };
+  }
+
+  /**
+   * Apila 1 a 6 cajones modulares en una posición libre sobre el piso,
+   * respetando la luz vertical entre frentes para garantizar 0 colisiones.
+   */
+  addParametricDrawerStackOnFloor(
+    baseConfig: Partial<ModularDrawerConfig> & { name: string },
+    count: number
+  ): PartGroup[] {
+    const safeCount = Math.max(1, Math.min(6, Math.round(count || 1)));
+    const frontMountType: DrawerFrontMountType =
+      baseConfig.frontMountType ?? (baseConfig.includeFront === false ? 'none' : 'overlay');
+    const handleType: DrawerOpeningSystem = baseConfig.handleType ?? 'handle';
+    const outerWidth = Math.max(140, Math.round(baseConfig.outerWidth || baseConfig.cavityWidth || 564));
+    const slideLength = baseConfig.slideLength || 450;
+    const bT = Math.max(3, baseConfig.bottomThickness || 3);
+    const ft = Math.max(12, baseConfig.frontThickness || baseConfig.boxThickness || baseConfig.thickness || 15);
+    const st = Math.max(12, baseConfig.sideThickness || 18);
+    const nominalFrontH = Math.max(
+      80,
+      Math.round(baseConfig.frontHeight || (baseConfig.boxHeight || 140) + bT + 30)
+    );
+    const effFrontH =
+      handleType === 'finger_pull' && frontMountType !== 'none'
+        ? Math.max(60, nominalFrontH - 28)
+        : nominalFrontH;
+    const desiredBoxH = Math.max(50, Math.round(baseConfig.boxHeight || 140));
+    const safeBoxH =
+      frontMountType !== 'none'
+        ? Math.max(40, Math.min(desiredBoxH, effFrontH - bT - 6))
+        : desiredBoxH;
+    const stepY =
+      frontMountType === 'none'
+        ? safeBoxH + bT + 15
+        : handleType === 'finger_pull'
+          ? effFrontH + 28
+          : nominalFrontH + 3;
+
+    const baseY = baseConfig.posY ?? 100;
+    const footprintW = frontMountType === 'overlay' ? outerWidth + 2 * st : outerWidth;
+    const { posX, posZ } = this.findFreeFloorPosition(
+      footprintW,
+      slideLength + ft + 10,
+      baseY,
+      safeCount * stepY,
+      baseConfig.posX,
+      baseConfig.posZ
+    );
+
+    const baseName = baseConfig.name?.trim() || 'Cajón';
+    const created: PartGroup[] = [];
+    for (let i = 0; i < safeCount; i++) {
+      const slotName = safeCount === 1 ? baseName : `${baseName} (${i + 1}/${safeCount})`;
+      const group = this.addParametricDrawer({
+        ...baseConfig,
+        name: slotName,
+        outerWidth,
+        slideLength,
+        boxHeight: safeBoxH,
+        frontHeight: nominalFrontH,
+        bottomThickness: bT,
+        frontThickness: ft,
+        sideThickness: st,
+        includeFront: frontMountType !== 'none',
+        frontMountType,
+        handleType,
+        posX,
+        posY: Math.round((baseY + i * stepY) * 10) / 10,
+        posZ,
+        hostGroupId: 'floor',
+        hostCavityId: undefined,
+        drawersCount: 1
+      });
+      created.push(group);
+    }
+    return created;
+  }
+
+  /**
+   * Convierte una pieza seleccionada en una cajonera modular:
+   * - Si está dentro o a <= 180 mm de un vano libre, la reemplaza encajando en ese vano con 0 colisiones.
+   * - Si está en el piso, la reemplaza por una cajonera sobre el piso heredando ancho, posición y material.
+   */
+  convertPartToModularDrawer(
+    partId: string,
+    drawerCount = 1,
+    frontMountType: 'overlay' | 'inset' | 'none' = 'overlay'
+  ): PartGroup[] {
+    const proj = this.currentProject();
+    const part = proj?.parts.find(p => p.id === partId);
+    if (!proj || !part) return [];
+
+    const safeCount = Math.max(1, Math.min(6, Math.round(drawerCount || 1)));
+    const partAABB = this.partGeometry.getWorldAABB(part);
+    const allCavs = this.partGeometry.detectAllSceneCavities(
+      proj.parts || [],
+      proj.groups || [],
+      proj.appliances
+    );
+
+    let nearestCav: ModuleCavityInfo | undefined;
+    let nearestDist = Infinity;
+
+    for (const cav of allCavs) {
+      if ((cav.existingDrawerCount ?? 0) > 0) continue;
+      const isWZ = cav.facingDirection === 'right' || cav.facingDirection === 'left';
+      const cavMinX = isWZ
+        ? Math.min(cav.frontEdgeCoord, cav.backInnerCoord)
+        : cav.centerX - cav.innerWidth / 2;
+      const cavMaxX = isWZ
+        ? Math.max(cav.frontEdgeCoord, cav.backInnerCoord)
+        : cav.centerX + cav.innerWidth / 2;
+      const cavMinZ = isWZ
+        ? cav.centerZ - cav.innerWidth / 2
+        : Math.min(cav.frontEdgeCoord, cav.backInnerCoord);
+      const cavMaxZ = isWZ
+        ? cav.centerZ + cav.innerWidth / 2
+        : Math.max(cav.frontEdgeCoord, cav.backInnerCoord);
+
+      const dx = Math.max(0, cavMinX - partAABB.maxX, partAABB.minX - cavMaxX);
+      const dy = Math.max(0, cav.minY - partAABB.maxY, partAABB.minY - cav.maxY);
+      const dz = Math.max(0, cavMinZ - partAABB.maxZ, partAABB.minZ - cavMaxZ);
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (dist <= 180 && dist < nearestDist) {
+        nearestDist = dist;
+        nearestCav = cav;
+      }
+    }
+
+    const cleanName =
+      (part.name || 'Cajón')
+        .replace(/\b(pieza|puerta|entrepa[ñn]o|repisa|tablero|panel)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim() || 'Cajón';
+    const frontThickness = Math.max(12, Math.min(25, part.thickness || 18));
+    const matId = part.materialId;
+
+    if (nearestCav) {
+      this.deletePart(partId);
+      const afterProj = this.currentProject();
+      const hostGrp = (afterProj.groups || []).find(g => g.id === nearestCav!.groupId);
+      const refreshedCavs = this.partGeometry.detectModuleCavities(
+        nearestCav.groupId,
+        afterProj.parts || [],
+        hostGrp,
+        afterProj.appliances
+      );
+      const targetCav =
+        refreshedCavs.find(c => c.id === nearestCav!.id) ||
+        refreshedCavs.find(
+          c =>
+            c.leftPartId === nearestCav!.leftPartId &&
+            c.rightPartId === nearestCav!.rightPartId &&
+            Math.abs((c.centerY ?? 0) - (nearestCav!.centerY ?? 0)) <= 200
+        ) ||
+        [...refreshedCavs].sort(
+          (a, b) =>
+            Math.hypot(
+              a.centerX - nearestCav!.centerX,
+              (a.centerY ?? 0) - (nearestCav!.centerY ?? 0),
+              a.centerZ - nearestCav!.centerZ
+            ) -
+            Math.hypot(
+              b.centerX - nearestCav!.centerX,
+              (b.centerY ?? 0) - (nearestCav!.centerY ?? 0),
+              b.centerZ - nearestCav!.centerZ
+            )
+        )[0] || {
+          ...nearestCav,
+          coveringDoorIds: (nearestCav.coveringDoorIds || []).filter(id => id !== partId)
+        };
+
+      const hasDoor =
+        frontMountType === 'none' && (targetCav.coveringDoorIds?.length ?? 0) > 0;
+      const optimalSlide = this.partGeometry.getOptimalCommercialSlideLength(
+        targetCav.internalDepth,
+        frontMountType,
+        frontThickness,
+        hasDoor
+      );
+
+      return this.addParametricDrawersToCavity(
+        targetCav,
+        safeCount,
+        {
+          name: cleanName,
+          outerWidth: targetCav.innerWidth,
+          slideLength: optimalSlide,
+          boxHeight: 140,
+          boxThickness: 15,
+          thickness: 15,
+          frontThickness,
+          bottomThickness: 3,
+          includeFront: frontMountType !== 'none',
+          frontMountType,
+          handleType: 'handle',
+          materialId: matId,
+          frontMaterialId: matId
+        }
+      );
+    }
+
+    const isYZ = part.orientation === 'vertical_yz';
+    const outerWidth = Math.max(160, Math.round(isYZ ? partAABB.sz : partAABB.sx));
+    const rawDepth = isYZ ? partAABB.sx : partAABB.sz;
+    const slideLength =
+      rawDepth >= 220
+        ? this.partGeometry.getOptimalCommercialSlideLength(rawDepth, frontMountType, frontThickness)
+        : 450;
+    const posX = Math.round(partAABB.px * 10) / 10;
+    const posZ = Math.round(partAABB.pz * 10) / 10;
+    const posY = Math.max(0, Math.round(partAABB.minY * 10) / 10);
+    const facingDirection = isYZ ? 'right' : 'front';
+
+    this.deletePart(partId);
+
+    return this.addParametricDrawerStackOnFloor(
+      {
+        name: cleanName,
+        outerWidth,
+        slideLength,
+        boxHeight: 140,
+        boxThickness: 15,
+        thickness: 15,
+        frontThickness,
+        bottomThickness: 3,
+        includeFront: frontMountType !== 'none',
+        frontMountType,
+        handleType: 'handle',
+        facingDirection,
+        posX,
+        posY,
+        posZ,
+        materialId: matId,
+        frontMaterialId: matId
+      },
+      safeCount
+    );
+  }
+
+  private resolveCavityRefContext(
+    proj: Project,
+    cavity: ModuleCavityInfo
+  ): { isLooseStructure: boolean; hostParts: Part[]; hostGroup?: PartGroup; refPart?: Part } {
+    const isLooseStructure = cavity.groupId === '__loose_structure__';
+    const hostParts = isLooseStructure
+      ? proj.parts.filter(p => !p.groupId)
+      : proj.parts.filter(p => p.groupId === cavity.groupId);
+    const hostGroup = isLooseStructure
+      ? undefined
+      : (proj.groups || []).find(g => g.id === cavity.groupId);
+    const refPart =
+      proj.parts.find(p => p.id === cavity.leftPartId) ||
+      proj.parts.find(p => p.id === cavity.rightPartId) ||
+      proj.parts.find(p => p.id === cavity.topPartId) ||
+      proj.parts.find(p => p.id === cavity.bottomPartId) ||
+      hostParts.find(p => p.componentRole === 'side_left') ||
+      hostParts.find(p => p.componentRole !== 'back' && p.componentRole !== 'plinth') ||
+      hostParts[0];
+    return { isLooseStructure, hostParts, hostGroup, refPart };
+  }
+
+  /**
+   * Inserta un entrepaño horizontal exactamente en el centro vertical de una cavidad,
+   * con 0.5 mm de luz lateral por costado y retranqueo frontal de 10 mm para 0 colisiones.
+   */
+  splitCavityWithShelf(cavity: ModuleCavityInfo): Part | null {
+    const proj = this.currentProject();
+    if (!proj || cavity.height < 90 || cavity.internalDepth < 80 || cavity.innerWidth < 100) {
+      return null;
+    }
+
+    const { isLooseStructure, hostParts, hostGroup, refPart } = this.resolveCavityRefContext(proj, cavity);
+
+    const t = Math.max(
+      12,
+      Math.min(
+        25,
+        hostGroup?.parametricConfig?.structureThickness ||
+          refPart?.thickness ||
+          Math.round(cavity.leftSideThickness) ||
+          18
+      )
+    );
+    const isWidthZ = cavity.facingDirection === 'right' || cavity.facingDirection === 'left';
+    const dirSign = cavity.facingDirection === 'front' || cavity.facingDirection === 'right' ? 1 : -1;
+
+    // 0.5 mm de luz lateral por cada lado => innerWidth - 1.0 mm; retranqueo frontal 10 mm y 2 mm traseros
+    const spanSize = Math.max(50, Math.round((cavity.innerWidth - 1) * 10) / 10);
+    const frontDepth = cavity.frontEdgeCoord - dirSign * 10;
+    const backDepth = cavity.backInnerCoord + dirSign * 2;
+    const shelfDepth = Math.max(50, Math.round(Math.abs(frontDepth - backDepth) * 10) / 10);
+    const depthCenter = Math.round(((frontDepth + backDepth) / 2) * 10) / 10;
+    const centerY = Math.round(((cavity.minY + cavity.maxY) / 2) * 10) / 10;
+
+    const existingShelves = hostParts.filter(p => p.componentRole === 'shelf').length;
+    const shelfPart: Part = {
+      id: `shelf_${isLooseStructure ? 'loose' : cavity.groupId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: `Entrepaño ${existingShelves + 1}`,
+      moduleId: isLooseStructure ? refPart?.moduleId : (refPart?.moduleId || cavity.moduleId),
+      moduleName: isLooseStructure ? refPart?.moduleName : (refPart?.moduleName || cavity.moduleName),
+      groupId: isLooseStructure ? undefined : cavity.groupId,
+      groupName: isLooseStructure ? undefined : (hostGroup?.name || cavity.groupName),
+      length: isWidthZ ? shelfDepth : spanSize,
+      width: isWidthZ ? spanSize : shelfDepth,
+      thickness: t,
+      quantity: 1,
+      materialId: refPart?.materialId || 'mat-1',
+      materialName: refPart?.materialName || 'Melamina Estándar',
+      colorHex: refPart?.colorHex,
+      grain: refPart?.grain ?? 'length',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: isWidthZ ? depthCenter : cavity.centerX,
+      posY: centerY,
+      posZ: isWidthZ ? cavity.centerZ : depthCenter,
+      orientation: 'horizontal',
+      componentRole: 'shelf',
+      notes: 'Entrepaño divisor de vano'
+    };
+
+    this.addPart(shelfPart);
+    return shelfPart;
+  }
+
+  /**
+   * Inserta una división vertical en el centro horizontal de una cavidad
+   * con altura y profundidad exactas y 0 colisiones.
+   */
+  splitCavityWithVerticalDivider(cavity: ModuleCavityInfo): Part | null {
+    const proj = this.currentProject();
+    if (!proj || cavity.innerWidth < 120 || cavity.height < 70 || cavity.internalDepth < 80) {
+      return null;
+    }
+
+    const { isLooseStructure, hostParts, hostGroup, refPart } = this.resolveCavityRefContext(proj, cavity);
+
+    const t = Math.max(
+      12,
+      Math.min(
+        25,
+        hostGroup?.parametricConfig?.structureThickness ||
+          refPart?.thickness ||
+          Math.round(cavity.leftSideThickness) ||
+          18
+      )
+    );
+    const isWidthZ = cavity.facingDirection === 'right' || cavity.facingDirection === 'left';
+
+    const dividerHeight = Math.round(cavity.height * 10) / 10;
+    const dividerDepth = Math.round(Math.abs(cavity.frontEdgeCoord - cavity.backInnerCoord) * 10) / 10;
+    const depthCenter = Math.round(((cavity.frontEdgeCoord + cavity.backInnerCoord) / 2) * 10) / 10;
+    const centerY = Math.round(((cavity.minY + cavity.maxY) / 2) * 10) / 10;
+
+    const existingDividers = hostParts.filter(p => p.componentRole === 'divider').length;
+    const dividerPart: Part = {
+      id: `divider_${isLooseStructure ? 'loose' : cavity.groupId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: `División Vertical ${existingDividers + 1}`,
+      moduleId: isLooseStructure ? refPart?.moduleId : (refPart?.moduleId || cavity.moduleId),
+      moduleName: isLooseStructure ? refPart?.moduleName : (refPart?.moduleName || cavity.moduleName),
+      groupId: isLooseStructure ? undefined : cavity.groupId,
+      groupName: isLooseStructure ? undefined : (hostGroup?.name || cavity.groupName),
+      length: isWidthZ ? dividerDepth : dividerHeight,
+      width: isWidthZ ? dividerHeight : dividerDepth,
+      thickness: t,
+      quantity: 1,
+      materialId: refPart?.materialId || 'mat-1',
+      materialName: refPart?.materialName || 'Melamina Estándar',
+      colorHex: refPart?.colorHex,
+      grain: refPart?.grain ?? 'length',
+      edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+      posX: isWidthZ ? depthCenter : cavity.centerX,
+      posY: centerY,
+      posZ: isWidthZ ? cavity.centerZ : depthCenter,
+      orientation: isWidthZ ? 'vertical_xy' : 'vertical_yz',
+      componentRole: 'divider',
+      notes: 'División vertical de vano'
+    };
+
+    this.addPart(dividerPart);
+    return dividerPart;
   }
 
   // ==========================================

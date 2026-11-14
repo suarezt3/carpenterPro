@@ -1252,31 +1252,40 @@
             <button
               type="button"
               (click)="addRoomWall()"
-              class="px-2.5 py-0.5 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              class="px-2.5 py-0.5 bg-white hover:bg-zinc-100 active:scale-95 text-zinc-900 border border-zinc-200 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
               title="Añadir un nuevo muro independiente o divisorio a la habitación 3D">
-              <hugeicons-icon [icon]="icons.cube3d" [size]="12" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
+              <hugeicons-icon [icon]="icons.cube3d" [size]="12" [strokeWidth]="1.9" class="shrink-0 text-sky-600"></hugeicons-icon>
               <span>+ Muro</span>
             </button>
 
             <!-- Barra Flotante de Acciones Rápidas del Muro Seleccionado en 3D -->
             @if (selectedWallInstance(); as wallInst) {
-              <div class="flex items-center gap-1.5 bg-sky-950/90 text-sky-200 border border-sky-500/40 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold animate-in fade-in duration-100 shadow-md">
+              <div class="flex items-center gap-1.5 bg-zinc-900/95 text-zinc-100 border border-sky-600/60 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold animate-in fade-in duration-100 shadow-md">
                 <hugeicons-icon [icon]="icons.cube3d" [size]="12" [strokeWidth]="1.9" class="text-sky-400 shrink-0"></hugeicons-icon>
                 <span class="text-white font-bold truncate max-w-[120px]">{{ wallInst.name }}:</span>
-                <span class="font-mono text-sky-300 text-[10px]">{{ wallInst.length }}×{{ wallInst.height }} mm</span>
+                <span class="font-numeric text-zinc-300 text-[10px]">{{ wallInst.length }}×{{ wallInst.height }} mm</span>
 
                 <!-- Badge Rotación -->
-                <span class="px-1.5 py-0.2 bg-sky-900/80 text-sky-200 rounded text-[9px] font-mono border border-sky-700/60">
-                  {{ (wallInst.rotationY || 0) }}° ({{ (wallInst.rotationY || 0) % 180 === 0 ? 'Horiz' : 'Vert' }})
+                <span class="px-1.5 py-0.2 bg-zinc-800 text-sky-300 rounded text-[9px] font-numeric border border-zinc-700">
+                  {{ Math.round((wallInst.rotationY || 0) * 10) / 10 }}° ({{ Math.abs((wallInst.rotationY || 0) % 180) < 0.01 ? 'Horiz' : (Math.abs(((wallInst.rotationY || 0) % 180) - 90) < 0.01 ? 'Vert' : 'Libre') }})
                 </span>
+
+                <!-- Botón Girar +45° -->
+                <button
+                  type="button"
+                  (click)="rotateWall(wallInst.id, 45)"
+                  class="px-1.5 py-0.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white border border-zinc-700 rounded text-[10px] font-numeric font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title="Girar muro +45° en su propio eje">
+                  <span>+45°</span>
+                </button>
 
                 <!-- Botón Girar 90° (R) -->
                 <button
                   type="button"
                   (click)="rotateWall(wallInst.id, 90)"
-                  class="px-1.5 py-0.5 bg-sky-700 hover:bg-sky-600 active:scale-95 text-white rounded text-[10px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                  class="px-1.5 py-0.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white border border-zinc-700 rounded text-[10px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                   title="Girar muro 90° en su propio eje (Atajo: tecla R)">
-                  <hugeicons-icon [icon]="icons.rotate" [size]="11" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  <hugeicons-icon [icon]="icons.rotate" [size]="11" [strokeWidth]="2" class="shrink-0 text-sky-400"></hugeicons-icon>
                   <span>Girar 90° (R)</span>
                 </button>
 
@@ -2715,6 +2724,112 @@
                 </div>
               }
 
+              <!-- 3B. HUECOS / VANOS LIBRES DEL MUEBLE (RELLENO 1 CLIC) -->
+              @if (isParametricCabinetGroup()) {
+                <div class="p-3 bg-white border border-zinc-200 rounded-xl space-y-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.inbox" class="w-4 h-4 text-zinc-900" [strokeWidth]="1.75"></hugeicons-icon>
+                      <span class="text-[11px] font-bold font-sans text-zinc-900">
+                        Huecos / Vanos Libres (Relleno 1 Clic)
+                      </span>
+                    </div>
+                    <span class="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[10px] font-bold font-numeric tabular-nums text-zinc-700">
+                      {{ selectedModuleCavities().length }}
+                    </span>
+                  </div>
+
+                  @if (selectedModuleCavities().length === 0) {
+                    <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-sans text-zinc-500">
+                      No se detectaron vanos libres disponibles en este módulo.
+                    </div>
+                  } @else {
+                    <div class="space-y-2">
+                      @for (cav of selectedModuleCavities(); track cav.id) {
+                        <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2">
+                          <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                              <div class="text-[11px] font-bold font-sans text-zinc-900 truncate">
+                                {{ cav.label }}
+                              </div>
+                              <div class="text-[11px] font-numeric tabular-nums font-semibold text-sky-600 mt-0.5">
+                                {{ cav.internalWidth }} × {{ cav.internalHeight }} × {{ cav.internalDepth }} mm
+                              </div>
+                            </div>
+                            <div class="flex flex-wrap items-center justify-end gap-1 shrink-0">
+                              @if ((cav.coveringDoorIds?.length ?? 0) > 0) {
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-[10px] font-semibold font-sans text-amber-700">
+                                  <hugeicons-icon [icon]="icons.doorClosed" class="w-3 h-3" [strokeWidth]="1.75"></hugeicons-icon>
+                                  <span>Con puerta</span>
+                                </span>
+                              }
+                              @if ((cav.existingDrawerCount ?? 0) > 0) {
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-[10px] font-semibold font-sans text-emerald-700">
+                                  <hugeicons-icon [icon]="icons.checkCircle" class="w-3 h-3" [strokeWidth]="1.75"></hugeicons-icon>
+                                  <span class="font-numeric tabular-nums">{{ cav.existingDrawerCount }}</span>
+                                  <span>caj.</span>
+                                </span>
+                              }
+                            </div>
+                          </div>
+
+                          <div class="grid grid-cols-3 gap-1">
+                            <button
+                              type="button"
+                              (click)="quickFillCavityWithDrawers(cav, 1, 'overlay')"
+                              class="px-2 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-semibold font-sans transition cursor-pointer">
+                              +<span class="font-numeric">1</span> Cajón
+                            </button>
+                            <button
+                              type="button"
+                              (click)="quickFillCavityWithDrawers(cav, 2, 'overlay')"
+                              class="px-2 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                              +<span class="font-numeric">2</span> Cajones
+                            </button>
+                            <button
+                              type="button"
+                              (click)="quickFillCavityWithDrawers(cav, 3, 'overlay')"
+                              class="px-2 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                              +<span class="font-numeric">3</span> Cajones
+                            </button>
+                            <button
+                              type="button"
+                              (click)="quickFillCavityWithDrawers(cav, 4, 'overlay')"
+                              class="px-2 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                              +<span class="font-numeric">4</span> Cajones
+                            </button>
+                            <button
+                              type="button"
+                              (click)="quickFillCavityWithDrawers(cav, 1, 'none')"
+                              title="Insertar cajón interior sin frente para closet o tras puerta"
+                              class="col-span-2 px-2 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                              Interno Closet
+                            </button>
+                          </div>
+
+                          <div class="grid grid-cols-2 gap-1 pt-1 border-t border-zinc-200">
+                            <button
+                              type="button"
+                              (click)="quickSplitCavityHorizontally(cav)"
+                              class="inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                              <hugeicons-icon [icon]="icons.shelfSplit" class="w-3.5 h-3.5 text-zinc-700" [strokeWidth]="1.75"></hugeicons-icon>
+                              <span>+ Entrepaño</span>
+                            </button>
+                            <button
+                              type="button"
+                              (click)="quickSplitCavityVertically(cav)"
+                              class="inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                              <hugeicons-icon [icon]="icons.columns" class="w-3.5 h-3.5 text-zinc-700" [strokeWidth]="1.75"></hugeicons-icon>
+                              <span>+ Div. Vertical</span>
+                            </button>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+
               <!-- 4. POSICIÓN 3D Y ALINEACIÓN DEL MÓDULO EN BLOQUE -->
               <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
                 <div class="flex items-center justify-between">
@@ -4068,6 +4183,135 @@
                 </div>
               }
 
+              <!-- 7A. HUECO DETECTADO EN ESTRUCTURA (PIEZAS SUELTAS O VANO ADYACENTE) -->
+              @let surroundingCavity = selectedPartSurroundingCavity();
+              @if (surroundingCavity) {
+                <div class="p-3 bg-white border border-zinc-200 rounded-xl space-y-2.5 shadow-2xs">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <hugeicons-icon [icon]="icons.expandArea" class="w-4 h-4 text-sky-600 shrink-0" [strokeWidth]="1.75"></hugeicons-icon>
+                      <span class="text-[11px] font-bold font-sans text-zinc-900 truncate">
+                        Hueco Detectado en Estructura
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg flex items-center justify-between gap-2">
+                    <span class="text-[10px] font-medium font-sans text-zinc-600 truncate">
+                      {{ surroundingCavity.label }}
+                    </span>
+                    <span class="text-[11px] font-semibold font-numeric tabular-nums text-zinc-900 shrink-0">
+                      {{ surroundingCavity.internalWidth }} × {{ surroundingCavity.internalHeight }} × {{ surroundingCavity.internalDepth }} mm
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      (click)="quickFillCavityWithDrawers(surroundingCavity, 1, 'overlay')"
+                      class="px-2 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-semibold font-sans transition cursor-pointer">
+                      +<span class="font-numeric">1</span> Cajón
+                    </button>
+                    <button
+                      type="button"
+                      (click)="quickFillCavityWithDrawers(surroundingCavity, 2, 'overlay')"
+                      class="px-2 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                      +<span class="font-numeric">2</span> Cajones
+                    </button>
+                    <button
+                      type="button"
+                      (click)="quickFillCavityWithDrawers(surroundingCavity, 3, 'overlay')"
+                      class="px-2 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                      +<span class="font-numeric">3</span> Cajones
+                    </button>
+                    <button
+                      type="button"
+                      (click)="quickFillCavityWithDrawers(surroundingCavity, 4, 'overlay')"
+                      class="px-2 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                      +<span class="font-numeric">4</span> Cajones
+                    </button>
+                    <button
+                      type="button"
+                      (click)="quickFillCavityWithDrawers(surroundingCavity, 1, 'none')"
+                      title="Insertar cajón interior sin frente para closet o tras puerta"
+                      class="col-span-2 px-2 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                      Interno Closet
+                    </button>
+                  </div>
+
+                  <div class="grid grid-cols-3 gap-1 pt-1.5 border-t border-zinc-200">
+                    <button
+                      type="button"
+                      (click)="quickSplitCavityHorizontally(surroundingCavity)"
+                      class="inline-flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                      <hugeicons-icon [icon]="icons.shelfSplit" class="w-3.5 h-3.5 text-zinc-700 shrink-0" [strokeWidth]="1.75"></hugeicons-icon>
+                      <span>+ Entrepaño</span>
+                    </button>
+                    <button
+                      type="button"
+                      (click)="quickSplitCavityVertically(surroundingCavity)"
+                      class="inline-flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                      <hugeicons-icon [icon]="icons.columns" class="w-3.5 h-3.5 text-zinc-700 shrink-0" [strokeWidth]="1.75"></hugeicons-icon>
+                      <span>+ Div. Vertical</span>
+                    </button>
+                    <button
+                      type="button"
+                      (click)="openDrawerWizardForCavity(surroundingCavity)"
+                      class="inline-flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-200 text-[10px] font-semibold font-sans transition cursor-pointer">
+                      <hugeicons-icon [icon]="icons.tune" class="w-3.5 h-3.5 text-sky-600 shrink-0" [strokeWidth]="1.75"></hugeicons-icon>
+                      <span>Asistente...</span>
+                    </button>
+                  </div>
+                </div>
+              }
+
+              <!-- 7B. CONVERSIÓN 1-CLIC A CAJÓN MODULAR (ESTILO MELAMINA 3D) -->
+              @if (canConvertSelectedPartToDrawer()) {
+                <div class="p-3 bg-white border border-zinc-200 rounded-xl space-y-2.5">
+                  <div class="flex items-center gap-1.5">
+                    <hugeicons-icon [icon]="icons.layers" class="w-4 h-4 text-zinc-900" [strokeWidth]="1.75"></hugeicons-icon>
+                    <span class="text-[11px] font-bold font-sans text-zinc-900">
+                      Convertir Pieza en Cajón Modular (Estilo Melamina 3D)
+                    </span>
+                  </div>
+                  <p class="text-[11px] font-sans text-zinc-600 leading-relaxed">
+                    Transforma esta pieza guía o frente en un cajón completo con caja, corredera y fondo.
+                  </p>
+                  <div class="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      (click)="convertSelectedPartToDrawer(1, 'overlay')"
+                      class="px-2.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-semibold font-sans transition cursor-pointer">
+                      <span class="font-numeric">1</span> Cajón
+                    </button>
+                    <button
+                      type="button"
+                      (click)="convertSelectedPartToDrawer(2, 'overlay')"
+                      class="px-2.5 py-2 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[11px] font-semibold font-sans transition cursor-pointer">
+                      <span class="font-numeric">2</span> Cajones
+                    </button>
+                    <button
+                      type="button"
+                      (click)="convertSelectedPartToDrawer(3, 'overlay')"
+                      class="px-2.5 py-2 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[11px] font-semibold font-sans transition cursor-pointer">
+                      <span class="font-numeric">3</span> Cajones
+                    </button>
+                    <button
+                      type="button"
+                      (click)="convertSelectedPartToDrawer(4, 'overlay')"
+                      class="px-2.5 py-2 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[11px] font-semibold font-sans transition cursor-pointer">
+                      <span class="font-numeric">4</span> Cajones
+                    </button>
+                    <button
+                      type="button"
+                      (click)="convertSelectedPartToDrawer(1, 'none')"
+                      class="col-span-2 px-2.5 py-2 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-200 text-[11px] font-semibold font-sans transition cursor-pointer">
+                      Interno Closet
+                    </button>
+                  </div>
+                </div>
+              }
+
               <!-- 8. MECANIZADOS Y PERFORACIONES CNC -->
               <div class="bg-white p-2.5 rounded-md border border-zinc-200/90 space-y-2 shadow-2xs">
                 <div class="flex items-center justify-between">
@@ -4195,7 +4439,7 @@
                     <div class="p-2.5 bg-white border border-zinc-200/90 rounded-md space-y-2 shadow-2xs">
                       <div class="flex items-center justify-between gap-1.5">
                         <div class="flex items-center gap-1.5 min-w-0">
-                          <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+                          <span class="w-2 h-2 rounded-full bg-sky-600 shrink-0"></span>
                           <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 truncate">
                             Muro Seleccionado
                           </span>
@@ -4214,9 +4458,9 @@
                           type="text"
                           [value]="selWall.name"
                           (change)="updateWallName(selWall.id, $any($event.target).value)"
-                          class="text-xs font-semibold text-zinc-900 bg-zinc-50 px-2 py-1 rounded border border-zinc-200 w-full focus:outline-hidden focus:border-zinc-400"
+                          class="text-xs font-semibold text-zinc-900 bg-zinc-50 px-2 py-1 rounded border border-zinc-200 w-full focus:outline-hidden focus:border-sky-600"
                           title="Clic para renombrar este muro" />
-                        <span class="text-[10px] font-mono px-2 py-1 rounded bg-zinc-100 text-zinc-600 font-bold border border-zinc-200 shrink-0">
+                        <span class="text-[10px] font-numeric px-2 py-1 rounded bg-zinc-100 text-zinc-700 font-bold border border-zinc-200 shrink-0">
                           {{ selWall.length }}×{{ selWall.height }} mm
                         </span>
                       </div>
@@ -4232,7 +4476,7 @@
                         <button
                           type="button"
                           (click)="addRoomWall()"
-                          class="text-[11px] font-semibold text-zinc-800 hover:text-black flex items-center gap-1 cursor-pointer transition">
+                          class="px-2 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-[11px] font-medium flex items-center gap-1 cursor-pointer transition shadow-2xs">
                           <hugeicons-icon [icon]="icons.add" [size]="12" [strokeWidth]="2.2"></hugeicons-icon>
                           <span>+ Muro</span>
                         </button>
@@ -4247,9 +4491,9 @@
                               ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
                               : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200 font-normal'"
                             class="px-2 py-1 text-[11px] rounded-md border transition flex items-center gap-1 cursor-pointer">
-                            <span class="w-1.5 h-1.5 rounded-full" [class]="selectedWall() === w.id ? 'bg-white' : 'bg-sky-500'"></span>
+                            <span class="w-1.5 h-1.5 rounded-full" [class]="selectedWall() === w.id ? 'bg-white' : 'bg-sky-600'"></span>
                             <span class="truncate max-w-[120px]">{{ w.name }}</span>
-                            <span class="text-[9px] opacity-70 font-mono">({{ (w.rotationY || 0) % 180 === 0 ? 'H' : 'V' }})</span>
+                            <span class="text-[9px] opacity-75 font-numeric">({{ Math.abs((w.rotationY || 0) % 180) < 0.01 ? 'H' : (Math.abs(((w.rotationY || 0) % 180) - 90) < 0.01 ? 'V' : (Math.round((w.rotationY || 0) * 10) / 10) + '°') }})</span>
                           </button>
                         }
                       </div>
@@ -4262,29 +4506,42 @@
                           <hugeicons-icon [icon]="icons.rotate" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                           <span>Orientación y Giro (R)</span>
                         </span>
-                        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 font-bold border border-zinc-200">
-                          {{ (selWall.rotationY || 0) }}°
+                        <span class="text-[10px] font-numeric px-1.5 py-0.5 rounded bg-sky-50 text-sky-600 font-bold border border-sky-600/30">
+                          {{ Math.round((selWall.rotationY || 0) * 10) / 10 }}°
                         </span>
                       </div>
 
-                      <div class="grid grid-cols-3 gap-1.5 text-xs">
+                      <div class="grid grid-cols-2 gap-1.5 text-xs">
                         <button
                           type="button"
                           (click)="setWallOrientation(selWall.id, 'horizontal')"
-                          [class]="(selWall.rotationY || 0) % 180 === 0
+                          [class]="Math.abs((selWall.rotationY || 0) % 180) < 0.01
                             ? 'bg-zinc-900 text-white font-medium shadow-xs'
                             : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200'"
-                          class="py-1.5 rounded-md transition text-center cursor-pointer">
-                          Horizontal
+                          class="py-1.5 rounded-md transition text-center cursor-pointer flex items-center justify-center gap-1">
+                          <span class="font-numeric">0°</span>
+                          <span>Horizontal</span>
                         </button>
                         <button
                           type="button"
                           (click)="setWallOrientation(selWall.id, 'vertical')"
-                          [class]="(selWall.rotationY || 0) % 180 === 90
+                          [class]="Math.abs(((selWall.rotationY || 0) % 180) - 90) < 0.01
                             ? 'bg-zinc-900 text-white font-medium shadow-xs'
                             : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200'"
-                          class="py-1.5 rounded-md transition text-center cursor-pointer">
-                          Vertical
+                          class="py-1.5 rounded-md transition text-center cursor-pointer flex items-center justify-center gap-1">
+                          <span class="font-numeric">90°</span>
+                          <span>Vertical</span>
+                        </button>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-1.5 text-xs">
+                        <button
+                          type="button"
+                          (click)="rotateWall(selWall.id, 45)"
+                          class="py-1.5 font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 rounded-md transition text-center flex items-center justify-center gap-1 cursor-pointer"
+                          title="Girar +45° sobre su propio eje">
+                          <hugeicons-icon [icon]="icons.rotate" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                          <span class="font-numeric">+45°</span>
                         </button>
                         <button
                           type="button"
@@ -4294,6 +4551,23 @@
                           <hugeicons-icon [icon]="icons.rotate" [size]="12" [strokeWidth]="2"></hugeicons-icon>
                           <span>+90° (R)</span>
                         </button>
+                      </div>
+
+                      <div class="p-2 bg-zinc-50 rounded-md border border-zinc-200 flex items-center justify-between gap-2">
+                        <span class="text-[11px] font-medium text-zinc-600 shrink-0">Ángulo libre (0° a 360°)</span>
+                        <div class="flex items-center gap-1 w-28">
+                          <input
+                            type="number"
+                            min="0"
+                            max="360"
+                            step="5"
+                            [value]="Math.round((selWall.rotationY || 0) * 10) / 10"
+                            (input)="onWallNumericInput(selWall.id, 'rotationY', $any($event.target).value)"
+                            (change)="setWallRotation(selWall.id, +$any($event.target).value)"
+                            aria-label="Ángulo de rotación del muro en grados"
+                            class="w-full text-center py-0.5 bg-white border border-zinc-200 rounded text-xs font-numeric font-bold text-zinc-900 focus:outline-hidden focus:border-sky-600" />
+                          <span class="text-[11px] font-numeric font-semibold text-zinc-500 shrink-0">°</span>
+                        </div>
                       </div>
                     </div>
 
@@ -4308,35 +4582,37 @@
                       <div class="p-2 bg-zinc-50 rounded-md border border-zinc-200 space-y-1.5">
                         <div class="flex items-center justify-between text-[11px]">
                           <span class="font-medium text-zinc-600">Longitud (Largo)</span>
-                          <span class="font-mono font-bold text-zinc-900">{{ selWall.length }} mm</span>
+                          <span class="font-numeric font-bold text-zinc-900">{{ selWall.length }} mm</span>
                         </div>
                         <div class="flex items-center gap-1">
                           <button
                             type="button"
                             (click)="nudgeWallLength(selWall.id, -500)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
                             title="-500 mm">-500</button>
                           <button
                             type="button"
                             (click)="nudgeWallLength(selWall.id, -100)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
                             title="-100 mm">-100</button>
                           <input
                             type="number"
                             min="400"
                             step="50"
                             [value]="selWall.length"
-                            (input)="setWallLength(selWall.id, +$any($event.target).value)"
-                            class="w-full text-center py-0.5 bg-white border border-zinc-200 rounded text-xs font-mono font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-400" />
+                            (input)="onWallNumericInput(selWall.id, 'length', $any($event.target).value)"
+                            (change)="setWallLength(selWall.id, +$any($event.target).value)"
+                            aria-label="Longitud del muro en milímetros"
+                            class="w-full text-center py-0.5 bg-white border border-zinc-200 rounded text-xs font-numeric font-bold text-zinc-900 focus:outline-hidden focus:border-sky-600" />
                           <button
                             type="button"
                             (click)="nudgeWallLength(selWall.id, 100)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
                             title="+100 mm">+100</button>
                           <button
                             type="button"
                             (click)="nudgeWallLength(selWall.id, 500)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
                             title="+500 mm">+500</button>
                         </div>
                       </div>
@@ -4345,18 +4621,18 @@
                       <div class="p-2 bg-zinc-50 rounded-md border border-zinc-200 space-y-1.5">
                         <div class="flex items-center justify-between text-[11px]">
                           <span class="font-medium text-zinc-600">Altura (Eje Y)</span>
-                          <span class="font-mono font-bold text-zinc-900">{{ selWall.height }} mm</span>
+                          <span class="font-numeric font-bold text-zinc-900">{{ selWall.height }} mm</span>
                         </div>
                         <div class="flex items-center gap-1">
                           <button
                             type="button"
                             (click)="nudgeWallHeight(selWall.id, -100)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
                             title="-100 mm">-100</button>
                           <button
                             type="button"
                             (click)="nudgeWallHeight(selWall.id, -50)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
                             title="-50 mm">-50</button>
                           <input
                             type="number"
@@ -4364,17 +4640,19 @@
                             max="4500"
                             step="10"
                             [value]="selWall.height"
-                            (input)="setWallHeight(selWall.id, +$any($event.target).value)"
-                            class="w-full text-center py-0.5 bg-white border border-zinc-200 rounded text-xs font-mono font-bold text-zinc-900 focus:outline-hidden focus:border-zinc-400" />
+                            (input)="onWallNumericInput(selWall.id, 'height', $any($event.target).value)"
+                            (change)="setWallHeight(selWall.id, +$any($event.target).value)"
+                            aria-label="Altura del muro en milímetros"
+                            class="w-full text-center py-0.5 bg-white border border-zinc-200 rounded text-xs font-numeric font-bold text-zinc-900 focus:outline-hidden focus:border-sky-600" />
                           <button
                             type="button"
                             (click)="nudgeWallHeight(selWall.id, 50)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
                             title="+50 mm">+50</button>
                           <button
                             type="button"
                             (click)="nudgeWallHeight(selWall.id, 100)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold text-zinc-700 transition cursor-pointer"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
                             title="+100 mm">+100</button>
                         </div>
                       </div>
@@ -4383,7 +4661,29 @@
                       <div class="p-2 bg-zinc-50 rounded-md border border-zinc-200 space-y-1.5">
                         <div class="flex items-center justify-between text-[11px]">
                           <span class="font-medium text-zinc-600">Grosor / Espesor</span>
-                          <span class="font-mono font-bold text-zinc-900">{{ selWall.thickness }} mm</span>
+                          <span class="font-numeric font-bold text-zinc-900">{{ selWall.thickness }} mm</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                          <button
+                            type="button"
+                            (click)="setWallThickness(selWall.id, selWall.thickness - 10)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
+                            title="-10 mm">-10</button>
+                          <input
+                            type="number"
+                            min="50"
+                            max="600"
+                            step="10"
+                            [value]="selWall.thickness"
+                            (input)="onWallNumericInput(selWall.id, 'thickness', $any($event.target).value)"
+                            (change)="setWallThickness(selWall.id, +$any($event.target).value)"
+                            aria-label="Espesor del muro en milímetros"
+                            class="w-full text-center py-0.5 bg-white border border-zinc-200 rounded text-xs font-numeric font-bold text-zinc-900 focus:outline-hidden focus:border-sky-600" />
+                          <button
+                            type="button"
+                            (click)="setWallThickness(selWall.id, selWall.thickness + 10)"
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold text-zinc-700 transition cursor-pointer"
+                            title="+10 mm">+10</button>
                         </div>
                         <div class="grid grid-cols-4 gap-1">
                           @for (th of [100, 150, 200, 250]; track th) {
@@ -4393,7 +4693,7 @@
                               [class]="selWall.thickness === th
                                 ? 'bg-zinc-900 text-white font-medium shadow-xs'
                                 : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 font-normal'"
-                              class="py-1 text-[10px] rounded transition text-center cursor-pointer">
+                              class="py-1 text-[10px] font-numeric rounded transition text-center cursor-pointer">
                               {{ th }} mm
                             </button>
                           }
@@ -4414,17 +4714,19 @@
                           <button
                             type="button"
                             (click)="nudgeWallPos(selWall.id, 'x', -50)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold cursor-pointer transition">-50</button>
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold cursor-pointer transition">-50</button>
                           <input
                             type="number"
                             step="50"
                             [value]="Math.round(selWall.posX)"
-                            (input)="setWallPosX(selWall.id, +$any($event.target).value)"
-                            class="w-full text-center py-0.5 bg-zinc-50 border border-zinc-200 rounded text-xs font-mono font-bold text-zinc-900" />
+                            (input)="onWallNumericInput(selWall.id, 'posX', $any($event.target).value)"
+                            (change)="setWallPosX(selWall.id, +$any($event.target).value)"
+                            aria-label="Posición X del muro en milímetros"
+                            class="w-full text-center py-0.5 bg-zinc-50 border border-zinc-200 rounded text-xs font-numeric font-bold text-zinc-900 focus:outline-hidden focus:border-sky-600" />
                           <button
                             type="button"
                             (click)="nudgeWallPos(selWall.id, 'x', 50)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold cursor-pointer transition">+50</button>
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold cursor-pointer transition">+50</button>
                         </div>
 
                         <div class="flex items-center justify-between gap-1">
@@ -4432,17 +4734,19 @@
                           <button
                             type="button"
                             (click)="nudgeWallPos(selWall.id, 'z', -50)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold cursor-pointer transition">-50</button>
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold cursor-pointer transition">-50</button>
                           <input
                             type="number"
                             step="50"
                             [value]="Math.round(selWall.posZ)"
-                            (input)="setWallPosZ(selWall.id, +$any($event.target).value)"
-                            class="w-full text-center py-0.5 bg-zinc-50 border border-zinc-200 rounded text-xs font-mono font-bold text-zinc-900" />
+                            (input)="onWallNumericInput(selWall.id, 'posZ', $any($event.target).value)"
+                            (change)="setWallPosZ(selWall.id, +$any($event.target).value)"
+                            aria-label="Posición Z del muro en milímetros"
+                            class="w-full text-center py-0.5 bg-zinc-50 border border-zinc-200 rounded text-xs font-numeric font-bold text-zinc-900 focus:outline-hidden focus:border-sky-600" />
                           <button
                             type="button"
                             (click)="nudgeWallPos(selWall.id, 'z', 50)"
-                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-bold cursor-pointer transition">+50</button>
+                            class="px-1.5 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded text-[10px] font-numeric font-bold cursor-pointer transition">+50</button>
                         </div>
                       </div>
                     </div>
@@ -4517,15 +4821,22 @@
                               type="button"
                               (click)="onWallSelected(w.id)"
                               class="flex items-center gap-2 flex-1 text-left cursor-pointer min-w-0">
-                              <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+                              <span class="w-2 h-2 rounded-full bg-sky-600 shrink-0"></span>
                               <span class="text-xs font-medium text-zinc-900 truncate">{{ w.name }}</span>
-                              <span class="text-[10px] text-zinc-500 font-mono shrink-0">{{ w.length }}×{{ w.height }} mm</span>
+                              <span class="text-[10px] text-zinc-500 font-numeric shrink-0">{{ w.length }}×{{ w.height }} mm</span>
+                            </button>
+                            <button
+                              type="button"
+                              (click)="rotateWall(w.id, 45)"
+                              class="px-1.5 py-0.5 hover:bg-white rounded text-[10px] font-numeric font-medium text-zinc-600 hover:text-zinc-900 transition cursor-pointer"
+                              title="Girar +45°">
+                              +45°
                             </button>
                             <button
                               type="button"
                               (click)="rotateWall(w.id, 90)"
                               class="p-1 hover:bg-white rounded text-zinc-500 hover:text-zinc-900 transition cursor-pointer"
-                              title="Girar 90°">
+                              title="Girar +90°">
                               <hugeicons-icon [icon]="icons.rotate" [size]="12" [strokeWidth]="2"></hugeicons-icon>
                             </button>
                           </div>
@@ -5969,13 +6280,25 @@
             }
           </div>
 
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-1">
+            <span class="text-[11px] font-bold font-sans text-zinc-900">Encajar automáticamente en:</span>
+            <label class="inline-flex items-center gap-1.5 text-[11px] font-medium font-sans text-zinc-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                [checked]="showUpperCabinetsInDrawerWizard()"
+                (change)="toggleShowUpperCabinetsInDrawerWizard(!showUpperCabinetsInDrawerWizard())"
+                class="w-3.5 h-3.5 rounded border-zinc-300 accent-zinc-900 cursor-pointer" />
+              <span>Incluir alacenas aéreas / muebles altos</span>
+            </label>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
-              <span class="block text-[10px] font-bold text-slate-600 mb-1">{{ 'drawer.targetModuleLabel' | t }}</span>
+              <span class="block text-[10px] font-bold font-sans text-zinc-600 mb-1">{{ 'drawer.targetModuleLabel' | t }}</span>
               <select
                 [value]="drawerWizardTargetModuleId()"
                 (change)="onDrawerWizardTargetModuleChange($event)"
-                class="w-full px-3 py-2 text-xs font-semibold bg-white border border-sky-200 rounded-xl text-slate-900 focus:outline-hidden focus:border-sky-500 cursor-pointer">
+                class="w-full px-3 py-2 text-xs font-semibold font-sans bg-white border border-zinc-200 rounded-xl text-zinc-900 focus:outline-hidden focus:border-sky-600 cursor-pointer">
                 <option value="floor">{{ 'drawer.createLooseOnFloor' | t }}</option>
                 @for (mod of availableCabinetModulesForDrawer(); track mod.id) {
                   <option [value]="mod.id">{{ mod.name }}</option>
@@ -5985,13 +6308,13 @@
 
             @if (drawerWizardTargetModuleId() !== 'floor' && availableCavitiesForDrawerModule().length > 0) {
               <div>
-                <span class="block text-[10px] font-bold text-slate-600 mb-1">{{ 'drawer.targetCavityLabel' | t }}</span>
+                <span class="block text-[10px] font-bold font-sans text-zinc-600 mb-1">{{ 'drawer.targetCavityLabel' | t }}</span>
                 <select
                   [value]="selectedDrawerWizardCavity()?.id || ''"
                   (change)="onDrawerWizardTargetCavityChange($event)"
-                  class="w-full px-3 py-2 text-xs font-semibold bg-white border border-sky-200 rounded-xl text-slate-900 focus:outline-hidden focus:border-sky-500 tabular-nums cursor-pointer">
+                  class="w-full px-3 py-2 text-xs font-semibold font-sans bg-white border border-zinc-200 rounded-xl text-zinc-900 focus:outline-hidden focus:border-sky-600 cursor-pointer">
                   @for (cav of availableCavitiesForDrawerModule(); track cav.id) {
-                    <option [value]="cav.id">{{ cav.label }}</option>
+                    <option [value]="cav.id">{{ cav.label }}@if (cav.existingDrawerCount) { ({{ cav.existingDrawerCount }} caj.) }@if (cav.coveringDoorIds?.length) { · Con puerta }</option>
                   }
                 </select>
               </div>
@@ -5999,36 +6322,63 @@
           </div>
 
           @if (selectedDrawerWizardCavity(); as selCav) {
-            <div class="pt-2 border-t border-sky-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div class="text-[11px] text-sky-900 font-medium tabular-nums">
-                Luz útil: <strong class="font-bold">{{ selCav.internalWidth }} mm</strong> ancho × <strong class="font-bold">{{ selCav.internalHeight }} mm</strong> alto × <strong class="font-bold">{{ selCav.internalDepth }} mm</strong> fondo
+            <div class="pt-2 border-t border-zinc-200 space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="text-[11px] font-sans text-zinc-700 font-medium">
+                  Luz útil:
+                  <strong class="font-bold font-numeric tabular-nums text-zinc-900">{{ selCav.internalWidth }} mm</strong> ancho ×
+                  <strong class="font-bold font-numeric tabular-nums text-zinc-900">{{ selCav.internalHeight }} mm</strong> alto ×
+                  <strong class="font-bold font-numeric tabular-nums text-zinc-900">{{ selCav.internalDepth }} mm</strong> fondo
+                </div>
+
+                <div class="flex flex-wrap items-center gap-1">
+                  @if ((selCav.existingDrawerCount ?? 0) > 0) {
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-[10px] font-semibold font-sans text-emerald-700">
+                      <hugeicons-icon [icon]="icons.checkCircle" class="w-3 h-3" [strokeWidth]="1.75"></hugeicons-icon>
+                      <span class="font-numeric tabular-nums">{{ selCav.existingDrawerCount }}</span>
+                      <span>caj. instalados</span>
+                    </span>
+                  }
+                  @if ((selCav.coveringDoorIds?.length ?? 0) > 0) {
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-[10px] font-semibold font-sans text-amber-700">
+                      <hugeicons-icon [icon]="icons.doorClosed" class="w-3 h-3" [strokeWidth]="1.75"></hugeicons-icon>
+                      <span>Con puerta frontal</span>
+                    </span>
+                  }
+                </div>
               </div>
 
-              <div class="flex items-center gap-1">
-                <span class="text-[10px] font-bold text-slate-600 mr-1">{{ 'drawer.quantityInCavityLabel' | t }}:</span>
-                <button
-                  type="button"
-                  (click)="setDrawerWizardCount(1)"
-                  [class]="drawerWizardCount() === 1 ? 'bg-sky-600 text-white font-bold shadow-2xs' : 'bg-white hover:bg-sky-100 text-slate-700 border border-sky-200 font-semibold'"
-                  class="w-7 h-7 rounded-lg text-xs tabular-nums transition cursor-pointer">1</button>
-                <button
-                  type="button"
-                  (click)="setDrawerWizardCount(2)"
-                  [class]="drawerWizardCount() === 2 ? 'bg-sky-600 text-white font-bold shadow-2xs' : 'bg-white hover:bg-sky-100 text-slate-700 border border-sky-200 font-semibold'"
-                  class="w-7 h-7 rounded-lg text-xs tabular-nums transition cursor-pointer">2</button>
-                <button
-                  type="button"
-                  (click)="setDrawerWizardCount(3)"
-                  [class]="drawerWizardCount() === 3 ? 'bg-sky-600 text-white font-bold shadow-2xs' : 'bg-white hover:bg-sky-100 text-slate-700 border border-sky-200 font-semibold'"
-                  class="w-7 h-7 rounded-lg text-xs tabular-nums transition cursor-pointer">3</button>
-                <button
-                  type="button"
-                  (click)="setDrawerWizardCount(4)"
-                  [class]="drawerWizardCount() === 4 ? 'bg-sky-600 text-white font-bold shadow-2xs' : 'bg-white hover:bg-sky-100 text-slate-700 border border-sky-200 font-semibold'"
-                  class="w-7 h-7 rounded-lg text-xs tabular-nums transition cursor-pointer">4</button>
-              </div>
+              @if ((selCav.coveringDoorIds?.length ?? 0) > 0 && drawerForm().frontMountType !== 'none') {
+                <label class="flex items-center gap-2 px-2.5 py-1.5 bg-white border border-zinc-200 rounded-lg text-[11px] font-medium font-sans text-zinc-800 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    [checked]="clearCoveringDoorsInDrawerWizard()"
+                    (change)="toggleClearCoveringDoorsInDrawerWizard(!clearCoveringDoorsInDrawerWizard())"
+                    class="w-3.5 h-3.5 rounded border-zinc-300 accent-zinc-900 cursor-pointer" />
+                  <span>Adaptar / retirar puerta frontal que cubre el vano</span>
+                </label>
+              }
             </div>
           }
+
+          <div class="pt-2 border-t border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span class="text-[10px] font-bold font-sans text-zinc-700">
+              @if (drawerWizardTargetModuleId() === 'floor') {
+                Cantidad de cajones en torre:
+              } @else {
+                {{ 'drawer.quantityInCavityLabel' | t }}:
+              }
+            </span>
+            <div class="flex items-center gap-1">
+              @for (qty of drawerWizardCountOptions; track qty) {
+                <button
+                  type="button"
+                  (click)="setDrawerWizardCount(qty)"
+                  [class]="drawerWizardCount() === qty ? 'bg-zinc-900 text-white border-zinc-900 font-bold' : 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200 font-semibold'"
+                  class="w-7 h-7 rounded-lg border text-xs font-numeric tabular-nums transition cursor-pointer">{{ qty }}</button>
+              }
+            </div>
+          </div>
         </div>
 
         <!-- Nombre e identificación con validación de duplicados -->
@@ -6176,20 +6526,31 @@
           </div>
 
           <div>
-            <span class="block text-[11px] font-bold text-slate-700 mb-1">
-              {{ 'drawer.slideLengthLabel' | t }} (mm)
-            </span>
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="block text-[11px] font-bold font-sans text-zinc-800">
+                {{ 'drawer.slideLengthLabel' | t }} (<span class="font-numeric">mm</span>)
+              </span>
+              @if (drawerWizardMaxSafeSlideLength(); as maxSlide) {
+                <span class="text-[10px] font-sans text-zinc-500">
+                  Máx. segura: <strong class="font-numeric tabular-nums font-bold text-sky-600">{{ maxSlide }} mm</strong>
+                </span>
+              }
+            </div>
             <input
               type="number"
               [value]="drawerForm().slideLength"
               (input)="onDrawerWizardNumberInput('slideLength', $event)"
-              class="w-full px-3 py-2 text-xs font-bold tabular-nums bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:outline-hidden" />
-            <div class="flex items-center gap-1 mt-1">
-              <button type="button" (click)="updateDrawerFormField('slideLength', 300)" [class]="drawerForm().slideLength === 300 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">300</button>
-              <button type="button" (click)="updateDrawerFormField('slideLength', 350)" [class]="drawerForm().slideLength === 350 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">350</button>
-              <button type="button" (click)="updateDrawerFormField('slideLength', 400)" [class]="drawerForm().slideLength === 400 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">400</button>
-              <button type="button" (click)="updateDrawerFormField('slideLength', 450)" [class]="drawerForm().slideLength === 450 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">450</button>
-              <button type="button" (click)="updateDrawerFormField('slideLength', 500)" [class]="drawerForm().slideLength === 500 ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold'" class="px-1.5 py-0.5 text-[10px] rounded tabular-nums cursor-pointer">500</button>
+              class="w-full px-3 py-2 text-xs font-bold font-numeric tabular-nums bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:border-sky-600 focus:outline-hidden" />
+            <div class="flex flex-wrap items-center gap-1 mt-1.5">
+              @for (slideOpt of drawerWizardSlideOptions; track slideOpt) {
+                <button
+                  type="button"
+                  [disabled]="drawerWizardMaxSafeSlideLength() !== null && slideOpt > drawerWizardMaxSafeSlideLength()!"
+                  (click)="updateDrawerFormField('slideLength', slideOpt)"
+                  [title]="(drawerWizardMaxSafeSlideLength() !== null && slideOpt > drawerWizardMaxSafeSlideLength()!) ? 'Excede la profundidad útil del vano' : 'Corredera de ' + slideOpt + ' mm'"
+                  [class]="(drawerWizardMaxSafeSlideLength() !== null && slideOpt > drawerWizardMaxSafeSlideLength()!) ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed line-through' : (drawerForm().slideLength === slideOpt ? 'bg-zinc-900 text-white border-zinc-900 font-bold cursor-pointer' : 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200 font-semibold cursor-pointer')"
+                  class="px-2 py-1 rounded-md border text-[10px] font-numeric tabular-nums transition">{{ slideOpt }}</button>
+              }
             </div>
           </div>
 
@@ -6312,7 +6673,9 @@
           <hugeicons-icon [icon]="icons.checkCircle" [size]="15" [strokeWidth]="2"></hugeicons-icon>
           <span>
             @if (drawerWizardTargetModuleId() !== 'floor' && drawerWizardCount() > 1) {
-              Insertar {{ drawerWizardCount() }} Cajones en Hueco
+              Insertar <span class="font-numeric">{{ drawerWizardCount() }}</span> Cajones en Hueco
+            } @else if (drawerWizardTargetModuleId() === 'floor' && drawerWizardCount() > 1) {
+              Crear Torre de <span class="font-numeric">{{ drawerWizardCount() }}</span> Cajones
             } @else {
               Crear y Ensamblar Cajón
             }
