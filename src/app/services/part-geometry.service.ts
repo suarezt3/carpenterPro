@@ -2,11 +2,13 @@ import { Injectable } from '@angular/core';
 import * as THREE from 'three';
 import {
   ApplianceItem,
+  ComponentRole,
   DrawerFrontMountType,
   ModuleCavityInfo,
   Part,
   PartCornerCutConfig,
-  PartGroup
+  PartGroup,
+  PartOrientation
 } from '../models/melamine.models';
 
 declare module '../models/melamine.models' {
@@ -79,6 +81,22 @@ export interface CountertopCutoutHole {
   holeD: number;
 }
 
+export interface SemanticNamingOptions {
+  focusPartIds?: Set<string>;
+  forceReevaluateIds?: Set<string>;
+}
+
+interface SemanticClusterItem {
+  part: Part;
+  aabb: PartWorldAABB;
+  effOrient: PartOrientation;
+}
+
+interface SemanticProposal {
+  name: string;
+  role: ComponentRole;
+}
+
 /**
  * Fuente única de verdad para la geometría local, ejes de estiramiento 3D,
  * cajas orientadas (OBB), cajas envolventes (AABB), extrusión de tableros con
@@ -88,12 +106,26 @@ export interface CountertopCutoutHole {
   providedIn: 'root'
 })
 export class PartGeometryService {
+  private static readonly NON_DOOR_STRUCTURAL_ROLES: ReadonlySet<ComponentRole> = new Set<ComponentRole>([
+    'top',
+    'bottom',
+    'shelf',
+    'side_left',
+    'side_right',
+    'divider',
+    'back',
+    'tie',
+    'plinth'
+  ]);
+
   // Objetos scratch reutilizables para evitar asignaciones de memoria en bucles de 60 FPS
   private readonly scratchEuler = new THREE.Euler(0, 0, 0, 'XYZ');
   private readonly scratchQuat = new THREE.Quaternion();
   private readonly scratchAxisX = new THREE.Vector3();
   private readonly scratchAxisY = new THREE.Vector3();
   private readonly scratchAxisZ = new THREE.Vector3();
+  private readonly namingEuler = new THREE.Euler(0, 0, 0, 'XYZ');
+  private readonly namingNormalVec = new THREE.Vector3();
 
   /**
    * Determina de forma puramente determinista por rol (sin heurísticas dinámicas L > W)
@@ -2442,5 +2474,652 @@ export class PartGeometryService {
     );
     result.push(...looseCavities);
     return result;
+  }
+
+  /**
+   * Calcula la orientación física efectiva en el mundo combinando la orientación base
+   * con las rotaciones Euler (XYZ) aplicadas al vector normal de espesor del tablero.
+   */
+  getEffectiveOrientation(part: Part): PartOrientation {
+    const baseOrient: PartOrientation = part.orientation ?? 'horizontal';
+    const rx = part.rotationX ?? 0;
+    const ry = part.rotationY ?? 0;
+    const rz = part.rotationZ ?? 0;
+    if (rx === 0 && ry === 0 && rz === 0) {
+      return baseOrient;
+    }
+
+    if (baseOrient === 'horizontal') {
+      this.namingNormalVec.set(0, 1, 0);
+    } else if (baseOrient === 'vertical_yz') {
+      this.namingNormalVec.set(1, 0, 0);
+    } else {
+      this.namingNormalVec.set(0, 0, 1);
+    }
+
+    this.namingEuler.set(
+      THREE.MathUtils.degToRad(rx),
+      THREE.MathUtils.degToRad(ry),
+      THREE.MathUtils.degToRad(rz),
+      'XYZ'
+    );
+    this.namingNormalVec.applyEuler(this.namingEuler);
+
+    const ax = Math.abs(this.namingNormalVec.x);
+    const ay = Math.abs(this.namingNormalVec.y);
+    const az = Math.abs(this.namingNormalVec.z);
+
+    if (ay >= ax && ay >= az) {
+      return 'horizontal';
+    }
+    if (ax >= ay && ax >= az) {
+      return 'vertical_yz';
+    }
+    return 'vertical_xy';
+  }
+
+  /**
+   * Determina si una pieza pertenece a un subconjunto de cajón modular protegido.
+   */
+  isModularDrawerSubPart(part: Part, group?: PartGroup): boolean {
+    const role = part.componentRole;
+    if (
+      role === 'drawer_front' ||
+      role === 'drawer_box' ||
+      role === 'drawer_bottom' ||
+      role === 'drawer_lateral'
+    ) {
+      return true;
+    }
+    if (
+      group &&
+      (group.type === 'drawer' || group.subType === 'drawer' || group.templateId === 'modular_drawer')
+    ) {
+      return true;
+    }
+    if (part.hardwareConfig?.movableType === 'drawer' && role !== 'front' && role !== 'door') {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Motor de inferencia semántica de piezas por geometría 3D, orientación efectiva y agrupación espacial.
+   */
+  inferAndApplySemanticPartNames(
+    parts: Part[],
+    groups: PartGroup[] = [],
+    options?: SemanticNamingOptions
+  ): Part[] {
+    if (!parts || parts.length === 0) {
+      return parts;
+    }
+
+    const focusSet = options?.focusPartIds;
+    const forceSet = options?.forceReevaluateIds;
+    const hasScopeFilter = Boolean((focusSet && focusSet.size > 0) || (forceSet && forceSet.size > 0));
+    const groupMap = new Map<string, PartGroup>(groups.map(g => [g.id, g]));
+
+    const groupedPartsMap = new Map<string, Part[]>();
+    const ungroupedParts: Part[] = [];
+    for (const part of parts) {
+      if (part.groupId) {
+        const list = groupedPartsMap.get(part.groupId) ?? [];
+        list.push(part);
+        groupedPartsMap.set(part.groupId, list);
+      } else {
+        ungroupedParts.push(part);
+      }
+    }
+
+    const updatedPartsMap = new Map<string, Part>();
+
+    for (const [groupId, gParts] of groupedPartsMap.entries()) {
+      const group = groupMap.get(groupId);
+      if (
+        group?.isCountertop ||
+        group?.type === 'drawer' ||
+        group?.subType === 'drawer' ||
+        group?.templateId === 'modular_drawer'
+      ) {
+        continue;
+      }
+
+      const isParametric = this.isParametricModuleGroup(group, gParts);
+      const isManualGroup = !isParametric && Boolean(group && (group.type === 'assembly' || group.type === 'custom'));
+
+      if (isParametric || !isManualGroup) {
+        const hasForcedTarget = gParts.some(
+          pt => Boolean(forceSet?.has(pt.id)) && !pt.hasCustomName && !this.isPermanentSemanticExclusion(pt, group)
+        );
+        if (!hasForcedTarget) {
+          continue;
+        }
+        const cluster = this.buildClusterItems(gParts, group);
+        const proposals = this.evaluateSemanticCluster(cluster, options);
+        for (const item of cluster) {
+          if (!item.part.hasCustomName && forceSet?.has(item.part.id)) {
+            const prop = proposals.get(item.part.id);
+            if (prop) {
+              updatedPartsMap.set(item.part.id, this.applyProposalToPart(item.part, prop));
+            }
+          }
+        }
+        continue;
+      }
+
+      if (hasScopeFilter && !gParts.some(pt => focusSet?.has(pt.id) || forceSet?.has(pt.id))) {
+        continue;
+      }
+
+      const cluster = this.buildClusterItems(gParts, group);
+      const proposals = this.evaluateSemanticCluster(cluster, options);
+      for (const item of cluster) {
+        if (item.part.hasCustomName) {
+          continue;
+        }
+        const prop = proposals.get(item.part.id);
+        if (prop) {
+          updatedPartsMap.set(item.part.id, this.applyProposalToPart(item.part, prop));
+        }
+      }
+    }
+
+    const eligibleLooseParts = ungroupedParts.filter(
+      pt => !this.isPermanentSemanticExclusion(pt) && (!pt.moduleId || Boolean(forceSet?.has(pt.id)))
+    );
+    const looseItems = this.buildClusterItems(eligibleLooseParts);
+    const looseClusters = this.clusterLoosePartsForNaming(looseItems);
+
+    for (const cluster of looseClusters) {
+      if (hasScopeFilter && !cluster.some(it => focusSet?.has(it.part.id) || forceSet?.has(it.part.id))) {
+        continue;
+      }
+      const proposals = this.evaluateSemanticCluster(cluster, options);
+      for (const item of cluster) {
+        if (item.part.hasCustomName) {
+          continue;
+        }
+        if (item.part.moduleId && !forceSet?.has(item.part.id)) {
+          continue;
+        }
+        const prop = proposals.get(item.part.id);
+        if (prop) {
+          updatedPartsMap.set(item.part.id, this.applyProposalToPart(item.part, prop));
+        }
+      }
+    }
+
+    if (updatedPartsMap.size === 0) {
+      return parts;
+    }
+    return parts.map(pt => updatedPartsMap.get(pt.id) ?? pt);
+  }
+
+  private buildClusterItems(sourceParts: Part[], group?: PartGroup): SemanticClusterItem[] {
+    const items: SemanticClusterItem[] = [];
+    for (const part of sourceParts) {
+      if (this.isPermanentSemanticExclusion(part, group)) {
+        continue;
+      }
+      items.push({
+        part,
+        aabb: this.getWorldAABB(part),
+        effOrient: this.getEffectiveOrientation(part)
+      });
+    }
+    return items;
+  }
+
+  private normalizeNamingText(value: string | undefined): string {
+    return (value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .trim();
+  }
+
+  private isPermanentSemanticExclusion(part: Part, group?: PartGroup): boolean {
+    if (part.type === 'wall' || part.type === 'appliance' || part.type === 'hardware') {
+      return true;
+    }
+    if (
+      group?.isCountertop ||
+      part.componentRole === 'countertop' ||
+      part.componentRole === 'backsplash'
+    ) {
+      return true;
+    }
+    const normName = this.normalizeNamingText(part.name);
+    if (/\b(MESON|SALPICADERO)\b/.test(normName)) {
+      return true;
+    }
+    if (this.isModularDrawerSubPart(part, group)) {
+      return true;
+    }
+    return this.isEmbeddedAppliancePart(part);
+  }
+
+  private isParametricModuleGroup(group: PartGroup | undefined, groupParts: Part[]): boolean {
+    if (group?.templateId || group?.parametricConfig) {
+      return true;
+    }
+    return groupParts.some(pt => Boolean(pt.moduleId));
+  }
+
+  private hasIncompatibleRoleOrName(part: Part, effOrient: PartOrientation): boolean {
+    const role = part.componentRole;
+    const normName = this.normalizeNamingText(part.name);
+
+    if (effOrient === 'horizontal') {
+      const badRole =
+        role === 'side_left' ||
+        role === 'side_right' ||
+        role === 'divider' ||
+        role === 'door' ||
+        role === 'front' ||
+        role === 'back' ||
+        role === 'plinth' ||
+        role === 'tie';
+      return badRole || /\b(LATERAL|DIVISION|PUERTA|FRENTE|FONDO|ZOCALO|AMARRE)\b/.test(normName);
+    }
+
+    if (effOrient === 'vertical_yz') {
+      const badRole =
+        role === 'top' ||
+        role === 'bottom' ||
+        role === 'shelf' ||
+        role === 'door' ||
+        role === 'front' ||
+        role === 'back' ||
+        role === 'plinth' ||
+        role === 'tie';
+      return (
+        badRole ||
+        /\b(TAPA|SUPERIOR|PISO|INFERIOR|ENTREPANO|REPISA|PUERTA|FRENTE|FONDO|ZOCALO|AMARRE)\b/.test(normName)
+      );
+    }
+
+    const badRole =
+      role === 'top' ||
+      role === 'bottom' ||
+      role === 'shelf' ||
+      role === 'side_left' ||
+      role === 'side_right' ||
+      role === 'divider';
+    return badRole || /\b(TAPA|SUPERIOR|PISO|INFERIOR|ENTREPANO|REPISA|LATERAL|DIVISION)\b/.test(normName);
+  }
+
+  private clusterLoosePartsForNaming(items: SemanticClusterItem[]): SemanticClusterItem[][] {
+    const n = items.length;
+    if (n === 0) {
+      return [];
+    }
+
+    const parent = Array.from({ length: n }, (_, i) => i);
+    const find = (x: number): number => {
+      let cur = x;
+      while (parent[cur] !== cur) {
+        parent[cur] = parent[parent[cur]];
+        cur = parent[cur];
+      }
+      return cur;
+    };
+    const union = (a: number, b: number): void => {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) {
+        parent[rb] = ra;
+      }
+    };
+
+    // Pasada 1: Unión por proximidad 3D (<= 120 mm en los 3 ejes)
+    for (let i = 0; i < n; i++) {
+      const a = items[i].aabb;
+      for (let j = i + 1; j < n; j++) {
+        const b = items[j].aabb;
+        const gapX = Math.max(0, a.minX - b.maxX, b.minX - a.maxX);
+        const gapY = Math.max(0, a.minY - b.maxY, b.minY - a.maxY);
+        const gapZ = Math.max(0, a.minZ - b.maxZ, b.minZ - a.maxZ);
+        if (gapX <= 120 && gapY <= 120 && gapZ <= 120) {
+          union(i, j);
+        }
+      }
+    }
+
+    // Pasada 2: Conectar subgrupos no puenteados con paneles vertical_yz paralelos hasta 1600 mm en X
+    const subclusterMap = new Map<number, number[]>();
+    for (let i = 0; i < n; i++) {
+      const r = find(i);
+      const list = subclusterMap.get(r) ?? [];
+      list.push(i);
+      subclusterMap.set(r, list);
+    }
+
+    const subclusterEntries = Array.from(subclusterMap.entries()).map(([root, indices]) => {
+      const subItems = indices.map(idx => items[idx]);
+      return {
+        root,
+        bridged: this.hasBridgedVerticalPanels(subItems),
+        verts: subItems.filter(it => it.effOrient === 'vertical_yz')
+      };
+    });
+
+    const mergePairs: [number, number][] = [];
+    for (let i = 0; i < subclusterEntries.length; i++) {
+      const subA = subclusterEntries[i];
+      if (subA.bridged || subA.verts.length === 0) {
+        continue;
+      }
+      for (let j = i + 1; j < subclusterEntries.length; j++) {
+        const subB = subclusterEntries[j];
+        if (subB.bridged || subB.verts.length === 0) {
+          continue;
+        }
+        let shouldConnect = false;
+        for (const vA of subA.verts) {
+          for (const vB of subB.verts) {
+            const gapX = Math.max(0, vA.aabb.minX - vB.aabb.maxX, vB.aabb.minX - vA.aabb.maxX);
+            const overlapY = Math.min(vA.aabb.maxY, vB.aabb.maxY) - Math.max(vA.aabb.minY, vB.aabb.minY);
+            const overlapZ = Math.min(vA.aabb.maxZ, vB.aabb.maxZ) - Math.max(vA.aabb.minZ, vB.aabb.minZ);
+            if (
+              gapX <= 1600 &&
+              overlapY >= Math.min(vA.aabb.sy, vB.aabb.sy) * 0.5 &&
+              overlapZ >= Math.min(vA.aabb.sz, vB.aabb.sz) * 0.5
+            ) {
+              shouldConnect = true;
+              break;
+            }
+          }
+          if (shouldConnect) {
+            break;
+          }
+        }
+        if (shouldConnect) {
+          mergePairs.push([subA.root, subB.root]);
+        }
+      }
+    }
+
+    for (const [rootA, rootB] of mergePairs) {
+      union(rootA, rootB);
+    }
+
+    const finalGroups = new Map<number, SemanticClusterItem[]>();
+    for (let i = 0; i < n; i++) {
+      const r = find(i);
+      const list = finalGroups.get(r) ?? [];
+      list.push(items[i]);
+      finalGroups.set(r, list);
+    }
+    return Array.from(finalGroups.values());
+  }
+
+  private hasBridgedVerticalPanels(subcluster: SemanticClusterItem[]): boolean {
+    const verts = subcluster.filter(it => it.effOrient === 'vertical_yz');
+    if (verts.length < 2) {
+      return false;
+    }
+    const bridges = subcluster.filter(
+      it => it.effOrient === 'horizontal' || it.effOrient === 'vertical_xy'
+    );
+    if (bridges.length === 0) {
+      return false;
+    }
+    return bridges.some(bridge => {
+      let count = 0;
+      let minPx = Infinity;
+      let maxPx = -Infinity;
+      for (const v of verts) {
+        const gx = Math.max(0, bridge.aabb.minX - v.aabb.maxX, v.aabb.minX - bridge.aabb.maxX);
+        const gy = Math.max(0, bridge.aabb.minY - v.aabb.maxY, v.aabb.minY - bridge.aabb.maxY);
+        const gz = Math.max(0, bridge.aabb.minZ - v.aabb.maxZ, v.aabb.minZ - bridge.aabb.maxZ);
+        if (gx <= 120 && gy <= 120 && gz <= 120) {
+          count++;
+          minPx = Math.min(minPx, v.aabb.px);
+          maxPx = Math.max(maxPx, v.aabb.px);
+        }
+      }
+      return count >= 2 && maxPx - minPx > 25;
+    });
+  }
+
+  private evaluateSemanticCluster(
+    cluster: SemanticClusterItem[],
+    options?: SemanticNamingOptions
+  ): Map<string, SemanticProposal> {
+    const proposals = new Map<string, SemanticProposal>();
+    if (cluster.length === 0) {
+      return proposals;
+    }
+
+    const forceSet = options?.forceReevaluateIds;
+    const horizontals = cluster
+      .filter(it => it.effOrient === 'horizontal')
+      .sort((a, b) => a.aabb.py - b.aabb.py || a.part.id.localeCompare(b.part.id));
+    const verticalYz = cluster
+      .filter(it => it.effOrient === 'vertical_yz')
+      .sort((a, b) => a.aabb.px - b.aabb.px || a.part.id.localeCompare(b.part.id));
+    const verticalXy = cluster.filter(it => it.effOrient === 'vertical_xy');
+
+    const structuralVerticals = cluster.filter(
+      it => it.effOrient === 'vertical_yz' || (it.effOrient === 'vertical_xy' && it.aabb.sy > 150)
+    );
+
+    if (horizontals.length > 0) {
+      const onlyHorizontals = cluster.length === horizontals.length;
+      const skipFreeHorizontals =
+        onlyHorizontals &&
+        !horizontals.some(h => Boolean(forceSet?.has(h.part.id)) || this.hasIncompatibleRoleOrName(h.part, 'horizontal'));
+      if (!skipFreeHorizontals) {
+        this.evaluateHorizontalNaming(horizontals, structuralVerticals, proposals);
+      }
+    }
+
+    if (verticalYz.length > 0) {
+      this.evaluateVerticalYzNaming(verticalYz, forceSet, proposals);
+    }
+
+    if (verticalXy.length > 0) {
+      this.evaluateVerticalXyNaming(verticalXy, cluster, forceSet, proposals);
+    }
+
+    return proposals;
+  }
+
+  private evaluateHorizontalNaming(
+    horizontals: SemanticClusterItem[],
+    structuralVerticals: SemanticClusterItem[],
+    proposals: Map<string, SemanticProposal>
+  ): void {
+    const hasVerts = structuralVerticals.length > 0;
+    const refMinY = hasVerts ? Math.min(...structuralVerticals.map(v => v.aabb.minY)) : 0;
+    const refMaxY = hasVerts ? Math.max(...structuralVerticals.map(v => v.aabb.maxY)) : 0;
+
+    const lowestHoriz = horizontals[0];
+    const highestHoriz = horizontals[horizontals.length - 1];
+    const shelves: SemanticClusterItem[] = [];
+
+    for (const h of horizontals) {
+      const isTop = hasVerts
+        ? h.aabb.minY >= refMaxY - 50 ||
+          Math.abs(h.aabb.maxY - refMaxY) <= 50 ||
+          (h === highestHoriz && h.aabb.maxY >= refMaxY - 120 && h.aabb.minY > 150)
+        : h === highestHoriz && h.aabb.minY > 150;
+
+      if (isTop) {
+        proposals.set(h.part.id, { name: 'TAPA SUPERIOR', role: 'top' });
+        continue;
+      }
+
+      const isBottom = hasVerts
+        ? (h.aabb.minY <= 150 && (h === lowestHoriz || h.aabb.minY <= lowestHoriz.aabb.maxY + 40)) ||
+          (Math.abs(h.aabb.minY - refMinY) <= 50 && refMaxY - h.aabb.maxY > 80)
+        : h.aabb.minY <= 150;
+
+      if (isBottom) {
+        proposals.set(h.part.id, { name: 'PISO INFERIOR', role: 'bottom' });
+        continue;
+      }
+
+      shelves.push(h);
+    }
+
+    const autoShelves = shelves.filter(s => !s.part.hasCustomName);
+    autoShelves.forEach((shelf, idx) => {
+      proposals.set(shelf.part.id, {
+        name: autoShelves.length === 1 ? 'ENTREPAÑO' : `ENTREPAÑO ${idx + 1}`,
+        role: 'shelf'
+      });
+    });
+  }
+
+  private evaluateVerticalYzNaming(
+    verticalYz: SemanticClusterItem[],
+    forceReevaluateIds: Set<string> | undefined,
+    proposals: Map<string, SemanticProposal>
+  ): void {
+    if (verticalYz.length === 1) {
+      const only = verticalYz[0];
+      const keepFree =
+        only.part.componentRole === 'free' &&
+        !forceReevaluateIds?.has(only.part.id) &&
+        !this.hasIncompatibleRoleOrName(only.part, 'vertical_yz');
+      if (!keepFree && (forceReevaluateIds?.has(only.part.id) || this.hasIncompatibleRoleOrName(only.part, 'vertical_yz'))) {
+        proposals.set(only.part.id, { name: 'LATERAL IZQUIERDO', role: 'side_left' });
+      }
+      return;
+    }
+
+    const minCx = verticalYz[0].aabb.px;
+    const maxCx = verticalYz[verticalYz.length - 1].aabb.px;
+
+    if (maxCx - minCx <= 25) {
+      verticalYz.forEach((item, idx) => {
+        proposals.set(item.part.id, {
+          name: idx === 0 ? 'LATERAL IZQUIERDO' : 'LATERAL DERECHO',
+          role: idx === 0 ? 'side_left' : 'side_right'
+        });
+      });
+      return;
+    }
+
+    const dividers: SemanticClusterItem[] = [];
+    for (const v of verticalYz) {
+      if (Math.abs(v.aabb.px - minCx) <= 25) {
+        proposals.set(v.part.id, { name: 'LATERAL IZQUIERDO', role: 'side_left' });
+      } else if (Math.abs(v.aabb.px - maxCx) <= 25) {
+        proposals.set(v.part.id, { name: 'LATERAL DERECHO', role: 'side_right' });
+      } else {
+        dividers.push(v);
+      }
+    }
+
+    const autoDividers = dividers.filter(d => !d.part.hasCustomName);
+    autoDividers.forEach((div, idx) => {
+      proposals.set(div.part.id, {
+        name: autoDividers.length === 1 ? 'DIVISIÓN VERTICAL' : `DIVISIÓN VERTICAL ${idx + 1}`,
+        role: 'divider'
+      });
+    });
+  }
+
+  private evaluateVerticalXyNaming(
+    verticalXy: SemanticClusterItem[],
+    clusterItems: SemanticClusterItem[],
+    forceReevaluateIds: Set<string> | undefined,
+    proposals: Map<string, SemanticProposal>
+  ): void {
+    if (clusterItems.length === 1 && verticalXy.length === 1) {
+      const only = verticalXy[0];
+      const thickness = Math.min(only.aabb.sx, only.aabb.sy, only.aabb.sz);
+      const keepIsolatedFree =
+        only.part.componentRole === 'free' &&
+        thickness > 6 &&
+        !forceReevaluateIds?.has(only.part.id) &&
+        !this.hasIncompatibleRoleOrName(only.part, 'vertical_xy');
+      if (keepIsolatedFree) {
+        return;
+      }
+    }
+
+    const clusterMinZ = Math.min(...clusterItems.map(it => it.aabb.minZ));
+    const clusterMaxZ = Math.max(...clusterItems.map(it => it.aabb.maxZ));
+    const clusterMidZ = (clusterMinZ + clusterMaxZ) / 2;
+    const clusterDepthZ = clusterMaxZ - clusterMinZ;
+    const clusterMinY = Math.min(...clusterItems.map(it => it.aabb.minY));
+    const hasDepthContext = clusterItems.length >= 2 && clusterDepthZ > 100;
+
+    for (const v of verticalXy) {
+      const height = v.aabb.sy;
+      const minY = v.aabb.minY;
+      const pz = v.aabb.pz;
+      const thickness = Math.min(v.aabb.sx, v.aabb.sy, v.aabb.sz);
+      const frontRole: ComponentRole = v.part.componentRole === 'door' ? 'door' : 'front';
+
+      if (hasDepthContext) {
+        const isRear = pz < clusterMidZ - 1 || (pz <= clusterMidZ + 20 && thickness <= 6);
+        if (isRear) {
+          proposals.set(
+            v.part.id,
+            height <= 150
+              ? { name: 'AMARRE TRASERO', role: 'tie' }
+              : { name: 'FONDO TRASERO', role: 'back' }
+          );
+          continue;
+        }
+        if (height <= 150 && minY <= Math.max(150, clusterMinY + 60)) {
+          proposals.set(v.part.id, { name: 'ZÓCALO FRONTAL', role: 'plinth' });
+          continue;
+        }
+        proposals.set(v.part.id, { name: 'FRENTE / PUERTA', role: frontRole });
+        continue;
+      }
+
+      if (pz < -20 || thickness <= 6) {
+        proposals.set(
+          v.part.id,
+          height <= 150
+            ? { name: 'AMARRE TRASERO', role: 'tie' }
+            : { name: 'FONDO TRASERO', role: 'back' }
+        );
+      } else if (pz > 50 && height > 150) {
+        proposals.set(v.part.id, { name: 'FRENTE / PUERTA', role: frontRole });
+      } else if (height <= 150 && minY <= 150) {
+        proposals.set(v.part.id, { name: 'ZÓCALO FRONTAL', role: 'plinth' });
+      } else if (height <= 150) {
+        proposals.set(v.part.id, { name: 'AMARRE TRASERO', role: 'tie' });
+      } else {
+        proposals.set(v.part.id, { name: 'FONDO TRASERO', role: 'back' });
+      }
+    }
+  }
+
+  private applyProposalToPart(part: Part, proposal: SemanticProposal): Part {
+    const shouldResetDoorHw =
+      part.hardwareConfig?.movableType === 'door' &&
+      PartGeometryService.NON_DOOR_STRUCTURAL_ROLES.has(proposal.role);
+
+    if (part.name === proposal.name && part.componentRole === proposal.role && !shouldResetDoorHw) {
+      return part;
+    }
+
+    const nextHardwareConfig = shouldResetDoorHw
+      ? {
+          ...part.hardwareConfig,
+          isMovable: false,
+          movableType: 'none' as const,
+          handleType: 'none' as const,
+          hingeType: 'none' as const,
+          slideType: 'none' as const
+        }
+      : part.hardwareConfig;
+
+    return {
+      ...part,
+      name: proposal.name,
+      componentRole: proposal.role,
+      ...(nextHardwareConfig !== undefined ? { hardwareConfig: nextHardwareConfig } : {})
+    };
   }
 }

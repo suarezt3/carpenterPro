@@ -158,20 +158,56 @@ export class Appliance3dBuilderService {
         })
     );
     const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+    hitMesh.name = 'raycast_hitbox';
     hitMesh.position.set(0, h / 2, 0);
-    hitMesh.userData = { isApplianceHitBox: true, applianceId: appliance.id };
+    hitMesh.castShadow = false;
+    hitMesh.receiveShadow = false;
+    hitMesh.userData = {
+      isApplianceHitBox: true,
+      isAuxiliaryVisual: true,
+      applianceId: appliance.id
+    };
     group.add(hitMesh);
 
     // Tag entire group and its children with appliance metadata for raycasting
     group.userData = { isAppliance: true, applianceId: appliance.id, appliance };
     group.traverse(child => {
       if (child instanceof THREE.Mesh) {
-        child.userData = { ...child.userData, isAppliance: true, applianceId: appliance.id };
-        child.castShadow = true;
-        child.receiveShadow = true;
+        const isHitBox =
+          child === hitMesh ||
+          Boolean(child.userData?.['isApplianceHitBox']) ||
+          child.name === 'raycast_hitbox';
+        child.userData = {
+          ...child.userData,
+          isAppliance: true,
+          applianceId: appliance.id,
+          ...(isHitBox ? { isApplianceHitBox: true, isAuxiliaryVisual: true } : {})
+        };
+        if (isHitBox) {
+          child.castShadow = false;
+          child.receiveShadow = false;
+        } else {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          if (child.geometry) {
+            if (!child.geometry.boundingBox) {
+              child.geometry.computeBoundingBox();
+            }
+            if (!child.geometry.boundingSphere) {
+              child.geometry.computeBoundingSphere();
+            }
+          }
+        }
+      } else if (child instanceof THREE.Line || child instanceof THREE.LineSegments) {
+        child.userData = {
+          ...child.userData,
+          isOutline: true,
+          isAuxiliaryVisual: true
+        };
       }
     });
 
+    group.updateMatrixWorld(true);
     return group;
   }
 
@@ -994,6 +1030,11 @@ export class Appliance3dBuilderService {
       ];
       const creaseGeo = new THREE.BufferGeometry().setFromPoints(cPoints);
       const creaseLine = new THREE.Line(creaseGeo, creaseMat);
+      creaseLine.userData = {
+        ...creaseLine.userData,
+        isOutline: true,
+        isAuxiliaryVisual: true
+      };
       group.add(creaseLine);
     }
   }

@@ -1,6 +1,23 @@
 import { inject, Injectable } from '@angular/core';
-import { Part, DrillHole, CollisionRecord } from '../models/melamine.models';
+import {
+  Part,
+  DrillHole,
+  CollisionRecord,
+  CollisionFixOption,
+  CollisionResolutionPlan
+} from '../models/melamine.models';
 import { PartGeometryService } from './part-geometry.service';
+
+type Axis3D = 'x' | 'y' | 'z';
+type FixReasonKind = 'top_support' | 'align_side' | 'general';
+
+interface AxisCandidate {
+  axis: Axis3D;
+  direction: 1 | -1;
+  deltaMm: number;
+  absDeltaMm: number;
+  overlap: number;
+}
 
 export interface Part3DBounds {
   part: Part;
@@ -247,6 +264,907 @@ export class JoineryEngineService {
     }
 
     return collisions;
+  }
+
+  // --- COLLISION AUTO-SOLVER ENGINE (MTV + CARPENTRY HEURISTICS) ---
+
+  /**
+   * Calcula un plan de resolución accionable en 1 clic (opción principal y alternativa)
+   * para cada colisión detectada usando MTV (Minimum Translation Vector) y reglas de carpintería.
+   */
+  buildCollisionResolutionPlans(
+    parts: Part[],
+    collisions?: CollisionRecord[]
+  ): CollisionResolutionPlan[] {
+    if (!parts || parts.length === 0) {
+      return [];
+    }
+
+    const activeCollisions = collisions ?? this.detectCollisions(parts);
+    if (activeCollisions.length === 0) {
+      return [];
+    }
+
+    const partById = new Map<string, Part>();
+    const indexById = new Map<string, number>();
+    const boundsById = new Map<string, Part3DBounds>();
+
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      partById.set(p.id, p);
+      indexById.set(p.id, i);
+      boundsById.set(p.id, this.getPartBounds(p));
+    }
+
+    const degreeById = new Map<string, number>();
+    const collisionsByPartId = new Map<string, CollisionRecord[]>();
+    for (const col of activeCollisions) {
+      degreeById.set(col.partAId, (degreeById.get(col.partAId) ?? 0) + 1);
+      degreeById.set(col.partBId, (degreeById.get(col.partBId) ?? 0) + 1);
+
+      const listA = collisionsByPartId.get(col.partAId) ?? [];
+      listA.push(col);
+      collisionsByPartId.set(col.partAId, listA);
+
+      const listB = collisionsByPartId.get(col.partBId) ?? [];
+      listB.push(col);
+      collisionsByPartId.set(col.partBId, listB);
+    }
+
+    return activeCollisions.map(collision =>
+      this.resolvePairPlan(
+        collision,
+        partById,
+        indexById,
+        boundsById,
+        degreeById,
+        collisionsByPartId
+      )
+    );
+  }
+
+  /**
+   * Calcula las coordenadas actualizadas (`posX` / `posY` / `posZ`) para aplicar un `CollisionFixOption`
+   * garantizando la restricción de piso (`minY >= 0`) y sin mutar la pieza original.
+   */
+  computePartUpdateForFix(part: Part, fix: CollisionFixOption): Partial<Part> | null {
+    if (!part || part.isLocked) {
+      return null;
+    }
+
+    const bounds = this.getPartBounds(part);
+    const round2 = (v: number): number => Math.round(v * 100) / 100;
+
+    if (fix.axis === 'x') {
+      const baseX = part.posX ?? bounds.px;
+      return { posX: round2(baseX + fix.deltaMm) };
+    }
+
+    if (fix.axis === 'z') {
+      const baseZ = part.posZ ?? bounds.pz;
+      return { posZ: round2(baseZ + fix.deltaMm) };
+    }
+
+    const baseY = part.posY ?? bounds.py;
+    const minValidPosY = bounds.sy / 2;
+    const rawPosY = Math.max(minValidPosY, baseY + fix.deltaMm);
+    let roundedPosY = round2(rawPosY);
+    if (roundedPosY < minValidPosY) {
+      roundedPosY = Math.ceil(minValidPosY * 100) / 100;
+    }
+    return { posY: roundedPosY };
+  }
+
+  /**
+   * Resuelve iterativamente las colisiones corregibles de la escena recomputando `detectCollisions`
+   * en cada paso y previniendo ciclos de oscilación mediante firmas de coordenadas visitadas.
+   */
+  resolveAllCollisionsIteratively(parts: Part[]): {
+    updatedParts: Part[];
+    updates: { partId: string; updates: Partial<Part> }[];
+    resolvedCount: number;
+    stepsApplied: number;
+    remainingCollisions: CollisionRecord[];
+  } {
+    if (!parts || parts.length < 2) {
+      return {
+        updatedParts: parts ? parts.map(p => ({ ...p })) : [],
+        updates: [],
+        resolvedCount: 0,
+        stepsApplied: 0,
+        remainingCollisions: []
+      };
+    }
+
+    let workingParts = parts.map(p => ({ ...p }));
+    const initialCollisions = this.detectCollisions(workingParts);
+    const initialCount = initialCollisions.length;
+
+    if (initialCount === 0) {
+      return {
+        updatedParts: workingParts,
+        updates: [],
+        resolvedCount: 0,
+        stepsApplied: 0,
+        remainingCollisions: []
+      };
+    }
+
+    const maxSteps = Math.max(24, workingParts.length * 4);
+    let stepsApplied = 0;
+    const visitedPartStates = new Set<string>();
+    const visitedSceneStates = new Set<string>();
+    visitedSceneStates.add(this.buildSceneSignature(workingParts));
+
+    let currentCollisions = initialCollisions;
+
+    for (let step = 0; step < maxSteps; step++) {
+      if (currentCollisions.length === 0) {
+        break;
+      }
+
+      const plans = this.buildCollisionResolutionPlans(workingParts, currentCollisions);
+      const fixablePlans = plans.filter(pl => pl.canFix && pl.primaryFix !== null);
+      if (fixablePlans.length === 0) {
+        break;
+      }
+
+      const partById = new Map<string, Part>(workingParts.map(p => [p.id, p]));
+      const degreeById = new Map<string, number>();
+      for (const col of currentCollisions) {
+        degreeById.set(col.partAId, (degreeById.get(col.partAId) ?? 0) + 1);
+        degreeById.set(col.partBId, (degreeById.get(col.partBId) ?? 0) + 1);
+      }
+
+      const isTopLiftFix = (fix: CollisionFixOption): number => {
+        const part = partById.get(fix.targetPartId);
+        return fix.axis === 'y' &&
+          fix.direction === 1 &&
+          part !== undefined &&
+          this.partGeometry.getEffectiveOrientation(part) === 'horizontal'
+          ? 1
+          : 0;
+      };
+
+      const sortedPlans = [...fixablePlans].sort((a, b) => {
+        const fixA = a.primaryFix!;
+        const fixB = b.primaryFix!;
+        const topDiff = isTopLiftFix(fixB) - isTopLiftFix(fixA);
+        if (topDiff !== 0) return topDiff;
+
+        const degA = degreeById.get(fixA.targetPartId) ?? 1;
+        const degB = degreeById.get(fixB.targetPartId) ?? 1;
+        if (degA !== degB) return degB - degA;
+
+        return fixA.absDeltaMm - fixB.absDeltaMm;
+      });
+
+      const appliedStep = this.tryApplyBestIterativeStep(
+        workingParts,
+        sortedPlans,
+        currentCollisions.length,
+        partById,
+        visitedPartStates,
+        visitedSceneStates
+      );
+
+      if (!appliedStep) {
+        break;
+      }
+
+      workingParts = appliedStep.nextParts;
+      currentCollisions = appliedStep.nextCollisions;
+      stepsApplied++;
+    }
+
+    const updates: { partId: string; updates: Partial<Part> }[] = [];
+    for (let i = 0; i < parts.length; i++) {
+      const orig = parts[i];
+      const curr = workingParts[i];
+      const deltaObj: Partial<Part> = {};
+      if (curr.posX !== orig.posX) deltaObj.posX = curr.posX;
+      if (curr.posY !== orig.posY) deltaObj.posY = curr.posY;
+      if (curr.posZ !== orig.posZ) deltaObj.posZ = curr.posZ;
+      if (Object.keys(deltaObj).length > 0) {
+        updates.push({ partId: orig.id, updates: deltaObj });
+      }
+    }
+
+    return {
+      updatedParts: workingParts,
+      updates,
+      resolvedCount: Math.max(0, initialCount - currentCollisions.length),
+      stepsApplied,
+      remainingCollisions: currentCollisions
+    };
+  }
+
+  private resolvePairPlan(
+    collision: CollisionRecord,
+    partById: Map<string, Part>,
+    indexById: Map<string, number>,
+    boundsById: Map<string, Part3DBounds>,
+    degreeById: Map<string, number>,
+    collisionsByPartId: Map<string, CollisionRecord[]>
+  ): CollisionResolutionPlan {
+    const partA = partById.get(collision.partAId);
+    const partB = partById.get(collision.partBId);
+    if (!partA || !partB) {
+      return {
+        collision,
+        focusPartId: collision.partAId,
+        primaryFix: null,
+        secondaryFix: null,
+        canFix: false
+      };
+    }
+
+    const lockedA = Boolean(partA.isLocked);
+    const lockedB = Boolean(partB.isLocked);
+    if (lockedA && lockedB) {
+      return {
+        collision,
+        focusPartId: partA.id,
+        primaryFix: null,
+        secondaryFix: null,
+        canFix: false
+      };
+    }
+
+    const bA = boundsById.get(partA.id)!;
+    const bB = boundsById.get(partB.id)!;
+    const overlaps = this.computeAxisOverlaps(bA, bB);
+
+    let target: Part;
+    let anchor: Part;
+    let targetBounds: Part3DBounds;
+    let anchorBounds: Part3DBounds;
+    let primaryCandidate: AxisCandidate | null = null;
+    let reasonKind: FixReasonKind = 'general';
+
+    if (lockedA !== lockedB) {
+      target = lockedA ? partB : partA;
+      anchor = lockedA ? partA : partB;
+      targetBounds = lockedA ? bB : bA;
+      anchorBounds = lockedA ? bA : bB;
+      primaryCandidate = this.pickMinimumValidCandidate(targetBounds, anchorBounds, overlaps);
+    } else {
+      const carpentryPick = this.pickCarpentryHorizVsVertCandidate(
+        partA,
+        partB,
+        bA,
+        bB,
+        overlaps
+      );
+
+      if (carpentryPick) {
+        target = carpentryPick.target;
+        anchor = carpentryPick.anchor;
+        targetBounds = carpentryPick.targetBounds;
+        anchorBounds = carpentryPick.anchorBounds;
+        primaryCandidate = carpentryPick.candidate;
+        reasonKind = carpentryPick.reasonKind;
+      } else {
+        const pairChoice = this.pickGeneralTargetAndAnchor(
+          partA,
+          partB,
+          bA,
+          bB,
+          overlaps,
+          indexById,
+          boundsById,
+          degreeById,
+          collisionsByPartId
+        );
+        target = pairChoice.target;
+        anchor = pairChoice.anchor;
+        targetBounds = pairChoice.targetBounds;
+        anchorBounds = pairChoice.anchorBounds;
+        primaryCandidate = this.pickMinimumValidCandidate(targetBounds, anchorBounds, overlaps);
+      }
+    }
+
+    if (!primaryCandidate) {
+      return {
+        collision,
+        focusPartId: partA.id,
+        primaryFix: null,
+        secondaryFix: null,
+        canFix: false
+      };
+    }
+
+    const primaryFix = this.buildFixOption(
+      primaryCandidate,
+      target,
+      anchor,
+      false,
+      reasonKind
+    );
+
+    const secondaryCandidates: AxisCandidate[] = [];
+    for (const axis of ['x', 'y', 'z'] as const) {
+      if (axis === primaryCandidate.axis) continue;
+      const axisOverlap = overlaps[axis];
+      if (axisOverlap > 25) continue;
+      const cand = this.createAxisCandidate(targetBounds, anchorBounds, axis, axisOverlap);
+      if (cand && cand.absDeltaMm <= 50) {
+        secondaryCandidates.push(cand);
+      }
+    }
+
+    secondaryCandidates.sort(
+      (a, b) => a.overlap - b.overlap || a.absDeltaMm - b.absDeltaMm
+    );
+
+    const secondaryFix =
+      secondaryCandidates.length > 0
+        ? this.buildFixOption(secondaryCandidates[0], target, anchor, true, 'general')
+        : null;
+
+    return {
+      collision,
+      focusPartId: primaryFix.targetPartId,
+      primaryFix,
+      secondaryFix,
+      canFix: true
+    };
+  }
+
+  private pickCarpentryHorizVsVertCandidate(
+    partA: Part,
+    partB: Part,
+    bA: Part3DBounds,
+    bB: Part3DBounds,
+    overlaps: Record<Axis3D, number>
+  ): {
+    target: Part;
+    anchor: Part;
+    targetBounds: Part3DBounds;
+    anchorBounds: Part3DBounds;
+    candidate: AxisCandidate;
+    reasonKind: FixReasonKind;
+  } | null {
+    const effA = this.partGeometry.getEffectiveOrientation(partA);
+    const effB = this.partGeometry.getEffectiveOrientation(partB);
+    const isHorizA = effA === 'horizontal';
+    const isHorizB = effB === 'horizontal';
+    if (isHorizA === isHorizB) {
+      return null;
+    }
+
+    const pH = isHorizA ? partA : partB;
+    const bH = isHorizA ? bA : bB;
+    const pV = isHorizA ? partB : partA;
+    const bV = isHorizA ? bB : bA;
+    const effV = isHorizA ? effB : effA;
+
+    const isNearTop =
+      overlaps.y <= 30 && bH.maxY >= bV.maxY - 35 && bH.py >= bV.py;
+    if (isNearTop) {
+      const cand = this.createAxisCandidate(bH, bV, 'y', overlaps.y, 1);
+      if (cand) {
+        return {
+          target: pH,
+          anchor: pV,
+          targetBounds: bH,
+          anchorBounds: bV,
+          candidate: cand,
+          reasonKind: 'top_support'
+        };
+      }
+    }
+
+    const isIntermediate =
+      bH.maxY < bV.maxY - 35 && bH.minY > bV.minY + 35;
+    if (isIntermediate) {
+      const candX = this.createAxisCandidate(bH, bV, 'x', overlaps.x);
+      const candZ = this.createAxisCandidate(bH, bV, 'z', overlaps.z);
+      const planar = [candX, candZ].filter((c): c is AxisCandidate => c !== null);
+      if (planar.length > 0) {
+        planar.sort(
+          (a, b) => a.absDeltaMm - b.absDeltaMm || a.overlap - b.overlap
+        );
+        const best = planar[0];
+        return {
+          target: pH,
+          anchor: pV,
+          targetBounds: bH,
+          anchorBounds: bV,
+          candidate: best,
+          reasonKind: best.axis === 'x' ? 'align_side' : 'general'
+        };
+      }
+    }
+
+    const isNearBottom = !isNearTop && bH.minY <= bV.minY + 35;
+    if (isNearBottom) {
+      if (overlaps.x <= 30 && overlaps.x <= overlaps.y) {
+        const candX = this.createAxisCandidate(bH, bV, 'x', overlaps.x);
+        if (candX) {
+          return {
+            target: pH,
+            anchor: pV,
+            targetBounds: bH,
+            anchorBounds: bV,
+            candidate: candX,
+            reasonKind: 'align_side'
+          };
+        }
+      }
+
+      if (effV === 'vertical_xy' && overlaps.z <= 30 && overlaps.z < overlaps.y) {
+        const candZ = this.createAxisCandidate(bH, bV, 'z', overlaps.z);
+        if (candZ) {
+          return {
+            target: pH,
+            anchor: pV,
+            targetBounds: bH,
+            anchorBounds: bV,
+            candidate: candZ,
+            reasonKind: 'general'
+          };
+        }
+      }
+
+      const liftVertFirst = bV.py >= bH.py;
+      const higher = liftVertFirst ? pV : pH;
+      const lower = liftVertFirst ? pH : pV;
+      const bHigher = liftVertFirst ? bV : bH;
+      const bLower = liftVertFirst ? bH : bV;
+      const candUp = this.createAxisCandidate(bHigher, bLower, 'y', overlaps.y, 1);
+      if (candUp) {
+        return {
+          target: higher,
+          anchor: lower,
+          targetBounds: bHigher,
+          anchorBounds: bLower,
+          candidate: candUp,
+          reasonKind: 'top_support'
+        };
+      }
+    }
+
+    return null;
+  }
+
+  private pickGeneralTargetAndAnchor(
+    partA: Part,
+    partB: Part,
+    bA: Part3DBounds,
+    bB: Part3DBounds,
+    overlaps: Record<Axis3D, number>,
+    indexById: Map<string, number>,
+    boundsById: Map<string, Part3DBounds>,
+    degreeById: Map<string, number>,
+    collisionsByPartId: Map<string, CollisionRecord[]>
+  ): {
+    target: Part;
+    anchor: Part;
+    targetBounds: Part3DBounds;
+    anchorBounds: Part3DBounds;
+  } {
+    const groupedA = Boolean(partA.groupId);
+    const groupedB = Boolean(partB.groupId);
+    if (groupedA !== groupedB) {
+      return groupedA
+        ? { target: partB, anchor: partA, targetBounds: bB, anchorBounds: bA }
+        : { target: partA, anchor: partB, targetBounds: bA, anchorBounds: bB };
+    }
+
+    const degA = degreeById.get(partA.id) ?? 1;
+    const degB = degreeById.get(partB.id) ?? 1;
+    if (degA !== degB) {
+      const candA = this.pickMinimumValidCandidate(bA, bB, overlaps);
+      const candB = this.pickMinimumValidCandidate(bB, bA, overlaps);
+      const resolvedA = candA
+        ? this.countResolvedCollisionsForMove(
+            partA.id,
+            bA,
+            candA,
+            collisionsByPartId.get(partA.id) ?? [],
+            boundsById
+          )
+        : 0;
+      const resolvedB = candB
+        ? this.countResolvedCollisionsForMove(
+            partB.id,
+            bB,
+            candB,
+            collisionsByPartId.get(partB.id) ?? [],
+            boundsById
+          )
+        : 0;
+
+      if (degA > degB && resolvedA >= 2 && resolvedA >= resolvedB) {
+        return { target: partA, anchor: partB, targetBounds: bA, anchorBounds: bB };
+      }
+      if (degB > degA && resolvedB >= 2 && resolvedB >= resolvedA) {
+        return { target: partB, anchor: partA, targetBounds: bB, anchorBounds: bA };
+      }
+    }
+
+    if (Math.abs(bA.py - bB.py) > 0.5) {
+      return bA.py > bB.py
+        ? { target: partA, anchor: partB, targetBounds: bA, anchorBounds: bB }
+        : { target: partB, anchor: partA, targetBounds: bB, anchorBounds: bA };
+    }
+
+    const idxA = indexById.get(partA.id) ?? 0;
+    const idxB = indexById.get(partB.id) ?? 0;
+    return idxB > idxA
+      ? { target: partB, anchor: partA, targetBounds: bB, anchorBounds: bA }
+      : { target: partA, anchor: partB, targetBounds: bA, anchorBounds: bB };
+  }
+
+  private pickMinimumValidCandidate(
+    targetBounds: Part3DBounds,
+    anchorBounds: Part3DBounds,
+    overlaps: Record<Axis3D, number>
+  ): AxisCandidate | null {
+    const candidates: AxisCandidate[] = [];
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const cand = this.createAxisCandidate(
+        targetBounds,
+        anchorBounds,
+        axis,
+        overlaps[axis]
+      );
+      if (cand) {
+        candidates.push(cand);
+      }
+    }
+    if (candidates.length === 0) {
+      return null;
+    }
+    candidates.sort(
+      (a, b) => a.absDeltaMm - b.absDeltaMm || a.overlap - b.overlap
+    );
+    return candidates[0];
+  }
+
+  private createAxisCandidate(
+    targetBounds: Part3DBounds,
+    anchorBounds: Part3DBounds,
+    axis: Axis3D,
+    overlap: number,
+    forcedDirection?: 1 | -1
+  ): AxisCandidate | null {
+    const tMin =
+      axis === 'x' ? targetBounds.minX : axis === 'y' ? targetBounds.minY : targetBounds.minZ;
+    const tMax =
+      axis === 'x' ? targetBounds.maxX : axis === 'y' ? targetBounds.maxY : targetBounds.maxZ;
+    const tCenter =
+      axis === 'x' ? targetBounds.px : axis === 'y' ? targetBounds.py : targetBounds.pz;
+
+    const aMin =
+      axis === 'x' ? anchorBounds.minX : axis === 'y' ? anchorBounds.minY : anchorBounds.minZ;
+    const aMax =
+      axis === 'x' ? anchorBounds.maxX : axis === 'y' ? anchorBounds.maxY : anchorBounds.maxZ;
+    const aCenter =
+      axis === 'x' ? anchorBounds.px : axis === 'y' ? anchorBounds.py : anchorBounds.pz;
+
+    const rawPlus = Math.max(0, aMax - tMin);
+    let deltaPlus = Math.ceil(Math.max(0, rawPlus * 100 - 1e-9)) / 100;
+    if (tMin + deltaPlus < aMax - 1e-6) {
+      deltaPlus = Math.ceil(rawPlus * 100) / 100;
+    }
+
+    const rawMinus = Math.min(0, aMin - tMax);
+    let absMinus = Math.ceil(Math.max(0, Math.abs(rawMinus) * 100 - 1e-9)) / 100;
+    if (tMax - absMinus > aMin + 1e-6) {
+      absMinus = Math.ceil(Math.abs(rawMinus) * 100) / 100;
+    }
+    const deltaMinus = -absMinus;
+
+    const plusValid = axis !== 'y' || targetBounds.minY + deltaPlus >= -0.01;
+    const minusValid = axis !== 'y' || targetBounds.minY + deltaMinus >= -0.01;
+
+    if (forcedDirection === 1) {
+      return plusValid
+        ? { axis, direction: 1, deltaMm: deltaPlus, absDeltaMm: deltaPlus, overlap }
+        : null;
+    }
+    if (forcedDirection === -1) {
+      return minusValid
+        ? { axis, direction: -1, deltaMm: deltaMinus, absDeltaMm: absMinus, overlap }
+        : null;
+    }
+
+    if (!plusValid && !minusValid) {
+      return null;
+    }
+    if (plusValid && !minusValid) {
+      return { axis, direction: 1, deltaMm: deltaPlus, absDeltaMm: deltaPlus, overlap };
+    }
+    if (!plusValid && minusValid) {
+      return { axis, direction: -1, deltaMm: deltaMinus, absDeltaMm: absMinus, overlap };
+    }
+
+    if (deltaPlus < absMinus - 1e-6) {
+      return { axis, direction: 1, deltaMm: deltaPlus, absDeltaMm: deltaPlus, overlap };
+    }
+    if (absMinus < deltaPlus - 1e-6) {
+      return { axis, direction: -1, deltaMm: deltaMinus, absDeltaMm: absMinus, overlap };
+    }
+
+    return tCenter >= aCenter
+      ? { axis, direction: 1, deltaMm: deltaPlus, absDeltaMm: deltaPlus, overlap }
+      : { axis, direction: -1, deltaMm: deltaMinus, absDeltaMm: absMinus, overlap };
+  }
+
+  private buildFixOption(
+    candidate: AxisCandidate,
+    target: Part,
+    anchor: Part,
+    isSecondary: boolean,
+    reasonKind: FixReasonKind
+  ): CollisionFixOption {
+    const cleanDelta = Math.round(candidate.deltaMm * 100) / 100;
+    const absDelta = Math.round(Math.abs(cleanDelta) * 100) / 100;
+    const signed = cleanDelta >= 0 ? `+${absDelta}` : `-${absDelta}`;
+    const shortAnchor = this.shortenPartName(anchor.name);
+
+    let buttonLabel: string;
+    if (isSecondary) {
+      if (candidate.axis === 'x') {
+        buttonLabel = 'Ajustar al lado (X)';
+      } else if (candidate.axis === 'y') {
+        buttonLabel =
+          candidate.direction === 1
+            ? `Subir +${absDelta} mm (Y)`
+            : `Bajar -${absDelta} mm (Y)`;
+      } else {
+        buttonLabel = `Separar en Z (${signed} mm)`;
+      }
+    } else if (candidate.axis === 'y') {
+      buttonLabel =
+        candidate.direction === 1
+          ? `Corregir: Subir +${absDelta} mm`
+          : `Corregir: Bajar -${absDelta} mm`;
+    } else if (candidate.axis === 'x') {
+      buttonLabel = `Corregir: Mover X ${signed} mm`;
+    } else {
+      buttonLabel = `Corregir: Mover Z ${signed} mm`;
+    }
+
+    let shortReason: string;
+    let actionText: string;
+
+    if (isSecondary) {
+      if (candidate.axis === 'x') {
+        shortReason = `Alternativa: ajustar al lado de ${shortAnchor}`;
+        actionText = `Desplazar ${target.name} en X ${signed} mm`;
+      } else if (candidate.axis === 'y') {
+        shortReason =
+          candidate.direction === 1
+            ? `Alternativa: apoyar sobre ${shortAnchor}`
+            : `Alternativa: bajar bajo ${shortAnchor}`;
+        actionText =
+          candidate.direction === 1
+            ? `Subir ${target.name} +${absDelta} mm`
+            : `Bajar ${target.name} -${absDelta} mm`;
+      } else {
+        shortReason = `Alternativa: separar en profundidad de ${shortAnchor}`;
+        actionText = `Desplazar ${target.name} en Z ${signed} mm`;
+      }
+    } else if (reasonKind === 'top_support' && candidate.axis === 'y' && candidate.direction === 1) {
+      shortReason = `Sugerencia: apoyar sobre ${shortAnchor}`;
+      actionText = `Subir ${target.name} +${absDelta} mm (Apoyar encima)`;
+    } else if (reasonKind === 'align_side' && candidate.axis === 'x') {
+      shortReason = 'Sugerencia: alinear al costado';
+      actionText = `Desplazar en X ${signed} mm (Alinear al costado)`;
+    } else if (candidate.axis === 'y') {
+      shortReason =
+        candidate.direction === 1
+          ? `Sugerencia: apoyar sobre ${shortAnchor}`
+          : `Sugerencia: bajar bajo ${shortAnchor}`;
+      actionText =
+        candidate.direction === 1
+          ? `Subir ${target.name} +${absDelta} mm`
+          : `Bajar ${target.name} -${absDelta} mm`;
+    } else if (candidate.axis === 'x') {
+      shortReason = `Sugerencia: separar de ${shortAnchor} en X`;
+      actionText = `Desplazar ${target.name} en X ${signed} mm`;
+    } else {
+      shortReason = `Sugerencia: separar de ${shortAnchor} en Z`;
+      actionText = `Desplazar ${target.name} en Z ${signed} mm`;
+    }
+
+    return {
+      axis: candidate.axis,
+      direction: candidate.direction,
+      deltaMm: cleanDelta,
+      absDeltaMm: absDelta,
+      targetPartId: target.id,
+      targetPartName: target.name,
+      anchorPartId: anchor.id,
+      anchorPartName: anchor.name,
+      buttonLabel,
+      shortReason,
+      actionText
+    };
+  }
+
+  private countResolvedCollisionsForMove(
+    partId: string,
+    originalBounds: Part3DBounds,
+    candidate: AxisCandidate,
+    partCollisions: CollisionRecord[],
+    boundsById: Map<string, Part3DBounds>
+  ): number {
+    const shifted: Part3DBounds = {
+      ...originalBounds,
+      minX: originalBounds.minX + (candidate.axis === 'x' ? candidate.deltaMm : 0),
+      maxX: originalBounds.maxX + (candidate.axis === 'x' ? candidate.deltaMm : 0),
+      minY: originalBounds.minY + (candidate.axis === 'y' ? candidate.deltaMm : 0),
+      maxY: originalBounds.maxY + (candidate.axis === 'y' ? candidate.deltaMm : 0),
+      minZ: originalBounds.minZ + (candidate.axis === 'z' ? candidate.deltaMm : 0),
+      maxZ: originalBounds.maxZ + (candidate.axis === 'z' ? candidate.deltaMm : 0)
+    };
+
+    let resolved = 0;
+    const tolerance = 1.5;
+    for (const col of partCollisions) {
+      const otherId = col.partAId === partId ? col.partBId : col.partAId;
+      const otherBounds = boundsById.get(otherId);
+      if (!otherBounds) continue;
+
+      const ox = Math.min(shifted.maxX, otherBounds.maxX) - Math.max(shifted.minX, otherBounds.minX);
+      const oy = Math.min(shifted.maxY, otherBounds.maxY) - Math.max(shifted.minY, otherBounds.minY);
+      const oz = Math.min(shifted.maxZ, otherBounds.maxZ) - Math.max(shifted.minZ, otherBounds.minZ);
+      if (ox <= tolerance || oy <= tolerance || oz <= tolerance) {
+        resolved++;
+      }
+    }
+    return resolved;
+  }
+
+  private tryApplyBestIterativeStep(
+    workingParts: Part[],
+    sortedPlans: CollisionResolutionPlan[],
+    currentCollisionCount: number,
+    partById: Map<string, Part>,
+    visitedPartStates: Set<string>,
+    visitedSceneStates: Set<string>
+  ): { nextParts: Part[]; nextCollisions: CollisionRecord[] } | null {
+    interface StepResult {
+      nextParts: Part[];
+      nextCollisions: CollisionRecord[];
+      prevSig: string;
+      nextSig: string;
+      sceneSig: string;
+    }
+
+    const evaluateCandidate = (fix: CollisionFixOption): { status: 'better' | 'neutral' | 'skip'; result?: StepResult } => {
+      const targetPart = partById.get(fix.targetPartId);
+      if (!targetPart || targetPart.isLocked) {
+        return { status: 'skip' };
+      }
+
+      const updates = this.computePartUpdateForFix(targetPart, fix);
+      if (!updates) {
+        return { status: 'skip' };
+      }
+
+      const bounds = this.getPartBounds(targetPart);
+      const prevSig = this.buildPartCoordSignature(
+        targetPart.id,
+        targetPart.posX ?? bounds.px,
+        targetPart.posY ?? bounds.py,
+        targetPart.posZ ?? bounds.pz
+      );
+      const nextSig = this.buildPartCoordSignature(
+        targetPart.id,
+        updates.posX ?? targetPart.posX ?? bounds.px,
+        updates.posY ?? targetPart.posY ?? bounds.py,
+        updates.posZ ?? targetPart.posZ ?? bounds.pz
+      );
+
+      if (prevSig === nextSig || visitedPartStates.has(nextSig)) {
+        return { status: 'skip' };
+      }
+
+      const nextParts = workingParts.map(p =>
+        p.id === targetPart.id ? { ...p, ...updates } : p
+      );
+      const sceneSig = this.buildSceneSignature(nextParts);
+      if (visitedSceneStates.has(sceneSig)) {
+        return { status: 'skip' };
+      }
+
+      const nextCollisions = this.detectCollisions(nextParts);
+      if (nextCollisions.length < currentCollisionCount) {
+        return {
+          status: 'better',
+          result: { nextParts, nextCollisions, prevSig, nextSig, sceneSig }
+        };
+      }
+      if (nextCollisions.length === currentCollisionCount) {
+        return {
+          status: 'neutral',
+          result: { nextParts, nextCollisions, prevSig, nextSig, sceneSig }
+        };
+      }
+      return { status: 'skip' };
+    };
+
+    const commit = (res: StepResult): { nextParts: Part[]; nextCollisions: CollisionRecord[] } => {
+      visitedPartStates.add(res.prevSig);
+      visitedPartStates.add(res.nextSig);
+      visitedSceneStates.add(res.sceneSig);
+      return { nextParts: res.nextParts, nextCollisions: res.nextCollisions };
+    };
+
+    let bestNeutral: StepResult | null = null;
+
+    // 1. Probar primaryFix / secondaryFix en orden de prioridad
+    for (const plan of sortedPlans) {
+      const fixes = [plan.primaryFix, plan.secondaryFix].filter(
+        (f): f is CollisionFixOption => f !== null
+      );
+      for (const fix of fixes) {
+        const evalRes = evaluateCandidate(fix);
+        if (evalRes.status === 'better' && evalRes.result) {
+          return commit(evalRes.result);
+        }
+        if (evalRes.status === 'neutral' && evalRes.result && !bestNeutral) {
+          bestNeutral = evalRes.result;
+        }
+      }
+    }
+
+    // 2. Si ningún primary/secondary redujo el total (ej. cadena A(locked)-B-C), probar mover el socio desbloqueado
+    for (const plan of sortedPlans) {
+      if (!plan.primaryFix) continue;
+      const anchorPart = partById.get(plan.primaryFix.anchorPartId);
+      const targetPart = partById.get(plan.primaryFix.targetPartId);
+      if (!anchorPart || !targetPart || anchorPart.isLocked) continue;
+
+      const bAnchor = this.getPartBounds(anchorPart);
+      const bTarget = this.getPartBounds(targetPart);
+      const overlaps = this.computeAxisOverlaps(bAnchor, bTarget);
+
+      const swappedCand = this.pickMinimumValidCandidate(bAnchor, bTarget, overlaps);
+      if (!swappedCand) continue;
+      const swappedFix = this.buildFixOption(swappedCand, anchorPart, targetPart, false, 'general');
+      const evalRes = evaluateCandidate(swappedFix);
+      if (evalRes.status === 'better' && evalRes.result) {
+        return commit(evalRes.result);
+      }
+      if (evalRes.status === 'neutral' && evalRes.result && !bestNeutral) {
+        bestNeutral = evalRes.result;
+      }
+    }
+
+    return bestNeutral ? commit(bestNeutral) : null;
+  }
+
+  private computeAxisOverlaps(bA: Part3DBounds, bB: Part3DBounds): Record<Axis3D, number> {
+    return {
+      x: Math.max(0, Math.min(bA.maxX, bB.maxX) - Math.max(bA.minX, bB.minX)),
+      y: Math.max(0, Math.min(bA.maxY, bB.maxY) - Math.max(bA.minY, bB.minY)),
+      z: Math.max(0, Math.min(bA.maxZ, bB.maxZ) - Math.max(bA.minZ, bB.minZ))
+    };
+  }
+
+  private buildPartCoordSignature(partId: string, x: number, y: number, z: number): string {
+    const r = (v: number): number => Math.round(v * 100) / 100;
+    return `${partId}:${r(x)},${r(y)},${r(z)}`;
+  }
+
+  private buildSceneSignature(parts: Part[]): string {
+    const r = (v: number | undefined): string =>
+      v === undefined ? '_' : String(Math.round(v * 100) / 100);
+    return parts.map(p => `${p.id}@${r(p.posX)},${r(p.posY)},${r(p.posZ)}`).join('|');
+  }
+
+  private shortenPartName(name: string): string {
+    const clean = (name || '').trim();
+    if (clean.length <= 32) {
+      return clean;
+    }
+    return `${clean.slice(0, 29).trimEnd()}...`;
   }
 
   // --- JOINERY & PARAMETRIC DRILLING ENGINE ---

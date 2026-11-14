@@ -46,6 +46,8 @@ import {
   LayerVisibilityState,
   DrillHole,
   CollisionRecord,
+  CollisionFixOption,
+  CollisionResolutionPlan,
   EdgeBandingType,
   PartHardwareConfig,
   HandleType,
@@ -70,6 +72,12 @@ import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
 import { GlbModelLoaderService } from '../../services/glb-model-loader.service';
 import { SpatialReferenceGuideService } from '../../services/spatial-reference-guide.service';
+import {
+  ScenePickCandidate,
+  ScenePieceHitMeta,
+  SceneRaycastPickerService,
+  SceneRaycastSources
+} from '../../services/scene-raycast-picker.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { I18nService } from '../../services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -219,6 +227,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private appliance3dBuilder = inject(Appliance3dBuilderService);
   private glbModelLoader = inject(GlbModelLoaderService);
   private spatialGuideBuilder = inject(SpatialReferenceGuideService);
+  private readonly sceneRaycastPicker = inject(SceneRaycastPickerService);
 
   // Iconos vectoriales estilizados para la cinta de herramientas CAD y menús 3D
   readonly icons = {
@@ -464,6 +473,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       depth: floorD
     });
     this.referenceGuideGroup.add(built);
+    this.sceneRaycastPicker.refreshPickableMatricesAndBounds(this.referenceGuideGroup);
   }
 
   // Hardware visibility per group / per part
@@ -519,9 +529,99 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly detectedCollisions = signal<CollisionRecord[]>([]);
   readonly showCollisionsDetail = signal<boolean>(false);
   readonly allDrillHoles = signal<DrillHole[]>([]);
+  readonly collisionPlans = computed<CollisionResolutionPlan[]>(() =>
+    this.joineryEngine.buildCollisionResolutionPlans(this.parts(), this.detectedCollisions())
+  );
+
+  private updateDetectedCollisions(collisions: CollisionRecord[]): void {
+    this.detectedCollisions.set(collisions);
+    if (collisions.length === 0) {
+      this.showCollisionsDetail.set(false);
+    }
+  }
 
   toggleCollisionsDetail() {
     this.showCollisionsDetail.update(v => !v);
+  }
+
+  /**
+   * Selecciona únicamente la pieza protagonista del conflicto y enfoca la cámara sobre ella en 3D.
+   */
+  onCollisionCardClick(plan: CollisionResolutionPlan) {
+    const targetId = plan.primaryFix?.targetPartId || plan.focusPartId || plan.collision.partAId;
+    const part =
+      this.parts().find(p => p.id === targetId) ||
+      this.parts().find(p => p.id === plan.collision.partAId);
+    if (!part) return;
+
+    this.partsSelected.emit([part.id]);
+    this.partSelected.emit(part);
+    this.focusCameraOnPart(part.id);
+  }
+
+  /**
+   * Aplica en 1 clic la corrección seleccionada sobre una colisión (vía ProjectStorageService con Undo o fallback standalone).
+   */
+  applySingleCollisionFix(fix: CollisionFixOption, event?: MouseEvent) {
+    event?.stopPropagation();
+    const isInProjectStore = this.projectStorage
+      .currentProject()
+      .parts.some(p => p.id === fix.targetPartId);
+
+    if (isInProjectStore) {
+      this.projectStorage.applyCollisionFix(fix);
+      return;
+    }
+
+    const targetPart = this.parts().find(p => p.id === fix.targetPartId);
+    if (!targetPart) return;
+
+    const updates = this.joineryEngine.computePartUpdateForFix(targetPart, fix);
+    if (!updates) return;
+
+    this.projectStorage.pushSnapshot();
+    this.partModified.emit({ part: targetPart, updates });
+  }
+
+  /**
+   * Resuelve todas las interferencias activas en un único paso transaccional con soporte de Undo.
+   */
+  resolveAllDetectedCollisions(event?: MouseEvent) {
+    event?.stopPropagation();
+    const collisions = this.detectedCollisions();
+    if (collisions.length === 0) return;
+
+    const projectPartIds = new Set(this.projectStorage.currentProject().parts.map(p => p.id));
+    const collidingIds = new Set<string>();
+    for (const c of collisions) {
+      collidingIds.add(c.partAId);
+      collidingIds.add(c.partBId);
+    }
+
+    const allCollidingInStore =
+      collidingIds.size > 0 && Array.from(collidingIds).every(id => projectPartIds.has(id));
+    if (allCollidingInStore) {
+      this.projectStorage.resolveAllProjectCollisions();
+      return;
+    }
+
+    const sceneParts = this.parts();
+    const res = this.joineryEngine.resolveAllCollisionsIteratively(sceneParts);
+    if (res.updates.length === 0) return;
+
+    const partById = new Map<string, Part>(sceneParts.map(p => [p.id, p]));
+    const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+    for (const item of res.updates) {
+      const part = partById.get(item.partId);
+      if (part) {
+        updatesList.push({ part, updates: item.updates });
+      }
+    }
+
+    if (updatesList.length > 0) {
+      this.projectStorage.pushSnapshot();
+      this.multiplePartsModified.emit({ updates: updatesList });
+    }
   }
 
   // Precision Nudge & Magnetic Snapping
@@ -1009,6 +1109,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.buildFurnitureScene(parts, selIds, mats, xRay, showDims);
         this.updateExplodedOffsets(this.explodedPercent());
         this.requestRender(10);
+      } else {
+        const visibleParts = parts.filter(p => !this.hiddenPartIds().has(p.id));
+        const collisions = visibleParts.length >= 2 ? this.joineryEngine.detectCollisions(visibleParts) : [];
+        this.updateDetectedCollisions(collisions);
       }
     });
 
@@ -1545,7 +1649,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.isAllOpen.set(anyStillOpen);
 
     if (!parts || parts.length === 0) {
-      this.detectedCollisions.set([]);
+      this.updateDetectedCollisions([]);
       this.allDrillHoles.set([]);
       return;
     }
@@ -1553,7 +1657,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     // 1. Calculate Joinery & Collisions via JoineryEngineService
     const visiblePartsForJoinery = parts.filter(p => !this.hiddenPartIds().has(p.id));
     const joinery = this.joineryEngine.calculateJoinery(visiblePartsForJoinery);
-    this.detectedCollisions.set(joinery.collisions);
+    this.updateDetectedCollisions(joinery.collisions);
     this.collisionsDetected.emit(joinery.collisions);
     this.allDrillHoles.set(joinery.allDrillHoles);
     this.drillHolesUpdated.emit(joinery.allDrillHoles);
@@ -1691,6 +1795,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       // Edges geometry for crisp technical outline (pooled geometry & shared material)
       const edgeMat = this.getSharedEdgeMaterial(isColliding, isSelected);
       const edgeLines = new THREE.LineSegments(edges, edgeMat);
+      edgeLines.userData = { isOutline: true, isAuxiliaryVisual: true };
       mesh.add(edgeLines);
 
       // Exploded vector
@@ -1954,6 +2059,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.disposeGroup(this.internalClearanceGroup);
       this.clearanceCalculated.emit(null);
     }
+
+    this.sceneRaycastPicker.refreshPickableMatricesAndBounds(
+      [this.furnitureGroup, this.drillGroup],
+      { forceRecomputeBounds: true }
+    );
   }
 
   private applyDoorPivotRotation(
@@ -2511,16 +2621,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return null;
     }
 
-    // Verificar que otra pieza no seleccionada no esté ocultando en primer plano este borde/esquina
+    // Verificar que otra pieza o volumen sólido en primer plano no esté ocultando este borde/esquina
     const hitDistToCam = this.camera.position.distanceTo(this.scratchBestHitWorld);
-    if (this.raycastablePieceMeshes.length > 1) {
-      const pieceHits = this.raycaster.intersectObjects(this.raycastablePieceMeshes, false);
-      if (pieceHits.length > 0) {
-        const frontPart = pieceHits[0].object.userData?.['part'] as Part | undefined;
-        if (frontPart && frontPart.id !== part.id && pieceHits[0].distance < hitDistToCam - 25) {
-          this.hideDynamicEdgeHandle();
-          return null;
-        }
+    const frontPick = this.sceneRaycastPicker.pickClosestSceneCandidate(
+      this.raycaster,
+      this.buildSceneRaycastSources()
+    );
+    const closestFront = frontPick.closest;
+    if (closestFront && closestFront.distance < hitDistToCam - 25) {
+      const isSameSelectedPart =
+        (closestFront.kind === 'piece' || closestFront.kind === 'drill_hole') &&
+        closestFront.part?.id === part.id;
+      if (!isSameSelectedPart) {
+        this.hideDynamicEdgeHandle();
+        return null;
       }
     }
 
@@ -4195,6 +4309,7 @@ private createHandleMesh(
       pMesh.receiveShadow = true;
       const edges = new THREE.EdgesGeometry(geometry);
       const lines = new THREE.LineSegments(edges, edgeLineMat);
+      lines.userData = { isOutline: true, isAuxiliaryVisual: true };
       pMesh.add(lines);
       boxGroup.add(pMesh);
     };
@@ -6104,6 +6219,7 @@ private createHandleMesh(
         item.mesh.position.copy(targetPos);
       }
     }
+    this.sceneRaycastPicker.refreshPickableMatricesAndBounds(this.furnitureGroup);
   }
 
   /**
@@ -6170,6 +6286,110 @@ private createHandleMesh(
       return this.parts().some(p => p.groupId === app.groupId && !!p.isLocked);
     }
     return false;
+  }
+
+  private isObjectAndAncestorsVisible(obj: THREE.Object3D | null | undefined): boolean {
+    let curr: THREE.Object3D | null | undefined = obj;
+    while (curr) {
+      if (!curr.visible) {
+        return false;
+      }
+      curr = curr.parent;
+    }
+    return true;
+  }
+
+  private getRaycastPieceRoots(): THREE.Object3D[] {
+    const roots: THREE.Object3D[] = [];
+    for (const item of this.pieceObjects) {
+      if (item.mesh) {
+        roots.push(item.mesh);
+      }
+      if (item.doorPivot) {
+        roots.push(item.doorPivot);
+      }
+    }
+    return roots;
+  }
+
+  private resolvePieceHitMeta(obj: THREE.Object3D): ScenePieceHitMeta | null {
+    let curr: THREE.Object3D | null = obj;
+    let part: Part | undefined;
+    let isHandle = false;
+    let isDoor = false;
+    let isDrawer = false;
+    let isDrillHole = false;
+    let drillHole: DrillHole | undefined;
+    let parentPartId: string | undefined;
+
+    while (curr && curr !== this.furnitureGroup && curr !== this.scene) {
+      const data = curr.userData;
+      if (data) {
+        if (data['isHandle']) isHandle = true;
+        if (data['isDoor']) isDoor = true;
+        if (data['isDrawer']) isDrawer = true;
+        if (data['isDrillHole']) isDrillHole = true;
+        if (!drillHole && data['drillHole']) {
+          drillHole = data['drillHole'] as DrillHole;
+        }
+        if (!parentPartId && typeof data['parentPartId'] === 'string') {
+          parentPartId = data['parentPartId'];
+        }
+        if (!part && data['part']) {
+          part = data['part'] as Part;
+        }
+      }
+      curr = curr.parent;
+    }
+
+    if (!part && parentPartId) {
+      part = this.pieceObjectMap.get(parentPartId)?.part;
+    }
+
+    if (!part) {
+      return null;
+    }
+
+    const pieceData = this.pieceObjectMap.get(part.id);
+    return {
+      part,
+      isHandle,
+      isDoor: isDoor || Boolean(pieceData?.isDoor),
+      isDrawer: isDrawer || Boolean(pieceData?.isDrawer),
+      isDrillHole,
+      drillHole
+    };
+  }
+
+  private buildSceneRaycastSources(): SceneRaycastSources {
+    const vis = this.layerVisibility();
+    const hasRoomWalls =
+      this.workspaceMode() === 'room' &&
+      this.roomGroup.visible &&
+      this.roomGroup.children.length > 0;
+    const hasAppliances =
+      vis.showAppliances &&
+      this.appliancesGroup.visible &&
+      this.appliancesGroup.children.length > 0;
+    const hasReferenceGuide =
+      this.showReferenceGuide() &&
+      this.referenceGuideGroup.visible &&
+      this.referenceGuideGroup.children.length > 0;
+    const hasDrillHoles =
+      this.drillGroup.visible &&
+      this.drillGroup.children.length > 0;
+
+    return {
+      pieces: this.getRaycastPieceRoots(),
+      appliancesRoot: hasAppliances ? this.appliancesGroup : null,
+      wallsRoot: hasRoomWalls ? this.roomGroup : null,
+      referenceGuideRoot: hasReferenceGuide ? this.referenceGuideGroup : null,
+      drillRoot: hasDrillHoles ? this.drillGroup : null,
+      hiddenPartIds: this.hiddenPartIds(),
+      resolvePartFromObject: obj => this.resolvePieceHitMeta(obj),
+      resolveApplianceFromObject: obj => this.resolveApplianceFromObject(obj),
+      resolveWallIdFromObject: obj => this.resolveWallIdFromObject(obj)
+    };
   }
 
   /**
@@ -6393,14 +6613,14 @@ private createHandleMesh(
 
     // 0.3. Rotate 90° Tool
     if (this.activeTool() === 'rotate_90') {
-      const intersects = this.raycaster.intersectObjects(
-        this.raycastablePieceMeshes,
-        false
+      const pickResult = this.sceneRaycastPicker.pickClosestSceneCandidate(
+        this.raycaster,
+        this.buildSceneRaycastSources()
       );
-      if (intersects.length > 0) {
-        const hit = intersects[0].object as THREE.Mesh;
-        const part = hit.userData['part'] as Part;
-        if (part) {
+      const closest = pickResult.closest;
+      if (closest) {
+        if ((closest.kind === 'piece' || closest.kind === 'drill_hole') && closest.part) {
+          const part = closest.part;
           this.ngZone.run(() => {
             if (this.isPartOrGroupLocked(part)) {
               this.partsSelected.emit([part.id]);
@@ -6427,12 +6647,20 @@ private createHandleMesh(
           e.stopPropagation();
           return;
         }
+        // Un objeto distinto en primer plano (electrodoméstico, muro o guía) bloquea piezas detrás
+        e.preventDefault();
+        e.stopPropagation();
+        return;
       }
     }
 
     // 0.8 Check if clicking on Wall Gizmo (Axis translation arrow, Edge stretch handle or Top Height handle)
     if (this.workspaceMode() === 'room' && this.wallGizmoHitMeshes.length > 0) {
-      const wallGizmoIntersects = this.raycaster.intersectObjects(this.wallGizmoHitMeshes, true);
+      const wallGizmoIntersects = this.sceneRaycastPicker.intersectPriorityHandles(
+        this.raycaster,
+        this.wallGizmoHitMeshes,
+        true
+      );
       if (wallGizmoIntersects.length > 0) {
         const hitObj = wallGizmoIntersects[0].object;
         const hitData = hitObj.userData as WallGizmoHitData;
@@ -6516,7 +6744,12 @@ private createHandleMesh(
 
     // 0.9 Check if clicking on an Editable 3D Dimension Badge (Clearance or Part Dimension)
     if (e.button === 0 && this.editableDimensionSprites.length > 0) {
-      const dimIntersects = this.raycaster.intersectObjects(this.editableDimensionSprites, false);
+      const visibleDimSprites = this.editableDimensionSprites.filter(sprite =>
+        this.isObjectAndAncestorsVisible(sprite)
+      );
+      const dimIntersects = visibleDimSprites.length > 0
+        ? this.raycaster.intersectObjects(visibleDimSprites, false)
+        : [];
       if (dimIntersects.length > 0) {
         const hitSprite = dimIntersects[0].object as THREE.Sprite;
         const badgeData = hitSprite.userData as DimensionBadgeUserData;
@@ -6540,7 +6773,11 @@ private createHandleMesh(
     // 1. Check if clicking on Gizmo stretch handle or directly on a Corner (Vertex) / Continuous Edge (Arista) of the selected piece
     let matchedGizmoHit: GizmoHitData | null = null;
     if (this.gizmoHitMeshes.length > 0) {
-      const gizmoIntersects = this.raycaster.intersectObjects(this.gizmoHitMeshes, true);
+      const gizmoIntersects = this.sceneRaycastPicker.intersectPriorityHandles(
+        this.raycaster,
+        this.gizmoHitMeshes,
+        true
+      );
       if (gizmoIntersects.length > 0) {
         const hitObj = gizmoIntersects[0].object;
         const rawHit = hitObj.userData as GizmoHitData;
@@ -6603,12 +6840,18 @@ private createHandleMesh(
 
     // 1.3 Check if clicking on an Appliance Resize Handle (3D Face Handles)
     if (this.applianceHandleHitMeshes.length > 0) {
-      const handleIntersects = this.raycaster.intersectObjects(this.applianceHandleHitMeshes, true);
+      const handleIntersects = this.sceneRaycastPicker.intersectPriorityHandles(
+        this.raycaster,
+        this.applianceHandleHitMeshes,
+        true
+      );
       if (handleIntersects.length > 0) {
         const hit = handleIntersects[0].object as THREE.Mesh;
         const handleData = hit.userData;
         if (handleData && handleData['isApplianceHandle']) {
-          const freshApp = this.appliances().find(a => a.id === handleData['appliance']?.id) || handleData['appliance'];
+          const handleApp = handleData['appliance'] as ApplianceItem | undefined;
+          const freshApp = this.appliances().find(a => a.id === handleApp?.id) || handleApp;
+          if (!freshApp) return;
           this.isApplianceResizing = true;
           this.liveDragPrimaryApplianceUpdate = null;
           this.draggingAppliance = freshApp;
@@ -6628,7 +6871,8 @@ private createHandleMesh(
 
           const camDir = new THREE.Vector3();
           this.camera.getWorldDirection(camDir);
-          const handlePos = hit.position.clone();
+          const handlePos = new THREE.Vector3();
+          hit.getWorldPosition(handlePos);
           this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), handlePos);
 
           const intersectPoint = new THREE.Vector3();
@@ -6646,380 +6890,386 @@ private createHandleMesh(
       }
     }
 
-    // Pre-evaluar intersección con muros en modo habitación para evitar seleccionar objetos detrás de un muro
-    const wallHit = this.findNearestWallHit();
+    // 2. Unified closest-distance-wins Priority 2 scene picking (Pieces, Drill Holes, Appliances, Walls, Reference Guide)
+    const scenePick = this.sceneRaycastPicker.pickClosestSceneCandidate(
+      this.raycaster,
+      this.buildSceneRaycastSources()
+    );
+    const closest = scenePick.closest;
 
-    // 1.5 Check if clicking on an Appliance in 3D (Select & Free Mouse Drag)
-    if (this.appliancesGroup.children.length > 0) {
-      const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
-      if (appIntersects.length > 0 && (!wallHit || appIntersects[0].distance <= wallHit.distance)) {
-        const resolved = this.resolveApplianceFromObject(appIntersects[0].object);
-        if (resolved) {
-          const targetApp = resolved.app;
-          if (e.shiftKey) {
-            this.ngZone.run(() => this.handleShiftClickSelection(e));
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-
-          const curPartIds = this.activeSelectedIds();
-          const curAppIds = this.activeSelectedApplianceIds();
-          const isPartOfActiveMulti = curAppIds.includes(targetApp.id) && (curPartIds.length > 0 || curAppIds.length > 1);
-
-          this.ngZone.run(() => {
-            this.applianceSelected.emit(targetApp);
-            if (!isPartOfActiveMulti) {
-              this.appliancesSelected.emit([targetApp.id]);
-              this.partsSelected.emit([]);
-              this.partSelected.emit(null);
-            }
-            this.selectedWallType.set(null);
-            this.wallSelected.emit(null);
-          });
-
-          if (e.button === 0 && !this.isApplianceLocked(targetApp)) {
-            this.isApplianceDragging = true;
-            this.liveDragPartUpdates.clear();
-            this.liveDragApplianceUpdates.clear();
-            this.liveDragPrimaryApplianceUpdate = null;
-            this.draggingAppliance = { ...targetApp };
-            this.dragInitialAppliancePos = { ...targetApp.position };
-            this.dragStartPointer = { x: e.clientX, y: e.clientY };
-            this.ngZone.run(() => this.dragStarted.emit());
-            this.controls.enabled = false;
-
-            // Almacenar las piezas y equipos que deben desplazarse junto a este electrodoméstico SOLO si es multiselección activa
-            const activeParts = isPartOfActiveMulti && targetApp.groupId
-              ? this.parts().filter(p => p.groupId === targetApp.groupId)
-              : (isPartOfActiveMulti ? this.selectedParts() : []);
-            this.dragInitialParts = activeParts.map(p => ({ ...p }));
-            const relevantGroupIds = new Set(activeParts.map(p => p.groupId).filter(Boolean));
-            const activeApps = isPartOfActiveMulti
-              ? this.appliances().filter(
-                  a => a.id !== targetApp.id && (curAppIds.includes(a.id) || (a.groupId && (a.groupId === targetApp.groupId || relevantGroupIds.has(a.groupId))))
-                )
-              : [];
-            this.dragInitialSelectedAppliances = activeApps.map(a => ({ ...a, position: { ...a.position } }));
-
-            const camDir = new THREE.Vector3();
-            this.camera.getWorldDirection(camDir);
-            const appCenterPos = new THREE.Vector3(
-              targetApp.position.x,
-              targetApp.position.y + targetApp.height / 2,
-              targetApp.position.z
-            );
-            this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), appCenterPos);
-
-            const intersectPoint = new THREE.Vector3();
-            if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
-              this.dragPlaneIntersectionStart.copy(intersectPoint);
-            } else {
-              this.dragPlaneIntersectionStart.copy(appCenterPos);
-            }
-
-            canvas.style.cursor = 'grabbing';
-          }
-
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-      }
-    }
-
-    // 1.8. Selección y arrastre libre en el suelo del Maniquí de Escala y Guía de Frente
-    if (this.showReferenceGuide() && this.referenceGuideGroup.children.length > 0) {
-      const guideIntersects = this.raycaster.intersectObjects(this.referenceGuideGroup.children, true);
-      const hitGuide = guideIntersects.find(h => h.object.userData?.['isReferenceGuide']);
-      if (hitGuide && (!wallHit || hitGuide.distance <= wallHit.distance)) {
-        this.ngZone.run(() => {
-          this.isReferenceGuideSelected.set(true);
-          this.partSelected.emit(null);
-          this.partsSelected.emit([]);
-          this.applianceSelected.emit(null);
-        });
-
-        if (e.button === 0) {
-          this.isReferenceGuideDragging = true;
-          this.dragInitialGuidePos = { ...this.referenceGuidePos() };
-          this.controls.enabled = false;
-          this.dragPlane.set(new THREE.Vector3(0, 1, 0), 0);
-          const intersectPt = new THREE.Vector3();
-          if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPt)) {
-            this.dragPlaneIntersectionStart.copy(intersectPt);
-          }
-          canvas.style.cursor = 'grabbing';
-        }
+    if (closest?.kind === 'appliance' && closest.appliance) {
+      const targetApp = closest.appliance;
+      if (e.shiftKey) {
+        this.ngZone.run(() => this.handleShiftClickSelection(e, closest));
         e.preventDefault();
         e.stopPropagation();
         return;
-      } else {
-        this.isReferenceGuideSelected.set(false);
-      }
-    }
-
-    // 2. Normal Piece & Handle selection (with Shift-Click multi-selection)
-    const targets: THREE.Object3D[] = [];
-    for (const item of this.pieceObjects) {
-      targets.push(item.mesh);
-      if (item.doorPivot) targets.push(item.doorPivot);
-    }
-    targets.push(this.drillGroup);
-
-    const intersects = this.raycaster.intersectObjects(targets, true);
-
-    if (wallHit && (intersects.length === 0 || wallHit.distance < intersects[0].distance)) {
-      const wallId = this.resolveWallIdFromObject(wallHit.object);
-      if (wallId) {
-        this.ngZone.run(() => {
-          this.selectedWallType.set(wallId);
-          this.wallSelected.emit(wallId);
-        });
-        const cfg = this.roomConfig();
-        const targetWall = getResolvedRoomWalls(cfg).find(w => w.id === wallId);
-        const isLocked = !targetWall || !!cfg.isWallsLocked || !!targetWall.isLocked || !!cfg.lockedWalls?.[wallId];
-        const canDragTool = this.activeTool() === 'select' || this.activeTool() === 'move';
-        if (e.button === 0 && canDragTool && !isLocked && targetWall) {
-          this.isWallDragging = true;
-          this.activeWallTarget = wallId;
-          this.dragStartPointer = { x: e.clientX, y: e.clientY };
-          this.initialWallPosX = targetWall.posX;
-          this.initialWallPosZ = targetWall.posZ;
-          this.initialWallLength = targetWall.length;
-          this.initialWallHeight = targetWall.height;
-          this.pendingWallUpdates = null;
-          this.dragPlane.set(new THREE.Vector3(0, 1, 0), -wallHit.point.y);
-          const startHit = new THREE.Vector3();
-          if (this.raycaster.ray.intersectPlane(this.dragPlane, startHit)) {
-            this.dragPlaneIntersectionStart.copy(startHit);
-          } else {
-            this.dragPlaneIntersectionStart.copy(wallHit.point);
-          }
-          this.controls.enabled = false;
-          canvas.style.cursor = 'move';
-          e.preventDefault();
-          e.stopPropagation();
-        } else {
-          this.isWallDragging = false;
-        }
-        return;
-      }
-    }
-
-    if (intersects.length > 0) {
-      const topHit = intersects[0].object as THREE.Mesh;
-      let part = topHit.userData['part'] as Part | undefined;
-      let isDoor = topHit.userData['isDoor'];
-      let isDrawer = topHit.userData['isDrawer'];
-      let isHandle = topHit.userData['isHandle'];
-
-      let currObj: THREE.Object3D | null = topHit;
-      while (currObj && !part && currObj !== this.furnitureGroup && currObj !== this.scene) {
-        if (currObj.userData?.['part']) {
-          part = currObj.userData['part'];
-          isDoor = isDoor || currObj.userData['isDoor'];
-          isDrawer = isDrawer || currObj.userData['isDrawer'];
-          isHandle = isHandle || currObj.userData['isHandle'];
-          break;
-        }
-        currObj = currObj.parent;
       }
 
-      if (part) {
-        const hitPart = part;
-        const isModularDrawer = !!hitPart.groupId && this.isModularDrawerGroup(hitPart.groupId);
+      const curPartIds = this.activeSelectedIds();
+      const curAppIds = this.activeSelectedApplianceIds();
+      const isPartOfActiveMulti =
+        curAppIds.includes(targetApp.id) && (curPartIds.length > 0 || curAppIds.length > 1);
 
-        if (isHandle) {
-          this.isDragging = false;
-          this.isDirectPieceDrag = false;
-          this.directPieceDragThresholdPassed = false;
-          this.activeGizmoHit = null;
-
-          this.ngZone.run(() => {
-            this.togglePartOpen(hitPart.id);
-
-            const curIds = this.activeSelectedIds();
-            if (isModularDrawer && hitPart.groupId) {
-              const drawerParts = this.parts().filter(p => p.groupId === hitPart.groupId);
-              const targetIds = drawerParts.length > 0 ? drawerParts.map(p => p.id) : [hitPart.id];
-              const alreadyFullDrawerSelected =
-                targetIds.length > 0 &&
-                targetIds.every(id => curIds.includes(id)) &&
-                curIds.length === targetIds.length;
-              if (!alreadyFullDrawerSelected) {
-                this.partsSelected.emit(targetIds);
-                this.partSelected.emit(hitPart);
-              }
-            } else if (!curIds.includes(hitPart.id)) {
-              if (hitPart.groupId) {
-                const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
-                const targetIds = groupParts.length > 0 ? groupParts.map(p => p.id) : [hitPart.id];
-                this.partsSelected.emit(targetIds);
-              } else {
-                this.partsSelected.emit([hitPart.id]);
-              }
-              this.partSelected.emit(hitPart);
-            }
-          });
-          return;
-        }
-
-        if (e.shiftKey) {
-          this.ngZone.run(() => {
-            const cur = [...this.activeSelectedIds()];
-            const idsToToggle = isModularDrawer && hitPart.groupId
-              ? this.parts().filter(p => p.groupId === hitPart.groupId).map(p => p.id)
-              : [hitPart.id];
-            const effectiveIds = idsToToggle.length > 0 ? idsToToggle : [hitPart.id];
-            const allPresent = effectiveIds.every(id => cur.includes(id));
-            if (allPresent) {
-              for (const id of effectiveIds) {
-                const idx = cur.indexOf(id);
-                if (idx >= 0) cur.splice(idx, 1);
-              }
-            } else {
-              for (const id of effectiveIds) {
-                if (!cur.includes(id)) cur.push(id);
-              }
-            }
-            this.partsSelected.emit(cur);
-            if (cur.length === 0) {
-              this.partSelected.emit(null);
-            } else if (!allPresent) {
-              this.partSelected.emit(hitPart);
-            }
-          });
-        } else {
-          const now = Date.now();
-          const isDoubleClickSamePart =
-            now - this.lastPieceClickTime < 350 && this.lastClickedPartId === hitPart.id;
-          this.lastPieceClickTime = now;
-          this.lastClickedPartId = hitPart.id;
-
-          let partsToSelect: Part[] = [];
-          const curIds = this.activeSelectedIds();
-          const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === hitPart.id;
-          const isCountertopUnit = hitPart.componentRole === 'countertop' || hitPart.componentRole === 'backsplash';
-
-          this.ngZone.run(() => {
-            if (isModularDrawer && hitPart.groupId) {
-              // Cajón modular indivisible: cualquier clic (simple, re-clic o doble clic) sobre cualquiera de sus piezas selecciona todo el grupo
-              const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
-              partsToSelect = groupParts.length > 0 ? groupParts : [hitPart];
-              this.partsSelected.emit(partsToSelect.map(p => p.id));
-              this.partSelected.emit(hitPart);
-            } else if (curIds.includes(hitPart.id) && curIds.length > 1) {
-              partsToSelect = this.parts().filter(p => curIds.includes(p.id));
-              this.partsSelected.emit(curIds);
-              this.partSelected.emit(hitPart);
-            } else if (isCountertopUnit) {
-              partsToSelect = [hitPart];
-              this.partsSelected.emit([hitPart.id]);
-              this.partSelected.emit(hitPart);
-            } else if (hitPart.groupId) {
-              const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
-              if (isDoubleClickSamePart || isAlreadySingleIsolated || this.isInternalShelf(hitPart) || this.isInternalDivider(hitPart)) {
-                partsToSelect = [hitPart];
-                if (this.isInternalShelf(hitPart) && !e.altKey && !e.shiftKey) {
-                  const cavity = this.partGeometry.getModuleCavityCenter(hitPart, this.parts());
-                  if (cavity) {
-                    const isOffX = Math.abs((hitPart.posX ?? 0) - cavity.x) > 1.5;
-                    const isOffZ = Math.abs((hitPart.posZ ?? 0) - cavity.z) > 1.5;
-                    if (isOffX || isOffZ) {
-                      hitPart.posX = cavity.x;
-                      hitPart.posZ = cavity.z;
-                      this.projectStorage.updatePart({ ...hitPart, posX: cavity.x, posZ: cavity.z });
-                    }
-                  }
-                }
-              } else {
-                partsToSelect = groupParts.length > 0 ? groupParts : [hitPart];
-              }
-              this.partsSelected.emit(partsToSelect.map(p => p.id));
-              this.partSelected.emit(hitPart);
-            } else {
-              partsToSelect = [hitPart];
-              this.partsSelected.emit([hitPart.id]);
-              this.partSelected.emit(hitPart);
-            }
-          });
-
-          // Si la pieza o alguna pieza del grupo seleccionado está CONGELADA (isLocked),
-          // permitimos seleccionarla pero NO iniciamos el arrastre con el mouse (isDirectPieceDrag = false)
-          const anyLocked = this.isPartOrGroupLocked(hitPart) || partsToSelect.some(p => this.isPartOrGroupLocked(p));
-          if (anyLocked) {
-            this.isDirectPieceDrag = false;
-            return;
-          }
-
-          if (e.button === 0 && (this.activeTool() === 'select' || this.activeTool() === 'move') && !isHandle) {
-            this.isDirectPieceDrag = true;
-            this.directPieceDragThresholdPassed = false;
-            this.liveDragPartUpdates.clear();
-            this.liveDragApplianceUpdates.clear();
-            this.dragStartPointer = { x: e.clientX, y: e.clientY };
-            this.dragInitialPart = { ...hitPart };
-
-            // Si es mesón o salpicadero, al arrastrar con el mouse se mueve todo el conjunto de placas y salpicaderos en bloque
-            if (isCountertopUnit && hitPart.groupId) {
-              const allCtParts = this.parts().filter(p => p.groupId === hitPart.groupId);
-              this.dragInitialParts = allCtParts.map(p => ({ ...p }));
-            } else {
-              this.dragInitialParts = partsToSelect.map(p => ({ ...p }));
-            }
-
-            // Capturar también los electrodomésticos seleccionados o vinculados a los módulos arrastrados
-            const targetGroupIds = new Set(partsToSelect.map(p => p.groupId).filter(Boolean));
-            const curAppIds = new Set(this.activeSelectedApplianceIds());
-            const linkedApps = this.appliances().filter(
-              a => curAppIds.has(a.id) || (a.groupId && targetGroupIds.has(a.groupId))
-            );
-            this.dragInitialSelectedAppliances = linkedApps.map(a => ({
-              ...a,
-              position: { ...a.position }
-            }));
-
-            const camDir = new THREE.Vector3();
-            this.camera.getWorldDirection(camDir);
-            const hitPoint = intersects[0].point.clone();
-
-            if (this.isInternalShelf(hitPart) && !e.altKey && !e.shiftKey) {
-              const absY = Math.abs(camDir.y);
-              if (absY > 0.85) {
-                this.camera.getWorldDirection(camDir);
-                this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hitPoint);
-              } else {
-                camDir.y = 0;
-                camDir.normalize();
-                const coplanarPt = new THREE.Vector3(hitPart.posX ?? 0, hitPart.posY ?? 0, hitPart.posZ ?? 0);
-                this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), coplanarPt);
-              }
-            } else if (this.isInternalDivider(hitPart) && !e.altKey && !e.shiftKey) {
-              const coplanarPt = new THREE.Vector3(hitPart.posX ?? 0, hitPart.posY ?? 0, hitPart.posZ ?? 0);
-              this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), coplanarPt);
-            } else {
-              this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hitPoint);
-            }
-
-            const intersectPoint = new THREE.Vector3();
-            if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
-              this.dragPlaneIntersectionStart.copy(intersectPoint);
-            } else {
-              this.dragPlaneIntersectionStart.copy(hitPoint);
-            }
-          }
-        }
-      }
-    } else {
       this.ngZone.run(() => {
+        this.isReferenceGuideSelected.set(false);
+        this.applianceSelected.emit(targetApp);
+        if (!isPartOfActiveMulti) {
+          this.appliancesSelected.emit([targetApp.id]);
+          this.partsSelected.emit([]);
+          this.partSelected.emit(null);
+        }
         this.selectedWallType.set(null);
         this.wallSelected.emit(null);
-        this.partsSelected.emit([]);
-        this.partSelected.emit(null);
-        this.applianceSelected.emit(null);
       });
+
+      if (e.button === 0 && !this.isApplianceLocked(targetApp)) {
+        this.isApplianceDragging = true;
+        this.liveDragPartUpdates.clear();
+        this.liveDragApplianceUpdates.clear();
+        this.liveDragPrimaryApplianceUpdate = null;
+        this.draggingAppliance = { ...targetApp };
+        this.dragInitialAppliancePos = { ...targetApp.position };
+        this.dragStartPointer = { x: e.clientX, y: e.clientY };
+        this.ngZone.run(() => this.dragStarted.emit());
+        this.controls.enabled = false;
+
+        // Almacenar las piezas y equipos que deben desplazarse junto a este electrodoméstico SOLO si es multiselección activa
+        const activeParts = isPartOfActiveMulti && targetApp.groupId
+          ? this.parts().filter(p => p.groupId === targetApp.groupId)
+          : (isPartOfActiveMulti ? this.selectedParts() : []);
+        this.dragInitialParts = activeParts.map(p => ({ ...p }));
+        const relevantGroupIds = new Set(activeParts.map(p => p.groupId).filter(Boolean));
+        const activeApps = isPartOfActiveMulti
+          ? this.appliances().filter(
+              a =>
+                a.id !== targetApp.id &&
+                (curAppIds.includes(a.id) ||
+                  (a.groupId && (a.groupId === targetApp.groupId || relevantGroupIds.has(a.groupId))))
+            )
+          : [];
+        this.dragInitialSelectedAppliances = activeApps.map(a => ({ ...a, position: { ...a.position } }));
+
+        const camDir = new THREE.Vector3();
+        this.camera.getWorldDirection(camDir);
+        const appCenterPos = new THREE.Vector3(
+          targetApp.position.x,
+          targetApp.position.y + targetApp.height / 2,
+          targetApp.position.z
+        );
+        this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), appCenterPos);
+
+        const intersectPoint = new THREE.Vector3();
+        if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
+          this.dragPlaneIntersectionStart.copy(intersectPoint);
+        } else {
+          this.dragPlaneIntersectionStart.copy(appCenterPos);
+        }
+
+        canvas.style.cursor = 'grabbing';
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+      return;
     }
+
+    if (closest?.kind === 'reference_guide') {
+      if (e.shiftKey) {
+        this.ngZone.run(() => this.handleShiftClickSelection(e, closest));
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      this.ngZone.run(() => {
+        this.isReferenceGuideSelected.set(true);
+        if (this.selectedWallType() !== null) {
+          this.selectedWallType.set(null);
+          this.wallSelected.emit(null);
+        }
+        this.partSelected.emit(null);
+        this.partsSelected.emit([]);
+        this.applianceSelected.emit(null);
+        if (this.activeSelectedApplianceIds().length > 0) {
+          this.appliancesSelected.emit([]);
+        }
+      });
+
+      if (e.button === 0) {
+        this.isReferenceGuideDragging = true;
+        this.dragInitialGuidePos = { ...this.referenceGuidePos() };
+        this.controls.enabled = false;
+        this.dragPlane.set(new THREE.Vector3(0, 1, 0), 0);
+        const intersectPt = new THREE.Vector3();
+        if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPt)) {
+          this.dragPlaneIntersectionStart.copy(intersectPt);
+        }
+        canvas.style.cursor = 'grabbing';
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    if (closest?.kind === 'wall' && closest.wallId) {
+      if (e.shiftKey) {
+        this.ngZone.run(() => this.handleShiftClickSelection(e, closest));
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      const wallId = closest.wallId;
+      this.ngZone.run(() => {
+        this.isReferenceGuideSelected.set(false);
+        this.selectedWallType.set(wallId);
+        this.wallSelected.emit(wallId);
+      });
+      const cfg = this.roomConfig();
+      const targetWall = getResolvedRoomWalls(cfg).find(w => w.id === wallId);
+      const isLocked =
+        !targetWall || !!cfg.isWallsLocked || !!targetWall.isLocked || !!cfg.lockedWalls?.[wallId];
+      const canDragTool = this.activeTool() === 'select' || this.activeTool() === 'move';
+      if (e.button === 0 && canDragTool && !isLocked && targetWall) {
+        this.isWallDragging = true;
+        this.activeWallTarget = wallId;
+        this.dragStartPointer = { x: e.clientX, y: e.clientY };
+        this.initialWallPosX = targetWall.posX;
+        this.initialWallPosZ = targetWall.posZ;
+        this.initialWallLength = targetWall.length;
+        this.initialWallHeight = targetWall.height;
+        this.pendingWallUpdates = null;
+        this.dragPlane.set(new THREE.Vector3(0, 1, 0), -closest.intersection.point.y);
+        const startHit = new THREE.Vector3();
+        if (this.raycaster.ray.intersectPlane(this.dragPlane, startHit)) {
+          this.dragPlaneIntersectionStart.copy(startHit);
+        } else {
+          this.dragPlaneIntersectionStart.copy(closest.intersection.point);
+        }
+        this.controls.enabled = false;
+        canvas.style.cursor = 'move';
+        e.preventDefault();
+        e.stopPropagation();
+      } else {
+        this.isWallDragging = false;
+      }
+      return;
+    }
+
+    if ((closest?.kind === 'piece' || closest?.kind === 'drill_hole') && closest.part) {
+      const hitPart = closest.part;
+      const hitMeta = this.resolvePieceHitMeta(closest.object);
+      const isHandle = Boolean(closest.isHandle || hitMeta?.isHandle);
+      const isModularDrawer = !!hitPart.groupId && this.isModularDrawerGroup(hitPart.groupId);
+
+      if (isHandle) {
+        this.isDragging = false;
+        this.isDirectPieceDrag = false;
+        this.directPieceDragThresholdPassed = false;
+        this.activeGizmoHit = null;
+
+        this.ngZone.run(() => {
+          this.isReferenceGuideSelected.set(false);
+          if (this.selectedWallType() !== null) {
+            this.selectedWallType.set(null);
+            this.wallSelected.emit(null);
+          }
+          if (this.selectedApplianceId() !== null || this.activeSelectedApplianceIds().length > 0) {
+            this.applianceSelected.emit(null);
+            this.appliancesSelected.emit([]);
+          }
+
+          this.togglePartOpen(hitPart.id);
+
+          const curIds = this.activeSelectedIds();
+          if (isModularDrawer && hitPart.groupId) {
+            const drawerParts = this.parts().filter(p => p.groupId === hitPart.groupId);
+            const targetIds = drawerParts.length > 0 ? drawerParts.map(p => p.id) : [hitPart.id];
+            const alreadyFullDrawerSelected =
+              targetIds.length > 0 &&
+              targetIds.every(id => curIds.includes(id)) &&
+              curIds.length === targetIds.length;
+            if (!alreadyFullDrawerSelected) {
+              this.partsSelected.emit(targetIds);
+              this.partSelected.emit(hitPart);
+            }
+          } else if (!curIds.includes(hitPart.id)) {
+            if (hitPart.groupId) {
+              const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
+              const targetIds = groupParts.length > 0 ? groupParts.map(p => p.id) : [hitPart.id];
+              this.partsSelected.emit(targetIds);
+            } else {
+              this.partsSelected.emit([hitPart.id]);
+            }
+            this.partSelected.emit(hitPart);
+          }
+        });
+        return;
+      }
+
+      if (e.shiftKey) {
+        this.ngZone.run(() => this.handleShiftClickSelection(e, closest));
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      const now = Date.now();
+      const isDoubleClickSamePart =
+        now - this.lastPieceClickTime < 350 && this.lastClickedPartId === hitPart.id;
+      this.lastPieceClickTime = now;
+      this.lastClickedPartId = hitPart.id;
+
+      let partsToSelect: Part[] = [];
+      const curIds = this.activeSelectedIds();
+      const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === hitPart.id;
+      const isCountertopUnit =
+        hitPart.componentRole === 'countertop' || hitPart.componentRole === 'backsplash';
+
+      this.ngZone.run(() => {
+        this.isReferenceGuideSelected.set(false);
+        if (this.selectedWallType() !== null) {
+          this.selectedWallType.set(null);
+          this.wallSelected.emit(null);
+        }
+        const keepActiveMulti = curIds.includes(hitPart.id) && curIds.length > 1;
+        if (
+          !keepActiveMulti &&
+          (this.selectedApplianceId() !== null || this.activeSelectedApplianceIds().length > 0)
+        ) {
+          this.applianceSelected.emit(null);
+          this.appliancesSelected.emit([]);
+        }
+
+        if (isModularDrawer && hitPart.groupId) {
+          // Cajón modular indivisible: cualquier clic (simple, re-clic o doble clic) sobre cualquiera de sus piezas selecciona todo el grupo
+          const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
+          partsToSelect = groupParts.length > 0 ? groupParts : [hitPart];
+          this.partsSelected.emit(partsToSelect.map(p => p.id));
+          this.partSelected.emit(hitPart);
+        } else if (curIds.includes(hitPart.id) && curIds.length > 1) {
+          partsToSelect = this.parts().filter(p => curIds.includes(p.id));
+          this.partsSelected.emit(curIds);
+          this.partSelected.emit(hitPart);
+        } else if (isCountertopUnit) {
+          partsToSelect = [hitPart];
+          this.partsSelected.emit([hitPart.id]);
+          this.partSelected.emit(hitPart);
+        } else if (hitPart.groupId) {
+          const groupParts = this.parts().filter(p => p.groupId === hitPart.groupId);
+          if (
+            isDoubleClickSamePart ||
+            isAlreadySingleIsolated ||
+            this.isInternalShelf(hitPart) ||
+            this.isInternalDivider(hitPart)
+          ) {
+            partsToSelect = [hitPart];
+            if (this.isInternalShelf(hitPart) && !e.altKey && !e.shiftKey) {
+              const cavity = this.partGeometry.getModuleCavityCenter(hitPart, this.parts());
+              if (cavity) {
+                const isOffX = Math.abs((hitPart.posX ?? 0) - cavity.x) > 1.5;
+                const isOffZ = Math.abs((hitPart.posZ ?? 0) - cavity.z) > 1.5;
+                if (isOffX || isOffZ) {
+                  hitPart.posX = cavity.x;
+                  hitPart.posZ = cavity.z;
+                  this.projectStorage.updatePart({ ...hitPart, posX: cavity.x, posZ: cavity.z });
+                }
+              }
+            }
+          } else {
+            partsToSelect = groupParts.length > 0 ? groupParts : [hitPart];
+          }
+          this.partsSelected.emit(partsToSelect.map(p => p.id));
+          this.partSelected.emit(hitPart);
+        } else {
+          partsToSelect = [hitPart];
+          this.partsSelected.emit([hitPart.id]);
+          this.partSelected.emit(hitPart);
+        }
+      });
+
+      // Si la pieza o alguna pieza del grupo seleccionado está CONGELADA (isLocked),
+      // permitimos seleccionarla pero NO iniciamos el arrastre con el mouse (isDirectPieceDrag = false)
+      const anyLocked =
+        this.isPartOrGroupLocked(hitPart) || partsToSelect.some(p => this.isPartOrGroupLocked(p));
+      if (anyLocked) {
+        this.isDirectPieceDrag = false;
+        return;
+      }
+
+      if (
+        e.button === 0 &&
+        (this.activeTool() === 'select' || this.activeTool() === 'move') &&
+        !isHandle
+      ) {
+        this.isDirectPieceDrag = true;
+        this.directPieceDragThresholdPassed = false;
+        this.liveDragPartUpdates.clear();
+        this.liveDragApplianceUpdates.clear();
+        this.dragStartPointer = { x: e.clientX, y: e.clientY };
+        this.dragInitialPart = { ...hitPart };
+
+        // Si es mesón o salpicadero, al arrastrar con el mouse se mueve todo el conjunto de placas y salpicaderos en bloque
+        if (isCountertopUnit && hitPart.groupId) {
+          const allCtParts = this.parts().filter(p => p.groupId === hitPart.groupId);
+          this.dragInitialParts = allCtParts.map(p => ({ ...p }));
+        } else {
+          this.dragInitialParts = partsToSelect.map(p => ({ ...p }));
+        }
+
+        // Capturar también los electrodomésticos seleccionados o vinculados a los módulos arrastrados
+        const targetGroupIds = new Set(partsToSelect.map(p => p.groupId).filter(Boolean));
+        const curAppIds = new Set(this.activeSelectedApplianceIds());
+        const linkedApps = this.appliances().filter(
+          a => curAppIds.has(a.id) || (a.groupId && targetGroupIds.has(a.groupId))
+        );
+        this.dragInitialSelectedAppliances = linkedApps.map(a => ({
+          ...a,
+          position: { ...a.position }
+        }));
+
+        const camDir = new THREE.Vector3();
+        this.camera.getWorldDirection(camDir);
+        const hitPoint = closest.intersection.point.clone();
+
+        if (this.isInternalShelf(hitPart) && !e.altKey && !e.shiftKey) {
+          const absY = Math.abs(camDir.y);
+          if (absY > 0.85) {
+            this.camera.getWorldDirection(camDir);
+            this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hitPoint);
+          } else {
+            camDir.y = 0;
+            camDir.normalize();
+            const coplanarPt = new THREE.Vector3(hitPart.posX ?? 0, hitPart.posY ?? 0, hitPart.posZ ?? 0);
+            this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), coplanarPt);
+          }
+        } else if (this.isInternalDivider(hitPart) && !e.altKey && !e.shiftKey) {
+          const coplanarPt = new THREE.Vector3(hitPart.posX ?? 0, hitPart.posY ?? 0, hitPart.posZ ?? 0);
+          this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), coplanarPt);
+        } else {
+          this.dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hitPoint);
+        }
+
+        const intersectPoint = new THREE.Vector3();
+        if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
+          this.dragPlaneIntersectionStart.copy(intersectPoint);
+        } else {
+          this.dragPlaneIntersectionStart.copy(hitPoint);
+        }
+      }
+      return;
+    }
+
+    this.ngZone.run(() => {
+      this.isReferenceGuideSelected.set(false);
+      this.selectedWallType.set(null);
+      this.wallSelected.emit(null);
+      this.partsSelected.emit([]);
+      this.partSelected.emit(null);
+      this.applianceSelected.emit(null);
+      this.appliancesSelected.emit([]);
+    });
   }
 
     // Pointer Move: Dragging Gizmo, Push/Pulling, Drawing Rect or Updating Hover Cursors
@@ -8311,7 +8561,12 @@ private createHandleMesh(
 
     // Hover feedback for 3D Editable Dimension Badges
     if (this.editableDimensionSprites.length > 0) {
-      const dimIntersects = this.raycaster.intersectObjects(this.editableDimensionSprites, false);
+      const visibleDimSprites = this.editableDimensionSprites.filter(sprite =>
+        this.isObjectAndAncestorsVisible(sprite)
+      );
+      const dimIntersects = visibleDimSprites.length > 0
+        ? this.raycaster.intersectObjects(visibleDimSprites, false)
+        : [];
       if (dimIntersects.length > 0) {
         this.setHoveredGizmoMesh(null);
         this.hideDynamicEdgeHandle();
@@ -8323,7 +8578,11 @@ private createHandleMesh(
     this.setHoveredDimensionSprite(null);
 
     if (this.gizmoHitMeshes.length > 0) {
-      const gizmoIntersects = this.raycaster.intersectObjects(this.gizmoHitMeshes, true);
+      const gizmoIntersects = this.sceneRaycastPicker.intersectPriorityHandles(
+        this.raycaster,
+        this.gizmoHitMeshes,
+        true
+      );
       if (gizmoIntersects.length > 0) {
         this.hideDynamicEdgeHandle();
         const hitMesh = gizmoIntersects[0].object as THREE.Mesh;
@@ -8350,7 +8609,11 @@ private createHandleMesh(
 
     // Hover feedback for 3D Wall Gizmo (Move, Length, Height)
     if (this.workspaceMode() === 'room' && this.wallGizmoHitMeshes.length > 0) {
-      const wallGizmoIntersects = this.raycaster.intersectObjects(this.wallGizmoHitMeshes, true);
+      const wallGizmoIntersects = this.sceneRaycastPicker.intersectPriorityHandles(
+        this.raycaster,
+        this.wallGizmoHitMeshes,
+        true
+      );
       if (wallGizmoIntersects.length > 0) {
         const hit = wallGizmoIntersects[0].object.userData as { type?: string; gizmoType?: string };
         const gType = hit.gizmoType || hit.type;
@@ -8367,7 +8630,11 @@ private createHandleMesh(
 
     // Hover feedback for 3D appliance resize handles
     if (this.applianceHandleHitMeshes.length > 0) {
-      const handleIntersects = this.raycaster.intersectObjects(this.applianceHandleHitMeshes, true);
+      const handleIntersects = this.sceneRaycastPicker.intersectPriorityHandles(
+        this.raycaster,
+        this.applianceHandleHitMeshes,
+        true
+      );
       if (handleIntersects.length > 0) {
         const hit = handleIntersects[0].object.userData;
         if (hit && hit['axis'] === 'x') {
@@ -8381,40 +8648,42 @@ private createHandleMesh(
       }
     }
 
-    const hoverWallHit = this.findNearestWallHit();
-
-    // Hover feedback for appliances
-    if (this.appliancesGroup.children.length > 0) {
-      const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
-      if (appIntersects.length > 0 && (!hoverWallHit || appIntersects[0].distance <= hoverWallHit.distance)) {
-        canvas.style.cursor = 'grab';
-        return;
-      }
+    // Unified closest-distance-wins Priority 2 hover feedback
+    const scenePick = this.sceneRaycastPicker.pickClosestSceneCandidate(
+      this.raycaster,
+      this.buildSceneRaycastSources()
+    );
+    const closest = scenePick.closest;
+    if (!closest) {
+      canvas.style.cursor = 'default';
+      return;
     }
 
-    const pieceIntersects = this.raycaster.intersectObjects(
-      this.raycastablePieceMeshes,
-      false
-    );
-    if (hoverWallHit && (pieceIntersects.length === 0 || hoverWallHit.distance < pieceIntersects[0].distance)) {
-      const wId = this.resolveWallIdFromObject(hoverWallHit.object);
+    if (closest.kind === 'appliance') {
+      canvas.style.cursor = this.isApplianceLocked(closest.appliance) ? 'pointer' : 'grab';
+      return;
+    }
+
+    if (closest.kind === 'reference_guide') {
+      canvas.style.cursor = 'grab';
+      return;
+    }
+
+    if (closest.kind === 'wall') {
+      const wId = closest.wallId;
       const cfg = this.roomConfig();
       const wall = wId ? getResolvedRoomWalls(cfg).find(w => w.id === wId) : undefined;
       const isLocked = !wall || !!cfg.isWallsLocked || !!wall.isLocked || !!cfg.lockedWalls?.[wall.id];
       canvas.style.cursor = isLocked ? 'pointer' : 'grab';
       return;
     }
-    if (pieceIntersects.length > 0) {
-      const topObj = pieceIntersects[0].object;
-      const topPart = topObj.userData?.['part'] as Part | undefined;
-      const isSelected = topPart && this.activeSelectedIds().includes(topPart.id);
-      if (this.activeTool() === 'move' || isSelected) {
-        canvas.style.cursor = 'grab';
-      } else {
-        canvas.style.cursor = 'pointer';
-      }
+
+    const topPart = closest.part;
+    const isSelected = topPart && this.activeSelectedIds().includes(topPart.id);
+    if (this.activeTool() === 'move' || isSelected) {
+      canvas.style.cursor = 'grab';
     } else {
-      canvas.style.cursor = 'default';
+      canvas.style.cursor = 'pointer';
     }
   }
 
@@ -8429,6 +8698,7 @@ private createHandleMesh(
   ) {
     let singleMovedDelta: THREE.Vector3 | null = null;
     let singleStretchedPart: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number } | null = null;
+    let anyDimensionChanged = false;
 
     for (const entry of partUpdates) {
       this.liveDragPartUpdates.set(entry.part.id, entry);
@@ -8449,6 +8719,11 @@ private createHandleMesh(
         item.doorPivot.position.x += dx;
         item.doorPivot.position.y += dy;
         item.doorPivot.position.z += dz;
+        if (item.doorPivotOriginalPos) {
+          item.doorPivotOriginalPos.x += dx;
+          item.doorPivotOriginalPos.y += dy;
+          item.doorPivotOriginalPos.z += dz;
+        }
       } else {
         item.mesh.position.x += dx;
         item.mesh.position.y += dy;
@@ -8462,6 +8737,7 @@ private createHandleMesh(
         entry.updates.orientation !== undefined;
 
       if (isDimensionChanged) {
+        anyDimensionChanged = true;
         const localDims = this.partGeometry.getLocalDimensions(updatedPart);
         let newBoxGeo: THREE.BufferGeometry;
         let newEdgesGeo: THREE.EdgesGeometry;
@@ -8621,6 +8897,25 @@ private createHandleMesh(
           }
         }
       }
+    }
+
+    const matricesToSync: THREE.Object3D[] = [];
+    if (partUpdates.length > 0) {
+      matricesToSync.push(this.furnitureGroup);
+    }
+    if (primaryAppUpdate || appUpdates.length > 0) {
+      matricesToSync.push(this.appliancesGroup);
+    }
+    if (matricesToSync.length > 0) {
+      this.sceneRaycastPicker.refreshPickableMatricesAndBounds(matricesToSync, {
+        forceRecomputeBounds: anyDimensionChanged
+      });
+    }
+    if (partUpdates.length > 0 && this.gizmoGroup.children.length > 0) {
+      this.gizmoGroup.updateMatrixWorld(true);
+    }
+    if ((primaryAppUpdate || appUpdates.length > 0) && this.applianceGizmoGroup.children.length > 0) {
+      this.applianceGizmoGroup.updateMatrixWorld(true);
     }
 
     this.requestRender(4);
@@ -9670,87 +9965,82 @@ private createHandleMesh(
     this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // 1. Probar primero si el clic derecho fue sobre un electrodoméstico
-    if (this.layerVisibility().showAppliances && this.appliancesGroup.children.length > 0) {
-      const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
-      if (appIntersects.length > 0) {
-        const resolved = this.resolveApplianceFromObject(appIntersects[0].object);
-        if (resolved) {
-          const foundApp = resolved.app;
-          this.contextMenuAppliance.set(foundApp);
-          this.contextMenuPart.set(null);
-          this.contextMenuPos.set({ x: posX, y: posY });
-          this.applianceSelected.emit(foundApp);
-          this.appliancesSelected.emit([foundApp.id]);
-          this.partsSelected.emit([]);
-          this.partSelected.emit(null);
+    // 1. Selección unificada por distancia mínima (el elemento en primer plano siempre prevalece)
+    const scenePick = this.sceneRaycastPicker.pickClosestSceneCandidate(
+      this.raycaster,
+      this.buildSceneRaycastSources()
+    );
+    const closest = scenePick.closest;
 
-          this.showQuickMaterialPicker.set(false);
-          this.showRotateSubmenu.set(false);
-          this.showMovableRoleSubmenu.set(false);
-          this.showHandleSubmenu.set(false);
-          this.showHingeSubmenu.set(false);
-          this.showSlideSubmenu.set(false);
-          return;
-        }
+    if (closest?.kind === 'appliance' && closest.appliance) {
+      const foundApp = closest.appliance;
+      this.isReferenceGuideSelected.set(false);
+      if (this.selectedWallType() !== null) {
+        this.selectedWallType.set(null);
+        this.wallSelected.emit(null);
       }
+      this.contextMenuAppliance.set(foundApp);
+      this.contextMenuPart.set(null);
+      this.contextMenuPos.set({ x: posX, y: posY });
+      this.applianceSelected.emit(foundApp);
+      this.appliancesSelected.emit([foundApp.id]);
+      this.partsSelected.emit([]);
+      this.partSelected.emit(null);
+
+      this.showQuickMaterialPicker.set(false);
+      this.showRotateSubmenu.set(false);
+      this.showMovableRoleSubmenu.set(false);
+      this.showHandleSubmenu.set(false);
+      this.showHingeSubmenu.set(false);
+      this.showSlideSubmenu.set(false);
+      return;
     }
 
-    const targets: THREE.Object3D[] = [];
-    for (const item of this.pieceObjects) {
-      targets.push(item.mesh);
-      if (item.doorPivot) targets.push(item.doorPivot);
-    }
-
-    const intersects = this.raycaster.intersectObjects(targets, true);
-
-    if (intersects.length > 0) {
-      const topHit = intersects[0].object as THREE.Mesh;
-      let part = topHit.userData['part'] as Part | undefined;
-      let currObj: THREE.Object3D | null = topHit;
-      while (currObj && !part && currObj !== this.furnitureGroup && currObj !== this.scene) {
-        if (currObj.userData?.['part']) {
-          part = currObj.userData['part'];
-          break;
-        }
-        currObj = currObj.parent;
+    if ((closest?.kind === 'piece' || closest?.kind === 'drill_hole') && closest.part) {
+      const part = closest.part;
+      this.isReferenceGuideSelected.set(false);
+      if (this.selectedWallType() !== null) {
+        this.selectedWallType.set(null);
+        this.wallSelected.emit(null);
       }
+      if (this.selectedApplianceId() !== null || this.activeSelectedApplianceIds().length > 0) {
+        this.applianceSelected.emit(null);
+        this.appliancesSelected.emit([]);
+      }
+      this.contextMenuAppliance.set(null);
+      this.contextMenuPart.set(part);
+      this.contextMenuPos.set({ x: posX, y: posY });
 
-      if (part) {
-        this.contextMenuAppliance.set(null);
-        this.contextMenuPart.set(part);
-        this.contextMenuPos.set({ x: posX, y: posY });
-
-        const curIds = this.activeSelectedIds();
-        const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === part.id;
-        if (part.groupId && !isAlreadySingleIsolated) {
-          const grpParts = this.parts().filter(p => p.groupId === part!.groupId);
-          if (grpParts.length > 1) {
-            this.partsSelected.emit(grpParts.map(p => p.id));
-            this.partSelected.emit(part);
-            this.applyMaterialToWholeGroup.set(true);
-          } else {
-            this.partsSelected.emit([part.id]);
-            this.partSelected.emit(part);
-            this.applyMaterialToWholeGroup.set(false);
-          }
+      const curIds = this.activeSelectedIds();
+      const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === part.id;
+      const isModularDrawer = !!part.groupId && this.isModularDrawerGroup(part.groupId);
+      if (part.groupId && (isModularDrawer || !isAlreadySingleIsolated)) {
+        const grpParts = this.parts().filter(p => p.groupId === part.groupId);
+        if (grpParts.length > 1) {
+          this.partsSelected.emit(grpParts.map(p => p.id));
+          this.partSelected.emit(part);
+          this.applyMaterialToWholeGroup.set(true);
         } else {
           this.partsSelected.emit([part.id]);
           this.partSelected.emit(part);
           this.applyMaterialToWholeGroup.set(false);
         }
-
-        this.showQuickMaterialPicker.set(false);
-        this.showRotateSubmenu.set(false);
-        this.showMovableRoleSubmenu.set(false);
-        this.showHandleSubmenu.set(false);
-        this.showHingeSubmenu.set(false);
-        this.showSlideSubmenu.set(false);
-        return;
+      } else {
+        this.partsSelected.emit([part.id]);
+        this.partSelected.emit(part);
+        this.applyMaterialToWholeGroup.set(false);
       }
+
+      this.showQuickMaterialPicker.set(false);
+      this.showRotateSubmenu.set(false);
+      this.showMovableRoleSubmenu.set(false);
+      this.showHandleSubmenu.set(false);
+      this.showHingeSubmenu.set(false);
+      this.showSlideSubmenu.set(false);
+      return;
     }
 
-    // Clicked empty canvas space
+    // Clicked empty canvas space (or non-part foreground blocker such as wall / reference guide)
     this.contextMenuAppliance.set(null);
     this.contextMenuPart.set(null);
     this.contextMenuPos.set({ x: posX, y: posY });
@@ -10495,107 +10785,136 @@ private createHandleMesh(
   /**
    * Gestiona el clic simple con Shift (Shift-Click) para alternar piezas, módulos o electrodomésticos en la selección.
    */
-  private handleShiftClickSelection(e: PointerEvent) {
-    const canvas = this.canvasRef()?.nativeElement;
-    if (!canvas || !this.camera) return;
-    const rect = canvas.getBoundingClientRect();
+  private handleShiftClickSelection(
+    e: PointerEvent,
+    precomputedClosest?: ScenePickCandidate | null
+  ) {
+    let closest = precomputedClosest;
+    if (closest === undefined) {
+      const canvas = this.canvasRef()?.nativeElement;
+      if (!canvas || !this.camera) return;
+      const rect = canvas.getBoundingClientRect();
 
-    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    this.raycaster.setFromCamera(this.mouse, this.camera);
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // 1. Probar primero si se hizo Shift+Clic sobre un electrodoméstico
-    if (this.layerVisibility().showAppliances && this.appliancesGroup.children.length > 0) {
-      const appIntersects = this.raycaster.intersectObjects(this.appliancesGroup.children, true);
-      if (appIntersects.length > 0) {
-        const resolved = this.resolveApplianceFromObject(appIntersects[0].object);
-        if (resolved) {
-          const foundApp = resolved.app;
-          const curAppIds = new Set(this.activeSelectedApplianceIds());
-          const curPartIds = new Set(this.activeSelectedIds());
-
-          if (foundApp.groupId) {
-            const gParts = this.parts().filter(p => p.groupId === foundApp.groupId);
-            const gApps = this.appliances().filter(a => a.groupId === foundApp.groupId);
-            const allInCur = gApps.every(a => curAppIds.has(a.id)) && gParts.every(p => curPartIds.has(p.id));
-            if (allInCur) {
-              for (const a of gApps) curAppIds.delete(a.id);
-              for (const p of gParts) curPartIds.delete(p.id);
-            } else {
-              for (const a of gApps) curAppIds.add(a.id);
-              for (const p of gParts) curPartIds.add(p.id);
-            }
-          } else {
-            if (curAppIds.has(foundApp.id)) {
-              curAppIds.delete(foundApp.id);
-            } else {
-              curAppIds.add(foundApp.id);
-            }
-          }
-
-          const nextPartIds = Array.from(curPartIds);
-          const nextAppIds = Array.from(curAppIds);
-          this.partsSelected.emit(nextPartIds);
-          this.appliancesSelected.emit(nextAppIds);
-          if (nextPartIds.length > 0) {
-            const firstP = this.parts().find(p => nextPartIds.includes(p.id));
-            this.partSelected.emit(firstP || null);
-          } else {
-            this.partSelected.emit(null);
-          }
-          return;
-        }
-      }
+      closest = this.sceneRaycastPicker.pickClosestSceneCandidate(
+        this.raycaster,
+        this.buildSceneRaycastSources()
+      ).closest;
     }
 
-    // 2. Probar si se hizo Shift+Clic sobre una pieza de melamina
-    const targets: THREE.Object3D[] = this.pieceObjects.map(p => p.mesh);
-    const intersects = this.raycaster.intersectObjects(targets, true);
+    if (!closest) {
+      return;
+    }
 
-    if (intersects.length > 0) {
-      let currObj: THREE.Object3D | null = intersects[0].object;
-      let part: Part | undefined;
-      while (currObj && !part && currObj !== this.furnitureGroup) {
-        if (currObj.userData?.['part']) {
-          part = currObj.userData['part'];
-          break;
+    // Muros o guía de referencia en primer plano bloquean la selección a través de ellos
+    if (closest.kind === 'wall' || closest.kind === 'reference_guide') {
+      return;
+    }
+
+    if (closest.kind === 'appliance' && closest.appliance) {
+      const foundApp = closest.appliance;
+      const curAppIds = new Set(this.activeSelectedApplianceIds());
+      const curPartIds = new Set(this.activeSelectedIds());
+
+      if (foundApp.groupId) {
+        const gParts = this.parts().filter(p => p.groupId === foundApp.groupId);
+        const gApps = this.appliances().filter(a => a.groupId === foundApp.groupId);
+        const allInCur = gApps.every(a => curAppIds.has(a.id)) && gParts.every(p => curPartIds.has(p.id));
+        if (allInCur) {
+          for (const a of gApps) curAppIds.delete(a.id);
+          for (const p of gParts) curPartIds.delete(p.id);
+        } else {
+          for (const a of gApps) curAppIds.add(a.id);
+          for (const p of gParts) curPartIds.add(p.id);
         }
-        currObj = currObj.parent;
+      } else {
+        if (curAppIds.has(foundApp.id)) {
+          curAppIds.delete(foundApp.id);
+        } else {
+          curAppIds.add(foundApp.id);
+        }
       }
 
-      if (part) {
-        const curIds = new Set(this.activeSelectedIds());
-        const curAppIds = new Set(this.activeSelectedApplianceIds());
+      const nextPartIds = Array.from(curPartIds);
+      const nextAppIds = Array.from(curAppIds);
+      this.partsSelected.emit(nextPartIds);
+      this.appliancesSelected.emit(nextAppIds);
+      if (nextPartIds.length > 0) {
+        const firstP = this.parts().find(p => nextPartIds.includes(p.id));
+        this.partSelected.emit(firstP || null);
+      } else {
+        this.partSelected.emit(null);
+      }
+      if (nextAppIds.length > 0) {
+        const nextApp = nextAppIds.includes(foundApp.id)
+          ? foundApp
+          : (this.appliances().find(a => nextAppIds.includes(a.id)) || null);
+        this.applianceSelected.emit(nextApp);
+      } else {
+        this.applianceSelected.emit(null);
+      }
+      return;
+    }
 
-        // Si la pieza pertenece a un módulo estándar, alternamos el módulo completo y sus equipos.
-        // Si es una pieza de mesón (agrupada o desagrupada), permitimos alternar cada tramo/pieza individualmente con Shift+Clic.
-        const isCountertopUnit = part.componentRole === 'countertop' || part.componentRole === 'backsplash';
-        const partsToToggle = (part.groupId && !isCountertopUnit)
-          ? this.parts().filter(p => p.groupId === part.groupId)
-          : [part];
-        const appsToToggle = (part.groupId && !isCountertopUnit)
-          ? this.appliances().filter(a => a.groupId === part.groupId)
-          : [];
+    if ((closest.kind === 'piece' || closest.kind === 'drill_hole') && closest.part) {
+      const part = closest.part;
+      const curIds = new Set(this.activeSelectedIds());
+      const curAppIds = new Set(this.activeSelectedApplianceIds());
+      const isModularDrawer = !!part.groupId && this.isModularDrawerGroup(part.groupId);
+      const isCountertopUnit = part.componentRole === 'countertop' || part.componentRole === 'backsplash';
 
-        const allInCur = partsToToggle.every(p => curIds.has(p.id));
-        if (allInCur) {
-          for (const p of partsToToggle) curIds.delete(p.id);
-          for (const a of appsToToggle) curAppIds.delete(a.id);
+      // Cajón modular: indivisible; módulo estándar: alterna módulo salvo si la pieza ya estaba aislada sola;
+      // mesones y piezas sueltas: alternan individualmente.
+      let partsToToggle: Part[];
+      let appsToToggle: ApplianceItem[] = [];
+
+      if (isModularDrawer && part.groupId) {
+        const drawerParts = this.parts().filter(p => p.groupId === part.groupId);
+        partsToToggle = drawerParts.length > 0 ? drawerParts : [part];
+      } else if (part.groupId && !isCountertopUnit) {
+        const groupParts = this.parts().filter(p => p.groupId === part.groupId);
+        const isSingleIsolatedDeselect =
+          curIds.size === 1 && curIds.has(part.id) && groupParts.length > 1;
+        if (isSingleIsolatedDeselect) {
+          partsToToggle = [part];
         } else {
-          for (const p of partsToToggle) curIds.add(p.id);
-          for (const a of appsToToggle) curAppIds.add(a.id);
+          partsToToggle = groupParts.length > 0 ? groupParts : [part];
+          appsToToggle = this.appliances().filter(a => a.groupId === part.groupId);
         }
+      } else {
+        partsToToggle = [part];
+      }
 
-        const updatedIds = Array.from(curIds);
-        const updatedAppIds = Array.from(curAppIds);
-        this.partsSelected.emit(updatedIds);
-        this.appliancesSelected.emit(updatedAppIds);
-        if (updatedIds.length > 0) {
-          const nextFirst = this.parts().find(p => updatedIds.includes(p.id));
-          this.partSelected.emit(nextFirst || null);
-        } else {
-          this.partSelected.emit(null);
-        }
+      const allInCur = partsToToggle.every(p => curIds.has(p.id));
+      if (allInCur) {
+        for (const p of partsToToggle) curIds.delete(p.id);
+        for (const a of appsToToggle) curAppIds.delete(a.id);
+      } else {
+        for (const p of partsToToggle) curIds.add(p.id);
+        for (const a of appsToToggle) curAppIds.add(a.id);
+      }
+
+      const updatedIds = Array.from(curIds);
+      const updatedAppIds = Array.from(curAppIds);
+      this.partsSelected.emit(updatedIds);
+      this.appliancesSelected.emit(updatedAppIds);
+      if (updatedIds.length > 0) {
+        const nextFirst =
+          !allInCur && updatedIds.includes(part.id)
+            ? part
+            : (this.parts().find(p => updatedIds.includes(p.id)) || null);
+        this.partSelected.emit(nextFirst);
+      } else {
+        this.partSelected.emit(null);
+      }
+      if (updatedAppIds.length > 0 && appsToToggle.length > 0) {
+        const nextFirstApp = this.appliances().find(a => updatedAppIds.includes(a.id)) || null;
+        this.applianceSelected.emit(nextFirstApp);
+      } else if (updatedAppIds.length === 0 && (appsToToggle.length > 0 || this.selectedApplianceId() !== null)) {
+        this.applianceSelected.emit(null);
       }
     }
   }
@@ -10950,10 +11269,26 @@ private createHandleMesh(
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length === 0) return;
 
-    // Calculate bounding box center and size across all meshes in the group
+    const box = this.buildWorldBoxForParts(grpParts);
+    this.focusCameraOnBox(box);
+  }
+
+  /**
+   * Enfoca suavemente la cámara orbital sobre una pieza individual en el espacio 3D.
+   */
+  focusCameraOnPart(partId: string) {
+    if (!this.camera || !this.controls) return;
+    const part = this.parts().find(p => p.id === partId);
+    if (!part) return;
+
+    const box = this.buildWorldBoxForParts([part]);
+    this.focusCameraOnBox(box);
+  }
+
+  private buildWorldBoxForParts(targetParts: Part[]): THREE.Box3 {
     const box = new THREE.Box3();
     let hasValidMesh = false;
-    for (const p of grpParts) {
+    for (const p of targetParts) {
       const pieceObj = this.pieceObjects.find(po => po.part.id === p.id);
       if (pieceObj && pieceObj.mesh) {
         box.expandByObject(pieceObj.mesh);
@@ -10963,25 +11298,17 @@ private createHandleMesh(
 
     // Fallback if meshes are not yet resolved
     if (!hasValidMesh || box.isEmpty()) {
-      let minX = Infinity, maxX = -Infinity;
-      let minY = Infinity, maxY = -Infinity;
-      let minZ = Infinity, maxZ = -Infinity;
-      for (const p of grpParts) {
-        const px = p.posX ?? 0;
-        const py = p.posY ?? 0;
-        const pz = p.posZ ?? 0;
-        const hl = (p.length || 200) / 2;
-        const hw = (p.width || 200) / 2;
-        minX = Math.min(minX, px - hl);
-        maxX = Math.max(maxX, px + hl);
-        minY = Math.min(minY, py);
-        maxY = Math.max(maxY, py + (p.thickness || 15));
-        minZ = Math.min(minZ, pz - hw);
-        maxZ = Math.max(maxZ, pz + hw);
+      for (const p of targetParts) {
+        const aabb = this.partGeometry.getWorldAABB(p);
+        box.expandByPoint(new THREE.Vector3(aabb.minX, aabb.minY, aabb.minZ));
+        box.expandByPoint(new THREE.Vector3(aabb.maxX, aabb.maxY, aabb.maxZ));
       }
-      box.min.set(minX, minY, minZ);
-      box.max.set(maxX, maxY, maxZ);
     }
+    return box;
+  }
+
+  private focusCameraOnBox(box: THREE.Box3) {
+    if (!this.camera || !this.controls || box.isEmpty()) return;
 
     const center = new THREE.Vector3();
     box.getCenter(center);
@@ -11005,6 +11332,7 @@ private createHandleMesh(
     const duration = 400; // ms
 
     const animateFocus = (time: number) => {
+      if (!this.camera || !this.controls) return;
       const elapsed = time - startTime;
       const progress = Math.min(1, elapsed / duration);
       // Ease out cubic
@@ -11014,6 +11342,7 @@ private createHandleMesh(
       this.camera.position.lerpVectors(startCamPos, targetCamPos, ease);
       this.camera.lookAt(this.controls.target);
       this.controls.update();
+      this.requestRender(4);
 
       if (progress < 1) {
         requestAnimationFrame(animateFocus);
@@ -11577,21 +11906,19 @@ private applyMagneticSnapToPosition(
     });
   }
 
-  private findNearestWallHit(): THREE.Intersection | undefined {
-    if (this.workspaceMode() !== 'room' || this.roomGroup.children.length === 0) {
-      return undefined;
-    }
-    const roomHits = this.raycaster.intersectObjects(this.roomGroup.children, true);
-    return roomHits.find(
-      h => Boolean(h.object.userData?.['isWall'] || h.object.parent?.userData?.['isWall'])
-    );
-  }
-
   private resolveWallIdFromObject(obj: THREE.Object3D): string | undefined {
-    const ownId = obj.userData?.['wallId'] || obj.userData?.['wallType'];
-    if (typeof ownId === 'string' && ownId.length > 0) return ownId;
-    const parentId = obj.parent?.userData?.['wallId'] || obj.parent?.userData?.['wallType'];
-    return typeof parentId === 'string' && parentId.length > 0 ? parentId : undefined;
+    let curr: THREE.Object3D | null = obj;
+    while (curr && curr !== this.roomGroup && curr !== this.scene) {
+      if (curr.userData?.['isFloor'] || curr.userData?.['isGrid']) {
+        return undefined;
+      }
+      const id = curr.userData?.['wallId'] || curr.userData?.['wallType'];
+      if (typeof id === 'string' && id.length > 0) {
+        return id;
+      }
+      curr = curr.parent;
+    }
+    return undefined;
   }
 
   private getWallPlaneDeltaXZ(e: PointerEvent): { deltaX: number; deltaZ: number } {
@@ -13069,6 +13396,7 @@ private applyMagneticSnapToPosition(
 
   private updateOpeningAnimations(delta = 0.016): boolean {
     let anyAnimating = false;
+    let anyOpeningChanged = false;
     const lerpFactor = Math.min(1, delta * 9.5);
     for (const p of this.pieceObjects) {
       if (!p.isDoor && !p.isDrawer) continue;
@@ -13078,7 +13406,11 @@ private applyMagneticSnapToPosition(
         cur += (tgt - cur) * lerpFactor;
         this.openCurrentMap.set(p.part.id, cur);
         anyAnimating = true;
+        anyOpeningChanged = true;
       } else {
+        if (cur !== tgt) {
+          anyOpeningChanged = true;
+        }
         cur = tgt;
         this.openCurrentMap.set(p.part.id, cur);
       }
@@ -13107,6 +13439,9 @@ private applyMagneticSnapToPosition(
           p.mesh.position.z = p.originalPos.z + expZ + cur * maxSlide * dir;
         }
       }
+    }
+    if (anyOpeningChanged) {
+      this.sceneRaycastPicker.refreshPickableMatricesAndBounds(this.furnitureGroup);
     }
     return anyAnimating;
   }
@@ -13223,6 +13558,7 @@ private applyMagneticSnapToPosition(
       const divisions = Math.max(10, Math.round(gridSpan / 500));
       const roomGrid = new THREE.GridHelper(gridSpan, divisions, 0x0284c7, 0x64748b);
       roomGrid.position.set(0, 0.2, 0);
+      roomGrid.userData = { isGrid: true, isAuxiliaryVisual: true };
       if (roomGrid.material instanceof THREE.Material) {
         roomGrid.material.opacity = 0.22;
         roomGrid.material.transparent = true;
@@ -13302,6 +13638,7 @@ private applyMagneticSnapToPosition(
         wallMesh.add(backSkirting);
       }
     }
+    this.sceneRaycastPicker.refreshPickableMatricesAndBounds(this.roomGroup);
     this.requestRender(8);
   }
 
@@ -13392,6 +13729,7 @@ private applyMagneticSnapToPosition(
     outlineLines.position.set(posX, posY, posZ);
     outlineLines.rotation.y = rotRad;
     outlineLines.renderOrder = 998;
+    outlineLines.userData = { isOutline: true, isAuxiliaryVisual: true };
     this.wallGizmoGroup.add(outlineLines);
 
     // Si el muro está congelado / fijo, bloqueamos sus controles interactivos y mostramos únicamente el outline
@@ -13507,6 +13845,7 @@ private applyMagneticSnapToPosition(
         new THREE.EdgesGeometry(handleGeo),
         new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
       );
+      handleEdge.userData = { isOutline: true, isAuxiliaryVisual: true };
       handleMesh.add(handleEdge);
       handleMesh.position.copy(position);
       handleMesh.rotation.y = rotationY;
@@ -13674,6 +14013,7 @@ private applyMagneticSnapToPosition(
         const boxLines = new THREE.LineSegments(edgesGeo, lineMat);
         boxLines.position.set(app.position.x, visualBaseY + app.height / 2, app.position.z);
         boxLines.rotation.y = rotRad;
+        boxLines.userData = { isOutline: true, isAuxiliaryVisual: true };
         this.applianceGizmoGroup.add(boxLines);
 
         // Anillo de proyección en el plano de apoyo
@@ -13689,6 +14029,7 @@ private applyMagneticSnapToPosition(
         const ringMesh = new THREE.Mesh(ringGeo, ringMat);
         ringMesh.rotation.x = -Math.PI / 2;
         ringMesh.position.set(app.position.x, Math.max(1, app.position.y + 1), app.position.z);
+        ringMesh.userData = { isFloorCircle: true, isAuxiliaryVisual: true };
         this.applianceGizmoGroup.add(ringMesh);
 
         // Si el equipo está elevado sobre el suelo, dibujar proyección en el piso y línea plomada vertical
@@ -13703,6 +14044,7 @@ private applyMagneticSnapToPosition(
           const groundRing = new THREE.Mesh(ringGeo, groundRingMat);
           groundRing.rotation.x = -Math.PI / 2;
           groundRing.position.set(app.position.x, 1, app.position.z);
+          groundRing.userData = { isFloorCircle: true, isAuxiliaryVisual: true };
           this.applianceGizmoGroup.add(groundRing);
 
           // Línea plomada vertical que conecta la base del equipo al piso
@@ -13719,6 +14061,7 @@ private applyMagneticSnapToPosition(
           });
           const plumbLine = new THREE.Line(plumbGeo, plumbMat);
           plumbLine.computeLineDistances();
+          plumbLine.userData = { isOutline: true, isAuxiliaryVisual: true };
           this.applianceGizmoGroup.add(plumbLine);
         }
 
@@ -13753,6 +14096,7 @@ private applyMagneticSnapToPosition(
             handleEdgeGeo,
             new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, depthTest: false })
           );
+          edges.userData = { isOutline: true, isAuxiliaryVisual: true };
           mesh.add(edges);
           mesh.position.set(localX, localY, localZ);
           mesh.renderOrder = 999;
@@ -13782,6 +14126,8 @@ private applyMagneticSnapToPosition(
         addHandle('z', -1, 0, halfH, -halfD - 18, 0x0284c7);
       }
     }
+    this.sceneRaycastPicker.refreshPickableMatricesAndBounds(this.appliancesGroup);
+    this.applianceGizmoGroup.updateMatrixWorld(true);
     this.requestRender(8);
   }
 
@@ -13864,6 +14210,7 @@ private applyMagneticSnapToPosition(
 
           this.appliancesGroup.add(glbGroup);
           this.applianceMeshMap.set(app.id, glbGroup);
+          this.sceneRaycastPicker.refreshPickableMatricesAndBounds(glbGroup);
           this.requestRender(8);
         }
       }).catch(() => {

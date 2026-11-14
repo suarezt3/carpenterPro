@@ -11,6 +11,7 @@ import {
   ProjectNoteItem,
   ProjectSettings,
   ApplianceItem,
+  ComponentRole,
   CountertopLayoutShape,
   HandleFinish,
   HandleType,
@@ -26,7 +27,8 @@ import {
   DrawerFrontMountType,
   DrawerOpeningSystem,
   ModuleCavityInfo,
-  SlideType
+  SlideType,
+  CollisionFixOption
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { JoineryEngineService } from './joinery-engine.service';
@@ -1212,34 +1214,155 @@ export class ProjectStorageService {
   // ==========================================
 
   addPart(part: Part) {
-    this.updateProject(p => ({
-      ...p,
-      parts: [...p.parts, part]
-    }));
+    this.updateProject(p => {
+      const nextParts = [...p.parts, part];
+      return {
+        ...p,
+        parts: this.partGeometry.inferAndApplySemanticPartNames(nextParts, p.groups || [], {
+          focusPartIds: new Set([part.id])
+        })
+      };
+    });
   }
 
   updatePart(part: Part, recordHistory = true) {
     this.updateProject(p => {
-      const updatedParts = p.parts.map(pt => pt.id === part.id ? part : pt);
+      const prev = p.parts.find(pt => pt.id === part.id);
+      const updatedParts = p.parts.map(pt => (pt.id === part.id ? part : pt));
+      const syncedParts = this.syncCountertopBacksplashes(updatedParts);
+
+      if (!prev) {
+        return {
+          ...p,
+          parts: syncedParts
+        };
+      }
+
+      const orientationOrRotationChanged =
+        prev.orientation !== part.orientation ||
+        (prev.rotationX ?? 0) !== (part.rotationX ?? 0) ||
+        (prev.rotationY ?? 0) !== (part.rotationY ?? 0) ||
+        (prev.rotationZ ?? 0) !== (part.rotationZ ?? 0);
+
+      const geometryChanged =
+        orientationOrRotationChanged ||
+        (prev.posX ?? 0) !== (part.posX ?? 0) ||
+        (prev.posY ?? 0) !== (part.posY ?? 0) ||
+        (prev.posZ ?? 0) !== (part.posZ ?? 0) ||
+        prev.length !== part.length ||
+        prev.width !== part.width ||
+        prev.thickness !== part.thickness;
+
+      if (!geometryChanged) {
+        return {
+          ...p,
+          parts: syncedParts
+        };
+      }
+
       return {
         ...p,
-        parts: this.syncCountertopBacksplashes(updatedParts)
+        parts: this.partGeometry.inferAndApplySemanticPartNames(syncedParts, p.groups || [], {
+          focusPartIds: new Set([part.id]),
+          ...(orientationOrRotationChanged ? { forceReevaluateIds: new Set([part.id]) } : {})
+        })
       };
     }, recordHistory);
   }
 
   updateMultipleParts(updatesList: { partId: string; updates: Partial<Part> }[], recordHistory = true) {
     this.updateProject(p => {
+      const prevMap = new Map<string, Part>(p.parts.map(pt => [pt.id, pt]));
       const updatesMap = new Map(updatesList.map(u => [u.partId, u.updates]));
+      const focusPartIds = new Set<string>();
+      const forceReevaluateIds = new Set<string>();
+
       const updatedParts = p.parts.map(pt => {
         const upd = updatesMap.get(pt.id);
-        return upd ? { ...pt, ...upd } : pt;
+        if (!upd) return pt;
+        const nextPart = { ...pt, ...upd };
+        const prev = prevMap.get(pt.id) ?? pt;
+
+        const orientChanged =
+          (upd.orientation !== undefined && upd.orientation !== prev.orientation) ||
+          (upd.rotationX !== undefined && (upd.rotationX ?? 0) !== (prev.rotationX ?? 0)) ||
+          (upd.rotationY !== undefined && (upd.rotationY ?? 0) !== (prev.rotationY ?? 0)) ||
+          (upd.rotationZ !== undefined && (upd.rotationZ ?? 0) !== (prev.rotationZ ?? 0));
+
+        const geomChanged =
+          orientChanged ||
+          (upd.posX !== undefined && (upd.posX ?? 0) !== (prev.posX ?? 0)) ||
+          (upd.posY !== undefined && (upd.posY ?? 0) !== (prev.posY ?? 0)) ||
+          (upd.posZ !== undefined && (upd.posZ ?? 0) !== (prev.posZ ?? 0)) ||
+          (upd.length !== undefined && upd.length !== prev.length) ||
+          (upd.width !== undefined && upd.width !== prev.width) ||
+          (upd.thickness !== undefined && upd.thickness !== prev.thickness);
+
+        if (geomChanged) {
+          focusPartIds.add(pt.id);
+        }
+        if (orientChanged) {
+          forceReevaluateIds.add(pt.id);
+        }
+        return nextPart;
       });
+
+      const syncedParts = this.syncCountertopBacksplashes(updatedParts);
+      if (focusPartIds.size === 0 && forceReevaluateIds.size === 0) {
+        return {
+          ...p,
+          parts: syncedParts
+        };
+      }
+
       return {
         ...p,
-        parts: this.syncCountertopBacksplashes(updatedParts)
+        parts: this.partGeometry.inferAndApplySemanticPartNames(syncedParts, p.groups || [], {
+          focusPartIds,
+          ...(forceReevaluateIds.size > 0 ? { forceReevaluateIds } : {})
+        })
       };
     }, recordHistory);
+  }
+
+  /**
+   * Aplica una solución de colisión de 1 clic sobre `fix.targetPartId` con snapshot transaccional
+   * de Undo/Redo, clamping de piso (`minY >= 0`) y re-evaluación automática de nombres semánticos.
+   */
+  applyCollisionFix(fix: CollisionFixOption): boolean {
+    const targetPart = this.currentProject().parts.find(p => p.id === fix.targetPartId);
+    if (!targetPart || targetPart.isLocked) {
+      return false;
+    }
+
+    const updates = this.joineryEngine.computePartUpdateForFix(targetPart, fix);
+    if (!updates) {
+      return false;
+    }
+
+    this.updateMultipleParts([{ partId: fix.targetPartId, updates }], true);
+    return true;
+  }
+
+  /**
+   * Resuelve automáticamente todas las colisiones corregibles del proyecto activo
+   * guardando un único snapshot atómico para Undo/Redo.
+   */
+  resolveAllProjectCollisions(): {
+    resolvedCount: number;
+    stepsApplied: number;
+    remainingCount: number;
+  } {
+    const parts = this.currentProject().parts;
+    const result = this.joineryEngine.resolveAllCollisionsIteratively(parts);
+    if (result.updates.length > 0) {
+      this.updateMultipleParts(result.updates, true);
+    }
+    return {
+      resolvedCount: result.resolvedCount,
+      stepsApplied: result.stepsApplied,
+      remainingCount: result.remainingCollisions.length
+    };
   }
 
   private syncCountertopBacksplashes(parts: Part[]): Part[] {
@@ -1449,6 +1572,7 @@ export class ProjectStorageService {
         moduleId: undefined,
         moduleName: undefined,
         componentRole: 'free',
+        hasCustomName: false,
         posX: Math.round(((part.posX ?? 0) + deltaX) * 10) / 10,
         posY: part.posY ?? 0,
         posZ: part.posZ ?? 0
@@ -1474,6 +1598,7 @@ export class ProjectStorageService {
         moduleId: undefined,
         moduleName: undefined,
         componentRole: 'free',
+        hasCustomName: false,
         posX: targetX,
         posY: part.posY ?? 0,
         posZ: part.posZ ?? 0
@@ -1481,7 +1606,7 @@ export class ProjectStorageService {
     }
 
     this.addPart(clone);
-    return clone;
+    return this.currentProject().parts.find(p => p.id === clone.id) || clone;
   }
 
   deletePart(partId: string) {
@@ -1585,8 +1710,9 @@ export class ProjectStorageService {
 
     this.updateProject(p => {
       const currentGroups = p.groups || [];
+      const partIdSet = new Set(partIds);
       const updatedParts = p.parts.map(pt => {
-        if (partIds.includes(pt.id)) {
+        if (partIdSet.has(pt.id)) {
           return {
             ...pt,
             groupId: newGroup.id,
@@ -1595,11 +1721,22 @@ export class ProjectStorageService {
         }
         return pt;
       });
+      const nextGroups = [...currentGroups, newGroup];
+      const isEligibleSemanticGroup =
+        !isCountertopDetected &&
+        (newGroup.type === 'assembly' || newGroup.type === 'custom') &&
+        updatedParts.some(pt => partIdSet.has(pt.id) && !pt.moduleId);
+
+      const finalParts = isEligibleSemanticGroup
+        ? this.partGeometry.inferAndApplySemanticPartNames(updatedParts, nextGroups, {
+            focusPartIds: partIdSet
+          })
+        : updatedParts;
 
       return {
         ...p,
-        groups: [...currentGroups, newGroup],
-        parts: updatedParts
+        groups: nextGroups,
+        parts: finalParts
       };
     });
 
@@ -4474,6 +4611,75 @@ export class ProjectStorageService {
 
     this.addPart(dividerPart);
     return dividerPart;
+  }
+
+  /**
+   * Asigna un rol semántico explícito (y opcionalmente un nombre personalizado) a una pieza,
+   * bloqueando el renombre automático futuro y ajustando su configuración de herrajes movibles.
+   */
+  assignPartQuickRole(partId: string, role: ComponentRole, customName?: string): Part | null {
+    const existing = this.currentProject().parts.find(p => p.id === partId);
+    if (!existing) {
+      return null;
+    }
+
+    let hardwareConfig = existing.hardwareConfig;
+    if (role === 'door') {
+      hardwareConfig = {
+        ...existing.hardwareConfig,
+        isMovable: true,
+        movableType: 'door',
+        hingeType:
+          existing.hardwareConfig?.hingeType && existing.hardwareConfig.hingeType !== 'none'
+            ? existing.hardwareConfig.hingeType
+            : 'straight',
+        openingDirection: existing.hardwareConfig?.openingDirection || 'left',
+        handleType:
+          existing.hardwareConfig?.handleType && existing.hardwareConfig.handleType !== 'none'
+            ? existing.hardwareConfig.handleType
+            : 'bar_modern',
+        slideType: 'none'
+      };
+    } else if (role === 'drawer_front') {
+      hardwareConfig = {
+        ...existing.hardwareConfig,
+        isMovable: true,
+        movableType: 'drawer',
+        hingeType: 'none',
+        handleType:
+          existing.hardwareConfig?.handleType && existing.hardwareConfig.handleType !== 'none'
+            ? existing.hardwareConfig.handleType
+            : 'bar_modern',
+        slideType:
+          existing.hardwareConfig?.slideType && existing.hardwareConfig.slideType !== 'none'
+            ? existing.hardwareConfig.slideType
+            : 'telescopic'
+      };
+    } else {
+      hardwareConfig = {
+        ...existing.hardwareConfig,
+        isMovable: false,
+        movableType: 'none',
+        handleType: 'none',
+        hingeType: 'none',
+        slideType: 'none'
+      };
+    }
+
+    const updatedPart: Part = {
+      ...existing,
+      componentRole: role,
+      name: customName ?? existing.name,
+      hasCustomName: true,
+      hardwareConfig
+    };
+
+    this.updateProject(p => ({
+      ...p,
+      parts: p.parts.map(pt => (pt.id === partId ? updatedPart : pt))
+    }));
+
+    return updatedPart;
   }
 
   // ==========================================

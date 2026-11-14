@@ -288,6 +288,7 @@ export interface Part {
   cornerCutConfig?: PartCornerCutConfig; // Configuración paramétrica de chaflanes, diagonales o destajes en L
   excludeFromCutlist?: boolean; // Si es true (ej. mesones de piedra/cuarzo/mármol), se excluye del optimizador de melamina y se cotiza por m²
   isLocked?: boolean;
+  hasCustomName?: boolean;
 }
 
 export type FurnitureModuleType =
@@ -673,6 +674,28 @@ export interface CollisionRecord {
   overlapY: number;
   overlapZ: number;
   overlapVolumeMm3: number;
+}
+
+export interface CollisionFixOption {
+  axis: 'x' | 'y' | 'z';
+  direction: 1 | -1;
+  deltaMm: number;
+  absDeltaMm: number;
+  targetPartId: string;
+  targetPartName: string;
+  anchorPartId: string;
+  anchorPartName: string;
+  buttonLabel: string;
+  shortReason: string;
+  actionText: string;
+}
+
+export interface CollisionResolutionPlan {
+  collision: CollisionRecord;
+  focusPartId: string;
+  primaryFix: CollisionFixOption | null;
+  secondaryFix: CollisionFixOption | null;
+  canFix: boolean;
 }
 
 export interface ProjectNoteItem {

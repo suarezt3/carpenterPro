@@ -20,6 +20,26 @@
   }
 }
 
+/* Barra de roles rápidos 1-clic en tipografía Inter (Minimalist Studio) */
+.md-quick-role-strip,
+.md-quick-role-pill {
+  font-family: var(--font-sans);
+}
+
+@media (max-height: 800px) {
+  .md-quick-role-strip {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .md-quick-role-pill {
+    height: 1.375rem;
+    padding-left: 0.4375rem;
+    padding-right: 0.4375rem;
+    font-size: 10.5px;
+  }
+}
+
 /* Scrollbar compacto y suave para filtros horizontales y listas de materiales */
 .scrollbar-thin::-webkit-scrollbar {
   height: 4px;

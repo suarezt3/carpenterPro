@@ -34,6 +34,7 @@ export class SpatialReferenceGuideService {
     const figureGroup = this.buildHumanScaleFigure(figurePos, isSelected, isWhiteTheme);
     rootGroup.add(figureGroup);
 
+    rootGroup.updateMatrixWorld(true);
     return rootGroup;
   }
 
@@ -57,6 +58,11 @@ export class SpatialReferenceGuideService {
       opacity: isWhiteTheme ? 0.65 : 0.8
     });
     const borderLine = new THREE.Line(borderGeo, borderMat);
+    borderLine.userData = {
+      ...borderLine.userData,
+      isOutline: true,
+      isAuxiliaryVisual: true
+    };
     group.add(borderLine);
 
     // 2. Cantoneras arquitectónicas CAD en las 4 esquinas del taller
@@ -95,6 +101,11 @@ export class SpatialReferenceGuideService {
     for (const pts of corners) {
       const cGeo = new THREE.BufferGeometry().setFromPoints(pts);
       const cLine = new THREE.Line(cGeo, cornerMat);
+      cLine.userData = {
+        ...cLine.userData,
+        isOutline: true,
+        isAuxiliaryVisual: true
+      };
       group.add(cLine);
     }
 
@@ -111,6 +122,10 @@ export class SpatialReferenceGuideService {
     const frontBar = new THREE.Mesh(frontBarGeo, frontBarMat);
     frontBar.rotation.x = -Math.PI / 2;
     frontBar.position.set(0, 1.6, halfD);
+    frontBar.userData = {
+      ...frontBar.userData,
+      isAuxiliaryVisual: true
+    };
     group.add(frontBar);
 
     // 4. Chevrons direccionales en el piso apuntando al interior del taller
@@ -136,6 +151,10 @@ export class SpatialReferenceGuideService {
       mesh.rotation.x = -Math.PI / 2;
       mesh.rotation.z = rotY;
       mesh.position.set(x, 2, z);
+      mesh.userData = {
+        ...mesh.userData,
+        isAuxiliaryVisual: true
+      };
       return mesh;
     };
 
@@ -209,6 +228,14 @@ export class SpatialReferenceGuideService {
     rightSprite.scale.set(780, 148, 1);
     group.add(rightSprite);
 
+    for (const sprite of [frontSprite, backSprite, leftSprite, rightSprite]) {
+      sprite.userData = {
+        ...sprite.userData,
+        isDimensionBadge: true,
+        isAuxiliaryVisual: true
+      };
+    }
+
     return group;
   }
 
@@ -261,6 +288,11 @@ export class SpatialReferenceGuideService {
       mesh.receiveShadow = true;
       const edges = new THREE.EdgesGeometry(geo, 25);
       const lines = new THREE.LineSegments(edges, edgeMat);
+      lines.userData = {
+        ...lines.userData,
+        isOutline: true,
+        isAuxiliaryVisual: true
+      };
       mesh.add(lines);
       figureGroup.add(mesh);
       return mesh;
@@ -277,6 +309,12 @@ export class SpatialReferenceGuideService {
     const baseRing = new THREE.Mesh(baseRingGeo, baseRingMat);
     baseRing.rotation.x = -Math.PI / 2;
     baseRing.position.set(0, 2, 0);
+    baseRing.userData = {
+      ...baseRing.userData,
+      isFloorCircle: true,
+      isReferenceFloorCircle: true,
+      isAuxiliaryVisual: true
+    };
     figureGroup.add(baseRing);
 
     const baseDiscGeo = new THREE.CircleGeometry(195, 36);
@@ -289,6 +327,12 @@ export class SpatialReferenceGuideService {
     const baseDisc = new THREE.Mesh(baseDiscGeo, baseDiscMat);
     baseDisc.rotation.x = -Math.PI / 2;
     baseDisc.position.set(0, 1.5, 0);
+    baseDisc.userData = {
+      ...baseDisc.userData,
+      isFloorCircle: true,
+      isReferenceFloorCircle: true,
+      isAuxiliaryVisual: true
+    };
     figureGroup.add(baseDisc);
 
     // Flecha frontal prominente en la base apuntando hacia +Z (EL FRENTE)
@@ -377,18 +421,33 @@ export class SpatialReferenceGuideService {
     ];
     const rulerGeo = new THREE.BufferGeometry().setFromPoints(rulerLinePoints);
     const rulerLines = new THREE.LineSegments(rulerGeo, edgeMat);
+    rulerLines.userData = {
+      ...rulerLines.userData,
+      isOutline: true,
+      isAuxiliaryVisual: true
+    };
     figureGroup.add(rulerLines);
 
     // Etiqueta de altura total (1.72 m)
     const heightBadge = this.createCardinalBadge('Escala 1.72 m (1720 mm)', '#0f172a', '#38bdf8', 320, 58);
     heightBadge.position.set(rulerX, 1785, 0);
     heightBadge.scale.set(230, 42, 1);
+    heightBadge.userData = {
+      ...heightBadge.userData,
+      isDimensionBadge: true,
+      isAuxiliaryVisual: true
+    };
     figureGroup.add(heightBadge);
 
     // Etiqueta de altura de mesada (900 mm)
     const counterBadge = this.createCardinalBadge('900 mm · Mesada', '#1e293b', '#fde68a', 260, 52);
     counterBadge.position.set(rulerX - 95, 900, 0);
     counterBadge.scale.set(175, 35, 1);
+    counterBadge.userData = {
+      ...counterBadge.userData,
+      isDimensionBadge: true,
+      isAuxiliaryVisual: true
+    };
     figureGroup.add(counterBadge);
 
     // Etiqueta flotante informativa cuando el maniquí está seleccionado
@@ -402,6 +461,11 @@ export class SpatialReferenceGuideService {
       );
       selectedBadge.position.set(0, 35, 370);
       selectedBadge.scale.set(310, 42, 1);
+      selectedBadge.userData = {
+        ...selectedBadge.userData,
+        isDimensionBadge: true,
+        isAuxiliaryVisual: true
+      };
       figureGroup.add(selectedBadge);
     }
 
@@ -411,8 +475,17 @@ export class SpatialReferenceGuideService {
         ...obj.userData,
         isReferenceGuide: true
       };
+      if (obj instanceof THREE.Mesh && obj.geometry) {
+        if (!obj.geometry.boundingBox) {
+          obj.geometry.computeBoundingBox();
+        }
+        if (!obj.geometry.boundingSphere) {
+          obj.geometry.computeBoundingSphere();
+        }
+      }
     });
 
+    figureGroup.updateMatrixWorld(true);
     return figureGroup;
   }
 

@@ -498,34 +498,85 @@
 
   <!-- ALERTA SUPERIOR DERECHA DE SOLAPAMIENTOS / COLISIONES -->
   @if (detectedCollisions().length > 0) {
-    <div class="absolute top-12 right-3 z-20 pointer-events-auto flex flex-col items-end gap-1.5 max-w-sm">
+    <div class="absolute top-12 right-3 z-20 pointer-events-auto flex flex-col items-end gap-1.5 max-w-sm font-sans">
       <button
         type="button"
         (click)="toggleCollisionsDetail()"
-        class="flex items-center gap-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white px-3 py-1.5 rounded-xl shadow-lg text-xs font-bold transition cursor-pointer">
+        class="flex items-center gap-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white px-3 py-1.5 rounded-xl shadow-lg text-xs font-bold transition cursor-pointer font-sans">
         <hugeicons-icon [icon]="icons.warning" [size]="15" [strokeWidth]="2" class="animate-pulse"></hugeicons-icon>
         <span>{{ detectedCollisions().length }} solapamiento(s)</span>
         <hugeicons-icon [icon]="showCollisionsDetail() ? icons.chevronUp : icons.chevronDown" [size]="13" [strokeWidth]="2"></hugeicons-icon>
       </button>
 
       @if (showCollisionsDetail()) {
-        <div class="bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-2xl border border-red-200 text-slate-800 text-xs w-80 max-h-64 overflow-y-auto scrollbar-thin flex flex-col gap-2">
-          <div class="flex items-center justify-between pb-1.5 border-b border-red-100 font-bold text-red-800">
-            <span>Interferencias detectadas</span>
-            <span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Tolerancia 0.8mm</span>
+        <div class="bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-2xl border border-zinc-200 text-zinc-900 text-xs w-96 max-w-[calc(100vw-2rem)] max-h-[26rem] overflow-y-auto scrollbar-thin flex flex-col gap-2 font-sans">
+          <div class="flex flex-col gap-2 pb-2 border-b border-zinc-200">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold text-zinc-900 font-sans">Interferencias detectadas</span>
+              <span class="text-[10px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded font-medium font-sans shrink-0">Tolerancia 0.8mm</span>
+            </div>
+
+            @if (detectedCollisions().length >= 2) {
+              <button
+                type="button"
+                (click)="resolveAllDetectedCollisions($event)"
+                class="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium px-2.5 py-1.5 rounded-md flex items-center justify-center gap-1.5 w-full transition cursor-pointer font-sans">
+                <hugeicons-icon [icon]="icons.checkCircle" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                <span>Resolver Todos Automáticamente</span>
+              </button>
+            }
           </div>
-          @for (c of detectedCollisions(); track c.partAId + c.partBId) {
-            <div class="p-2 rounded-lg bg-red-50/80 border border-red-100 flex flex-col gap-1">
-              <div class="font-semibold text-slate-900 flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                <span>{{ c.partAName }}</span>
-                <span class="text-slate-400">↔</span>
-                <span>{{ c.partBName }}</span>
+
+          @for (plan of collisionPlans(); track plan.collision.partAId + plan.collision.partBId) {
+            <div
+              class="p-2.5 rounded-lg border flex flex-col gap-1.5 transition"
+              [class]="activeSelectedIds().includes(plan.focusPartId) || (plan.primaryFix !== null && activeSelectedIds().includes(plan.primaryFix.targetPartId)) ? 'border-sky-600 bg-sky-50/40' : 'bg-zinc-50 border-zinc-200'">
+              <button
+                type="button"
+                (click)="onCollisionCardClick(plan)"
+                class="w-full text-left flex items-center justify-between gap-2 cursor-pointer font-sans group">
+                <span class="font-semibold text-zinc-900 flex items-center gap-1.5 min-w-0 truncate">
+                  <span class="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0"></span>
+                  <span class="truncate">{{ plan.collision.partAName }}</span>
+                  <span class="text-zinc-400 shrink-0">↔</span>
+                  <span class="truncate">{{ plan.collision.partBName }}</span>
+                </span>
+                <span class="text-[11px] font-medium text-sky-600 group-hover:underline shrink-0 font-sans">Ver en 3D</span>
+              </button>
+
+              <div class="text-[11px] text-zinc-600 flex items-center justify-between gap-2 font-sans">
+                <span>
+                  Invasión:
+                  <span class="cad-collision-numeric">X:{{ plan.collision.overlapX }}mm | Y:{{ plan.collision.overlapY }}mm | Z:{{ plan.collision.overlapZ }}mm</span>
+                </span>
+                <span class="text-red-600 font-semibold cad-collision-numeric shrink-0">{{ plan.collision.overlapVolumeMm3 }} mm³</span>
               </div>
-              <div class="text-[11px] text-slate-600 flex justify-between">
-                <span>Invasión: X:{{ c.overlapX }}mm | Y:{{ c.overlapY }}mm | Z:{{ c.overlapZ }}mm</span>
-                <span class="font-mono text-red-600 font-bold">{{ c.overlapVolumeMm3 }} mm³</span>
-              </div>
+
+              @if (plan.canFix && plan.primaryFix; as fix) {
+                <p class="text-[11px] text-zinc-600 font-sans m-0">{{ fix.shortReason }}</p>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    (click)="applySingleCollisionFix(fix, $event)"
+                    class="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium px-2.5 py-1.5 rounded-md flex items-center gap-1.5 font-sans transition cursor-pointer">
+                    <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                    <span>{{ fix.buttonLabel }}</span>
+                  </button>
+                  @if (plan.secondaryFix; as secFix) {
+                    <button
+                      type="button"
+                      (click)="applySingleCollisionFix(secFix, $event)"
+                      class="bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 text-xs font-medium px-2 py-1.5 rounded-md font-sans transition cursor-pointer">
+                      {{ secFix.buttonLabel }}
+                    </button>
+                  }
+                </div>
+              } @else {
+                <div class="flex items-center gap-1.5 text-[11px] text-zinc-600 bg-zinc-100 border border-zinc-200 rounded-md px-2 py-1.5 font-sans">
+                  <hugeicons-icon [icon]="icons.lock" [size]="12" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                  <span>Piezas congeladas: descongela al menos una para corregir</span>
+                </div>
+              }
             </div>
           }
         </div>

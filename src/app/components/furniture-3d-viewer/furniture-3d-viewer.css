@@ -91,3 +91,9 @@
 .cad-inline-editor input[type='number'] {
   -moz-appearance: textfield;
 }
+
+/* Cifras y mediciones técnicas en tarjetas de interferencias 3D */
+.cad-collision-numeric {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}

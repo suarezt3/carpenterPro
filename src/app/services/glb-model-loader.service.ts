@@ -22,6 +22,15 @@ export class GlbModelLoaderService {
     }
   }
 
+  private ensureGeometryBounds(geometry: THREE.BufferGeometry): void {
+    if (!geometry.boundingBox) {
+      geometry.computeBoundingBox();
+    }
+    if (!geometry.boundingSphere) {
+      geometry.computeBoundingSphere();
+    }
+  }
+
   /**
    * Resuelve la URL o ruta final del modelo .glb.
    * Si es una URL absoluta o ruta raíz, se mantiene; de lo contrario se asume `public/models/appliances/`.
@@ -82,6 +91,7 @@ export class GlbModelLoaderService {
 
               if (child.geometry) {
                 child.geometry.userData = { ...(child.geometry.userData || {}), isShared: true };
+                this.ensureGeometryBounds(child.geometry);
               }
 
               if (child.material) {
@@ -95,6 +105,12 @@ export class GlbModelLoaderService {
                   child.material.needsUpdate = true;
                 }
               }
+            } else if (child instanceof THREE.Line || child instanceof THREE.LineSegments) {
+              child.userData = {
+                ...(child.userData || {}),
+                isOutline: true,
+                isAuxiliaryVisual: true
+              };
             }
           });
 
@@ -195,11 +211,14 @@ export class GlbModelLoaderService {
     const offX = appliance.modelOffset?.x || 0;
     const offY = appliance.modelOffset?.y || 0;
     const offZ = appliance.modelOffset?.z || 0;
+    const safeCenterX = Number.isFinite(center.x) ? center.x : 0;
+    const safeMinY = Number.isFinite(box.min.y) ? box.min.y : 0;
+    const safeCenterZ = Number.isFinite(center.z) ? center.z : 0;
 
     clonedModel.position.set(
-      -center.x + offX,
-      -box.min.y + offY,
-      -center.z + offZ
+      -safeCenterX + offX,
+      -safeMinY + offY,
+      -safeCenterZ + offZ
     );
 
     innerWrapper.scale.setScalar(scaleFactor);
@@ -211,25 +230,66 @@ export class GlbModelLoaderService {
     hitGeo.userData = { isShared: true };
     const hitMat = new THREE.MeshBasicMaterial({
       visible: false,
+      transparent: true,
+      opacity: 0,
       wireframe: false
     });
     hitMat.userData = { isShared: true };
     const hitMesh = new THREE.Mesh(hitGeo, hitMat);
     hitMesh.name = 'raycast_hitbox';
     hitMesh.position.set(0, targetH / 2, 0);
+    hitMesh.castShadow = false;
+    hitMesh.receiveShadow = false;
     hitMesh.userData = {
       isRaycastTarget: true,
+      isApplianceHitBox: true,
+      isAuxiliaryVisual: true,
+      isAppliance: true,
       applianceId: appliance.id
     };
     root.add(hitMesh);
 
-    // Guardar referencia en userData
+    // Guardar referencia en userData y asegurar metadatos, bounds y matrices en toda la jerarquía
     root.userData = {
+      isAppliance: true,
+      applianceId: appliance.id,
       appliance,
       isGlbModel: true,
       scaleFactor
     };
 
+    root.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const isHitBox =
+          child === hitMesh ||
+          Boolean(child.userData?.['isApplianceHitBox']) ||
+          child.name === 'raycast_hitbox';
+        child.userData = {
+          ...(child.userData || {}),
+          isAppliance: true,
+          applianceId: appliance.id,
+          ...(isHitBox ? { isApplianceHitBox: true, isAuxiliaryVisual: true } : {})
+        };
+        if (isHitBox) {
+          child.castShadow = false;
+          child.receiveShadow = false;
+        } else {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          if (child.geometry) {
+            this.ensureGeometryBounds(child.geometry);
+          }
+        }
+      } else if (child instanceof THREE.Line || child instanceof THREE.LineSegments) {
+        child.userData = {
+          ...(child.userData || {}),
+          isOutline: true,
+          isAuxiliaryVisual: true
+        };
+      }
+    });
+
+    root.updateMatrixWorld(true);
     return root;
   }
 

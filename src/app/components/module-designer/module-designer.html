@@ -940,50 +940,53 @@
           <!-- BARRA FLOTANTE PARA PIEZA INDIVIDUAL -->
           <div
             [class]="isSidebarCollapsed() ? 'right-26' : 'right-2.5'"
-            class="absolute top-2.5 z-30 flex items-center gap-1 bg-zinc-900/95 text-zinc-100 backdrop-blur-md px-1.5 py-0.5 rounded-md shadow-xl border border-zinc-800 animate-in fade-in slide-in-from-top-1 duration-150 pointer-events-auto max-w-[calc(100%-3.75rem)] min-[1800px]:max-w-[calc(100%-330px)] overflow-x-auto no-scrollbar whitespace-nowrap">
-            <!-- Badge de Pieza Individual / Edición en Línea -->
-            @if (renamingPartId() === selPart.id) {
-              <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-zinc-800 border border-zinc-700 h-6 shrink-0">
-                <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="2" class="text-zinc-400 shrink-0"></hugeicons-icon>
-                <input
-                  type="text"
-                  [value]="renamingPartName()"
-                  (input)="renamingPartName.set($any($event.target).value)"
-                  (click)="$event.stopPropagation()"
-                  (keydown.enter)="saveRenameSelectedPart()"
-                  (keydown.escape)="cancelRenamePart()"
-                  class="text-[11px] font-semibold px-1.5 py-0.5 bg-zinc-900 border border-zinc-600 rounded text-white w-28 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  placeholder="Nombre de pieza" />
-                <button
-                  type="button"
-                  (click)="saveRenameSelectedPart()"
-                  class="h-5 w-5 text-emerald-400 hover:text-emerald-300 hover:bg-zinc-700 rounded flex items-center justify-center transition cursor-pointer"
-                  title="Guardar nombre (Enter)">
-                  <hugeicons-icon [icon]="icons.check" [size]="12" [strokeWidth]="2.2"></hugeicons-icon>
-                </button>
-                <button
-                  type="button"
-                  (click)="cancelRenamePart()"
-                  class="h-5 w-5 text-red-400 hover:text-red-300 hover:bg-zinc-700 rounded flex items-center justify-center transition cursor-pointer"
-                  title="Cancelar (Esc)">
-                  <hugeicons-icon [icon]="icons.close" [size]="12" [strokeWidth]="2"></hugeicons-icon>
-                </button>
-              </div>
-            } @else {
-              <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-zinc-800/80 border border-zinc-700 h-6 shrink-0">
-                <span class="w-1.5 h-1.5 rounded-full" [class]="isPartLocked(selPart.id) ? 'bg-amber-400' : 'bg-blue-400 animate-pulse'"></span>
-                <hugeicons-icon [icon]="icons.squareShape" [size]="13" [strokeWidth]="1.9" class="text-zinc-300 shrink-0"></hugeicons-icon>
-                <span class="text-[11px] font-semibold text-zinc-100 truncate max-w-24 xl:max-w-32">{{ selPart.name }}</span>
-                <span class="text-[10px] text-zinc-400 font-mono tabular-nums">({{ selPart.length }}×{{ selPart.width }}×{{ selPart.thickness }})</span>
-                <button
-                  type="button"
-                  (click)="startRenameSelectedPart($event)"
-                  class="ml-0.5 text-zinc-400 hover:text-white hover:bg-zinc-700 p-0.5 rounded transition cursor-pointer flex items-center justify-center"
-                  title="Renombrar esta pieza">
-                  <hugeicons-icon [icon]="icons.edit" [size]="11" [strokeWidth]="1.9"></hugeicons-icon>
-                </button>
-              </div>
-            }
+            class="absolute top-2.5 z-30 flex flex-col items-end gap-1 pointer-events-none max-w-[calc(100%-3.75rem)] min-[1800px]:max-w-[calc(100%-330px)]">
+            <div class="pointer-events-auto flex items-center gap-1 bg-zinc-900/95 text-zinc-100 backdrop-blur-md px-1.5 py-0.5 rounded-md shadow-xl border border-zinc-800 animate-in fade-in slide-in-from-top-1 duration-150 max-w-full overflow-x-auto no-scrollbar whitespace-nowrap font-sans">
+              <!-- Badge de Pieza Individual / Edición en Línea -->
+              @if (renamingPartId() === selPart.id) {
+                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-zinc-800 border border-zinc-700 h-6 shrink-0">
+                  <hugeicons-icon [icon]="icons.edit" [size]="12" [strokeWidth]="2" class="text-zinc-400 shrink-0"></hugeicons-icon>
+                  <input
+                    #floatingRenameInput
+                    type="text"
+                    [value]="renamingPartName()"
+                    (input)="renamingPartName.set(floatingRenameInput.value)"
+                    (click)="$event.stopPropagation()"
+                    (keydown.enter)="saveRenameSelectedPart()"
+                    (keydown.escape)="cancelRenamePart()"
+                    class="text-[11px] font-sans font-semibold px-1.5 py-0.5 bg-zinc-900 border border-zinc-600 rounded text-white w-28 sm:w-36 focus:outline-hidden focus:ring-1 focus:ring-sky-600"
+                    placeholder="Nombre de pieza"
+                    aria-label="Nombre de la pieza" />
+                  <button
+                    type="button"
+                    (click)="saveRenameSelectedPart()"
+                    class="h-5 w-5 text-emerald-400 hover:text-emerald-300 hover:bg-zinc-700 rounded flex items-center justify-center transition cursor-pointer"
+                    title="Guardar nombre (Enter)">
+                    <hugeicons-icon [icon]="icons.check" [size]="12" [strokeWidth]="2.2"></hugeicons-icon>
+                  </button>
+                  <button
+                    type="button"
+                    (click)="cancelRenamePart()"
+                    class="h-5 w-5 text-red-400 hover:text-red-300 hover:bg-zinc-700 rounded flex items-center justify-center transition cursor-pointer"
+                    title="Cancelar (Esc)">
+                    <hugeicons-icon [icon]="icons.close" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                  </button>
+                </div>
+              } @else {
+                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-zinc-800/80 border border-zinc-700 h-6 shrink-0">
+                  <span class="w-1.5 h-1.5 rounded-full" [class]="isPartLocked(selPart.id) ? 'bg-amber-400' : 'bg-sky-500 animate-pulse'"></span>
+                  <hugeicons-icon [icon]="icons.squareShape" [size]="13" [strokeWidth]="1.9" class="text-zinc-300 shrink-0"></hugeicons-icon>
+                  <span class="text-[11px] font-sans font-semibold text-zinc-100 truncate max-w-28 xl:max-w-44">{{ selPart.name }}</span>
+                  <span class="text-[10px] text-zinc-400 font-numeric tabular-nums">({{ selPart.length }}×{{ selPart.width }}×{{ selPart.thickness }})</span>
+                  <button
+                    type="button"
+                    (click)="startRenameSelectedPart($event)"
+                    class="ml-0.5 text-zinc-400 hover:text-white hover:bg-zinc-700 p-0.5 rounded transition cursor-pointer flex items-center justify-center"
+                    title="Renombrar esta pieza o asignar rol rápido">
+                    <hugeicons-icon [icon]="icons.edit" [size]="11" [strokeWidth]="1.9"></hugeicons-icon>
+                  </button>
+                </div>
+              }
 
             @if (selectedPartParentGroup(); as parentGrp) {
               <button
@@ -1104,6 +1107,29 @@
               title="Deseleccionar pieza (Esc)">
               <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
             </button>
+            </div>
+
+            @if (renamingPartId() === selPart.id) {
+              <!-- Selector Rápido de Rol Semántico en 1 Clic -->
+              <div class="md-quick-role-strip pointer-events-auto flex flex-wrap items-center justify-end gap-1 bg-zinc-900/95 text-zinc-100 backdrop-blur-md px-2 py-1.5 rounded-md shadow-xl border border-zinc-800 animate-in fade-in slide-in-from-top-1 duration-150 max-w-full font-sans">
+                <span class="text-[10px] font-sans font-medium text-zinc-400 mr-0.5 shrink-0 flex items-center gap-1">
+                  <hugeicons-icon [icon]="icons.tag" [size]="11" [strokeWidth]="2" class="text-sky-400 shrink-0"></hugeicons-icon>
+                  <span>Rol rápido:</span>
+                </span>
+                @for (preset of quickRolePresets; track preset.role) {
+                  <button
+                    type="button"
+                    (click)="applyQuickRoleToPart(selPart.id, preset, $event)"
+                    [class]="selPart.componentRole === preset.role
+                      ? 'bg-sky-600/20 text-sky-300 border-sky-500 font-semibold'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700 font-medium'"
+                    class="md-quick-role-pill h-6 px-2 rounded-md border text-[11px] font-sans leading-none flex items-center justify-center transition cursor-pointer shrink-0 whitespace-nowrap"
+                    [title]="'Asignar rol: ' + preset.partName">
+                    {{ preset.label }}
+                  </button>
+                }
+              </div>
+            }
           </div>
         } @else if (selectedAppliance(); as selApp) {
           <!-- BARRA FLOTANTE PARA ELECTRODOMÉSTICO INDIVIDUAL -->
@@ -3185,11 +3211,13 @@
 
                 <!-- Nombre Editable -->
                 <input
+                  #manualNameInput
                   type="text"
                   [value]="sel.name"
-                  (input)="updateSelectedPart({ name: $any($event.target).value })"
-                  class="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs font-semibold text-zinc-900 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs transition"
-                  placeholder="Nombre de la pieza" />
+                  (input)="updateSelectedPartManualName(manualNameInput.value)"
+                  class="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs font-sans font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 focus:ring-1 focus:ring-sky-600 shadow-2xs transition"
+                  placeholder="Nombre de la pieza"
+                  aria-label="Nombre de la pieza" />
 
                 <!-- Selector Rápido de Disposición / Orientación en 3D -->
                 <div class="pt-1">
@@ -5535,13 +5563,15 @@
                           {{ $index + 1 }}
                         </span>
                         <input
+                          #partListRenameInput
                           type="text"
                           [value]="renamingPartName()"
-                          (input)="renamingPartName.set($any($event.target).value)"
+                          (input)="renamingPartName.set(partListRenameInput.value)"
                           (keydown.enter)="saveRenamePart(part.id)"
                           (keydown.escape)="cancelRenamePart()"
-                          class="text-xs font-medium px-1.5 py-0.5 bg-white border border-zinc-300 rounded text-zinc-900 flex-1 min-w-0 focus:outline-hidden focus:border-zinc-500"
-                          placeholder="Nombre de la pieza" />
+                          class="text-xs font-sans font-medium px-1.5 py-0.5 bg-white border border-zinc-300 rounded text-zinc-900 flex-1 min-w-0 focus:outline-hidden focus:border-sky-600 focus:ring-1 focus:ring-sky-600"
+                          placeholder="Nombre de la pieza"
+                          aria-label="Nombre de la pieza" />
                         <button
                           type="button"
                           (click)="saveRenamePart(part.id)"

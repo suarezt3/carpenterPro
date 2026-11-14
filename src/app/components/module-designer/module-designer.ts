@@ -114,6 +114,13 @@ function normalizeSearchText(value: string | null | undefined): string {
     .trim();
 }
 
+/** Preset de rol rápido semántico para asignación en 1 clic desde la barra flotante. */
+export interface QuickRolePreset {
+  label: string;
+  partName: string;
+  role: ComponentRole;
+}
+
 /**
  * Componente principal de diseño y modelado 3D (Modo Módulo y Modo Habitación 3D).
  * Coordina el visor Three.js, el inspector de propiedades de piezas, el catálogo de módulos
@@ -354,6 +361,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     ]),
     listNumbered: CheckListIcon,
     currency: Tag01Icon,
+    tag: Tag01Icon,
     coffee: cadSvg([
       'M4 8H16V15A4 4 0 0 1 12 19H8A4 4 0 0 1 4 15V8Z',
       'M16 9H18.5A2.5 2.5 0 0 1 18.5 14H16',
@@ -1338,6 +1346,18 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   readonly renamingGroupName = signal<string>('');
   readonly renamingPartId = signal<string | null>(null);
   readonly renamingPartName = signal<string>('');
+
+  readonly quickRolePresets: readonly QuickRolePreset[] = [
+    { label: 'Lateral Izq.', partName: 'LATERAL IZQUIERDO', role: 'side_left' },
+    { label: 'Lateral Der.', partName: 'LATERAL DERECHO', role: 'side_right' },
+    { label: 'Tapa / Cubierta', partName: 'TAPA SUPERIOR', role: 'top' },
+    { label: 'Piso / Base', partName: 'PISO INFERIOR', role: 'bottom' },
+    { label: 'Entrepaño', partName: 'ENTREPAÑO', role: 'shelf' },
+    { label: 'División', partName: 'DIVISIÓN VERTICAL', role: 'divider' },
+    { label: 'Amarre', partName: 'AMARRE TRASERO', role: 'tie' },
+    { label: 'Fondo', partName: 'FONDO TRASERO', role: 'back' },
+    { label: 'Zócalo', partName: 'ZÓCALO FRONTAL', role: 'plinth' }
+  ];
 
   readonly isNewGroupNameDuplicate = computed(() => {
     const name = this.newGroupNameInput().trim();
@@ -2560,6 +2580,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.projectService.selectAppliances([]);
     this.projectService.selectAppliance(null);
     this.selectedWall.set(null);
+    this.cancelRenamePart();
     this.activeDockTab.set('catalog');
   }
 
@@ -2715,6 +2736,17 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     }
 
     this.projectService.updatePart(updated);
+  }
+
+  /**
+   * Actualiza manualmente el nombre de la pieza seleccionada marcándola con nombre personalizado
+   * para protegerla contra re-etiquetados semánticos automáticos.
+   */
+  updateSelectedPartManualName(rawName: string) {
+    this.updateSelectedPart({
+      name: rawName,
+      hasCustomName: rawName.trim().length > 0
+    });
   }
 
   /**
@@ -3013,7 +3045,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       orientation,
       posY: newPosY
     });
-    this.showToast(`📐 Orientación: ${orientation === 'horizontal' ? 'Horizontal (H)' : orientation === 'vertical_yz' ? 'Lateral YZ (L)' : 'Frontal XY (F)'}`);
+    this.showToast(`Orientación: ${orientation === 'horizontal' ? 'Horizontal (H)' : orientation === 'vertical_yz' ? 'Lateral YZ (L)' : 'Frontal XY (F)'}`);
   }
 
   rotateSelectedPart90(axis: 'x' | 'y' | 'z' = 'y') {
@@ -3032,7 +3064,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       const current = sel[prop] || 0;
       this.updateSelectedPart({ [prop]: (current + 90) % 360 });
     }
-    this.showToast('🔄 Pieza girada 90°');
+    this.showToast('Pieza girada 90°');
   }
 
   rotateSelectedPart3DAngle(axis: 'x' | 'y' | 'z', delta: number) {
@@ -3338,7 +3370,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       this.selectedPartId.set(cloned.id);
       this.selectedPartIds.set([cloned.id]);
       this.activeDockTab.set('piece');
-      this.showToast(`📋 Se duplicó "${cloned.name}"`);
+      this.showToast(`Se duplicó "${cloned.name}"`);
     }
   }
 
@@ -3714,6 +3746,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     }
     this.projectService.addPart(newPart);
     this.selectedPartId.set(newPart.id);
+    this.selectedPartIds.set([newPart.id]);
     this.activeDockTab.set('piece');
   }
 
@@ -5105,14 +5138,29 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       this.cancelRenamePart();
       return;
     }
-    if (this.isPieceNameTaken(newName, partId)) {
-      const suggestion = this.getNextUniquePieceName(newName);
-      this.showToast(`⚠️ Ya existe otra pieza llamada "${newName}". Sugerencia: ${suggestion}`);
+    if (newName === part.name) {
+      this.cancelRenamePart();
       return;
     }
-    this.projectService.updatePart({ ...part, name: newName });
-    this.showToast(`✏️ Pieza renombrada a "${newName}"`);
+    if (this.isPieceNameTaken(newName, partId)) {
+      const suggestion = this.getNextUniquePieceName(newName);
+      this.showToast(`Ya existe otra pieza llamada "${newName}". Sugerencia: ${suggestion}`);
+      return;
+    }
+    this.projectService.updatePart({ ...part, name: newName, hasCustomName: true });
+    this.showToast(`Pieza renombrada a "${newName}"`);
     this.renamingPartId.set(null);
+    this.renamingPartName.set('');
+  }
+
+  applyQuickRoleToPart(partId: string, preset: QuickRolePreset, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    const updated = this.projectService.assignPartQuickRole(partId, preset.role, preset.partName);
+    this.renamingPartId.set(null);
+    this.renamingPartName.set('');
+    if (updated) {
+      this.showToast(`Rol asignado: "${updated.name || preset.partName}"`);
+    }
   }
 
   cancelRenamePart() {
