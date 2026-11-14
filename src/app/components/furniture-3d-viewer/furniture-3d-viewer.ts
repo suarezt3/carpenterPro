@@ -11,6 +11,7 @@ import {
   effect,
   untracked,
   OnDestroy,
+  DestroyRef,
   NgZone,
   inject
 } from '@angular/core';
@@ -104,6 +105,13 @@ import {
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { I18nService } from '../../services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import {
+  ContainerBoundsRect,
+  ContextMenuPositioningService,
+  DEFAULT_CONTEXT_MENU_HEIGHT_PX,
+  DEFAULT_CONTEXT_MENU_WIDTH_PX,
+  SubmenuPlacement
+} from '../../services/context-menu-positioning.service';
 
 type HugeIconDef = typeof Compass01Icon;
 const cadSvg = (paths: string[]): HugeIconDef =>
@@ -237,12 +245,14 @@ export interface WallToWallSnapGuide {
   host: {
     class: 'block w-full h-full',
     '(window:keydown)': 'handleViewerKeyDown($event)',
-    '(window:keyup)': 'handleViewerKeyUp($event)'
+    '(window:keyup)': 'handleViewerKeyUp($event)',
+    '(window:resize)': 'onWindowResize()'
   }
 })
 export class Furniture3dViewerComponent implements OnDestroy {
   readonly i18n = inject(I18nService);
   private readonly ngZone = inject(NgZone);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly projectStorage = inject(ProjectStorageService);
   private joineryEngine = inject(JoineryEngineService);
   private partGeometry = inject(PartGeometryService);
@@ -253,6 +263,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private readonly sceneRaycastPicker = inject(SceneRaycastPickerService);
   private readonly dimensionAnchor = inject(DimensionAnchor3dService);
   private readonly tapeMeasure = inject(TapeMeasure3dService);
+  private readonly contextMenuPositioning = inject(ContextMenuPositioningService);
 
   // Iconos vectoriales estilizados para la cinta de herramientas CAD y menús 3D
   readonly icons = {
@@ -515,6 +526,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   // Right-Click Context Menu State
   readonly contextMenuPos = signal<{ x: number; y: number } | null>(null);
+  readonly contextMenuSubmenuFlip = signal<SubmenuPlacement>({
+    openLeft: false,
+    openUp: false
+  });
+  readonly contextMenuMaxHeightPx = signal<number | null>(null);
+  readonly contextMenuPanelRef = viewChild<ElementRef<HTMLElement>>('contextMenuPanel');
+  readonly contextMenuBodyRef = viewChild<ElementRef<HTMLElement>>('contextMenuBody');
+  private contextMenuRawCursor: { clientX: number; clientY: number } | null = null;
+  private contextMenuRepositionRafId: number | null = null;
   readonly contextMenuPart = signal<Part | null>(null);
   readonly contextMenuAppliance = signal<ApplianceItem | null>(null);
   readonly showQuickMaterialPicker = signal<boolean>(false);
@@ -1142,6 +1162,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
   } | null = null;
 
   constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.cancelContextMenuRepositionRaf();
+    });
+
     afterNextRender(() => {
       this.initThree();
     });
@@ -10040,9 +10064,6 @@ private createHandleMesh(
     if (!canvas || !container || !this.camera) return;
 
     const rect = canvas.getBoundingClientRect();
-    const contRect = container.getBoundingClientRect();
-    const posX = Math.max(10, Math.min(e.clientX - contRect.left, contRect.width - 265));
-    const posY = Math.max(10, Math.min(e.clientY - contRect.top, contRect.height - 390));
 
     this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -10064,18 +10085,11 @@ private createHandleMesh(
       }
       this.contextMenuAppliance.set(foundApp);
       this.contextMenuPart.set(null);
-      this.contextMenuPos.set({ x: posX, y: posY });
       this.applianceSelected.emit(foundApp);
       this.appliancesSelected.emit([foundApp.id]);
       this.partsSelected.emit([]);
       this.partSelected.emit(null);
-
-      this.showQuickMaterialPicker.set(false);
-      this.showRotateSubmenu.set(false);
-      this.showMovableRoleSubmenu.set(false);
-      this.showHandleSubmenu.set(false);
-      this.showHingeSubmenu.set(false);
-      this.showSlideSubmenu.set(false);
+      this.openContextMenuAtCursor(e.clientX, e.clientY);
       return;
     }
 
@@ -10092,7 +10106,6 @@ private createHandleMesh(
       }
       this.contextMenuAppliance.set(null);
       this.contextMenuPart.set(part);
-      this.contextMenuPos.set({ x: posX, y: posY });
 
       const curIds = this.activeSelectedIds();
       const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === part.id;
@@ -10114,37 +10127,180 @@ private createHandleMesh(
         this.applyMaterialToWholeGroup.set(false);
       }
 
-      this.showQuickMaterialPicker.set(false);
-      this.showRotateSubmenu.set(false);
-      this.showMovableRoleSubmenu.set(false);
-      this.showHandleSubmenu.set(false);
-      this.showHingeSubmenu.set(false);
-      this.showSlideSubmenu.set(false);
+      this.openContextMenuAtCursor(e.clientX, e.clientY);
       return;
     }
 
     // Clicked empty canvas space (or non-part foreground blocker such as wall / reference guide)
     this.contextMenuAppliance.set(null);
     this.contextMenuPart.set(null);
-    this.contextMenuPos.set({ x: posX, y: posY });
-    this.showQuickMaterialPicker.set(false);
-    this.showRotateSubmenu.set(false);
-    this.showMovableRoleSubmenu.set(false);
-    this.showHandleSubmenu.set(false);
-    this.showHingeSubmenu.set(false);
-    this.showSlideSubmenu.set(false);
+    this.openContextMenuAtCursor(e.clientX, e.clientY);
+  }
+
+  /** Recalcula la posición del menú contextual usando las dimensiones medidas en el DOM. */
+  repositionContextMenuToViewport(): void {
+    if (!this.contextMenuPos() || !this.contextMenuRawCursor) {
+      return;
+    }
+    const panelEl = this.contextMenuPanelRef()?.nativeElement;
+    const rect = panelEl?.getBoundingClientRect();
+    const measuredWidth = rect && rect.width > 0 ? rect.width : undefined;
+    const measuredHeight = rect && rect.height > 0 ? rect.height : undefined;
+    this.applySmartContextMenuPosition(
+      this.contextMenuRawCursor.clientX,
+      this.contextMenuRawCursor.clientY,
+      measuredWidth,
+      measuredHeight
+    );
+  }
+
+  /** Programa un reajuste tras el próximo frame de renderizado para reflejar la altura real del menú. */
+  scheduleContextMenuReposition(): void {
+    if (!this.contextMenuPos() || !this.contextMenuRawCursor) {
+      return;
+    }
+    this.cancelContextMenuRepositionRaf();
+    if (typeof requestAnimationFrame !== 'function') {
+      this.repositionContextMenuToViewport();
+      return;
+    }
+    this.contextMenuRepositionRafId = requestAnimationFrame(() => {
+      this.contextMenuRepositionRafId = null;
+      this.repositionContextMenuToViewport();
+    });
+  }
+
+  /** Reubica el menú contextual si está abierto cuando cambia el tamaño de la ventana. */
+  onWindowResize(): void {
+    if (!this.contextMenuPos()) {
+      return;
+    }
+    this.repositionContextMenuToViewport();
+    this.scheduleContextMenuReposition();
+  }
+
+  private cancelContextMenuRepositionRaf(): void {
+    if (this.contextMenuRepositionRafId !== null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(this.contextMenuRepositionRafId);
+    }
+    this.contextMenuRepositionRafId = null;
+  }
+
+  private getViewportMetricsForContextMenu(): {
+    viewportWidth: number;
+    viewportHeight: number;
+    containerRect: ContainerBoundsRect | null;
+    rightPanelLeft: number | null;
+  } {
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const containerEl = this.containerRef()?.nativeElement;
+    let containerRect: ContainerBoundsRect | null = null;
+    if (containerEl) {
+      const rect = containerEl.getBoundingClientRect();
+      containerRect = {
+        top: rect.top,
+        left: rect.left,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height
+      };
+    }
+    const rightPanelLeft =
+      typeof document !== 'undefined'
+        ? this.contextMenuPositioning.findOpenRightPanelLeftPx(document)
+        : null;
+    return { viewportWidth, viewportHeight, containerRect, rightPanelLeft };
+  }
+
+  private applySmartContextMenuPosition(
+    clientX: number,
+    clientY: number,
+    menuWidth?: number,
+    menuHeight?: number
+  ): void {
+    const { viewportWidth, viewportHeight, containerRect, rightPanelLeft } =
+      this.getViewportMetricsForContextMenu();
+    const effectiveWidth =
+      menuWidth != null && Number.isFinite(menuWidth) && menuWidth > 0
+        ? menuWidth
+        : DEFAULT_CONTEXT_MENU_WIDTH_PX;
+    const effectiveHeight =
+      menuHeight != null && Number.isFinite(menuHeight) && menuHeight > 0
+        ? menuHeight
+        : DEFAULT_CONTEXT_MENU_HEIGHT_PX;
+
+    const smartPos = this.contextMenuPositioning.computeSmartContextMenuPosition({
+      clientX,
+      clientY,
+      menuWidth: effectiveWidth,
+      menuHeight: effectiveHeight,
+      viewportWidth,
+      viewportHeight,
+      rightPanelLeft,
+      containerRect
+    });
+
+    const renderedHeight = Math.min(effectiveHeight, smartPos.maxHeightPx);
+    const submenuPlacement = this.contextMenuPositioning.computeSubmenuPlacement({
+      menuRect: {
+        left: smartPos.x,
+        right: smartPos.x + effectiveWidth,
+        top: smartPos.y,
+        bottom: smartPos.y + renderedHeight
+      },
+      viewportWidth,
+      viewportHeight,
+      safeBottom: smartPos.safeBounds.bottom
+    });
+
+    this.contextMenuPos.set({ x: smartPos.x, y: smartPos.y });
+    this.contextMenuMaxHeightPx.set(smartPos.maxHeightPx);
+    this.contextMenuSubmenuFlip.set(submenuPlacement);
+  }
+
+  private resetContextMenuSubmenus(active?: typeof this.showRotateSubmenu): void {
+    const submenus = [
+      this.showQuickMaterialPicker,
+      this.showRotateSubmenu,
+      this.showMovableRoleSubmenu,
+      this.showHandleSubmenu,
+      this.showHingeSubmenu,
+      this.showSlideSubmenu
+    ];
+    for (const submenu of submenus) {
+      if (submenu !== active) {
+        submenu.set(false);
+      }
+    }
+  }
+
+  private openContextMenuAtCursor(clientX: number, clientY: number): void {
+    this.contextMenuRawCursor = { clientX, clientY };
+    this.resetContextMenuSubmenus();
+    this.applySmartContextMenuPosition(clientX, clientY);
+    this.scheduleContextMenuReposition();
+  }
+
+  private toggleContextSubmenu(target: typeof this.showRotateSubmenu): void {
+    target.update(v => !v);
+    this.resetContextMenuSubmenus(target);
+    if (this.contextMenuPos()) {
+      this.repositionContextMenuToViewport();
+      this.scheduleContextMenuReposition();
+    }
   }
 
   closeContextMenu() {
+    this.cancelContextMenuRepositionRaf();
+    this.contextMenuRawCursor = null;
     this.contextMenuPos.set(null);
+    this.contextMenuMaxHeightPx.set(null);
+    this.contextMenuSubmenuFlip.set({ openLeft: false, openUp: false });
     this.contextMenuPart.set(null);
     this.contextMenuAppliance.set(null);
-    this.showQuickMaterialPicker.set(false);
-    this.showRotateSubmenu.set(false);
-    this.showMovableRoleSubmenu.set(false);
-    this.showHandleSubmenu.set(false);
-    this.showHingeSubmenu.set(false);
-    this.showSlideSubmenu.set(false);
+    this.resetContextMenuSubmenus();
   }
 
   onContextMenuApplianceDimChange(app: ApplianceItem, prop: 'width' | 'depth' | 'height', val: number | string) {
@@ -10204,57 +10360,27 @@ private createHandleMesh(
   }
 
   toggleRotateSubmenu() {
-    this.showRotateSubmenu.update(v => !v);
-    this.showQuickMaterialPicker.set(false);
-    this.showMovableRoleSubmenu.set(false);
-    this.showHandleSubmenu.set(false);
-    this.showHingeSubmenu.set(false);
-    this.showSlideSubmenu.set(false);
+    this.toggleContextSubmenu(this.showRotateSubmenu);
   }
 
   toggleQuickMaterialPicker() {
-    this.showQuickMaterialPicker.update(v => !v);
-    this.showRotateSubmenu.set(false);
-    this.showMovableRoleSubmenu.set(false);
-    this.showHandleSubmenu.set(false);
-    this.showHingeSubmenu.set(false);
-    this.showSlideSubmenu.set(false);
+    this.toggleContextSubmenu(this.showQuickMaterialPicker);
   }
 
   toggleMovableRoleSubmenu() {
-    this.showMovableRoleSubmenu.update(v => !v);
-    this.showRotateSubmenu.set(false);
-    this.showQuickMaterialPicker.set(false);
-    this.showHandleSubmenu.set(false);
-    this.showHingeSubmenu.set(false);
-    this.showSlideSubmenu.set(false);
+    this.toggleContextSubmenu(this.showMovableRoleSubmenu);
   }
 
   toggleHandleSubmenu() {
-    this.showHandleSubmenu.update(v => !v);
-    this.showRotateSubmenu.set(false);
-    this.showQuickMaterialPicker.set(false);
-    this.showMovableRoleSubmenu.set(false);
-    this.showHingeSubmenu.set(false);
-    this.showSlideSubmenu.set(false);
+    this.toggleContextSubmenu(this.showHandleSubmenu);
   }
 
   toggleHingeSubmenu() {
-    this.showHingeSubmenu.update(v => !v);
-    this.showRotateSubmenu.set(false);
-    this.showQuickMaterialPicker.set(false);
-    this.showMovableRoleSubmenu.set(false);
-    this.showHandleSubmenu.set(false);
-    this.showSlideSubmenu.set(false);
+    this.toggleContextSubmenu(this.showHingeSubmenu);
   }
 
   toggleSlideSubmenu() {
-    this.showSlideSubmenu.update(v => !v);
-    this.showRotateSubmenu.set(false);
-    this.showQuickMaterialPicker.set(false);
-    this.showMovableRoleSubmenu.set(false);
-    this.showHandleSubmenu.set(false);
-    this.showHingeSubmenu.set(false);
+    this.toggleContextSubmenu(this.showSlideSubmenu);
   }
 
   isAnimatablePart(part: Part | null): boolean {
@@ -10392,6 +10518,10 @@ private createHandleMesh(
     this.partsSelected.emit(grpIds);
     if (part) this.partSelected.emit(part);
     this.applyMaterialToWholeGroup.set(true);
+    if (this.contextMenuPos()) {
+      this.repositionContextMenuToViewport();
+      this.scheduleContextMenuReposition();
+    }
   }
 
   selectSinglePartFromContext() {
@@ -10412,6 +10542,10 @@ private createHandleMesh(
     this.partsSelected.emit([part.id]);
     this.partSelected.emit(part);
     this.applyMaterialToWholeGroup.set(false);
+    if (this.contextMenuPos()) {
+      this.repositionContextMenuToViewport();
+      this.scheduleContextMenuReposition();
+    }
   }
 
   hideContextMenuGroup() {
