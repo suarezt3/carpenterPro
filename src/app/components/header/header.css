@@ -3,3 +3,16 @@
   display: block;
   width: 100%;
 }
+
+/* Garantiza que el popover de edición de título nunca sea recortado por .truncate */
+:host .header-title-trigger.overflow-visible {
+  overflow: visible;
+}
+
+/* Compactación de altura del header principal en portátiles de altura reducida (<= 820px) */
+@media (max-height: 820px) {
+  .header-main-bar {
+    min-height: 44px;
+    height: 44px;
+  }
+}

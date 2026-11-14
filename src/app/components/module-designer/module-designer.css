@@ -8,25 +8,42 @@
   flex: 1 1 0%;
 }
 
-/* Ajustes verticales automáticos para pantallas HD (1280x720 / 1366x768) */
-@media (max-height: 800px) {
+/* Sub-barra superior del Modelador 3D: anti-colisión en una sola fila con scroll invisible de respaldo */
+.md-top-bar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.md-top-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ajustes verticales automáticos para pantallas portátiles 14" / HD (max-height: 820px: 1280x720, 1366x768) */
+@media (max-height: 820px) {
+  .md-designer-shell {
+    padding: 0.375rem;
+    gap: 0.375rem;
+  }
+
+  .md-main-columns,
+  .md-viewer-column {
+    gap: 0.375rem;
+  }
+
   .md-top-bar {
-    height: 2rem;
+    min-height: 38px;
+    height: 2.375rem;
+    padding-block: 0.25rem;
   }
 
   .md-chips-bar {
-    padding-top: 0.25rem;
-    padding-bottom: 0.25rem;
+    padding-top: 0.1875rem;
+    padding-bottom: 0.1875rem;
   }
-}
 
-/* Barra de roles rápidos 1-clic en tipografía Inter (Minimalist Studio) */
-.md-quick-role-strip,
-.md-quick-role-pill {
-  font-family: var(--font-sans);
-}
-
-@media (max-height: 800px) {
   .md-quick-role-strip {
     padding-top: 0.25rem;
     padding-bottom: 0.25rem;
@@ -38,6 +55,12 @@
     padding-right: 0.4375rem;
     font-size: 10.5px;
   }
+}
+
+/* Barra de roles rápidos 1-clic en tipografía Inter (Minimalist Studio) */
+.md-quick-role-strip,
+.md-quick-role-pill {
+  font-family: var(--font-sans);
 }
 
 /* Scrollbar compacto y suave para filtros horizontales y listas de materiales */

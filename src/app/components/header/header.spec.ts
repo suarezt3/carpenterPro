@@ -102,12 +102,14 @@ describe('HeaderComponent — Milestone 4 (Studio Topbar Reorganization & Overla
   });
 
   describe('F3: Contenedor del nombre de proyecto acotado', () => {
-    it('debe contener min-w-[120px] max-w-[180px] 2xl:max-w-[230px] truncate shrink-0 para evitar solapamiento', () => {
+    it('debe contener min-w-[84px] max-w-[108px] min-[1440px]:max-w-[125px] 2xl:max-w-[125px] min-[1840px]:max-w-[180px] truncate shrink-0 para evitar solapamiento', () => {
       const titleContainer = element.querySelector('.relative.hidden.md\\:flex.items-center');
       expect(titleContainer).toBeTruthy();
-      expect(titleContainer?.className).toContain('min-w-[120px]');
-      expect(titleContainer?.className).toContain('max-w-[180px]');
-      expect(titleContainer?.className).toContain('2xl:max-w-[230px]');
+      expect(titleContainer?.className).toContain('min-w-[84px]');
+      expect(titleContainer?.className).toContain('max-w-[108px]');
+      expect(titleContainer?.className).toContain('min-[1440px]:max-w-[125px]');
+      expect(titleContainer?.className).toContain('2xl:max-w-[125px]');
+      expect(titleContainer?.className).toContain('min-[1840px]:max-w-[180px]');
       expect(titleContainer?.className).toContain('truncate');
       expect(titleContainer?.className).toContain('shrink-0');
     });
@@ -194,8 +196,10 @@ describe('HeaderComponent — Milestone 4 (Studio Topbar Reorganization & Overla
 
       const adminBtn = element.querySelector('[data-testid="header-admin-btn"]') as HTMLButtonElement;
       expect(adminBtn).toBeTruthy();
-      expect(adminBtn.className).toContain('w-9');
-      expect(adminBtn.className).toContain('h-9');
+      expect(adminBtn.className).toContain('w-7.5');
+      expect(adminBtn.className).toContain('h-7.5');
+      expect(adminBtn.className).toContain('min-[1840px]:w-8');
+      expect(adminBtn.className).toContain('min-[1840px]:h-8');
       expect(adminBtn.className).toContain('shrink-0');
       expect(adminBtn.textContent?.trim()).toBe('');
       expect(adminBtn.getAttribute('title')).toBe('Panel Ejecutivo Superadmin');
@@ -208,11 +212,13 @@ describe('HeaderComponent — Milestone 4 (Studio Topbar Reorganization & Overla
   });
 
   describe('F7: Botón Minimalista Compacto de Cerrar Sesión', () => {
-    it('debe tener dimensiones w-9 h-9, shrink-0 y selector data-testid="studio-signout-btn"', () => {
+    it('debe tener dimensiones w-7.5 h-7.5 min-[1840px]:w-8 min-[1840px]:h-8, shrink-0 y selector data-testid="studio-signout-btn"', () => {
       const signOutBtn = element.querySelector('[data-testid="studio-signout-btn"]') as HTMLButtonElement;
       expect(signOutBtn).toBeTruthy();
-      expect(signOutBtn.className).toContain('w-9');
-      expect(signOutBtn.className).toContain('h-9');
+      expect(signOutBtn.className).toContain('w-7.5');
+      expect(signOutBtn.className).toContain('h-7.5');
+      expect(signOutBtn.className).toContain('min-[1840px]:w-8');
+      expect(signOutBtn.className).toContain('min-[1840px]:h-8');
       expect(signOutBtn.className).toContain('shrink-0');
     });
 
@@ -449,6 +455,219 @@ describe('HeaderComponent — Milestone 4 (Studio Topbar Reorganization & Overla
       const fallbackCircle = userButton.querySelector('div.rounded-full') as HTMLElement;
       expect(fallbackCircle).toBeTruthy();
       expect(fallbackCircle.className).toContain('bg-emerald-600');
+    });
+  });
+
+  describe('Fase 1 y Fase 3: Header responsivo para portátiles 14" (1280px–1920px)', () => {
+    it('debe mantener overflow-visible en .header-main-bar y compacto h-11 2xl:h-12', () => {
+      const mainBar = element.querySelector('.header-main-bar') as HTMLElement;
+      expect(mainBar).toBeTruthy();
+      expect(mainBar.className).toContain('h-11');
+      expect(mainBar.className).toContain('2xl:h-12');
+      expect(mainBar.className).toContain('overflow-visible');
+
+      const headerWrapper = element.querySelector('header > div') as HTMLElement;
+      expect(headerWrapper).toBeTruthy();
+      expect(headerWrapper.className).toContain('overflow-visible');
+    });
+
+    it('debe ocultar Studio, separador y pastilla v3.0.0 por debajo de 2xl (1536px) manteniendo v3.0.0 en el DOM', () => {
+      const spans = Array.from(element.querySelectorAll('header span'));
+      const studioBadge = spans.find((el) => el.textContent?.trim() === 'Studio');
+      const dotSeparator = spans.find((el) => el.textContent?.trim() === '·');
+      const versionBtn = Array.from(element.querySelectorAll('header button')).find((btn) =>
+        btn.textContent?.includes('v3.0.0')
+      );
+
+      expect(studioBadge).toBeTruthy();
+      expect(studioBadge?.className).toContain('hidden');
+      expect(studioBadge?.className).toContain('2xl:inline-block');
+
+      expect(dotSeparator).toBeTruthy();
+      expect(dotSeparator?.className).toContain('hidden');
+      expect(dotSeparator?.className).toContain('2xl:inline');
+
+      expect(versionBtn).toBeTruthy();
+      expect(versionBtn?.className).toContain('hidden');
+      expect(versionBtn?.className).toContain('2xl:inline-flex');
+      expect(versionBtn?.className).toContain('whitespace-nowrap');
+      expect(versionBtn?.className).toContain('shrink-0');
+    });
+
+    it('debe renderizar en <nav> las 5 pestañas con versión completa (hidden min-[1840px]:inline), compacta (min-[1840px]:hidden) y respaldo <1280px', () => {
+      const nav = element.querySelector('header nav') as HTMLElement;
+      expect(nav).toBeTruthy();
+      expect(nav.className).toContain('min-[1280px]:shrink-0');
+      expect(nav.className).toContain('max-[1279px]:min-w-0');
+      expect(nav.className).toContain('max-[1279px]:shrink');
+      expect(nav.className).toContain('max-[1279px]:overflow-x-auto');
+      expect(nav.className).toContain('no-scrollbar');
+
+      const navButtons = Array.from(nav.querySelectorAll('button'));
+      expect(navButtons.length).toBe(5);
+
+      const expectedCompactLabels = [
+        'Diseñador 3D',
+        'Despiece',
+        'Optimizador',
+        'Presupuesto',
+        'Etiquetas',
+      ];
+
+      navButtons.forEach((btn, idx) => {
+        expect(btn.className).toContain('px-1.5');
+        expect(btn.className).toContain('py-1');
+        expect(btn.className).toContain('min-[1440px]:px-2');
+        expect(btn.className).toContain('min-[1840px]:px-2.5');
+        expect(btn.className).toContain('min-[1840px]:py-1.5');
+        expect(btn.className).toContain('text-[11px]');
+        expect(btn.className).toContain('min-[1440px]:text-xs');
+        expect(btn.className).toContain('shrink-0');
+
+        const spansInBtn = Array.from(btn.querySelectorAll('span'));
+        const fullLabel = spansInBtn.find(
+          (s) => s.className.includes('hidden') && s.className.includes('min-[1840px]:inline')
+        );
+        const compactLabel = spansInBtn.find((s) => s.className.includes('min-[1840px]:hidden'));
+        expect(fullLabel?.textContent?.trim()).toBeTruthy();
+        expect(compactLabel?.textContent?.trim()).toBe(expectedCompactLabels[idx]);
+      });
+    });
+
+    it('debe aplicar icon-only progresivo (Proyecto <2xl, Exportar/Login <1840px) con [title] y altura h-7.5 min-[1840px]:h-8 en bloque derecho', () => {
+      const rightContainer = element.querySelector('.flex.items-center.gap-1.shrink-0.justify-end') as HTMLElement;
+      expect(rightContainer).toBeTruthy();
+
+      const buttons = Array.from(rightContainer.querySelectorAll('button'));
+      const projectBtn = buttons.find((b) =>
+        Array.from(b.querySelectorAll('span')).some(
+          (s) =>
+            s.className.includes('hidden') &&
+            s.className.includes('2xl:inline') &&
+            s.textContent?.trim() === 'Proyecto'
+        )
+      );
+      const exportBtn = buttons.find((b) =>
+        Array.from(b.querySelectorAll('span')).some(
+          (s) =>
+            s.className.includes('hidden') &&
+            s.className.includes('min-[1840px]:inline') &&
+            s.textContent?.trim() === 'Exportar'
+        )
+      );
+
+      expect(projectBtn).toBeTruthy();
+      expect(projectBtn?.className).toContain('h-7.5');
+      expect(projectBtn?.className).toContain('min-[1840px]:h-8');
+      expect(projectBtn?.getAttribute('title')).toBeTruthy();
+
+      expect(exportBtn).toBeTruthy();
+      expect(exportBtn?.className).toContain('h-7.5');
+      expect(exportBtn?.className).toContain('min-[1840px]:h-8');
+      expect(exportBtn?.getAttribute('title')).toBeTruthy();
+
+      const userNameSpan = rightContainer.querySelector('[data-testid="studio-user-name"]') as HTMLElement;
+      expect(userNameSpan).toBeTruthy();
+      expect(userNameSpan.className).toContain('hidden');
+      expect(userNameSpan.className).toContain('2xl:inline');
+      expect(userNameSpan.className).toContain('max-w-16');
+      expect(userNameSpan.className).toContain('min-[1840px]:max-w-20');
+      expect(userNameSpan.className).toContain('truncate');
+
+      const userAccountBtn = userNameSpan.closest('button') as HTMLButtonElement;
+      expect(userAccountBtn).toBeTruthy();
+      expect(userAccountBtn.className).toContain('h-7.5');
+      expect(userAccountBtn.className).toContain('min-[1840px]:h-8');
+      expect(userAccountBtn.getAttribute('title')).toBe(userNameSpan.textContent?.trim());
+
+      mockSupabase.isAuthenticated.set(false);
+      fixture.detectChanges();
+
+      const loginLink = rightContainer.querySelector('[data-testid="studio-login-link"]') as HTMLAnchorElement;
+      expect(loginLink).toBeTruthy();
+      expect(loginLink.className).toContain('h-7.5');
+      expect(loginLink.className).toContain('min-[1840px]:h-8');
+      expect(loginLink.getAttribute('title')).toBeTruthy();
+      const loginLabel = Array.from(loginLink.querySelectorAll('span')).find(
+        (s) => s.className.includes('hidden') && s.className.includes('min-[1840px]:inline')
+      );
+      expect(loginLabel?.textContent?.trim()).toBeTruthy();
+    });
+
+    it('debe incluir límites seguros de viewport (max-w y max-h overflow-y-auto) en popovers/dropdowns del header', () => {
+      const titleTriggerBtn = element.querySelector('.header-title-trigger button') as HTMLButtonElement;
+      expect(titleTriggerBtn).toBeTruthy();
+      titleTriggerBtn.click();
+      fixture.detectChanges();
+
+      const titlePopover = Array.from(element.querySelectorAll('.header-title-trigger div')).find(
+        (d) =>
+          d.querySelector('input') !== null &&
+          d.className.includes('max-w-[calc(100vw-1rem)]')
+      ) as HTMLElement;
+      expect(titlePopover).toBeTruthy();
+      expect(titlePopover.className).toContain('max-w-[calc(100vw-1rem)]');
+      expect(titlePopover.className).toContain('max-h-[calc(100vh-4.5rem)]');
+      expect(titlePopover.className).toContain('overflow-y-auto');
+
+      const rightContainer = element.querySelector('.flex.items-center.gap-1.shrink-0.justify-end') as HTMLElement;
+      const rightButtons = Array.from(rightContainer.querySelectorAll('button'));
+
+      const projectBtn = rightButtons.find((b) =>
+        Array.from(b.querySelectorAll('span')).some(
+          (s) =>
+            s.className.includes('hidden') &&
+            s.className.includes('2xl:inline') &&
+            s.textContent?.trim() === 'Proyecto'
+        )
+      ) as HTMLButtonElement;
+      projectBtn.click();
+      fixture.detectChanges();
+
+      const projectDropdown = rightContainer.querySelector('[class*="max-w-[calc(100vw-1rem)]"][class*="max-h-[calc(100vh-4.5rem)]"]') as HTMLElement;
+      expect(projectDropdown).toBeTruthy();
+      expect(projectDropdown.className).toContain('overflow-y-auto');
+      projectBtn.click();
+      fixture.detectChanges();
+
+      const exportBtn = rightButtons.find((b) =>
+        Array.from(b.querySelectorAll('span')).some(
+          (s) =>
+            s.className.includes('hidden') &&
+            s.className.includes('min-[1840px]:inline') &&
+            s.textContent?.trim() === 'Exportar'
+        )
+      ) as HTMLButtonElement;
+      exportBtn.click();
+      fixture.detectChanges();
+
+      const exportDropdown = rightContainer.querySelector('[class*="max-w-[calc(100vw-1rem)]"][class*="max-h-[calc(100vh-4.5rem)]"]') as HTMLElement;
+      expect(exportDropdown).toBeTruthy();
+      expect(exportDropdown.className).toContain('overflow-y-auto');
+      exportBtn.click();
+      fixture.detectChanges();
+
+      const langBtn = rightButtons.find((b) => b.textContent?.trim() === 'ES') as HTMLButtonElement;
+      expect(langBtn).toBeTruthy();
+      langBtn.click();
+      fixture.detectChanges();
+
+      const langDropdown = rightContainer.querySelector('[class*="max-w-[calc(100vw-1rem)]"][class*="max-h-[calc(100vh-4.5rem)]"]') as HTMLElement;
+      expect(langDropdown).toBeTruthy();
+      expect(langDropdown.className).toContain('overflow-y-auto');
+    });
+
+    it('debe incluir @media (max-height: 820px) a 44px y regla .header-title-trigger.overflow-visible en los estilos compilados', () => {
+      const stylesText = Array.from(document.head.querySelectorAll('style'))
+        .map((styleEl) => styleEl.textContent ?? '')
+        .join('\n');
+
+      expect(stylesText).toContain('.header-title-trigger.overflow-visible');
+      expect(stylesText).toMatch(/overflow:\s*visible/);
+      expect(stylesText).toMatch(/@media\s*\(\s*max-height:\s*820px\s*\)/);
+      expect(stylesText).toContain('.header-main-bar');
+      expect(stylesText).toMatch(/min-height:\s*44px/);
+      expect(stylesText).toMatch(/height:\s*44px/);
     });
   });
 });

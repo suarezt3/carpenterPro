@@ -134,7 +134,7 @@
   }
 
   <!-- PALETA VERTICAL IZQUIERDA DE HERRAMIENTAS CAD (ADAPTATIVA HD / FHD / 2K) -->
-  <div class="cad-toolbar absolute top-2.5 left-2.5 z-30 flex flex-col items-center bg-white/95 text-zinc-700 backdrop-blur-md rounded-md border border-zinc-200/90 shadow-md pointer-events-auto transition-colors duration-200 max-h-[calc(100%-2.25rem)] overflow-y-auto scrollbar-none">
+  <div class="cad-toolbar absolute top-2.5 left-2.5 z-30 flex flex-col items-center bg-white/95 text-zinc-700 backdrop-blur-md rounded-md border border-zinc-200/90 shadow-md pointer-events-auto transition-colors duration-200 max-h-[calc(100%-2.5rem)] 2xl:max-h-[calc(100%-3rem)] overflow-y-auto overflow-x-hidden scrollbar-none">
 
     <!-- 1. HERRAMIENTA SELECCIONAR / MOVER (V) -->
     <button
@@ -210,7 +210,7 @@
       [title]="'designer.toolCnc' | t">
       <hugeicons-icon [icon]="icons.cncTarget" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       @if (showDrillHoles() && allDrillHoles().length > 0) {
-        <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
+        <span class="absolute -top-0.5 -right-0.5 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
           {{ allDrillHoles().length }}
         </span>
       }
@@ -273,7 +273,7 @@
         title="Cajones y Grupos Guardados: Administrar y seleccionar cajones completos para moverlos o animarlos">
         <hugeicons-icon [icon]="icons.inbox" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
         @if (activePartGroups().length > 0) {
-          <span class="absolute -top-1 -right-1 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
+          <span class="absolute -top-0.5 -right-0.5 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
             {{ activePartGroups().length }}
           </span>
         }
@@ -319,7 +319,7 @@
       class="absolute inset-0 z-35 bg-black/5 backdrop-blur-xs cursor-default w-full h-full border-none outline-hidden"
       (click)="closeGroupsFlyout()">
     </button>
-    <div class="absolute left-13 top-10 z-40 bg-white/95 text-slate-800 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 w-80 max-w-[calc(100vw-4.5rem)] max-h-[calc(100%-3.5rem)] overflow-y-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 scrollbar-thin pointer-events-auto">
+    <div class="absolute left-14 top-10 z-40 bg-white/95 text-slate-800 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 w-80 max-w-[calc(100%-4.5rem)] max-h-[calc(100%-3.5rem)] overflow-y-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 scrollbar-thin pointer-events-auto">
       <div class="flex items-center justify-between pb-2 border-b border-slate-200/80">
         <div class="flex items-center gap-2">
           <div class="w-7 h-7 rounded-lg bg-zinc-100 text-zinc-900 flex items-center justify-center">
@@ -495,7 +495,7 @@
 
   <!-- BANNER DE ELEMENTOS OCULTOS (PIEZAS Y ELECTRODOMÉSTICOS) -->
   @if (totalHiddenCount() > 0) {
-    <div class="absolute top-12 left-13 z-20 pointer-events-auto animate-in fade-in duration-150">
+    <div class="absolute top-12 left-14 z-20 max-w-[calc(100%-4.5rem)] pointer-events-auto animate-in fade-in duration-150">
       <div class="flex items-center gap-2 bg-amber-500 text-slate-950 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-lg text-xs font-bold border border-amber-400">
         <hugeicons-icon [icon]="icons.eyeOff" [size]="15" [strokeWidth]="2.2" class="text-slate-950 shrink-0"></hugeicons-icon>
         <span>
@@ -547,7 +547,7 @@
 
   <!-- ALERTA SUPERIOR DERECHA DE SOLAPAMIENTOS / COLISIONES -->
   @if (detectedCollisions().length > 0) {
-    <div class="absolute top-12 right-3 z-20 pointer-events-auto flex flex-col items-end gap-1.5 max-w-sm font-sans">
+    <div class="cad-collision-banner absolute top-12 right-3 z-20 pointer-events-auto flex flex-col items-end gap-1.5 max-w-[calc(100%-4.5rem)] font-sans">
       <button
         type="button"
         (click)="toggleCollisionsDetail()"
@@ -558,7 +558,7 @@
       </button>
 
       @if (showCollisionsDetail()) {
-        <div class="bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-2xl border border-zinc-200 text-zinc-900 text-xs w-96 max-w-[calc(100vw-2rem)] max-h-[26rem] overflow-y-auto scrollbar-thin flex flex-col gap-2 font-sans">
+        <div class="cad-collision-popover bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-2xl border border-zinc-200 text-zinc-900 text-xs w-88 xl:w-96 max-w-full max-h-[26rem] overflow-y-auto scrollbar-thin flex flex-col gap-2 font-sans">
           <div class="flex flex-col gap-2 pb-2 border-b border-zinc-200">
             <div class="flex items-center justify-between gap-2">
               <span class="font-semibold text-zinc-900 font-sans">Interferencias detectadas</span>
@@ -635,7 +635,7 @@
 
   <!-- HUD MINIMALIST STUDIO DE CINTA MÉTRICA 3D -->
   @if (isMeasureMode()) {
-    <div class="absolute top-2.5 left-13 z-30 pointer-events-auto flex flex-col gap-1.5 w-76 max-w-[calc(100vw-4.5rem)] animate-in fade-in zoom-in-95 duration-150 font-sans">
+    <div class="absolute top-2.5 left-14 z-30 pointer-events-auto flex flex-col gap-1.5 w-76 max-w-[calc(100%-4.5rem)] max-h-[calc(100%-3rem)] overflow-y-auto scrollbar-none animate-in fade-in zoom-in-95 duration-150 font-sans">
       <div class="bg-white/95 text-zinc-900 backdrop-blur-md p-2.5 rounded-xl border border-zinc-200 shadow-lg flex flex-col gap-2">
         <div class="flex items-center justify-between border-b border-zinc-200/80 pb-1.5">
           <div class="flex items-center gap-1.5 min-w-0">
@@ -767,7 +767,7 @@
       </div>
     </div>
   } @else if (savedMeasurements().length > 0) {
-    <div class="absolute top-2.5 left-13 z-30 pointer-events-auto animate-in fade-in duration-150 font-sans">
+    <div class="absolute top-2.5 left-14 z-30 pointer-events-auto animate-in fade-in duration-150 font-sans">
       <button
         type="button"
         (click)="clearAllMeasurements()"
@@ -781,7 +781,7 @@
 
   <!-- HUD FLOTANTE DE MICRO-AJUSTE EN ZOOM -->
   @if (selectedPart(); as sel) {
-    <div class="absolute bottom-8.5 left-13 z-20 pointer-events-auto flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+    <div class="absolute bottom-8.5 2xl:bottom-9.5 left-14 z-20 pointer-events-auto flex flex-col gap-1 max-w-[calc(100%-4.5rem)] animate-in fade-in zoom-in-95 duration-150">
       <div class="cad-nudge-card bg-white/95 text-zinc-800 backdrop-blur-md px-3 py-2 rounded-md border border-zinc-200/90 shadow-lg flex flex-col gap-1.5 max-w-76">
         <div class="flex items-center justify-between gap-2 border-b border-zinc-100 pb-1">
           <div class="flex items-center gap-1.5">

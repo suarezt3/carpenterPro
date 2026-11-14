@@ -314,8 +314,11 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
 
       const titleContainer = headerElement.querySelector('.relative.hidden.md\\:flex.items-center');
       expect(titleContainer).toBeTruthy();
-      expect(titleContainer?.className).toContain('max-w-[180px]');
-      expect(titleContainer?.className).toContain('2xl:max-w-[230px]');
+      expect(titleContainer?.className).toContain('min-w-[84px]');
+      expect(titleContainer?.className).toContain('max-w-[108px]');
+      expect(titleContainer?.className).toContain('min-[1440px]:max-w-[125px]');
+      expect(titleContainer?.className).toContain('2xl:max-w-[125px]');
+      expect(titleContainer?.className).toContain('min-[1840px]:max-w-[180px]');
       expect(titleContainer?.className).toContain('truncate');
       expect(titleContainer?.className).toContain('shrink-0');
     });
@@ -596,11 +599,13 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       headerElement = headerFixture.nativeElement as HTMLElement;
     });
 
-    it('Step 5.1: Botón de logout es minimalista (w-9 h-9, sin texto visible "Cerrar Sesión")', () => {
+    it('Step 5.1: Botón de logout es minimalista (w-7.5 h-7.5 min-[1840px]:w-8 min-[1840px]:h-8, sin texto visible "Cerrar Sesión")', () => {
       const signOutBtn = headerElement.querySelector('[data-testid="studio-signout-btn"]') as HTMLButtonElement;
       expect(signOutBtn).toBeTruthy();
-      expect(signOutBtn.className).toContain('w-9');
-      expect(signOutBtn.className).toContain('h-9');
+      expect(signOutBtn.className).toContain('w-7.5');
+      expect(signOutBtn.className).toContain('h-7.5');
+      expect(signOutBtn.className).toContain('min-[1840px]:w-8');
+      expect(signOutBtn.className).toContain('min-[1840px]:h-8');
       expect(signOutBtn.textContent?.trim()).toBe('');
       expect(signOutBtn.getAttribute('title')).toBeTruthy();
     });

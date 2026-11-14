@@ -1,26 +1,26 @@
-<div class="w-full px-3 sm:px-6 py-4 space-y-5">
+<div class="w-full px-3 sm:px-5 2xl:px-6 py-2.5 xl:py-3 2xl:py-4 space-y-3.5 2xl:space-y-4">
 
   <!-- Barra de Herramientas Superior (Oculta durante la impresión) -->
-  <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200 rounded-lg p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden' : 'bg-zinc-900 border border-zinc-800 rounded-lg p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden'">
-    <div>
+  <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200 rounded-lg p-3.5 sm:p-4 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3 print:hidden' : 'bg-zinc-900 border border-zinc-800 rounded-lg p-3.5 sm:p-4 shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-3 print:hidden'">
+    <div class="min-w-0">
       <div class="flex items-center gap-2">
         <hugeicons-icon [icon]="icons.qrCode" [size]="20" [strokeWidth]="1.8" class="text-zinc-700 shrink-0"></hugeicons-icon>
-        <h2 [class]="themeService.isClassic() ? 'text-xl font-bold text-zinc-900' : 'text-xl font-bold text-white'">
+        <h2 [class]="themeService.isClassic() ? 'text-lg sm:text-xl font-bold text-zinc-900 truncate' : 'text-lg sm:text-xl font-bold text-white truncate'">
           {{ 'labels.title' | t }}
         </h2>
       </div>
-      <p [class]="themeService.isClassic() ? 'text-xs text-zinc-500 mt-1' : 'text-xs text-zinc-400 mt-1'">
+      <p [class]="themeService.isClassic() ? 'text-xs text-zinc-500 mt-0.5' : 'text-xs text-zinc-400 mt-0.5'">
         {{ 'labels.subtitle' | t }}
       </p>
     </div>
 
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
       <!-- Filtro por Módulo -->
       <select
         [value]="selectedModuleFilter()"
         (change)="onModuleFilterChange($event)"
         [attr.aria-label]="'labels.filterByModule' | t"
-        [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-700 focus:outline-hidden focus:border-zinc-900 cursor-pointer font-medium' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-zinc-200 focus:outline-hidden focus:border-zinc-500 cursor-pointer font-medium'">
+        [class]="themeService.isClassic() ? 'max-w-full sm:max-w-48 px-3 py-1.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-700 focus:outline-hidden focus:border-zinc-900 cursor-pointer font-medium' : 'max-w-full sm:max-w-48 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-zinc-200 focus:outline-hidden focus:border-zinc-500 cursor-pointer font-medium'">
         <option value="all">{{ 'labels.allModules' | t }}</option>
         @for (g of groups(); track g.id) {
           <option [value]="g.id">{{ g.name }}</option>
@@ -32,7 +32,7 @@
         [value]="selectedMaterialFilter()"
         (change)="onMaterialFilterChange($event)"
         [attr.aria-label]="'labels.filterByMaterial' | t"
-        [class]="themeService.isClassic() ? 'px-3 py-1.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-700 focus:outline-hidden focus:border-zinc-900 cursor-pointer font-medium' : 'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-zinc-200 focus:outline-hidden focus:border-zinc-500 cursor-pointer font-medium'">
+        [class]="themeService.isClassic() ? 'max-w-full sm:max-w-48 px-3 py-1.5 bg-white border border-zinc-200 rounded-md text-xs text-zinc-700 focus:outline-hidden focus:border-zinc-900 cursor-pointer font-medium' : 'max-w-full sm:max-w-48 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-zinc-200 focus:outline-hidden focus:border-zinc-500 cursor-pointer font-medium'">
         <option value="all">{{ 'labels.allMaterials' | t }}</option>
         @for (mat of materials(); track mat.id) {
           <option [value]="mat.id">{{ mat.name }}</option>
@@ -45,8 +45,8 @@
         (click)="openAssemblyGuideModal()"
         [disabled]="!canGenerateAssemblyGuide()"
         [class]="themeService.isClassic()
-          ? 'px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium text-xs rounded-md flex items-center gap-2 shadow-2xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'
-          : 'px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-md flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'"
+          ? 'px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium text-xs rounded-md flex items-center gap-2 shadow-2xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap'
+          : 'px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs rounded-md flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap'"
         [title]="!canGenerateAssemblyGuide() ? ('assemblyGuide.noFurnitureTooltip' | t) : ('assemblyGuide.buttonTooltip' | t)">
         <hugeicons-icon [icon]="icons.book" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
         <span>{{ 'assemblyGuide.button' | t }}</span>
@@ -56,7 +56,7 @@
       <button
         type="button"
         (click)="printLabels()"
-        class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs rounded-md flex items-center gap-2 shadow-xs transition cursor-pointer">
+        class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs rounded-md flex items-center gap-2 shadow-xs transition cursor-pointer whitespace-nowrap">
         <hugeicons-icon [icon]="icons.print" [size]="16" [strokeWidth]="2"></hugeicons-icon>
         <span>{{ 'labels.printLabels' | t }} ({{ flatLabels().length }})</span>
       </button>
