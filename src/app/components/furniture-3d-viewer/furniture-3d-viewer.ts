@@ -78,6 +78,13 @@ import {
   SceneRaycastPickerService,
   SceneRaycastSources
 } from '../../services/scene-raycast-picker.service';
+import {
+  DIMENSION_LINE_RENDER_ORDER,
+  DIMENSION_SPRITE_RENDER_ORDER,
+  DimensionAnchor3dService,
+  DimensionLineSegment,
+  ModuleVerticalBayInput
+} from '../../services/dimension-anchor-3d.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { I18nService } from '../../services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -228,6 +235,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private glbModelLoader = inject(GlbModelLoaderService);
   private spatialGuideBuilder = inject(SpatialReferenceGuideService);
   private readonly sceneRaycastPicker = inject(SceneRaycastPickerService);
+  private readonly dimensionAnchor = inject(DimensionAnchor3dService);
 
   // Iconos vectoriales estilizados para la cinta de herramientas CAD y menús 3D
   readonly icons = {
@@ -872,8 +880,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
       dashSize: 14,
       gapSize: 7,
       linewidth: 2,
-      depthTest: false
+      depthTest: false,
+      depthWrite: false
     });
+    this.dimensionAnchor.configureDimensionOverlayMaterial(mat, DIMENSION_LINE_RENDER_ORDER);
     mat.userData = { isShared: true };
     return mat;
   })();
@@ -881,8 +891,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const mat = new THREE.LineBasicMaterial({
       color: 0x10b981,
       linewidth: 2,
-      depthTest: false
+      depthTest: false,
+      depthWrite: false
     });
+    this.dimensionAnchor.configureDimensionOverlayMaterial(mat, DIMENSION_LINE_RENDER_ORDER);
     mat.userData = { isShared: true };
     return mat;
   })();
@@ -997,6 +1009,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private readonly scratchBestHitWorld = new THREE.Vector3();
   private readonly scratchSegDir = new THREE.Vector3();
   private readonly scratchW0 = new THREE.Vector3();
+  private readonly scratchDimWorldP1 = new THREE.Vector3();
+  private readonly scratchDimWorldP2 = new THREE.Vector3();
+  private readonly scratchDimParentOffset = new THREE.Vector3();
 
   private isDirectPieceDrag = false;
   private directPieceDragThresholdPassed = false;
@@ -1322,8 +1337,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     // 7. Add Groups
     this.scene.add(this.furnitureGroup);
+    this.dimensionGroup.renderOrder = DIMENSION_LINE_RENDER_ORDER;
     this.scene.add(this.dimensionGroup);
-    this.internalClearanceGroup.renderOrder = 999;
+    this.internalClearanceGroup.renderOrder = DIMENSION_LINE_RENDER_ORDER;
     this.scene.add(this.internalClearanceGroup);
     this.scene.add(this.gizmoGroup);
     this.scene.add(this.measureGroup);
@@ -2841,65 +2857,54 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     }
 
-    // 2. Escalar y mantener visibles las etiquetas de medida (dimensionGroup) en zoom cercano
-    for (const dimGroup of this.dimensionGroup.children) {
-      for (const child of dimGroup.children) {
-        if (child instanceof THREE.Sprite) {
-          const u = child.userData;
-          if (u?.['edgeP1'] && u?.['edgeP2'] && this.controls) {
-            const p1 = u['edgeP1'] as THREE.Vector3;
-            const p2 = u['edgeP2'] as THREE.Vector3;
-            const midX = (p1.x + p2.x) * 0.5;
-            const midY = (p1.y + p2.y) * 0.5;
-            const midZ = (p1.z + p2.z) * 0.5;
-            const distToMid = this.camera.position.distanceTo(
-              this.scratchGizmoWorldPos.set(midX, midY, midZ)
-            );
-
-            if (distToMid < 850) {
-              this.scratchSegDir.subVectors(p2, p1);
-              const segLenSq = this.scratchSegDir.lengthSq();
-              if (segLenSq > 1) {
-                this.scratchW0.subVectors(this.controls.target, p1);
-                const t = Math.max(0.12, Math.min(0.88, this.scratchW0.dot(this.scratchSegDir) / segLenSq));
-                const blend = Math.max(0, Math.min(1, (850 - distToMid) / 500));
-                const finalT = 0.5 + (t - 0.5) * blend;
-                child.position.lerpVectors(p1, p2, finalT);
-                if (u['labelOffset']) {
-                  const off = u['labelOffset'] as THREE.Vector3;
-                  const offScale = Math.max(0.25, Math.min(1.0, distToMid / 900));
-                  child.position.addScaledVector(off, offScale);
-                }
-              }
-            } else {
-              child.position.set(midX, midY, midZ);
-              if (u['labelOffset']) {
-                child.position.add(u['labelOffset'] as THREE.Vector3);
-              }
-            }
+    // 2. Escalar y mantener visibles las etiquetas de medida (dimensionGroup) centradas/deslizadas sobre P1..P2
+    for (const child of this.dimensionGroup.children) {
+      if (child instanceof THREE.Sprite) {
+        this.updateDimensionSpriteAdaptiveTransform(child, this.dimensionGroup.position);
+      } else {
+        this.scratchDimParentOffset.copy(this.dimensionGroup.position).add(child.position);
+        for (const nested of child.children) {
+          if (nested instanceof THREE.Sprite) {
+            this.updateDimensionSpriteAdaptiveTransform(nested, this.scratchDimParentOffset);
           }
-
-          const dist = this.camera.position.distanceTo(child.position);
-          const baseX = child.userData?.['baseScaleX'] || 140;
-          const baseY = child.userData?.['baseScaleY'] || 38;
-          const isHovered = child.userData?.['isHovered'];
-          const sDim = Math.max(0.12, Math.min(1.45, dist / 1050)) * (isHovered ? 1.15 : 1.0);
-          child.scale.set(baseX * sDim, baseY * sDim, 1);
         }
       }
     }
 
-    // 3. Escalar y mantener legibles las cotas de luz interna (internalClearanceGroup)
+    // 3. Escalar y alinear sobre P1..P2 las cotas de luz interna (internalClearanceGroup)
     for (const child of this.internalClearanceGroup.children) {
       if (child instanceof THREE.Sprite) {
-        const dist = this.camera.position.distanceTo(child.position);
-        const baseX = child.userData?.['baseScaleX'] || 140;
-        const baseY = child.userData?.['baseScaleY'] || 38;
-        const isHovered = child.userData?.['isHovered'];
-        const sDim = Math.max(0.12, Math.min(1.45, dist / 1050)) * (isHovered ? 1.15 : 1.0);
-        child.scale.set(baseX * sDim, baseY * sDim, 1);
+        this.updateDimensionSpriteAdaptiveTransform(child, this.internalClearanceGroup.position);
       }
     }
+  }
+
+  private updateDimensionSpriteAdaptiveTransform(
+    sprite: THREE.Sprite,
+    parentWorldOffset: THREE.Vector3
+  ): void {
+    const u = sprite.userData;
+    if (u?.['edgeP1'] && u?.['edgeP2'] && this.controls) {
+      const p1 = u['edgeP1'] as THREE.Vector3;
+      const p2 = u['edgeP2'] as THREE.Vector3;
+      this.scratchDimWorldP1.copy(p1).add(parentWorldOffset);
+      this.scratchDimWorldP2.copy(p2).add(parentWorldOffset);
+      const alongWorldPos = this.dimensionAnchor.computeAlongSegmentLabelPosition(
+        this.scratchDimWorldP1,
+        this.scratchDimWorldP2,
+        this.camera.position,
+        this.controls.target
+      );
+      sprite.position.copy(alongWorldPos).sub(parentWorldOffset);
+    }
+
+    this.scratchGizmoWorldPos.copy(sprite.position).add(parentWorldOffset);
+    const dist = this.camera.position.distanceTo(this.scratchGizmoWorldPos);
+    const baseX = (u?.['baseScaleX'] as number | undefined) || 140;
+    const baseY = (u?.['baseScaleY'] as number | undefined) || 38;
+    const isHovered = Boolean(u?.['isHovered']);
+    const sDim = Math.max(0.12, Math.min(1.45, dist / 1050)) * (isHovered ? 1.15 : 1.0);
+    sprite.scale.set(baseX * sDim, baseY * sDim, 1);
   }
 
   // --- MAGNETIC SNAP ENGINE (MOTOR DE INFERENCIAS CAD) ---
@@ -4897,7 +4902,57 @@ private createHandleMesh(
     return ProceduralTextureFactory.getBoardTexture(colorHex, type, grain, this.isPerformanceMode());
   }
 
-  // Draw 3D dimension lines and text sprites matching reference image
+  private appendDimensionSegmentVisuals(
+    targetGroup: THREE.Group,
+    segment: DimensionLineSegment,
+    lineMat: THREE.Material,
+    tickMat: THREE.Material,
+    dashed = false
+  ): void {
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([segment.p1, segment.p2]);
+    lineGeo.userData = { isCota: true, isAuxiliaryVisual: true };
+    const line = new THREE.Line(lineGeo, lineMat);
+    line.renderOrder = DIMENSION_LINE_RENDER_ORDER;
+    line.userData = { isCota: true, isAuxiliaryVisual: true };
+    if (dashed) {
+      line.computeLineDistances();
+    }
+    targetGroup.add(line);
+
+    if (segment.tickSegments.length >= 2) {
+      const tickGeo = new THREE.BufferGeometry().setFromPoints(segment.tickSegments);
+      tickGeo.userData = { isCota: true, isAuxiliaryVisual: true };
+      const ticks = new THREE.LineSegments(tickGeo, tickMat);
+      ticks.renderOrder = DIMENSION_LINE_RENDER_ORDER;
+      ticks.userData = { isCota: true, isAuxiliaryVisual: true };
+      targetGroup.add(ticks);
+    }
+
+    if (segment.witnessSegments.length >= 2) {
+      const witnessGeo = new THREE.BufferGeometry().setFromPoints(segment.witnessSegments);
+      witnessGeo.userData = { isCota: true, isAuxiliaryVisual: true };
+      const witnesses = new THREE.LineSegments(witnessGeo, tickMat);
+      witnesses.renderOrder = DIMENSION_LINE_RENDER_ORDER;
+      witnesses.userData = { isCota: true, isAuxiliaryVisual: true };
+      targetGroup.add(witnesses);
+    }
+  }
+
+  private getCachedDimensionOverlayMaterial<T extends THREE.Material>(
+    cacheKey: string,
+    factory: () => T
+  ): T {
+    let mat = this.materialCache.get(cacheKey) as T | undefined;
+    if (!mat) {
+      mat = factory();
+      mat.userData = { isShared: true };
+      this.materialCache.set(cacheKey, mat);
+    }
+    this.dimensionAnchor.configureDimensionOverlayMaterial(mat, DIMENSION_LINE_RENDER_ORDER);
+    return mat;
+  }
+
+  // Draw 3D dimension lines and text sprites anchored vertex-to-vertex (0.0 mm float)
   private renderPieceDimensions(
     part: Part,
     px: number,
@@ -4908,56 +4963,45 @@ private createHandleMesh(
     sz: number
   ) {
     const dimGroup = new THREE.Group();
-    let lineMat = this.materialCache.get('dim_line_mat_blue') as THREE.LineBasicMaterial | undefined;
-    if (!lineMat) {
-      lineMat = new THREE.LineBasicMaterial({ color: 0x2563eb, linewidth: 2 });
-      lineMat.userData = { isShared: true };
-      this.materialCache.set('dim_line_mat_blue', lineMat);
-    }
-
-    const offsetY = sy / 2 + 35;
-    const offsetZ = sz / 2 + 25;
-
-    // Horizontal dimension line along X (or vertical along Y for vertical_yz pieces)
-    const isVertYZ = part.orientation === 'vertical_yz';
-    const p1 = isVertYZ
-      ? new THREE.Vector3(px + sx / 2 + 24, py - sy / 2, pz + sz / 2 + 20)
-      : new THREE.Vector3(px - sx / 2, py + offsetY, pz + offsetZ);
-    const p2 = isVertYZ
-      ? new THREE.Vector3(px + sx / 2 + 24, py + sy / 2, pz + sz / 2 + 20)
-      : new THREE.Vector3(px + sx / 2, py + offsetY, pz + offsetZ);
-
-    const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-    const line = new THREE.Line(lineGeo, lineMat);
-    dimGroup.add(line);
-
-    const tickH = 15;
-    const t1 = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(
-        isVertYZ
-          ? [new THREE.Vector3(p1.x, p1.y, p1.z - tickH), new THREE.Vector3(p1.x, p1.y, p1.z + tickH)]
-          : [new THREE.Vector3(p1.x, p1.y - tickH, p1.z), new THREE.Vector3(p1.x, p1.y + tickH, p1.z)]
-      ),
-      lineMat
+    const lineMat = this.getCachedDimensionOverlayMaterial('dim_line_mat_blue', () =>
+      new THREE.LineBasicMaterial({
+        color: 0x2563eb,
+        linewidth: 2,
+        depthTest: false,
+        depthWrite: false
+      })
     );
-    const t2 = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(
-        isVertYZ
-          ? [new THREE.Vector3(p2.x, p2.y, p2.z - tickH), new THREE.Vector3(p2.x, p2.y, p2.z + tickH)]
-          : [new THREE.Vector3(p2.x, p2.y - tickH, p2.z), new THREE.Vector3(p2.x, p2.y + tickH, p2.z)]
-      ),
-      lineMat
-    );
-    dimGroup.add(t1);
-    dimGroup.add(t2);
 
-    const lengthLabelOffset = isVertYZ ? new THREE.Vector3(18, 0, 18) : new THREE.Vector3(0, 25, 0);
+    const localDims = this.partGeometry.getLocalDimensions(part);
+    const layout = this.dimensionAnchor.computePieceDimensionSegments({
+      px,
+      py,
+      pz,
+      sx,
+      sy,
+      sz,
+      orientation: part.orientation,
+      rotationX: part.rotationX,
+      rotationY: part.rotationY,
+      rotationZ: part.rotationZ,
+      localLx: localDims.sx,
+      localLy: localDims.sy,
+      localLz: localDims.sz
+    });
+
+    const isDepthLengthYZ =
+      part.orientation === 'vertical_yz' && localDims.lengthLocalAxis === 'z';
+    const lengthSegment = isDepthLengthYZ ? layout.widthSegment : layout.lengthSegment;
+    const widthSegment = isDepthLengthYZ ? layout.lengthSegment : layout.widthSegment;
+
+    this.appendDimensionSegmentVisuals(dimGroup, lengthSegment, lineMat, lineMat, false);
+    this.appendDimensionSegmentVisuals(dimGroup, widthSegment, lineMat, lineMat, false);
+
+    const zeroLabelOffset = new THREE.Vector3(0, 0, 0);
+
     const lengthSprite = this.createTextSprite(`${part.length} mm`);
-    lengthSprite.position.set(
-      (p1.x + p2.x) / 2 + lengthLabelOffset.x,
-      (p1.y + p2.y) / 2 + lengthLabelOffset.y,
-      (p1.z + p2.z) / 2 + lengthLabelOffset.z
-    );
+    lengthSprite.position.copy(lengthSegment.midpoint);
+    lengthSprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
     const lengthUserData: DimensionBadgeUserData = {
       isDimensionBadge: true,
       badgeType: 'length',
@@ -4970,25 +5014,16 @@ private createHandleMesh(
     lengthSprite.userData = {
       ...lengthSprite.userData,
       ...lengthUserData,
-      edgeP1: p1,
-      edgeP2: p2,
-      labelOffset: lengthLabelOffset
+      edgeP1: lengthSegment.p1.clone(),
+      edgeP2: lengthSegment.p2.clone(),
+      labelOffset: zeroLabelOffset.clone()
     };
     this.editableDimensionSprites.push(lengthSprite);
     dimGroup.add(lengthSprite);
 
-    // Width / Depth dimension line
-    const p3 = new THREE.Vector3(px + sx / 2 + 30, py, pz - sz / 2);
-    const p4 = new THREE.Vector3(px + sx / 2 + 30, py, pz + sz / 2);
-    const widthLine = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([p3, p4]),
-      lineMat
-    );
-    dimGroup.add(widthLine);
-
-    const widthLabelOffset = new THREE.Vector3(15, 20, 0);
     const widthSprite = this.createTextSprite(`${part.width} mm`);
-    widthSprite.position.set(px + sx / 2 + 45, py + 20, (p3.z + p4.z) / 2);
+    widthSprite.position.copy(widthSegment.midpoint);
+    widthSprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
     const widthUserData: DimensionBadgeUserData = {
       isDimensionBadge: true,
       badgeType: 'width',
@@ -5001,14 +5036,15 @@ private createHandleMesh(
     widthSprite.userData = {
       ...widthSprite.userData,
       ...widthUserData,
-      edgeP1: p3,
-      edgeP2: p4,
-      labelOffset: widthLabelOffset
+      edgeP1: widthSegment.p1.clone(),
+      edgeP2: widthSegment.p2.clone(),
+      labelOffset: zeroLabelOffset.clone()
     };
     this.editableDimensionSprites.push(widthSprite);
     dimGroup.add(widthSprite);
 
     this.dimensionGroup.add(dimGroup);
+    this.dimensionGroup.updateMatrixWorld(true);
     this.updateAdaptiveGizmoScale();
   }
 
@@ -5110,7 +5146,7 @@ private createHandleMesh(
 
     const sprite = new THREE.Sprite(idleMat);
     sprite.scale.set(140, 38, 1);
-    sprite.renderOrder = 1000;
+    sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
     sprite.userData = {
       idleMaterial: idleMat,
       hoverMaterial: hoverMat
@@ -5158,8 +5194,10 @@ private createHandleMesh(
     const mat = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
-      depthTest: false
+      depthTest: false,
+      depthWrite: false
     });
+    this.dimensionAnchor.configureDimensionOverlayMaterial(mat, DIMENSION_SPRITE_RENDER_ORDER);
     mat.userData = { isShared: true };
     this.badgeSpriteCache.set(cacheKey, { texture, material: mat });
     return mat;
@@ -5179,7 +5217,7 @@ private createHandleMesh(
 
     const sprite = new THREE.Sprite(idleMat);
     sprite.scale.set(140, 38, 1);
-    sprite.renderOrder = 1000;
+    sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
     sprite.userData = {
       idleMaterial: idleMat,
       hoverMaterial: hoverMat
@@ -5189,17 +5227,34 @@ private createHandleMesh(
 
   // Dynamic Clearance Computation: Real-time useful internal clearances between shelves/sides/roof/floor
   computeClearanceInfo(part: Part, allParts: Part[]): ClearanceInfo {
+    return this.computeClearanceWithNeighborDepth(part, allParts).info;
+  }
+
+  private computeClearanceWithNeighborDepth(
+    part: Part,
+    allParts: Part[]
+  ): {
+    info: ClearanceInfo;
+    topNeighborFrontZ: number | null;
+    bottomNeighborFrontZ: number | null;
+    leftNeighborFrontZ: number | null;
+    rightNeighborFrontZ: number | null;
+  } {
     const selBounds = this.getPartBounds(part);
     const others = allParts.filter(p => p.id !== part.id);
 
     let topClearance: number | null = null;
     let topNeighborName: string | null = null;
+    let topNeighborFrontZ: number | null = null;
     let bottomClearance: number | null = null;
     let bottomNeighborName: string | null = null;
+    let bottomNeighborFrontZ: number | null = null;
     let leftClearance: number | null = null;
     let leftNeighborName: string | null = null;
+    let leftNeighborFrontZ: number | null = null;
     let rightClearance: number | null = null;
     let rightNeighborName: string | null = null;
+    let rightNeighborFrontZ: number | null = null;
 
     let minTopGap = Infinity;
     let minBottomGap = Infinity;
@@ -5221,6 +5276,7 @@ private createHandleMesh(
             minTopGap = gap;
             topClearance = Math.round(gap);
             topNeighborName = o.name;
+            topNeighborFrontZ = oBounds.maxZ;
           }
         }
         // Element directly below
@@ -5230,6 +5286,7 @@ private createHandleMesh(
             minBottomGap = gap;
             bottomClearance = Math.round(gap);
             bottomNeighborName = o.name;
+            bottomNeighborFrontZ = oBounds.maxZ;
           }
         }
       }
@@ -5244,6 +5301,7 @@ private createHandleMesh(
             minLeftGap = gap;
             leftClearance = Math.round(gap);
             leftNeighborName = o.name;
+            leftNeighborFrontZ = oBounds.maxZ;
           }
         }
         // Element to the right
@@ -5253,20 +5311,27 @@ private createHandleMesh(
             minRightGap = gap;
             rightClearance = Math.round(gap);
             rightNeighborName = o.name;
+            rightNeighborFrontZ = oBounds.maxZ;
           }
         }
       }
     }
 
     return {
-      topClearance,
-      bottomClearance,
-      leftClearance,
-      rightClearance,
-      topNeighborName,
-      bottomNeighborName,
-      leftNeighborName,
-      rightNeighborName
+      info: {
+        topClearance,
+        bottomClearance,
+        leftClearance,
+        rightClearance,
+        topNeighborName,
+        bottomNeighborName,
+        leftNeighborName,
+        rightNeighborName
+      },
+      topNeighborFrontZ,
+      bottomNeighborFrontZ,
+      leftNeighborFrontZ,
+      rightNeighborFrontZ
     };
   }
 
@@ -5474,7 +5539,7 @@ private createHandleMesh(
 
     const sprite = new THREE.Sprite(idleMat);
     sprite.scale.set(isWide ? 155 : 140, 38, 1);
-    sprite.renderOrder = 1000;
+    sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
     sprite.userData = {
       idleMaterial: idleMat,
       hoverMaterial: hoverMat
@@ -5488,6 +5553,7 @@ private createHandleMesh(
     overridePosY?: number
   ) {
     this.disposeGroup(this.internalClearanceGroup);
+    this.internalClearanceGroup.position.set(0, 0, 0);
     if (!this.showClearances()) return;
     if (this.isModularDrawerGroup(groupId)) return;
 
@@ -5496,13 +5562,38 @@ private createHandleMesh(
     );
     if (moduleParts.length < 2) return;
 
+    const getEffectiveBounds = (p: Part): PartWorldAABB => {
+      if (selectedOrDraggingPart && p.id === selectedOrDraggingPart.id && overridePosY !== undefined) {
+        return this.getPartBounds(p, {
+          x: p.posX ?? 0,
+          y: overridePosY,
+          z: p.posZ ?? 0
+        });
+      }
+      return this.getPartBounds(p);
+    };
+
+    let moduleMinX = Infinity;
+    let moduleMaxX = -Infinity;
+    let moduleMinY = Infinity;
+    let maxModuleZ = -Infinity;
+    for (const p of moduleParts) {
+      const b = getEffectiveBounds(p);
+      if (b.minX < moduleMinX) moduleMinX = b.minX;
+      if (b.maxX > moduleMaxX) moduleMaxX = b.maxX;
+      if (b.minY < moduleMinY) moduleMinY = b.minY;
+      if (b.maxZ > maxModuleZ) maxModuleZ = b.maxZ;
+    }
+
     // 1. Piso / Base Inferior (excluyendo repisas internas)
     const bottomPart =
       moduleParts.find(p => p.componentRole === 'bottom') ||
       moduleParts
         .filter(p => p.orientation === 'horizontal' && !this.isInternalShelf(p) && p.componentRole !== 'top' && p.componentRole !== 'countertop')
         .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0))[0];
-    const floorTopY = bottomPart ? this.getPartBounds(bottomPart).maxY : 0;
+    const bottomBounds = bottomPart ? getEffectiveBounds(bottomPart) : null;
+    const floorTopY = bottomBounds ? bottomBounds.maxY : 0;
+    const bottomFrontZ = bottomBounds ? bottomBounds.maxZ : maxModuleZ;
 
     // 2. Techo / Tapa Superior (excluyendo repisas internas y zócalos)
     const topPart =
@@ -5510,15 +5601,25 @@ private createHandleMesh(
       moduleParts
         .filter(p => p.orientation === 'horizontal' && !this.isInternalShelf(p) && p.componentRole !== 'bottom' && p.componentRole !== 'plinth')
         .sort((a, b) => (b.posY ?? 0) - (a.posY ?? 0))[0];
-    let roofBottomY = topPart && topPart.id !== bottomPart?.id ? this.getPartBounds(topPart).minY : Infinity;
-    if (roofBottomY === Infinity) {
+    let roofBottomY = Infinity;
+    let roofFrontZ = maxModuleZ;
+    if (topPart && topPart.id !== bottomPart?.id) {
+      const topBounds = getEffectiveBounds(topPart);
+      roofBottomY = topBounds.minY;
+      roofFrontZ = topBounds.maxZ;
+    } else {
       const ties = moduleParts.filter(p => p.componentRole === 'tie');
       if (ties.length > 0) {
-        roofBottomY = Math.min(...ties.map(t => this.getPartBounds(t).minY));
+        const tieBounds = ties.map(t => getEffectiveBounds(t));
+        tieBounds.sort((a, b) => a.minY - b.minY);
+        roofBottomY = tieBounds[0].minY;
+        roofFrontZ = tieBounds[0].maxZ;
       } else {
-        const sides = moduleParts.filter(p => p.orientation === 'vertical_yz');
-        if (sides.length > 0) {
-          roofBottomY = Math.max(...sides.map(s => this.getPartBounds(s).maxY));
+        const sidesFallback = moduleParts.filter(p => p.orientation === 'vertical_yz');
+        if (sidesFallback.length > 0) {
+          const sideBounds = sidesFallback.map(s => getEffectiveBounds(s));
+          roofBottomY = Math.max(...sideBounds.map(s => s.maxY));
+          roofFrontZ = Math.max(...sideBounds.map(s => s.maxZ));
         }
       }
     }
@@ -5527,15 +5628,29 @@ private createHandleMesh(
     const sides = moduleParts.filter(p => p.orientation === 'vertical_yz');
     let leftInnerX: number | null = null;
     let rightInnerX: number | null = null;
+    let leftSideFrontZ: number | null = null;
+    let rightSideFrontZ: number | null = null;
     if (sides.length >= 2) {
       const sortedSides = [...sides].sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
-      leftInnerX = this.getPartBounds(sortedSides[0]).maxX;
-      rightInnerX = this.getPartBounds(sortedSides[sortedSides.length - 1]).minX;
+      const leftSideBounds = getEffectiveBounds(sortedSides[0]);
+      const rightSideBounds = getEffectiveBounds(sortedSides[sortedSides.length - 1]);
+      leftInnerX = leftSideBounds.maxX;
+      rightInnerX = rightSideBounds.minX;
+      leftSideFrontZ = leftSideBounds.maxZ;
+      rightSideFrontZ = rightSideBounds.maxZ;
     } else {
       const sLeft = moduleParts.find(p => p.componentRole === 'side_left');
       const sRight = moduleParts.find(p => p.componentRole === 'side_right');
-      if (sLeft) leftInnerX = this.getPartBounds(sLeft).maxX;
-      if (sRight) rightInnerX = this.getPartBounds(sRight).minX;
+      if (sLeft) {
+        const b = getEffectiveBounds(sLeft);
+        leftInnerX = b.maxX;
+        leftSideFrontZ = b.maxZ;
+      }
+      if (sRight) {
+        const b = getEffectiveBounds(sRight);
+        rightInnerX = b.minX;
+        rightSideFrontZ = b.maxZ;
+      }
     }
 
     // 4. Repisas / Entrepaños Interiores
@@ -5555,45 +5670,33 @@ private createHandleMesh(
     const isDraggingOrSelectedShelf = selectedOrDraggingPart && this.isInternalShelf(selectedOrDraggingPart);
 
     if (isDraggingOrSelectedShelf) {
-      const activeRefBounds = this.getPartBounds(selectedOrDraggingPart);
+      const activeRefBounds = getEffectiveBounds(selectedOrDraggingPart);
       const columnShelves = allShelves.filter(s => {
-        const b = this.getPartBounds(s);
+        const b = getEffectiveBounds(s);
         const overlapX = Math.max(0, Math.min(activeRefBounds.maxX, b.maxX) - Math.max(activeRefBounds.minX, b.minX));
         return overlapX > 15;
       });
-      const sList = columnShelves.map(s => {
-        if (s.id === selectedOrDraggingPart.id && overridePosY !== undefined) {
-          return {
-            part: s,
-            bounds: this.getPartBounds(s, {
-              x: s.posX ?? 0,
-              y: overridePosY,
-              z: s.posZ ?? 0
-            })
-          };
-        }
-        return { part: s, bounds: this.getPartBounds(s) };
-      });
+      const sList = columnShelves.map(s => ({ part: s, bounds: getEffectiveBounds(s) }));
       sList.sort((a, b) => a.bounds.minY - b.bounds.minY);
       const refX = sList.length > 0 ? sList[0].bounds.px : (selectedOrDraggingPart.posX ?? 0);
-      const frontZ = sList.length > 0 ? Math.max(...sList.map(s => s.bounds.maxZ)) : (selectedOrDraggingPart.posZ ?? 0);
+      const frontZ = sList.length > 0 ? Math.max(...sList.map(s => s.bounds.maxZ)) : activeRefBounds.maxZ;
       columns.push({ refX, frontZ, shelfBoundsList: sList });
     } else {
       const remainingShelves = [...allShelves];
       while (remainingShelves.length > 0) {
         const first = remainingShelves.shift()!;
-        const firstBounds = this.getPartBounds(first);
+        const firstBounds = getEffectiveBounds(first);
         const colList = [first];
         for (let i = remainingShelves.length - 1; i >= 0; i--) {
           const cand = remainingShelves[i];
-          const candBounds = this.getPartBounds(cand);
+          const candBounds = getEffectiveBounds(cand);
           const overlapX = Math.max(0, Math.min(firstBounds.maxX, candBounds.maxX) - Math.max(firstBounds.minX, candBounds.minX));
           if (overlapX > 15) {
             colList.push(cand);
             remainingShelves.splice(i, 1);
           }
         }
-        const sList = colList.map(s => ({ part: s, bounds: this.getPartBounds(s) }));
+        const sList = colList.map(s => ({ part: s, bounds: getEffectiveBounds(s) }));
         sList.sort((a, b) => a.bounds.minY - b.bounds.minY);
         const refX = sList[0].bounds.px;
         const frontZ = Math.max(...sList.map(s => s.bounds.maxZ));
@@ -5601,156 +5704,176 @@ private createHandleMesh(
       }
 
       if (columns.length === 0) {
-        let refX = 0;
-        let frontZ = 0;
-        if (leftInnerX !== null && rightInnerX !== null) {
-          refX = (leftInnerX + rightInnerX) / 2;
-          frontZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
-        } else {
-          refX = bottomPart?.posX ?? 0;
-          frontZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
-        }
-        columns.push({ refX, frontZ, shelfBoundsList: [] });
+        const refX =
+          leftInnerX !== null && rightInnerX !== null
+            ? (leftInnerX + rightInnerX) / 2
+            : (bottomPart?.posX ?? 0);
+        columns.push({ refX, frontZ: maxModuleZ, shelfBoundsList: [] });
       }
     }
 
-    const maxModuleZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
+    const moduleFrontZ =
+      leftSideFrontZ !== null && rightSideFrontZ !== null
+        ? Math.min(leftSideFrontZ, rightSideFrontZ)
+        : (leftSideFrontZ ?? rightSideFrontZ ?? bottomFrontZ);
 
-    // 6. Dibujo 3D de Cotas Verticales Limpias con Anti-Solapamiento y Sprites HD
-    for (const col of columns) {
+    interface BayMeta {
+      targetPart: Part | null;
+      badgeType: 'top_clearance' | 'bottom_clearance';
+      label: string;
+    }
+
+    // 6. Dibujo 3D de Cotas Verticales + Luz X ancladas arista-a-arista (0.0 mm float)
+    const zeroLabelOffset = new THREE.Vector3(0, 0, 0);
+    for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+      const col = columns[colIdx];
       const bayWidth = col.shelfBoundsList.length > 0
         ? col.shelfBoundsList[0].bounds.sx
         : (leftInnerX !== null && rightInnerX !== null ? Math.abs(rightInnerX - leftInnerX) : 400);
-      const lateralOffset = Math.max(48, Math.min(125, bayWidth * 0.24));
-      const refX = col.refX + lateralOffset;
-      const refZ = Math.max(col.frontZ, maxModuleZ) + 28;
+      const lateralOffset = Math.min(125, bayWidth * 0.24);
+      const columnAnchorX = col.refX + lateralOffset;
       const shelfBoundsList = col.shelfBoundsList;
 
-      interface VerticalBay {
-        yBottom: number;
-        yTop: number;
-        distance: number;
-        targetPart: Part | null;
-        badgeType: 'top_clearance' | 'bottom_clearance';
-        label: string;
-      }
-      const bays: VerticalBay[] = [];
+      const bays: ModuleVerticalBayInput[] = [];
+      const bayMetas: BayMeta[] = [];
 
       if (shelfBoundsList.length === 0) {
         if (roofBottomY !== Infinity && roofBottomY > floorTopY) {
           bays.push({
             yBottom: floorTopY,
             yTop: roofBottomY,
-            distance: Math.round(roofBottomY - floorTopY),
+            bottomFrontZ,
+            topFrontZ: roofFrontZ,
+            shelfFrontZ: Math.min(bottomFrontZ, roofFrontZ),
+            bayMinX: leftInnerX ?? moduleMinX,
+            bayMaxX: rightInnerX ?? moduleMaxX,
+            centerX: columnAnchorX,
+            distance: Math.round(roofBottomY - floorTopY)
+          });
+          bayMetas.push({
             targetPart: null,
             badgeType: 'bottom_clearance',
             label: this.i18n.t('designer.freeClearance')
           });
         }
       } else {
-        const shelf0 = shelfBoundsList[0].part;
+        const firstShelf = shelfBoundsList[0];
         bays.push({
           yBottom: floorTopY,
-          yTop: shelfBoundsList[0].bounds.minY,
-          distance: Math.round(shelfBoundsList[0].bounds.minY - floorTopY),
-          targetPart: shelf0,
+          yTop: firstShelf.bounds.minY,
+          bottomFrontZ,
+          topFrontZ: firstShelf.bounds.maxZ,
+          shelfFrontZ: firstShelf.bounds.maxZ,
+          bayMinX: firstShelf.bounds.minX,
+          bayMaxX: firstShelf.bounds.maxX,
+          centerX: columnAnchorX,
+          distance: Math.round(firstShelf.bounds.minY - floorTopY)
+        });
+        bayMetas.push({
+          targetPart: firstShelf.part,
           badgeType: 'bottom_clearance',
           label: this.i18n.t('designer.lowerClearance')
         });
 
         for (let i = 0; i < shelfBoundsList.length - 1; i++) {
-          const yB = shelfBoundsList[i].bounds.maxY;
-          const yT = shelfBoundsList[i + 1].bounds.minY;
-          const lowerShelf = shelfBoundsList[i].part;
-          const upperShelf = shelfBoundsList[i + 1].part;
-
-          let targetPart = upperShelf;
+          const lower = shelfBoundsList[i];
+          const upper = shelfBoundsList[i + 1];
+          let targetPart = upper.part;
           let badgeType: 'top_clearance' | 'bottom_clearance' = 'bottom_clearance';
           let label = this.i18n.t('designer.lowerClearance');
 
-          if (selectedOrDraggingPart && selectedOrDraggingPart.id === lowerShelf.id) {
-            targetPart = lowerShelf;
+          if (selectedOrDraggingPart && selectedOrDraggingPart.id === lower.part.id) {
+            targetPart = lower.part;
             badgeType = 'top_clearance';
             label = this.i18n.t('designer.upperClearance');
           }
 
+          const overlapMinX = Math.max(lower.bounds.minX, upper.bounds.minX);
+          const overlapMaxX = Math.min(lower.bounds.maxX, upper.bounds.maxX);
+          const bayMinX = overlapMinX < overlapMaxX ? overlapMinX : lower.bounds.minX;
+          const bayMaxX = overlapMinX < overlapMaxX ? overlapMaxX : lower.bounds.maxX;
+
           bays.push({
-            yBottom: yB,
-            yTop: yT,
-            distance: Math.round(yT - yB),
-            targetPart,
-            badgeType,
-            label
+            yBottom: lower.bounds.maxY,
+            yTop: upper.bounds.minY,
+            bottomFrontZ: lower.bounds.maxZ,
+            topFrontZ: upper.bounds.maxZ,
+            shelfFrontZ: Math.min(lower.bounds.maxZ, upper.bounds.maxZ),
+            bayMinX,
+            bayMaxX,
+            centerX: columnAnchorX,
+            distance: Math.round(upper.bounds.minY - lower.bounds.maxY)
           });
+          bayMetas.push({ targetPart, badgeType, label });
         }
 
-        if (roofBottomY !== Infinity && roofBottomY > shelfBoundsList[shelfBoundsList.length - 1].bounds.maxY) {
-          const lastShelf = shelfBoundsList[shelfBoundsList.length - 1].part;
-          const lastY = shelfBoundsList[shelfBoundsList.length - 1].bounds.maxY;
+        const lastShelf = shelfBoundsList[shelfBoundsList.length - 1];
+        if (roofBottomY !== Infinity && roofBottomY > lastShelf.bounds.maxY) {
           bays.push({
-            yBottom: lastY,
+            yBottom: lastShelf.bounds.maxY,
             yTop: roofBottomY,
-            distance: Math.round(roofBottomY - lastY),
-            targetPart: lastShelf,
+            bottomFrontZ: lastShelf.bounds.maxZ,
+            topFrontZ: roofFrontZ,
+            shelfFrontZ: lastShelf.bounds.maxZ,
+            bayMinX: lastShelf.bounds.minX,
+            bayMaxX: lastShelf.bounds.maxX,
+            centerX: columnAnchorX,
+            distance: Math.round(roofBottomY - lastShelf.bounds.maxY)
+          });
+          bayMetas.push({
+            targetPart: lastShelf.part,
             badgeType: 'top_clearance',
             label: this.i18n.t('designer.upperClearance')
           });
         }
       }
 
-      for (const bay of bays) {
-        if (bay.distance < 10) continue;
+      const layout = this.dimensionAnchor.computeModuleInternalClearancesLayout({
+        bays,
+        leftInnerX: colIdx === 0 ? leftInnerX : null,
+        rightInnerX: colIdx === 0 ? rightInnerX : null,
+        leftSideFrontZ: colIdx === 0 ? leftSideFrontZ : null,
+        rightSideFrontZ: colIdx === 0 ? rightSideFrontZ : null,
+        bottomFrontZ,
+        floorTopY,
+        moduleMinX,
+        moduleMaxX,
+        moduleMinY,
+        moduleFrontZ,
+        columnRefX: columnAnchorX
+      });
 
-        const p1 = new THREE.Vector3(refX, bay.yBottom, refZ);
-        const p2 = new THREE.Vector3(refX, bay.yTop, refZ);
-        const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-        const dashedLine = new THREE.Line(geo, this.internalClearanceLineMat);
-        dashedLine.computeLineDistances();
-        this.internalClearanceGroup.add(dashedLine);
-
-        const tickW = 16;
-        const arrowH = 8;
-        const arrowW = 6;
-
-        // LineSegments con pares de vértices limpios (sin diagonales espurias)
-        const tBotPts = [
-          new THREE.Vector3(refX - tickW, bay.yBottom, refZ),
-          new THREE.Vector3(refX + tickW, bay.yBottom, refZ),
-          new THREE.Vector3(refX - arrowW, bay.yBottom + arrowH, refZ),
-          new THREE.Vector3(refX, bay.yBottom, refZ),
-          new THREE.Vector3(refX + arrowW, bay.yBottom + arrowH, refZ),
-          new THREE.Vector3(refX, bay.yBottom, refZ)
-        ];
-        const tBot = new THREE.LineSegments(
-          new THREE.BufferGeometry().setFromPoints(tBotPts),
-          this.internalClearanceTickMat
+      for (const bayAnchor of layout.verticalBays) {
+        const meta = bayMetas[bayAnchor.bayIndex];
+        this.appendDimensionSegmentVisuals(
+          this.internalClearanceGroup,
+          bayAnchor.segment,
+          this.internalClearanceLineMat,
+          this.internalClearanceTickMat,
+          true
         );
 
-        const tTopPts = [
-          new THREE.Vector3(refX - tickW, bay.yTop, refZ),
-          new THREE.Vector3(refX + tickW, bay.yTop, refZ),
-          new THREE.Vector3(refX - arrowW, bay.yTop - arrowH, refZ),
-          new THREE.Vector3(refX, bay.yTop, refZ),
-          new THREE.Vector3(refX + arrowW, bay.yTop - arrowH, refZ),
-          new THREE.Vector3(refX, bay.yTop, refZ)
-        ];
-        const tTop = new THREE.LineSegments(
-          new THREE.BufferGeometry().setFromPoints(tTopPts),
-          this.internalClearanceTickMat
-        );
-        this.internalClearanceGroup.add(tBot, tTop);
+        const isEditable = Boolean(meta?.targetPart);
+        const sprite = this.createInternalClearanceBadge(`↕ ${bayAnchor.bay.distance} mm`, false, isEditable);
+        sprite.position.copy(bayAnchor.segment.midpoint);
+        sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
+        sprite.userData = {
+          ...sprite.userData,
+          baseScaleX: 140,
+          baseScaleY: 38,
+          edgeP1: bayAnchor.segment.p1.clone(),
+          edgeP2: bayAnchor.segment.p2.clone(),
+          labelOffset: zeroLabelOffset.clone()
+        };
 
-        const sprite = this.createInternalClearanceBadge(`↕ ${bay.distance} mm`, false, true);
-        const midY = (bay.yBottom + bay.yTop) / 2;
-        sprite.position.set(refX, midY, refZ + 12);
-        if (bay.targetPart) {
+        if (meta?.targetPart) {
           const badgeUserData: DimensionBadgeUserData = {
             isDimensionBadge: true,
-            badgeType: bay.badgeType,
-            part: bay.targetPart,
-            currentValue: bay.distance,
-            label: bay.label,
-            referenceY: bay.badgeType === 'bottom_clearance' ? bay.yBottom : bay.yTop,
+            badgeType: meta.badgeType,
+            part: meta.targetPart,
+            currentValue: bayAnchor.bay.distance,
+            label: meta.label,
+            referenceY: meta.badgeType === 'bottom_clearance' ? bayAnchor.bay.yBottom : bayAnchor.bay.yTop,
             baseScaleX: 140,
             baseScaleY: 38
           };
@@ -5759,63 +5882,45 @@ private createHandleMesh(
             ...badgeUserData
           };
           this.editableDimensionSprites.push(sprite);
+        } else {
+          sprite.userData = {
+            ...sprite.userData,
+            isCota: true,
+            isAuxiliaryVisual: true
+          };
         }
         this.internalClearanceGroup.add(sprite);
       }
-    }
 
-    // 7. Cota Horizontal de Luz Interna (Ancho Útil) Limpia separada de cotas verticales y manijas
-    if (leftInnerX !== null && rightInnerX !== null) {
-      const innerWidth = Math.round(rightInnerX - leftInnerX);
-      if (innerWidth > 40) {
-        const maxZ = Math.max(...moduleParts.map(p => this.getPartBounds(p).maxZ));
-        const refZ = maxZ + 46;
-        const yLine = floorTopY >= 24 ? floorTopY - 12 : floorTopY + 14;
-        const pLeft = new THREE.Vector3(leftInnerX, yLine, refZ);
-        const pRight = new THREE.Vector3(rightInnerX, yLine, refZ);
-        const horizGeo = new THREE.BufferGeometry().setFromPoints([pLeft, pRight]);
-        const horizLine = new THREE.Line(horizGeo, this.internalClearanceLineMat);
-        horizLine.computeLineDistances();
-        this.internalClearanceGroup.add(horizLine);
-
-        const tickH = 14;
-        const arrowW = 6;
-        const arrowH = 8;
-        const tLPts = [
-          new THREE.Vector3(leftInnerX, yLine - tickH, refZ),
-          new THREE.Vector3(leftInnerX, yLine + tickH, refZ),
-          new THREE.Vector3(leftInnerX + arrowH, yLine - arrowW, refZ),
-          new THREE.Vector3(leftInnerX, yLine, refZ),
-          new THREE.Vector3(leftInnerX + arrowH, yLine + arrowW, refZ),
-          new THREE.Vector3(leftInnerX, yLine, refZ)
-        ];
-        const tL = new THREE.LineSegments(
-          new THREE.BufferGeometry().setFromPoints(tLPts),
-          this.internalClearanceTickMat
+      // 7. Cota Horizontal de Luz Interna (Ancho Útil) anclada de cara interior a cara interior sobre frontZ
+      if (colIdx === 0 && layout.innerWidthSegment) {
+        this.appendDimensionSegmentVisuals(
+          this.internalClearanceGroup,
+          layout.innerWidthSegment,
+          this.internalClearanceLineMat,
+          this.internalClearanceTickMat,
+          true
         );
 
-        const tRPts = [
-          new THREE.Vector3(rightInnerX, yLine - tickH, refZ),
-          new THREE.Vector3(rightInnerX, yLine + tickH, refZ),
-          new THREE.Vector3(rightInnerX - arrowH, yLine - arrowW, refZ),
-          new THREE.Vector3(rightInnerX, yLine, refZ),
-          new THREE.Vector3(rightInnerX - arrowH, yLine + arrowW, refZ),
-          new THREE.Vector3(rightInnerX, yLine, refZ)
-        ];
-        const tR = new THREE.LineSegments(
-          new THREE.BufferGeometry().setFromPoints(tRPts),
-          this.internalClearanceTickMat
-        );
-        this.internalClearanceGroup.add(tL, tR);
-
-        const midX = (leftInnerX + rightInnerX) / 2;
-        const badgeOffsetX = floorTopY >= 24 ? 0 : -Math.min(55, innerWidth * 0.14);
-        const badgeY = floorTopY >= 24 ? yLine - 18 : yLine + 16;
-        const horizBadge = this.createInternalClearanceBadge(`↔ ${innerWidth} mm`, true, false);
-        horizBadge.position.set(midX + badgeOffsetX, badgeY, refZ + 10);
+        const horizBadge = this.createInternalClearanceBadge(`↔ ${layout.innerWidth} mm`, true, false);
+        horizBadge.position.copy(layout.innerWidthSegment.midpoint);
+        horizBadge.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
+        horizBadge.userData = {
+          ...horizBadge.userData,
+          isCota: true,
+          isAuxiliaryVisual: true,
+          baseScaleX: 155,
+          baseScaleY: 38,
+          edgeP1: layout.innerWidthSegment.p1.clone(),
+          edgeP2: layout.innerWidthSegment.p2.clone(),
+          labelOffset: zeroLabelOffset.clone()
+        };
         this.internalClearanceGroup.add(horizBadge);
       }
     }
+
+    this.internalClearanceGroup.updateMatrixWorld(true);
+    this.updateAdaptiveGizmoScale();
 
     // 8. Sincronizar clearanceInfo al inspector si hay una pieza seleccionada y no se está arrastrando en vivo
     if (selectedOrDraggingPart && overridePosY === undefined) {
@@ -5824,185 +5929,149 @@ private createHandleMesh(
     }
   }
 
-  // Draw 3D Technical Clearance Lines (Luz Libre)
+  // Draw 3D Technical Clearance Lines (Luz Libre) anchored directly at bounds.maxZ (0.0 mm float)
   private renderClearanceDimensions(part: Part, allParts: Part[]) {
-    const clr = this.computeClearanceInfo(part, allParts);
+    const {
+      info: clr,
+      topNeighborFrontZ,
+      bottomNeighborFrontZ,
+      leftNeighborFrontZ,
+      rightNeighborFrontZ
+    } = this.computeClearanceWithNeighborDepth(part, allParts);
     this.clearanceCalculated.emit(clr);
 
     const selBounds = this.getPartBounds(part);
-    const lineMat = new THREE.LineDashedMaterial({
-      color: 0x10b981,
-      dashSize: 14,
-      gapSize: 7,
-      linewidth: 2,
-      depthTest: false
+    const lineMat = this.getCachedDimensionOverlayMaterial('clearance_line_mat_green', () =>
+      new THREE.LineDashedMaterial({
+        color: 0x10b981,
+        dashSize: 14,
+        gapSize: 7,
+        linewidth: 2,
+        depthTest: false,
+        depthWrite: false
+      })
+    );
+    const tickMat = this.getCachedDimensionOverlayMaterial('clearance_tick_mat_green', () =>
+      new THREE.LineBasicMaterial({
+        color: 0x10b981,
+        linewidth: 2,
+        depthTest: false,
+        depthWrite: false
+      })
+    );
+
+    const layout = this.dimensionAnchor.computeStandaloneClearanceSegments({
+      bounds: selBounds,
+      topClearance: clr.topClearance,
+      bottomClearance: clr.bottomClearance,
+      leftClearance: clr.leftClearance,
+      rightClearance: clr.rightClearance,
+      topNeighborFrontZ,
+      bottomNeighborFrontZ,
+      leftNeighborFrontZ,
+      rightNeighborFrontZ
     });
-    const tickMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2, depthTest: false });
-    const lateralOffset = Math.max(42, Math.min(115, selBounds.sx * 0.22));
-    const vertZ = selBounds.pz + selBounds.sz / 2 + 30;
-    const horizY = Math.max(24, selBounds.py - Math.min(26, selBounds.sy * 0.25));
-    const horizZ = selBounds.pz + selBounds.sz / 2 + 46;
+
+    const zeroLabelOffset = new THREE.Vector3(0, 0, 0);
 
     // Render Vertical Top Clearance Line
-    if (clr.topClearance !== null && clr.topClearance > 5) {
-      const topY = selBounds.maxY + clr.topClearance;
-      const midY = (selBounds.maxY + topY) / 2;
-      const x = selBounds.px + lateralOffset;
-      const z = vertZ;
-
-      const p1 = new THREE.Vector3(x, selBounds.maxY, z);
-      const p2 = new THREE.Vector3(x, topY, z);
-      const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-      const dashedLine = new THREE.Line(geo, lineMat);
-      dashedLine.computeLineDistances();
-      this.dimensionGroup.add(dashedLine);
-
-      // Arrow ticks
-      const tickW = 18;
-      const t1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(x - tickW, selBounds.maxY, z),
-        new THREE.Vector3(x + tickW, selBounds.maxY, z)
-      ]), tickMat);
-      const t2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(x - tickW, topY, z),
-        new THREE.Vector3(x + tickW, topY, z)
-      ]), tickMat);
-      this.dimensionGroup.add(t1, t2);
+    if (clr.topClearance !== null && layout.top) {
+      this.appendDimensionSegmentVisuals(this.dimensionGroup, layout.top, lineMat, tickMat, true);
 
       const sprite = this.createClearanceSprite(`↕ ${clr.topClearance} mm`);
-      sprite.position.set(x, midY, z + 12);
+      sprite.position.copy(layout.top.midpoint);
+      sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
       const badgeData: DimensionBadgeUserData = {
         isDimensionBadge: true,
         badgeType: 'top_clearance',
         part,
         currentValue: clr.topClearance,
         label: this.i18n.t('designer.upperClearance'),
-        referenceY: topY,
+        referenceY: layout.top.p2.y,
         baseScaleX: 140,
         baseScaleY: 38
       };
       sprite.userData = {
         ...sprite.userData,
-        ...badgeData
+        ...badgeData,
+        edgeP1: layout.top.p1.clone(),
+        edgeP2: layout.top.p2.clone(),
+        labelOffset: zeroLabelOffset.clone()
       };
       this.editableDimensionSprites.push(sprite);
       this.dimensionGroup.add(sprite);
     }
 
     // Render Vertical Bottom Clearance Line
-    if (clr.bottomClearance !== null && clr.bottomClearance > 5) {
-      const botY = selBounds.minY - clr.bottomClearance;
-      const midY = (selBounds.minY + botY) / 2;
-      const x = selBounds.px + lateralOffset;
-      const z = vertZ;
-
-      const p1 = new THREE.Vector3(x, botY, z);
-      const p2 = new THREE.Vector3(x, selBounds.minY, z);
-      const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-      const dashedLine = new THREE.Line(geo, lineMat);
-      dashedLine.computeLineDistances();
-      this.dimensionGroup.add(dashedLine);
-
-      const tickW = 18;
-      const t1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(x - tickW, botY, z),
-        new THREE.Vector3(x + tickW, botY, z)
-      ]), tickMat);
-      const t2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(x - tickW, selBounds.minY, z),
-        new THREE.Vector3(x + tickW, selBounds.minY, z)
-      ]), tickMat);
-      this.dimensionGroup.add(t1, t2);
+    if (clr.bottomClearance !== null && layout.bottom) {
+      this.appendDimensionSegmentVisuals(this.dimensionGroup, layout.bottom, lineMat, tickMat, true);
 
       const sprite = this.createClearanceSprite(`↕ ${clr.bottomClearance} mm`);
-      sprite.position.set(x, midY, z + 12);
+      sprite.position.copy(layout.bottom.midpoint);
+      sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
       const badgeData: DimensionBadgeUserData = {
         isDimensionBadge: true,
         badgeType: 'bottom_clearance',
         part,
         currentValue: clr.bottomClearance,
         label: this.i18n.t('designer.lowerClearance'),
-        referenceY: botY,
+        referenceY: layout.bottom.p1.y,
         baseScaleX: 140,
         baseScaleY: 38
       };
       sprite.userData = {
         ...sprite.userData,
-        ...badgeData
+        ...badgeData,
+        edgeP1: layout.bottom.p1.clone(),
+        edgeP2: layout.bottom.p2.clone(),
+        labelOffset: zeroLabelOffset.clone()
       };
       this.editableDimensionSprites.push(sprite);
       this.dimensionGroup.add(sprite);
     }
 
-    // Render Horizontal Left Clearance Line (separada en altura y profundidad respecto a cotas verticales/manijas)
-    if (clr.leftClearance !== null && clr.leftClearance > 5) {
-      const leftX = selBounds.minX - clr.leftClearance;
-      const midX = (selBounds.minX + leftX) / 2;
-      const y = horizY;
-      const z = horizZ;
-
-      const p1 = new THREE.Vector3(leftX, y, z);
-      const p2 = new THREE.Vector3(selBounds.minX, y, z);
-      const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-      const dashedLine = new THREE.Line(geo, lineMat);
-      dashedLine.computeLineDistances();
-      this.dimensionGroup.add(dashedLine);
-
-      const tickH = 14;
-      const t1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(leftX, y - tickH, z),
-        new THREE.Vector3(leftX, y + tickH, z)
-      ]), tickMat);
-      const t2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(selBounds.minX, y - tickH, z),
-        new THREE.Vector3(selBounds.minX, y + tickH, z)
-      ]), tickMat);
-      this.dimensionGroup.add(t1, t2);
+    // Render Horizontal Left Clearance Line
+    if (clr.leftClearance !== null && layout.left) {
+      this.appendDimensionSegmentVisuals(this.dimensionGroup, layout.left, lineMat, tickMat, true);
 
       const sprite = this.createClearanceSprite(`↔ ${clr.leftClearance} mm`, false);
-      sprite.position.set(midX, y + 20, z + 10);
+      sprite.position.copy(layout.left.midpoint);
+      sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
       sprite.userData = {
         ...sprite.userData,
+        isCota: true,
+        isAuxiliaryVisual: true,
         baseScaleX: 140,
-        baseScaleY: 38
+        baseScaleY: 38,
+        edgeP1: layout.left.p1.clone(),
+        edgeP2: layout.left.p2.clone(),
+        labelOffset: zeroLabelOffset.clone()
       };
       this.dimensionGroup.add(sprite);
     }
 
     // Render Horizontal Right Clearance Line
-    if (clr.rightClearance !== null && clr.rightClearance > 5) {
-      const rightX = selBounds.maxX + clr.rightClearance;
-      const midX = (selBounds.maxX + rightX) / 2;
-      const y = horizY;
-      const z = horizZ;
-
-      const p1 = new THREE.Vector3(selBounds.maxX, y, z);
-      const p2 = new THREE.Vector3(rightX, y, z);
-      const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-      const dashedLine = new THREE.Line(geo, lineMat);
-      dashedLine.computeLineDistances();
-      this.dimensionGroup.add(dashedLine);
-
-      const tickH = 14;
-      const t1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(selBounds.maxX, y - tickH, z),
-        new THREE.Vector3(selBounds.maxX, y + tickH, z)
-      ]), tickMat);
-      const t2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(rightX, y - tickH, z),
-        new THREE.Vector3(rightX, y + tickH, z)
-      ]), tickMat);
-      this.dimensionGroup.add(t1, t2);
+    if (clr.rightClearance !== null && layout.right) {
+      this.appendDimensionSegmentVisuals(this.dimensionGroup, layout.right, lineMat, tickMat, true);
 
       const sprite = this.createClearanceSprite(`↔ ${clr.rightClearance} mm`, false);
-      sprite.position.set(midX, y + 20, z + 10);
+      sprite.position.copy(layout.right.midpoint);
+      sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
       sprite.userData = {
         ...sprite.userData,
+        isCota: true,
+        isAuxiliaryVisual: true,
         baseScaleX: 140,
-        baseScaleY: 38
+        baseScaleY: 38,
+        edgeP1: layout.right.p1.clone(),
+        edgeP2: layout.right.p2.clone(),
+        labelOffset: zeroLabelOffset.clone()
       };
       this.dimensionGroup.add(sprite);
     }
+
+    this.dimensionGroup.updateMatrixWorld(true);
+    this.updateAdaptiveGizmoScale();
   }
 
   // --- INLINE 3D DIMENSION EDITOR (Edición Directa con Clic sobre Cotas 3D) ---
@@ -9157,59 +9226,111 @@ private createHandleMesh(
     drawerMaxY: number
   ) {
     this.disposeGroup(this.internalClearanceGroup);
+    this.internalClearanceGroup.position.set(0, 0, 0);
 
-    const bottomClr = Math.max(0, Math.round(drawerMinY - cavity.minY));
-    const topClr = Math.max(0, Math.round(cavity.maxY - drawerMaxY));
-
-    const isWZ = cavity.facingDirection === 'right' || cavity.facingDirection === 'left';
-    const dirSign = cavity.facingDirection === 'front' || cavity.facingDirection === 'right' ? 1 : -1;
-    const refDepth = cavity.frontEdgeCoord + dirSign * 26;
-    const refX = isWZ ? refDepth : cavity.centerX;
-    const refZ = isWZ ? cavity.centerZ : refDepth;
+    const layout = this.dimensionAnchor.computeDrawerCavitySegments({
+      minY: cavity.minY,
+      maxY: cavity.maxY,
+      innerWidth: cavity.innerWidth,
+      centerX: cavity.centerX,
+      centerZ: cavity.centerZ,
+      frontEdgeCoord: cavity.frontEdgeCoord,
+      facingDirection: cavity.facingDirection,
+      drawerMinY,
+      drawerMaxY
+    });
+    const zeroLabelOffset = new THREE.Vector3(0, 0, 0);
 
     // Luz Superior
-    if (topClr >= 4) {
-      const p1 = new THREE.Vector3(refX, drawerMaxY, refZ);
-      const p2 = new THREE.Vector3(refX, cavity.maxY, refZ);
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-      const line = new THREE.Line(lineGeo, this.internalClearanceLineMat);
-      line.computeLineDistances();
-      this.internalClearanceGroup.add(line);
-
-      const midY = (drawerMaxY + cavity.maxY) / 2;
-      const badge = this.createInternalClearanceBadge(`Luz Sup: ${topClr} mm`, false, false);
-      badge.position.set(refX, midY, refZ + (isWZ ? 0 : dirSign * 10));
+    if (layout.topLine) {
+      this.appendDimensionSegmentVisuals(
+        this.internalClearanceGroup,
+        layout.topLine,
+        this.internalClearanceLineMat,
+        this.internalClearanceTickMat,
+        true
+      );
+      const badge = this.createInternalClearanceBadge(`Luz Sup: ${layout.topClearance} mm`, false, false);
+      badge.position.copy(layout.topLine.midpoint);
+      badge.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
+      badge.userData = {
+        ...badge.userData,
+        isCota: true,
+        isAuxiliaryVisual: true,
+        baseScaleX: 140,
+        baseScaleY: 38,
+        edgeP1: layout.topLine.p1.clone(),
+        edgeP2: layout.topLine.p2.clone(),
+        labelOffset: zeroLabelOffset.clone()
+      };
       this.internalClearanceGroup.add(badge);
     }
 
     // Luz Inferior
-    if (bottomClr >= 4) {
-      const p1 = new THREE.Vector3(refX, cavity.minY, refZ);
-      const p2 = new THREE.Vector3(refX, drawerMinY, refZ);
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-      const line = new THREE.Line(lineGeo, this.internalClearanceLineMat);
-      line.computeLineDistances();
-      this.internalClearanceGroup.add(line);
-
-      const midY = (cavity.minY + drawerMinY) / 2;
-      const badge = this.createInternalClearanceBadge(`Luz Inf: ${bottomClr} mm`, false, false);
-      badge.position.set(refX, midY, refZ + (isWZ ? 0 : dirSign * 10));
+    if (layout.bottomLine) {
+      this.appendDimensionSegmentVisuals(
+        this.internalClearanceGroup,
+        layout.bottomLine,
+        this.internalClearanceLineMat,
+        this.internalClearanceTickMat,
+        true
+      );
+      const badge = this.createInternalClearanceBadge(`Luz Inf: ${layout.bottomClearance} mm`, false, false);
+      badge.position.copy(layout.bottomLine.midpoint);
+      badge.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
+      badge.userData = {
+        ...badge.userData,
+        isCota: true,
+        isAuxiliaryVisual: true,
+        baseScaleX: 140,
+        baseScaleY: 38,
+        edgeP1: layout.bottomLine.p1.clone(),
+        edgeP2: layout.bottomLine.p2.clone(),
+        labelOffset: zeroLabelOffset.clone()
+      };
       this.internalClearanceGroup.add(badge);
     }
 
-    // Etiqueta de Ancho de Hueco Auto-Encajado
+    // Cota y Etiqueta de Ancho de Hueco Auto-Encajado (0.0 mm offset sobre frontEdgeCoord)
+    if (layout.widthLine) {
+      this.appendDimensionSegmentVisuals(
+        this.internalClearanceGroup,
+        layout.widthLine,
+        this.internalClearanceLineMat,
+        this.internalClearanceTickMat,
+        true
+      );
+    }
     const widthBadge = this.createInternalClearanceBadge(
       `Hueco: ${Math.round(cavity.innerWidth)} mm`,
       true,
       false
     );
-    widthBadge.position.set(refX, cavity.minY + 18, refZ + (isWZ ? 0 : dirSign * 14));
+    widthBadge.position.copy(layout.widthMidpoint);
+    widthBadge.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
+    widthBadge.userData = {
+      ...widthBadge.userData,
+      isCota: true,
+      isAuxiliaryVisual: true,
+      baseScaleX: 155,
+      baseScaleY: 38,
+      ...(layout.widthLine
+        ? {
+            edgeP1: layout.widthLine.p1.clone(),
+            edgeP2: layout.widthLine.p2.clone(),
+            labelOffset: zeroLabelOffset.clone()
+          }
+        : {})
+    };
     this.internalClearanceGroup.add(widthBadge);
+
+    this.internalClearanceGroup.updateMatrixWorld(true);
+    this.updateAdaptiveGizmoScale();
 
     this.ngZone.run(() => {
       this.clearanceCalculated.emit({
-        topClearance: topClr,
-        bottomClearance: bottomClr,
+        topClearance: layout.topClearance,
+        bottomClearance: layout.bottomClearance,
         leftClearance: 0,
         rightClearance: 0,
         topNeighborName: cavity.moduleName,
@@ -14225,6 +14346,9 @@ private applyMagneticSnapToPosition(
 
   private disposeGroup(group: THREE.Group) {
     if (!group) return;
+    if (group === this.dimensionGroup || group === this.internalClearanceGroup) {
+      group.position.set(0, 0, 0);
+    }
     while (group.children.length > 0) {
       const child = group.children[0];
       group.remove(child);
