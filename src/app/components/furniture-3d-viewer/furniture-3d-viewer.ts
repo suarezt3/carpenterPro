@@ -85,6 +85,22 @@ import {
   DimensionLineSegment,
   ModuleVerticalBayInput
 } from '../../services/dimension-anchor-3d.service';
+import {
+  AXIS_COLORS,
+  CLICK_DRAG_THRESHOLD_PX,
+  MagneticSnapCandidate,
+  MeasureAxisLock,
+  MeasureProjectionMode,
+  Point3D,
+  ProjectedMeasurementBadge,
+  SNAP_COLORS,
+  SNAP_CSS_COLORS,
+  SNAP_LABELS,
+  SavedMeasurement,
+  TAPE_MEASURE_RENDER_ORDER,
+  TapeMeasure3dService,
+  ViewportRect
+} from '../../services/tape-measure-3d.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { I18nService } from '../../services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -236,6 +252,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private spatialGuideBuilder = inject(SpatialReferenceGuideService);
   private readonly sceneRaycastPicker = inject(SceneRaycastPickerService);
   private readonly dimensionAnchor = inject(DimensionAnchor3dService);
+  private readonly tapeMeasure = inject(TapeMeasure3dService);
 
   // Iconos vectoriales estilizados para la cinta de herramientas CAD y menús 3D
   readonly icons = {
@@ -636,33 +653,59 @@ export class Furniture3dViewerComponent implements OnDestroy {
   readonly isMagneticSnap = signal<boolean>(true);
   readonly nudgeStep = signal<number>(1); // 1 mm default (toggleable to 10mm)
 
-  // 3D Measurement Tape / Ruler tool (Motor de Inferencias CAD)
+  // 3D Measurement Tape / Ruler tool (Motor de Inferencias CAD + Fase 5 multi-cota persistente)
   readonly isMeasureMode = signal<boolean>(false);
-  readonly isMeasurementPersistent = signal<boolean>(false);
-  readonly measurePointA = signal<{ x: number; y: number; z: number } | null>(null);
-  readonly measurePointB = signal<{ x: number; y: number; z: number } | null>(null);
-  readonly measureProjectionMode = signal<'direct' | 'x' | 'y' | 'z'>('direct');
-  readonly activeInferredAxis = signal<'x' | 'y' | 'z' | null>(null);
+  readonly measurePointA = signal<Point3D | null>(null);
+  readonly measurePointB = signal<Point3D | null>(null);
+  readonly measureProjectionMode = signal<MeasureProjectionMode>('direct');
+  readonly activeInferredAxis = signal<MeasureAxisLock>(null);
   readonly isShiftPressed = signal<boolean>(false);
+  readonly savedMeasurements = signal<SavedMeasurement[]>([]);
+  readonly projectedMeasureBadges = signal<ProjectedMeasurementBadge[]>([]);
+  readonly previewMeasureBadge = signal<ProjectedMeasurementBadge | null>(null);
 
-  private measurePointAEdgeDir: THREE.Vector3 | null = null;
   private measurePointerDownPos: { x: number; y: number } | null = null;
-  private measurePointerDownTime = 0;
+  private lastMeasurePointerClient: { x: number; y: number } | null = null;
+  private lastRawMeasurePointB: Point3D | null = null;
+  private suppressNextContextMenuForMeasureCancel = false;
 
+  readonly hasActiveTrace = computed(() => !!this.measurePointA());
   readonly hasActiveMeasurement = computed(() => !!this.measurePointA() && !!this.measurePointB());
+  readonly lastSavedMeasurement = computed(() => {
+    const saved = this.savedMeasurements();
+    return saved.length > 0 ? saved[saved.length - 1] : null;
+  });
   readonly measureDistance = computed(() => {
     const a = this.measurePointA();
     const b = this.measurePointB();
-    if (!a || !b) return null;
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const dz = b.z - a.z;
-    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (a && b) {
+      let targetB: Point3D = b;
+      const mode = this.measureProjectionMode();
+      if (mode === 'x') {
+        targetB = { x: b.x, y: a.y, z: a.z };
+      } else if (mode === 'y') {
+        targetB = { x: a.x, y: b.y, z: a.z };
+      } else if (mode === 'z') {
+        targetB = { x: a.x, y: a.y, z: b.z };
+      }
+      const dx = targetB.x - a.x;
+      const dy = targetB.y - a.y;
+      const dz = targetB.z - a.z;
+      const dist = Math.hypot(dx, dy, dz);
+      return {
+        total: Math.round(dist * 10) / 10,
+        dx: Math.round(Math.abs(dx) * 10) / 10,
+        dy: Math.round(Math.abs(dy) * 10) / 10,
+        dz: Math.round(Math.abs(dz) * 10) / 10
+      };
+    }
+    const last = this.lastSavedMeasurement();
+    if (!last) return null;
     return {
-      total: Math.round(dist * 10) / 10,
-      dx: Math.round(Math.abs(dx) * 10) / 10,
-      dy: Math.round(Math.abs(dy) * 10) / 10,
-      dz: Math.round(Math.abs(dz) * 10) / 10
+      total: last.distanceMm,
+      dx: last.deltaX,
+      dy: last.deltaY,
+      dz: last.deltaZ
     };
   });
 
@@ -1084,9 +1127,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private rightPointerDownTime = 0;
   private rightPointerDragged = false;
 
-  // Tape Measure Drag State (Clic y arrastrar para estirar y soltar para fijar cota)
-  private isMeasuringDrag = false;
-
   // Push / Pull Tool Interactive State
   private isPushPulling = false;
   private pushPullData: {
@@ -1315,6 +1355,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.controls.addEventListener('change', () => {
         this.updateAdaptiveCameraSpeeds();
         this.updateAdaptiveGizmoScale();
+        this.updateProjectedMeasureBadges();
         if (this.inlineDimensionEditor()) {
           this.updateInlineEditorScreenPosition();
         }
@@ -1324,6 +1365,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.isCameraInteracting = false;
         this.updateAdaptiveCameraSpeeds();
         this.updateAdaptiveGizmoScale();
+        this.updateProjectedMeasureBadges();
         this.projectStorage.saveCameraState(this.camera.position, this.controls.target, true);
         this.requestRender(16);
       });
@@ -1342,6 +1384,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.internalClearanceGroup.renderOrder = DIMENSION_LINE_RENDER_ORDER;
     this.scene.add(this.internalClearanceGroup);
     this.scene.add(this.gizmoGroup);
+    this.measureGroup.renderOrder = TAPE_MEASURE_RENDER_ORDER;
+    this.magneticSnapGroup.renderOrder = TAPE_MEASURE_RENDER_ORDER;
     this.scene.add(this.measureGroup);
     this.scene.add(this.magneticSnapGroup);
     this.scene.add(this.drillGroup);
@@ -2792,6 +2836,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     this.updateAdaptiveCameraSpeeds();
     this.updateAdaptiveGizmoScale();
+    this.updateProjectedMeasureBadges();
     this.requestRender(10);
   }
 
@@ -2877,6 +2922,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.updateDimensionSpriteAdaptiveTransform(child, this.internalClearanceGroup.position);
       }
     }
+    this.updateProjectedMeasureBadges();
   }
 
   private updateDimensionSpriteAdaptiveTransform(
@@ -2910,320 +2956,92 @@ export class Furniture3dViewerComponent implements OnDestroy {
   // --- MAGNETIC SNAP ENGINE (MOTOR DE INFERENCIAS CAD) ---
 
   // Estructura universal de candidato de imán magnético
-  private findMagneticSnapCandidate(
-    screenX: number,
-    screenY: number,
-    thresholdPx = 30
-  ): {
-    worldPos: THREE.Vector3;
-    type: 'corner' | 'midpoint' | 'edge' | 'face';
-    objectName: string;
-    edgeDir?: THREE.Vector3;
-    edgeP1?: THREE.Vector3;
-    edgeP2?: THREE.Vector3;
-    faceNormal?: THREE.Vector3;
-  } | null {
-    if (!this.camera || !this.canvasRef()?.nativeElement) return null;
-    const canvas = this.canvasRef()!.nativeElement;
+  private getMeasureViewportRect(): ViewportRect | null {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-
-    const mouse = new THREE.Vector2(
-      ((screenX - rect.left) / rect.width) * 2 - 1,
-      -((screenY - rect.top) / rect.height) * 2 + 1
-    );
-    this.raycaster.setFromCamera(mouse, this.camera);
-    const rayOrigin = this.raycaster.ray.origin;
-    const rayDir = this.raycaster.ray.direction;
-
-    // 1. Recolección universal de aristas (12 segmentos por caja orientada)
-    interface SceneEdgeSegment {
-      p1: THREE.Vector3;
-      p2: THREE.Vector3;
-      objectName: string;
+    if (rect.width > 0 && rect.height > 0) {
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
     }
-    const segments: SceneEdgeSegment[] = [];
-    const edgePairs: [number, number][] = [
-      [0, 1], [2, 3], [4, 5], [6, 7], // Paralelas a eje local X
-      [0, 2], [1, 3], [4, 6], [5, 7], // Paralelas a eje local Y
-      [0, 4], [1, 5], [2, 6], [3, 7]  // Paralelas a eje local Z
-    ];
+    const container = this.containerRef()?.nativeElement;
+    const width = canvas.clientWidth || container?.clientWidth || 0;
+    const height = canvas.clientHeight || container?.clientHeight || 0;
+    if (width <= 0 || height <= 0) return null;
+    return { left: rect.left, top: rect.top, width, height };
+  }
 
-    // 1.1. Piezas de melamina, cubiertas y mesones
-    const visiblePieces = this.pieceObjects.filter(p => !this.hiddenPartIds().has(p.part.id));
-    for (const item of visiblePieces) {
-      const mesh = item.mesh;
-      if (!mesh || !mesh.geometry) continue;
-      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-      const min = mesh.geometry.boundingBox!.min;
-      const max = mesh.geometry.boundingBox!.max;
-      mesh.updateMatrixWorld(true);
-      const m = mesh.matrixWorld;
-
-      const corners = [
-        new THREE.Vector3(min.x, min.y, min.z).applyMatrix4(m),
-        new THREE.Vector3(max.x, min.y, min.z).applyMatrix4(m),
-        new THREE.Vector3(min.x, max.y, min.z).applyMatrix4(m),
-        new THREE.Vector3(max.x, max.y, min.z).applyMatrix4(m),
-        new THREE.Vector3(min.x, min.y, max.z).applyMatrix4(m),
-        new THREE.Vector3(max.x, min.y, max.z).applyMatrix4(m),
-        new THREE.Vector3(min.x, max.y, max.z).applyMatrix4(m),
-        new THREE.Vector3(max.x, max.y, max.z).applyMatrix4(m),
-      ];
-
-      for (const [i, j] of edgePairs) {
-        segments.push({
-          p1: corners[i],
-          p2: corners[j],
-          objectName: item.part.name
-        });
-      }
+  private getTapeMeasureSolidRoots(): THREE.Object3D[] {
+    const roots: THREE.Object3D[] = [];
+    if (this.furnitureGroup && this.furnitureGroup.visible && this.furnitureGroup.children.length > 0) {
+      roots.push(this.furnitureGroup);
     }
-
-    // 1.2. Electrodomésticos y equipamiento
-    if (this.layerVisibility().showAppliances) {
-      for (const app of this.appliances()) {
-        if (app.isHidden) continue;
-        const hW = (app.width || 600) / 2;
-        const hH = (app.height || 850) / 2;
-        const hD = (app.depth || 600) / 2;
-        const cX = app.position?.x ?? 0;
-        const cY = (app.position?.y ?? 0) + hH;
-        const cZ = app.position?.z ?? 0;
-        const rotY = -((app.rotation || 0) * (Math.PI / 180));
-        const cosR = Math.cos(rotY);
-        const sinR = Math.sin(rotY);
-
-        const getRotPt = (lx: number, ly: number, lz: number) => {
-          const rx = lx * cosR - lz * sinR;
-          const rz = lx * sinR + lz * cosR;
-          return new THREE.Vector3(cX + rx, cY + ly, cZ + rz);
-        };
-        const appCorners = [
-          getRotPt(-hW, -hH, -hD),
-          getRotPt( hW, -hH, -hD),
-          getRotPt(-hW,  hH, -hD),
-          getRotPt( hW,  hH, -hD),
-          getRotPt(-hW, -hH,  hD),
-          getRotPt( hW, -hH,  hD),
-          getRotPt(-hW,  hH,  hD),
-          getRotPt( hW,  hH,  hD),
-        ];
-        for (const [i, j] of edgePairs) {
-          segments.push({
-            p1: appCorners[i],
-            p2: appCorners[j],
-            objectName: app.name || 'Electrodoméstico'
-          });
-        }
-      }
+    const vis = this.layerVisibility();
+    if (
+      vis.showAppliances &&
+      this.appliancesGroup &&
+      this.appliancesGroup.visible &&
+      this.appliancesGroup.children.length > 0
+    ) {
+      roots.push(this.appliancesGroup);
     }
-
-    // 1.3. Muros arquitectónicos y suelo
-    if (this.workspaceMode() === 'room') {
-      const walls = getResolvedRoomWalls(this.roomConfig());
-      for (const wall of walls) {
-        if (wall.isHidden) continue;
-        const hL = wall.length / 2;
-        const hH = wall.height / 2;
-        const hT = wall.thickness / 2;
-        const cX = wall.posX;
-        const cY = hH;
-        const cZ = wall.posZ;
-        const rotY = -((wall.rotationY || 0) * (Math.PI / 180));
-        const cosR = Math.cos(rotY);
-        const sinR = Math.sin(rotY);
-
-        const getWallPt = (lx: number, ly: number, lz: number) => {
-          const rx = lx * cosR - lz * sinR;
-          const rz = lx * sinR + lz * cosR;
-          return new THREE.Vector3(cX + rx, cY + ly, cZ + rz);
-        };
-        const wallCorners = [
-          getWallPt(-hL, -hH, -hT),
-          getWallPt( hL, -hH, -hT),
-          getWallPt(-hL,  hH, -hT),
-          getWallPt( hL,  hH, -hT),
-          getWallPt(-hL, -hH,  hT),
-          getWallPt( hL, -hH,  hT),
-          getWallPt(-hL,  hH,  hT),
-          getWallPt( hL,  hH,  hT),
-        ];
-        for (const [i, j] of edgePairs) {
-          segments.push({
-            p1: wallCorners[i],
-            p2: wallCorners[j],
-            objectName: wall.name || 'Muro'
-          });
-        }
-      }
-
-      // Bordes del piso arquitectónico
-      const cfg = this.roomConfig();
-      const hFW = (cfg.floorWidth || 5000) / 2;
-      const hFD = (cfg.floorDepth || 5000) / 2;
-      const floorCorners = [
-        new THREE.Vector3(-hFW, 0, -hFD),
-        new THREE.Vector3( hFW, 0, -hFD),
-        new THREE.Vector3( hFW, 0,  hFD),
-        new THREE.Vector3(-hFW, 0,  hFD)
-      ];
-      segments.push({ p1: floorCorners[0], p2: floorCorners[1], objectName: 'Borde Piso' });
-      segments.push({ p1: floorCorners[1], p2: floorCorners[2], objectName: 'Borde Piso' });
-      segments.push({ p1: floorCorners[2], p2: floorCorners[3], objectName: 'Borde Piso' });
-      segments.push({ p1: floorCorners[3], p2: floorCorners[0], objectName: 'Borde Piso' });
+    if (
+      this.workspaceMode() === 'room' &&
+      this.roomGroup &&
+      this.roomGroup.visible &&
+      this.roomGroup.children.length > 0
+    ) {
+      roots.push(this.roomGroup);
     }
-
-    // 2. Evaluación del punto más cercano sobre aristas continuas
-    const tempProj = new THREE.Vector3();
-    let bestEdgeCandidate: {
-      worldPos: THREE.Vector3;
-      type: 'corner' | 'midpoint' | 'edge' | 'face';
-      objectName: string;
-      edgeDir?: THREE.Vector3;
-      edgeP1?: THREE.Vector3;
-      edgeP2?: THREE.Vector3;
-      faceNormal?: THREE.Vector3;
-    } | null = null;
-    let minScore = thresholdPx;
-
-    for (const seg of segments) {
-      const p1 = seg.p1;
-      const p2 = seg.p2;
-
-      // Descarte rápido si ambos extremos están detrás de la cámara
-      tempProj.copy(p1).project(this.camera);
-      const z1 = tempProj.z;
-      tempProj.copy(p2).project(this.camera);
-      const z2 = tempProj.z;
-      if (z1 > 1 && z2 > 1) continue;
-
-      const v = new THREE.Vector3().subVectors(p2, p1);
-      const segLenSq = v.lengthSq();
-      if (segLenSq < 1) continue;
-
-      // Algoritmo analítico de distancia mínima Rayo 3D -> Segmento de Arista
-      const w0 = new THREE.Vector3().subVectors(p1, rayOrigin);
-      const a = 1; // rayDir es normalizado
-      const b = rayDir.dot(v);
-      const c = segLenSq;
-      const d = rayDir.dot(w0);
-      const e = v.dot(w0);
-      const denom = a * c - b * b;
-
-      let t = 0;
-      if (denom > 1e-6) {
-        t = (a * e - b * d) / denom;
-      }
-      t = Math.max(0, Math.min(1, t));
-
-      const segPt = p1.clone().addScaledVector(v, t);
-      tempProj.copy(segPt).project(this.camera);
-      if (tempProj.z > 1) continue;
-
-      const segScreenX = ((tempProj.x + 1) / 2) * rect.width + rect.left;
-      const segScreenY = ((-tempProj.y + 1) / 2) * rect.height + rect.top;
-      const screenDist = Math.hypot(segScreenX - screenX, segScreenY - screenY);
-
-      if (screenDist > thresholdPx) continue;
-
-      // Proyección de extremos y punto medio para jerarquía de imán
-      tempProj.copy(p1).project(this.camera);
-      const d1 = Math.hypot(
-        ((tempProj.x + 1) / 2) * rect.width + rect.left - screenX,
-        ((-tempProj.y + 1) / 2) * rect.height + rect.top - screenY
-      );
-
-      tempProj.copy(p2).project(this.camera);
-      const d2 = Math.hypot(
-        ((tempProj.x + 1) / 2) * rect.width + rect.left - screenX,
-        ((-tempProj.y + 1) / 2) * rect.height + rect.top - screenY
-      );
-
-      const midPt = p1.clone().add(p2).multiplyScalar(0.5);
-      tempProj.copy(midPt).project(this.camera);
-      const dMid = Math.hypot(
-        ((tempProj.x + 1) / 2) * rect.width + rect.left - screenX,
-        ((-tempProj.y + 1) / 2) * rect.height + rect.top - screenY
-      );
-
-      let candType: 'corner' | 'midpoint' | 'edge' = 'edge';
-      let candPos = segPt;
-      let score = screenDist;
-
-      // Jerarquía: Vértice Esquina (1) > Punto Medio (2) > En la Arista (3)
-      if (d1 < 16 || d2 < 16 || t < 0.03 || t > 0.97) {
-        candType = 'corner';
-        candPos = d1 <= d2 ? p1.clone() : p2.clone();
-        score = Math.min(d1, d2) * 0.55;
-      } else if (dMid < 14 || Math.abs(t - 0.5) < 0.04) {
-        candType = 'midpoint';
-        candPos = midPt;
-        score = dMid * 0.75;
-      } else {
-        candType = 'edge';
-        candPos = segPt;
-        score = screenDist;
-      }
-
-      if (score < minScore) {
-        minScore = score;
-        bestEdgeCandidate = {
-          worldPos: candPos,
-          type: candType,
-          objectName: seg.objectName,
-          edgeDir: v.clone().normalize(),
-          edgeP1: p1.clone(),
-          edgeP2: p2.clone()
-        };
-      }
+    if (this.floorMesh && this.floorMesh.visible) {
+      roots.push(this.floorMesh);
     }
+    return roots;
+  }
 
-    if (bestEdgeCandidate) {
-      return bestEdgeCandidate;
+  private resolveTapeMeasureObjectName(obj: THREE.Object3D): string | null {
+    const pieceMeta = this.resolvePieceHitMeta(obj);
+    if (pieceMeta?.part?.name) {
+      return pieceMeta.part.name;
     }
-
-    // 3. Fallback en la cara (Superficie 3D cuando el cursor está lejos de las aristas)
-    const faceCandidates: THREE.Object3D[] = [
-      ...this.raycastablePieceMeshes,
-      ...this.appliancesGroup.children,
-      ...this.roomGroup.children,
-      ...(this.floorMesh ? [this.floorMesh] : [])
-    ];
-    const intersects = this.raycaster.intersectObjects(faceCandidates, true);
-    if (intersects.length > 0) {
-      const hit = intersects[0];
-      let objName = 'Superficie 3D';
-      if (hit.object.userData?.['part']) {
-        objName = hit.object.userData['part'].name;
-      } else if (hit.object.userData?.['appliance'] || hit.object.userData?.['applianceId']) {
-        const resolved = this.resolveApplianceFromObject(hit.object);
-        objName = resolved?.app.name || 'Equipo';
-      } else if (hit.object.userData?.['isWall']) {
-        objName = 'Muro';
-      } else if (hit.object.userData?.['isFloor']) {
-        objName = 'Piso';
-      }
-
-      return {
-        worldPos: hit.point.clone(),
-        type: 'face',
-        objectName: objName,
-        faceNormal: hit.face?.normal
-      };
+    const resolvedApp = this.resolveApplianceFromObject(obj);
+    if (resolvedApp?.app?.name) {
+      return resolvedApp.app.name;
     }
-
+    const wallId = this.resolveWallIdFromObject(obj);
+    if (wallId) {
+      const wall = getResolvedRoomWalls(this.roomConfig()).find(w => w.id === wallId);
+      return wall?.name || 'Muro';
+    }
+    let curr: THREE.Object3D | null = obj;
+    while (curr && curr !== this.scene) {
+      const data = curr.userData;
+      if (data?.['part']?.name) return String(data['part'].name);
+      if (data?.['isWall']) return 'Muro';
+      if (data?.['isFloor']) return 'Piso';
+      curr = curr.parent;
+    }
     return null;
   }
 
+  private findMeasureSnapCandidateAt(clientX: number, clientY: number): MagneticSnapCandidate | null {
+    if (!this.camera) return null;
+    const viewportRect = this.getMeasureViewportRect();
+    if (!viewportRect) return null;
+    return this.tapeMeasure.findClosestVisibleSnapCandidate(
+      clientX,
+      clientY,
+      viewportRect,
+      this.camera,
+      this.getTapeMeasureSolidRoots(),
+      {
+        hiddenPartIds: this.hiddenPartIds(),
+        resolveObjectName: obj => this.resolveTapeMeasureObjectName(obj)
+      }
+    );
+  }
+
   // Renders visual magnetic snap indicator differentiated by type (Corner, Midpoint, Edge, Face)
-  private updateMagneticSnapIndicator(
-    candidate: {
-      worldPos: THREE.Vector3;
-      type: 'corner' | 'midpoint' | 'edge' | 'face';
-      objectName: string;
-      edgeDir?: THREE.Vector3;
-    } | null
-  ) {
+  private updateMagneticSnapIndicator(candidate: MagneticSnapCandidate | null) {
     if (!candidate) {
       if (this.magneticSnapGroup.children.length > 0) {
         this.disposeGroup(this.magneticSnapGroup);
@@ -3234,9 +3052,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
 
     this.magneticSnapGroup.position.copy(candidate.worldPos);
+    this.magneticSnapGroup.renderOrder = TAPE_MEASURE_RENDER_ORDER;
     const snapKey = `${candidate.type}_${candidate.objectName}`;
 
-    // If the snap badge type and object name haven't changed, simply update orientation & position without recreating CanvasTexture
     if (snapKey === this.lastSnapIndicatorKey && this.magneticSnapGroup.children.length > 0) {
       for (const child of this.magneticSnapGroup.children) {
         if (child instanceof THREE.Mesh) {
@@ -3253,23 +3071,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.disposeGroup(this.magneticSnapGroup);
     this.lastSnapIndicatorKey = snapKey;
 
-    let colorHex = 0x10b981; // Green for Corner
-    let colorCss = '#10b981';
-    let labelPrefix = 'Esquina';
-
-    if (candidate.type === 'midpoint') {
-      colorHex = 0x06b6d4; // Cyan for Midpoint
-      colorCss = '#06b6d4';
-      labelPrefix = 'Punto Medio';
-    } else if (candidate.type === 'edge') {
-      colorHex = 0xf59e0b; // Amber for On Edge
-      colorCss = '#f59e0b';
-      labelPrefix = 'En la Arista';
-    } else if (candidate.type === 'face') {
-      colorHex = 0x3b82f6; // Blue for Face
-      colorCss = '#3b82f6';
-      labelPrefix = 'En la Cara';
-    }
+    const colorHex = candidate.colorHex ?? SNAP_COLORS[candidate.type];
+    const colorCss = candidate.colorCss || SNAP_CSS_COLORS[candidate.type];
+    const labelPrefix = candidate.label || SNAP_LABELS[candidate.type];
 
     // 1. Technical Precision Crosshair
     const crossSize = 5.0; // mm
@@ -3282,426 +3086,519 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const crossMat = new THREE.LineBasicMaterial({
       color: colorHex,
       depthTest: false,
+      depthWrite: false,
       linewidth: 2
     });
-    this.magneticSnapGroup.add(new THREE.LineSegments(crossGeo, crossMat));
+    this.tapeMeasure.configureMeasureOverlayMaterial(crossMat);
+    const crossLines = new THREE.LineSegments(crossGeo, crossMat);
+    crossLines.renderOrder = TAPE_MEASURE_RENDER_ORDER;
+    crossLines.userData = { isMeasurementVisual: true, isAuxiliaryVisual: true };
+    this.magneticSnapGroup.add(crossLines);
 
     // 2. Specialized Geometric Snapping Badge
+    let badgeMesh: THREE.Mesh;
     if (candidate.type === 'corner') {
-      // Circular Ring for Vertices
       const ringGeo = new THREE.RingGeometry(3.5, 5.5, 16);
       const ringMat = new THREE.MeshBasicMaterial({
         color: colorHex,
         side: THREE.DoubleSide,
         depthTest: false,
+        depthWrite: false,
         transparent: true,
         opacity: 0.95
       });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.quaternion.copy(this.camera.quaternion);
-      this.magneticSnapGroup.add(ring);
+      this.tapeMeasure.configureMeasureOverlayMaterial(ringMat);
+      badgeMesh = new THREE.Mesh(ringGeo, ringMat);
+      badgeMesh.quaternion.copy(this.camera.quaternion);
     } else if (candidate.type === 'midpoint') {
-      // Cyan Diamond for Midpoints
       const diamondGeo = new THREE.PlaneGeometry(6, 6);
       const diamondMat = new THREE.MeshBasicMaterial({
         color: colorHex,
         side: THREE.DoubleSide,
         depthTest: false,
+        depthWrite: false,
         transparent: true,
         opacity: 0.95
       });
-      const diamond = new THREE.Mesh(diamondGeo, diamondMat);
-      diamond.quaternion.copy(this.camera.quaternion);
-      diamond.rotateZ(Math.PI / 4);
-      this.magneticSnapGroup.add(diamond);
+      this.tapeMeasure.configureMeasureOverlayMaterial(diamondMat);
+      badgeMesh = new THREE.Mesh(diamondGeo, diamondMat);
+      badgeMesh.quaternion.copy(this.camera.quaternion);
+      badgeMesh.rotateZ(Math.PI / 4);
     } else if (candidate.type === 'edge') {
-      // Amber Solid Diamond/Square attached to the edge wire
       const edgeGeo = new THREE.PlaneGeometry(5, 5);
       const edgeMat = new THREE.MeshBasicMaterial({
         color: colorHex,
         side: THREE.DoubleSide,
         depthTest: false,
+        depthWrite: false,
         transparent: true,
         opacity: 0.95
       });
-      const edgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
-      edgeMesh.quaternion.copy(this.camera.quaternion);
-      edgeMesh.rotateZ(Math.PI / 4);
-      this.magneticSnapGroup.add(edgeMesh);
+      this.tapeMeasure.configureMeasureOverlayMaterial(edgeMat);
+      badgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
+      badgeMesh.quaternion.copy(this.camera.quaternion);
+      badgeMesh.rotateZ(Math.PI / 4);
     } else {
-      // Small Circle for Surface Face
       const faceGeo = new THREE.RingGeometry(2.5, 4.0, 12);
       const faceMat = new THREE.MeshBasicMaterial({
         color: colorHex,
         side: THREE.DoubleSide,
         depthTest: false,
+        depthWrite: false,
         transparent: true,
         opacity: 0.85
       });
-      const faceMesh = new THREE.Mesh(faceGeo, faceMat);
-      faceMesh.quaternion.copy(this.camera.quaternion);
-      this.magneticSnapGroup.add(faceMesh);
+      this.tapeMeasure.configureMeasureOverlayMaterial(faceMat);
+      badgeMesh = new THREE.Mesh(faceGeo, faceMat);
+      badgeMesh.quaternion.copy(this.camera.quaternion);
     }
+    badgeMesh.renderOrder = TAPE_MEASURE_RENDER_ORDER;
+    badgeMesh.userData = { isMeasurementVisual: true, isAuxiliaryVisual: true };
+    this.magneticSnapGroup.add(badgeMesh);
 
-    // 3. Compact Floating Label Sprite
-    const labelText = `${labelPrefix} · ${candidate.objectName}`;
-    const spriteMat = this.getCachedBadgeMaterial(`snap_label_${colorCss}_${labelText}`, 250, 48, (ctx) => {
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-      ctx.beginPath();
-      ctx.roundRect(0, 0, 250, 48, 10);
-      ctx.fill();
-      ctx.strokeStyle = colorCss;
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
+    // 3. Compact Floating Label Sprite (Minimalist Studio + Inter --font-sans)
+    const rawName = (candidate.objectName || '').trim();
+    const shortName = rawName.length > 18 ? `${rawName.slice(0, 17)}…` : rawName;
+    const labelText = shortName ? `${labelPrefix} · ${shortName}` : labelPrefix;
+    const spriteMat = this.getCachedBadgeMaterial(
+      `snap_label_ms_${colorCss}_${labelText}`,
+      270,
+      48,
+      (ctx) => {
+        ctx.fillStyle = 'rgba(24, 24, 27, 0.94)';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 270, 48, 10);
+        ctx.fill();
+        ctx.strokeStyle = colorCss;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 18px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(labelText, 125, 24);
-    });
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '600 17px Inter, system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, 135, 24);
+      },
+      'measure'
+    );
     const sprite = new THREE.Sprite(spriteMat);
     sprite.position.set(0, 16, 0);
-    sprite.scale.set(62, 14, 1);
+    sprite.scale.set(66, 14, 1);
+    sprite.renderOrder = TAPE_MEASURE_RENDER_ORDER;
+    sprite.userData = { isMeasurementVisual: true, isAuxiliaryVisual: true };
     this.magneticSnapGroup.add(sprite);
     this.requestRender(4);
   }
 
-  // Resolves Point B applying orthogonal axis inference, perpendicular edge projection and HUD modes
+  private resolveMeasureFallbackPlanePoint(clientX: number, clientY: number, ptA: Point3D): Point3D | null {
+    const viewportRect = this.getMeasureViewportRect();
+    if (!viewportRect || !this.camera) return null;
+
+    this.mouse.x = ((clientX - viewportRect.left) / viewportRect.width) * 2 - 1;
+    this.mouse.y = -((clientY - viewportRect.top) / viewportRect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    const horizontalPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -ptA.y);
+    const intersectPt = new THREE.Vector3();
+    if (
+      Math.abs(this.raycaster.ray.direction.y) > 0.08 &&
+      this.raycaster.ray.intersectPlane(horizontalPlane, intersectPt)
+    ) {
+      return { x: intersectPt.x, y: intersectPt.y, z: intersectPt.z };
+    }
+
+    const camNormal = new THREE.Vector3();
+    this.camera.getWorldDirection(camNormal);
+    const camPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+      camNormal,
+      new THREE.Vector3(ptA.x, ptA.y, ptA.z)
+    );
+    if (this.raycaster.ray.intersectPlane(camPlane, intersectPt)) {
+      return { x: intersectPt.x, y: intersectPt.y, z: intersectPt.z };
+    }
+    return null;
+  }
+
+  // Resolves Point B applying orthogonal axis inference, perpendicular projection & 15px/25mm thresholds
   private resolveMeasurementPointB(
-    candidate: {
-      worldPos: THREE.Vector3;
-      type: 'corner' | 'midpoint' | 'edge' | 'face';
-      objectName: string;
-      edgeDir?: THREE.Vector3;
-      edgeP1?: THREE.Vector3;
-      edgeP2?: THREE.Vector3;
-    },
-    shiftPressed = false
-  ): { x: number; y: number; z: number } {
+    rawPoint: Point3D | THREE.Vector3,
+    shiftPressed = false,
+    clientX?: number,
+    clientY?: number
+  ): { pointB: Point3D; axisLock: MeasureAxisLock } {
     const a = this.measurePointA();
     if (!a) {
       return {
-        x: Math.round(candidate.worldPos.x),
-        y: Math.max(0, Math.round(candidate.worldPos.y)),
-        z: Math.round(candidate.worldPos.z)
+        pointB: {
+          x: Math.round(rawPoint.x),
+          y: Math.max(0, Math.round(rawPoint.y)),
+          z: Math.round(rawPoint.z)
+        },
+        axisLock: null
       };
     }
 
-    const raw = candidate.worldPos;
-    const mode = this.measureProjectionMode();
+    const clientPos =
+      clientX !== undefined && clientY !== undefined
+        ? { x: clientX, y: clientY }
+        : this.lastMeasurePointerClient;
 
-    // 1. Modo Forzado desde el panel HUD (ΔX, ΔY, ΔZ)
-    if (mode === 'x') {
-      this.activeInferredAxis.set('x');
-      return { x: Math.round(raw.x), y: Math.round(a.y), z: Math.round(a.z) };
-    }
-    if (mode === 'y') {
-      this.activeInferredAxis.set('y');
-      return { x: Math.round(a.x), y: Math.max(0, Math.round(raw.y)), z: Math.round(a.z) };
-    }
-    if (mode === 'z') {
-      this.activeInferredAxis.set('z');
-      return { x: Math.round(a.x), y: Math.round(a.y), z: Math.round(raw.z) };
-    }
+    return this.tapeMeasure.resolvePerpendicularPointB(a, rawPoint, {
+      mode: this.measureProjectionMode(),
+      shiftPressed: shiftPressed || this.isShiftPressed(),
+      camera: this.camera,
+      viewportRect: this.getMeasureViewportRect(),
+      cursorClientX: clientPos?.x,
+      cursorClientY: clientPos?.y
+    });
+  }
 
-    // 2. Inferencia interactiva en modo Directo 3D
-    const dx = raw.x - a.x;
-    const dy = raw.y - a.y;
-    const dz = raw.z - a.z;
-    const absX = Math.abs(dx);
-    const absY = Math.abs(dy);
-    const absZ = Math.abs(dz);
-    const dist = Math.hypot(dx, dy, dz);
+  private reprojectActiveMeasurePreview(shiftOverride?: boolean): void {
+    const a = this.measurePointA();
+    const rawB = this.lastRawMeasurePointB ?? this.measurePointB();
+    if (!a || !rawB) return;
 
-    if (dist < 4) {
-      this.activeInferredAxis.set(null);
-      return { x: Math.round(raw.x), y: Math.max(0, Math.round(raw.y)), z: Math.round(raw.z) };
-    }
-
-    // 2.1. Bloqueo de eje ortogonal con tecla Shift presionada
-    if (shiftPressed || this.isShiftPressed()) {
-      if (absX >= absY && absX >= absZ) {
-        this.activeInferredAxis.set('x');
-        return { x: Math.round(raw.x), y: Math.round(a.y), z: Math.round(a.z) };
-      } else if (absY >= absX && absY >= absZ) {
-        this.activeInferredAxis.set('y');
-        return { x: Math.round(a.x), y: Math.max(0, Math.round(raw.y)), z: Math.round(a.z) };
-      } else {
-        this.activeInferredAxis.set('z');
-        return { x: Math.round(a.x), y: Math.round(a.y), z: Math.round(raw.z) };
-      }
-    }
-
-    // 2.2. Inferencia y enganche magnético a ejes principales (umbral angular <= ~23°)
-    if (dist > 12) {
-      if (absX / dist > 0.92) {
-        this.activeInferredAxis.set('x');
-        return { x: Math.round(raw.x), y: Math.round(a.y), z: Math.round(a.z) };
-      }
-      if (absY / dist > 0.92) {
-        this.activeInferredAxis.set('y');
-        return { x: Math.round(a.x), y: Math.max(0, Math.round(raw.y)), z: Math.round(a.z) };
-      }
-      if (absZ / dist > 0.92) {
-        this.activeInferredAxis.set('z');
-        return { x: Math.round(a.x), y: Math.round(a.y), z: Math.round(raw.z) };
-      }
-    }
-
-    // 2.3. Inferencia Perpendicular Automática entre aristas paralelas (ej. filo mesón a frente cajón)
-    if (this.measurePointAEdgeDir && candidate.edgeDir) {
-      const dot = Math.abs(this.measurePointAEdgeDir.dot(candidate.edgeDir));
-      if (dot > 0.96 && candidate.edgeP1) {
-        const uB = candidate.edgeDir;
-        const b0 = candidate.edgeP1;
-        const tPerp = (new THREE.Vector3(a.x - b0.x, a.y - b0.y, a.z - b0.z)).dot(uB);
-        const perpPt = b0.clone().addScaledVector(uB, tPerp);
-
-        const segLen = candidate.edgeP1.distanceTo(candidate.edgeP2 || candidate.edgeP1);
-        if (tPerp >= -15 && tPerp <= segLen + 15) {
-          this.activeInferredAxis.set(null);
-          return {
-            x: Math.round(perpPt.x),
-            y: Math.max(0, Math.round(perpPt.y)),
-            z: Math.round(perpPt.z)
-          };
-        }
-      }
-    }
-
-    this.activeInferredAxis.set(null);
-    return {
-      x: Math.round(raw.x),
-      y: Math.max(0, Math.round(raw.y)),
-      z: Math.round(raw.z)
-    };
+    const resolved = this.resolveMeasurementPointB(rawB, shiftOverride ?? this.isShiftPressed());
+    this.measurePointB.set(resolved.pointB);
+    this.activeInferredAxis.set(resolved.axisLock);
+    this.renderMeasurementVisuals();
+    this.updateProjectedMeasureBadges();
   }
 
   // Permite conmutar la proyección visual de la cota desde el panel flotante
-  setMeasureProjectionMode(mode: 'direct' | 'x' | 'y' | 'z') {
+  setMeasureProjectionMode(mode: MeasureProjectionMode) {
     this.measureProjectionMode.set(mode);
-    if (this.measurePointA() && this.measurePointB()) {
-      this.renderMeasurementVisuals();
+    if (this.measurePointA() && (this.lastRawMeasurePointB || this.measurePointB())) {
+      this.reprojectActiveMeasurePreview();
     }
   }
 
-  // Start a fresh measurement without resetting tool
+  // Start a fresh measurement without deleting saved measurements
   startNewMeasurement() {
-    this.isMeasurementPersistent.set(false);
+    this.measureProjectionMode.set('direct');
+    this.cancelActiveMeasurementTrace();
+  }
+
+  // Cancel ONLY the in-progress trace (preserves savedMeasurements)
+  cancelActiveMeasurementTrace() {
     this.measurePointA.set(null);
     this.measurePointB.set(null);
-    this.measurePointAEdgeDir = null;
+    this.lastRawMeasurePointB = null;
+    this.measurePointerDownPos = null;
     this.activeInferredAxis.set(null);
-    this.measureProjectionMode.set('direct');
+    if (this.previewMeasureBadge() !== null) {
+      if (NgZone.isInAngularZone()) {
+        this.previewMeasureBadge.set(null);
+      } else {
+        this.ngZone.run(() => this.previewMeasureBadge.set(null));
+      }
+    }
+    this.updateMagneticSnapIndicator(null);
+    this.renderMeasurementVisuals();
+    this.updateProjectedMeasureBadges();
+  }
+
+  removeMeasurement(id: string) {
+    this.savedMeasurements.update(list => list.filter(item => item.id !== id));
+    this.renderMeasurementVisuals();
+    this.updateProjectedMeasureBadges();
+    this.requestRender(6);
+  }
+
+  clearAllMeasurements() {
+    this.savedMeasurements.set([]);
+    this.measurePointA.set(null);
+    this.measurePointB.set(null);
+    this.lastRawMeasurePointB = null;
+    this.measurePointerDownPos = null;
+    this.activeInferredAxis.set(null);
+    this.projectedMeasureBadges.set([]);
+    this.previewMeasureBadge.set(null);
     this.disposeGroup(this.measureGroup);
     this.updateMagneticSnapIndicator(null);
     this.requestRender(6);
   }
 
-  // Render Interactive 3D Measurement Visuals with Fine CAD Arrowheads & Subtle Center Cross
+  private isProjectedBadgeListEqual(
+    prev: readonly ProjectedMeasurementBadge[],
+    next: readonly ProjectedMeasurementBadge[]
+  ): boolean {
+    if (prev.length !== next.length) return false;
+    for (let i = 0; i < prev.length; i++) {
+      const a = prev[i];
+      const b = next[i];
+      if (
+        a.id !== b.id ||
+        a.visible !== b.visible ||
+        a.formattedDistance !== b.formattedDistance ||
+        a.colorCss !== b.colorCss ||
+        a.axisLock !== b.axisLock ||
+        Math.abs(a.x - b.x) > 0.1 ||
+        Math.abs(a.y - b.y) > 0.1
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private isProjectedBadgeEqual(
+    a: ProjectedMeasurementBadge | null,
+    b: ProjectedMeasurementBadge | null
+  ): boolean {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    return (
+      a.id === b.id &&
+      a.visible === b.visible &&
+      a.formattedDistance === b.formattedDistance &&
+      a.colorCss === b.colorCss &&
+      a.axisLock === b.axisLock &&
+      Math.abs(a.x - b.x) <= 0.1 &&
+      Math.abs(a.y - b.y) <= 0.1
+    );
+  }
+
+  updateProjectedMeasureBadges(): void {
+    const saved = this.savedMeasurements();
+    const activeA = this.measurePointA();
+    const activeB = this.measurePointB();
+
+    if (saved.length === 0 && (!activeA || !activeB)) {
+      const hasSaved = this.projectedMeasureBadges().length > 0;
+      const hasPreview = this.previewMeasureBadge() !== null;
+      if (!hasSaved && !hasPreview) return;
+      const clearFn = () => {
+        if (hasSaved) this.projectedMeasureBadges.set([]);
+        if (hasPreview) this.previewMeasureBadge.set(null);
+      };
+      if (NgZone.isInAngularZone()) {
+        clearFn();
+      } else {
+        this.ngZone.run(clearFn);
+      }
+      return;
+    }
+
+    const viewportRect = this.getMeasureViewportRect();
+    if (!this.camera || !viewportRect) return;
+
+    const nextSavedBadges =
+      saved.length > 0
+        ? this.tapeMeasure.buildProjectedBadges(saved, this.camera, viewportRect.width, viewportRect.height)
+        : [];
+
+    let nextPreview: ProjectedMeasurementBadge | null = null;
+    if (activeA && activeB) {
+      let targetB = activeB;
+      const mode = this.measureProjectionMode();
+      let effectiveLock: MeasureAxisLock = this.activeInferredAxis();
+      if (mode === 'x') {
+        targetB = { x: activeB.x, y: activeA.y, z: activeA.z };
+        effectiveLock = 'x';
+      } else if (mode === 'y') {
+        targetB = { x: activeA.x, y: activeB.y, z: activeA.z };
+        effectiveLock = 'y';
+      } else if (mode === 'z') {
+        targetB = { x: activeA.x, y: activeA.y, z: activeB.z };
+        effectiveLock = 'z';
+      }
+      const dist = Math.hypot(targetB.x - activeA.x, targetB.y - activeA.y, targetB.z - activeA.z);
+      if (dist >= 0.5) {
+        const previewSaved = this.tapeMeasure.buildSavedMeasurement(activeA, targetB, effectiveLock, '__preview__');
+        nextPreview =
+          this.tapeMeasure.buildProjectedBadges(
+            [previewSaved],
+            this.camera,
+            viewportRect.width,
+            viewportRect.height
+          )[0] ?? null;
+      }
+    }
+
+    const savedChanged = !this.isProjectedBadgeListEqual(this.projectedMeasureBadges(), nextSavedBadges);
+    const previewChanged = !this.isProjectedBadgeEqual(this.previewMeasureBadge(), nextPreview);
+    if (!savedChanged && !previewChanged) return;
+
+    const applyUpdate = () => {
+      if (savedChanged) this.projectedMeasureBadges.set(nextSavedBadges);
+      if (previewChanged) this.previewMeasureBadge.set(nextPreview);
+    };
+    if (NgZone.isInAngularZone()) {
+      applyUpdate();
+    } else {
+      this.ngZone.run(applyUpdate);
+    }
+  }
+
+  private configureMeasureOverlayObject(obj: THREE.Object3D, mat?: THREE.Material): void {
+    obj.renderOrder = TAPE_MEASURE_RENDER_ORDER;
+    obj.userData = { ...obj.userData, isMeasurementVisual: true, isAuxiliaryVisual: true };
+    if (mat) {
+      this.tapeMeasure.configureMeasureOverlayMaterial(mat);
+    }
+  }
+
+  private createCadCrosshair(pt: Point3D, colorHex: number): THREE.Group {
+    const group = new THREE.Group();
+    group.position.set(pt.x, pt.y, pt.z);
+    this.configureMeasureOverlayObject(group);
+
+    const s = 4.0;
+    const pts = [
+      new THREE.Vector3(-s, 0, 0), new THREE.Vector3(s, 0, 0),
+      new THREE.Vector3(0, -s, 0), new THREE.Vector3(0, s, 0),
+      new THREE.Vector3(0, 0, -s), new THREE.Vector3(0, 0, s)
+    ];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: colorHex, depthTest: false, depthWrite: false, linewidth: 2 });
+    const lines = new THREE.LineSegments(geo, mat);
+    this.configureMeasureOverlayObject(lines, mat);
+    group.add(lines);
+
+    const dotGeo = new THREE.SphereGeometry(1.2, 8, 8);
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, depthWrite: false });
+    const dot = new THREE.Mesh(dotGeo, dotMat);
+    this.configureMeasureOverlayObject(dot, dotMat);
+    group.add(dot);
+
+    return group;
+  }
+
+  private createCadArrow(tipPos: Point3D, dirPointingAtTip: THREE.Vector3, colorHex: number): THREE.Mesh {
+    const arrowLength = 12; // mm
+    const arrowRadius = 2.4; // mm
+    const coneGeo = new THREE.ConeGeometry(arrowRadius, arrowLength, 12);
+    coneGeo.translate(0, -arrowLength / 2, 0);
+
+    const coneMat = new THREE.MeshBasicMaterial({ color: colorHex, depthTest: false, depthWrite: false });
+    const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+
+    const defaultUp = new THREE.Vector3(0, 1, 0);
+    const normDir = dirPointingAtTip.clone().normalize();
+    coneMesh.quaternion.setFromUnitVectors(defaultUp, normDir);
+    coneMesh.position.set(tipPos.x, tipPos.y, tipPos.z);
+    this.configureMeasureOverlayObject(coneMesh, coneMat);
+
+    return coneMesh;
+  }
+
+  private renderMeasurementSegmentVisuals(
+    a: Point3D,
+    b: Point3D,
+    axisLock: MeasureAxisLock,
+    showDeltaGuides: boolean
+  ): void {
+    const vecAB = new THREE.Vector3(b.x - a.x, b.y - a.y, b.z - a.z);
+    const totalDist = vecAB.length();
+    const lineColor = axisLock ? AXIS_COLORS[axisLock] : AXIS_COLORS.direct;
+
+    const dirAtA =
+      totalDist > 0.1
+        ? new THREE.Vector3(a.x - b.x, a.y - b.y, a.z - b.z).normalize()
+        : new THREE.Vector3(0, 1, 0);
+    const dirAtB = dirAtA.clone().negate();
+
+    if (totalDist > 0.5) {
+      this.measureGroup.add(this.createCadArrow(a, dirAtA, lineColor));
+      this.measureGroup.add(this.createCadArrow(b, dirAtB, lineColor));
+    }
+    this.measureGroup.add(this.createCadCrosshair(a, 0x10b981));
+    this.measureGroup.add(this.createCadCrosshair(b, 0x10b981));
+
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(a.x, a.y, a.z),
+      new THREE.Vector3(b.x, b.y, b.z)
+    ]);
+    const lineMat = new THREE.LineBasicMaterial({
+      color: lineColor,
+      linewidth: 2,
+      depthTest: false,
+      depthWrite: false
+    });
+    const directLine = new THREE.Line(lineGeo, lineMat);
+    this.configureMeasureOverlayObject(directLine, lineMat);
+    this.measureGroup.add(directLine);
+
+    if (showDeltaGuides && axisLock === null) {
+      const addDashedDelta = (pStart: THREE.Vector3, pEnd: THREE.Vector3, color: number) => {
+        const g = new THREE.BufferGeometry().setFromPoints([pStart, pEnd]);
+        const m = new THREE.LineDashedMaterial({
+          color,
+          dashSize: 12,
+          gapSize: 8,
+          depthTest: false,
+          depthWrite: false
+        });
+        const l = new THREE.Line(g, m);
+        l.computeLineDistances();
+        this.configureMeasureOverlayObject(l, m);
+        this.measureGroup.add(l);
+      };
+
+      if (Math.abs(b.x - a.x) > 4) {
+        addDashedDelta(new THREE.Vector3(a.x, a.y, a.z), new THREE.Vector3(b.x, a.y, a.z), AXIS_COLORS.x);
+      }
+      if (Math.abs(b.y - a.y) > 4) {
+        addDashedDelta(new THREE.Vector3(b.x, a.y, a.z), new THREE.Vector3(b.x, b.y, a.z), AXIS_COLORS.y);
+      }
+      if (Math.abs(b.z - a.z) > 4) {
+        addDashedDelta(new THREE.Vector3(b.x, b.y, a.z), new THREE.Vector3(b.x, b.y, b.z), AXIS_COLORS.z);
+      }
+    }
+  }
+
+  // Render Interactive 3D Measurement Visuals for all saved measurements + active trace
   renderMeasurementVisuals() {
     this.disposeGroup(this.measureGroup);
+    this.measureGroup.renderOrder = TAPE_MEASURE_RENDER_ORDER;
     this.requestRender(6);
 
+    for (const saved of this.savedMeasurements()) {
+      this.renderMeasurementSegmentVisuals(saved.pointA, saved.pointB, saved.axisLock, saved.axisLock === null);
+    }
+
     const a = this.measurePointA();
-    const b = this.measurePointB();
     if (!a) return;
 
-    // Helper 1: Technical CAD Crosshair
-    const createCadCrosshair = (pt: { x: number; y: number; z: number }, colorHex: number) => {
-      const group = new THREE.Group();
-      group.position.set(pt.x, pt.y, pt.z);
-
-      const s = 4.0;
-      const pts = [
-        new THREE.Vector3(-s, 0, 0), new THREE.Vector3(s, 0, 0),
-        new THREE.Vector3(0, -s, 0), new THREE.Vector3(0, s, 0),
-        new THREE.Vector3(0, 0, -s), new THREE.Vector3(0, 0, s)
-      ];
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({ color: colorHex, depthTest: false, linewidth: 2 });
-      group.add(new THREE.LineSegments(geo, mat));
-
-      const dotGeo = new THREE.SphereGeometry(1.2, 8, 8);
-      const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false });
-      group.add(new THREE.Mesh(dotGeo, dotMat));
-
-      return group;
-    };
-
-    // Helper 2: Slender CAD Arrowhead Cone
-    const createCadArrow = (tipPos: { x: number; y: number; z: number }, dirPointingAtTip: THREE.Vector3, colorHex: number) => {
-      const arrowLength = 12; // mm
-      const arrowRadius = 2.4; // mm
-      const coneGeo = new THREE.ConeGeometry(arrowRadius, arrowLength, 12);
-      coneGeo.translate(0, -arrowLength / 2, 0);
-
-      const coneMat = new THREE.MeshBasicMaterial({ color: colorHex, depthTest: false });
-      const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-
-      const defaultUp = new THREE.Vector3(0, 1, 0);
-      const normDir = dirPointingAtTip.clone().normalize();
-      coneMesh.quaternion.setFromUnitVectors(defaultUp, normDir);
-      coneMesh.position.set(tipPos.x, tipPos.y, tipPos.z);
-
-      return coneMesh;
-    };
-
-    // Initial state: only Point A is placed
+    const b = this.measurePointB();
     if (!b) {
-      this.measureGroup.add(createCadCrosshair(a, 0xf59e0b));
+      this.measureGroup.add(this.createCadCrosshair(a, AXIS_COLORS.direct));
       const anchorRingGeo = new THREE.RingGeometry(3, 5, 16);
       const anchorRingMat = new THREE.MeshBasicMaterial({
-        color: 0xf59e0b,
+        color: AXIS_COLORS.direct,
         side: THREE.DoubleSide,
         depthTest: false,
+        depthWrite: false,
         transparent: true,
         opacity: 0.85
       });
       const anchorRing = new THREE.Mesh(anchorRingGeo, anchorRingMat);
       anchorRing.position.set(a.x, a.y, a.z);
-      anchorRing.quaternion.copy(this.camera.quaternion);
+      if (this.camera) {
+        anchorRing.quaternion.copy(this.camera.quaternion);
+      }
+      this.configureMeasureOverlayObject(anchorRing, anchorRingMat);
       this.measureGroup.add(anchorRing);
       return;
     }
 
-    // Both Point A and Point B are defined
-    let targetB = { ...b };
+    let targetB: Point3D = { ...b };
     const mode = this.measureProjectionMode();
-    const inferredAxis = this.activeInferredAxis();
+    let effectiveAxisLock: MeasureAxisLock = this.activeInferredAxis();
 
     if (mode === 'x') {
       targetB = { x: b.x, y: a.y, z: a.z };
+      effectiveAxisLock = 'x';
     } else if (mode === 'y') {
       targetB = { x: a.x, y: b.y, z: a.z };
+      effectiveAxisLock = 'y';
     } else if (mode === 'z') {
       targetB = { x: a.x, y: a.y, z: b.z };
+      effectiveAxisLock = 'z';
     }
 
-    const vecAB = new THREE.Vector3(targetB.x - a.x, targetB.y - a.y, targetB.z - a.z);
-    const totalDist = vecAB.length();
-
-    let lineColor = 0xf59e0b; // Amber default
-    let axisLabel: 'x' | 'y' | 'z' | null = null;
-
-    if (mode === 'x' || (mode === 'direct' && inferredAxis === 'x')) {
-      lineColor = 0xef4444; // Rojo Eje X
-      axisLabel = 'x';
-    } else if (mode === 'y' || (mode === 'direct' && inferredAxis === 'y')) {
-      lineColor = 0x10b981; // Verde Eje Y
-      axisLabel = 'y';
-    } else if (mode === 'z' || (mode === 'direct' && inferredAxis === 'z')) {
-      lineColor = 0x3b82f6; // Azul Eje Z
-      axisLabel = 'z';
-    }
-
-    // Direction vectors pointing AT the endpoints
-    const dirAtA = totalDist > 0.1
-      ? new THREE.Vector3(a.x - targetB.x, a.y - targetB.y, a.z - targetB.z).normalize()
-      : new THREE.Vector3(0, 1, 0);
-    const dirAtB = dirAtA.clone().negate();
-
-    // Endpoints CAD Arrows
-    this.measureGroup.add(createCadArrow(a, dirAtA, lineColor));
-    this.measureGroup.add(createCadCrosshair(a, 0x10b981));
-
-    this.measureGroup.add(createCadArrow(targetB, dirAtB, lineColor));
-    this.measureGroup.add(createCadCrosshair(targetB, 0x10b981));
-
-    // Direct Measurement Line
-    const lineGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(a.x, a.y, a.z),
-      new THREE.Vector3(targetB.x, targetB.y, targetB.z)
-    ]);
-    const lineMat = new THREE.LineBasicMaterial({
-      color: lineColor,
-      linewidth: 2,
-      depthTest: false
-    });
-    const directLine = new THREE.Line(lineGeo, lineMat);
-    this.measureGroup.add(directLine);
-
-    // Subtle orthogonal delta projection lines in direct mode
-    if (mode === 'direct' && !axisLabel) {
-      if (Math.abs(b.x - a.x) > 4) {
-        const geoX = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(a.x, a.y, a.z),
-          new THREE.Vector3(b.x, a.y, a.z)
-        ]);
-        const matX = new THREE.LineDashedMaterial({ color: 0xef4444, dashSize: 12, gapSize: 8, depthTest: false });
-        const lineX = new THREE.Line(geoX, matX);
-        lineX.computeLineDistances();
-        this.measureGroup.add(lineX);
-      }
-      if (Math.abs(b.y - a.y) > 4) {
-        const geoY = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(b.x, a.y, a.z),
-          new THREE.Vector3(b.x, b.y, a.z)
-        ]);
-        const matY = new THREE.LineDashedMaterial({ color: 0x10b981, dashSize: 12, gapSize: 8, depthTest: false });
-        const lineY = new THREE.Line(geoY, matY);
-        lineY.computeLineDistances();
-        this.measureGroup.add(lineY);
-      }
-      if (Math.abs(b.z - a.z) > 4) {
-        const geoZ = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(b.x, b.y, a.z),
-          new THREE.Vector3(b.x, b.y, b.z)
-        ]);
-        const matZ = new THREE.LineDashedMaterial({ color: 0x3b82f6, dashSize: 12, gapSize: 8, depthTest: false });
-        const lineZ = new THREE.Line(geoZ, matZ);
-        lineZ.computeLineDistances();
-        this.measureGroup.add(lineZ);
-      }
-    }
-
-    // Floating Midpoint Distance Badge
-    const mid = new THREE.Vector3(
-      (a.x + targetB.x) / 2,
-      (a.y + targetB.y) / 2 + 18,
-      (a.z + targetB.z) / 2
-    );
-    const distInfo = this.measureDistance();
-    if (distInfo) {
-      let badgeText = `${distInfo.total} mm`;
-      let strokeColor = '#f59e0b';
-      let textColor = '#fbbf24';
-
-      if (axisLabel === 'x') {
-        badgeText = `X: ${distInfo.dx} mm`;
-        strokeColor = '#ef4444';
-        textColor = '#fca5a5';
-      } else if (axisLabel === 'y') {
-        badgeText = `Y: ${distInfo.dy} mm`;
-        strokeColor = '#10b981';
-        textColor = '#6ee7b7';
-      } else if (axisLabel === 'z') {
-        badgeText = `Z: ${distInfo.dz} mm`;
-        strokeColor = '#3b82f6';
-        textColor = '#93c5fd';
-      }
-
-      const spriteMat = this.getCachedBadgeMaterial(`measure_${strokeColor}_${badgeText}`, 200, 48, (ctx) => {
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-        ctx.beginPath();
-        ctx.roundRect(0, 0, 200, 48, 10);
-        ctx.fill();
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-
-        ctx.fillStyle = textColor;
-        ctx.font = 'bold 22px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(badgeText, 100, 24);
-      });
-      const sprite = new THREE.Sprite(spriteMat);
-      sprite.position.copy(mid);
-      sprite.scale.set(60, 16, 1);
-      this.measureGroup.add(sprite);
-    }
+    this.renderMeasurementSegmentVisuals(a, targetB, effectiveAxisLock, true);
   }
 
   toggleDrillHoles() {
@@ -5158,7 +5055,8 @@ private createHandleMesh(
     cacheKey: string,
     width: number,
     height: number,
-    drawFn: (ctx: CanvasRenderingContext2D) => void
+    drawFn: (ctx: CanvasRenderingContext2D) => void,
+    overlayTarget: 'dimension' | 'measure' = 'dimension'
   ): THREE.SpriteMaterial {
     const existing = this.badgeSpriteCache.get(cacheKey);
     if (existing) {
@@ -5197,7 +5095,11 @@ private createHandleMesh(
       depthTest: false,
       depthWrite: false
     });
-    this.dimensionAnchor.configureDimensionOverlayMaterial(mat, DIMENSION_SPRITE_RENDER_ORDER);
+    if (overlayTarget === 'measure') {
+      this.tapeMeasure.configureMeasureOverlayMaterial(mat);
+    } else {
+      this.dimensionAnchor.configureDimensionOverlayMaterial(mat, DIMENSION_SPRITE_RENDER_ORDER);
+    }
     mat.userData = { isShared: true };
     this.badgeSpriteCache.set(cacheKey, { texture, material: mat });
     return mat;
@@ -6578,6 +6480,7 @@ private createHandleMesh(
 
     // Right-Click tracking: record down coordinates & time to distinguish stationary click from drag pan/orbit
     if (e.button === 2) {
+      this.suppressNextContextMenuForMeasureCancel = false;
       this.rightPointerDownPos = { x: e.clientX, y: e.clientY };
       this.rightPointerDownTime = Date.now();
       this.rightPointerDragged = false;
@@ -6586,7 +6489,7 @@ private createHandleMesh(
 
     // 0. Selección múltiple por ventana (Marquee Box Selection con tecla Shift presionada)
     // Desactiva OrbitControls para que la cámara no se mueva durante el arrastre de selección técnica
-    if (e.button === 0 && e.shiftKey) {
+    if (e.button === 0 && e.shiftKey && !this.isMeasureMode()) {
       const canvasBounds = canvas.getBoundingClientRect();
       this.isMarqueeSelecting = true;
       this.marqueeStart = {
@@ -6606,78 +6509,17 @@ private createHandleMesh(
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // 0. Measurement Tape 2-Click & Drag Mode (Motor de Inferencias CAD)
+    // 0. Measurement Tape Mode (Free Orbit + Click <= 5px threshold in pointerup)
     if (this.isMeasureMode()) {
-      if (e.button !== 0) return; // Solo responder a clic primario
-
-      const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
-
-      // Si la cota anterior ya estaba finalizada y el usuario hace clic sobre un punto de imán:
-      if (this.isMeasurementPersistent()) {
-        if (snapCand) {
-          this.startNewMeasurement();
-          const pt = {
-            x: Math.round(snapCand.worldPos.x),
-            y: Math.round(snapCand.worldPos.y),
-            z: Math.round(snapCand.worldPos.z)
-          };
-          this.measurePointA.set(pt);
-          this.measurePointB.set(pt);
-          this.measurePointAEdgeDir = snapCand.edgeDir ? snapCand.edgeDir.clone() : null;
-          this.measurePointerDownPos = { x: e.clientX, y: e.clientY };
-          this.measurePointerDownTime = performance.now();
-          this.isMeasuringDrag = true;
-          this.controls.enabled = false;
-          this.renderMeasurementVisuals();
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        } else {
-          // Si hace clic en el vacío, permitir orbitar la cámara libremente
-          return;
-        }
+      if (e.button === 0) {
+        this.measurePointerDownPos = { x: e.clientX, y: e.clientY };
+        this.lastMeasurePointerClient = { x: e.clientX, y: e.clientY };
       }
-
-      // Si el Punto A no ha sido fijado todavía (Primer clic):
-      if (!this.measurePointA()) {
-        if (snapCand) {
-          const pt = {
-            x: Math.round(snapCand.worldPos.x),
-            y: Math.round(snapCand.worldPos.y),
-            z: Math.round(snapCand.worldPos.z)
-          };
-          this.measurePointA.set(pt);
-          this.measurePointB.set(pt);
-          this.measurePointAEdgeDir = snapCand.edgeDir ? snapCand.edgeDir.clone() : null;
-          this.measurePointerDownPos = { x: e.clientX, y: e.clientY };
-          this.measurePointerDownTime = performance.now();
-          this.isMeasuringDrag = true;
-          this.controls.enabled = false;
-          this.renderMeasurementVisuals();
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        } else {
-          // Clic en vacío: permitir rotación / órbita de cámara
-          return;
-        }
+      // Keep OrbitControls enabled so user can freely orbit/zoom/pan at any point
+      if (this.controls) {
+        this.controls.enabled = true;
       }
-
-      // Si el Punto A YA está fijado (Segundo clic en modo 2-Clicks de precisión CAD):
-      if (this.measurePointA() && !this.isMeasurementPersistent()) {
-        if (snapCand) {
-          const resolvedB = this.resolveMeasurementPointB(snapCand, e.shiftKey);
-          this.measurePointB.set(resolvedB);
-          this.isMeasurementPersistent.set(true);
-          this.isMeasuringDrag = false;
-          this.controls.enabled = true;
-          this.renderMeasurementVisuals();
-          this.updateMagneticSnapIndicator(null);
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-      }
+      return;
     }
 
     // 0.3. Rotate 90° Tool
@@ -7717,34 +7559,53 @@ private createHandleMesh(
       return;
     }
 
-    // 0.05. Measurement Tape Live Dragging, 2-Click Preview & Magnetic Snapping
+    // 0.05. Measurement Tape Closest-Surface Magnetic Snapping & Live Preview
     if (this.isMeasureMode()) {
-      if (!this.isMeasurementPersistent()) {
-        const snapCand = this.findMagneticSnapCandidate(e.clientX, e.clientY, 32);
-        this.updateMagneticSnapIndicator(snapCand);
+      this.lastMeasurePointerClient = { x: e.clientX, y: e.clientY };
 
-        if (this.measurePointA()) {
-          if (snapCand) {
-            const resolvedB = this.resolveMeasurementPointB(snapCand, e.shiftKey);
-            this.measurePointB.set(resolvedB);
+      const isOrbitDragging =
+        (e.buttons & 2) !== 0 ||
+        (!!this.measurePointerDownPos &&
+          (e.buttons & 1) !== 0 &&
+          !this.tapeMeasure.isClickWithinThreshold(
+            this.measurePointerDownPos.x,
+            this.measurePointerDownPos.y,
+            e.clientX,
+            e.clientY,
+            CLICK_DRAG_THRESHOLD_PX
+          ));
+
+      if (isOrbitDragging) {
+        this.updateMagneticSnapIndicator(null);
+        return;
+      }
+
+      const snapCand = this.findMeasureSnapCandidateAt(e.clientX, e.clientY);
+      this.updateMagneticSnapIndicator(snapCand);
+
+      const activeA = this.measurePointA();
+      if (activeA) {
+        const rawPoint = snapCand
+          ? { x: snapCand.worldPos.x, y: snapCand.worldPos.y, z: snapCand.worldPos.z }
+          : this.resolveMeasureFallbackPlanePoint(e.clientX, e.clientY, activeA);
+
+        if (rawPoint) {
+          this.lastRawMeasurePointB = rawPoint;
+          const resolved = this.resolveMeasurementPointB(rawPoint, e.shiftKey, e.clientX, e.clientY);
+          const syncPreview = () => {
+            this.measurePointB.set(resolved.pointB);
+            this.activeInferredAxis.set(resolved.axisLock);
+            this.renderMeasurementVisuals();
+            this.updateProjectedMeasureBadges();
+          };
+          if (NgZone.isInAngularZone()) {
+            syncPreview();
           } else {
-            const ptA = this.measurePointA()!;
-            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -ptA.y);
-            const intersectPt = new THREE.Vector3();
-            if (this.raycaster.ray.intersectPlane(plane, intersectPt)) {
-              const fallbackCand = {
-                worldPos: intersectPt,
-                type: 'face' as const,
-                objectName: 'Plano Horizontal'
-              };
-              const resolvedB = this.resolveMeasurementPointB(fallbackCand, e.shiftKey);
-              this.measurePointB.set(resolvedB);
-            }
+            this.ngZone.run(syncPreview);
           }
-          this.renderMeasurementVisuals();
-          return;
         }
       }
+      return;
     }
 
     if (this.isDragging && this.activeGizmoHit && (this.dragInitialPart || this.dragInitialParts.length > 0)) {
@@ -9440,36 +9301,124 @@ private createHandleMesh(
       return;
     }
 
-    if (this.isMeasuringDrag) {
-      this.isMeasuringDrag = false;
-      this.controls.enabled = true;
+    if (this.isMeasureMode()) {
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) canvas.style.cursor = 'crosshair';
+      if (this.controls) {
+        this.controls.enabled = true;
+      }
 
-      const distMoved = this.measurePointerDownPos && e
-        ? Math.hypot(e.clientX - this.measurePointerDownPos.x, e.clientY - this.measurePointerDownPos.y)
-        : 0;
+      if (!e) {
+        this.measurePointerDownPos = null;
+        return;
+      }
 
-      if (distMoved > 8 && e) {
-        // Gesto de Arrastre: resolver Punto B y fijar medición persistente
-        const snapEnd = this.findMagneticSnapCandidate(e.clientX, e.clientY, 36);
-        if (snapEnd) {
-          const resolvedB = this.resolveMeasurementPointB(snapEnd, e.shiftKey);
-          this.measurePointB.set(resolvedB);
-        }
+      if (e.button === 2) {
+        if (this.measurePointA()) {
+          const isStationaryRightClick = this.rightPointerDownPos
+            ? this.tapeMeasure.isClickWithinThreshold(
+                this.rightPointerDownPos.x,
+                this.rightPointerDownPos.y,
+                e.clientX,
+                e.clientY,
+                CLICK_DRAG_THRESHOLD_PX
+              )
+            : !this.rightPointerDragged;
 
-        const a = this.measurePointA();
-        const b = this.measurePointB();
-        if (a && b) {
-          const dist = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-          if (dist >= 3) {
-            this.isMeasurementPersistent.set(true);
-            this.updateMagneticSnapIndicator(null);
+          if (isStationaryRightClick) {
+            this.suppressNextContextMenuForMeasureCancel = true;
+            this.rightPointerDownPos = null;
+            this.rightPointerDragged = false;
+            const cancelFn = () => this.cancelActiveMeasurementTrace();
+            if (NgZone.isInAngularZone()) {
+              cancelFn();
+            } else {
+              this.ngZone.run(cancelFn);
+            }
+            e.preventDefault();
+            e.stopPropagation();
           }
         }
+        return;
+      }
+
+      if (e.button !== 0) {
+        return;
+      }
+
+      const downPos = this.measurePointerDownPos;
+      this.measurePointerDownPos = null;
+      if (!downPos) {
+        return;
+      }
+
+      const isClick = this.tapeMeasure.isClickWithinThreshold(
+        downPos.x,
+        downPos.y,
+        e.clientX,
+        e.clientY,
+        CLICK_DRAG_THRESHOLD_PX
+      );
+      if (!isClick) {
+        // Drag > 5px: camera orbit/pan gesture — preserve active Point A and all savedMeasurements
+        return;
+      }
+
+      this.lastMeasurePointerClient = { x: e.clientX, y: e.clientY };
+      const snapCand = this.findMeasureSnapCandidateAt(e.clientX, e.clientY);
+      const activeA = this.measurePointA();
+
+      const commitMeasureClick = () => {
+        if (!activeA) {
+          if (!snapCand) {
+            this.updateMagneticSnapIndicator(null);
+            return;
+          }
+          const ptA: Point3D = {
+            x: Math.round(snapCand.worldPos.x),
+            y: Math.round(snapCand.worldPos.y),
+            z: Math.round(snapCand.worldPos.z)
+          };
+          this.measurePointA.set(ptA);
+          this.measurePointB.set(null);
+          this.lastRawMeasurePointB = null;
+          this.activeInferredAxis.set(null);
+          this.renderMeasurementVisuals();
+          this.updateProjectedMeasureBadges();
+          return;
+        }
+
+        const rawPoint: Point3D | null = snapCand
+          ? { x: snapCand.worldPos.x, y: snapCand.worldPos.y, z: snapCand.worldPos.z }
+          : (this.resolveMeasureFallbackPlanePoint(e.clientX, e.clientY, activeA) ??
+            this.lastRawMeasurePointB ??
+            this.measurePointB());
+
+        if (!rawPoint) return;
+
+        const resolved = this.resolveMeasurementPointB(rawPoint, e.shiftKey, e.clientX, e.clientY);
+        const dist = Math.hypot(
+          resolved.pointB.x - activeA.x,
+          resolved.pointB.y - activeA.y,
+          resolved.pointB.z - activeA.z
+        );
+        if (dist < 0.5) return;
+
+        const saved = this.tapeMeasure.buildSavedMeasurement(activeA, resolved.pointB, resolved.axisLock);
+        this.savedMeasurements.update(list => [...list, saved]);
+        this.measurePointA.set(null);
+        this.measurePointB.set(null);
+        this.lastRawMeasurePointB = null;
+        this.activeInferredAxis.set(null);
+        this.updateMagneticSnapIndicator(null);
         this.renderMeasurementVisuals();
+        this.updateProjectedMeasureBadges();
+      };
+
+      if (NgZone.isInAngularZone()) {
+        commitMeasureClick();
       } else {
-        // Clic simple: El Punto A queda fijado firmemente y la cámara queda libre para orbitar/inspeccionar antes del segundo clic
+        this.ngZone.run(commitMeasureClick);
       }
       return;
     }
@@ -9597,11 +9546,12 @@ private createHandleMesh(
     this.activeTool.set(tool);
     if (tool === 'measure') {
       this.isMeasureMode.set(true);
-      const canvas = this.canvasRef()?.nativeElement;
-      if (canvas) canvas.style.cursor = 'crosshair';
+      if (this.controls) {
+        this.controls.enabled = true;
+      }
     } else {
       this.isMeasureMode.set(false);
-      this.clearMeasure();
+      this.cancelActiveMeasurementTrace();
     }
     if (tool === 'rotate_90') {
       const grp = this.currentSelectedGroup();
@@ -9620,7 +9570,7 @@ private createHandleMesh(
     this.hoveredFaceInfo.set(null);
     const canvas = this.canvasRef()?.nativeElement;
     if (canvas) {
-      canvas.style.cursor = 'default';
+      canvas.style.cursor = tool === 'measure' ? 'crosshair' : 'default';
     }
     this.requestRender(6);
   }
@@ -10065,11 +10015,23 @@ private createHandleMesh(
     e.preventDefault();
     e.stopPropagation();
 
+    if (this.suppressNextContextMenuForMeasureCancel) {
+      this.suppressNextContextMenuForMeasureCancel = false;
+      this.rightPointerDownPos = null;
+      this.rightPointerDragged = false;
+      return;
+    }
+
     const duration = Date.now() - this.rightPointerDownTime;
     const wasDragged = this.rightPointerDragged;
     this.rightPointerDownPos = null;
     this.rightPointerDragged = false;
     if (wasDragged || duration > 300) {
+      return;
+    }
+
+    if (this.isMeasureMode() && this.measurePointA()) {
+      this.cancelActiveMeasurementTrace();
       return;
     }
 
@@ -11057,7 +11019,7 @@ private createHandleMesh(
     this.isApplianceDragging = false;
     this.isApplianceResizing = false;
     this.draggingAppliance = null;
-    this.isMeasuringDrag = false;
+    this.measurePointerDownPos = null;
     this.closeContextMenu();
     this.showGroupsFlyout.set(false);
     if (this.controls) {
@@ -11463,6 +11425,7 @@ private createHandleMesh(
       this.camera.position.lerpVectors(startCamPos, targetCamPos, ease);
       this.camera.lookAt(this.controls.target);
       this.controls.update();
+      this.updateProjectedMeasureBadges();
       this.requestRender(4);
 
       if (progress < 1) {
@@ -11571,20 +11534,26 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
   toggleMeasureMode() {
     const next = !this.isMeasureMode();
     this.isMeasureMode.set(next);
-    if (!next) {
-      this.clearMeasure();
+    if (next) {
+      this.activeTool.set('measure');
+      if (this.controls) {
+        this.controls.enabled = true;
+      }
+    } else {
+      if (this.activeTool() === 'measure') {
+        this.activeTool.set('select');
+      }
+      this.cancelActiveMeasurementTrace();
     }
+    const canvas = this.canvasRef()?.nativeElement;
+    if (canvas) {
+      canvas.style.cursor = next ? 'crosshair' : 'default';
+    }
+    this.requestRender(6);
   }
 
   clearMeasure() {
-    this.isMeasurementPersistent.set(false);
-    this.measurePointA.set(null);
-    this.measurePointB.set(null);
-    while (this.measureGroup.children.length > 0) {
-      const obj = this.measureGroup.children[0];
-      this.measureGroup.remove(obj);
-    }
-    this.updateMagneticSnapIndicator(null);
+    this.clearAllMeasurements();
   }
   nudgePart(axis: 'x' | 'y' | 'z', delta: number) {
     const selList = this.selectedParts();
@@ -11722,8 +11691,8 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
 
     if (e.key === 'Shift') {
       this.isShiftPressed.set(true);
-      if (this.isMeasureMode() && this.measurePointA() && !this.isMeasurementPersistent()) {
-        this.renderMeasurementVisuals();
+      if (this.isMeasureMode() && this.measurePointA()) {
+        this.reprojectActiveMeasurePreview(true);
       }
     }
 
@@ -11778,9 +11747,13 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
         this.cancelInlineDimension();
         return;
       }
+      if (this.isMeasureMode() && this.measurePointA()) {
+        this.cancelActiveMeasurementTrace();
+        return;
+      }
       this.closeContextMenu();
       this.clearSelection();
-      this.clearMeasure();
+      this.cancelActiveMeasurementTrace();
       this.clearPushPullHighlight();
       this.clearRectPreview();
       return;
@@ -11878,8 +11851,8 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
   handleViewerKeyUp(e: KeyboardEvent) {
     if (e.key === 'Shift') {
       this.isShiftPressed.set(false);
-      if (this.isMeasureMode() && this.measurePointA() && !this.isMeasurementPersistent()) {
-        this.renderMeasurementVisuals();
+      if (this.isMeasureMode() && this.measurePointA()) {
+        this.reprojectActiveMeasurePreview(false);
       }
     }
   }
@@ -13419,6 +13392,7 @@ private applyMagneticSnapToPosition(
     }
     this.camera.lookAt(target);
     this.controls.update();
+    this.updateProjectedMeasureBadges();
     this.projectStorage.saveCameraState(this.camera.position, this.controls.target, true);
     this.requestRender(12);
   }
@@ -13596,6 +13570,7 @@ private applyMagneticSnapToPosition(
     this.camera.updateProjectionMatrix();
     this.renderer.setPixelRatio(this.getTargetPixelRatio());
     this.renderer.setSize(width, height);
+    this.updateProjectedMeasureBadges();
     this.requestRender(8);
   }
 
@@ -13626,6 +13601,7 @@ private applyMagneticSnapToPosition(
       }
       if (this.renderer && this.scene && this.camera) {
         this.renderer.render(this.scene, this.camera);
+        this.updateProjectedMeasureBadges();
       }
     }
   }
@@ -13794,6 +13770,7 @@ private applyMagneticSnapToPosition(
       this.controls.target.lerpVectors(startTarget, targetCenter, ease);
       this.camera.position.lerpVectors(startCamPos, targetCamPos, ease);
       this.controls.update();
+      this.updateProjectedMeasureBadges();
       this.requestRender(4);
 
       if (progress < 1) {
