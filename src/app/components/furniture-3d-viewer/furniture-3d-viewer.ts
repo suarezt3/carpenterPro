@@ -80,11 +80,17 @@ import {
   SceneRaycastSources
 } from '../../services/scene-raycast-picker.service';
 import {
+  ClearanceAxis,
+  ClearanceBadgeType,
+  computeClearanceReposition,
   DIMENSION_LINE_RENDER_ORDER,
   DIMENSION_SPRITE_RENDER_ORDER,
   DimensionAnchor3dService,
   DimensionLineSegment,
-  ModuleVerticalBayInput
+  EditableDimensionBadgeType,
+  getBadgeClearanceAxis,
+  ModuleVerticalBayInput,
+  resolveClearanceAnchorAndMover
 } from '../../services/dimension-anchor-3d.service';
 import {
   AXIS_COLORS,
@@ -172,11 +178,23 @@ interface PartStretchAxesConfig {
 
 export interface DimensionBadgeUserData {
   isDimensionBadge: boolean;
-  badgeType: 'length' | 'width' | 'top_clearance' | 'bottom_clearance';
+  badgeType: EditableDimensionBadgeType;
   part: Part;
   currentValue: number;
   label: string;
   referenceY?: number;
+  axis?: ClearanceAxis;
+  anchorPart?: Part | null;
+  moverPart?: Part | null;
+  minSidePart?: Part | null;
+  maxSidePart?: Part | null;
+  syntheticMinFaceCoord?: number;
+  syntheticMaxFaceCoord?: number;
+  defaultMoverSide?: 'min' | 'max';
+  moverMinLimitEdge?: number;
+  moverMaxLimitEdge?: number;
+  selectedPartId?: string | null;
+  isModuleInternalBadge?: boolean;
   baseScaleX?: number;
   baseScaleY?: number;
 }
@@ -190,6 +208,10 @@ export interface ClearanceInfo {
   bottomNeighborName: string | null;
   leftNeighborName: string | null;
   rightNeighborName: string | null;
+  frontClearance?: number | null;
+  backClearance?: number | null;
+  frontNeighborName?: string | null;
+  backNeighborName?: string | null;
 }
 
 export interface WallSnapResult {
@@ -246,7 +268,8 @@ export interface WallToWallSnapGuide {
     class: 'block w-full h-full',
     '(window:keydown)': 'handleViewerKeyDown($event)',
     '(window:keyup)': 'handleViewerKeyUp($event)',
-    '(window:resize)': 'onWindowResize()'
+    '(window:resize)': 'onWindowResize()',
+    '(document:pointerdown)': 'handleDocumentPointerDown($event)'
   }
 })
 export class Furniture3dViewerComponent implements OnDestroy {
@@ -395,6 +418,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private readonly boundPointerDown = (e: PointerEvent) => this.onPointerDown(e);
   private readonly boundPointerMove = (e: PointerEvent) => this.onPointerMove(e);
   private readonly boundPointerUp = (e: PointerEvent) => this.onPointerUp(e);
+  private readonly boundPointerLeave = () => this.onCanvasPointerLeave();
   private readonly boundCanvasWheel = (e: WheelEvent) => this.onCanvasWheel(e);
   // Inputs
   parts = input<Part[]>([]);
@@ -459,12 +483,28 @@ export class Furniture3dViewerComponent implements OnDestroy {
     x: number;
     y: number;
     value: number;
-    propType: 'length' | 'width' | 'top_clearance' | 'bottom_clearance';
+    propType: EditableDimensionBadgeType;
     part: Part;
     label: string;
     referenceY?: number;
+    axis?: ClearanceAxis;
+    anchorPart?: Part | null;
+    moverPart?: Part | null;
+    minSidePart?: Part | null;
+    maxSidePart?: Part | null;
+    syntheticMinFaceCoord?: number;
+    syntheticMaxFaceCoord?: number;
+    defaultMoverSide?: 'min' | 'max';
+    moverMinLimitEdge?: number;
+    moverMaxLimitEdge?: number;
+    selectedPartId?: string | null;
+    isModuleInternalBadge?: boolean;
     worldPos: THREE.Vector3;
   } | null>(null);
+  readonly hoveredDimensionTooltip = signal<string | null>(null);
+  readonly clearanceWarningToast = signal<string | null>(null);
+  private clearanceToastTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly explicitLowClearancePairKeys = new Set<string>();
 
   // Interactive View States
   isOpenFrentes = signal<boolean>(false);
@@ -1456,6 +1496,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
 
       canvas.addEventListener('pointerdown', this.boundPointerDown);
+      canvas.addEventListener('pointerleave', this.boundPointerLeave);
       canvas.addEventListener('wheel', this.boundCanvasWheel, { passive: true });
       window.addEventListener('pointermove', this.boundPointerMove);
       window.addEventListener('pointerup', this.boundPointerUp);
@@ -1761,7 +1802,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         continue;
       }
 
-      // Filtro de capas estilo Click-Cuisine 2
+      // Filtro de capas y visibilidad de piezas
       const role = part.componentRole || 'free';
       const nameLow = (part.name || '').toLowerCase();
       if (!vis.showCountertops && (role === 'countertop' || role === 'backsplash' || nameLow.includes('mesón') || nameLow.includes('meson') || nameLow.includes('salpicadero'))) {
@@ -2319,7 +2360,74 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.requestRender(4);
   }
 
+  private tFallback(key: string, fallback: string): string {
+    const translated = this.i18n.t(key);
+    return translated && translated !== key ? translated : fallback;
+  }
+
+  isClearanceBadgeType(propType: EditableDimensionBadgeType): boolean {
+    return propType !== 'length' && propType !== 'width';
+  }
+
+  private buildClearancePairKey(
+    axis: ClearanceAxis,
+    idA?: string | null,
+    idB?: string | null
+  ): string {
+    const [a, b] = [idA ?? 'none', idB ?? 'none'].sort();
+    return `${axis}:${a}:${b}`;
+  }
+
+  showClearanceWarningToast(message: string) {
+    if (this.clearanceToastTimer !== null) {
+      clearTimeout(this.clearanceToastTimer);
+      this.clearanceToastTimer = null;
+    }
+    this.ngZone.run(() => {
+      this.clearanceWarningToast.set(message);
+    });
+    this.clearanceToastTimer = setTimeout(() => {
+      this.clearanceToastTimer = null;
+      this.ngZone.run(() => {
+        this.clearanceWarningToast.set(null);
+      });
+    }, 3800);
+  }
+
+  dismissClearanceWarningToast() {
+    if (this.clearanceToastTimer !== null) {
+      clearTimeout(this.clearanceToastTimer);
+      this.clearanceToastTimer = null;
+    }
+    this.ngZone.run(() => {
+      this.clearanceWarningToast.set(null);
+    });
+  }
+
+  private onCanvasPointerLeave() {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (canvas && !this.isDragging && !this.activeGizmoHit) {
+      canvas.style.cursor = this.isMeasureMode() ? 'crosshair' : 'grab';
+    }
+    this.setHoveredGizmoMesh(null);
+    this.setHoveredDimensionSprite(null);
+  }
+
   private setHoveredDimensionSprite(sprite: THREE.Sprite | null) {
+    const badgeData = sprite?.userData as Partial<DimensionBadgeUserData> | undefined;
+    const nextTooltip =
+      sprite &&
+      badgeData?.isDimensionBadge &&
+      badgeData.badgeType &&
+      this.isClearanceBadgeType(badgeData.badgeType)
+        ? this.tFallback('designer.editClearanceHint', 'Clic para editar separación en mm')
+        : null;
+    if (this.hoveredDimensionTooltip() !== nextTooltip) {
+      this.ngZone.run(() => {
+        this.hoveredDimensionTooltip.set(nextTooltip);
+      });
+    }
+
     if (this.hoveredDimensionSprite === sprite) return;
 
     if (this.hoveredDimensionSprite) {
@@ -5165,6 +5273,14 @@ private createHandleMesh(
     bottomNeighborFrontZ: number | null;
     leftNeighborFrontZ: number | null;
     rightNeighborFrontZ: number | null;
+    topNeighborPart: Part | null;
+    bottomNeighborPart: Part | null;
+    leftNeighborPart: Part | null;
+    rightNeighborPart: Part | null;
+    frontNeighborPart: Part | null;
+    backNeighborPart: Part | null;
+    frontNeighborAnchorXY: { x: number; y: number } | null;
+    backNeighborAnchorXY: { x: number; y: number } | null;
   } {
     const selBounds = this.getPartBounds(part);
     const others = allParts.filter(p => p.id !== part.id);
@@ -5172,72 +5288,126 @@ private createHandleMesh(
     let topClearance: number | null = null;
     let topNeighborName: string | null = null;
     let topNeighborFrontZ: number | null = null;
+    let topNeighborPart: Part | null = null;
     let bottomClearance: number | null = null;
     let bottomNeighborName: string | null = null;
     let bottomNeighborFrontZ: number | null = null;
+    let bottomNeighborPart: Part | null = null;
     let leftClearance: number | null = null;
     let leftNeighborName: string | null = null;
     let leftNeighborFrontZ: number | null = null;
+    let leftNeighborPart: Part | null = null;
     let rightClearance: number | null = null;
     let rightNeighborName: string | null = null;
     let rightNeighborFrontZ: number | null = null;
+    let rightNeighborPart: Part | null = null;
+    let frontClearance: number | null = null;
+    let frontNeighborName: string | null = null;
+    let frontNeighborPart: Part | null = null;
+    let frontNeighborAnchorXY: { x: number; y: number } | null = null;
+    let backClearance: number | null = null;
+    let backNeighborName: string | null = null;
+    let backNeighborPart: Part | null = null;
+    let backNeighborAnchorXY: { x: number; y: number } | null = null;
 
     let minTopGap = Infinity;
     let minBottomGap = Infinity;
     let minLeftGap = Infinity;
     let minRightGap = Infinity;
+    let minFrontGap = Infinity;
+    let minBackGap = Infinity;
 
     for (const o of others) {
       const oBounds = this.getPartBounds(o);
 
-      // Overlap in X and Z (for vertical clearances: above & below)
-      const overlapX = Math.max(0, Math.min(selBounds.maxX, oBounds.maxX) - Math.max(selBounds.minX, oBounds.minX));
+      const overlapMinX = Math.max(selBounds.minX, oBounds.minX);
+      const overlapMaxX = Math.min(selBounds.maxX, oBounds.maxX);
+      const overlapX = Math.max(0, overlapMaxX - overlapMinX);
+
+      const overlapMinY = Math.max(selBounds.minY, oBounds.minY);
+      const overlapMaxY = Math.min(selBounds.maxY, oBounds.maxY);
+      const overlapY = Math.max(0, overlapMaxY - overlapMinY);
+
       const overlapZ = Math.max(0, Math.min(selBounds.maxZ, oBounds.maxZ) - Math.max(selBounds.minZ, oBounds.minZ));
 
+      // Overlap in X and Z (for vertical clearances: above & below)
       if (overlapX > 15 && overlapZ > 15) {
         // Element directly above
         if (oBounds.minY >= selBounds.maxY - 1) {
-          const gap = oBounds.minY - selBounds.maxY;
+          const gap = Math.max(0, oBounds.minY - selBounds.maxY);
           if (gap < minTopGap) {
             minTopGap = gap;
             topClearance = Math.round(gap);
             topNeighborName = o.name;
             topNeighborFrontZ = oBounds.maxZ;
+            topNeighborPart = o;
           }
         }
         // Element directly below
         if (oBounds.maxY <= selBounds.minY + 1) {
-          const gap = selBounds.minY - oBounds.maxY;
+          const gap = Math.max(0, selBounds.minY - oBounds.maxY);
           if (gap < minBottomGap) {
             minBottomGap = gap;
             bottomClearance = Math.round(gap);
             bottomNeighborName = o.name;
             bottomNeighborFrontZ = oBounds.maxZ;
+            bottomNeighborPart = o;
           }
         }
       }
 
       // Overlap in Y and Z (for horizontal clearances: left & right)
-      const overlapY = Math.max(0, Math.min(selBounds.maxY, oBounds.maxY) - Math.max(selBounds.minY, oBounds.minY));
       if (overlapY > 15 && overlapZ > 15) {
         // Element to the left
         if (oBounds.maxX <= selBounds.minX + 1) {
-          const gap = selBounds.minX - oBounds.maxX;
+          const gap = Math.max(0, selBounds.minX - oBounds.maxX);
           if (gap < minLeftGap) {
             minLeftGap = gap;
             leftClearance = Math.round(gap);
             leftNeighborName = o.name;
             leftNeighborFrontZ = oBounds.maxZ;
+            leftNeighborPart = o;
           }
         }
         // Element to the right
         if (oBounds.minX >= selBounds.maxX - 1) {
-          const gap = oBounds.minX - selBounds.maxX;
+          const gap = Math.max(0, oBounds.minX - selBounds.maxX);
           if (gap < minRightGap) {
             minRightGap = gap;
             rightClearance = Math.round(gap);
             rightNeighborName = o.name;
             rightNeighborFrontZ = oBounds.maxZ;
+            rightNeighborPart = o;
+          }
+        }
+      }
+
+      // Overlap in X and Y (for depth clearances: front & back)
+      if (overlapX > 15 && overlapY > 15) {
+        const anchorXY = {
+          x: (overlapMinX + overlapMaxX) * 0.5,
+          y: (overlapMinY + overlapMaxY) * 0.5
+        };
+        // Element in front (+Z)
+        if (oBounds.minZ >= selBounds.maxZ - 1) {
+          const gap = Math.max(0, oBounds.minZ - selBounds.maxZ);
+          if (gap < minFrontGap) {
+            minFrontGap = gap;
+            frontClearance = Math.round(gap);
+            frontNeighborName = o.name;
+            frontNeighborPart = o;
+            frontNeighborAnchorXY = anchorXY;
+          }
+        }
+        // Element behind (-Z)
+        if (oBounds.maxZ <= selBounds.minZ + 1) {
+          const gap = Math.max(0, selBounds.minZ - oBounds.maxZ);
+          if (gap < minBackGap) {
+            minBackGap = gap;
+            backClearance = Math.round(gap);
+            backNeighborName = o.name;
+            backNeighborPart = o;
+            backNeighborAnchorXY = anchorXY;
           }
         }
       }
@@ -5252,12 +5422,24 @@ private createHandleMesh(
         topNeighborName,
         bottomNeighborName,
         leftNeighborName,
-        rightNeighborName
+        rightNeighborName,
+        frontClearance,
+        backClearance,
+        frontNeighborName,
+        backNeighborName
       },
       topNeighborFrontZ,
       bottomNeighborFrontZ,
       leftNeighborFrontZ,
-      rightNeighborFrontZ
+      rightNeighborFrontZ,
+      topNeighborPart,
+      bottomNeighborPart,
+      leftNeighborPart,
+      rightNeighborPart,
+      frontNeighborPart,
+      backNeighborPart,
+      frontNeighborAnchorXY,
+      backNeighborAnchorXY
     };
   }
 
@@ -5314,7 +5496,7 @@ private createHandleMesh(
     return this.partGeometry.isInternalDivider(part);
   }
 
-  getShelfVerticalLimits(part: Part): {
+  getShelfVerticalLimits(part: Part, overrideParts?: Part[]): {
     minAllowedY: number;
     maxAllowedY: number;
     belowTopY: number;
@@ -5325,9 +5507,10 @@ private createHandleMesh(
     const initBounds = this.getPartBounds(part);
     const halfThick = initBounds.sy / 2;
 
+    const sourceParts = overrideParts ?? this.parts();
     const groupParts = part.groupId
-      ? this.parts().filter(p => p.groupId === part.groupId && p.id !== part.id)
-      : this.parts().filter(p => p.id !== part.id);
+      ? sourceParts.filter(p => p.groupId === part.groupId && p.id !== part.id)
+      : sourceParts.filter(p => p.id !== part.id);
 
     let belowTopY = -Infinity;
     let aboveBottomY = Infinity;
@@ -5476,14 +5659,16 @@ private createHandleMesh(
   renderModuleInternalClearances(
     groupId: string,
     selectedOrDraggingPart?: Part,
-    overridePosY?: number
+    overridePosY?: number,
+    overrideParts?: Part[]
   ) {
     this.disposeGroup(this.internalClearanceGroup);
     this.internalClearanceGroup.position.set(0, 0, 0);
     if (!this.showClearances()) return;
     if (this.isModularDrawerGroup(groupId)) return;
 
-    const moduleParts = this.parts().filter(
+    const sourceParts = overrideParts ?? this.parts();
+    const moduleParts = sourceParts.filter(
       p => p.groupId === groupId && !this.hiddenPartIds().has(p.id)
     );
     if (moduleParts.length < 2) return;
@@ -5516,7 +5701,8 @@ private createHandleMesh(
       moduleParts.find(p => p.componentRole === 'bottom') ||
       moduleParts
         .filter(p => p.orientation === 'horizontal' && !this.isInternalShelf(p) && p.componentRole !== 'top' && p.componentRole !== 'countertop')
-        .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0))[0];
+        .sort((a, b) => (a.posY ?? 0) - (b.posY ?? 0))[0] ||
+      null;
     const bottomBounds = bottomPart ? getEffectiveBounds(bottomPart) : null;
     const floorTopY = bottomBounds ? bottomBounds.maxY : 0;
     const bottomFrontZ = bottomBounds ? bottomBounds.maxZ : maxModuleZ;
@@ -5526,20 +5712,25 @@ private createHandleMesh(
       moduleParts.find(p => p.componentRole === 'top') ||
       moduleParts
         .filter(p => p.orientation === 'horizontal' && !this.isInternalShelf(p) && p.componentRole !== 'bottom' && p.componentRole !== 'plinth')
-        .sort((a, b) => (b.posY ?? 0) - (a.posY ?? 0))[0];
+        .sort((a, b) => (b.posY ?? 0) - (a.posY ?? 0))[0] ||
+      null;
     let roofBottomY = Infinity;
     let roofFrontZ = maxModuleZ;
+    let roofAnchorPart: Part | null = null;
     if (topPart && topPart.id !== bottomPart?.id) {
       const topBounds = getEffectiveBounds(topPart);
       roofBottomY = topBounds.minY;
       roofFrontZ = topBounds.maxZ;
+      roofAnchorPart = topPart;
     } else {
       const ties = moduleParts.filter(p => p.componentRole === 'tie');
       if (ties.length > 0) {
-        const tieBounds = ties.map(t => getEffectiveBounds(t));
-        tieBounds.sort((a, b) => a.minY - b.minY);
-        roofBottomY = tieBounds[0].minY;
-        roofFrontZ = tieBounds[0].maxZ;
+        const tieEntries = ties
+          .map(t => ({ part: t, bounds: getEffectiveBounds(t) }))
+          .sort((a, b) => a.bounds.minY - b.bounds.minY);
+        roofBottomY = tieEntries[0].bounds.minY;
+        roofFrontZ = tieEntries[0].bounds.maxZ;
+        roofAnchorPart = tieEntries[0].part;
       } else {
         const sidesFallback = moduleParts.filter(p => p.orientation === 'vertical_yz');
         if (sidesFallback.length > 0) {
@@ -5556,23 +5747,29 @@ private createHandleMesh(
     let rightInnerX: number | null = null;
     let leftSideFrontZ: number | null = null;
     let rightSideFrontZ: number | null = null;
+    let leftSidePart: Part | null = null;
+    let rightSidePart: Part | null = null;
     if (sides.length >= 2) {
       const sortedSides = [...sides].sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
-      const leftSideBounds = getEffectiveBounds(sortedSides[0]);
-      const rightSideBounds = getEffectiveBounds(sortedSides[sortedSides.length - 1]);
+      leftSidePart = sortedSides[0];
+      rightSidePart = sortedSides[sortedSides.length - 1];
+      const leftSideBounds = getEffectiveBounds(leftSidePart);
+      const rightSideBounds = getEffectiveBounds(rightSidePart);
       leftInnerX = leftSideBounds.maxX;
       rightInnerX = rightSideBounds.minX;
       leftSideFrontZ = leftSideBounds.maxZ;
       rightSideFrontZ = rightSideBounds.maxZ;
     } else {
-      const sLeft = moduleParts.find(p => p.componentRole === 'side_left');
-      const sRight = moduleParts.find(p => p.componentRole === 'side_right');
+      const sLeft = moduleParts.find(p => p.componentRole === 'side_left') ?? null;
+      const sRight = moduleParts.find(p => p.componentRole === 'side_right') ?? null;
       if (sLeft) {
+        leftSidePart = sLeft;
         const b = getEffectiveBounds(sLeft);
         leftInnerX = b.maxX;
         leftSideFrontZ = b.maxZ;
       }
       if (sRight) {
+        rightSidePart = sRight;
         const b = getEffectiveBounds(sRight);
         rightInnerX = b.minX;
         rightSideFrontZ = b.maxZ;
@@ -5587,11 +5784,11 @@ private createHandleMesh(
     });
 
     // 5. Agrupación por columnas (bahías)
-    const columns: Array<{
+    const columns: {
       refX: number;
       frontZ: number;
-      shelfBoundsList: Array<{ part: Part; bounds: PartWorldAABB }>;
-    }> = [];
+      shelfBoundsList: { part: Part; bounds: PartWorldAABB }[];
+    }[] = [];
 
     const isDraggingOrSelectedShelf = selectedOrDraggingPart && this.isInternalShelf(selectedOrDraggingPart);
 
@@ -5647,7 +5844,54 @@ private createHandleMesh(
       targetPart: Part | null;
       badgeType: 'top_clearance' | 'bottom_clearance';
       label: string;
+      minSidePart: Part | null;
+      maxSidePart: Part | null;
+      syntheticMinFaceCoord?: number;
+      syntheticMaxFaceCoord?: number;
+      defaultMoverSide: 'min' | 'max';
+      isEditable: boolean;
     }
+
+    const buildVerticalBayMeta = (
+      minSidePart: Part | null,
+      maxSidePart: Part | null,
+      syntheticMinFaceCoord: number | undefined,
+      syntheticMaxFaceCoord: number | undefined,
+      defaultMoverSide: 'min' | 'max',
+      labelOverride?: string
+    ): BayMeta => {
+      const resolved = resolveClearanceAnchorAndMover({
+        axis: 'y',
+        minSidePart,
+        maxSidePart,
+        selectedPartId: selectedOrDraggingPart?.id,
+        defaultMoverSide
+      });
+      const fallbackTarget =
+        defaultMoverSide === 'min' ? (minSidePart ?? maxSidePart) : (maxSidePart ?? minSidePart);
+      const targetPart =
+        resolved.status === 'ok' && resolved.moverPart ? resolved.moverPart : fallbackTarget;
+      const effectiveSide = resolved.status === 'ok' && resolved.moverSide ? resolved.moverSide : defaultMoverSide;
+      const badgeType: 'top_clearance' | 'bottom_clearance' =
+        effectiveSide === 'min' ? 'top_clearance' : 'bottom_clearance';
+      const label =
+        labelOverride ??
+        (badgeType === 'top_clearance'
+          ? this.i18n.t('designer.upperClearance')
+          : this.i18n.t('designer.lowerClearance'));
+
+      return {
+        targetPart,
+        badgeType,
+        label,
+        minSidePart,
+        maxSidePart,
+        syntheticMinFaceCoord,
+        syntheticMaxFaceCoord,
+        defaultMoverSide,
+        isEditable: Boolean(minSidePart || maxSidePart)
+      };
+    };
 
     // 6. Dibujo 3D de Cotas Verticales + Luz X ancladas arista-a-arista (0.0 mm float)
     const zeroLabelOffset = new THREE.Vector3(0, 0, 0);
@@ -5664,7 +5908,7 @@ private createHandleMesh(
       const bayMetas: BayMeta[] = [];
 
       if (shelfBoundsList.length === 0) {
-        if (roofBottomY !== Infinity && roofBottomY > floorTopY) {
+        if (roofBottomY !== Infinity && roofBottomY >= floorTopY - 0.5) {
           bays.push({
             yBottom: floorTopY,
             yTop: roofBottomY,
@@ -5674,13 +5918,18 @@ private createHandleMesh(
             bayMinX: leftInnerX ?? moduleMinX,
             bayMaxX: rightInnerX ?? moduleMaxX,
             centerX: columnAnchorX,
-            distance: Math.round(roofBottomY - floorTopY)
+            distance: Math.max(0, Math.round(roofBottomY - floorTopY))
           });
-          bayMetas.push({
-            targetPart: null,
-            badgeType: 'bottom_clearance',
-            label: this.i18n.t('designer.freeClearance')
-          });
+          bayMetas.push(
+            buildVerticalBayMeta(
+              bottomPart,
+              roofAnchorPart,
+              bottomPart ? undefined : floorTopY,
+              roofAnchorPart ? undefined : roofBottomY,
+              'max',
+              this.i18n.t('designer.freeClearance')
+            )
+          );
         }
       } else {
         const firstShelf = shelfBoundsList[0];
@@ -5693,26 +5942,21 @@ private createHandleMesh(
           bayMinX: firstShelf.bounds.minX,
           bayMaxX: firstShelf.bounds.maxX,
           centerX: columnAnchorX,
-          distance: Math.round(firstShelf.bounds.minY - floorTopY)
+          distance: Math.max(0, Math.round(firstShelf.bounds.minY - floorTopY))
         });
-        bayMetas.push({
-          targetPart: firstShelf.part,
-          badgeType: 'bottom_clearance',
-          label: this.i18n.t('designer.lowerClearance')
-        });
+        bayMetas.push(
+          buildVerticalBayMeta(
+            bottomPart,
+            firstShelf.part,
+            bottomPart ? undefined : floorTopY,
+            undefined,
+            'max'
+          )
+        );
 
         for (let i = 0; i < shelfBoundsList.length - 1; i++) {
           const lower = shelfBoundsList[i];
           const upper = shelfBoundsList[i + 1];
-          let targetPart = upper.part;
-          let badgeType: 'top_clearance' | 'bottom_clearance' = 'bottom_clearance';
-          let label = this.i18n.t('designer.lowerClearance');
-
-          if (selectedOrDraggingPart && selectedOrDraggingPart.id === lower.part.id) {
-            targetPart = lower.part;
-            badgeType = 'top_clearance';
-            label = this.i18n.t('designer.upperClearance');
-          }
 
           const overlapMinX = Math.max(lower.bounds.minX, upper.bounds.minX);
           const overlapMaxX = Math.min(lower.bounds.maxX, upper.bounds.maxX);
@@ -5728,13 +5972,15 @@ private createHandleMesh(
             bayMinX,
             bayMaxX,
             centerX: columnAnchorX,
-            distance: Math.round(upper.bounds.minY - lower.bounds.maxY)
+            distance: Math.max(0, Math.round(upper.bounds.minY - lower.bounds.maxY))
           });
-          bayMetas.push({ targetPart, badgeType, label });
+          bayMetas.push(
+            buildVerticalBayMeta(lower.part, upper.part, undefined, undefined, 'max')
+          );
         }
 
         const lastShelf = shelfBoundsList[shelfBoundsList.length - 1];
-        if (roofBottomY !== Infinity && roofBottomY > lastShelf.bounds.maxY) {
+        if (roofBottomY !== Infinity && roofBottomY >= lastShelf.bounds.maxY - 0.5) {
           bays.push({
             yBottom: lastShelf.bounds.maxY,
             yTop: roofBottomY,
@@ -5744,15 +5990,30 @@ private createHandleMesh(
             bayMinX: lastShelf.bounds.minX,
             bayMaxX: lastShelf.bounds.maxX,
             centerX: columnAnchorX,
-            distance: Math.round(roofBottomY - lastShelf.bounds.maxY)
+            distance: Math.max(0, Math.round(roofBottomY - lastShelf.bounds.maxY))
           });
-          bayMetas.push({
-            targetPart: lastShelf.part,
-            badgeType: 'top_clearance',
-            label: this.i18n.t('designer.upperClearance')
-          });
+          bayMetas.push(
+            buildVerticalBayMeta(
+              lastShelf.part,
+              roofAnchorPart,
+              undefined,
+              roofAnchorPart ? undefined : roofBottomY,
+              'min'
+            )
+          );
         }
       }
+
+      const allowZeroBayIndices: number[] = [];
+      for (let idx = 0; idx < bayMetas.length; idx++) {
+        const meta = bayMetas[idx];
+        const key = this.buildClearancePairKey('y', meta.minSidePart?.id, meta.maxSidePart?.id);
+        if (this.explicitLowClearancePairKeys.has(key)) {
+          allowZeroBayIndices.push(idx);
+        }
+      }
+      const innerPairKey = this.buildClearancePairKey('x', leftSidePart?.id, rightSidePart?.id);
+      const allowZeroInnerWidth = this.explicitLowClearancePairKeys.has(innerPairKey);
 
       const layout = this.dimensionAnchor.computeModuleInternalClearancesLayout({
         bays,
@@ -5766,7 +6027,9 @@ private createHandleMesh(
         moduleMaxX,
         moduleMinY,
         moduleFrontZ,
-        columnRefX: columnAnchorX
+        columnRefX: columnAnchorX,
+        allowZeroBayIndices,
+        allowZeroInnerWidth
       });
 
       for (const bayAnchor of layout.verticalBays) {
@@ -5779,7 +6042,7 @@ private createHandleMesh(
           true
         );
 
-        const isEditable = Boolean(meta?.targetPart);
+        const isEditable = Boolean(meta?.isEditable && meta?.targetPart);
         const sprite = this.createInternalClearanceBadge(`↕ ${bayAnchor.bay.distance} mm`, false, isEditable);
         sprite.position.copy(bayAnchor.segment.midpoint);
         sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
@@ -5792,7 +6055,7 @@ private createHandleMesh(
           labelOffset: zeroLabelOffset.clone()
         };
 
-        if (meta?.targetPart) {
+        if (isEditable && meta?.targetPart) {
           const badgeUserData: DimensionBadgeUserData = {
             isDimensionBadge: true,
             badgeType: meta.badgeType,
@@ -5800,6 +6063,14 @@ private createHandleMesh(
             currentValue: bayAnchor.bay.distance,
             label: meta.label,
             referenceY: meta.badgeType === 'bottom_clearance' ? bayAnchor.bay.yBottom : bayAnchor.bay.yTop,
+            axis: 'y',
+            minSidePart: meta.minSidePart,
+            maxSidePart: meta.maxSidePart,
+            syntheticMinFaceCoord: meta.syntheticMinFaceCoord,
+            syntheticMaxFaceCoord: meta.syntheticMaxFaceCoord,
+            defaultMoverSide: meta.defaultMoverSide,
+            selectedPartId: selectedOrDraggingPart?.id,
+            isModuleInternalBadge: true,
             baseScaleX: 140,
             baseScaleY: 38
           };
@@ -5828,7 +6099,12 @@ private createHandleMesh(
           true
         );
 
-        const horizBadge = this.createInternalClearanceBadge(`↔ ${layout.innerWidth} mm`, true, false);
+        const isHorizEditable = Boolean(leftSidePart || rightSidePart);
+        const horizBadge = this.createInternalClearanceBadge(
+          `↔ ${layout.innerWidth} mm`,
+          true,
+          isHorizEditable
+        );
         horizBadge.position.copy(layout.innerWidthSegment.midpoint);
         horizBadge.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
         horizBadge.userData = {
@@ -5841,6 +6117,45 @@ private createHandleMesh(
           edgeP2: layout.innerWidthSegment.p2.clone(),
           labelOffset: zeroLabelOffset.clone()
         };
+
+        if (isHorizEditable) {
+          const resolvedX = resolveClearanceAnchorAndMover({
+            axis: 'x',
+            minSidePart: leftSidePart,
+            maxSidePart: rightSidePart,
+            selectedPartId: selectedOrDraggingPart?.id,
+            defaultMoverSide: 'max'
+          });
+          const targetXPart =
+            resolvedX.status === 'ok' && resolvedX.moverPart
+              ? resolvedX.moverPart
+              : (rightSidePart ?? leftSidePart!);
+          const badgeUserData: DimensionBadgeUserData = {
+            isDimensionBadge: true,
+            badgeType: 'inner_width_clearance',
+            part: targetXPart,
+            currentValue: layout.innerWidth,
+            label: this.tFallback('designer.innerWidthClearance', 'Luz Interna X'),
+            axis: 'x',
+            anchorPart: resolvedX.status === 'ok' ? resolvedX.anchorPart : leftSidePart,
+            moverPart: resolvedX.status === 'ok' ? resolvedX.moverPart : rightSidePart,
+            minSidePart: leftSidePart,
+            maxSidePart: rightSidePart,
+            syntheticMinFaceCoord: leftSidePart ? undefined : (leftInnerX ?? undefined),
+            syntheticMaxFaceCoord: rightSidePart ? undefined : (rightInnerX ?? undefined),
+            defaultMoverSide: 'max',
+            selectedPartId: selectedOrDraggingPart?.id,
+            isModuleInternalBadge: true,
+            baseScaleX: 155,
+            baseScaleY: 38
+          };
+          horizBadge.userData = {
+            ...horizBadge.userData,
+            ...badgeUserData
+          };
+          this.editableDimensionSprites.push(horizBadge);
+        }
+
         this.internalClearanceGroup.add(horizBadge);
       }
     }
@@ -5850,7 +6165,7 @@ private createHandleMesh(
 
     // 8. Sincronizar clearanceInfo al inspector si hay una pieza seleccionada y no se está arrastrando en vivo
     if (selectedOrDraggingPart && overridePosY === undefined) {
-      const clr = this.computeClearanceInfo(selectedOrDraggingPart, this.parts());
+      const clr = this.computeClearanceInfo(selectedOrDraggingPart, sourceParts);
       this.clearanceCalculated.emit(clr);
     }
   }
@@ -5862,7 +6177,15 @@ private createHandleMesh(
       topNeighborFrontZ,
       bottomNeighborFrontZ,
       leftNeighborFrontZ,
-      rightNeighborFrontZ
+      rightNeighborFrontZ,
+      topNeighborPart,
+      bottomNeighborPart,
+      leftNeighborPart,
+      rightNeighborPart,
+      frontNeighborPart,
+      backNeighborPart,
+      frontNeighborAnchorXY,
+      backNeighborAnchorXY
     } = this.computeClearanceWithNeighborDepth(part, allParts);
     this.clearanceCalculated.emit(clr);
 
@@ -5886,115 +6209,164 @@ private createHandleMesh(
       })
     );
 
+    const allowZeroAxes = {
+      top: this.explicitLowClearancePairKeys.has(this.buildClearancePairKey('y', part.id, topNeighborPart?.id)),
+      bottom: this.explicitLowClearancePairKeys.has(this.buildClearancePairKey('y', bottomNeighborPart?.id, part.id)),
+      left: this.explicitLowClearancePairKeys.has(this.buildClearancePairKey('x', leftNeighborPart?.id, part.id)),
+      right: this.explicitLowClearancePairKeys.has(this.buildClearancePairKey('x', part.id, rightNeighborPart?.id)),
+      front: this.explicitLowClearancePairKeys.has(this.buildClearancePairKey('z', part.id, frontNeighborPart?.id)),
+      back: this.explicitLowClearancePairKeys.has(this.buildClearancePairKey('z', backNeighborPart?.id, part.id))
+    };
+
     const layout = this.dimensionAnchor.computeStandaloneClearanceSegments({
       bounds: selBounds,
       topClearance: clr.topClearance,
       bottomClearance: clr.bottomClearance,
       leftClearance: clr.leftClearance,
       rightClearance: clr.rightClearance,
+      frontClearance: clr.frontClearance ?? null,
+      backClearance: clr.backClearance ?? null,
       topNeighborFrontZ,
       bottomNeighborFrontZ,
       leftNeighborFrontZ,
-      rightNeighborFrontZ
+      rightNeighborFrontZ,
+      frontNeighborAnchorXY,
+      backNeighborAnchorXY,
+      allowZeroAxes
     });
 
     const zeroLabelOffset = new THREE.Vector3(0, 0, 0);
 
-    // Render Vertical Top Clearance Line
-    if (clr.topClearance !== null && layout.top) {
-      this.appendDimensionSegmentVisuals(this.dimensionGroup, layout.top, lineMat, tickMat, true);
+    const appendStandaloneClearanceBadge = (cfg: {
+      segment: DimensionLineSegment | null | undefined;
+      clearanceMm: number | null | undefined;
+      arrowPrefix: '↕' | '↔';
+      badgeType: ClearanceBadgeType;
+      label: string;
+      axis: ClearanceAxis;
+      minSidePart: Part | null;
+      maxSidePart: Part | null;
+      defaultMoverSide: 'min' | 'max';
+      referenceY?: number;
+    }) => {
+      if (cfg.clearanceMm === null || cfg.clearanceMm === undefined || !cfg.segment) return;
 
-      const sprite = this.createClearanceSprite(`↕ ${clr.topClearance} mm`);
-      sprite.position.copy(layout.top.midpoint);
+      this.appendDimensionSegmentVisuals(this.dimensionGroup, cfg.segment, lineMat, tickMat, true);
+
+      const sprite = this.createClearanceSprite(`${cfg.arrowPrefix} ${cfg.clearanceMm} mm`, true);
+      sprite.position.copy(cfg.segment.midpoint);
       sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
+
+      const resolved = resolveClearanceAnchorAndMover({
+        axis: cfg.axis,
+        minSidePart: cfg.minSidePart,
+        maxSidePart: cfg.maxSidePart,
+        selectedPartId: part.id,
+        defaultMoverSide: cfg.defaultMoverSide
+      });
+
       const badgeData: DimensionBadgeUserData = {
         isDimensionBadge: true,
-        badgeType: 'top_clearance',
+        badgeType: cfg.badgeType,
         part,
-        currentValue: clr.topClearance,
-        label: this.i18n.t('designer.upperClearance'),
-        referenceY: layout.top.p2.y,
+        currentValue: cfg.clearanceMm,
+        label: cfg.label,
+        referenceY: cfg.referenceY,
+        axis: cfg.axis,
+        anchorPart: resolved.status === 'ok' ? resolved.anchorPart : undefined,
+        moverPart: resolved.status === 'ok' ? resolved.moverPart : undefined,
+        minSidePart: cfg.minSidePart,
+        maxSidePart: cfg.maxSidePart,
+        defaultMoverSide: cfg.defaultMoverSide,
+        selectedPartId: part.id,
+        isModuleInternalBadge: false,
         baseScaleX: 140,
         baseScaleY: 38
       };
       sprite.userData = {
         ...sprite.userData,
         ...badgeData,
-        edgeP1: layout.top.p1.clone(),
-        edgeP2: layout.top.p2.clone(),
+        edgeP1: cfg.segment.p1.clone(),
+        edgeP2: cfg.segment.p2.clone(),
         labelOffset: zeroLabelOffset.clone()
       };
       this.editableDimensionSprites.push(sprite);
       this.dimensionGroup.add(sprite);
-    }
+    };
 
-    // Render Vertical Bottom Clearance Line
-    if (clr.bottomClearance !== null && layout.bottom) {
-      this.appendDimensionSegmentVisuals(this.dimensionGroup, layout.bottom, lineMat, tickMat, true);
+    appendStandaloneClearanceBadge({
+      segment: layout.top,
+      clearanceMm: clr.topClearance,
+      arrowPrefix: '↕',
+      badgeType: 'top_clearance',
+      label: this.i18n.t('designer.upperClearance'),
+      axis: 'y',
+      minSidePart: part,
+      maxSidePart: topNeighborPart,
+      defaultMoverSide: 'min',
+      referenceY: layout.top?.p2.y
+    });
 
-      const sprite = this.createClearanceSprite(`↕ ${clr.bottomClearance} mm`);
-      sprite.position.copy(layout.bottom.midpoint);
-      sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
-      const badgeData: DimensionBadgeUserData = {
-        isDimensionBadge: true,
-        badgeType: 'bottom_clearance',
-        part,
-        currentValue: clr.bottomClearance,
-        label: this.i18n.t('designer.lowerClearance'),
-        referenceY: layout.bottom.p1.y,
-        baseScaleX: 140,
-        baseScaleY: 38
-      };
-      sprite.userData = {
-        ...sprite.userData,
-        ...badgeData,
-        edgeP1: layout.bottom.p1.clone(),
-        edgeP2: layout.bottom.p2.clone(),
-        labelOffset: zeroLabelOffset.clone()
-      };
-      this.editableDimensionSprites.push(sprite);
-      this.dimensionGroup.add(sprite);
-    }
+    appendStandaloneClearanceBadge({
+      segment: layout.bottom,
+      clearanceMm: clr.bottomClearance,
+      arrowPrefix: '↕',
+      badgeType: 'bottom_clearance',
+      label: this.i18n.t('designer.lowerClearance'),
+      axis: 'y',
+      minSidePart: bottomNeighborPart,
+      maxSidePart: part,
+      defaultMoverSide: 'max',
+      referenceY: layout.bottom?.p1.y
+    });
 
-    // Render Horizontal Left Clearance Line
-    if (clr.leftClearance !== null && layout.left) {
-      this.appendDimensionSegmentVisuals(this.dimensionGroup, layout.left, lineMat, tickMat, true);
+    appendStandaloneClearanceBadge({
+      segment: layout.left,
+      clearanceMm: clr.leftClearance,
+      arrowPrefix: '↔',
+      badgeType: 'left_clearance',
+      label: this.tFallback('designer.leftClearance', 'Luz Izquierda'),
+      axis: 'x',
+      minSidePart: leftNeighborPart,
+      maxSidePart: part,
+      defaultMoverSide: 'max'
+    });
 
-      const sprite = this.createClearanceSprite(`↔ ${clr.leftClearance} mm`, false);
-      sprite.position.copy(layout.left.midpoint);
-      sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
-      sprite.userData = {
-        ...sprite.userData,
-        isCota: true,
-        isAuxiliaryVisual: true,
-        baseScaleX: 140,
-        baseScaleY: 38,
-        edgeP1: layout.left.p1.clone(),
-        edgeP2: layout.left.p2.clone(),
-        labelOffset: zeroLabelOffset.clone()
-      };
-      this.dimensionGroup.add(sprite);
-    }
+    appendStandaloneClearanceBadge({
+      segment: layout.right,
+      clearanceMm: clr.rightClearance,
+      arrowPrefix: '↔',
+      badgeType: 'right_clearance',
+      label: this.tFallback('designer.rightClearance', 'Luz Derecha'),
+      axis: 'x',
+      minSidePart: part,
+      maxSidePart: rightNeighborPart,
+      defaultMoverSide: 'min'
+    });
 
-    // Render Horizontal Right Clearance Line
-    if (clr.rightClearance !== null && layout.right) {
-      this.appendDimensionSegmentVisuals(this.dimensionGroup, layout.right, lineMat, tickMat, true);
+    appendStandaloneClearanceBadge({
+      segment: layout.front,
+      clearanceMm: clr.frontClearance,
+      arrowPrefix: '↔',
+      badgeType: 'front_clearance',
+      label: this.tFallback('designer.frontClearance', 'Luz Frontal'),
+      axis: 'z',
+      minSidePart: part,
+      maxSidePart: frontNeighborPart,
+      defaultMoverSide: 'max'
+    });
 
-      const sprite = this.createClearanceSprite(`↔ ${clr.rightClearance} mm`, false);
-      sprite.position.copy(layout.right.midpoint);
-      sprite.renderOrder = DIMENSION_SPRITE_RENDER_ORDER;
-      sprite.userData = {
-        ...sprite.userData,
-        isCota: true,
-        isAuxiliaryVisual: true,
-        baseScaleX: 140,
-        baseScaleY: 38,
-        edgeP1: layout.right.p1.clone(),
-        edgeP2: layout.right.p2.clone(),
-        labelOffset: zeroLabelOffset.clone()
-      };
-      this.dimensionGroup.add(sprite);
-    }
+    appendStandaloneClearanceBadge({
+      segment: layout.back,
+      clearanceMm: clr.backClearance,
+      arrowPrefix: '↔',
+      badgeType: 'back_clearance',
+      label: this.tFallback('designer.backClearance', 'Luz Trasera'),
+      axis: 'z',
+      minSidePart: backNeighborPart,
+      maxSidePart: part,
+      defaultMoverSide: 'max'
+    });
 
     this.dimensionGroup.updateMatrixWorld(true);
     this.updateAdaptiveGizmoScale();
@@ -6008,6 +6380,7 @@ private createHandleMesh(
     const screenPos = this.projectWorldToScreen(worldPos);
     if (!screenPos) return;
 
+    this.setHoveredDimensionSprite(null);
     this.ngZone.run(() => {
       this.inlineDimensionEditor.set({
         x: screenPos.x,
@@ -6017,6 +6390,18 @@ private createHandleMesh(
         part: data.part,
         label: data.label,
         referenceY: data.referenceY,
+        axis: data.axis,
+        anchorPart: data.anchorPart,
+        moverPart: data.moverPart,
+        minSidePart: data.minSidePart,
+        maxSidePart: data.maxSidePart,
+        syntheticMinFaceCoord: data.syntheticMinFaceCoord,
+        syntheticMaxFaceCoord: data.syntheticMaxFaceCoord,
+        defaultMoverSide: data.defaultMoverSide,
+        moverMinLimitEdge: data.moverMinLimitEdge,
+        moverMaxLimitEdge: data.moverMaxLimitEdge,
+        selectedPartId: data.selectedPartId,
+        isModuleInternalBadge: data.isModuleInternalBadge,
         worldPos: worldPos.clone()
       });
     });
@@ -6039,21 +6424,34 @@ private createHandleMesh(
     }
   }
 
+  handleDocumentPointerDown(e: PointerEvent) {
+    if (!this.inlineDimensionEditor()) return;
+    const target = e.target;
+    const editorContainer = this.inlineEditorContainerRef()?.nativeElement;
+    if (editorContainer && target instanceof Node && editorContainer.contains(target)) {
+      return;
+    }
+    this.cancelInlineDimension();
+  }
+
   confirmInlineDimension(rawValue: string) {
     const editor = this.inlineDimensionEditor();
     if (!editor) return;
 
     const cleanStr = String(rawValue || '').replace(/mm/gi, '').replace(',', '.').trim();
     const numVal = Math.round(Number(cleanStr));
-    if (isNaN(numVal) || numVal <= 0) {
+    const isClearance = this.isClearanceBadgeType(editor.propType);
+    if (!Number.isFinite(numVal) || (isClearance ? numVal < 0 : numVal <= 0)) {
       this.cancelInlineDimension();
       return;
     }
 
-    const part = editor.part;
-    const currentPart = this.parts().find(p => p.id === part.id) || part;
+    const allParts = this.parts();
+    const findFreshPart = (candidate?: Part | null): Part | null =>
+      candidate ? (allParts.find(p => p.id === candidate.id) ?? candidate) : null;
 
     if (editor.propType === 'length' || editor.propType === 'width') {
+      const currentPart = findFreshPart(editor.part) ?? editor.part;
       const prop = editor.propType;
       const updatedPart: Part = {
         ...currentPart,
@@ -6065,6 +6463,7 @@ private createHandleMesh(
 
       if (this.pieceObjectMap.has(currentPart.id)) {
         this.previewPartUpdatesInPlace([{ part: currentPart, updates: { [prop]: numVal } }]);
+        this.liveDragPartUpdates.delete(currentPart.id);
       } else {
         this.disposeGroup(this.dimensionGroup);
         if (this.show3dDimensions()) {
@@ -6072,70 +6471,217 @@ private createHandleMesh(
           this.renderPieceDimensions(updatedPart, b.px, b.py, b.pz, b.sx, b.sy, b.sz);
         }
       }
-    } else if (editor.propType === 'bottom_clearance' || editor.propType === 'top_clearance') {
-      const limits = this.getShelfVerticalLimits(currentPart);
-      const initBounds = this.getPartBounds(currentPart);
-      const halfThick = initBounds.sy / 2;
+    } else {
+      const axis: ClearanceAxis =
+        editor.axis ?? getBadgeClearanceAxis(editor.propType as ClearanceBadgeType);
 
-      let targetPosY: number;
-      if (editor.referenceY !== undefined) {
-        if (editor.propType === 'bottom_clearance') {
-          // Distancia libre exacta respecto al borde superior de la pieza inferior
-          targetPosY = editor.referenceY + numVal + halfThick;
+      let moverPart: Part | null = null;
+      let updates: Partial<Part> | null = null;
+
+      if (editor.minSidePart !== undefined || editor.maxSidePart !== undefined) {
+        const minPart = findFreshPart(editor.minSidePart);
+        const maxPart = findFreshPart(editor.maxSidePart);
+        const minBounds = minPart ? this.getPartBounds(minPart) : null;
+        const maxBounds = maxPart ? this.getPartBounds(maxPart) : null;
+
+        const preliminary = resolveClearanceAnchorAndMover({
+          axis,
+          minSidePart: minPart,
+          maxSidePart: maxPart,
+          selectedPartId: editor.selectedPartId,
+          defaultMoverSide: editor.defaultMoverSide
+        });
+
+        let moverMinLimitEdge = editor.moverMinLimitEdge;
+        let moverMaxLimitEdge = editor.moverMaxLimitEdge;
+
+        if (
+          editor.isModuleInternalBadge &&
+          axis === 'y' &&
+          preliminary.status === 'ok' &&
+          preliminary.moverPart &&
+          this.isInternalShelf(preliminary.moverPart)
+        ) {
+          const shelfLimits = this.getShelfVerticalLimits(preliminary.moverPart, allParts);
+          if (preliminary.moverSide === 'max') {
+            moverMaxLimitEdge = shelfLimits.aboveBottomY;
+          } else if (preliminary.moverSide === 'min') {
+            moverMinLimitEdge = shelfLimits.belowTopY;
+          }
+        }
+
+        const repo = computeClearanceReposition({
+          axis,
+          desiredGapMm: numVal,
+          minSidePart: minPart,
+          minSideBounds: minBounds,
+          maxSidePart: maxPart,
+          maxSideBounds: maxBounds,
+          syntheticMinFaceCoord: editor.syntheticMinFaceCoord,
+          syntheticMaxFaceCoord: editor.syntheticMaxFaceCoord,
+          selectedPartId: editor.selectedPartId,
+          defaultMoverSide: editor.defaultMoverSide,
+          moverMinLimitEdge,
+          moverMaxLimitEdge
+        });
+
+        if (repo.status === 'locked') {
+          this.showClearanceWarningToast(
+            this.tFallback(
+              'designer.clearanceLockedWarning',
+              'La pieza está bloqueada; desbloquéala para modificar esta luz'
+            )
+          );
+          this.cancelInlineDimension();
+          return;
+        }
+
+        if (repo.status !== 'ok' || !repo.moverPart || !repo.posProp || repo.newPosCoord === null) {
+          this.cancelInlineDimension();
+          return;
+        }
+
+        moverPart = repo.moverPart;
+        updates = { [repo.posProp]: repo.newPosCoord };
+
+        const pairKey = this.buildClearancePairKey(axis, minPart?.id, maxPart?.id);
+        if ((repo.resultingGapMm ?? numVal) < 10) {
+          this.explicitLowClearancePairKeys.add(pairKey);
         } else {
-          // Distancia libre exacta respecto al borde inferior de la pieza superior
-          targetPosY = editor.referenceY - numVal - halfThick;
+          this.explicitLowClearancePairKeys.delete(pairKey);
         }
       } else {
-        if (editor.propType === 'bottom_clearance') {
-          targetPosY = limits.belowTopY + numVal + halfThick;
-        } else {
-          targetPosY = limits.aboveBottomY - numVal - halfThick;
+        // Respaldo compatible para invocación sintética de pruebas con editor.part y referenceY en Y
+        const currentPart = findFreshPart(editor.part) ?? editor.part;
+        if (currentPart.isLocked) {
+          this.showClearanceWarningToast(
+            this.tFallback(
+              'designer.clearanceLockedWarning',
+              'La pieza está bloqueada; desbloquéala para modificar esta luz'
+            )
+          );
+          this.cancelInlineDimension();
+          return;
         }
+
+        const limits = this.getShelfVerticalLimits(currentPart, allParts);
+        const initBounds = this.getPartBounds(currentPart);
+        const halfThick = initBounds.sy / 2;
+
+        let targetPosY: number;
+        if (editor.referenceY !== undefined) {
+          targetPosY =
+            editor.propType === 'bottom_clearance'
+              ? editor.referenceY + numVal + halfThick
+              : editor.referenceY - numVal - halfThick;
+        } else {
+          targetPosY =
+            editor.propType === 'bottom_clearance'
+              ? limits.belowTopY + numVal + halfThick
+              : limits.aboveBottomY - numVal - halfThick;
+        }
+
+        // Permitir 0 mm de luz sin salto mínimo de 5 mm, protegiendo suelo (minY >= 0) y vano sólido
+        const minSafeY = Math.max(halfThick, limits.belowTopY + halfThick);
+        const maxSafeY = limits.aboveBottomY - halfThick;
+        const clampedPosY =
+          minSafeY <= maxSafeY
+            ? Math.max(minSafeY, Math.min(maxSafeY, Math.round(targetPosY * 100) / 100))
+            : Math.max(halfThick, Math.round(targetPosY * 100) / 100);
+
+        moverPart = currentPart;
+        updates = { posY: clampedPosY };
       }
 
-      // Clamping físico que evita colisión contra paneles adyacentes manteniendo al menos 5 mm
-      const minSafeY = limits.belowTopY + 5 + halfThick;
-      const maxSafeY = limits.aboveBottomY - 5 - halfThick;
-      const clampedPosY = minSafeY <= maxSafeY
-        ? Math.max(minSafeY, Math.min(maxSafeY, Math.round(targetPosY)))
-        : Math.round(targetPosY);
+      if (!moverPart || !updates) {
+        this.cancelInlineDimension();
+        return;
+      }
 
       const updatedPart: Part = {
-        ...currentPart,
-        posY: clampedPosY
+        ...moverPart,
+        ...updates
       };
 
       // 1 único snapshot en Undo/Redo y persistencia en ProjectStorageService
       this.projectStorage.updatePart(updatedPart, true);
-      this.partModified.emit({ part: updatedPart, updates: { posY: clampedPosY } });
+      this.partModified.emit({ part: updatedPart, updates });
 
-      if (this.pieceObjectMap.has(currentPart.id)) {
-        this.previewPartUpdatesInPlace([{ part: currentPart, updates: { posY: clampedPosY } }]);
+      if (this.pieceObjectMap.has(moverPart.id)) {
+        this.previewPartUpdatesInPlace([{ part: moverPart, updates }]);
+        this.liveDragPartUpdates.delete(moverPart.id);
       }
 
-      // Actualización inmediata 3D de cotas y gizmo
-      const updatedParts = this.parts().map(p => p.id === updatedPart.id ? updatedPart : p);
-      const clr = this.computeClearanceInfo(updatedPart, updatedParts);
+      const baseParts = allParts.some(p => p.id === updatedPart.id)
+        ? allParts
+        : this.parts();
+      const updatedParts = baseParts.map(p => (p.id === updatedPart.id ? updatedPart : p));
+
+      const visibleForJoinery = updatedParts.filter(p => !this.hiddenPartIds().has(p.id));
+      const joinery = this.joineryEngine.calculateJoinery(visibleForJoinery);
+      this.updateDetectedCollisions(joinery.collisions);
+      this.collisionsDetected.emit(joinery.collisions);
+      this.allDrillHoles.set(joinery.allDrillHoles);
+      this.drillHolesUpdated.emit(joinery.allDrillHoles);
+
+      const currentSelectedIds = this.activeSelectedIds();
+      const singleSelectedFresh =
+        currentSelectedIds.length === 1
+          ? (updatedParts.find(p => p.id === currentSelectedIds[0]) ?? null)
+          : null;
+      const focusPart = singleSelectedFresh ?? updatedPart;
+      const focusBounds = this.getPartBounds(focusPart);
+
+      const clr = this.computeClearanceInfo(focusPart, updatedParts);
       this.clearanceCalculated.emit(clr);
 
+      this.disposeGroup(this.dimensionGroup);
+      if (this.show3dDimensions() && singleSelectedFresh) {
+        this.renderPieceDimensions(
+          focusPart,
+          focusBounds.px,
+          focusBounds.py,
+          focusBounds.pz,
+          focusBounds.sx,
+          focusBounds.sy,
+          focusBounds.sz
+        );
+      }
+
       if (this.showClearances()) {
-        if (updatedPart.groupId && (this.isInternalShelf(updatedPart) || this.isInternalDivider(updatedPart))) {
-          this.renderModuleInternalClearances(updatedPart.groupId, updatedPart);
+        const groupTargetId = updatedPart.groupId ?? focusPart.groupId;
+        if (
+          groupTargetId &&
+          (editor.isModuleInternalBadge ||
+            this.isInternalShelf(focusPart) ||
+            this.isInternalDivider(focusPart))
+        ) {
+          this.renderModuleInternalClearances(
+            groupTargetId,
+            singleSelectedFresh ?? undefined,
+            undefined,
+            updatedParts
+          );
         } else {
           this.disposeGroup(this.internalClearanceGroup);
-          this.renderClearanceDimensions(updatedPart, updatedParts);
+          this.renderClearanceDimensions(focusPart, updatedParts);
         }
       }
-      this.buildGizmo(
-        updatedPart,
-        updatedPart.posX ?? 0,
-        clampedPosY,
-        updatedPart.posZ ?? 0,
-        initBounds.sx,
-        initBounds.sy,
-        initBounds.sz
-      );
+
+      if (
+        (singleSelectedFresh || currentSelectedIds.length === 0) &&
+        (this.activeTool() === 'move' || this.activeTool() === 'select')
+      ) {
+        this.buildGizmo(
+          focusPart,
+          focusBounds.px,
+          focusBounds.py,
+          focusBounds.pz,
+          focusBounds.sx,
+          focusBounds.sy,
+          focusBounds.sz
+        );
+      }
     }
 
     this.cancelInlineDimension();
@@ -6528,6 +7074,13 @@ private createHandleMesh(
     }
 
     const rect = canvas.getBoundingClientRect();
+    if (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom)
+    ) {
+      return;
+    }
     this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
@@ -8508,6 +9061,14 @@ private createHandleMesh(
     // Hover cursor updates when not dragging
 
     const rect = canvas.getBoundingClientRect();
+    if (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom)
+    ) {
+      this.setHoveredDimensionSprite(null);
+      return;
+    }
     this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
@@ -9604,6 +10165,13 @@ private createHandleMesh(
     if (!canvas || !this.camera || this.isPushPulling) return;
 
     const rect = canvas.getBoundingClientRect();
+    if (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom)
+    ) {
+      return;
+    }
     this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
@@ -14485,6 +15053,11 @@ private applyMagneticSnapToPosition(
         } else if (obj instanceof THREE.Sprite) {
           if (this.hoveredDimensionSprite === obj) {
             this.hoveredDimensionSprite = null;
+            if (this.hoveredDimensionTooltip() !== null) {
+              this.ngZone.run(() => {
+                this.hoveredDimensionTooltip.set(null);
+              });
+            }
           }
           const idx = this.editableDimensionSprites.indexOf(obj as THREE.Sprite);
           if (idx !== -1) {
@@ -14523,7 +15096,12 @@ private applyMagneticSnapToPosition(
     const canvas = this.canvasRef()?.nativeElement;
     if (canvas) {
       canvas.removeEventListener('pointerdown', this.boundPointerDown);
+      canvas.removeEventListener('pointerleave', this.boundPointerLeave);
       canvas.removeEventListener('wheel', this.boundCanvasWheel);
+    }
+    if (this.clearanceToastTimer !== null) {
+      clearTimeout(this.clearanceToastTimer);
+      this.clearanceToastTimer = null;
     }
     if (typeof window !== 'undefined') {
       window.removeEventListener('pointermove', this.boundPointerMove);

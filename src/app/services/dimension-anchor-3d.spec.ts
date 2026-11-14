@@ -5,7 +5,10 @@ import {
   DIMENSION_SPRITE_RENDER_ORDER,
   DimensionAnchor3dService,
   DimensionLineSegment,
-  configureDimensionOverlayMaterial
+  computeClearanceReposition,
+  configureDimensionOverlayMaterial,
+  getBadgeClearanceAxis,
+  resolveClearanceAnchorAndMover
 } from './dimension-anchor-3d.service';
 import { Part } from '../models/melamine.models';
 import { PartWorldAABB } from './part-geometry.service';
@@ -686,6 +689,202 @@ describe('DimensionAnchor3dService', () => {
       expect(closePos.z).toBeCloseTo(200, 6);
       expect(closePos.x).toBeGreaterThan(0);
       expect(closePos.x).toBeLessThanOrEqual(400);
+    });
+  });
+
+  describe('Luces Z, tolerancia 0 mm y matemática de ancla vs pieza móvil (X/Y/Z)', () => {
+    it('computeStandaloneClearanceSegments debe construir segmentos Z front/back y soportar allowZeroAxes sin romper umbrales por defecto', () => {
+      const bounds = makeWorldBounds(0, 500, 0, 600, 18, 400);
+
+      const defaultLayout = service.computeStandaloneClearanceSegments({
+        bounds,
+        topClearance: null,
+        bottomClearance: 4,
+        leftClearance: null,
+        rightClearance: 0,
+        frontClearance: 90,
+        backClearance: 4,
+        frontNeighborAnchorXY: { x: 40, y: 500 },
+        backNeighborAnchorXY: { x: -20, y: 500 }
+      });
+
+      expect(defaultLayout.bottom).toBeNull();
+      expect(defaultLayout.right).toBeNull();
+      expect(defaultLayout.back).toBeNull();
+      expect(defaultLayout.front).not.toBeNull();
+      expectVectorClose(defaultLayout.front!.p1, new THREE.Vector3(40, 500, 200));
+      expectVectorClose(defaultLayout.front!.p2, new THREE.Vector3(40, 500, 290));
+
+      const zeroAllowedLayout = service.computeStandaloneClearanceSegments({
+        bounds,
+        topClearance: null,
+        bottomClearance: 0,
+        leftClearance: null,
+        rightClearance: 2,
+        frontClearance: 0,
+        backClearance: 3,
+        frontNeighborAnchorXY: { x: 40, y: 500 },
+        backNeighborAnchorXY: { x: -20, y: 500 },
+        allowZeroAxes: { bottom: true, right: true, front: true, back: true }
+      });
+
+      expect(zeroAllowedLayout.bottom).not.toBeNull();
+      expect(zeroAllowedLayout.right).not.toBeNull();
+      expect(zeroAllowedLayout.front).not.toBeNull();
+      expect(zeroAllowedLayout.back).not.toBeNull();
+      expectVectorClose(zeroAllowedLayout.front!.p1, new THREE.Vector3(40, 500, 200));
+      expectVectorClose(zeroAllowedLayout.front!.p2, new THREE.Vector3(40, 500, 200));
+      expectVectorClose(zeroAllowedLayout.back!.p1, new THREE.Vector3(-20, 500, -203));
+      expectVectorClose(zeroAllowedLayout.back!.p2, new THREE.Vector3(-20, 500, -200));
+    });
+
+    it('computeModuleInternalClearancesLayout debe respetar allowZeroBayIndices y allowZeroInnerWidth', () => {
+      const baseInput = {
+        bays: [
+          {
+            yBottom: 18,
+            yTop: 18,
+            bottomFrontZ: 200,
+            topFrontZ: 200,
+            shelfFrontZ: 200,
+            bayMinX: 0,
+            bayMaxX: 0,
+            centerX: 0,
+            distance: 0
+          }
+        ],
+        leftInnerX: 0,
+        rightInnerX: 0,
+        floorTopY: 18,
+        moduleMinX: -18,
+        moduleMaxX: 18,
+        moduleMinY: 0,
+        moduleFrontZ: 200
+      };
+
+      const hidden = service.computeModuleInternalClearancesLayout(baseInput);
+      expect(hidden.verticalBays.length).toBe(0);
+      expect(hidden.innerWidthSegment).toBeNull();
+
+      const visibleZero = service.computeModuleInternalClearancesLayout({
+        ...baseInput,
+        allowZeroBayIndices: [0],
+        allowZeroInnerWidth: true
+      });
+      expect(visibleZero.verticalBays.length).toBe(1);
+      expect(visibleZero.verticalBays[0].bay.distance).toBe(0);
+      expect(visibleZero.innerWidthSegment).not.toBeNull();
+      expect(visibleZero.innerWidth).toBe(0);
+    });
+
+    it('getBadgeClearanceAxis debe mapear correctamente cotas en X, Y y Z', () => {
+      expect(getBadgeClearanceAxis('top_clearance')).toBe('y');
+      expect(getBadgeClearanceAxis('bottom_clearance')).toBe('y');
+      expect(getBadgeClearanceAxis('left_clearance')).toBe('x');
+      expect(getBadgeClearanceAxis('right_clearance')).toBe('x');
+      expect(getBadgeClearanceAxis('inner_width_clearance')).toBe('x');
+      expect(getBadgeClearanceAxis('front_clearance')).toBe('z');
+      expect(getBadgeClearanceAxis('back_clearance')).toBe('z');
+    });
+
+    it('resolveClearanceAnchorAndMover y computeClearanceReposition respetan anclas por defecto, selección, isLocked, 0 mm y minY >= 0', () => {
+      const lower = makeTestPart({ id: 'p-low', posY: 7.5, thickness: 15 });
+      const upper = makeTestPart({ id: 'p-high', posY: 250, thickness: 15 });
+      const lowerBounds = makeWorldBounds(0, 7.5, 0, 600, 15, 400);
+      const upperBounds = makeWorldBounds(0, 250, 0, 600, 15, 400);
+
+      // Y por defecto: pieza inferior ancla, superior se mueve; permite 2 mm sin salto a 5 mm
+      const yDefault = computeClearanceReposition({
+        axis: 'y',
+        desiredGapMm: 2,
+        minSidePart: lower,
+        minSideBounds: lowerBounds,
+        maxSidePart: upper,
+        maxSideBounds: upperBounds
+      });
+      expect(yDefault.status).toBe('ok');
+      expect(yDefault.anchorPart?.id).toBe('p-low');
+      expect(yDefault.moverPart?.id).toBe('p-high');
+      expect(yDefault.posProp).toBe('posY');
+      // lower.maxY (15) + 2 + upper.halfY (7.5) = 24.5
+      expect(yDefault.newPosCoord).toBeCloseTo(24.5, 4);
+      expect(yDefault.resultingGapMm).toBeCloseTo(2, 4);
+
+      // Y si la superior está bloqueada y la inferior está libre, mueve la inferior protegiendo suelo minY >= 0
+      const yLockedUpper = computeClearanceReposition({
+        axis: 'y',
+        desiredGapMm: 500,
+        minSidePart: lower,
+        minSideBounds: lowerBounds,
+        maxSidePart: { ...upper, isLocked: true },
+        maxSideBounds: upperBounds
+      });
+      expect(yLockedUpper.status).toBe('ok');
+      expect(yLockedUpper.moverPart?.id).toBe('p-low');
+      // Clampea minY >= 0 => posY >= halfSize (7.5)
+      expect(yLockedUpper.newPosCoord).toBeCloseTo(7.5, 4);
+
+      // X por defecto: lateral izquierdo ancla, derecho se mueve (inner_width_clearance 0 mm)
+      const leftSide = makeTestPart({
+        id: 'side-l',
+        orientation: 'vertical_yz',
+        posX: -300,
+        posY: 400,
+        thickness: 18
+      });
+      const rightSide = makeTestPart({
+        id: 'side-r',
+        orientation: 'vertical_yz',
+        posX: 300,
+        posY: 400,
+        thickness: 18
+      });
+      const leftBounds = makeWorldBounds(-300, 400, 0, 18, 800, 400);
+      const rightBounds = makeWorldBounds(300, 400, 0, 18, 800, 400);
+
+      const xZero = computeClearanceReposition({
+        axis: 'x',
+        desiredGapMm: 0,
+        minSidePart: leftSide,
+        minSideBounds: leftBounds,
+        maxSidePart: rightSide,
+        maxSideBounds: rightBounds
+      });
+      expect(xZero.status).toBe('ok');
+      expect(xZero.moverPart?.id).toBe('side-r');
+      expect(xZero.posProp).toBe('posX');
+      // leftSide.maxX (-291) + 0 + 9 = -282
+      expect(xZero.newPosCoord).toBeCloseTo(-282, 4);
+
+      // Z por defecto: pieza trasera (-Z) ancla, delantera (+Z) se mueve
+      const backPart = makeTestPart({ id: 'z-back', posZ: -120, width: 100 });
+      const frontPart = makeTestPart({ id: 'z-front', posZ: 120, width: 100 });
+      const backBounds = makeWorldBounds(0, 500, -120, 600, 18, 100);
+      const frontBounds = makeWorldBounds(0, 500, 120, 600, 18, 100);
+
+      const zMoved = computeClearanceReposition({
+        axis: 'z',
+        desiredGapMm: 60,
+        minSidePart: backPart,
+        minSideBounds: backBounds,
+        maxSidePart: frontPart,
+        maxSideBounds: frontBounds
+      });
+      expect(zMoved.status).toBe('ok');
+      expect(zMoved.anchorPart?.id).toBe('z-back');
+      expect(zMoved.moverPart?.id).toBe('z-front');
+      expect(zMoved.posProp).toBe('posZ');
+      // back.maxZ (-70) + 60 + 50 = 40
+      expect(zMoved.newPosCoord).toBeCloseTo(40, 4);
+
+      // Ambos bloqueados => status 'locked' sin mover ninguna
+      const bothLocked = resolveClearanceAnchorAndMover({
+        axis: 'x',
+        minSidePart: { ...leftSide, isLocked: true },
+        maxSidePart: { ...rightSide, isLocked: true }
+      });
+      expect(bothLocked.status).toBe('locked');
+      expect(bothLocked.moverPart).toBeNull();
     });
   });
 });

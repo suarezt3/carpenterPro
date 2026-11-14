@@ -1187,7 +1187,14 @@ describe('Furniture3dViewerComponent - Cotas 3D HD, Edición Inline y Tirantes C
       const bayBadges = harness.editableDimensionSprites.filter(
         s => s.userData['isDimensionBadge'] === true
       );
-      expect(bayBadges.length).toBe(3);
+      expect(bayBadges.length).toBe(4);
+      expect(
+        bayBadges.some(
+          s =>
+            s.userData['badgeType'] === 'inner_width_clearance' &&
+            s.userData['currentValue'] === 764
+        )
+      ).toBe(true);
       expect(
         bayBadges.some(
           s =>
@@ -1565,6 +1572,683 @@ describe('Furniture3dViewerComponent - Cotas 3D HD, Edición Inline y Tirantes C
         expect(sprite.position.z).toBeCloseTo(250, 4);
         expect(labelOffset.length()).toBeCloseTo(0, 5);
         expect(sprite.position.distanceTo(edgeP1.clone().add(edgeP2).multiplyScalar(0.5))).toBeLessThan(1e-4);
+      }
+    });
+  });
+
+  describe('6. Edición Directa en Vivo para TODAS las Cotas Verdes (X, Y, Z), Hover, Bloqueo y Undo', () => {
+    interface LiveClearanceHarness {
+      camera: THREE.PerspectiveCamera;
+      controls: {
+        enabled: boolean;
+        target: THREE.Vector3;
+        minDistance: number;
+        maxDistance: number;
+        update: () => void;
+        dispose: () => void;
+      };
+      raycaster: THREE.Raycaster;
+      dimensionGroup: THREE.Group;
+      internalClearanceGroup: THREE.Group;
+      pieceObjectMap: Map<
+        string,
+        {
+          part: Part;
+          mesh: THREE.Mesh;
+          originalPos: THREE.Vector3;
+          explodedOffset: THREE.Vector3;
+        }
+      >;
+      editableDimensionSprites: THREE.Sprite[];
+      hoveredDimensionSprite: THREE.Sprite | null;
+      lastHoverRaycastTime: number;
+      renderClearanceDimensions: (part: Part, allParts: Part[]) => void;
+      renderModuleInternalClearances: (
+        groupId: string,
+        selectedOrDraggingPart?: Part,
+        overridePosY?: number,
+        overrideParts?: Part[]
+      ) => void;
+      onPointerMove: (e: PointerEvent) => void;
+      onPointerDown: (e: PointerEvent) => void;
+      onCanvasPointerLeave: () => void;
+      openInlineDimensionEditor: (sprite: THREE.Sprite, data: DimensionBadgeUserData) => void;
+      confirmInlineDimension: (rawValue: string) => void;
+      cancelInlineDimension: () => void;
+    }
+
+    const createPart = (overrides: Partial<Part> & { id: string }): Part => ({
+      name: overrides.id,
+      length: 600,
+      width: 400,
+      thickness: 15,
+      quantity: 1,
+      materialId: 'mat-1',
+      materialName: 'Blanco 15mm',
+      grain: 'length',
+      edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+      orientation: 'horizontal',
+      posX: 0,
+      posY: 0,
+      posZ: 0,
+      rotationX: 0,
+      rotationY: 0,
+      rotationZ: 0,
+      ...overrides
+    });
+
+    const installCanvas2dMock = (): (() => void) => {
+      const testCanvas = document.createElement('canvas');
+      if (testCanvas.getContext('2d')) {
+        return () => undefined;
+      }
+      const origGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = (function (contextId: string) {
+        if (contextId === '2d') {
+          return {
+            save: vi.fn(),
+            restore: vi.fn(),
+            beginPath: vi.fn(),
+            moveTo: vi.fn(),
+            lineTo: vi.fn(),
+            arcTo: vi.fn(),
+            closePath: vi.fn(),
+            fill: vi.fn(),
+            stroke: vi.fn(),
+            fillText: vi.fn(),
+            strokeText: vi.fn(),
+            clearRect: vi.fn(),
+            measureText: (txt: string) => ({ width: txt.length * 10 }),
+            fillStyle: '',
+            strokeStyle: '',
+            lineWidth: 0,
+            font: '',
+            textAlign: '',
+            textBaseline: '',
+            lineCap: '',
+            lineJoin: '',
+            miterLimit: 0
+          } as unknown as CanvasRenderingContext2D;
+        }
+        return null;
+      }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+      return () => {
+        HTMLCanvasElement.prototype.getContext = origGetContext;
+      };
+    };
+
+    const setupLiveFixture = (initialParts: Part[]) => {
+      const restoreCtx = installCanvas2dMock();
+      const fixture = TestBed.createComponent(Furniture3dViewerComponent);
+      const comp = fixture.componentInstance;
+      const harness = comp as unknown as LiveClearanceHarness;
+
+      projectStorage.updateProject(p => ({ ...p, parts: initialParts, modules: [] }), false);
+      projectStorage.clearHistory();
+      fixture.componentRef.setInput('parts', initialParts);
+      fixture.detectChanges();
+
+      const camera = new THREE.PerspectiveCamera(45, 1000 / 800, 1, 10000);
+      camera.position.set(0, 400, 2200);
+      camera.lookAt(0, 400, 0);
+      camera.updateMatrixWorld(true);
+
+      const canvasEl = fixture.nativeElement.querySelector('canvas') as HTMLCanvasElement;
+      vi.spyOn(canvasEl, 'getBoundingClientRect').mockReturnValue({
+        left: 0,
+        top: 0,
+        width: 1000,
+        height: 800,
+        right: 1000,
+        bottom: 800,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      } as DOMRect);
+
+      const origCamera = harness.camera;
+      const origControls = harness.controls;
+      harness.camera = camera;
+      harness.controls = {
+        enabled: true,
+        target: new THREE.Vector3(0, 400, 0),
+        minDistance: 100,
+        maxDistance: 8000,
+        update: vi.fn(),
+        dispose: vi.fn()
+      };
+
+      const registerPieceMesh = (part: Part): THREE.Mesh => {
+        const mesh = new THREE.Mesh();
+        mesh.position.set(part.posX ?? 0, part.posY ?? 0, part.posZ ?? 0);
+        mesh.userData['part'] = part;
+        harness.pieceObjectMap.set(part.id, {
+          part,
+          mesh,
+          originalPos: new THREE.Vector3(part.posX ?? 0, part.posY ?? 0, part.posZ ?? 0),
+          explodedOffset: new THREE.Vector3()
+        });
+        return mesh;
+      };
+
+      return {
+        fixture,
+        comp,
+        harness,
+        camera,
+        canvasEl,
+        registerPieceMesh,
+        cleanup: () => {
+          harness.camera = origCamera;
+          harness.controls = origControls;
+          restoreCtx();
+        }
+      };
+    };
+
+    const projectToClient = (
+      worldPos: THREE.Vector3,
+      camera: THREE.PerspectiveCamera
+    ): { clientX: number; clientY: number } => {
+      const ndc = worldPos.clone().project(camera);
+      return {
+        clientX: (ndc.x * 0.5 + 0.5) * 1000,
+        clientY: (-ndc.y * 0.5 + 0.5) * 800
+      };
+    };
+
+    it('debe hacer clicables y editables las cotas internas de módulo: vano vacío (sin entrepaños) y Luz Interna X', () => {
+      const modId = 'mod-empty-1';
+      const bottom = createPart({
+        id: 'empty-bottom',
+        groupId: modId,
+        componentRole: 'bottom',
+        length: 770,
+        width: 400,
+        thickness: 15,
+        posX: 0,
+        posY: 7.5,
+        posZ: 0
+      });
+      const roof = createPart({
+        id: 'empty-roof',
+        groupId: modId,
+        componentRole: 'top',
+        length: 770,
+        width: 400,
+        thickness: 15,
+        posX: 0,
+        posY: 792.5,
+        posZ: 0
+      });
+      const leftSide = createPart({
+        id: 'empty-left',
+        groupId: modId,
+        componentRole: 'side_left',
+        orientation: 'vertical_yz',
+        length: 800,
+        width: 400,
+        thickness: 15,
+        posX: -392.5,
+        posY: 400,
+        posZ: 0
+      });
+      const rightSide = createPart({
+        id: 'empty-right',
+        groupId: modId,
+        componentRole: 'side_right',
+        orientation: 'vertical_yz',
+        length: 800,
+        width: 400,
+        thickness: 15,
+        posX: 392.5,
+        posY: 400,
+        posZ: 0
+      });
+
+      const env = setupLiveFixture([bottom, roof, leftSide, rightSide]);
+      try {
+        env.harness.renderModuleInternalClearances(modId);
+
+        const emptyBaySprite = env.harness.editableDimensionSprites.find(
+          s =>
+            s.userData['isDimensionBadge'] === true &&
+            s.userData['badgeType'] !== 'inner_width_clearance'
+        );
+        const innerWidthSprite = env.harness.editableDimensionSprites.find(
+          s =>
+            s.userData['isDimensionBadge'] === true &&
+            s.userData['badgeType'] === 'inner_width_clearance'
+        );
+
+        expect(emptyBaySprite).toBeDefined();
+        expect(emptyBaySprite!.userData['currentValue']).toBe(770);
+        expect(innerWidthSprite).toBeDefined();
+        expect(innerWidthSprite!.userData['currentValue']).toBe(770);
+
+        // Editar vano vacío (sin entrepaños) a 500 mm: mueve el techo sobre la base anclada
+        env.harness.openInlineDimensionEditor(
+          emptyBaySprite!,
+          emptyBaySprite!.userData as DimensionBadgeUserData
+        );
+        env.fixture.detectChanges();
+        env.harness.confirmInlineDimension('500');
+        const updatedRoof = projectStorage.currentProject().parts.find(p => p.id === 'empty-roof');
+        // bottom.maxY (15) + 500 + roof.halfY (7.5) = 522.5
+        expect(updatedRoof?.posY).toBeCloseTo(522.5, 4);
+        expect(projectStorage.currentProject().parts.find(p => p.id === 'empty-bottom')?.posY).toBeCloseTo(7.5, 4);
+
+        // Editar Luz Interna X a 600 mm desplaza el lateral derecho (izquierdo queda anclado en -392.5)
+        const freshInnerWidthSprite = env.harness.editableDimensionSprites.find(
+          s =>
+            s.userData['isDimensionBadge'] === true &&
+            s.userData['badgeType'] === 'inner_width_clearance'
+        );
+        expect(freshInnerWidthSprite).toBeDefined();
+        env.harness.openInlineDimensionEditor(
+          freshInnerWidthSprite!,
+          freshInnerWidthSprite!.userData as DimensionBadgeUserData
+        );
+        env.fixture.detectChanges();
+
+        const inputEl = env.fixture.nativeElement.querySelector('input[type="number"]') as HTMLInputElement;
+        expect(inputEl).not.toBeNull();
+        expect(inputEl.getAttribute('min')).toBe('0');
+
+        env.harness.confirmInlineDimension('600');
+        const updatedRight = projectStorage.currentProject().parts.find(p => p.id === 'empty-right');
+        // leftInnerX (-385) + 600 + halfThick (7.5) = 222.5
+        expect(updatedRight?.posX).toBeCloseTo(222.5, 4);
+        expect(projectStorage.currentProject().parts.find(p => p.id === 'empty-left')?.posX).toBeCloseTo(-392.5, 4);
+
+        // Editar Luz Interna X a 0 mm deja ambos laterales tocándose y conserva la cota editable
+        const innerAfter = env.harness.editableDimensionSprites.find(
+          s => s.userData['badgeType'] === 'inner_width_clearance'
+        );
+        expect(innerAfter).toBeDefined();
+        env.harness.openInlineDimensionEditor(innerAfter!, innerAfter!.userData as DimensionBadgeUserData);
+        env.harness.confirmInlineDimension('0');
+        const updatedRightZero = projectStorage.currentProject().parts.find(p => p.id === 'empty-right');
+        expect(updatedRightZero?.posX).toBeCloseTo(-377.5, 4);
+        const innerZeroBadge = env.harness.editableDimensionSprites.find(
+          s => s.userData['badgeType'] === 'inner_width_clearance'
+        );
+        expect(innerZeroBadge?.userData['currentValue']).toBe(0);
+      } finally {
+        env.cleanup();
+      }
+    });
+
+    it('debe activar hover, cursor pointer y tooltip en canvas y limpiarlos al salir o abrir editor; clic izquierdo abre editor y frena OrbitControls', async () => {
+      const back = createPart({
+        id: 'h-left',
+        posX: -250,
+        posY: 300,
+        posZ: 0,
+        length: 100,
+        thickness: 20
+      });
+      const right = createPart({
+        id: 'h-right',
+        posX: 250,
+        posY: 300,
+        posZ: 0,
+        length: 100,
+        thickness: 20
+      });
+      const env = setupLiveFixture([back, right]);
+
+      try {
+        env.harness.renderClearanceDimensions(back, [back, right]);
+        const rightBadge = env.harness.editableDimensionSprites.find(
+          s => s.userData['badgeType'] === 'right_clearance'
+        );
+        expect(rightBadge).toBeDefined();
+
+        rightBadge!.updateMatrixWorld(true);
+        const worldPos = new THREE.Vector3();
+        rightBadge!.getWorldPosition(worldPos);
+        const { clientX, clientY } = projectToClient(worldPos, env.camera);
+
+        // Simulamos raycast sobre la cota en hover
+        let shouldHitBadge = true;
+        env.harness.lastHoverRaycastTime = 0;
+        const intersectSpy = vi
+          .spyOn(env.harness.raycaster, 'intersectObjects')
+          .mockImplementation((objs: THREE.Object3D[]) => {
+            if (shouldHitBadge && objs.includes(rightBadge!)) {
+              return [{ object: rightBadge!, distance: 100, point: worldPos.clone() }] as THREE.Intersection[];
+            }
+            return [];
+          });
+
+        env.harness.onPointerMove({ clientX, clientY } as PointerEvent);
+        env.fixture.detectChanges();
+
+        expect(env.canvasEl.style.cursor).toBe('pointer');
+        expect(env.harness.hoveredDimensionSprite).toBe(rightBadge);
+        expect(env.comp.hoveredDimensionTooltip()).toBe('Clic para editar separación en mm');
+        expect(env.canvasEl.getAttribute('title')).toBe('Clic para editar separación en mm');
+
+        // Al salir del canvas se limpia tooltip y cursor
+        env.harness.onCanvasPointerLeave();
+        env.fixture.detectChanges();
+        expect(env.harness.hoveredDimensionSprite).toBeNull();
+        expect(env.comp.hoveredDimensionTooltip()).toBeNull();
+        expect(env.canvasEl.style.cursor).toBe('grab');
+
+        // Al volver a pasar y hacer clic izquierdo se bloquea OrbitControls y se previene propagación
+        const focusProtoSpy = vi.spyOn(HTMLInputElement.prototype, 'focus');
+        const selectProtoSpy = vi.spyOn(HTMLInputElement.prototype, 'select');
+        const preventDefault = vi.fn();
+        const stopPropagation = vi.fn();
+        env.harness.onPointerDown({
+          button: 0,
+          clientX,
+          clientY,
+          shiftKey: false,
+          preventDefault,
+          stopPropagation
+        } as unknown as PointerEvent);
+        env.fixture.detectChanges();
+
+        expect(preventDefault).toHaveBeenCalledTimes(1);
+        expect(stopPropagation).toHaveBeenCalledTimes(1);
+        expect(env.harness.controls.enabled).toBe(false);
+        expect(env.comp.inlineDimensionEditor()?.propType).toBe('right_clearance');
+        expect(env.comp.inlineDimensionEditor()?.value).toBe(400);
+
+        const inputEl = env.fixture.nativeElement.querySelector('input[type="number"]') as HTMLInputElement;
+        expect(inputEl).not.toBeNull();
+        expect(inputEl.value).toBe('400');
+
+        // Focus + auto-select tras timeout de apertura
+        await new Promise(resolve => setTimeout(resolve, 75));
+        expect(focusProtoSpy).toHaveBeenCalled();
+        expect(selectProtoSpy).toHaveBeenCalled();
+
+        // Clic fuera de la cota cancela el editor inline sin cambios
+        shouldHitBadge = false;
+        env.harness.onPointerDown({
+          button: 0,
+          clientX: 10,
+          clientY: 10,
+          shiftKey: false,
+          preventDefault: vi.fn(),
+          stopPropagation: vi.fn()
+        } as unknown as PointerEvent);
+        env.fixture.detectChanges();
+        expect(env.comp.inlineDimensionEditor()).toBeNull();
+        expect(env.harness.controls.enabled).toBe(true);
+        expect(projectStorage.canUndo()).toBe(false);
+
+        // Reabrir y cancelar con Escape sin mutar las piezas
+        shouldHitBadge = true;
+        env.harness.onPointerDown({
+          button: 0,
+          clientX,
+          clientY,
+          shiftKey: false,
+          preventDefault: vi.fn(),
+          stopPropagation: vi.fn()
+        } as unknown as PointerEvent);
+        env.fixture.detectChanges();
+        const reopenInputEl = env.fixture.nativeElement.querySelector('input[type="number"]') as HTMLInputElement;
+        reopenInputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        env.fixture.detectChanges();
+        expect(env.comp.inlineDimensionEditor()).toBeNull();
+        expect(env.harness.controls.enabled).toBe(true);
+        expect(projectStorage.canUndo()).toBe(false);
+
+        focusProtoSpy.mockRestore();
+        selectProtoSpy.mockRestore();
+        intersectSpy.mockRestore();
+      } finally {
+        env.cleanup();
+      }
+    });
+
+    it('debe soportar edición directa en X, Y y Z (incluyendo 0 mm y 3 mm sin salto a 5 mm), refrescar 3D y mantener cámara intacta', () => {
+      const center = createPart({
+        id: 'center-p',
+        name: 'Centro',
+        length: 200,
+        width: 100,
+        thickness: 20,
+        posX: 0,
+        posY: 300,
+        posZ: 0
+      });
+      const leftNeighbor = createPart({
+        id: 'left-p',
+        name: 'Izquierda',
+        length: 100,
+        width: 100,
+        thickness: 20,
+        posX: -250,
+        posY: 300,
+        posZ: 0
+      });
+      const frontNeighbor = createPart({
+        id: 'front-p',
+        name: 'Frontal',
+        length: 200,
+        width: 100,
+        thickness: 20,
+        posX: 0,
+        posY: 300,
+        posZ: 200
+      });
+      const backNeighbor = createPart({
+        id: 'back-p',
+        name: 'Trasera',
+        length: 200,
+        width: 100,
+        thickness: 20,
+        posX: 0,
+        posY: 300,
+        posZ: -200
+      });
+      const topNeighbor = createPart({
+        id: 'top-p',
+        name: 'Superior',
+        length: 200,
+        width: 100,
+        thickness: 20,
+        posX: 0,
+        posY: 500,
+        posZ: 0
+      });
+      const all = [center, leftNeighbor, frontNeighbor, backNeighbor, topNeighbor];
+      const env = setupLiveFixture(all);
+
+      try {
+        const centerMesh = env.registerPieceMesh(center);
+        const camBefore = env.camera.position.clone();
+        const targetBefore = env.harness.controls.target.clone();
+
+        const clrEvents: unknown[] = [];
+        const clrSub = env.comp.clearanceCalculated.subscribe(v => clrEvents.push(v));
+
+        env.harness.renderClearanceDimensions(center, all);
+
+        // Todas las cotas verdes editables (left, top, front, back)
+        const leftBadge = env.harness.editableDimensionSprites.find(s => s.userData['badgeType'] === 'left_clearance');
+        const topBadge = env.harness.editableDimensionSprites.find(s => s.userData['badgeType'] === 'top_clearance');
+        const frontBadge = env.harness.editableDimensionSprites.find(s => s.userData['badgeType'] === 'front_clearance');
+        const backBadge = env.harness.editableDimensionSprites.find(s => s.userData['badgeType'] === 'back_clearance');
+        expect(leftBadge).toBeDefined();
+        expect(topBadge).toBeDefined();
+        expect(frontBadge).toBeDefined();
+        expect(backBadge).toBeDefined();
+
+        // Editar left_clearance a 3 mm (< 5 mm): se mueve center porque es la seleccionada
+        env.harness.openInlineDimensionEditor(leftBadge!, leftBadge!.userData as DimensionBadgeUserData);
+        env.harness.confirmInlineDimension('3');
+
+        const centerAfterX = projectStorage.currentProject().parts.find(p => p.id === 'center-p')!;
+        // leftNeighbor.maxX (-200) + 3 + center.halfLen (100) = -97
+        expect(centerAfterX.posX).toBeCloseTo(-97, 4);
+        expect(centerMesh.position.x).toBeCloseTo(-97, 4);
+        expect(projectStorage.canUndo()).toBe(true);
+
+        // Deshacer con 1 único Undo restaura posX = 0
+        projectStorage.undo();
+        expect(projectStorage.currentProject().parts.find(p => p.id === 'center-p')?.posX).toBe(0);
+        expect(projectStorage.canUndo()).toBe(false);
+
+        // Editar top_clearance sobre eje Y a 2 mm y proteger suelo minY >= 0 si pidiera bajar bajo el piso
+        env.harness.renderClearanceDimensions(center, all);
+        const freshTopBadge = env.harness.editableDimensionSprites.find(s => s.userData['badgeType'] === 'top_clearance')!;
+        env.harness.openInlineDimensionEditor(freshTopBadge, freshTopBadge.userData as DimensionBadgeUserData);
+        env.harness.confirmInlineDimension('2');
+        const centerAfterY = projectStorage.currentProject().parts.find(p => p.id === 'center-p')!;
+        // topNeighbor.minY (490) - 2 - center.halfY (10) = 478
+        expect(centerAfterY.posY).toBeCloseTo(478, 4);
+
+        projectStorage.undo();
+        expect(projectStorage.currentProject().parts.find(p => p.id === 'center-p')?.posY).toBe(300);
+
+        // Editar back_clearance sobre eje Z manteniendo trasera (-Z) anclada y moviendo center (posZ)
+        env.harness.renderClearanceDimensions(center, all);
+        const freshBackBadge = env.harness.editableDimensionSprites.find(s => s.userData['badgeType'] === 'back_clearance')!;
+        env.harness.openInlineDimensionEditor(freshBackBadge, freshBackBadge.userData as DimensionBadgeUserData);
+        env.harness.confirmInlineDimension('25');
+        const centerAfterBackZ = projectStorage.currentProject().parts.find(p => p.id === 'center-p')!;
+        // backNeighbor.maxZ (-150) + 25 + center.halfWidth (50) = -75
+        expect(centerAfterBackZ.posZ).toBeCloseTo(-75, 4);
+
+        // Editar front_clearance sobre eje Z con tecla Enter a 0 mm cuando center está bloqueada (entonces se mueve frontNeighbor!)
+        const lockedCenter: Part = { ...center, isLocked: true };
+        const partsWithLockedCenter = [lockedCenter, leftNeighbor, frontNeighbor, backNeighbor, topNeighbor];
+        projectStorage.updateProject(p => ({ ...p, parts: partsWithLockedCenter }), false);
+        projectStorage.clearHistory();
+        env.fixture.componentRef.setInput('parts', partsWithLockedCenter);
+        env.fixture.detectChanges();
+        const activeFrontMesh =
+          env.harness.pieceObjectMap.get('front-p')?.mesh ?? env.registerPieceMesh(frontNeighbor);
+
+        env.harness.renderClearanceDimensions(lockedCenter, partsWithLockedCenter);
+        const frontBadgeLocked = env.harness.editableDimensionSprites.find(
+          s => s.userData['badgeType'] === 'front_clearance'
+        )!;
+        env.harness.openInlineDimensionEditor(
+          frontBadgeLocked,
+          frontBadgeLocked.userData as DimensionBadgeUserData
+        );
+        env.fixture.detectChanges();
+
+        const inputEl = env.fixture.nativeElement.querySelector('input[type="number"]') as HTMLInputElement;
+        inputEl.value = '0';
+        inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        env.fixture.detectChanges();
+
+        const frontAfterZ = projectStorage.currentProject().parts.find(p => p.id === 'front-p')!;
+        // lockedCenter.maxZ (50) + 0 + frontNeighbor.halfWidth (50) = 100
+        expect(frontAfterZ.posZ).toBeCloseTo(100, 4);
+        expect(activeFrontMesh.position.z).toBeCloseTo(100, 4);
+        expect(clrEvents.length).toBeGreaterThan(0);
+
+        // Cámara y target permanecen completamente inmóviles
+        expect(env.camera.position.distanceTo(camBefore)).toBeLessThan(1e-6);
+        expect(env.harness.controls.target.distanceTo(targetBefore)).toBeLessThan(1e-6);
+        clrSub.unsubscribe();
+      } finally {
+        env.cleanup();
+      }
+    });
+
+    it('si ambas piezas están bloqueadas no mueve ninguna, no graba Undo y muestra alerta con designer.clearanceLockedWarning', () => {
+      const lowerLocked = createPart({
+        id: 'lock-low',
+        posX: 0,
+        posY: 10,
+        thickness: 20,
+        isLocked: true
+      });
+      const upperLocked = createPart({
+        id: 'lock-up',
+        posX: 0,
+        posY: 210,
+        thickness: 20,
+        isLocked: true
+      });
+      const env = setupLiveFixture([lowerLocked, upperLocked]);
+
+      try {
+        const storageSpy = vi.spyOn(projectStorage, 'updatePart');
+        env.harness.renderClearanceDimensions(upperLocked, [lowerLocked, upperLocked]);
+
+        const bottomBadge = env.harness.editableDimensionSprites.find(
+          s => s.userData['badgeType'] === 'bottom_clearance'
+        );
+        expect(bottomBadge).toBeDefined();
+
+        env.harness.openInlineDimensionEditor(bottomBadge!, bottomBadge!.userData as DimensionBadgeUserData);
+        env.harness.confirmInlineDimension('120');
+        env.fixture.detectChanges();
+
+        expect(storageSpy).not.toHaveBeenCalled();
+        expect(projectStorage.canUndo()).toBe(false);
+        expect(env.comp.clearanceWarningToast()).toBe(
+          'La pieza está bloqueada; desbloquéala para modificar esta luz'
+        );
+        const alertEl = env.fixture.nativeElement.querySelector('[role="alert"]') as HTMLElement | null;
+        expect(alertEl?.textContent).toContain(
+          'La pieza está bloqueada; desbloquéala para modificar esta luz'
+        );
+      } finally {
+        env.cleanup();
+      }
+    });
+
+    it('un pointerdown fuera del editor inline en document.body debe cerrarlo sin modificar piezas', () => {
+      const lower = createPart({
+        id: 'ext-low',
+        posX: 0,
+        posY: 10,
+        thickness: 20
+      });
+      const upper = createPart({
+        id: 'ext-up',
+        posX: 0,
+        posY: 210,
+        thickness: 20
+      });
+      const env = setupLiveFixture([lower, upper]);
+
+      try {
+        const storageSpy = vi.spyOn(projectStorage, 'updatePart');
+        env.harness.renderClearanceDimensions(upper, [lower, upper]);
+        const bottomBadge = env.harness.editableDimensionSprites.find(
+          s => s.userData['badgeType'] === 'bottom_clearance'
+        );
+        expect(bottomBadge).toBeDefined();
+
+        env.harness.controls.enabled = false;
+        env.harness.openInlineDimensionEditor(
+          bottomBadge!,
+          bottomBadge!.userData as DimensionBadgeUserData
+        );
+        env.fixture.detectChanges();
+        expect(env.comp.inlineDimensionEditor()).not.toBeNull();
+
+        const inputEl = env.fixture.nativeElement.querySelector('input[type="number"]') as HTMLInputElement;
+        expect(inputEl).not.toBeNull();
+        inputEl.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+        env.fixture.detectChanges();
+        expect(env.comp.inlineDimensionEditor()).not.toBeNull();
+
+        document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+        env.fixture.detectChanges();
+
+        expect(env.comp.inlineDimensionEditor()).toBeNull();
+        expect(env.harness.controls.enabled).toBe(true);
+        expect(storageSpy).not.toHaveBeenCalled();
+        expect(projectStorage.canUndo()).toBe(false);
+        expect(projectStorage.currentProject().parts.find(p => p.id === 'ext-up')?.posY).toBe(210);
+      } finally {
+        env.cleanup();
       }
     });
   });

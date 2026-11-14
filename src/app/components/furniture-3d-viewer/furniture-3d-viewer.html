@@ -4,7 +4,9 @@
   class="relative w-full h-full min-h-0 rounded-lg border overflow-hidden shadow-xs select-none group transition-colors duration-200">
 
   <!-- Lienzo 3D WebGL -->
-  <canvas #canvas3d class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+  <canvas #canvas3d
+    [attr.title]="hoveredDimensionTooltip()"
+    class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
 
   <!-- ETIQUETAS 2D PROYECTADAS DE MEDICIONES 3D PERSISTENTES -->
   @if (projectedMeasureBadges().length > 0 || previewMeasureBadge()) {
@@ -70,23 +72,47 @@
     </div>
   }
 
+  <!-- ALERTA SEMÁNTICA DE PIEZA BLOQUEADA AL EDITAR COTAS -->
+  @if (clearanceWarningToast(); as warningMsg) {
+    <div
+      role="alert"
+      aria-live="assertive"
+      class="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-white border border-amber-500/60 shadow-lg text-zinc-900 font-sans text-xs font-medium pointer-events-auto">
+      <span class="flex items-center justify-center w-6 h-6 rounded-md bg-amber-500/15 text-amber-600 shrink-0">
+        <hugeicons-icon [icon]="icons.warning" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+      </span>
+      <span class="font-sans leading-snug">{{ warningMsg }}</span>
+      <button
+        type="button"
+        (click)="dismissClearanceWarningToast()"
+        class="ml-1 p-1 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer"
+        aria-label="Cerrar alerta">
+        <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+      </button>
+    </div>
+  }
+
   <!-- INLINE 3D DIMENSION / CLEARANCE EDITOR (Edición Directa al Clic sobre Cotas 3D) -->
   @if (inlineDimensionEditor(); as editor) {
     <div
       #inlineEditorContainer
-      class="cad-inline-editor absolute z-50 flex items-center bg-zinc-950/95 backdrop-blur-md rounded-lg border px-2 py-1.5 gap-1.5 select-none pointer-events-auto"
-      [class.border-emerald-500]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
-      [class.border-sky-500]="editor.propType === 'length' || editor.propType === 'width'"
+      role="dialog"
+      tabindex="-1"
+      aria-label="Editar medida en milímetros"
+      class="cad-inline-editor absolute z-50 flex items-center bg-zinc-950/95 backdrop-blur-md rounded-lg border px-2 py-1.5 gap-1.5 select-none pointer-events-auto font-sans"
+      [class.border-emerald-600]="isClearanceBadgeType(editor.propType)"
+      [class.border-sky-600]="!isClearanceBadgeType(editor.propType)"
       [style.left.px]="editor.x"
       [style.top.px]="editor.y"
       (pointerdown)="$event.stopPropagation()"
       (mousedown)="$event.stopPropagation()"
       (click)="$event.stopPropagation()"
+      (keydown.escape)="cancelInlineDimension()"
       (wheel)="$event.stopPropagation()">
 
-      <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded text-white flex items-center gap-1 shadow-xs"
-        [class.bg-emerald-600]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
-        [class.bg-sky-600]="editor.propType === 'length' || editor.propType === 'width'">
+      <span class="font-sans text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded text-white flex items-center gap-1 shadow-xs"
+        [class.bg-emerald-600]="isClearanceBadgeType(editor.propType)"
+        [class.bg-sky-600]="!isClearanceBadgeType(editor.propType)">
         <hugeicons-icon [icon]="icons.edit" [size]="10" [strokeWidth]="2.5"></hugeicons-icon>
         <span>{{ editor.label }}</span>
       </span>
@@ -95,18 +121,18 @@
         <input
           #inlineDimensionInput
           type="number"
-          min="1"
+          [min]="editor.propType === 'length' || editor.propType === 'width' ? 1 : 0"
           max="6000"
           step="1"
           [value]="editor.value"
           (keydown)="$event.stopPropagation()"
           (keydown.enter)="confirmInlineDimension(inlineDimensionInput.value)"
           (keydown.escape)="cancelInlineDimension()"
-          class="w-20 px-2 py-1 bg-zinc-900 text-white font-mono text-sm font-bold rounded border border-zinc-700 focus:outline-none focus:ring-2 focus:border-transparent text-center"
-          [class.focus:ring-emerald-500]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
-          [class.focus:ring-sky-500]="editor.propType === 'length' || editor.propType === 'width'"
+          class="cad-numeric w-20 px-2 py-1 bg-zinc-900 text-white text-sm font-bold rounded border border-zinc-700 focus:outline-none focus:ring-2 focus:border-transparent text-center"
+          [class.focus:ring-emerald-600]="isClearanceBadgeType(editor.propType)"
+          [class.focus:ring-sky-600]="!isClearanceBadgeType(editor.propType)"
         />
-        <span class="ml-1 text-xs text-zinc-400 font-mono font-medium">mm</span>
+        <span class="cad-numeric ml-1 text-xs text-zinc-400 font-medium">mm</span>
       </div>
 
       <!-- Botón Confirmar (Check) -->
@@ -114,10 +140,10 @@
         type="button"
         (click)="confirmInlineDimension(inlineDimensionInput.value)"
         class="p-1 rounded text-white transition hover:scale-105 active:scale-95 cursor-pointer shadow-xs"
-        [class.bg-emerald-600]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
-        [class.hover:bg-emerald-500]="editor.propType === 'top_clearance' || editor.propType === 'bottom_clearance'"
-        [class.bg-sky-600]="editor.propType === 'length' || editor.propType === 'width'"
-        [class.hover:bg-sky-500]="editor.propType === 'length' || editor.propType === 'width'"
+        [class.bg-emerald-600]="isClearanceBadgeType(editor.propType)"
+        [class.hover:bg-emerald-500]="isClearanceBadgeType(editor.propType)"
+        [class.bg-sky-600]="!isClearanceBadgeType(editor.propType)"
+        [class.hover:bg-sky-500]="!isClearanceBadgeType(editor.propType)"
         title="Aplicar cambio exacto (Enter)">
         <hugeicons-icon [icon]="icons.checkCircle" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
       </button>

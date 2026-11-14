@@ -113,6 +113,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.cad-numeric {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Cifras y etiquetas 2D proyectadas para Cinta Métrica 3D */
 .cad-measure-numeric {
   font-family: var(--font-numeric);

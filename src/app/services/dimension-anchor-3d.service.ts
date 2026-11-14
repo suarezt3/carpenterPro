@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import * as THREE from 'three';
-import { PartOrientation } from '../models/melamine.models';
+import { Part, PartOrientation } from '../models/melamine.models';
 import { PartWorldAABB } from './part-geometry.service';
 
 export const DIMENSION_LINE_RENDER_ORDER = 950;
@@ -80,6 +80,9 @@ export interface ModuleInternalClearancesInput {
   moduleMinY: number;
   moduleFrontZ: number;
   columnRefX?: number;
+  minBayMm?: number;
+  allowZeroBayIndices?: number[];
+  allowZeroInnerWidth?: boolean;
 }
 
 export interface ModuleInternalClearancesLayout {
@@ -96,10 +99,16 @@ export interface StandaloneClearanceInput {
   bottomClearance: number | null;
   leftClearance: number | null;
   rightClearance: number | null;
+  frontClearance?: number | null;
+  backClearance?: number | null;
   topNeighborFrontZ?: number | null;
   bottomNeighborFrontZ?: number | null;
   leftNeighborFrontZ?: number | null;
   rightNeighborFrontZ?: number | null;
+  frontNeighborAnchorXY?: { x: number; y: number } | null;
+  backNeighborAnchorXY?: { x: number; y: number } | null;
+  minClearanceMm?: number;
+  allowZeroAxes?: Partial<Record<'top' | 'bottom' | 'left' | 'right' | 'front' | 'back', boolean>>;
 }
 
 export interface StandaloneClearanceLayout {
@@ -107,6 +116,62 @@ export interface StandaloneClearanceLayout {
   bottom: DimensionLineSegment | null;
   left: DimensionLineSegment | null;
   right: DimensionLineSegment | null;
+  front?: DimensionLineSegment | null;
+  back?: DimensionLineSegment | null;
+}
+
+export type ClearanceAxis = 'x' | 'y' | 'z';
+
+export type ClearanceBadgeType =
+  | 'top_clearance'
+  | 'bottom_clearance'
+  | 'left_clearance'
+  | 'right_clearance'
+  | 'inner_width_clearance'
+  | 'front_clearance'
+  | 'back_clearance';
+
+export type EditableDimensionBadgeType = 'length' | 'width' | ClearanceBadgeType;
+
+export interface ClearanceAnchorResolutionInput {
+  axis: ClearanceAxis;
+  minSidePart: Part | null;
+  maxSidePart: Part | null;
+  selectedPartId?: string | null;
+  defaultMoverSide?: 'min' | 'max';
+}
+
+export interface ClearanceAnchorResolutionResult {
+  status: 'ok' | 'locked' | 'missing_mover';
+  axis: ClearanceAxis;
+  moverSide: 'min' | 'max' | null;
+  anchorPart: Part | null;
+  moverPart: Part | null;
+}
+
+export interface ClearanceRepositionInput {
+  axis: ClearanceAxis;
+  desiredGapMm: number;
+  minSidePart: Part | null;
+  minSideBounds: PartWorldAABB | null;
+  maxSidePart: Part | null;
+  maxSideBounds: PartWorldAABB | null;
+  syntheticMinFaceCoord?: number;
+  syntheticMaxFaceCoord?: number;
+  selectedPartId?: string | null;
+  defaultMoverSide?: 'min' | 'max';
+  moverMinLimitEdge?: number;
+  moverMaxLimitEdge?: number;
+}
+
+export interface ClearanceRepositionResult {
+  status: 'ok' | 'locked' | 'invalid';
+  axis: ClearanceAxis;
+  anchorPart: Part | null;
+  moverPart: Part | null;
+  posProp: 'posX' | 'posY' | 'posZ' | null;
+  newPosCoord: number | null;
+  resultingGapMm: number | null;
 }
 
 export interface DrawerCavityClearanceInput {
@@ -417,13 +482,16 @@ export function computeModuleInternalClearancesLayout(
   input: ModuleInternalClearancesInput
 ): ModuleInternalClearancesLayout {
   const verticalBays: ModuleVerticalBayAnchor[] = [];
+  const allowZeroSet = new Set(input.allowZeroBayIndices ?? []);
 
   for (let bayIndex = 0; bayIndex < input.bays.length; bayIndex++) {
     const bay = input.bays[bayIndex];
-    if (!Number.isFinite(bay.distance) || bay.distance < MIN_VERTICAL_BAY_MM) {
+    const allowZeroBay = allowZeroSet.has(bayIndex) || (input.minBayMm !== undefined && input.minBayMm <= 0);
+    const minBayThreshold = allowZeroBay ? 0 : (input.minBayMm ?? MIN_VERTICAL_BAY_MM);
+    if (!Number.isFinite(bay.distance) || bay.distance < minBayThreshold) {
       continue;
     }
-    if (bay.yTop <= bay.yBottom) {
+    if (bay.yTop < bay.yBottom || (!allowZeroBay && bay.yTop <= bay.yBottom)) {
       continue;
     }
 
@@ -487,8 +555,10 @@ export function computeModuleInternalClearancesLayout(
 
   if (input.leftInnerX !== null && input.rightInnerX !== null) {
     const rawInnerSpan = input.rightInnerX - input.leftInnerX;
-    if (rawInnerSpan > MIN_HORIZONTAL_SPAN_MM) {
-      innerWidth = Math.round(rawInnerSpan);
+    const minInnerSpan = input.allowZeroInnerWidth ? 0 : MIN_HORIZONTAL_SPAN_MM;
+    const spanOk = input.allowZeroInnerWidth ? rawInnerSpan >= minInnerSpan : rawInnerSpan > minInnerSpan;
+    if (spanOk) {
+      innerWidth = Math.max(0, Math.round(rawInnerSpan));
       const y = input.floorTopY > 0 ? input.floorTopY : input.moduleMinY;
       const p1 = new THREE.Vector3(input.leftInnerX, y, lateralZ.frontZ);
       const p2 = new THREE.Vector3(input.rightInnerX, y, lateralZ.frontZ);
@@ -549,9 +619,18 @@ export function computeStandaloneClearanceSegments(
 
   const tickHalfW = Math.min(18, Math.max(6, bounds.sx * 0.5));
   const tickHalfH = DEFAULT_WIDTH_TICK_HALF_LEN;
+  const defaultMinThreshold = input.minClearanceMm ?? MIN_STANDALONE_CLEARANCE_MM;
+  const shouldInclude = (
+    dir: 'top' | 'bottom' | 'left' | 'right' | 'front' | 'back',
+    val: number | null | undefined
+  ): val is number => {
+    if (val === null || val === undefined || !Number.isFinite(val)) return false;
+    const allowZero = Boolean(input.allowZeroAxes?.[dir]) || (input.minClearanceMm !== undefined && input.minClearanceMm <= 0);
+    return allowZero ? val >= 0 : val > defaultMinThreshold;
+  };
 
   let top: DimensionLineSegment | null = null;
-  if (input.topClearance !== null && input.topClearance > MIN_STANDALONE_CLEARANCE_MM) {
+  if (shouldInclude('top', input.topClearance)) {
     const topY = bounds.maxY + input.topClearance;
     const p1 = new THREE.Vector3(vertX, bounds.maxY, vertZ);
     const p2 = new THREE.Vector3(vertX, topY, vertZ);
@@ -576,7 +655,7 @@ export function computeStandaloneClearanceSegments(
   }
 
   let bottom: DimensionLineSegment | null = null;
-  if (input.bottomClearance !== null && input.bottomClearance > MIN_STANDALONE_CLEARANCE_MM) {
+  if (shouldInclude('bottom', input.bottomClearance)) {
     const botY = bounds.minY - input.bottomClearance;
     const p1 = new THREE.Vector3(vertX, botY, vertZ);
     const p2 = new THREE.Vector3(vertX, bounds.minY, vertZ);
@@ -601,7 +680,7 @@ export function computeStandaloneClearanceSegments(
   }
 
   let left: DimensionLineSegment | null = null;
-  if (input.leftClearance !== null && input.leftClearance > MIN_STANDALONE_CLEARANCE_MM) {
+  if (shouldInclude('left', input.leftClearance)) {
     const leftX = bounds.minX - input.leftClearance;
     const p1 = new THREE.Vector3(leftX, horizY, horizZ);
     const p2 = new THREE.Vector3(bounds.minX, horizY, horizZ);
@@ -626,7 +705,7 @@ export function computeStandaloneClearanceSegments(
   }
 
   let right: DimensionLineSegment | null = null;
-  if (input.rightClearance !== null && input.rightClearance > MIN_STANDALONE_CLEARANCE_MM) {
+  if (shouldInclude('right', input.rightClearance)) {
     const rightX = bounds.maxX + input.rightClearance;
     const p1 = new THREE.Vector3(bounds.maxX, horizY, horizZ);
     const p2 = new THREE.Vector3(rightX, horizY, horizZ);
@@ -650,7 +729,39 @@ export function computeStandaloneClearanceSegments(
     };
   }
 
-  return { top, bottom, left, right };
+  let front: DimensionLineSegment | null = null;
+  if (shouldInclude('front', input.frontClearance)) {
+    const fx = Math.max(bounds.minX, Math.min(bounds.maxX, input.frontNeighborAnchorXY?.x ?? vertX));
+    const fy = Math.max(bounds.minY, Math.min(bounds.maxY, input.frontNeighborAnchorXY?.y ?? horizY));
+    const frontZ = bounds.maxZ + input.frontClearance;
+    const p1 = new THREE.Vector3(fx, fy, bounds.maxZ);
+    const p2 = new THREE.Vector3(fx, fy, frontZ);
+    front = {
+      p1,
+      p2,
+      midpoint: buildMidpoint(p1, p2),
+      tickSegments: buildEndTickPair(p1, p2, new THREE.Vector3(0, 1, 0), tickHalfH),
+      witnessSegments: []
+    };
+  }
+
+  let back: DimensionLineSegment | null = null;
+  if (shouldInclude('back', input.backClearance)) {
+    const bx = Math.max(bounds.minX, Math.min(bounds.maxX, input.backNeighborAnchorXY?.x ?? vertX));
+    const by = Math.max(bounds.minY, Math.min(bounds.maxY, input.backNeighborAnchorXY?.y ?? horizY));
+    const backZ = bounds.minZ - input.backClearance;
+    const p1 = new THREE.Vector3(bx, by, backZ);
+    const p2 = new THREE.Vector3(bx, by, bounds.minZ);
+    back = {
+      p1,
+      p2,
+      midpoint: buildMidpoint(p1, p2),
+      tickSegments: buildEndTickPair(p1, p2, new THREE.Vector3(0, 1, 0), tickHalfH),
+      witnessSegments: []
+    };
+  }
+
+  return { top, bottom, left, right, front, back };
 }
 
 /**
@@ -813,4 +924,238 @@ export class DimensionAnchor3dService {
   ): THREE.Vector3 {
     return computeAlongSegmentLabelPosition(p1, p2, cameraPos, focusTarget, closeThreshold);
   }
+
+  resolveClearanceAnchorAndMover(
+    input: ClearanceAnchorResolutionInput
+  ): ClearanceAnchorResolutionResult {
+    return resolveClearanceAnchorAndMover(input);
+  }
+
+  computeClearanceReposition(
+    input: ClearanceRepositionInput
+  ): ClearanceRepositionResult {
+    return computeClearanceReposition(input);
+  }
+}
+
+/**
+ * Devuelve el eje espacial ('x' | 'y' | 'z') asociado a un tipo de cota de luz editable.
+ */
+export function getBadgeClearanceAxis(badgeType: ClearanceBadgeType): ClearanceAxis {
+  if (
+    badgeType === 'left_clearance' ||
+    badgeType === 'right_clearance' ||
+    badgeType === 'inner_width_clearance'
+  ) {
+    return 'x';
+  }
+  if (badgeType === 'front_clearance' || badgeType === 'back_clearance') {
+    return 'z';
+  }
+  return 'y';
+}
+
+function getAxisSpan(
+  bounds: PartWorldAABB,
+  axis: ClearanceAxis
+): { min: number; max: number; size: number } {
+  if (axis === 'x') {
+    return { min: bounds.minX, max: bounds.maxX, size: bounds.sx };
+  }
+  if (axis === 'y') {
+    return { min: bounds.minY, max: bounds.maxY, size: bounds.sy };
+  }
+  return { min: bounds.minZ, max: bounds.maxZ, size: bounds.sz };
+}
+
+/**
+ * Resuelve de forma pura y determinista qué pieza actúa como ancla inmóvil y qué pieza se desplaza
+ * al editar una cota verde de luz sobre el eje X, Y o Z, respetando `isLocked`, selección activa y
+ * convenciones por defecto (inferior en Y, izquierda en X, trasera en Z como anclas).
+ */
+export function resolveClearanceAnchorAndMover(
+  input: ClearanceAnchorResolutionInput
+): ClearanceAnchorResolutionResult {
+  const { axis, minSidePart, maxSidePart, selectedPartId, defaultMoverSide } = input;
+  const minLocked = Boolean(minSidePart?.isLocked);
+  const maxLocked = Boolean(maxSidePart?.isLocked);
+  const canMoveMin = minSidePart !== null && !minLocked;
+  const canMoveMax = maxSidePart !== null && !maxLocked;
+
+  if (!canMoveMin && !canMoveMax) {
+    if ((minSidePart && minLocked) || (maxSidePart && maxLocked)) {
+      return {
+        status: 'locked',
+        axis,
+        moverSide: null,
+        anchorPart: minSidePart ?? maxSidePart,
+        moverPart: null
+      };
+    }
+    return {
+      status: 'missing_mover',
+      axis,
+      moverSide: null,
+      anchorPart: null,
+      moverPart: null
+    };
+  }
+
+  if (canMoveMin && !canMoveMax) {
+    return {
+      status: 'ok',
+      axis,
+      moverSide: 'min',
+      anchorPart: maxSidePart,
+      moverPart: minSidePart
+    };
+  }
+
+  if (!canMoveMin && canMoveMax) {
+    return {
+      status: 'ok',
+      axis,
+      moverSide: 'max',
+      anchorPart: minSidePart,
+      moverPart: maxSidePart
+    };
+  }
+
+  let moverSide: 'min' | 'max' = defaultMoverSide ?? 'max';
+  if (selectedPartId && minSidePart && selectedPartId === minSidePart.id) {
+    moverSide = 'min';
+  } else if (selectedPartId && maxSidePart && selectedPartId === maxSidePart.id) {
+    moverSide = 'max';
+  }
+
+  return moverSide === 'min'
+    ? { status: 'ok', axis, moverSide: 'min', anchorPart: maxSidePart, moverPart: minSidePart }
+    : { status: 'ok', axis, moverSide: 'max', anchorPart: minSidePart, moverPart: maxSidePart };
+}
+
+/**
+ * Calcula la nueva coordenada exacta (`posX`, `posY` o `posZ`) para la pieza móvil al editar una cota
+ * de luz en milímetros (>= 0 mm), garantizando `minY >= 0` sobre el suelo del estudio y permitiendo
+ * contacto exacto a 0 mm sin saltos mínimos artificiales.
+ */
+export function computeClearanceReposition(
+  input: ClearanceRepositionInput
+): ClearanceRepositionResult {
+  const { axis, desiredGapMm } = input;
+  if (!Number.isFinite(desiredGapMm) || desiredGapMm < 0) {
+    return {
+      status: 'invalid',
+      axis,
+      anchorPart: null,
+      moverPart: null,
+      posProp: null,
+      newPosCoord: null,
+      resultingGapMm: null
+    };
+  }
+
+  const resolution = resolveClearanceAnchorAndMover({
+    axis,
+    minSidePart: input.minSidePart,
+    maxSidePart: input.maxSidePart,
+    selectedPartId: input.selectedPartId,
+    defaultMoverSide: input.defaultMoverSide
+  });
+
+  if (resolution.status === 'locked') {
+    return {
+      status: 'locked',
+      axis,
+      anchorPart: resolution.anchorPart,
+      moverPart: null,
+      posProp: null,
+      newPosCoord: null,
+      resultingGapMm: null
+    };
+  }
+
+  if (resolution.status !== 'ok' || !resolution.moverPart || !resolution.moverSide) {
+    return {
+      status: 'invalid',
+      axis,
+      anchorPart: resolution.anchorPart,
+      moverPart: null,
+      posProp: null,
+      newPosCoord: null,
+      resultingGapMm: null
+    };
+  }
+
+  const moverBounds =
+    resolution.moverSide === 'min' ? input.minSideBounds : input.maxSideBounds;
+  if (!moverBounds) {
+    return {
+      status: 'invalid',
+      axis,
+      anchorPart: resolution.anchorPart,
+      moverPart: null,
+      posProp: null,
+      newPosCoord: null,
+      resultingGapMm: null
+    };
+  }
+
+  const halfSize = getAxisSpan(moverBounds, axis).size * 0.5;
+  let anchorEdge: number | undefined;
+
+  if (resolution.moverSide === 'max') {
+    anchorEdge = input.minSideBounds
+      ? getAxisSpan(input.minSideBounds, axis).max
+      : input.syntheticMinFaceCoord;
+  } else {
+    anchorEdge = input.maxSideBounds
+      ? getAxisSpan(input.maxSideBounds, axis).min
+      : input.syntheticMaxFaceCoord;
+  }
+
+  if (anchorEdge === undefined || !Number.isFinite(anchorEdge)) {
+    return {
+      status: 'invalid',
+      axis,
+      anchorPart: resolution.anchorPart,
+      moverPart: null,
+      posProp: null,
+      newPosCoord: null,
+      resultingGapMm: null
+    };
+  }
+
+  let rawPos =
+    resolution.moverSide === 'max'
+      ? anchorEdge + desiredGapMm + halfSize
+      : anchorEdge - desiredGapMm - halfSize;
+
+  if (input.moverMinLimitEdge !== undefined && Number.isFinite(input.moverMinLimitEdge)) {
+    rawPos = Math.max(rawPos, input.moverMinLimitEdge + halfSize);
+  }
+  if (input.moverMaxLimitEdge !== undefined && Number.isFinite(input.moverMaxLimitEdge)) {
+    rawPos = Math.min(rawPos, input.moverMaxLimitEdge - halfSize);
+  }
+  if (axis === 'y') {
+    // Garantizar siempre minY >= 0 (nivel del suelo del estudio)
+    rawPos = Math.max(halfSize, rawPos);
+  }
+
+  const newPosCoord = Math.round(rawPos * 100) / 100;
+  const resultingGapMm =
+    resolution.moverSide === 'max'
+      ? Math.max(0, Math.round((newPosCoord - halfSize - anchorEdge) * 100) / 100)
+      : Math.max(0, Math.round((anchorEdge - (newPosCoord + halfSize)) * 100) / 100);
+  const posProp: 'posX' | 'posY' | 'posZ' =
+    axis === 'x' ? 'posX' : axis === 'y' ? 'posY' : 'posZ';
+
+  return {
+    status: 'ok',
+    axis,
+    anchorPart: resolution.anchorPart,
+    moverPart: resolution.moverPart,
+    posProp,
+    newPosCoord,
+    resultingGapMm
+  };
 }

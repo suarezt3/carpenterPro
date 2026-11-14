@@ -2,6 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { I18nService, STORAGE_LANG_KEY } from './i18n.service';
 import { TranslatePipe } from '../pipes/translate.pipe';
 import { AppLanguage, APP_LANGUAGES, TRANSLATIONS } from '../data/i18n-translations.data';
+import { ADDITIONAL_TRANSLATIONS } from '../data/i18n-additional-translations.data';
+import { LANDING_TRANSLATIONS } from '../data/i18n-landing.data';
 import { APP_RELEASES_BY_LANG, APP_ROADMAP_BY_LANG } from '../data/changelog-i18n.data';
 
 describe('I18nService & TranslatePipe (Multilenguaje Reactivo en Tiempo Real)', () => {
@@ -263,6 +265,101 @@ describe('I18nService & TranslatePipe (Multilenguaje Reactivo en Tiempo Real)', 
         expect(item.description.trim().length).toBeGreaterThan(0);
         if (item.badge) {
           expect(item.badge.trim().length).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('debe resolver todas las claves projects.*, partsList.included, technicalSheet.* y designer.*Clearance en los 6 idiomas sin claves rotas', () => {
+    const labelKeysWithoutDots = [
+      'projects.modalTitle',
+      'projects.modalSubtitle',
+      'projects.tabCloud',
+      'projects.tabLocal',
+      'projects.clientLabel',
+      'projects.modules',
+      'projects.parts',
+      'projects.updatedAt',
+      'projects.currentBadge',
+      'projects.open',
+      'projects.saveCurrentNow',
+      'projects.refreshTitle',
+      'projects.emptyCloud',
+      'projects.emptyCloudDesc',
+      'projects.emptyLocal',
+      'projects.loadDemoBar',
+      'projects.cloudConnected',
+      'partsList.included',
+      'technicalSheet.projectHeader',
+      'technicalSheet.clientHeader',
+      'technicalSheet.mainThickness',
+      'technicalSheet.noEdge',
+      'layers.quickTitle',
+      'designer.lowerClearance',
+      'designer.upperClearance',
+      'designer.innerWidthClearance',
+      'designer.leftClearance',
+      'designer.rightClearance',
+      'designer.frontClearance',
+      'designer.backClearance',
+      'designer.editClearanceHint',
+      'designer.clearanceLockedWarning'
+    ];
+
+    const esProjectsKeys = Object.keys(TRANSLATIONS.es).filter(k =>
+      k.startsWith('projects.') || k.startsWith('technicalSheet.')
+    );
+    expect(esProjectsKeys.length).toBeGreaterThan(20);
+
+    for (const opt of APP_LANGUAGES) {
+      service.setLanguage(opt.code);
+
+      for (const key of labelKeysWithoutDots) {
+        const value = service.t(key);
+        expect(value, `Clave faltante para ${opt.code}: ${key}`).not.toBe(key);
+        expect(value.trim().length, `Clave vacía para ${opt.code}: ${key}`).toBeGreaterThan(0);
+        expect(value, `Clave sin traducir (contiene '.') para ${opt.code}: ${key} -> "${value}"`).not.toContain('.');
+      }
+
+      for (const key of esProjectsKeys) {
+        const value = service.t(key);
+        expect(value, `Clave faltante para ${opt.code}: ${key}`).not.toBe(key);
+        expect(value.trim().length).toBeGreaterThan(0);
+        expect(value).not.toMatch(/^(projects|technicalSheet)\./);
+      }
+    }
+
+    service.setLanguage('es');
+    expect(service.t('projects.modalTitle')).toBe('Mis Proyectos de Diseño');
+    expect(service.t('projects.tabCloud')).toBe('Proyectos en la Nube');
+    expect(service.t('projects.tabLocal')).toBe('Guardados en Navegador');
+    expect(service.t('projects.open')).toBe('Abrir Proyecto');
+    expect(service.t('designer.innerWidthClearance')).toBe('Luz Interna X');
+    expect(service.t('layers.quickTitle')).toBe('Capas del Diseño');
+  });
+
+  it('no debe contener menciones a software de terceros ni proveedores internos en los diccionarios (es, en, pt, fr, it, de)', () => {
+    const forbiddenBrandRegex = /(sketchup|melamina\s*3d|mueble\s*m[ií]o|polyboard|promob|lepton|cutlist|opticut|click-cuisine|carpenterpro)/i;
+    const forbiddenInfraRegex = /(supabase|postgresql|postgres|umdcxcjrdyckpxomxlmi|sql\s*editor)/i;
+
+    const dictionaries = [
+      { name: 'TRANSLATIONS', dict: TRANSLATIONS },
+      { name: 'ADDITIONAL_TRANSLATIONS', dict: ADDITIONAL_TRANSLATIONS },
+      { name: 'LANDING_TRANSLATIONS', dict: LANDING_TRANSLATIONS }
+    ];
+
+    for (const { name, dict } of dictionaries) {
+      for (const opt of APP_LANGUAGES) {
+        const entries = Object.entries(dict[opt.code] ?? {});
+        for (const [key, value] of entries) {
+          expect(
+            value,
+            `${name}[${opt.code}]['${key}'] contiene marca de terceros prohibida: "${value}"`
+          ).not.toMatch(forbiddenBrandRegex);
+          expect(
+            value,
+            `${name}[${opt.code}]['${key}'] expone proveedor/infraestructura interna: "${value}"`
+          ).not.toMatch(forbiddenInfraRegex);
         }
       }
     }

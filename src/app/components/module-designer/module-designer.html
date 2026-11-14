@@ -231,7 +231,7 @@
           (showAllRequested)="showAllParts()">
         </app-furniture-3d-viewer>
 
-        <!-- PANEL FLOTANTE MAESTRO "COCINA PRO / CLICK-CUISINE 2" (REDISEÑADO CON INTERFAZ CAD CORPORATIVA) -->
+        <!-- PANEL FLOTANTE MAESTRO "COCINA PRO STUDIO" (INTERFAZ CAD CORPORATIVA) -->
         @defer (when showKitchenProPanel()) {
           @if (showKitchenProPanel()) {
             <div class="absolute top-2.5 left-14 z-40 w-85 sm:w-96 max-w-[calc(100%-4.25rem)] max-h-[calc(100%-3rem)] flex flex-col bg-zinc-900/95 text-zinc-100 backdrop-blur-md border border-zinc-700/80 rounded-lg shadow-2xl overflow-hidden pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-150">
@@ -255,11 +255,11 @@
               </button>
             </div>
 
-            <!-- Barra de Capas Rápidas Estilo Click-Cuisine 2 (Indicadores Técnicos Limpios) -->
+            <!-- Barra de Capas Rápidas del Diseño (Indicadores Técnicos Limpios) -->
             <div class="px-3 py-2 bg-zinc-950/80 border-b border-zinc-800/90 shrink-0">
               <div class="flex items-center justify-between mb-1.5">
                 <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Capas Visibles (1-Clic)</span>
-                <span class="text-[9px] font-mono text-zinc-500">Click-Cuisine Layers</span>
+                <span class="text-[9px] font-sans text-zinc-500">{{ 'layers.quickTitle' | t }}</span>
               </div>
               <div class="grid grid-cols-5 gap-1">
                 <button
@@ -4302,13 +4302,13 @@
                 </div>
               }
 
-              <!-- 7B. CONVERSIÓN 1-CLIC A CAJÓN MODULAR (ESTILO MELAMINA 3D) -->
+              <!-- 7B. CONVERSIÓN 1-CLIC A CAJÓN MODULAR -->
               @if (canConvertSelectedPartToDrawer()) {
                 <div class="p-3 bg-white border border-zinc-200 rounded-xl space-y-2.5">
                   <div class="flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.layers" class="w-4 h-4 text-zinc-900" [strokeWidth]="1.75"></hugeicons-icon>
                     <span class="text-[11px] font-bold font-sans text-zinc-900">
-                      Convertir Pieza en Cajón Modular (Estilo Melamina 3D)
+                      Convertir Pieza en Cajón Modular
                     </span>
                   </div>
                   <p class="text-[11px] font-sans text-zinc-600 leading-relaxed">

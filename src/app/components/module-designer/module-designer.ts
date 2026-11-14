@@ -6022,7 +6022,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   // =========================================================================
-  // PANEL MAESTRO "COCINA PRO / ESTILO GLOBAL" (CLICK-CUISINE 2) & CORTES CAD
+  // PANEL MAESTRO "COCINA PRO / ESTILO GLOBAL" & CORTES CAD
   // =========================================================================
 
   readonly showKitchenProPanel = signal<boolean>(false);

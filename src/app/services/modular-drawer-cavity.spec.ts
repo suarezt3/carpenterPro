@@ -597,7 +597,7 @@ describe('Motor de Cavidades y Cajoneras Modulares (Escenarios 1-8)', () => {
     });
   });
 
-  describe('Escenario 5: Estilo Melamina 3D (convertPartToModularDrawer)', () => {
+  describe('Escenario 5: Conversión 1-clic a cajón modular (convertPartToModularDrawer)', () => {
     it('debe convertir una pieza guía dentro de un vano en cajonera modular eliminando la pieza temporal, generando herrajes y 0 colisiones', () => {
       const { group } = addGeneratedCabinet({
         code: 'MOD_CONV',
