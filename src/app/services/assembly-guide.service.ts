@@ -1,16 +1,32 @@
 import { computed, inject, Injectable } from '@angular/core';
 import {
   ComponentRole,
+  Material,
+  ParametricCabinetConfig,
   Part,
   PartEdges,
   PartGroup,
   Project,
-  isStoneMaterial,
-  Material
+  isStoneMaterial
 } from '../models/melamine.models';
 import { ProjectStorageService } from './project-storage.service';
 import { JoineryEngineService } from './joinery-engine.service';
 import { I18nService } from './i18n.service';
+
+export interface AssemblyPieceWorldBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+  spanX: number;
+  spanY: number;
+  spanZ: number;
+  cx: number;
+  cy: number;
+  cz: number;
+}
 
 export interface AssemblyGuidePiece {
   partId: string;
@@ -24,6 +40,8 @@ export interface AssemblyGuidePiece {
   materialName: string;
   edges: PartEdges;
   componentRole?: ComponentRole;
+  resolvedRole: ComponentRole;
+  worldBounds: AssemblyPieceWorldBounds;
   part: Part;
 }
 
@@ -34,6 +52,7 @@ export type AssemblyHardwareType =
   | 'drawer_slide'
   | 'screw_slide_hinge'
   | 'hinge'
+  | 'gas_piston'
   | 'handle'
   | 'closet_rod';
 
@@ -63,6 +82,7 @@ export interface AssemblyStep {
   tips: string[];
   actionType: 'carcass' | 'back' | 'shelves' | 'drawers' | 'doors' | 'accessories';
   partCodes: string[];
+  cumulativePriorPartCodes: string[];
   parts: AssemblyGuidePiece[];
   hardware: AssemblyHardwareItem[];
   measurements?: AssemblyStepMeasurement[];
@@ -169,45 +189,105 @@ export class AssemblyGuideService {
     }
 
     const groups = project.groups || [];
-    const guides: ModuleAssemblyGuide[] = [];
+    const nonCountertopGroups = groups.filter(g => !g.isCountertop);
+    const nonCountertopGroupIds = new Set(nonCountertopGroups.map(g => g.id));
 
-    // Determinar qué grupos son módulos armables (excluir grupos de mesones puros)
-    const armableGroups = groups.filter(g => {
-      if (g.isCountertop) return false;
-      const groupParts = armableParts.filter(p => p.groupId === g.id || p.moduleId === g.id);
-      return groupParts.length > 0;
-    });
+    // Resolver grupo anfitrión si un subgrupo (ej. cajón modular) vive dentro de un mueble padre
+    const resolveHostGroupId = (g: PartGroup): string => {
+      if (
+        (g.type === 'drawer' || g.type === 'door_set') &&
+        g.hostGroupId &&
+        g.hostGroupId !== 'floor' &&
+        g.hostGroupId !== g.id &&
+        nonCountertopGroupIds.has(g.hostGroupId)
+      ) {
+        return g.hostGroupId;
+      }
+      return g.id;
+    };
+
+    const groupedPartsMap = new Map<string, { group: PartGroup; parts: Part[] }>();
+    for (const g of nonCountertopGroups) {
+      const targetId = resolveHostGroupId(g);
+      if (targetId === g.id && !groupedPartsMap.has(g.id)) {
+        groupedPartsMap.set(g.id, { group: g, parts: [] });
+      }
+    }
 
     const processedPartIds = new Set<string>();
 
-    for (const group of armableGroups) {
-      const groupParts = armableParts.filter(p => p.groupId === group.id || p.moduleId === group.id);
-      if (groupParts.length > 0) {
-        groupParts.forEach(p => processedPartIds.add(p.id));
-        const guide = this.buildModuleGuide(group.id, group.name, groupParts, group);
+    for (const part of armableParts) {
+      const matchedGroup = nonCountertopGroups.find(
+        g =>
+          part.groupId === g.id ||
+          part.moduleId === g.id ||
+          (g.partIds?.includes(part.id) ?? false)
+      );
+      if (matchedGroup) {
+        const hostId = resolveHostGroupId(matchedGroup);
+        const bucket = groupedPartsMap.get(hostId);
+        if (bucket) {
+          bucket.parts.push(part);
+          processedPartIds.add(part.id);
+        }
+      }
+    }
+
+    const guides: ModuleAssemblyGuide[] = [];
+    for (const { group, parts } of groupedPartsMap.values()) {
+      if (parts.length > 0) {
+        const guide = this.buildModuleGuide(group.id, group.name, parts, group);
         if (guide) {
           guides.push(guide);
         }
       }
     }
 
-    // Piezas que no tienen grupo o cuyo grupo no está en project.groups
+    // Piezas sueltas (armadas manualmente pieza a pieza) o cuyo grupo no está en project.groups
     const orphanParts = armableParts.filter(p => !processedPartIds.has(p.id));
     if (orphanParts.length > 0) {
-      // Subdividir por moduleId o nombre si existen, o agrupar en un mueble principal
       const modulesMap = new Map<string, { name: string; parts: Part[] }>();
+      const manualAssemblyKey = 'manual_custom_assembly';
+      const hasExistingGuides = guides.length > 0;
 
       for (const part of orphanParts) {
-        const key = part.moduleId || part.groupName || part.moduleName || 'default_module';
-        const name = part.moduleName || part.groupName || project.name || 'Mueble Principal';
-        if (!modulesMap.has(key)) {
-          modulesMap.set(key, { name, parts: [] });
+        let key: string;
+        let name: string;
+
+        if (part.moduleId) {
+          key = `module:${part.moduleId}`;
+          name = part.moduleName || part.groupName || 'Mueble Armado Manual';
+        } else if (part.groupId) {
+          key = `group:${part.groupId}`;
+          name = part.groupName || part.moduleName || 'Mueble Armado Manual';
+        } else {
+          key = manualAssemblyKey;
+          name = hasExistingGuides
+            ? 'Mueble Armado Manual'
+            : (project.name?.trim() || 'Mueble Personalizado');
         }
-        modulesMap.get(key)!.parts.push(part);
+
+        let bucket = modulesMap.get(key);
+        if (!bucket) {
+          bucket = { name, parts: [] };
+          modulesMap.set(key, bucket);
+        }
+        bucket.parts.push(part);
+      }
+
+      const manualBucket = modulesMap.get(manualAssemblyKey);
+      if (manualBucket && modulesMap.size > 1 && !hasExistingGuides) {
+        manualBucket.name = 'Mueble Armado Manual';
       }
 
       for (const [key, mod] of modulesMap.entries()) {
-        const guide = this.buildModuleGuide(key, mod.name, mod.parts, null);
+        mod.parts.forEach(p => processedPartIds.add(p.id));
+        const resolvedId = key.startsWith('module:')
+          ? key.slice('module:'.length)
+          : key.startsWith('group:')
+            ? key.slice('group:'.length)
+            : key;
+        const guide = this.buildModuleGuide(resolvedId, mod.name, mod.parts, null);
         if (guide) {
           guides.push(guide);
         }
@@ -215,6 +295,129 @@ export class AssemblyGuideService {
     }
 
     return guides;
+  }
+
+  /**
+   * Convierte la caja envolvente 3D de una pieza en límites espaciales redondeados y centroide.
+   */
+  private toWorldBounds(part: Part): AssemblyPieceWorldBounds {
+    const b = this.joineryEngine.getPartBounds(part);
+    const minX = Math.round(b.minX * 100) / 100;
+    const maxX = Math.round(b.maxX * 100) / 100;
+    const minY = Math.round(b.minY * 100) / 100;
+    const maxY = Math.round(b.maxY * 100) / 100;
+    const minZ = Math.round(b.minZ * 100) / 100;
+    const maxZ = Math.round(b.maxZ * 100) / 100;
+    const spanX = Math.round((b.maxX - b.minX) * 100) / 100;
+    const spanY = Math.round((b.maxY - b.minY) * 100) / 100;
+    const spanZ = Math.round((b.maxZ - b.minZ) * 100) / 100;
+    const cx = Math.round(((b.minX + b.maxX) / 2) * 100) / 100;
+    const cy = Math.round(((b.minY + b.maxY) / 2) * 100) / 100;
+    const cz = Math.round(((b.minZ + b.maxZ) / 2) * 100) / 100;
+    return { minX, maxX, minY, maxY, minZ, maxZ, spanX, spanY, spanZ, cx, cy, cz };
+  }
+
+  /**
+   * Clasifica determinísticamente el rol estructural o funcional de una pieza a partir de
+   * su rol explícito (si es concreto) o de sus límites reales en 3D dentro del mueble.
+   */
+  resolveEffectiveRole(
+    part: Part,
+    b: AssemblyPieceWorldBounds,
+    modMinX: number,
+    modMaxX: number,
+    modMinY: number,
+    modMaxY: number,
+    modMinZ: number,
+    modMaxZ: number
+  ): ComponentRole {
+    if (part.componentRole && part.componentRole !== 'free') {
+      return part.componentRole;
+    }
+
+    const nameUpper = (part.name || '').toUpperCase();
+    // Tubos colgadores circulares se conservan como 'free' para no confundirlos con repisas
+    if (part.shapeType === 'circle' && b.spanY <= 50 && b.spanZ <= 50) {
+      return 'free';
+    }
+
+    // Piezas sin rol explícito inclinadas en ángulo oblicuo (no ortogonal a 90°) se conservan como 'free'
+    const isOrthogonalAngle = (deg?: number): boolean => {
+      const rem = Math.abs(deg || 0) % 90;
+      return rem < 1 || rem > 89;
+    };
+    if (
+      !isOrthogonalAngle(part.rotationX) ||
+      !isOrthogonalAngle(part.rotationY) ||
+      !isOrthogonalAngle(part.rotationZ)
+    ) {
+      return 'free';
+    }
+
+    const modWidth = Math.max(1, modMaxX - modMinX);
+    const modHeight = Math.max(1, modMaxY - modMinY);
+    const modDepth = Math.max(1, modMaxZ - modMinZ);
+
+    // 1. Fondo trasero delgado en Z cerca de modMinZ
+    if (
+      b.spanZ <= 6 &&
+      b.spanX * b.spanY > 50000 &&
+      b.minZ <= modMinZ + Math.max(30, modDepth * 0.22) &&
+      b.cz <= modMinZ + modDepth * 0.5
+    ) {
+      return 'back';
+    }
+
+    // 2. Panel frontal delgado vertical cerca de modMaxZ
+    if (b.spanZ <= 26 && b.cz > modMinZ + modDepth * 0.72) {
+      if (nameUpper.includes('CAJ')) {
+        return 'drawer_front';
+      }
+      if (nameUpper.includes('ZOCALO') || nameUpper.includes('ZÓCALO')) {
+        return 'plinth';
+      }
+      if (
+        nameUpper.includes('MOLDUR') ||
+        nameUpper.includes('LISTON') ||
+        nameUpper.includes('LISTÓN') ||
+        nameUpper.includes('CORNIS') ||
+        nameUpper.includes('CENEFA') ||
+        nameUpper.includes('APLIQUE')
+      ) {
+        return 'free';
+      }
+      return 'door';
+    }
+
+    // 3. Paneles verticales delgados en X (laterales izquierdo/derecho o divisores internos)
+    if (b.spanX <= 26 && b.spanY > b.spanX * 2) {
+      const sideTol = Math.max(30, modWidth * 0.08);
+      if (b.minX <= modMinX + sideTol && b.cx < modMinX + modWidth * 0.35) {
+        return 'side_left';
+      }
+      if (b.maxX >= modMaxX - sideTol && b.cx > modMaxX - modWidth * 0.35) {
+        return 'side_right';
+      }
+      return 'divider';
+    }
+
+    // 4. Paneles horizontales delgados en Y (piso, techo, amarres o repisas)
+    if (b.spanY <= 26) {
+      const bottomTol = Math.max(30, modHeight * 0.14);
+      const topTol = Math.max(30, modHeight * 0.08);
+      if (b.minY <= modMinY + bottomTol && b.cy < modMinY + modHeight * 0.35) {
+        return 'bottom';
+      }
+      if (b.maxY >= modMaxY - topTol && b.cy > modMinY + modHeight * 0.65) {
+        if ((nameUpper.includes('AMARRE') || nameUpper.includes('TIRANTE')) && b.spanZ < modDepth * 0.35) {
+          return 'tie';
+        }
+        return 'top';
+      }
+      return 'shelf';
+    }
+
+    return 'free';
   }
 
   /**
@@ -228,19 +431,24 @@ export class AssemblyGuideService {
   ): ModuleAssemblyGuide | null {
     if (parts.length === 0) return null;
 
-    // 1. Dimensiones exteriores totales y Bounding Box
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
+    // 1. Dimensiones exteriores totales y Bounding Box 3D real por pieza
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
 
+    const boundsByPart = new Map<Part, AssemblyPieceWorldBounds>();
     for (const p of parts) {
-      const b = this.joineryEngine.getPartBounds(p);
-      if (b.minX < minX) minX = b.minX;
-      if (b.maxX > maxX) maxX = b.maxX;
-      if (b.minY < minY) minY = b.minY;
-      if (b.maxY > maxY) maxY = b.maxY;
-      if (b.minZ < minZ) minZ = b.minZ;
-      if (b.maxZ > maxZ) maxZ = b.maxZ;
+      const wb = this.toWorldBounds(p);
+      boundsByPart.set(p, wb);
+      if (wb.minX < minX) minX = wb.minX;
+      if (wb.maxX > maxX) maxX = wb.maxX;
+      if (wb.minY < minY) minY = wb.minY;
+      if (wb.maxY > maxY) maxY = wb.maxY;
+      if (wb.minZ < minZ) minZ = wb.minZ;
+      if (wb.maxZ > maxZ) maxZ = wb.maxZ;
     }
 
     const calculatedWidth = Math.max(100, Math.round(maxX - minX));
@@ -252,34 +460,52 @@ export class AssemblyGuideService {
     const height = paramConfig?.height ? Math.round(paramConfig.height) : calculatedHeight;
     const depth = paramConfig?.depth ? Math.round(paramConfig.depth) : calculatedDepth;
 
+    const roleByPart = new Map<Part, ComponentRole>();
+    for (const p of parts) {
+      const wb = boundsByPart.get(p) ?? this.toWorldBounds(p);
+      roleByPart.set(p, this.resolveEffectiveRole(p, wb, minX, maxX, minY, maxY, minZ, maxZ));
+    }
+    const resolveRole = (p: Part): ComponentRole => roleByPart.get(p) ?? (p.componentRole || 'free');
+
     // 2. Indexación ordenada de piezas P1, P2, P3...
-    const sortedParts = this.sortPartsForAssembly(parts);
-    const pieces: AssemblyGuidePiece[] = sortedParts.map((p, idx) => ({
-      partId: p.id,
-      code: `P${idx + 1}`,
-      name: p.name,
-      translatedName: this.i18n.translatePartName(p.name),
-      length: Math.round(p.length),
-      width: Math.round(p.width),
-      thickness: Math.round(p.thickness || 18),
-      quantity: Math.max(1, p.quantity || 1),
-      materialName: p.materialName || 'Melamina',
-      edges: p.edges || { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
-      componentRole: p.componentRole,
-      part: p
-    }));
+    const sortedParts = this.sortPartsForAssembly(parts, resolveRole, boundsByPart, (minZ + maxZ) / 2);
+    const pieces: AssemblyGuidePiece[] = sortedParts.map((p, idx) => {
+      const worldBounds = boundsByPart.get(p) ?? this.toWorldBounds(p);
+      const resolvedRole = resolveRole(p);
+      return {
+        partId: p.id,
+        code: `P${idx + 1}`,
+        name: p.name,
+        translatedName: this.i18n.translatePartName(p.name),
+        length: Math.round(p.length),
+        width: Math.round(p.width),
+        thickness: Math.round(p.thickness || 18),
+        quantity: Math.max(1, p.quantity || 1),
+        materialName: p.materialName || 'Melamina',
+        edges: p.edges || { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: p.componentRole,
+        resolvedRole,
+        worldBounds,
+        part: p
+      };
+    });
 
     const totalPartsCount = pieces.reduce((sum, p) => sum + p.quantity, 0);
 
     // 3. Detección de elementos funcionales (cajones, puertas, repisas, divisores, fondos)
-    const drawersCount = this.detectDrawersCount(parts, group);
-    const doorParts = pieces.filter(p => p.componentRole === 'door');
+    const drawersCount = this.detectDrawersCount(pieces, group);
+    const doorParts = pieces.filter(p => p.resolvedRole === 'door');
     const doorsCount = doorParts.reduce((sum, p) => sum + p.quantity, 0);
-    const shelfParts = pieces.filter(p => p.componentRole === 'shelf');
+    const shelfParts = pieces.filter(p => p.resolvedRole === 'shelf');
     const shelvesCount = shelfParts.reduce((sum, p) => sum + p.quantity, 0);
-    const dividerParts = pieces.filter(p => p.componentRole === 'divider');
+    const dividerParts = pieces.filter(p => p.resolvedRole === 'divider');
     const dividersCount = dividerParts.reduce((sum, p) => sum + p.quantity, 0);
-    const backParts = pieces.filter(p => p.componentRole === 'back' || (p.thickness <= 3 && p.length * p.width > 80000));
+    const backParts = pieces.filter(p => {
+      if (p.resolvedRole === 'back') return true;
+      const nameLower = (p.name || '').toLowerCase();
+      const isDrawerBottom = p.resolvedRole === 'drawer_bottom' || nameLower.includes('caj');
+      return !isDrawerBottom && p.thickness <= 3 && p.worldBounds.spanX * p.worldBounds.spanY > 80000;
+    });
     const hasBack = backParts.length > 0;
 
     // 4. Tiempo estimado de armado
@@ -303,7 +529,6 @@ export class AssemblyGuideService {
     const hardwareKit = this.calculateHardwareKit({
       width,
       height,
-      depth,
       screwsPerJoint,
       drawersCount,
       doorsCount,
@@ -332,9 +557,11 @@ export class AssemblyGuideService {
       hasBack,
       backParts,
       hardwareKit,
+      minX,
       minY,
       maxY,
       minZ,
+      maxZ,
       paramConfig
     });
 
@@ -357,11 +584,16 @@ export class AssemblyGuideService {
    * Ordena lógicamente las piezas según su secuencia de ensamble:
    * 1. Casco y estructura (costados, piso, amarres, zócalos)
    * 2. Fondo trasero
-   * 3. Divisiones y repisas fijas/móviles
+   * 3. Divisiones, repisas e insertos interiores
    * 4. Componentes de cajones
-   * 5. Puertas y frentes
+   * 5. Puertas, frentes y complementos exteriores
    */
-  private sortPartsForAssembly(parts: Part[]): Part[] {
+  private sortPartsForAssembly(
+    parts: Part[],
+    resolveRole?: (part: Part) => ComponentRole,
+    boundsMap?: Map<Part, AssemblyPieceWorldBounds>,
+    moduleCenterZ?: number
+  ): Part[] {
     const rolePriority: Record<string, number> = {
       side_left: 10,
       side_right: 11,
@@ -374,18 +606,46 @@ export class AssemblyGuideService {
       shelf: 31,
       drawer_box: 40,
       drawer_lateral: 41,
-      drawer_front: 42,
+      drawer_bottom: 42,
+      drawer_front: 43,
       door: 50,
       front: 51,
       free: 60
     };
 
+    const localBounds = new Map<Part, AssemblyPieceWorldBounds>();
+    const getBounds = (p: Part): AssemblyPieceWorldBounds => {
+      const existing = boundsMap?.get(p) ?? localBounds.get(p);
+      if (existing) return existing;
+      const computedBounds = this.toWorldBounds(p);
+      localBounds.set(p, computedBounds);
+      return computedBounds;
+    };
+
+    const getPriority = (p: Part, wb: AssemblyPieceWorldBounds): number => {
+      const role = resolveRole ? resolveRole(p) : (p.componentRole || 'free');
+      if (role === 'free' && moduleCenterZ !== undefined) {
+        return wb.cz <= moduleCenterZ + 0.5 ? 35 : 55;
+      }
+      return rolePriority[role] ?? 55;
+    };
+
     return [...parts].sort((a, b) => {
-      const pA = rolePriority[a.componentRole || 'free'] ?? 55;
-      const pB = rolePriority[b.componentRole || 'free'] ?? 55;
+      const bA = getBounds(a);
+      const bB = getBounds(b);
+      const pA = getPriority(a, bA);
+      const pB = getPriority(b, bB);
       if (pA !== pB) return pA - pB;
+
+      const minYDiff = bA.minY - bB.minY;
+      if (Math.abs(minYDiff) > 0.5) return minYDiff;
+
+      const minZDiff = bA.minZ - bB.minZ;
+      if (Math.abs(minZDiff) > 0.5) return minZDiff;
+
       const areaDiff = (b.length * b.width) - (a.length * a.width);
       if (Math.abs(areaDiff) > 1) return areaDiff;
+
       return (a.name || '').localeCompare(b.name || '') || a.id.localeCompare(b.id);
     });
   }
@@ -393,24 +653,35 @@ export class AssemblyGuideService {
   /**
    * Detecta la cantidad real de cajones en el módulo.
    */
-  private detectDrawersCount(parts: Part[], group: PartGroup | null): number {
+  private detectDrawersCount(pieces: AssemblyGuidePiece[], group: PartGroup | null): number {
     if (group?.parametricConfig?.drawersCount && group.parametricConfig.drawersCount > 0) {
       return group.parametricConfig.drawersCount;
     }
-    const drawerFronts = parts.filter(p => p.componentRole === 'drawer_front');
+    const drawerFronts = pieces.filter(p => p.resolvedRole === 'drawer_front');
     if (drawerFronts.length > 0) {
       return drawerFronts.reduce((sum, p) => sum + p.quantity, 0);
     }
     const drawerGroups = new Set(
-      parts
-        .filter(p => p.componentRole?.startsWith('drawer_') || p.groupName?.toLowerCase().includes('cajón') || p.groupName?.toLowerCase().includes('cajon'))
-        .map(p => p.groupId || p.groupName)
-        .filter(Boolean)
+      pieces
+        .filter(
+          p =>
+            p.resolvedRole.startsWith('drawer_') ||
+            p.part.groupName?.toLowerCase().includes('cajón') ||
+            p.part.groupName?.toLowerCase().includes('cajon')
+        )
+        .map(p => p.part.groupId || p.part.groupName)
+        .filter((v): v is string => Boolean(v))
     );
     if (drawerGroups.size > 0) {
       return drawerGroups.size;
     }
-    return 0;
+    const hasLooseDrawerParts = pieces.some(
+      p =>
+        p.resolvedRole.startsWith('drawer_') ||
+        p.name.toLowerCase().includes('cajón') ||
+        p.name.toLowerCase().includes('cajon')
+    );
+    return hasLooseDrawerParts ? 1 : 0;
   }
 
   /**
@@ -419,7 +690,6 @@ export class AssemblyGuideService {
   private calculateHardwareKit(params: {
     width: number;
     height: number;
-    depth: number;
     screwsPerJoint: number;
     drawersCount: number;
     doorsCount: number;
@@ -429,12 +699,11 @@ export class AssemblyGuideService {
     hasBack: boolean;
     backParts: AssemblyGuidePiece[];
     pieces: AssemblyGuidePiece[];
-    paramConfig?: import('../models/melamine.models').ParametricCabinetConfig;
+    paramConfig?: ParametricCabinetConfig;
   }): AssemblyHardwareItem[] {
     const {
       width,
       height,
-      depth,
       screwsPerJoint,
       drawersCount,
       doorsCount,
@@ -450,14 +719,9 @@ export class AssemblyGuideService {
     const kit: AssemblyHardwareItem[] = [];
 
     // 1. Tornillos estructurales 4.0 x 50 mm (o Minifix + Tarugos)
-    // - Piso contra 2 laterales: 2 uniones * screwsPerJoint
-    // - Techo o Amarres superiores: 2 uniones * screwsPerJoint (si son 2 amarres, 4 uniones)
-    // - Zócalos: 2 uniones * screwsPerJoint
-    // - Repisas fijas / Divisores: 2 uniones * screwsPerJoint cada uno
-    // - Cajas de cajones: 8 tornillos por cajón (4 esquinas * 2 tornillos)
-    const hasTop = pieces.some(p => p.componentRole === 'top');
-    const tieCount = pieces.filter(p => p.componentRole === 'tie').reduce((s, p) => s + p.quantity, 0);
-    const plinthCount = pieces.filter(p => p.componentRole === 'plinth').reduce((s, p) => s + p.quantity, 0);
+    const hasTop = pieces.some(p => p.resolvedRole === 'top');
+    const tieCount = pieces.filter(p => p.resolvedRole === 'tie').reduce((s, p) => s + p.quantity, 0);
+    const plinthCount = pieces.filter(p => p.resolvedRole === 'plinth').reduce((s, p) => s + p.quantity, 0);
 
     let structuralJoints = 2; // Piso contra laterales
     if (hasTop) {
@@ -479,7 +743,6 @@ export class AssemblyGuideService {
     if (drawersCount > 0) {
       structuralScrews += drawersCount * 8; // Armado de las 4 esquinas de cada caja de cajón
     }
-    // Asegurar mínimo técnico razonable
     structuralScrews = Math.max(8, structuralScrews);
 
     kit.push({
@@ -498,7 +761,7 @@ export class AssemblyGuideService {
       let backPerimeterMm = 2 * (width + height);
       if (backParts.length > 0) {
         const bp = backParts[0];
-        backPerimeterMm = 2 * (bp.length + bp.width);
+        backPerimeterMm = 2 * (bp.worldBounds.spanX + bp.worldBounds.spanY);
       }
       const backFasteners = Math.max(14, Math.ceil(backPerimeterMm / 150));
       kit.push({
@@ -542,29 +805,69 @@ export class AssemblyGuideService {
         iconName: 'sliders',
         description: '1 juego (izq + der) por cada cajón del mueble.'
       });
-      slideScrews = drawersCount * 8; // 4 tornillos al lateral + 4 tornillos al cajón
+      slideScrews = drawersCount * 8;
     }
 
-    // 5. Bisagras cazoleta 35 mm para puertas + tornillos 3.5 x 15 mm
+    // 5. Bisagras cazoleta 35 mm + Pistones Hidráulicos a Gas para Abatible Superior
+    const isGasPistonDoor = (dp: AssemblyGuidePiece): boolean => {
+      const upperName = (dp.name || '').toUpperCase();
+      return (
+        dp.part.hardwareConfig?.hingeType === 'gas_piston' ||
+        dp.part.hardwareConfig?.openingDirection === 'top' ||
+        upperName.includes('ABATIBLE SUPERIOR') ||
+        upperName.includes('ELEVABLE')
+      );
+    };
+
+    const gasDoorQty = doorParts
+      .filter(isGasPistonDoor)
+      .reduce((sum, dp) => sum + dp.quantity, 0);
+
     let totalHinges = 0;
     if (doorsCount > 0) {
       for (const dp of doorParts) {
-        const doorH = Math.max(dp.length, dp.width);
-        const hingesPerDoor = doorH >= 1600 ? 4 : (doorH >= 900 ? 3 : 2);
+        if (dp.part.hardwareConfig?.hingeType === 'none') {
+          continue;
+        }
+        const openingDir = dp.part.hardwareConfig?.openingDirection;
+        const upperName = (dp.name || '').toUpperCase();
+        const isHorizontalHinge =
+          openingDir === 'top' ||
+          openingDir === 'bottom' ||
+          isGasPistonDoor(dp) ||
+          upperName.includes('ABATIBLE INFERIOR');
+        const doorEdge = isHorizontalHinge
+          ? Math.max(dp.worldBounds.spanX, dp.worldBounds.spanZ)
+          : dp.worldBounds.spanY;
+        const hingesPerDoor = doorEdge >= 1600 ? 4 : (doorEdge > 900 ? 3 : 2);
         totalHinges += hingesPerDoor * dp.quantity;
       }
-      totalHinges = Math.max(2, totalHinges);
 
-      kit.push({
-        id: 'cup_hinges',
-        name: 'assemblyGuide.hardwareHinges',
-        codeName: 'Bisagras Cazoleta 35 mm',
-        spec: 'Cazoleta Ø 35 mm con base regulable en 3 ejes',
-        quantity: totalHinges,
-        type: 'hinge',
-        iconName: 'unfold',
-        description: '2 a 3 bisagras por puerta según su altura.'
-      });
+      if (totalHinges > 0) {
+        kit.push({
+          id: 'cup_hinges',
+          name: 'assemblyGuide.hardwareHinges',
+          codeName: 'Bisagras Cazoleta 35 mm',
+          spec: 'Cazoleta Ø 35 mm con base regulable en 3 ejes',
+          quantity: totalHinges,
+          type: 'hinge',
+          iconName: 'unfold',
+          description: '2 a 4 bisagras por puerta según la longitud del borde abisagrado.'
+        });
+      }
+
+      if (gasDoorQty > 0) {
+        kit.push({
+          id: 'piston_gas_pair',
+          name: 'Pistones Hidráulicos a Gas',
+          codeName: 'Pistones Hidráulicos a Gas',
+          spec: 'Brazo neumático 80N / 100N con herrajes internos',
+          quantity: 2 * gasDoorQty,
+          type: 'gas_piston',
+          iconName: 'unfold',
+          description: '2 pistones neumáticos a gas por cada puerta abatible superior.'
+        });
+      }
     }
 
     // 6. Tornillos 3.5 x 15 mm para rieles y bases de bisagras
@@ -584,7 +887,32 @@ export class AssemblyGuideService {
     }
 
     // 7. Manijas / Tiradores con tornillos M4
-    const totalHandles = doorsCount + drawersCount;
+    const physicalHandleDoors = doorParts
+      .filter(dp => {
+        const hc = dp.part.hardwareConfig;
+        if (hc?.handlePosition === 'none') return false;
+        if (hc?.handleType) {
+          return (
+            hc.handleType !== 'none' &&
+            hc.handleType !== 'push' &&
+            hc.handleType !== 'push_open' &&
+            hc.handleType !== 'gola_less'
+          );
+        }
+        if (paramConfig?.hasHandle === false) return false;
+        if (
+          paramConfig?.handleType === 'none' ||
+          paramConfig?.handleType === 'push_open' ||
+          paramConfig?.handleType === 'push' ||
+          paramConfig?.handleType === 'gola_less'
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .reduce((sum, dp) => sum + dp.quantity, 0);
+
+    const totalHandles = physicalHandleDoors + drawersCount;
     if (totalHandles > 0) {
       kit.push({
         id: 'handles_knobs',
@@ -624,7 +952,8 @@ export class AssemblyGuideService {
   }
 
   /**
-   * Genera los pasos secuenciales de armado ilustrado.
+   * Genera los pasos secuenciales de armado ilustrado asegurando cobertura total y disjunta
+   * de todas las piezas (P1..Pn) y seguimiento acumulativo previo.
    */
   private generateAssemblySteps(params: {
     moduleId: string;
@@ -641,68 +970,110 @@ export class AssemblyGuideService {
     hasBack: boolean;
     backParts: AssemblyGuidePiece[];
     hardwareKit: AssemblyHardwareItem[];
+    minX: number;
     minY: number;
     maxY: number;
     minZ: number;
-    paramConfig?: import('../models/melamine.models').ParametricCabinetConfig;
+    maxZ: number;
+    paramConfig?: ParametricCabinetConfig;
   }): AssemblyStep[] {
     const {
       screwsPerJoint,
       pieces,
       drawersCount,
       doorsCount,
-      shelvesCount,
       dividersCount,
-      hasBack,
       hardwareKit,
+      minX,
       minY,
+      minZ,
+      maxZ,
       paramConfig
     } = params;
 
     const steps: AssemblyStep[] = [];
     let stepNum = 1;
+    const centerZ = (minZ + maxZ) / 2;
+
+    const assignedCodes = new Set<string>();
+    const markAssigned = (list: AssemblyGuidePiece[]): AssemblyGuidePiece[] => {
+      const unique: AssemblyGuidePiece[] = [];
+      for (const item of list) {
+        if (!assignedCodes.has(item.code)) {
+          assignedCodes.add(item.code);
+          unique.push(item);
+        }
+      }
+      return unique;
+    };
 
     // =========================================================================
     // PASO 1: Estructura Base y Costados (Casco / Carcasa)
     // =========================================================================
-    const carcassPieces = pieces.filter(p =>
-      p.componentRole === 'side_left' ||
-      p.componentRole === 'side_right' ||
-      p.componentRole === 'bottom' ||
-      p.componentRole === 'top' ||
-      p.componentRole === 'tie' ||
-      p.componentRole === 'plinth'
+    const carcassRoles = new Set<ComponentRole>([
+      'side_left',
+      'side_right',
+      'bottom',
+      'top',
+      'tie',
+      'plinth'
+    ]);
+    const rawCarcass = pieces.filter(p => carcassRoles.has(p.resolvedRole));
+    const hasAnyTypedNonCarcass = pieces.some(p => {
+      const r = p.resolvedRole;
+      return (
+        r === 'back' ||
+        r === 'shelf' ||
+        r === 'divider' ||
+        r === 'door' ||
+        r === 'front' ||
+        r.startsWith('drawer_')
+      );
+    });
+
+    const step1Pieces = markAssigned(
+      rawCarcass.length > 0
+        ? rawCarcass
+        : (!hasAnyTypedNonCarcass ? pieces : [])
     );
 
-    const step1Pieces = carcassPieces.length > 0
-      ? carcassPieces
-      : pieces.slice(0, Math.min(4, pieces.length));
+    if (step1Pieces.length > 0) {
+      const structuralScrewHardware = hardwareKit.find(h => h.id === 'screw_structural_50');
 
-    const structuralScrewHardware = hardwareKit.find(h => h.id === 'screw_structural_50');
-
-    steps.push({
-      stepNumber: stepNum++,
-      titleKey: 'assemblyGuide.step1Title',
-      defaultTitle: 'Paso 1 — Estructura Base y Costados (Casco)',
-      descriptionKey: 'assemblyGuide.step1Desc',
-      defaultDescription:
-        'Coloque los laterales sobre una superficie limpia y plana. Una el piso inferior y los amarres superiores o techo a los laterales izquierdo y derecho. Asegúrese de que los bordes que cuentan con tapacanto queden alineados hacia la fachada frontal del mueble.',
-      tips: [
-        `Coloque ${screwsPerJoint} tornillos de 4.0 × 50 mm por cada unión estructural a 50 mm de los extremos.`,
-        'Verifique que los bordes con tapacanto (L1/A1) queden mirando hacia el frente visto.',
-        'Si el módulo incluye zócalo inferior, ensámblelo antes de elevar el mueble.'
-      ],
-      actionType: 'carcass',
-      partCodes: step1Pieces.map(p => p.code),
-      parts: step1Pieces,
-      hardware: structuralScrewHardware ? [{ ...structuralScrewHardware, quantity: Math.min(structuralScrewHardware.quantity, 12) }] : []
-    });
+      steps.push({
+        stepNumber: stepNum++,
+        titleKey: 'assemblyGuide.step1Title',
+        defaultTitle: 'Paso 1 — Estructura Base y Costados (Casco)',
+        descriptionKey: 'assemblyGuide.step1Desc',
+        defaultDescription:
+          'Coloque los laterales sobre una superficie limpia y plana. Una el piso inferior y los amarres superiores o techo a los laterales izquierdo y derecho. Asegúrese de que los bordes que cuentan con tapacanto queden alineados hacia la fachada frontal del mueble.',
+        tips: [
+          `Coloque ${screwsPerJoint} tornillos de 4.0 × 50 mm por cada unión estructural a 50 mm de los extremos.`,
+          'Verifique que los bordes con tapacanto (L1/A1) queden mirando hacia el frente visto.',
+          'Si el módulo incluye zócalo inferior, ensámblelo antes de elevar el mueble.'
+        ],
+        actionType: 'carcass',
+        partCodes: step1Pieces.map(p => p.code),
+        cumulativePriorPartCodes: [],
+        parts: step1Pieces,
+        hardware: structuralScrewHardware ? [{ ...structuralScrewHardware, quantity: Math.min(structuralScrewHardware.quantity, 12) }] : []
+      });
+    }
 
     // =========================================================================
     // PASO 2: Escuadrado y Fijación del Fondo Trasero (Solo si tiene fondo)
     // =========================================================================
-    if (hasBack) {
-      const backPieces = pieces.filter(p => p.componentRole === 'back' || (p.thickness <= 3 && p.length * p.width > 80000));
+    const backPieces = markAssigned(
+      pieces.filter(p => {
+        if (assignedCodes.has(p.code)) return false;
+        if (p.resolvedRole === 'back') return true;
+        const nameLower = (p.name || '').toLowerCase();
+        const isDrawerBottom = p.resolvedRole === 'drawer_bottom' || nameLower.includes('caj');
+        return !isDrawerBottom && p.thickness <= 3 && p.worldBounds.spanX * p.worldBounds.spanY > 80000;
+      })
+    );
+
+    if (backPieces.length > 0) {
       const nailHardware = hardwareKit.find(h => h.id === 'nail_back_panel');
 
       steps.push({
@@ -718,32 +1089,39 @@ export class AssemblyGuideService {
         ],
         actionType: 'back',
         partCodes: backPieces.map(p => p.code),
+        cumulativePriorPartCodes: [],
         parts: backPieces,
         hardware: nailHardware ? [nailHardware] : []
       });
     }
 
     // =========================================================================
-    // PASO 3: Instalación de Divisiones y Repisas Internas (Si aplica)
+    // PASO 3: Instalación de Divisiones, Repisas e Insertos Interiores
     // =========================================================================
-    if (shelvesCount > 0 || dividersCount > 0) {
-      const shelfPieces = pieces.filter(p => p.componentRole === 'shelf' || p.componentRole === 'divider');
+    const step3Pieces = markAssigned(
+      pieces.filter(p => {
+        if (assignedCodes.has(p.code)) return false;
+        if (p.resolvedRole === 'shelf' || p.resolvedRole === 'divider') return true;
+        return p.resolvedRole === 'free' && p.worldBounds.cz <= centerZ + 0.5;
+      })
+    );
+
+    if (step3Pieces.length > 0) {
       const pinHardware = hardwareKit.find(h => h.id === 'shelf_pins');
+      const hasShelves = step3Pieces.some(p => p.resolvedRole === 'shelf');
 
       // Calcular cotas exactas en mm desde el piso interior y laterales
       const measurements: AssemblyStepMeasurement[] = [];
-      const bottomPart = pieces.find(p => p.componentRole === 'bottom');
-      const bottomThickness = bottomPart ? bottomPart.thickness : 18;
-      const baseInteriorY = minY + bottomThickness;
-      const leftSidePart = pieces.find(p => p.componentRole === 'side_left');
-      const leftInnerX = leftSidePart ? this.joineryEngine.getPartBounds(leftSidePart.part).maxX : 0;
+      const bottomPart = pieces.find(p => p.resolvedRole === 'bottom');
+      const baseInteriorY = bottomPart ? bottomPart.worldBounds.maxY : minY + 18;
+      const leftSidePart = pieces.find(p => p.resolvedRole === 'side_left');
+      const leftInnerX = leftSidePart ? leftSidePart.worldBounds.maxX : minX;
 
       let shelfIndex = 1;
       let dividerIndex = 1;
-      for (const piece of shelfPieces) {
-        if (piece.componentRole === 'shelf') {
-          const b = this.joineryEngine.getPartBounds(piece.part);
-          let heightFromBaseMm = Math.round(b.minY - baseInteriorY);
+      for (const piece of step3Pieces) {
+        if (piece.resolvedRole === 'shelf') {
+          let heightFromBaseMm = Math.round(piece.worldBounds.minY - baseInteriorY);
           if (paramConfig?.shelfManualOffsets && paramConfig.shelfManualOffsets[shelfIndex - 1]) {
             heightFromBaseMm = Math.round(paramConfig.shelfManualOffsets[shelfIndex - 1]);
           }
@@ -756,11 +1134,10 @@ export class AssemblyGuideService {
             referenceText: 'Altura libre desde el piso interior del mueble'
           });
           shelfIndex++;
-        } else if (piece.componentRole === 'divider') {
-          const b = this.joineryEngine.getPartBounds(piece.part);
-          let distFromLeftMm = Math.round(b.minX - leftInnerX);
+        } else if (piece.resolvedRole === 'divider') {
+          let distFromLeftMm = Math.round(piece.worldBounds.minX - leftInnerX);
           if (distFromLeftMm <= 0) {
-            distFromLeftMm = Math.round(params.width / (dividersCount + 1)) * dividerIndex;
+            distFromLeftMm = Math.round(params.width / (Math.max(1, dividersCount) + 1)) * dividerIndex;
           }
           measurements.push({
             label: `${piece.code} (${piece.translatedName || piece.name}) — Posición Divisor`,
@@ -783,9 +1160,10 @@ export class AssemblyGuideService {
           'En repisas móviles, el borde frontal con tapacanto grueso o delgado siempre debe mirar hacia afuera.'
         ],
         actionType: 'shelves',
-        partCodes: shelfPieces.map(p => p.code),
-        parts: shelfPieces,
-        hardware: pinHardware ? [pinHardware] : [],
+        partCodes: step3Pieces.map(p => p.code),
+        cumulativePriorPartCodes: [],
+        parts: step3Pieces,
+        hardware: hasShelves && pinHardware ? [pinHardware] : [],
         measurements: measurements.length > 0 ? measurements : undefined
       });
     }
@@ -793,46 +1171,50 @@ export class AssemblyGuideService {
     // =========================================================================
     // PASO 4: Fijación de Correderas y Armado de Cajones (Solo si tiene cajones)
     // =========================================================================
-    if (drawersCount > 0) {
-      const drawerPieces = pieces.filter(p =>
-        p.componentRole === 'drawer_front' ||
-        p.componentRole === 'drawer_box' ||
-        p.componentRole === 'drawer_lateral' ||
-        p.name.toLowerCase().includes('cajón') ||
-        p.name.toLowerCase().includes('cajon')
-      );
+    const drawerPieces = markAssigned(
+      pieces.filter(p => {
+        if (assignedCodes.has(p.code)) return false;
+        if (
+          p.resolvedRole === 'drawer_front' ||
+          p.resolvedRole === 'drawer_box' ||
+          p.resolvedRole === 'drawer_lateral' ||
+          p.resolvedRole === 'drawer_bottom'
+        ) {
+          return true;
+        }
+        const nameLower = (p.name || '').toLowerCase();
+        return nameLower.includes('cajón') || nameLower.includes('cajon');
+      })
+    );
 
+    if (drawersCount > 0 || drawerPieces.length > 0) {
+      const effectiveDrawersCount = Math.max(1, drawersCount);
       const slideHardware = hardwareKit.find(h => h.id === 'telescopic_slides');
       const smallScrewHardware = hardwareKit.find(h => h.id === 'screw_hardware_15');
 
       // Calcular cotas exactas de riel telescópico desde la base inferior del lateral
       const measurements: AssemblyStepMeasurement[] = [];
-      const sidePart = pieces.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right');
-      const sideMinY = sidePart ? this.joineryEngine.getPartBounds(sidePart.part).minY : minY;
+      const sidePart = pieces.find(p => p.resolvedRole === 'side_left' || p.resolvedRole === 'side_right');
+      const sideMinY = sidePart ? sidePart.worldBounds.minY : minY;
 
-      const drawerFronts = pieces
-        .filter(p => p.componentRole === 'drawer_front')
-        .sort((a, b) => {
-          const bA = this.joineryEngine.getPartBounds(a.part);
-          const bB = this.joineryEngine.getPartBounds(b.part);
-          return bA.minY - bB.minY;
-        });
+      const drawerFronts = drawerPieces
+        .filter(p => p.resolvedRole === 'drawer_front')
+        .sort((a, b) => a.worldBounds.minY - b.worldBounds.minY);
 
-      for (let i = 0; i < drawersCount; i++) {
+      for (let i = 0; i < effectiveDrawersCount; i++) {
         let railHeightMm: number;
         let drawerLabel: string;
 
         if (drawerFronts[i]) {
           const df = drawerFronts[i];
-          const b = this.joineryEngine.getPartBounds(df.part);
-          railHeightMm = Math.max(40, Math.round((b.minY - sideMinY) + 40));
+          railHeightMm = Math.max(40, Math.round((df.worldBounds.minY - sideMinY) + 40));
           drawerLabel = `${df.code} (${df.name || 'Cajón'})`;
         } else {
           const plinthH = paramConfig?.plinthHeight || 70;
           const innerH = Math.max(300, params.height - plinthH - 36);
-          const slotH = innerH / drawersCount;
+          const slotH = innerH / effectiveDrawersCount;
           railHeightMm = Math.max(40, Math.round(plinthH + 18 + 40 + (i * slotH)));
-          drawerLabel = `Cajón ${i + 1} (${i === 0 ? 'Inferior' : (i === drawersCount - 1 ? 'Superior' : 'Medio')})`;
+          drawerLabel = `Cajón ${i + 1} (${i === 0 ? 'Inferior' : (i === effectiveDrawersCount - 1 ? 'Superior' : 'Medio')})`;
         }
 
         measurements.push({
@@ -856,23 +1238,37 @@ export class AssemblyGuideService {
         ],
         actionType: 'drawers',
         partCodes: drawerPieces.map(p => p.code),
+        cumulativePriorPartCodes: [],
         parts: drawerPieces,
         hardware: [
           ...(slideHardware ? [slideHardware] : []),
-          ...(smallScrewHardware ? [{ ...smallScrewHardware, quantity: drawersCount * 8 }] : [])
+          ...(smallScrewHardware ? [{ ...smallScrewHardware, quantity: effectiveDrawersCount * 8 }] : [])
         ],
         measurements
       });
     }
 
     // =========================================================================
-    // PASO 5: Montaje de Bisagras, Puertas y Manijas (Solo si tiene puertas)
+    // PASO 5: Montaje de Bisagras, Pistones, Puertas, Frentes y Piezas Exteriores
     // =========================================================================
-    if (doorsCount > 0) {
-      const doorPieces = pieces.filter(p => p.componentRole === 'door');
+    const step5Pieces = markAssigned(pieces.filter(p => !assignedCodes.has(p.code)));
+
+    if (doorsCount > 0 || step5Pieces.length > 0) {
       const hingeHardware = hardwareKit.find(h => h.id === 'cup_hinges');
+      const pistonHardware = hardwareKit.find(h => h.id === 'piston_gas_pair');
       const handleHardware = hardwareKit.find(h => h.id === 'handles_knobs');
       const smallScrewHardware = hardwareKit.find(h => h.id === 'screw_hardware_15');
+
+      const step5Tips = [
+        'Tornillo 1 (Frontal): Regula la separación lateral entre puertas (luz central de 2 a 3 mm).',
+        'Tornillo 2 (Profundidad): Acerca o aleja la puerta del casco para que cierre al ras sin golpear.',
+        'Tornillo 3 (Placa base): Ajusta la altura vertical de la puerta para nivelarla con los bordes superior e inferior.'
+      ];
+      if (pistonHardware) {
+        step5Tips.push(
+          'Pistones a Gas: Instale las bases internas en ambos costados (15 mm hacia adentro, 120 mm bajo el techo) y enganche el brazo neumático en la cara interior de la puerta a 130 mm del borde superior para apertura asistida de 80°.'
+        );
+      }
 
       steps.push({
         stepNumber: stepNum++,
@@ -881,20 +1277,25 @@ export class AssemblyGuideService {
         descriptionKey: 'assemblyGuide.step5Desc',
         defaultDescription:
           'Inserte las cazoletas de 35 mm en las perforaciones de la puerta y asegúrelas con tornillos de 3.5 × 15 mm. Fije las bases de bisagra a los laterales del mueble y enganche los brazos. Utilice los 3 tornillos excéntricos de regulación para alinear la holgura perimetral (3 mm) en profundidad, altura y lateral. Finalmente, instale las manijas o tiradores.',
-        tips: [
-          'Tornillo 1 (Frontal): Regula la separación lateral entre puertas (luz central de 2 a 3 mm).',
-          'Tornillo 2 (Profundidad): Acerca o aleja la puerta del casco para que cierre al ras sin golpear.',
-          'Tornillo 3 (Placa base): Ajusta la altura vertical de la puerta para nivelarla con los bordes superior e inferior.'
-        ],
+        tips: step5Tips,
         actionType: 'doors',
-        partCodes: doorPieces.map(p => p.code),
-        parts: doorPieces,
+        partCodes: step5Pieces.map(p => p.code),
+        cumulativePriorPartCodes: [],
+        parts: step5Pieces,
         hardware: [
           ...(hingeHardware ? [hingeHardware] : []),
-          ...(smallScrewHardware ? [{ ...smallScrewHardware, quantity: (hingeHardware?.quantity || 2) * 4 }] : []),
+          ...(pistonHardware ? [pistonHardware] : []),
+          ...(smallScrewHardware && hingeHardware ? [{ ...smallScrewHardware, quantity: hingeHardware.quantity * 4 }] : []),
           ...(handleHardware ? [handleHardware] : [])
         ]
       });
+    }
+
+    // Asignar códigos acumulados estrictamente previos (pasos 1 .. stepNumber - 1)
+    const cumulativePrior: string[] = [];
+    for (const step of steps) {
+      step.cumulativePriorPartCodes = [...cumulativePrior];
+      cumulativePrior.push(...step.partCodes);
     }
 
     return steps;

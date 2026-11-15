@@ -158,8 +158,44 @@ input::placeholder, textarea::placeholder {
   nav,
   footer,
   app-confirm-dialog,
+  .rta-print-iframe,
   .print\:hidden {
     display: none !important;
+  }
+
+  /* Desbloquear flujo multi-página cuando la Guía de Armado RTA se imprime directamente */
+  body.assembly-guide-open,
+  body.assembly-guide-open app-root,
+  body.assembly-guide-open app-assembly-guide-modal,
+  body.assembly-guide-open .assembly-guide-backdrop,
+  body.assembly-guide-open .assembly-guide-card,
+  body.assembly-guide-open .assembly-guide-body {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    display: block !important;
+    background: #ffffff !important;
+    color: #18181b !important;
+  }
+
+  body.assembly-guide-open app-assembly-guide-modal footer {
+    display: flex !important;
+  }
+
+  body.assembly-guide-open table.parts-table {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  body.assembly-guide-open table.parts-table thead {
+    display: table-header-group !important;
+  }
+
+  body.assembly-guide-open table.parts-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   /* Ocultar app-header cuando no contenga modales de impresión abiertos */

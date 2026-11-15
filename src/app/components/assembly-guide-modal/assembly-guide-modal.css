@@ -1,6 +1,7 @@
 /* Estilos encapsulados del componente AssemblyGuideModal */
 :host {
   display: contents;
+  font-family: var(--font-sans);
 }
 
 /* Animación sutil de entrada en pantalla */
@@ -20,18 +21,20 @@
 }
 
 /* =========================================================================
-   ESTILOS DE IMPRESIÓN LIMPIA @media print (ESTILO EDITORIAL RTA)
+   ESTILOS DE IMPRESIÓN MULTI-PÁGINA @media print (MINIMALIST STUDIO RTA)
    ========================================================================= */
 @media print {
   @page {
-    size: portrait;
-    margin: 10mm;
+    size: A4 portrait;
+    margin: 12mm 14mm;
   }
 
   :host {
     display: block !important;
     width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     overflow: visible !important;
     position: static !important;
     margin: 0 !important;
@@ -41,7 +44,7 @@
   .assembly-guide-backdrop {
     position: static !important;
     inset: auto !important;
-    background: transparent !important;
+    background: #ffffff !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     padding: 0 !important;
@@ -65,7 +68,7 @@
     border: none !important;
     box-shadow: none !important;
     background: #ffffff !important;
-    color: #0f172a !important;
+    color: #18181b !important;
     display: block !important;
     border-radius: 0 !important;
     padding: 0 !important;
@@ -85,24 +88,48 @@
     padding: 0 !important;
     margin: 0 !important;
     display: block !important;
+    background: #ffffff !important;
   }
 
   .assembly-module-document {
     page-break-after: always;
     break-after: page;
-    margin-bottom: 20mm !important;
+    margin-bottom: 12mm !important;
   }
 
   .assembly-module-document:last-child {
     page-break-after: auto;
     break-after: auto;
+    margin-bottom: 0 !important;
+  }
+
+  .assembly-parts-table-section {
+    overflow: visible !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  table.parts-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  table.parts-table thead {
+    display: table-header-group !important;
+  }
+
+  table.parts-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .assembly-step-card {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
     margin-bottom: 6mm !important;
-    border: 1.5px solid #18181b !important;
+    border: 1px solid #d4d4d8 !important;
     background: #ffffff !important;
     box-shadow: none !important;
   }
@@ -112,10 +139,5 @@
     height: auto !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-  }
-
-  table {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
   }
 }
