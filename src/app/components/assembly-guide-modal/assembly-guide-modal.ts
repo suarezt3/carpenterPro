@@ -1206,11 +1206,14 @@ export class AssemblyGuideModalComponent implements OnInit, OnDestroy, AfterView
       `;
     }).join('\n');
 
+    const faviconLinks = this.buildFaviconHeadLinks();
+
     return `<!DOCTYPE html>
 <html lang="${this.escapeHtml(this.i18n.currentLang())}">
 <head>
   <meta charset="utf-8" />
   <title>${this.escapeHtml(this.i18n.t('assemblyGuide.title'))} — ${projectTitle}</title>
+  ${faviconLinks}
   <style>
     @page { size: A4 portrait; margin: 12mm 14mm; }
     *, *::before, *::after {
@@ -1665,6 +1668,29 @@ export class AssemblyGuideModalComponent implements OnInit, OnDestroy, AfterView
   ${guideBlocks}
 </body>
 </html>`;
+  }
+
+  /**
+   * Resuelve el origen seguro de la plataforma para enlazar el favicon oficial en documentos HTML autónomos.
+   */
+  private resolveIconBaseUrl(): string {
+    const rawOrigin =
+      typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null'
+        ? window.location.origin
+        : '';
+    return rawOrigin.replace(/\/+$/, '');
+  }
+
+  /**
+   * Genera las etiquetas `<link>` del favicon oficial de Piezo3D para el `<head>` del documento imprimible.
+   */
+  private buildFaviconHeadLinks(): string {
+    const iconOrigin = this.escapeAttr(this.resolveIconBaseUrl());
+    return [
+      `<link rel="icon" type="image/x-icon" href="${iconOrigin}/favicon.ico" />`,
+      `<link rel="shortcut icon" type="image/x-icon" href="${iconOrigin}/favicon.ico" />`,
+      `<link rel="icon" type="image/png" sizes="32x32" href="${iconOrigin}/assets/favicon-32x32.png" />`
+    ].join('\n  ');
   }
 
   private buildPrintableHeaderSection(

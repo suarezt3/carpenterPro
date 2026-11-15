@@ -384,6 +384,7 @@ export class CutOptimizerViewComponent {
 
       const projName = this.project().name || 'Proyecto Cocina';
       const dateStr = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+      const faviconLinks = this.buildFaviconHeadLinks();
 
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
@@ -396,6 +397,7 @@ export class CutOptimizerViewComponent {
 <head>
   <meta charset="utf-8">
   <title>Plano de Corte - Tablero #${sheet.sheetIndex} - ${projName}</title>
+  ${faviconLinks}
   <style>
     @page {
       size: landscape;
@@ -529,5 +531,40 @@ export class CutOptimizerViewComponent {
     } finally {
       this.isExporting.set(false);
     }
+  }
+
+  /**
+   * Resuelve el origen seguro de la plataforma para enlazar el favicon oficial en pestañas de impresión.
+   */
+  private resolveIconBaseUrl(): string {
+    const rawOrigin =
+      typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null'
+        ? window.location.origin
+        : '';
+    return rawOrigin.replace(/\/+$/, '');
+  }
+
+  /**
+   * Escapa caracteres especiales para atributos HTML en el documento de impresión.
+   */
+  private escapeAttr(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Genera las etiquetas `<link>` del favicon oficial de Piezo3D para el `<head>` de la pestaña independiente.
+   */
+  private buildFaviconHeadLinks(): string {
+    const iconOrigin = this.escapeAttr(this.resolveIconBaseUrl());
+    return [
+      `<link rel="icon" type="image/x-icon" href="${iconOrigin}/favicon.ico" />`,
+      `<link rel="shortcut icon" type="image/x-icon" href="${iconOrigin}/favicon.ico" />`,
+      `<link rel="icon" type="image/png" sizes="32x32" href="${iconOrigin}/assets/favicon-32x32.png" />`
+    ].join('\n  ');
   }
 }

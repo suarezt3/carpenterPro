@@ -66,6 +66,50 @@ function findAngularOutputDir(rootDir) {
   );
 }
 
+const SEO_STATIC_FILES = [
+  'robots.txt',
+  'sitemap.xml',
+  'assets/og-preview.png',
+  'favicon.ico',
+  'site.webmanifest',
+  'assets/favicon-16x16.png',
+  'assets/favicon-32x32.png',
+  'assets/favicon-48x48.png',
+  'assets/apple-touch-icon.png',
+  'assets/icon-192.png',
+  'assets/icon-512.png',
+];
+
+/**
+ * Verifies and reports which static SEO assets from `public/` are preserved
+ * intact inside the Angular output directory (without failing on partial builds).
+ */
+function reportPreservedSeoAssets(outputDir) {
+  const preserved = [];
+  const missing = [];
+
+  for (const relativeAsset of SEO_STATIC_FILES) {
+    const assetPath = path.join(outputDir, relativeAsset);
+    if (fs.existsSync(assetPath)) {
+      preserved.push(relativeAsset);
+    } else {
+      missing.push(relativeAsset);
+    }
+  }
+
+  if (preserved.length > 0) {
+    console.log(
+      `[postbuild-spa] Preserved static SEO assets in outputDir: ${preserved.join(', ')}`
+    );
+  }
+
+  if (missing.length > 0) {
+    console.warn(
+      `[postbuild-spa] Note: optional static SEO assets absent in outputDir: ${missing.join(', ')}`
+    );
+  }
+}
+
 function generatePhysicalSpaRoutes() {
   const outputDir = findAngularOutputDir(DIST_DIR);
   const sourceIndexPath = path.join(outputDir, 'index.html');
@@ -93,6 +137,8 @@ function generatePhysicalSpaRoutes() {
     const relativeFile = path.relative(process.cwd(), filePath).replaceAll('\\', '/');
     console.log(`  - ${relativeFile}`);
   }
+
+  reportPreservedSeoAssets(outputDir);
 }
 
 generatePhysicalSpaRoutes();

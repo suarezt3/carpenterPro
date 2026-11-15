@@ -830,5 +830,161 @@ describe('LandingPageComponent', () => {
       expect(compiled.textContent).toContain('eydersuarez900@gmail.com');
     });
   });
+
+  describe('SEO Semántico, FAQ y Accesibilidad ARIA (FASE 4)', () => {
+    it('debe renderizar un único <h1> con palabras clave de diseño 3D, melamina y despiece y actualizarlo en los 6 idiomas', () => {
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const h1Elements = compiled.querySelectorAll('h1');
+      expect(h1Elements.length).toBe(1);
+
+      const h1Text = h1Elements.item(0).textContent ?? '';
+      expect(h1Text).toContain('Diseño 3D');
+      expect(h1Text).toContain('Melamina');
+      expect(h1Text).toContain('Despiece');
+      expect(h1Text.toLowerCase()).not.toContain('melamina 3d');
+
+      const langs: readonly AppLanguage[] = ['es', 'en', 'pt', 'fr', 'it', 'de'];
+      for (const lang of langs) {
+        component.selectLanguage(lang);
+        fixture.detectChanges();
+        const currentH1 = compiled.querySelectorAll('h1');
+        expect(currentH1.length).toBe(1);
+        expect(currentH1.item(0).textContent?.trim()).toBe(TRANSLATIONS[lang]['landing.hero.title']);
+      }
+    });
+
+    it('debe mantener una jerarquía semántica estricta (<h1> -> <h2> -> <h3>, sin saltos a <h4>-<h6>) e incluir #faq', () => {
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const h1Elements = compiled.querySelectorAll('h1');
+      const h2Elements = compiled.querySelectorAll('h2');
+      const h3Elements = compiled.querySelectorAll('h3');
+      const skippedHeadings = compiled.querySelectorAll('h4, h5, h6');
+
+      expect(h1Elements.length).toBe(1);
+      expect(h2Elements.length).toBeGreaterThanOrEqual(7);
+      expect(h3Elements.length).toBeGreaterThanOrEqual(4);
+      expect(skippedHeadings.length).toBe(0);
+
+      const faqSection = compiled.querySelector('section#faq');
+      expect(faqSection).toBeTruthy();
+      expect(faqSection?.querySelector('h2')?.textContent).toContain('Preguntas Frecuentes');
+      expect(faqSection?.querySelectorAll('h3').length).toBe(4);
+      expect(faqSection?.querySelectorAll('hugeicons-icon').length).toBe(5);
+    });
+
+    it('debe incluir todas las claves landing.faq.* y landing.a11y.* en los 6 idiomas sin marcas ni términos prohibidos', () => {
+      const langs: readonly AppLanguage[] = ['es', 'en', 'pt', 'fr', 'it', 'de'];
+      const requiredKeys = [
+        'landing.nav.faq',
+        'landing.hero.title',
+        'landing.faq.badge',
+        'landing.faq.title',
+        'landing.faq.subtitle',
+        'landing.faq.q1',
+        'landing.faq.a1',
+        'landing.faq.q2',
+        'landing.faq.a2',
+        'landing.faq.q3',
+        'landing.faq.a3',
+        'landing.faq.q4',
+        'landing.faq.a4',
+        'landing.a11y.mainNav',
+        'landing.a11y.navFaq',
+        'landing.a11y.termsLink',
+        'landing.a11y.privacyLink',
+        'landing.a11y.refundsLink',
+        'landing.a11y.supportEmailLink',
+      ];
+      const forbiddenBrandRegex =
+        /(sketchup|melamina\s*3d|mueble\s*m[ií]o|polyboard|promob|lepton|cutlist|opticut|click-cuisine|carpenterpro)/i;
+      const forbiddenInfraRegex = /(supabase|postgresql|postgres|umdcxcjrdyckpxomxlmi|sql\s*editor)/i;
+
+      for (const lang of langs) {
+        const dict = TRANSLATIONS[lang];
+        for (const key of requiredKeys) {
+          const value = dict[key];
+          expect(value, `Falta clave ${key} en idioma ${lang}`).toBeTruthy();
+          expect(value.trim().length).toBeGreaterThan(0);
+          expect(forbiddenBrandRegex.test(value)).toBe(false);
+          expect(forbiddenInfraRegex.test(value)).toBe(false);
+        }
+      }
+    });
+
+    it('debe expandir y contraer las preguntas del acordeón FAQ mediante toggleFaq y actualizar aria-expanded', () => {
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(component.faqItems.length).toBe(4);
+      expect(component.openFaqIndex()).toBe(0);
+
+      const firstTrigger = compiled.querySelector('#faq-trigger-0') as HTMLButtonElement | null;
+      const secondTrigger = compiled.querySelector('#faq-trigger-1') as HTMLButtonElement | null;
+      expect(firstTrigger?.getAttribute('aria-expanded')).toBe('true');
+      expect(secondTrigger?.getAttribute('aria-expanded')).toBe('false');
+      expect(compiled.querySelector('#faq-panel-0')).toBeTruthy();
+      expect(compiled.querySelector('#faq-panel-1')).toBeFalsy();
+
+      secondTrigger?.click();
+      fixture.detectChanges();
+
+      expect(component.openFaqIndex()).toBe(1);
+      expect(firstTrigger?.getAttribute('aria-expanded')).toBe('false');
+      expect(secondTrigger?.getAttribute('aria-expanded')).toBe('true');
+      expect(compiled.querySelector('#faq-panel-0')).toBeFalsy();
+      expect(compiled.querySelector('#faq-panel-1')).toBeTruthy();
+
+      const secondIcon = secondTrigger?.querySelector('hugeicons-icon');
+      expect(secondIcon?.classList.contains('rotate-180')).toBe(true);
+
+      component.toggleFaq(1);
+      fixture.detectChanges();
+      expect(component.openFaqIndex()).toBeNull();
+      expect(compiled.querySelector('#faq-panel-1')).toBeFalsy();
+    });
+
+    it('debe incluir atributos aria-label descriptivos en navegación, botones de sección, selector de idioma y enlaces legales', () => {
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const mainNav = compiled.querySelector('nav[aria-label="Navegación principal"]');
+      expect(mainNav).toBeTruthy();
+
+      const navButtons = mainNav?.querySelectorAll('button') ?? [];
+      expect(navButtons.length).toBeGreaterThanOrEqual(5);
+      for (const button of Array.from(navButtons)) {
+        const label = button.getAttribute('aria-label')?.trim() ?? '';
+        expect(label.length).toBeGreaterThan(5);
+      }
+
+      const termsLink = compiled.querySelector('a[routerLink="/terms"]');
+      const privacyLink = compiled.querySelector('a[routerLink="/privacy"]');
+      const refundsLink = compiled.querySelector('a[routerLink="/refunds"]');
+
+      expect(termsLink?.getAttribute('aria-label')?.trim().length).toBeGreaterThan(5);
+      expect(privacyLink?.getAttribute('aria-label')?.trim().length).toBeGreaterThan(5);
+      expect(refundsLink?.getAttribute('aria-label')?.trim().length).toBeGreaterThan(5);
+
+      const footerNav = compiled.querySelector('footer nav');
+      expect(footerNav?.getAttribute('aria-label')?.trim().length).toBeGreaterThan(5);
+      expect(footerNav?.textContent).toContain('Preguntas Frecuentes');
+    });
+  });
 });
 

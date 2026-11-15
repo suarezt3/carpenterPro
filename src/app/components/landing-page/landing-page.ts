@@ -99,6 +99,12 @@ export interface DisplayTestimonial {
   isRealCloud: boolean;
 }
 
+export interface LandingFaqItem {
+  readonly id: string;
+  readonly questionKey: string;
+  readonly answerKey: string;
+}
+
 /**
  * Landing Page Oficial de Piezo3D Studio.
  * Estándar Enterprise Light UI con fondos limpios (#ffffff, #f8fafc),
@@ -236,6 +242,31 @@ export class LandingPageComponent implements OnInit {
   readonly isMobileMenuOpen = signal<boolean>(false);
   readonly showLoginModal = signal<boolean>(false);
   readonly selectedPlanKey = signal<'pro' | 'industrial' | null>(null);
+
+  // Estado del acordeón de Preguntas Frecuentes (FAQ)
+  readonly openFaqIndex = signal<number | null>(0);
+  readonly faqItems: readonly LandingFaqItem[] = [
+    {
+      id: 'faq-design-3d',
+      questionKey: 'landing.faq.q1',
+      answerKey: 'landing.faq.a1'
+    },
+    {
+      id: 'faq-cutlist-optimizer',
+      questionKey: 'landing.faq.q2',
+      answerKey: 'landing.faq.a2'
+    },
+    {
+      id: 'faq-exports-cnc',
+      questionKey: 'landing.faq.q3',
+      answerKey: 'landing.faq.a3'
+    },
+    {
+      id: 'faq-free-start',
+      questionKey: 'landing.faq.q4',
+      answerKey: 'landing.faq.a4'
+    }
+  ];
 
   // Testimonios cargados en vivo desde Supabase
   readonly cloudTestimonials = signal<UserFeedbackRecord[]>([]);
@@ -378,7 +409,7 @@ export class LandingPageComponent implements OnInit {
       const getApprovedFn = (
         this.supabaseService as {
           getApprovedPlatformTestimonials?: (limit?: number) => Promise<
-            Array<{
+            {
               id: string;
               user_id: string | null;
               user_name: string;
@@ -388,7 +419,7 @@ export class LandingPageComponent implements OnInit {
               message: string;
               rating: number | null;
               created_at: string;
-            }>
+            }[]
           >;
         }
       ).getApprovedPlatformTestimonials;
@@ -546,6 +577,13 @@ export class LandingPageComponent implements OnInit {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
+  }
+
+  toggleFaq(index: number): void {
+    if (index < 0 || index >= this.faqItems.length) {
+      return;
+    }
+    this.openFaqIndex.update(current => (current === index ? null : index));
   }
 
   openLoginModal(planKey?: 'pro' | 'industrial'): void {

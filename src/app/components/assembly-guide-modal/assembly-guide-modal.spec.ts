@@ -1143,6 +1143,51 @@ describe('AssemblyGuideModalComponent (RTA 3D OBB, Progressive Steps, Minimalist
       expect(iframe?.contentDocument?.body.innerHTML).toContain('Alacena Sobre-Nevera 90cm');
       expect(iframe?.contentDocument?.body.innerHTML).toContain('P7');
     });
+
+    it('buildPrintableDocumentHtml debe incluir los enlaces del favicon oficial de Piezo3D en el <head>', () => {
+      const guide = guidesSignal()[0];
+      const html = component.buildPrintableDocumentHtml([guide], projectSignal(), [], {});
+      const expectedOrigin =
+        typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null'
+          ? window.location.origin.replace(/\/+$/, '')
+          : '';
+
+      expect(html).not.toContain('href="null/');
+      expect(html).toContain(`<link rel="icon" type="image/x-icon" href="${expectedOrigin}/favicon.ico" />`);
+      expect(html).toContain(`<link rel="shortcut icon" type="image/x-icon" href="${expectedOrigin}/favicon.ico" />`);
+      expect(html).toContain(
+        `<link rel="icon" type="image/png" sizes="32x32" href="${expectedOrigin}/assets/favicon-32x32.png" />`
+      );
+
+      const parsed = new DOMParser().parseFromString(html, 'text/html');
+      const headLinks = Array.from(parsed.head.querySelectorAll('link')).map(link => ({
+        rel: link.getAttribute('rel'),
+        type: link.getAttribute('type'),
+        sizes: link.getAttribute('sizes'),
+        href: link.getAttribute('href')
+      }));
+
+      expect(headLinks).toEqual([
+        {
+          rel: 'icon',
+          type: 'image/x-icon',
+          sizes: null,
+          href: `${expectedOrigin}/favicon.ico`
+        },
+        {
+          rel: 'shortcut icon',
+          type: 'image/x-icon',
+          sizes: null,
+          href: `${expectedOrigin}/favicon.ico`
+        },
+        {
+          rel: 'icon',
+          type: 'image/png',
+          sizes: '32x32',
+          href: `${expectedOrigin}/assets/favicon-32x32.png`
+        }
+      ]);
+    });
   });
 
   describe('FASE 5: Modo Por Grupos, Sub-ensambles Zoom, Resaltado Interactivo y Protección PDF', () => {
