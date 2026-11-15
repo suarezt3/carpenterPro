@@ -3336,13 +3336,106 @@ export const ACCOUNT_MODAL_TRANSLATIONS: Record<AppLanguage, TranslationDictiona
   }
 };
 
+export const EARLY_ACCESS_TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
+  es: {
+    'earlyAccess.badge': 'ACCESO ANTICIPADO · PIEZO3D STUDIO',
+    'earlyAccess.title': 'Pasarela de Pagos Internacional en Activación Final',
+    'earlyAccess.selectedPlanPrefix': 'Plan seleccionado:',
+    'earlyAccess.cycleMonthly': 'Mensual',
+    'earlyAccess.cycleAnnual': 'Anual',
+    'earlyAccess.description': 'Estamos completando los últimos ajustes técnicos y la verificación internacional de cobros para el plan seleccionado. Durante esta fase de lanzamiento no estamos procesando cargos con tarjeta, pero puedes ingresar y utilizar el Estudio de Diseño 3D de forma gratuita con tu cuenta o solicitarnos activación prioritaria para tu taller.',
+    'earlyAccess.benefit1': 'Acceso inmediato al Modelador 3D, Despiece y Optimizador 2D.',
+    'earlyAccess.benefit2': 'Sin cobros automáticos ni necesidad de ingresar tarjeta bancaria hoy.',
+    'earlyAccess.benefit3': 'Notificación prioritaria apenas se habiliten las suscripciones Pro e Industrial.',
+    'earlyAccess.primaryCta': 'Ingresar Gratis al Estudio 3D',
+    'earlyAccess.secondaryCta': 'Solicitar Activación Prioritaria ({email})',
+    'earlyAccess.closeCta': 'Cerrar',
+    'earlyAccess.mailSubject': 'Solicitud Acceso Prioritario Piezo3D Studio'
+  },
+  en: {
+    'earlyAccess.badge': 'EARLY ACCESS · PIEZO3D STUDIO',
+    'earlyAccess.title': 'International Payment Gateway in Final Activation',
+    'earlyAccess.selectedPlanPrefix': 'Selected plan:',
+    'earlyAccess.cycleMonthly': 'Monthly',
+    'earlyAccess.cycleAnnual': 'Annual',
+    'earlyAccess.description': 'We are completing final technical adjustments and international billing verification for your selected plan. During this launch phase we are not processing card charges, so you can enter and use the 3D Design Studio for free with your account or request priority activation for your workshop.',
+    'earlyAccess.benefit1': 'Immediate access to the 3D Modeler, Cut List, and 2D Optimizer.',
+    'earlyAccess.benefit2': 'No automatic charges and no credit card required today.',
+    'earlyAccess.benefit3': 'Priority notification as soon as Pro and Industrial subscriptions go live.',
+    'earlyAccess.primaryCta': 'Enter the 3D Studio for Free',
+    'earlyAccess.secondaryCta': 'Request Priority Activation ({email})',
+    'earlyAccess.closeCta': 'Close',
+    'earlyAccess.mailSubject': 'Priority Access Request Piezo3D Studio'
+  },
+  pt: {
+    'earlyAccess.badge': 'ACESSO ANTECIPADO · PIEZO3D STUDIO',
+    'earlyAccess.title': 'Gateway de Pagamentos Internacional em Ativação Final',
+    'earlyAccess.selectedPlanPrefix': 'Plano selecionado:',
+    'earlyAccess.cycleMonthly': 'Mensal',
+    'earlyAccess.cycleAnnual': 'Anual',
+    'earlyAccess.description': 'Estamos concluindo os últimos ajustes técnicos e a verificação internacional de cobranças para o plano selecionado. Durante esta fase de lançamento não estamos processando cobranças no cartão, mas você pode entrar e usar o Estúdio de Design 3D gratuitamente com sua conta ou solicitar ativação prioritária para sua marcenaria.',
+    'earlyAccess.benefit1': 'Acesso imediato ao Modelador 3D, Plano de Corte e Otimizador 2D.',
+    'earlyAccess.benefit2': 'Sem cobranças automáticas nem necessidade de informar cartão bancário hoje.',
+    'earlyAccess.benefit3': 'Notificação prioritária assim que as assinaturas Pro e Industrial forem liberadas.',
+    'earlyAccess.primaryCta': 'Entrar Grátis no Estúdio 3D',
+    'earlyAccess.secondaryCta': 'Solicitar Ativação Prioritária ({email})',
+    'earlyAccess.closeCta': 'Fechar',
+    'earlyAccess.mailSubject': 'Solicitação de Acesso Prioritário Piezo3D Studio'
+  },
+  fr: {
+    'earlyAccess.badge': 'ACCÈS ANTICIPÉ · PIEZO3D STUDIO',
+    'earlyAccess.title': 'Passerelle de Paiement Internationale en Activation Finale',
+    'earlyAccess.selectedPlanPrefix': 'Offre sélectionnée :',
+    'earlyAccess.cycleMonthly': 'Mensuel',
+    'earlyAccess.cycleAnnual': 'Annuel',
+    'earlyAccess.description': 'Nous finalisons les derniers réglages techniques et la vérification internationale des paiements pour l’offre sélectionnée. Durant cette phase de lancement, aucun débit par carte n’est effectué : vous pouvez accéder gratuitement au Studio de Conception 3D avec votre compte ou demander une activation prioritaire pour votre atelier.',
+    'earlyAccess.benefit1': 'Accès immédiat au Modeleur 3D, à la Liste de Débit et à l’Optimiseur 2D.',
+    'earlyAccess.benefit2': 'Aucun prélèvement automatique et aucune carte bancaire requise aujourd’hui.',
+    'earlyAccess.benefit3': 'Notification prioritaire dès l’ouverture des abonnements Pro et Industrial.',
+    'earlyAccess.primaryCta': 'Accéder Gratuitement au Studio 3D',
+    'earlyAccess.secondaryCta': 'Demander une Activation Prioritaire ({email})',
+    'earlyAccess.closeCta': 'Fermer',
+    'earlyAccess.mailSubject': 'Demande d’Accès Prioritaire Piezo3D Studio'
+  },
+  it: {
+    'earlyAccess.badge': 'ACCESSO ANTICIPATO · PIEZO3D STUDIO',
+    'earlyAccess.title': 'Gateway di Pagamento Internazionale in Attivazione Finale',
+    'earlyAccess.selectedPlanPrefix': 'Piano selezionato:',
+    'earlyAccess.cycleMonthly': 'Mensile',
+    'earlyAccess.cycleAnnual': 'Annuale',
+    'earlyAccess.description': 'Stiamo completando gli ultimi aggiustamenti tecnici e la verifica internazionale degli addebiti per il piano selezionato. Durante questa fase di lancio non elaboriamo pagamenti con carta, ma puoi accedere e utilizzare gratuitamente lo Studio di Progettazione 3D con il tuo account oppure richiedere l’attivazione prioritaria per il tuo laboratorio.',
+    'earlyAccess.benefit1': 'Accesso immediato al Modellatore 3D, Distinta Taglio e Ottimizzatore 2D.',
+    'earlyAccess.benefit2': 'Nessun addebito automatico e nessuna carta bancaria richiesta oggi.',
+    'earlyAccess.benefit3': 'Notifica prioritaria non appena saranno attivi gli abbonamenti Pro e Industrial.',
+    'earlyAccess.primaryCta': 'Entra Gratis nello Studio 3D',
+    'earlyAccess.secondaryCta': 'Richiedi Attivazione Prioritaria ({email})',
+    'earlyAccess.closeCta': 'Chiudi',
+    'earlyAccess.mailSubject': 'Richiesta Accesso Prioritario Piezo3D Studio'
+  },
+  de: {
+    'earlyAccess.badge': 'FRÜHER ZUGANG · PIEZO3D STUDIO',
+    'earlyAccess.title': 'Internationales Zahlungs-Gateway in der finalen Aktivierung',
+    'earlyAccess.selectedPlanPrefix': 'Ausgewählter Tarif:',
+    'earlyAccess.cycleMonthly': 'Monatlich',
+    'earlyAccess.cycleAnnual': 'Jährlich',
+    'earlyAccess.description': 'Wir schließen gerade die letzten technischen Anpassungen und die internationale Abrechnungsprüfung für den gewählten Tarif ab. Während dieser Startphase belasten wir keine Kreditkarten, sodass Sie das 3D-Design-Studio kostenlos mit Ihrem Konto nutzen oder eine vorrangige Aktivierung für Ihre Werkstatt anfordern können.',
+    'earlyAccess.benefit1': 'Sofortiger Zugang zum 3D-Modellierer, zur Stückliste und zum 2D-Optimierer.',
+    'earlyAccess.benefit2': 'Keine automatischen Abbuchungen und heute keine Bankkarte erforderlich.',
+    'earlyAccess.benefit3': 'Bevorzugte Benachrichtigung, sobald die Pro- und Industrial-Tarife freigeschaltet sind.',
+    'earlyAccess.primaryCta': 'Kostenlos ins 3D-Studio eintreten',
+    'earlyAccess.secondaryCta': 'Vorrangige Aktivierung anfordern ({email})',
+    'earlyAccess.closeCta': 'Schließen',
+    'earlyAccess.mailSubject': 'Anfrage Vorrangiger Zugang Piezo3D Studio'
+  }
+};
+
 export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
-  es: { ...BASE_TRANSLATIONS.es, ...ADDITIONAL_TRANSLATIONS.es, ...LANDING_TRANSLATIONS.es, ...AUTH_TRANSLATIONS.es, ...ACCOUNT_MODAL_TRANSLATIONS.es },
-  en: { ...BASE_TRANSLATIONS.en, ...ADDITIONAL_TRANSLATIONS.en, ...LANDING_TRANSLATIONS.en, ...AUTH_TRANSLATIONS.en, ...ACCOUNT_MODAL_TRANSLATIONS.en },
-  pt: { ...BASE_TRANSLATIONS.pt, ...ADDITIONAL_TRANSLATIONS.pt, ...LANDING_TRANSLATIONS.pt, ...AUTH_TRANSLATIONS.pt, ...ACCOUNT_MODAL_TRANSLATIONS.pt },
-  fr: { ...BASE_TRANSLATIONS.fr, ...ADDITIONAL_TRANSLATIONS.fr, ...LANDING_TRANSLATIONS.fr, ...AUTH_TRANSLATIONS.fr, ...ACCOUNT_MODAL_TRANSLATIONS.fr },
-  it: { ...BASE_TRANSLATIONS.it, ...ADDITIONAL_TRANSLATIONS.it, ...LANDING_TRANSLATIONS.it, ...AUTH_TRANSLATIONS.it, ...ACCOUNT_MODAL_TRANSLATIONS.it },
-  de: { ...BASE_TRANSLATIONS.de, ...ADDITIONAL_TRANSLATIONS.de, ...LANDING_TRANSLATIONS.de, ...AUTH_TRANSLATIONS.de, ...ACCOUNT_MODAL_TRANSLATIONS.de },
+  es: { ...BASE_TRANSLATIONS.es, ...ADDITIONAL_TRANSLATIONS.es, ...LANDING_TRANSLATIONS.es, ...AUTH_TRANSLATIONS.es, ...ACCOUNT_MODAL_TRANSLATIONS.es, ...EARLY_ACCESS_TRANSLATIONS.es },
+  en: { ...BASE_TRANSLATIONS.en, ...ADDITIONAL_TRANSLATIONS.en, ...LANDING_TRANSLATIONS.en, ...AUTH_TRANSLATIONS.en, ...ACCOUNT_MODAL_TRANSLATIONS.en, ...EARLY_ACCESS_TRANSLATIONS.en },
+  pt: { ...BASE_TRANSLATIONS.pt, ...ADDITIONAL_TRANSLATIONS.pt, ...LANDING_TRANSLATIONS.pt, ...AUTH_TRANSLATIONS.pt, ...ACCOUNT_MODAL_TRANSLATIONS.pt, ...EARLY_ACCESS_TRANSLATIONS.pt },
+  fr: { ...BASE_TRANSLATIONS.fr, ...ADDITIONAL_TRANSLATIONS.fr, ...LANDING_TRANSLATIONS.fr, ...AUTH_TRANSLATIONS.fr, ...ACCOUNT_MODAL_TRANSLATIONS.fr, ...EARLY_ACCESS_TRANSLATIONS.fr },
+  it: { ...BASE_TRANSLATIONS.it, ...ADDITIONAL_TRANSLATIONS.it, ...LANDING_TRANSLATIONS.it, ...AUTH_TRANSLATIONS.it, ...ACCOUNT_MODAL_TRANSLATIONS.it, ...EARLY_ACCESS_TRANSLATIONS.it },
+  de: { ...BASE_TRANSLATIONS.de, ...ADDITIONAL_TRANSLATIONS.de, ...LANDING_TRANSLATIONS.de, ...AUTH_TRANSLATIONS.de, ...ACCOUNT_MODAL_TRANSLATIONS.de, ...EARLY_ACCESS_TRANSLATIONS.de },
 };
 
 

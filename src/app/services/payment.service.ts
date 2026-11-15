@@ -6,6 +6,16 @@ import { BillingCycle, SupabaseService } from './supabase.service';
 export type PaidPlan = 'pro' | 'industrial';
 export type CheckoutCycleInput = 'monthly' | 'annual' | 'yearly';
 export type UpgradeReason = 'modules_limit' | 'workshop_export' | 'cnc_export';
+export type PaymentsReadinessMode = 'early_access_protected' | 'live_checkout';
+
+export const DEFAULT_PAYMENTS_READINESS_MODE: PaymentsReadinessMode = 'early_access_protected';
+export const PAYMENTS_READINESS_MODE_STORAGE_KEY = 'piezo3d_payments_readiness_mode';
+
+export interface EarlyAccessModalState {
+  plan: PaidPlan;
+  cycle: BillingCycle;
+  sourceRoute: string;
+}
 
 export interface CheckoutVariantConfig {
   plan: PaidPlan;
@@ -107,6 +117,9 @@ export class PaymentService {
   readonly isScriptReady = signal<boolean>(false);
   readonly lastCheckoutSuccessAt = signal<number | null>(null);
   readonly upgradeModalState = signal<UpgradeModalState | null>(null);
+  readonly paymentsMode = signal<PaymentsReadinessMode>(this.readStoredPaymentsMode());
+  readonly isPaymentsProtected = computed<boolean>(() => this.paymentsMode() === 'early_access_protected');
+  readonly earlyAccessModalState = signal<EarlyAccessModalState | null>(null);
 
   /**
    * Indica si el usuario actual está sujeto a las restricciones del Plan Inicial (`free`).
@@ -157,9 +170,66 @@ export class PaymentService {
   });
 
   constructor() {
-    if (this.isBrowser) {
+    if (this.isBrowser && this.paymentsMode() === 'live_checkout') {
       void this.ensureLemonScriptLoaded();
     }
+  }
+
+  private readStoredPaymentsMode(): PaymentsReadinessMode {
+    if (!this.isBrowser || typeof localStorage === 'undefined') {
+      return DEFAULT_PAYMENTS_READINESS_MODE;
+    }
+    try {
+      const stored = localStorage.getItem(PAYMENTS_READINESS_MODE_STORAGE_KEY);
+      return stored === 'live_checkout' ? 'live_checkout' : DEFAULT_PAYMENTS_READINESS_MODE;
+    } catch {
+      return DEFAULT_PAYMENTS_READINESS_MODE;
+    }
+  }
+
+  /**
+   * Actualiza el modo de disponibilidad de la pasarela de pagos y lo persiste en `localStorage`.
+   */
+  setPaymentsMode(mode: PaymentsReadinessMode): void {
+    this.paymentsMode.set(mode);
+    if (!this.isBrowser || typeof localStorage === 'undefined') {
+      return;
+    }
+    try {
+      localStorage.setItem(PAYMENTS_READINESS_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Ignorar si localStorage no está disponible
+    }
+  }
+
+  /**
+   * Alterna entre el modo protegido de acceso anticipado (`early_access_protected`)
+   * y el modo de checkout público activo (`live_checkout`).
+   */
+  togglePaymentsMode(): PaymentsReadinessMode {
+    const nextMode: PaymentsReadinessMode =
+      this.paymentsMode() === 'early_access_protected' ? 'live_checkout' : 'early_access_protected';
+    this.setPaymentsMode(nextMode);
+    return nextMode;
+  }
+
+  /**
+   * Abre el modal informativo de Acceso Anticipado para el plan y ciclo solicitados.
+   */
+  openEarlyAccessModal(plan: PaidPlan, cycle: CheckoutCycleInput = 'monthly', sourceRoute?: string): void {
+    this.closeUpgradeModal();
+    this.earlyAccessModalState.set({
+      plan,
+      cycle: this.normalizeCycle(cycle),
+      sourceRoute: sourceRoute ?? (this.router.url || '/')
+    });
+  }
+
+  /**
+   * Cierra el modal informativo de Acceso Anticipado.
+   */
+  closeEarlyAccessModal(): void {
+    this.earlyAccessModalState.set(null);
   }
 
   /**
@@ -317,11 +387,39 @@ export class PaymentService {
   }
 
   /**
+   * Construye la URL completa del Checkout Overlay y la abre en Lemon Squeezy (o en pestaña nueva como respaldo).
+   */
+  private async launchLemonCheckoutOverlay(plan: PaidPlan, cycle: BillingCycle): Promise<void> {
+    const finalUrl = this.buildCheckoutUrl(plan, cycle);
+    if (!this.isBrowser || typeof window === 'undefined') {
+      return;
+    }
+
+    await this.ensureLemonScriptLoaded();
+    this.initializeLemonOverlay();
+
+    if (window.LemonSqueezy?.Url?.Open) {
+      window.LemonSqueezy.Url.Open(finalUrl);
+      return;
+    }
+
+    window.open(finalUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  /**
    * Abre el Checkout Overlay para el plan y ciclo elegidos.
-   * Si el usuario no ha iniciado sesión, guarda la intención y redirige a `/auth?mode=register&plan=...&cycle=...`.
+   * Si la pasarela está en modo protegido (`early_access_protected`), abre el modal de Acceso Anticipado
+   * sin redirigir a `/auth` ni invocar Lemon Squeezy.
+   * En modo `live_checkout`, si el usuario no ha iniciado sesión, guarda la intención y redirige a `/auth?mode=register&plan=...&cycle=...`.
    */
   async openCheckout(plan: PaidPlan, cycle: CheckoutCycleInput = 'monthly'): Promise<void> {
     const normalizedCycle = this.normalizeCycle(cycle);
+
+    if (this.paymentsMode() === 'early_access_protected') {
+      this.clearPendingCheckout();
+      this.openEarlyAccessModal(plan, normalizedCycle);
+      return;
+    }
 
     if (!this.supabaseService.isAuthenticated?.()) {
       this.savePendingCheckout({ plan, cycle: normalizedCycle });
@@ -337,21 +435,16 @@ export class PaymentService {
 
     this.clearPendingCheckout();
     this.closeUpgradeModal();
+    await this.launchLemonCheckoutOverlay(plan, normalizedCycle);
+  }
 
-    const finalUrl = this.buildCheckoutUrl(plan, normalizedCycle);
-    if (!this.isBrowser || typeof window === 'undefined') {
-      return;
-    }
-
-    await this.ensureLemonScriptLoaded();
-    this.initializeLemonOverlay();
-
-    if (window.LemonSqueezy?.Url?.Open) {
-      window.LemonSqueezy.Url.Open(finalUrl);
-      return;
-    }
-
-    window.open(finalUrl, '_blank', 'noopener,noreferrer');
+  /**
+   * Permite al SuperAdmin probar el flujo real del Checkout Overlay de Lemon Squeezy
+   * sin desactivar la protección pública (`early_access_protected`).
+   */
+  async testAdminCheckout(plan: PaidPlan, cycle: CheckoutCycleInput = 'monthly'): Promise<void> {
+    const normalizedCycle = this.normalizeCycle(cycle);
+    await this.launchLemonCheckoutOverlay(plan, normalizedCycle);
   }
 
   /**

@@ -9,6 +9,10 @@ import {
   SupabaseService,
   UserProfile
 } from '../../services/supabase.service';
+import {
+  PAYMENTS_READINESS_MODE_STORAGE_KEY,
+  PaymentService
+} from '../../services/payment.service';
 import { isSuperAdminOwnerEmail } from '../../utils/support-email';
 
 describe('AdminDashboardComponent', () => {
@@ -122,6 +126,7 @@ describe('AdminDashboardComponent', () => {
   ];
 
   beforeEach(async () => {
+    localStorage.removeItem(PAYMENTS_READINESS_MODE_STORAGE_KEY);
     const settingsSignal = signal<PlatformSettingsRecord>({ ...mockSettings });
     const profileSignal = signal<UserProfile | null>(mockProfiles[0]);
 
@@ -173,6 +178,11 @@ describe('AdminDashboardComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    localStorage.removeItem(PAYMENTS_READINESS_MODE_STORAGE_KEY);
+    vi.restoreAllMocks();
   });
 
   it('should create the component and calculate executive KPIs including MRR in USD', async () => {
@@ -335,5 +345,46 @@ describe('AdminDashboardComponent', () => {
     // Salvaguarda dual de correos propietarios SuperAdmin
     expect(isSuperAdminOwnerEmail('eydersuarez900@gmail.com')).toBe(true);
     expect(isSuperAdminOwnerEmail('piezo3dstudio@gmail.com')).toBe(true);
+  });
+
+  it('should render Control de Pasarela de Pagos card, toggle Modo Protegido <-> Modo en Vivo, and trigger admin checkout tests', () => {
+    const paymentService = TestBed.inject(PaymentService);
+    const cardEl = fixture.nativeElement.querySelector('[data-testid="admin-payments-readiness-card"]') as HTMLElement | null;
+    const badgeEl = fixture.nativeElement.querySelector('[data-testid="admin-payments-mode-badge"]') as HTMLElement | null;
+    const toggleBtn = fixture.nativeElement.querySelector('[data-testid="admin-toggle-payments-mode-btn"]') as HTMLButtonElement | null;
+    const testProBtn = fixture.nativeElement.querySelector('[data-testid="admin-test-checkout-pro-btn"]') as HTMLButtonElement | null;
+    const testIndBtn = fixture.nativeElement.querySelector('[data-testid="admin-test-checkout-industrial-btn"]') as HTMLButtonElement | null;
+
+    expect(cardEl).toBeTruthy();
+    expect(cardEl?.textContent).toContain('Control de Pasarela de Pagos (Lemon Squeezy)');
+    expect(badgeEl?.textContent).toContain('Modo Protegido (Acceso Anticipado — Cobros Pausados)');
+    expect(component.isPaymentsProtected()).toBe(true);
+    expect(paymentService.paymentsMode()).toBe('early_access_protected');
+
+    expect(testProBtn?.textContent).toContain('Probar Checkout Pro ($15)');
+    expect(testIndBtn?.textContent).toContain('Probar Checkout Industrial ($29)');
+
+    toggleBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.isPaymentsProtected()).toBe(false);
+    expect(paymentService.paymentsMode()).toBe('live_checkout');
+    expect(badgeEl?.textContent).toContain('Modo en Vivo (Checkout Lemon Squeezy Activo)');
+    expect(component.toastBanner()?.type).toBe('success');
+    expect(component.toastBanner()?.text).toContain('Modo en Vivo');
+
+    const testAdminSpy = vi.spyOn(paymentService, 'testAdminCheckout').mockResolvedValue(undefined);
+    testProBtn?.click();
+    testIndBtn?.click();
+
+    expect(testAdminSpy).toHaveBeenNthCalledWith(1, 'pro', 'monthly');
+    expect(testAdminSpy).toHaveBeenNthCalledWith(2, 'industrial', 'monthly');
+
+    toggleBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.isPaymentsProtected()).toBe(true);
+    expect(paymentService.paymentsMode()).toBe('early_access_protected');
+    expect(badgeEl?.textContent).toContain('Modo Protegido (Acceso Anticipado — Cobros Pausados)');
   });
 });

@@ -1,6 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { CHECKOUT_VARIANTS, FREE_PLAN_MAX_MODULES, PaymentService } from './payment.service';
+import {
+  CHECKOUT_VARIANTS,
+  DEFAULT_PAYMENTS_READINESS_MODE,
+  FREE_PLAN_MAX_MODULES,
+  PAYMENTS_READINESS_MODE_STORAGE_KEY,
+  PaymentService
+} from './payment.service';
 import { SupabaseService } from './supabase.service';
 import { User } from '@supabase/supabase-js';
 
@@ -10,7 +16,9 @@ describe('PaymentService (Checkout Overlay, Pre-fill & Plan Limits)', () => {
   let router: Router;
 
   beforeEach(() => {
+    localStorage.removeItem(PAYMENTS_READINESS_MODE_STORAGE_KEY);
     sessionStorage.clear();
+    delete window.LemonSqueezy;
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -21,6 +29,23 @@ describe('PaymentService (Checkout Overlay, Pre-fill & Plan Limits)', () => {
     supabaseService = TestBed.inject(SupabaseService);
     service = TestBed.inject(PaymentService);
     router = TestBed.inject(Router);
+  });
+
+  afterEach(() => {
+    localStorage.removeItem(PAYMENTS_READINESS_MODE_STORAGE_KEY);
+    sessionStorage.clear();
+    delete window.LemonSqueezy;
+    document
+      .querySelectorAll('script[src="https://assets.lemonsqueezy.com/lemon.js"]')
+      .forEach((el) => el.remove());
+    vi.restoreAllMocks();
+  });
+
+  it('debe iniciar por defecto en modo protegido early_access_protected', () => {
+    expect(service.paymentsMode()).toBe(DEFAULT_PAYMENTS_READINESS_MODE);
+    expect(service.paymentsMode()).toBe('early_access_protected');
+    expect(service.isPaymentsProtected()).toBe(true);
+    expect(service.earlyAccessModalState()).toBeNull();
   });
 
   it('debe tener configurados los 4 enlaces oficiales y Variant IDs exactos', () => {
@@ -45,7 +70,150 @@ describe('PaymentService (Checkout Overlay, Pre-fill & Plan Limits)', () => {
     );
   });
 
-  it('debe redirigir a /auth?mode=register&plan=...&cycle=... cuando el usuario no ha iniciado sesión', async () => {
+  it('en modo protegido debe interceptar openCheckout(pro, monthly) y openCheckout(industrial, annual) sin redirigir a /auth ni abrir LemonSqueezy', async () => {
+    supabaseService.currentUser.set(null);
+    service.savePendingCheckout({ plan: 'pro', cycle: 'monthly' });
+    service.openUpgradeModal('modules_limit', 'pro');
+
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const ensureScriptSpy = vi.spyOn(service, 'ensureLemonScriptLoaded').mockResolvedValue(true);
+    const openSpy = vi.fn();
+    window.LemonSqueezy = {
+      Url: { Open: openSpy },
+      Setup: vi.fn()
+    };
+    const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    await service.openCheckout('pro', 'monthly');
+
+    expect(navSpy).not.toHaveBeenCalled();
+    expect(ensureScriptSpy).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+    expect(service.consumePendingCheckout()).toBeNull();
+    expect(service.upgradeModalState()).toBeNull();
+    expect(service.earlyAccessModalState()).toEqual({
+      plan: 'pro',
+      cycle: 'monthly',
+      sourceRoute: router.url || '/'
+    });
+
+    await service.openCheckout('industrial', 'annual');
+
+    expect(navSpy).not.toHaveBeenCalled();
+    expect(ensureScriptSpy).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+    expect(service.earlyAccessModalState()).toEqual({
+      plan: 'industrial',
+      cycle: 'annual',
+      sourceRoute: router.url || '/'
+    });
+
+    service.closeEarlyAccessModal();
+    expect(service.earlyAccessModalState()).toBeNull();
+  });
+
+  it('debe permitir abrir y cerrar openEarlyAccessModal con normalización de ciclo y ruta explícita', () => {
+    service.openUpgradeModal('cnc_export', 'industrial');
+    service.openEarlyAccessModal('industrial', 'yearly', '/studio/designer');
+
+    expect(service.upgradeModalState()).toBeNull();
+    expect(service.earlyAccessModalState()).toEqual({
+      plan: 'industrial',
+      cycle: 'annual',
+      sourceRoute: '/studio/designer'
+    });
+
+    service.closeEarlyAccessModal();
+    expect(service.earlyAccessModalState()).toBeNull();
+  });
+
+  it('debe leer override inicial desde localStorage y soportar setPaymentsMode y togglePaymentsMode', () => {
+    expect(service.togglePaymentsMode()).toBe('live_checkout');
+    expect(service.paymentsMode()).toBe('live_checkout');
+    expect(service.isPaymentsProtected()).toBe(false);
+    expect(localStorage.getItem(PAYMENTS_READINESS_MODE_STORAGE_KEY)).toBe('live_checkout');
+
+    expect(service.togglePaymentsMode()).toBe('early_access_protected');
+    expect(service.paymentsMode()).toBe('early_access_protected');
+    expect(service.isPaymentsProtected()).toBe(true);
+    expect(localStorage.getItem(PAYMENTS_READINESS_MODE_STORAGE_KEY)).toBe('early_access_protected');
+
+    service.setPaymentsMode('live_checkout');
+    expect(service.paymentsMode()).toBe('live_checkout');
+    expect(localStorage.getItem(PAYMENTS_READINESS_MODE_STORAGE_KEY)).toBe('live_checkout');
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), SupabaseService, PaymentService]
+    });
+    const rehydratedService = TestBed.inject(PaymentService);
+    expect(rehydratedService.paymentsMode()).toBe('live_checkout');
+    expect(rehydratedService.isPaymentsProtected()).toBe(false);
+
+    localStorage.setItem(PAYMENTS_READINESS_MODE_STORAGE_KEY, 'unexpected_mode');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), SupabaseService, PaymentService]
+    });
+    const fallbackService = TestBed.inject(PaymentService);
+    expect(fallbackService.paymentsMode()).toBe('early_access_protected');
+    expect(fallbackService.isPaymentsProtected()).toBe(true);
+  });
+
+  it('debe permitir al administrador probar Lemon Squeezy via testAdminCheckout sin desactivar la protección pública', async () => {
+    expect(service.paymentsMode()).toBe('early_access_protected');
+
+    const mockUser = {
+      id: 'usr-admin',
+      email: 'piezo3dstudio@gmail.com',
+      app_metadata: {},
+      user_metadata: {},
+      aud: 'authenticated',
+      created_at: '2026-11-10T00:00:00Z'
+    } as unknown as User;
+    supabaseService.currentUser.set(mockUser);
+    supabaseService.userProfile.set({
+      id: 'usr-admin',
+      email: 'piezo3dstudio@gmail.com',
+      first_name: 'Admin',
+      last_name: 'Studio',
+      role: 'super_admin',
+      plan: 'industrial',
+      created_at: '2026-11-10T00:00:00Z',
+      updated_at: '2026-11-10T00:00:00Z'
+    });
+
+    const openSpy = vi.fn();
+    window.LemonSqueezy = {
+      Url: { Open: openSpy },
+      Setup: vi.fn()
+    };
+
+    await service.testAdminCheckout('pro', 'monthly');
+
+    expect(service.paymentsMode()).toBe('early_access_protected');
+    expect(service.isPaymentsProtected()).toBe(true);
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    const adminUrl = openSpy.mock.calls[0][0] as string;
+    expect(adminUrl).toContain('enabled=2359025');
+    expect(adminUrl).toContain('checkout[custom][plan]=pro');
+
+    delete window.LemonSqueezy;
+    const ensureSpy = vi.spyOn(service, 'ensureLemonScriptLoaded').mockResolvedValue(false);
+    const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    await service.testAdminCheckout('industrial', 'yearly');
+
+    expect(ensureSpy).toHaveBeenCalledTimes(1);
+    expect(windowOpenSpy).toHaveBeenCalledTimes(1);
+    expect(windowOpenSpy.mock.calls[0][0]).toContain('enabled=2359083');
+    expect(service.paymentsMode()).toBe('early_access_protected');
+  });
+
+  it('debe redirigir a /auth?mode=register&plan=...&cycle=... cuando el usuario no ha iniciado sesión en modo live_checkout', async () => {
+    service.setPaymentsMode('live_checkout');
     supabaseService.currentUser.set(null);
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
@@ -63,7 +231,8 @@ describe('PaymentService (Checkout Overlay, Pre-fill & Plan Limits)', () => {
     expect(pending).toEqual({ plan: 'pro', cycle: 'annual' });
   });
 
-  it('debe pre-llenar email, name y custom user_id/plan/billing_cycle y abrir LemonSqueezy.Url.Open cuando el usuario está autenticado', async () => {
+  it('debe pre-llenar email, name y custom user_id/plan/billing_cycle y abrir LemonSqueezy.Url.Open cuando el usuario está autenticado en modo live_checkout', async () => {
+    service.setPaymentsMode('live_checkout');
     const mockUser = {
       id: 'usr-999',
       email: 'eyder@taller.com',

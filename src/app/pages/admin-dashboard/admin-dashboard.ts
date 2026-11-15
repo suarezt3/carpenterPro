@@ -26,6 +26,7 @@ import {
   InformationCircleIcon,
   Invoice01Icon,
   Layers01Icon,
+  LockPasswordIcon,
   QuoteUpIcon,
   Rocket01Icon,
   Settings01Icon,
@@ -50,6 +51,12 @@ import {
   UserProfile,
   UserRole
 } from '../../services/supabase.service';
+import {
+  DEFAULT_PAYMENTS_READINESS_MODE,
+  PaidPlan,
+  PaymentService,
+  PaymentsReadinessMode
+} from '../../services/payment.service';
 import { OFFICIAL_SUPPORT_EMAIL, resolvePublicSupportEmail } from '../../utils/support-email';
 
 export type AdminSection = 'overview' | 'users' | 'cms' | 'testimonials' | 'support';
@@ -109,12 +116,14 @@ const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsRecord = {
 })
 export class AdminDashboardComponent implements OnInit {
   readonly supabase = inject(SupabaseService);
+  readonly paymentService = inject(PaymentService);
   private readonly fb = inject(NonNullableFormBuilder);
 
   readonly icons = {
     shield: Shield01Icon,
     cube: CubeIcon,
     layers: Layers01Icon,
+    lock: LockPasswordIcon,
     user: UserIcon,
     settings: Settings01Icon,
     star: StarIcon,
@@ -202,6 +211,17 @@ export class AdminDashboardComponent implements OnInit {
       support_email: resolvePublicSupportEmail(raw.support_email)
     };
   });
+
+  // Payments Readiness Guard (SuperAdmin Switch)
+  readonly paymentsMode = computed<PaymentsReadinessMode>(() =>
+    typeof this.paymentService.paymentsMode === 'function'
+      ? this.paymentService.paymentsMode()
+      : DEFAULT_PAYMENTS_READINESS_MODE
+  );
+
+  readonly isPaymentsProtected = computed<boolean>(
+    () => this.paymentsMode() === 'early_access_protected'
+  );
 
   // KPI Computed Signals (Module 1)
   readonly totalUsersCount = computed<number>(() => this.profiles().length);
@@ -383,6 +403,29 @@ export class AdminDashboardComponent implements OnInit {
 
   dismissToast(): void {
     this.toastBanner.set(null);
+  }
+
+  togglePaymentsReadinessMode(): void {
+    const nextMode =
+      this.paymentService.togglePaymentsMode?.() ??
+      (this.isPaymentsProtected() ? 'live_checkout' : 'early_access_protected');
+
+    if (nextMode === 'live_checkout') {
+      this.showToast(
+        'Pasarela de pagos activada en Modo en Vivo (Checkout Lemon Squeezy activo).',
+        'success'
+      );
+      return;
+    }
+
+    this.showToast(
+      'Pasarela de pagos cambiada a Modo Protegido (Acceso Anticipado — cobros pausados).',
+      'success'
+    );
+  }
+
+  testAdminCheckout(plan: PaidPlan): void {
+    void this.paymentService.testAdminCheckout?.(plan, 'monthly');
   }
 
   async reloadAllData(): Promise<void> {
