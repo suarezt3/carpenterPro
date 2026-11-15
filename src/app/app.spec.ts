@@ -16,4 +16,12 @@ describe('App', () => {
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
   });
+
+  it('debe montar globalmente <app-early-access-modal> junto a <app-confirm-dialog>', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('app-confirm-dialog')).toBeTruthy();
+    expect(compiled.querySelector('app-early-access-modal')).toBeTruthy();
+  });
 });

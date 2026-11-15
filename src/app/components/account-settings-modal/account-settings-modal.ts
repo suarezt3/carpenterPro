@@ -1007,7 +1007,13 @@ export class AccountSettingsModalComponent {
   }
 
   upgradePlan(plan?: PaidPlan, cycleOverride?: 'monthly' | 'annual'): void {
-    this.showToast(this.i18n.t('account.billing.upgradeMockToast'));
+    const paymentBridge = this.paymentService as unknown as {
+      isPaymentsProtected?: () => boolean;
+    };
+    const isPaymentsProtected = paymentBridge.isPaymentsProtected?.() ?? false;
+    if (!isPaymentsProtected) {
+      this.showToast(this.i18n.t('account.billing.upgradeMockToast'));
+    }
     const targetPlan: PaidPlan = plan ?? (this.userPlan() === 'pro' ? 'industrial' : 'pro');
     const cycle = cycleOverride ?? this.billingCycleSelect();
     this.billingCycleSelect.set(cycle);

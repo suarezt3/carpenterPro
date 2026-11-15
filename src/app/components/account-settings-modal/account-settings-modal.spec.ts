@@ -928,4 +928,71 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       expect(fixture.nativeElement.querySelector('[data-testid="account-modal-admin-btn"]')).toBeTruthy();
     });
   });
+
+  describe('Modo Pagos Protegidos (Acceso Anticipado)', () => {
+    let protectedSignal: ReturnType<typeof signal<boolean>>;
+    let openCheckoutMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      protectedSignal = signal(true);
+      openCheckoutMock = vi.fn().mockResolvedValue(undefined);
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [AccountSettingsModalComponent],
+        providers: [
+          provideRouter([]),
+          { provide: SupabaseService, useValue: supabaseMock },
+          {
+            provide: PaymentService,
+            useValue: {
+              isPaymentsProtected: protectedSignal,
+              openCheckout: openCheckoutMock
+            }
+          },
+          { provide: ProjectStorageService, useValue: projectServiceMock },
+          { provide: I18nService, useValue: i18nMock },
+          { provide: ThemeService, useValue: themeServiceMock }
+        ]
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(AccountSettingsModalComponent);
+      component = fixture.componentInstance;
+      componentRef = fixture.componentRef;
+      componentRef.setInput('isOpen', true);
+      componentRef.setInput('initialTab', 'billing');
+      fixture.detectChanges();
+      await fixture.whenStable();
+    });
+
+    it('debe delegar upgradePlan a openCheckout sin mostrar upgradeMockToast cuando los pagos están protegidos', () => {
+      const upgradeBtn = fixture.nativeElement.querySelector(
+        '[data-testid="account-upgrade-plan-btn"]'
+      ) as HTMLButtonElement | null;
+      expect(upgradeBtn).toBeTruthy();
+
+      upgradeBtn?.click();
+      fixture.detectChanges();
+
+      expect(openCheckoutMock).toHaveBeenCalledWith('pro', 'monthly');
+      expect(component.toastMessage()).toBeNull();
+    });
+
+    it('debe permitir selectPlanCheckout de Industrial anual sin emitir toast legado en modo protegido', () => {
+      component.selectPlanCheckout('industrial', 'annual');
+      fixture.detectChanges();
+
+      expect(openCheckoutMock).toHaveBeenCalledWith('industrial', 'annual');
+      expect(component.toastMessage()).toBeNull();
+    });
+
+    it('debe conservar upgradeMockToast cuando isPaymentsProtected es false', () => {
+      protectedSignal.set(false);
+      component.upgradePlan('pro');
+      fixture.detectChanges();
+
+      expect(component.toastMessage()).toBe('account.billing.upgradeMockToast');
+      expect(openCheckoutMock).toHaveBeenCalledWith('pro', 'monthly');
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { signal, WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { LandingPageComponent } from './landing-page';
+import { PaymentService } from '../../services/payment.service';
 import { SupabaseService } from '../../services/supabase.service';
 import { UserFeedbackRecord } from '../../models/feedback.models';
 import { TRANSLATIONS, AppLanguage } from '../../data/i18n-translations.data';
@@ -1007,6 +1008,123 @@ describe('LandingPageComponent', () => {
       const footerNav = compiled.querySelector('footer nav');
       expect(footerNav?.getAttribute('aria-label')?.trim().length).toBeGreaterThan(5);
       expect(footerNav?.textContent).toContain('Preguntas Frecuentes');
+    });
+  });
+
+  describe('Integración de Protección de Pagos y Acceso Anticipado en Pricing', () => {
+    it('debe mantener visibles las 3 tarjetas de planes y el selector Mensual/Anual sin mensajes de construcción', () => {
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const pricingSection = compiled.querySelector('#pricing');
+      expect(pricingSection).toBeTruthy();
+
+      const pricingText = pricingSection?.textContent ?? '';
+      expect(pricingText).toContain('Plan Inicial');
+      expect(pricingText).toContain('Taller Pro');
+      expect(pricingText).toContain('Industrial & CNC');
+      expect(pricingText).toContain('Mensual');
+      expect(pricingText).toContain('Anual');
+      expect(pricingText.toLowerCase()).not.toContain('sitio en construcción');
+      expect(pricingText.toLowerCase()).not.toContain('próximamente');
+
+      expect(compiled.querySelector('[data-testid="pricing-cta-starter"]')).toBeTruthy();
+      expect(compiled.querySelector('[data-testid="pricing-cta-pro"]')).toBeTruthy();
+      expect(compiled.querySelector('[data-testid="pricing-cta-industrial"]')).toBeTruthy();
+    });
+
+    it('el CTA de Plan Inicial debe enlazar a /auth?mode=register o /studio sin activar openCheckout', () => {
+      const paymentService = TestBed.inject(PaymentService);
+      const openCheckoutSpy = vi.spyOn(paymentService, 'openCheckout').mockResolvedValue(undefined);
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+
+      isAuthSignal.set(false);
+      fixture.detectChanges();
+      const compiled = fixture.nativeElement as HTMLElement;
+      const starterGuest = compiled.querySelector('[data-testid="pricing-cta-starter"]') as HTMLAnchorElement | null;
+      expect(starterGuest).toBeTruthy();
+      expect(starterGuest?.tagName).toBe('A');
+      expect(starterGuest?.getAttribute('href')).toContain('/auth');
+      expect(starterGuest?.getAttribute('href')).toContain('mode=register');
+
+      isAuthSignal.set(true);
+      fixture.detectChanges();
+      const starterAuth = compiled.querySelector('[data-testid="pricing-cta-starter"]') as HTMLAnchorElement | null;
+      expect(starterAuth?.getAttribute('href')).toBe('/studio');
+      expect(openCheckoutSpy).not.toHaveBeenCalled();
+    });
+
+    it('al pulsar Taller Pro e Industrial & CNC debe invocar openCheckout con el plan y ciclo activos', () => {
+      const paymentService = TestBed.inject(PaymentService);
+      const openCheckoutSpy = vi.spyOn(paymentService, 'openCheckout').mockResolvedValue(undefined);
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const proBtn = compiled.querySelector('[data-testid="pricing-cta-pro"]') as HTMLButtonElement | null;
+      const indBtn = compiled.querySelector('[data-testid="pricing-cta-industrial"]') as HTMLButtonElement | null;
+      expect(proBtn).toBeTruthy();
+      expect(indBtn).toBeTruthy();
+
+      proBtn?.click();
+      expect(openCheckoutSpy).toHaveBeenCalledWith('pro', 'monthly');
+
+      component.setBillingCycle('yearly');
+      fixture.detectChanges();
+      indBtn?.click();
+      expect(openCheckoutSpy).toHaveBeenCalledWith('industrial', 'annual');
+    });
+
+    it('en modo protegido, pulsar los planes de pago debe poblar earlyAccessModalState y dejar intacto Plan Inicial', async () => {
+      const earlyAccessStateSignal = signal<{
+        plan: 'pro' | 'industrial';
+        cycle: 'monthly' | 'annual';
+        sourceRoute: string;
+      } | null>(null);
+      const paymentMock = {
+        isPaymentsProtected: signal(true),
+        earlyAccessModalState: earlyAccessStateSignal.asReadonly(),
+        openCheckout: vi.fn(async (plan: 'pro' | 'industrial', cycle?: 'monthly' | 'annual' | 'yearly') => {
+          const normalizedCycle = cycle === 'yearly' ? 'annual' : (cycle ?? 'monthly');
+          earlyAccessStateSignal.set({ plan, cycle: normalizedCycle, sourceRoute: '/' });
+        })
+      };
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [LandingPageComponent],
+        providers: [
+          provideRouter([]),
+          { provide: SupabaseService, useValue: mockSupabase },
+          { provide: PaymentService, useValue: paymentMock }
+        ]
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const starterLink = compiled.querySelector('[data-testid="pricing-cta-starter"]') as HTMLAnchorElement | null;
+      expect(starterLink?.getAttribute('href')).toContain('/auth');
+      expect(earlyAccessStateSignal()).toBeNull();
+
+      const proBtn = compiled.querySelector('[data-testid="pricing-cta-pro"]') as HTMLButtonElement | null;
+      proBtn?.click();
+      expect(paymentMock.openCheckout).toHaveBeenCalledWith('pro', 'monthly');
+      expect(earlyAccessStateSignal()).toEqual({
+        plan: 'pro',
+        cycle: 'monthly',
+        sourceRoute: '/'
+      });
     });
   });
 });

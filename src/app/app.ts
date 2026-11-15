@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ConfirmDialog } from './components/confirm-dialog/confirm-dialog';
+import { EarlyAccessModalComponent } from './components/early-access-modal/early-access-modal';
 import { SeoService } from './services/seo.service';
 
 /**
  * Componente raíz de la aplicación Piezo3D Studio.
- * Aloja el RouterOutlet principal, el diálogo global de confirmación e inicializa el SEO dinámico por ruta.
+ * Aloja el RouterOutlet principal, el diálogo global de confirmación, el modal de acceso anticipado e inicializa el SEO dinámico por ruta.
  */
 @Component({
   selector: 'app-root',
@@ -13,7 +14,8 @@ import { SeoService } from './services/seo.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterOutlet,
-    ConfirmDialog
+    ConfirmDialog,
+    EarlyAccessModalComponent
   ],
   templateUrl: './app.html',
   styleUrl: './app.css',
