@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { User } from '@supabase/supabase-js';
 import { SupabaseService } from '../services/supabase.service';
+import { isSuperAdminOwnerEmail } from '../utils/support-email';
 
 /**
  * Guardia de seguridad exclusivo para el Panel de Superadministrador (/admin).
@@ -51,7 +52,7 @@ export const superAdminGuard: CanActivateFn = async (_route, _state): Promise<bo
 
   const isSuper =
     resolvedProfile?.role === 'super_admin' ||
-    user.email?.toLowerCase() === 'eydersuarez900@gmail.com';
+    isSuperAdminOwnerEmail(user.email);
 
   if (isSuper) {
     return true;

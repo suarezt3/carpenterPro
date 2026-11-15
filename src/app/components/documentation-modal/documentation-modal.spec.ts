@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DocumentationModalComponent } from './documentation-modal';
 import { I18nService, STORAGE_LANG_KEY } from '../../services/i18n.service';
 import { ThemeService } from '../../services/theme.service';
+import { SupabaseService } from '../../services/supabase.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { AppLanguage } from '../../data/i18n-translations.data';
 import { ADDITIONAL_TRANSLATIONS } from '../../data/i18n-additional-translations.data';
@@ -413,6 +414,28 @@ describe('Empirical Adversarial Audit — Milestone 2: Help Center & Interactive
 
       fixture.componentInstance.selectTab('manual');
       expect(fixture.componentInstance.activeModalTab()).toBe('manual');
+    });
+
+    it('debe renderizar piezo3dstudio@gmail.com con mailto en el pie del modal y nunca el correo legado', () => {
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(fixture.componentInstance.supportEmail()).toBe('piezo3dstudio@gmail.com');
+
+      const mailLink = compiled.querySelector('[data-testid="help-direct-support-email"]') as HTMLAnchorElement;
+      expect(mailLink).toBeTruthy();
+      expect(mailLink.getAttribute('href')).toBe('mailto:piezo3dstudio@gmail.com');
+      expect(mailLink.textContent?.trim()).toBe('piezo3dstudio@gmail.com');
+      expect(compiled.textContent).not.toContain('eydersuarez900@gmail.com');
+
+      const supabase = TestBed.inject(SupabaseService);
+      supabase.platformSettings.set({
+        ...supabase.platformSettings(),
+        support_email: 'eydersuarez900@gmail.com'
+      });
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.supportEmail()).toBe('piezo3dstudio@gmail.com');
+      expect(mailLink.getAttribute('href')).toBe('mailto:piezo3dstudio@gmail.com');
+      expect(compiled.textContent).not.toContain('eydersuarez900@gmail.com');
     });
   });
 });

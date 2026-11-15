@@ -57,6 +57,7 @@ import { ThemeService, ThemeMode } from '../../services/theme.service';
 import { AppLanguage } from '../../data/i18n-translations.data';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { DEFAULT_ROOM_CONFIG, ProjectSettings } from '../../models/melamine.models';
+import { isSuperAdminOwnerEmail } from '../../utils/support-email';
 
 export type AccountModalTab = 'profile' | 'workshop' | 'preferences' | 'billing';
 
@@ -146,8 +147,8 @@ export class AccountSettingsModalComponent {
 
   readonly isSuperAdmin = computed(() => {
     const role = typeof this.userProfile === 'function' ? this.userProfile()?.role : undefined;
-    const email = typeof this.currentUser === 'function' ? this.currentUser()?.email?.toLowerCase() : undefined;
-    return role === 'super_admin' || email === 'eydersuarez900@gmail.com';
+    const email = typeof this.currentUser === 'function' ? this.currentUser()?.email : undefined;
+    return role === 'super_admin' || isSuperAdminOwnerEmail(email);
   });
 
   readonly planPrices = computed(() => {

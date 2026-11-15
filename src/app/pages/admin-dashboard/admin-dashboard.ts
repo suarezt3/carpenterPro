@@ -50,6 +50,7 @@ import {
   UserProfile,
   UserRole
 } from '../../services/supabase.service';
+import { OFFICIAL_SUPPORT_EMAIL, resolvePublicSupportEmail } from '../../utils/support-email';
 
 export type AdminSection = 'overview' | 'users' | 'cms' | 'testimonials' | 'support';
 export type AdminUserFilter = 'all' | 'free' | 'pro' | 'industrial' | 'super_admin' | 'suspended';
@@ -78,7 +79,7 @@ export interface UserProfilePatch {
 const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsRecord = {
   id: 1,
   app_version: 'v3.0.0',
-  support_email: 'eydersuarez900@gmail.com',
+  support_email: OFFICIAL_SUPPORT_EMAIL,
   pro_monthly_usd: 15,
   pro_annual_monthly_usd: 12,
   pro_annual_total_usd: 144,
@@ -195,7 +196,11 @@ export class AdminDashboardComponent implements OnInit {
   // Current Settings Computed
   readonly currentSettings = computed<PlatformSettingsRecord>(() => {
     const sig = this.supabase.platformSettings;
-    return typeof sig === 'function' ? sig() : DEFAULT_PLATFORM_SETTINGS;
+    const raw = typeof sig === 'function' ? sig() : DEFAULT_PLATFORM_SETTINGS;
+    return {
+      ...raw,
+      support_email: resolvePublicSupportEmail(raw.support_email)
+    };
   });
 
   // KPI Computed Signals (Module 1)
@@ -315,7 +320,7 @@ export class AdminDashboardComponent implements OnInit {
     industrial_annual_total_usd: [276, [Validators.required, Validators.min(0)]],
     free_max_modules: [3, [Validators.required, Validators.min(1)]],
     app_version: ['v3.0.0', [Validators.required]],
-    support_email: ['eydersuarez900@gmail.com', [Validators.required, Validators.email]],
+    support_email: [OFFICIAL_SUPPORT_EMAIL, [Validators.required, Validators.email]],
     announcement_enabled: [false],
     announcement_badge: ['NOVEDAD', [Validators.required]],
     announcement_text: ['']
@@ -421,7 +426,7 @@ export class AdminDashboardComponent implements OnInit {
         industrial_annual_total_usd: settings.industrial_annual_total_usd,
         free_max_modules: settings.free_max_modules,
         app_version: settings.app_version,
-        support_email: settings.support_email,
+        support_email: resolvePublicSupportEmail(settings.support_email),
         announcement_enabled: settings.announcement_enabled,
         announcement_badge: settings.announcement_badge || 'NOVEDAD',
         announcement_text: settings.announcement_text || ''
@@ -559,7 +564,7 @@ export class AdminDashboardComponent implements OnInit {
         industrial_annual_total_usd: Number(raw.industrial_annual_total_usd),
         free_max_modules: Number(raw.free_max_modules),
         app_version: raw.app_version.trim(),
-        support_email: raw.support_email.trim(),
+        support_email: resolvePublicSupportEmail(raw.support_email),
         announcement_enabled: Boolean(raw.announcement_enabled),
         announcement_badge: raw.announcement_badge.trim() || 'NOVEDAD',
         announcement_text: raw.announcement_text.trim()

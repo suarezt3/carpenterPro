@@ -34,6 +34,7 @@ import { PaymentService } from '../../services/payment.service';
 import { I18nService } from '../../services/i18n.service';
 import { AppLanguage } from '../../data/i18n-translations.data';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { resolvePublicSupportEmail } from '../../utils/support-email';
 
 export type AuthMode = 'login' | 'register' | 'forgot' | 'reset';
 
@@ -110,8 +111,8 @@ export class AuthPageComponent {
         platformSettings?: () => { support_email?: string } | null;
       }
     ).platformSettings;
-    const dynamicEmail = typeof settingsFn === 'function' ? settingsFn()?.support_email?.trim() : '';
-    return dynamicEmail || 'eydersuarez900@gmail.com';
+    const rawEmail = typeof settingsFn === 'function' ? settingsFn()?.support_email : undefined;
+    return resolvePublicSupportEmail(rawEmail);
   });
 
   // Estados de envío y notificaciones amigables (claves i18n)

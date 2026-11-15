@@ -53,6 +53,7 @@ import { CurrencyExchangeService } from '../../services/currency-exchange.servic
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { AppLanguage } from '../../data/i18n-translations.data';
 import { UserFeedbackRecord } from '../../models/feedback.models';
+import { resolvePublicSupportEmail } from '../../utils/support-email';
 
 export type PricingCurrencyCode = 'USD' | 'COP' | 'MXN' | 'EUR';
 
@@ -344,8 +345,8 @@ export class LandingPageComponent implements OnInit {
         platformSettings?: () => { support_email?: string } | null;
       }
     ).platformSettings;
-    const dynamicEmail = typeof settingsFn === 'function' ? settingsFn()?.support_email?.trim() : '';
-    return dynamicEmail || 'eydersuarez900@gmail.com';
+    const rawEmail = typeof settingsFn === 'function' ? settingsFn()?.support_email : undefined;
+    return resolvePublicSupportEmail(rawEmail);
   });
 
   ngOnInit(): void {

@@ -35,6 +35,7 @@ import {
   TargetModule,
   UserFeedbackRecord
 } from '../../models/feedback.models';
+import { resolvePublicSupportEmail } from '../../utils/support-email';
 
 /**
  * Formulario dinámico unificado para Reporte de Bugs, Solicitudes de Funciones,
@@ -136,6 +137,15 @@ export class FeedbackFormComponent implements OnInit {
   readonly loadingCommunity = signal<boolean>(false);
 
   // Computados para validación y UI
+  readonly supportEmail = computed<string>(() =>
+    resolvePublicSupportEmail(
+      (
+        this.supabase as unknown as {
+          platformSettings?: () => { support_email?: string } | null;
+        }
+      ).platformSettings?.()?.support_email
+    )
+  );
   readonly isTestimonial = computed(() => this.selectedCategory() === 'testimonial');
 
   readonly messageValue = toSignal(this.feedbackForm.controls.message.valueChanges, {

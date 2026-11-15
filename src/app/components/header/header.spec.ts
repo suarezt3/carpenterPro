@@ -209,6 +209,36 @@ describe('HeaderComponent — Milestone 4 (Studio Topbar Reorganization & Overla
       adminBtn.click();
       expect(navSpy).toHaveBeenCalledWith('/admin');
     });
+
+    it('debe habilitar isSuperAdmin y mostrar el botón Admin para ambos correos propietarios (eydersuarez900@gmail.com y piezo3dstudio@gmail.com)', () => {
+      mockSupabase.userProfile.set({
+        id: 'usr-owner-1',
+        email: 'eydersuarez900@gmail.com',
+        role: 'user',
+        plan: 'free'
+      } as UserProfile);
+      mockSupabase.currentUser.set({
+        id: 'usr-owner-1',
+        email: 'eydersuarez900@gmail.com'
+      } as User);
+      fixture.detectChanges();
+      expect(component.isSuperAdmin()).toBe(true);
+      expect(element.querySelector('[data-testid="header-admin-btn"]')).toBeTruthy();
+
+      mockSupabase.userProfile.set({
+        id: 'usr-owner-2',
+        email: 'piezo3dstudio@gmail.com',
+        role: 'user',
+        plan: 'free'
+      } as UserProfile);
+      mockSupabase.currentUser.set({
+        id: 'usr-owner-2',
+        email: '  Piezo3DStudio@GMAIL.com '
+      } as User);
+      fixture.detectChanges();
+      expect(component.isSuperAdmin()).toBe(true);
+      expect(element.querySelector('[data-testid="header-admin-btn"]')).toBeTruthy();
+    });
   });
 
   describe('F7: Botón Minimalista Compacto de Cerrar Sesión', () => {

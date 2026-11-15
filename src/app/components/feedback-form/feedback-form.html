@@ -119,6 +119,16 @@
             <p class="text-xs" [class]="themeService.isClassic() ? 'text-zinc-500' : 'text-zinc-400'">
               {{ 'feedback.subtitle' | t }}
             </p>
+            <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-sans" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-400'">
+              <hugeicons-icon [icon]="icons.mail" [size]="14" [strokeWidth]="2" class="text-sky-600 dark:text-sky-400 shrink-0"></hugeicons-icon>
+              <span>{{ 'feedback.directSupportLabel' | t }}</span>
+              <a
+                [href]="'mailto:' + supportEmail()"
+                data-testid="feedback-direct-support-email"
+                class="font-medium text-sky-600 hover:underline dark:text-sky-400 transition">
+                {{ supportEmail() }}
+              </a>
+            </div>
           </div>
 
           <!-- SELECTOR DE CATEGORÍA (4 PÍLDORAS GRANDES) -->

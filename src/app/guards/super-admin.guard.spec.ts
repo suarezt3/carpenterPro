@@ -113,12 +113,18 @@ describe('superAdminGuard', () => {
     expect(loadUserProfileSpy).not.toHaveBeenCalled();
   });
 
-  it('debe permitir acceso (retornar true) para la cuenta propietaria eydersuarez900@gmail.com', async () => {
-    const ownerUser = { id: 'u-owner', email: 'eydersuarez900@gmail.com' } as User;
-    waitForAuthReadySpy.mockResolvedValue(ownerUser);
+  it('debe permitir acceso (retornar true) para ambas cuentas propietarias (eydersuarez900@gmail.com y piezo3dstudio@gmail.com)', async () => {
+    const legacyOwner = { id: 'u-owner', email: 'eydersuarez900@gmail.com' } as User;
+    waitForAuthReadySpy.mockResolvedValue(legacyOwner);
+    expect(await TestBed.runInInjectionContext(() => superAdminGuard(dummyRoute, dummyState))).toBe(true);
 
-    const result = await TestBed.runInInjectionContext(() => superAdminGuard(dummyRoute, dummyState));
-    expect(result).toBe(true);
+    const studioOwner = { id: 'u-owner-studio', email: 'piezo3dstudio@gmail.com' } as User;
+    waitForAuthReadySpy.mockResolvedValue(studioOwner);
+    expect(await TestBed.runInInjectionContext(() => superAdminGuard(dummyRoute, dummyState))).toBe(true);
+
+    const normalizedOwner = { id: 'u-owner-normalized', email: '  Piezo3DStudio@GMAIL.com  ' } as User;
+    waitForAuthReadySpy.mockResolvedValue(normalizedOwner);
+    expect(await TestBed.runInInjectionContext(() => superAdminGuard(dummyRoute, dummyState))).toBe(true);
   });
 
   it('debe esperar a que waitForAuthReady() hidrate sesión y perfil al recargar /admin y conservar la ruta exacta', async () => {

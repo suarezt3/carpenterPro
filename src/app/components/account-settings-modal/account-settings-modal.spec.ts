@@ -889,5 +889,43 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       adminBtn.click();
       expect(navSpy).toHaveBeenCalledWith('/admin');
     });
+
+    it('debe habilitar isSuperAdmin y mostrar el botón Panel Admin para ambos correos propietarios (eydersuarez900@gmail.com y piezo3dstudio@gmail.com)', () => {
+      supabaseMock.userProfile.set({
+        id: 'u-owner-1',
+        email: 'eydersuarez900@gmail.com',
+        first_name: 'Eyder',
+        last_name: 'Suarez',
+        role: 'user',
+        plan: 'free',
+        created_at: '2026-11-10',
+        updated_at: '2026-11-10'
+      });
+      supabaseMock.currentUser.set({
+        id: 'u-owner-1',
+        email: 'eydersuarez900@gmail.com'
+      } as unknown as User);
+      fixture.detectChanges();
+      expect(component.isSuperAdmin()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="account-modal-admin-btn"]')).toBeTruthy();
+
+      supabaseMock.userProfile.set({
+        id: 'u-owner-2',
+        email: 'piezo3dstudio@gmail.com',
+        first_name: 'Piezo3D',
+        last_name: 'Studio',
+        role: 'user',
+        plan: 'free',
+        created_at: '2026-11-10',
+        updated_at: '2026-11-10'
+      });
+      supabaseMock.currentUser.set({
+        id: 'u-owner-2',
+        email: '  PIEZO3DSTUDIO@GMAIL.COM  '
+      } as unknown as User);
+      fixture.detectChanges();
+      expect(component.isSuperAdmin()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="account-modal-admin-btn"]')).toBeTruthy();
+    });
   });
 });

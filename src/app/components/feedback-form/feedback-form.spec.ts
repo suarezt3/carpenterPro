@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { FeedbackFormComponent } from './feedback-form';
 import { SupabaseService } from '../../services/supabase.service';
 import { I18nService } from '../../services/i18n.service';
@@ -370,6 +371,29 @@ describe('FeedbackFormComponent — Soporte, Bugs, Sugerencias y Testimonios con
       expect(compiled.textContent).toContain('Respuesta del Equipo de Piezo3D Studio:');
       expect(compiled.textContent).toContain('Estamos revisando');
       expect(compiled.textContent).toContain('Caso #E5689B');
+    });
+
+    it('debe mostrar el correo directo oficial piezo3dstudio@gmail.com con enlace mailto y normalizar el valor legado', () => {
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(component.supportEmail()).toBe('piezo3dstudio@gmail.com');
+
+      const mailLink = compiled.querySelector('[data-testid="feedback-direct-support-email"]') as HTMLAnchorElement;
+      expect(mailLink).toBeTruthy();
+      expect(mailLink.getAttribute('href')).toBe('mailto:piezo3dstudio@gmail.com');
+      expect(mailLink.textContent?.trim()).toBe('piezo3dstudio@gmail.com');
+      expect(compiled.textContent).not.toContain('eydersuarez900@gmail.com');
+
+      // Simular mock con platformSettings devolviendo correo legado
+      const legacySettings = signal({ support_email: 'eydersuarez900@gmail.com' });
+      (supabaseMock as unknown as { platformSettings: typeof legacySettings }).platformSettings = legacySettings;
+      const freshFixture = TestBed.createComponent(FeedbackFormComponent);
+      freshFixture.detectChanges();
+
+      const freshEl = freshFixture.nativeElement as HTMLElement;
+      expect(freshFixture.componentInstance.supportEmail()).toBe('piezo3dstudio@gmail.com');
+      const freshLink = freshEl.querySelector('[data-testid="feedback-direct-support-email"]') as HTMLAnchorElement;
+      expect(freshLink?.getAttribute('href')).toBe('mailto:piezo3dstudio@gmail.com');
+      expect(freshEl.textContent).not.toContain('eydersuarez900@gmail.com');
     });
   });
 });

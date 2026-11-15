@@ -28,6 +28,7 @@ import {
   Shield01Icon
 } from '@hugeicons/core-free-icons';
 import { SupabaseService } from '../../services/supabase.service';
+import { resolvePublicSupportEmail } from '../../utils/support-email';
 
 export type LegalDocType = 'terms' | 'privacy' | 'refunds';
 
@@ -97,8 +98,8 @@ export class LegalPageComponent implements OnInit {
         platformSettings?: () => { support_email?: string } | null;
       }
     ).platformSettings;
-    const dynamicEmail = typeof settingsFn === 'function' ? settingsFn()?.support_email?.trim() : '';
-    return dynamicEmail || 'eydersuarez900@gmail.com';
+    const rawEmail = typeof settingsFn === 'function' ? settingsFn()?.support_email : undefined;
+    return resolvePublicSupportEmail(rawEmail);
   });
 
   readonly appVersion = computed<string>(() => {

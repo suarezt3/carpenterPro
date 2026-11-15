@@ -26,14 +26,17 @@ import {
   SlidersHorizontalIcon,
   Exchange01Icon,
   SquareIcon,
-  CustomerSupportIcon
+  CustomerSupportIcon,
+  Mail01Icon
 } from '@hugeicons/core-free-icons';
 import { ThemeService } from '../../services/theme.service';
 import { I18nService } from '../../services/i18n.service';
+import { SupabaseService } from '../../services/supabase.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { DocArticle, DocCategory } from '../../models/documentation.models';
 import { APP_DOC_ARTICLES_BY_LANG, APP_DOC_CATEGORIES_BY_LANG } from '../../data/documentation-i18n.data';
 import { FeedbackFormComponent } from '../feedback-form/feedback-form';
+import { resolvePublicSupportEmail } from '../../utils/support-email';
 
 /**
  * Modal de documentación técnica interactiva y manual de usuario en Piezo3D Studio.
@@ -42,6 +45,7 @@ import { FeedbackFormComponent } from '../feedback-form/feedback-form';
  */
 @Component({
   selector: 'app-documentation-modal',
+  standalone: true,
   imports: [HugeiconsIconComponent, TranslatePipe, FeedbackFormComponent],
   templateUrl: './documentation-modal.html',
   styleUrl: './documentation-modal.css',
@@ -50,6 +54,17 @@ import { FeedbackFormComponent } from '../feedback-form/feedback-form';
 export class DocumentationModalComponent {
   readonly themeService = inject(ThemeService);
   readonly i18n = inject(I18nService);
+  readonly supabase = inject(SupabaseService);
+
+  readonly supportEmail = computed<string>(() =>
+    resolvePublicSupportEmail(
+      (
+        this.supabase as unknown as {
+          platformSettings?: () => { support_email?: string } | null;
+        }
+      ).platformSettings?.()?.support_email
+    )
+  );
 
   // Registro local de iconos Hugeicons oficiales verificados (cero SVGs inline)
   readonly icons = {
@@ -74,7 +89,8 @@ export class DocumentationModalComponent {
     scissors: ScissorsIcon,
     tag: Tag01Icon,
     download: Download01Icon,
-    support: CustomerSupportIcon
+    support: CustomerSupportIcon,
+    mail: Mail01Icon
   };
 
   // Estado de apertura del modal y eventos de salida

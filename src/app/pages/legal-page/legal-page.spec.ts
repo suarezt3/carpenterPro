@@ -31,7 +31,7 @@ describe('LegalPageComponent (Centro Legal Público: /terms, /privacy, /refunds)
   beforeEach(async () => {
     mockSupabase = {
       platformSettings: signal({
-        support_email: 'eydersuarez900@gmail.com',
+        support_email: 'piezo3dstudio@gmail.com',
         app_version: 'v3.0.0'
       }),
       loadPlatformSettings: vi.fn().mockResolvedValue({})
@@ -63,7 +63,8 @@ describe('LegalPageComponent (Centro Legal Público: /terms, /privacy, /refunds)
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Centro Legal y Transparencia Operativa');
     expect(el.textContent).toContain('Última actualización: Noviembre 2026');
-    expect(el.textContent).toContain('eydersuarez900@gmail.com');
+    expect(el.textContent).toContain('piezo3dstudio@gmail.com');
+    expect(el.textContent).not.toContain('eydersuarez900@gmail.com');
     expect(el.querySelector('[data-testid="legal-back-home-btn"]')).toBeTruthy();
     expect(el.querySelector('[data-testid="legal-content-terms"]')).toBeTruthy();
   });
@@ -237,5 +238,18 @@ describe('LegalPageComponent (Centro Legal Público: /terms, /privacy, /refunds)
       expect(lower).not.toContain('postgresql');
       expect(lower).not.toContain('uuid');
     }
+  });
+
+  it('debe normalizar automáticamente el correo legado eydersuarez900@gmail.com a piezo3dstudio@gmail.com en las vistas legales', () => {
+    mockSupabase.platformSettings.set({
+      support_email: 'eydersuarez900@gmail.com',
+      app_version: 'v3.0.0'
+    });
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(component.supportEmail()).toBe('piezo3dstudio@gmail.com');
+    expect(el.textContent).toContain('piezo3dstudio@gmail.com');
+    expect(el.textContent).not.toContain('eydersuarez900@gmail.com');
   });
 });

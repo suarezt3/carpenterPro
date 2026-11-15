@@ -9,6 +9,7 @@ import {
   SupabaseService,
   UserProfile
 } from '../../services/supabase.service';
+import { isSuperAdminOwnerEmail } from '../../utils/support-email';
 
 describe('AdminDashboardComponent', () => {
   let component: AdminDashboardComponent;
@@ -18,7 +19,7 @@ describe('AdminDashboardComponent', () => {
   const mockSettings: PlatformSettingsRecord = {
     id: 1,
     app_version: 'v3.0.0',
-    support_email: 'eydersuarez900@gmail.com',
+    support_email: 'piezo3dstudio@gmail.com',
     pro_monthly_usd: 15,
     pro_annual_monthly_usd: 12,
     pro_annual_total_usd: 144,
@@ -313,5 +314,26 @@ describe('AdminDashboardComponent', () => {
     expect(component.supportTicketsList()[0].status).toBe('resolved');
     expect(component.supportTicketsList()[0].admin_notes).toBe('Resuelto en revisión v3.0.1');
     expect(component.savedFeedbackId()).toBe('fb-bug-1');
+  });
+
+  it('should default and normalize support_email to piezo3dstudio@gmail.com and recognize both owner emails', async () => {
+    expect(component.currentSettings().support_email).toBe('piezo3dstudio@gmail.com');
+    expect(component.cmsForm.controls.support_email.value).toBe('piezo3dstudio@gmail.com');
+    expect(fixture.nativeElement.textContent).toContain('piezo3dstudio@gmail.com');
+
+    // Simular que la fila heredada en DB todavía contiene el correo legado
+    (supabaseMock.platformSettings as ReturnType<typeof signal<PlatformSettingsRecord>>).set({
+      ...mockSettings,
+      support_email: 'eydersuarez900@gmail.com'
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(component.currentSettings().support_email).toBe('piezo3dstudio@gmail.com');
+    expect(component.cmsForm.controls.support_email.value).toBe('piezo3dstudio@gmail.com');
+
+    // Salvaguarda dual de correos propietarios SuperAdmin
+    expect(isSuperAdminOwnerEmail('eydersuarez900@gmail.com')).toBe(true);
+    expect(isSuperAdminOwnerEmail('piezo3dstudio@gmail.com')).toBe(true);
   });
 });

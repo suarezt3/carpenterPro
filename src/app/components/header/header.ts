@@ -67,6 +67,7 @@ import { ChangelogModalComponent } from '../changelog-modal/changelog-modal';
 import { AssemblyGuideModalComponent } from '../assembly-guide-modal/assembly-guide-modal';
 import { AccountSettingsModalComponent } from '../account-settings-modal/account-settings-modal';
 import { APP_CURRENT_VERSION } from '../../data/changelog.data';
+import { isSuperAdminOwnerEmail } from '../../utils/support-email';
 
 /**
  * Barra de navegación superior global de Piezo3D Studio.
@@ -213,7 +214,7 @@ export class HeaderComponent {
     const user = typeof this.supabase.currentUser === 'function' ? this.supabase.currentUser() : null;
     return (
       profile?.role === 'super_admin' ||
-      user?.email?.toLowerCase() === 'eydersuarez900@gmail.com'
+      isSuperAdminOwnerEmail(user?.email)
     );
   });
 

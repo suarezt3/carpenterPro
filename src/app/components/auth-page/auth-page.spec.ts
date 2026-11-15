@@ -620,12 +620,27 @@ describe('AuthPageComponent', () => {
       expect(component.pwHasSpecialChar()).toBe(true);
     });
 
-    it('debe renderizar enlaces legales en el footer hacia /terms, /privacy, /refunds y el correo de soporte', () => {
+    it('debe renderizar enlaces legales en el footer hacia /terms, /privacy, /refunds y el correo oficial de soporte piezo3dstudio@gmail.com', () => {
       const el = fixture.nativeElement as HTMLElement;
       expect(el.querySelector('a[routerLink="/terms"]')).toBeTruthy();
       expect(el.querySelector('a[routerLink="/privacy"]')).toBeTruthy();
       expect(el.querySelector('a[routerLink="/refunds"]')).toBeTruthy();
-      expect(el.textContent).toContain(component.supportEmail());
+      expect(component.supportEmail()).toBe('piezo3dstudio@gmail.com');
+      expect(el.textContent).toContain('piezo3dstudio@gmail.com');
+      expect(el.textContent).not.toContain('eydersuarez900@gmail.com');
+      expect(el.querySelector('a[href="mailto:piezo3dstudio@gmail.com"]')).toBeTruthy();
+
+      // Incluso si platformSettings contiene el valor legado, debe mostrar piezo3dstudio@gmail.com
+      const settingsSig = signal<{ support_email?: string }>({
+        support_email: 'eydersuarez900@gmail.com'
+      });
+      (mockSupabase as unknown as { platformSettings: typeof settingsSig }).platformSettings = settingsSig;
+      const freshFixture = TestBed.createComponent(AuthPageComponent);
+      freshFixture.detectChanges();
+      const freshEl = freshFixture.nativeElement as HTMLElement;
+      expect(freshFixture.componentInstance.supportEmail()).toBe('piezo3dstudio@gmail.com');
+      expect(freshEl.textContent).toContain('piezo3dstudio@gmail.com');
+      expect(freshEl.textContent).not.toContain('eydersuarez900@gmail.com');
     });
   });
 });

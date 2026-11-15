@@ -3,6 +3,21 @@ import { isPlatformBrowser } from '@angular/common';
 import { createClient, Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { Project } from '../models/melamine.models';
 import { CreateFeedbackPayload, UserFeedbackRecord } from '../models/feedback.models';
+import {
+  LEGACY_SUPPORT_EMAIL,
+  OFFICIAL_SUPPORT_EMAIL,
+  SUPER_ADMIN_OWNER_EMAILS,
+  isSuperAdminOwnerEmail,
+  resolvePublicSupportEmail
+} from '../utils/support-email';
+
+export {
+  LEGACY_SUPPORT_EMAIL,
+  OFFICIAL_SUPPORT_EMAIL,
+  SUPER_ADMIN_OWNER_EMAILS,
+  isSuperAdminOwnerEmail,
+  resolvePublicSupportEmail
+};
 
 /**
  * Estructura del registro que se guarda en la tabla `public.projects` de Supabase.
@@ -553,10 +568,10 @@ ALTER TABLE public.user_profiles
   ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'super_admin')),
   ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN NOT NULL DEFAULT false;
 
--- 2. Elevar automáticamente la cuenta propietaria a super_admin e industrial
+-- 2. Elevar automáticamente las cuentas propietarias a super_admin e industrial
 UPDATE public.user_profiles
 SET role = 'super_admin', plan = 'industrial', subscription_status = 'active'
-WHERE lower(email) = 'eydersuarez900@gmail.com';
+WHERE lower(email) IN ('eydersuarez900@gmail.com', 'piezo3dstudio@gmail.com');
 
 -- 3. Función SECURITY DEFINER para verificar super_admin sin recursión infinita en RLS
 CREATE OR REPLACE FUNCTION public.is_super_admin()
@@ -596,7 +611,7 @@ CREATE POLICY "Super admins can view all invoices"
 CREATE TABLE IF NOT EXISTS public.platform_settings (
   id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   app_version TEXT NOT NULL DEFAULT 'v3.0.0',
-  support_email TEXT NOT NULL DEFAULT 'eydersuarez900@gmail.com',
+  support_email TEXT NOT NULL DEFAULT 'piezo3dstudio@gmail.com',
   pro_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 15,
   pro_annual_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 12,
   pro_annual_total_usd NUMERIC(10,2) NOT NULL DEFAULT 144,
@@ -611,6 +626,8 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
 );
 
 INSERT INTO public.platform_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+UPDATE public.platform_settings SET support_email = 'piezo3dstudio@gmail.com' WHERE id = 1 AND lower(support_email) = 'eydersuarez900@gmail.com';
 
 ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
 
@@ -706,7 +723,7 @@ export class SupabaseService {
   readonly platformSettings = signal<PlatformSettingsRecord>({
     id: 1,
     app_version: 'v3.0.0',
-    support_email: 'eydersuarez900@gmail.com',
+    support_email: OFFICIAL_SUPPORT_EMAIL,
     pro_monthly_usd: 15,
     pro_annual_monthly_usd: 12,
     pro_annual_total_usd: 144,
@@ -723,7 +740,7 @@ export class SupabaseService {
   readonly isSuperAdmin = computed<boolean>(
     () =>
       this.userProfile()?.role === 'super_admin' ||
-      this.currentUser()?.email?.toLowerCase() === 'eydersuarez900@gmail.com'
+      isSuperAdminOwnerEmail(this.currentUser()?.email)
   );
 
   /**
@@ -956,7 +973,7 @@ export class SupabaseService {
       firstName = user.email.split('@')[0] || 'Usuario';
     }
 
-    const isOwnerEmail = (user.email ?? '').trim().toLowerCase() === 'eydersuarez900@gmail.com';
+    const isOwnerEmail = isSuperAdminOwnerEmail(user.email);
     const hasGooglePhoto =
       (typeof meta['avatar_url'] === 'string' && !!meta['avatar_url'].trim()) ||
       (typeof meta['picture'] === 'string' && !!meta['picture'].trim());
@@ -1043,7 +1060,7 @@ export class SupabaseService {
       if (!error && data) {
         const record = data as Record<string, unknown>;
         const recordEmail = String(record['email'] ?? targetUser.email ?? '');
-        const isOwner = recordEmail.trim().toLowerCase() === 'eydersuarez900@gmail.com';
+        const isOwner = isSuperAdminOwnerEmail(recordEmail);
         const rawCycle = record['billing_cycle'];
         const rawStatus = record['subscription_status'];
         const rawAvatarMode = record['avatar_mode'];
@@ -2566,10 +2583,11 @@ export class SupabaseService {
         typeof raw['app_version'] === 'string' && raw['app_version'].trim()
           ? raw['app_version'].trim()
           : fallback.app_version,
-      support_email:
-        typeof raw['support_email'] === 'string' && raw['support_email'].trim()
-          ? raw['support_email'].trim()
-          : fallback.support_email,
+      support_email: resolvePublicSupportEmail(
+        typeof raw['support_email'] === 'string'
+          ? raw['support_email']
+          : fallback.support_email
+      ),
       pro_monthly_usd:
         raw['pro_monthly_usd'] !== undefined && raw['pro_monthly_usd'] !== null
           ? Number(raw['pro_monthly_usd'])
@@ -2759,6 +2777,9 @@ export class SupabaseService {
         ...patch,
         updated_at: nowIso
       };
+      if (typeof patch.support_email === 'string') {
+        payload['support_email'] = resolvePublicSupportEmail(patch.support_email);
+      }
       delete payload['id'];
 
       const { error } = await this.client
@@ -2795,7 +2816,7 @@ export class SupabaseService {
       return data.map((row) => {
         const record = row as Record<string, unknown>;
         const email = String(record['email'] ?? '');
-        const isOwner = email.trim().toLowerCase() === 'eydersuarez900@gmail.com';
+        const isOwner = isSuperAdminOwnerEmail(email);
         const rawStatus = record['subscription_status'];
         const validStatuses: SubscriptionStatus[] = [
           'free',

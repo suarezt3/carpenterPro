@@ -511,38 +511,69 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
     });
 
     describe('Superadministrador y CMS Global (platform_settings y platform_feedback)', () => {
-      it('SUPABASE_SUPERADMIN_SQL_SETUP debe incluir platform_settings, platform_feedback y función is_super_admin', async () => {
+      it('SUPABASE_SUPERADMIN_SQL_SETUP debe incluir platform_settings, ambos correos SuperAdmin y default piezo3dstudio@gmail.com', async () => {
         const { SUPABASE_SUPERADMIN_SQL_SETUP } = await import('./supabase.service');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.platform_settings');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.platform_feedback');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE OR REPLACE FUNCTION public.is_super_admin()');
-        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('eydersuarez900@gmail.com');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain(
+          "WHERE lower(email) IN ('eydersuarez900@gmail.com', 'piezo3dstudio@gmail.com');"
+        );
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain(
+          "support_email TEXT NOT NULL DEFAULT 'piezo3dstudio@gmail.com',"
+        );
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain(
+          "UPDATE public.platform_settings SET support_email = 'piezo3dstudio@gmail.com' WHERE id = 1 AND lower(support_email) = 'eydersuarez900@gmail.com';"
+        );
       });
 
-      it('buildFallbackProfile debe asignar rol super_admin y plan industrial a la cuenta propietaria', () => {
-        const ownerUser = {
-          id: 'owner-1',
-          email: 'eydersuarez900@gmail.com',
+      it('buildFallbackProfile debe asignar rol super_admin y plan industrial a ambas cuentas propietarias', () => {
+        for (const ownerEmail of ['eydersuarez900@gmail.com', 'piezo3dstudio@gmail.com', '  Piezo3DStudio@GMAIL.com  ']) {
+          const ownerUser = {
+            id: `owner-${ownerEmail}`,
+            email: ownerEmail,
+            app_metadata: {},
+            user_metadata: { first_name: 'Eyder', last_name: 'Suárez' },
+            aud: 'authenticated',
+            created_at: '2026-11-01T00:00:00Z'
+          };
+          const profile = service.buildFallbackProfile(ownerUser);
+          expect(profile.role).toBe('super_admin');
+          expect(profile.plan).toBe('industrial');
+          expect(profile.subscription_status).toBe('active');
+          expect(profile.is_suspended).toBe(false);
+        }
+
+        const regularProfile = service.buildFallbackProfile({
+          id: 'regular-1',
+          email: 'cliente@taller.com',
           app_metadata: {},
-          user_metadata: { first_name: 'Eyder', last_name: 'Suárez' },
+          user_metadata: {},
           aud: 'authenticated',
           created_at: '2026-11-01T00:00:00Z'
-        };
-        const profile = service.buildFallbackProfile(ownerUser);
-        expect(profile.role).toBe('super_admin');
-        expect(profile.plan).toBe('industrial');
-        expect(profile.subscription_status).toBe('active');
-        expect(profile.is_suspended).toBe(false);
+        });
+        expect(regularProfile.role).toBe('user');
+        expect(regularProfile.plan).toBe('free');
       });
 
-      it('isSuperAdmin debe ser true si el rol es super_admin o el email es el propietario', () => {
+      it('isSuperAdmin debe ser true si el rol es super_admin o el email corresponde a cualquiera de los propietarios', () => {
         service.currentUser.set(null);
         service.userProfile.set(null);
         expect(service.isSuperAdmin()).toBe(false);
 
         service.currentUser.set({
-          id: 'owner-id',
+          id: 'owner-id-1',
           email: 'eydersuarez900@gmail.com',
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated',
+          created_at: ''
+        });
+        expect(service.isSuperAdmin()).toBe(true);
+
+        service.currentUser.set({
+          id: 'owner-id-2',
+          email: 'piezo3dstudio@gmail.com',
           app_metadata: {},
           user_metadata: {},
           aud: 'authenticated',
@@ -571,12 +602,77 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(service.isSuperAdmin()).toBe(true);
       });
 
-      it('loadPlatformSettings debe retornar la configuración por defecto y actualizar la señal', async () => {
+      it('loadUserProfile debe elevar a super_admin e industrial a ambos correos propietarios', async () => {
+        for (const ownerEmail of ['eydersuarez900@gmail.com', 'piezo3dstudio@gmail.com']) {
+          const mockMaybeSingle = vi.fn().mockResolvedValue({
+            data: {
+              id: `u-${ownerEmail}`,
+              email: ownerEmail,
+              first_name: 'Piezo3D',
+              last_name: 'Owner',
+              role: 'user',
+              plan: 'free',
+              billing_cycle: 'monthly',
+              subscription_status: 'free',
+              is_suspended: false,
+              created_at: '2026-11-01T00:00:00Z',
+              updated_at: '2026-11-01T00:00:00Z'
+            },
+            error: null
+          });
+          const mockEq = vi.fn().mockReturnValue({ maybeSingle: mockMaybeSingle });
+          const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+          const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+          (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
+
+          const loaded = await service.loadUserProfile({
+            id: `u-${ownerEmail}`,
+            email: ownerEmail,
+            app_metadata: {},
+            user_metadata: {},
+            aud: 'authenticated',
+            created_at: '2026-11-01T00:00:00Z'
+          } as unknown as import('@supabase/supabase-js').User);
+
+          expect(loaded?.role).toBe('super_admin');
+          expect(loaded?.plan).toBe('industrial');
+          expect(loaded?.subscription_status).toBe('active');
+        }
+      });
+
+      it('loadPlatformSettings debe retornar piezo3dstudio@gmail.com por defecto y normalizar el valor legado', async () => {
+        expect(service.platformSettings().support_email).toBe('piezo3dstudio@gmail.com');
+
         const settings = await service.loadPlatformSettings();
         expect(settings.id).toBe(1);
         expect(settings.app_version).toBe('v3.0.0');
-        expect(settings.support_email).toBe('eydersuarez900@gmail.com');
+        expect(settings.support_email).toBe('piezo3dstudio@gmail.com');
         expect(service.platformSettings().pro_monthly_usd).toBe(15);
+
+        // Si Supabase devuelve el correo legado en la fila de platform_settings, debe normalizarse a piezo3dstudio@gmail.com
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: 1, support_email: 'eydersuarez900@gmail.com', app_version: 'v3.0.0' }]
+        } as unknown as Response);
+        try {
+          const normalizedLegacy = await service.loadPlatformSettings();
+          expect(normalizedLegacy.support_email).toBe('piezo3dstudio@gmail.com');
+          expect(service.platformSettings().support_email).toBe('piezo3dstudio@gmail.com');
+        } finally {
+          fetchSpy.mockRestore();
+        }
+
+        // Si Supabase devuelve un correo corporativo personalizado, debe conservarse
+        const fetchCustomSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: 1, support_email: 'soporte@piezo3d.com', app_version: 'v3.0.0' }]
+        } as unknown as Response);
+        try {
+          const customSettings = await service.loadPlatformSettings();
+          expect(customSettings.support_email).toBe('soporte@piezo3d.com');
+        } finally {
+          fetchCustomSpy.mockRestore();
+        }
       });
 
       it('updatePlatformSettings debe actualizar la señal platformSettings localmente y llamar a la base de datos', async () => {
@@ -599,13 +695,39 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(mockEq).toHaveBeenCalledWith('id', 1);
       });
 
-      it('adminGetAllProfiles debe retornar lista de perfiles mapeados', async () => {
+      it('adminGetAllProfiles debe retornar lista de perfiles mapeados y elevar ambos correos propietarios', async () => {
         const mockProfiles = [
           {
             id: 'u-1',
             email: 'user1@test.com',
             first_name: 'User',
             last_name: 'Uno',
+            role: 'user',
+            plan: 'free',
+            billing_cycle: 'monthly',
+            subscription_status: 'free',
+            is_suspended: false,
+            created_at: '2026-11-01T00:00:00Z',
+            updated_at: '2026-11-01T00:00:00Z'
+          },
+          {
+            id: 'u-owner-legacy',
+            email: 'eydersuarez900@gmail.com',
+            first_name: 'Eyder',
+            last_name: 'Suarez',
+            role: 'user',
+            plan: 'free',
+            billing_cycle: 'monthly',
+            subscription_status: 'free',
+            is_suspended: false,
+            created_at: '2026-11-01T00:00:00Z',
+            updated_at: '2026-11-01T00:00:00Z'
+          },
+          {
+            id: 'u-owner-studio',
+            email: 'piezo3dstudio@gmail.com',
+            first_name: 'Piezo3D',
+            last_name: 'Studio',
             role: 'user',
             plan: 'free',
             billing_cycle: 'monthly',
@@ -621,8 +743,13 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
 
         const list = await service.adminGetAllProfiles();
-        expect(list.length).toBe(1);
+        expect(list.length).toBe(3);
         expect(list[0].email).toBe('user1@test.com');
+        expect(list[0].role).toBe('user');
+        expect(list[1].role).toBe('super_admin');
+        expect(list[1].plan).toBe('industrial');
+        expect(list[2].role).toBe('super_admin');
+        expect(list[2].plan).toBe('industrial');
         expect(mockFrom).toHaveBeenCalledWith('user_profiles');
       });
 

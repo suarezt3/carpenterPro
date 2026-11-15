@@ -827,7 +827,30 @@ describe('LandingPageComponent', () => {
       expect(compiled.querySelector('a[routerLink="/terms"]')).toBeTruthy();
       expect(compiled.querySelector('a[routerLink="/privacy"]')).toBeTruthy();
       expect(compiled.querySelector('a[routerLink="/refunds"]')).toBeTruthy();
-      expect(compiled.textContent).toContain('eydersuarez900@gmail.com');
+      expect(compiled.textContent).toContain('piezo3dstudio@gmail.com');
+      expect(compiled.textContent).not.toContain('eydersuarez900@gmail.com');
+      expect(compiled.querySelector('a[href="mailto:piezo3dstudio@gmail.com"]')).toBeTruthy();
+    });
+
+    it('jamás debe mostrar el correo legado eydersuarez900@gmail.com en el DOM aunque platformSettings aún lo contenga', () => {
+      const settingsSig = signal<{ support_email?: string }>({
+        support_email: 'eydersuarez900@gmail.com'
+      });
+      (mockSupabase as Record<string, unknown>)['platformSettings'] = settingsSig;
+
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(component.supportEmail()).toBe('piezo3dstudio@gmail.com');
+      expect(compiled.textContent).toContain('piezo3dstudio@gmail.com');
+      expect(compiled.textContent).not.toContain('eydersuarez900@gmail.com');
+
+      settingsSig.set({ support_email: 'soporte@piezo3d.com' });
+      fixture.detectChanges();
+      expect(component.supportEmail()).toBe('soporte@piezo3d.com');
+      expect(compiled.textContent).toContain('soporte@piezo3d.com');
     });
   });
 

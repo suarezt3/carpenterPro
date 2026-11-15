@@ -399,17 +399,30 @@
 
       <!-- PIE DEL MODAL -->
       <div
-        class="px-5 sm:px-6 py-3 border-t flex items-center justify-between shrink-0"
+        class="px-5 sm:px-6 py-3 border-t flex flex-wrap items-center justify-between gap-3 shrink-0"
         [class]="themeService.isClassic() ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-950 border-zinc-800'">
-        <div class="flex items-center gap-2 text-xs font-medium" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-400'">
-          <hugeicons-icon [icon]="icons.verified" [size]="15" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-          <span>{{ 'help.footerText' | t }}</span>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-medium font-sans" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-400'">
+          <div class="flex items-center gap-2">
+            <hugeicons-icon [icon]="icons.verified" [size]="15" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+            <span>{{ 'help.footerText' | t }}</span>
+          </div>
+          <span aria-hidden="true" class="hidden sm:inline text-zinc-300 dark:text-zinc-700">·</span>
+          <div class="flex items-center gap-1.5">
+            <hugeicons-icon [icon]="icons.mail" [size]="14" [strokeWidth]="2" class="text-sky-600 dark:text-sky-400 shrink-0"></hugeicons-icon>
+            <span>{{ 'feedback.directSupportLabel' | t }}</span>
+            <a
+              [href]="'mailto:' + supportEmail()"
+              data-testid="help-direct-support-email"
+              class="font-medium text-sky-600 hover:underline dark:text-sky-400 transition">
+              {{ supportEmail() }}
+            </a>
+          </div>
         </div>
 
         <button
           type="button"
           (click)="close()"
-          class="px-4 py-2 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition shadow-xs cursor-pointer flex items-center gap-1.5">
+          class="px-4 py-2 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0">
           <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
           <span>{{ 'help.closeBtn' | t }}</span>
         </button>
