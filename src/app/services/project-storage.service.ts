@@ -28,7 +28,11 @@ import {
   DrawerOpeningSystem,
   ModuleCavityInfo,
   SlideType,
-  CollisionFixOption
+  CollisionFixOption,
+  DoorConfigurationMode,
+  DoorHandleVerticalPosition,
+  HingeType,
+  PartHardwareConfig
 } from '../models/melamine.models';
 import { CabinetGeneratorService } from './cabinet-generator.service';
 import { JoineryEngineService } from './joinery-engine.service';
@@ -683,6 +687,10 @@ export class ProjectStorageService {
     } catch {
       // Fallback seguro si falla la serialización
     }
+  }
+
+  saveUndoSnapshot(): void {
+    this.pushSnapshot();
   }
 
   clearHistory() {
@@ -2294,7 +2302,7 @@ export class ProjectStorageService {
       });
 
       // Actualizar la dirección frontal ('front' | 'right' | 'back' | 'left') de los grupos rotados
-      let currentGroups = p.groups ? [...p.groups] : [];
+      const currentGroups = p.groups ? [...p.groups] : [];
       for (const gId of groupIdsFromParts) {
         if (!currentGroups.some(g => g.id === gId)) {
           const sample = targetParts.find(pt => pt.groupId === gId);
@@ -5652,5 +5660,580 @@ export class ProjectStorageService {
     }
 
     return newParts;
+  }
+
+  // =========================================================================
+  // CONFIGURACIÓN DE PUERTAS EN 1 CLIC (FASE 3 & FASE 4.1)
+  // =========================================================================
+
+  private isConfigurableDoorPart(part: Part | null | undefined): boolean {
+    if (!part) return false;
+    if (
+      part.componentRole === 'drawer_front' ||
+      part.componentRole === 'drawer_box' ||
+      part.componentRole === 'drawer_lateral' ||
+      part.componentRole === 'drawer_bottom'
+    ) {
+      return false;
+    }
+    const upperName = (part.name || '').toUpperCase();
+    if (upperName.includes('PANEL CIEGO')) {
+      return false;
+    }
+    return (
+      part.componentRole === 'door' ||
+      part.hardwareConfig?.movableType === 'door' ||
+      (upperName.includes('PUERTA') && !upperName.includes('CAJ'))
+    );
+  }
+
+  private getDoorHorizontalMetrics(door: Part): {
+    isRotatedZ: boolean;
+    wProp: 'length' | 'width';
+    hProp: 'length' | 'width';
+    coordProp: 'posX' | 'posZ';
+    depthProp: 'posX' | 'posZ';
+    horizW: number;
+    vertH: number;
+    horizCenter: number;
+    depthCenter: number;
+    posY: number;
+    minCoord: number;
+    maxCoord: number;
+  } {
+    const isRotatedZ =
+      door.orientation === 'vertical_yz' || Math.abs((door.rotationY || 0) % 180) === 90;
+    const wProp: 'length' | 'width' = door.orientation === 'vertical_xy' ? 'length' : 'width';
+    const hProp: 'length' | 'width' = door.orientation === 'vertical_xy' ? 'width' : 'length';
+    const coordProp: 'posX' | 'posZ' = isRotatedZ ? 'posZ' : 'posX';
+    const depthProp: 'posX' | 'posZ' = isRotatedZ ? 'posX' : 'posZ';
+    const horizW = Math.max(10, Number(door[wProp]) || 0);
+    const vertH = Math.max(10, Number(door[hProp]) || 0);
+    const horizCenter = Number(door[coordProp]) || 0;
+    const depthCenter = Number(door[depthProp]) || 0;
+    const posY = door.posY ?? vertH / 2;
+    return {
+      isRotatedZ,
+      wProp,
+      hProp,
+      coordProp,
+      depthProp,
+      horizW,
+      vertH,
+      horizCenter,
+      depthCenter,
+      posY,
+      minCoord: horizCenter - horizW / 2,
+      maxCoord: horizCenter + horizW / 2
+    };
+  }
+
+  /**
+   * Busca la puerta hermana par (Doble Hoja) que comparte el mismo vano horizontal y altura.
+   */
+  findPairedDoorSibling(doorPart: Part, allParts?: Part[]): Part | null {
+    if (!doorPart || !this.isConfigurableDoorPart(doorPart)) {
+      return null;
+    }
+    const list = allParts ?? this.partsList();
+    const m0 = this.getDoorHorizontalMetrics(doorPart);
+
+    let bestCandidate: Part | null = null;
+    let bestScore = Infinity;
+
+    for (const candidate of list) {
+      if (candidate.id === doorPart.id) continue;
+      if (!this.isConfigurableDoorPart(candidate)) continue;
+
+      if (doorPart.groupId || candidate.groupId) {
+        if (doorPart.groupId !== candidate.groupId) continue;
+      } else if (doorPart.moduleId || candidate.moduleId) {
+        if (doorPart.moduleId !== candidate.moduleId) continue;
+      }
+
+      const mc = this.getDoorHorizontalMetrics(candidate);
+      if (mc.isRotatedZ !== m0.isRotatedZ) continue;
+      if (Math.abs(mc.posY - m0.posY) > 25) continue;
+      if (Math.abs(mc.vertH - m0.vertH) > 5 && Math.abs(candidate.length - doorPart.length) > 5) {
+        continue;
+      }
+      if (Math.abs(mc.depthCenter - m0.depthCenter) > 25) continue;
+
+      const edgeGap =
+        mc.horizCenter >= m0.horizCenter
+          ? mc.minCoord - m0.maxCoord
+          : m0.minCoord - mc.maxCoord;
+
+      if (edgeGap >= -5 && edgeGap <= 20) {
+        const score = Math.abs(edgeGap - 3) + Math.abs(mc.posY - m0.posY) * 0.1;
+        if (score < bestScore) {
+          bestScore = score;
+          bestCandidate = candidate;
+        }
+      }
+    }
+
+    return bestCandidate;
+  }
+
+  private resolveTargetBayDoors(
+    partOrGroupId: string,
+    allParts: Part[],
+    groups: PartGroup[]
+  ): { primaryDoor: Part | null; siblingDoor: Part | null; groupId?: string } {
+    const directPart = allParts.find(p => p.id === partOrGroupId);
+    if (directPart) {
+      if (this.isConfigurableDoorPart(directPart)) {
+        const siblingDoor = this.findPairedDoorSibling(directPart, allParts);
+        return {
+          primaryDoor: directPart,
+          siblingDoor,
+          groupId: directPart.groupId
+        };
+      }
+      if (directPart.groupId) {
+        partOrGroupId = directPart.groupId;
+      } else if (directPart.moduleId) {
+        partOrGroupId = directPart.moduleId;
+      } else {
+        return { primaryDoor: null, siblingDoor: null };
+      }
+    }
+
+    const matchedGroup = groups.find(g => g.id === partOrGroupId);
+    const groupPartIds = new Set(matchedGroup?.partIds || []);
+    const groupDoors = allParts.filter(
+      p =>
+        this.isConfigurableDoorPart(p) &&
+        (p.groupId === partOrGroupId ||
+          p.moduleId === partOrGroupId ||
+          groupPartIds.has(p.id))
+    );
+
+    if (groupDoors.length === 0) {
+      return { primaryDoor: null, siblingDoor: null, groupId: matchedGroup?.id };
+    }
+
+    const primaryDoor = groupDoors[0];
+    const siblingDoor =
+      this.findPairedDoorSibling(primaryDoor, groupDoors) ??
+      (groupDoors.length === 2 ? groupDoors[1] : null);
+
+    return {
+      primaryDoor,
+      siblingDoor,
+      groupId: primaryDoor.groupId || matchedGroup?.id
+    };
+  }
+
+  /**
+   * Obtiene el modo actual de configuración de puerta ('left' | 'right' | 'double' | 'top' | 'bottom' | 'none')
+   * tanto si se pasa el ID de una puerta individual como el ID de un grupo/módulo.
+   */
+  getDoorConfigurationMode(partOrGroupId: string): DoorConfigurationMode | 'none' {
+    if (!partOrGroupId) return 'none';
+    const proj = this.currentProject();
+    const allParts = proj.parts || [];
+    const groups = proj.groups || [];
+
+    const { primaryDoor, siblingDoor } = this.resolveTargetBayDoors(
+      partOrGroupId,
+      allParts,
+      groups
+    );
+
+    if (!primaryDoor) {
+      return 'none';
+    }
+    if (siblingDoor) {
+      return 'double';
+    }
+
+    const dir = primaryDoor.hardwareConfig?.openingDirection;
+    if (dir === 'left' || dir === 'right' || dir === 'top' || dir === 'bottom') {
+      return dir;
+    }
+
+    const upperName = (primaryDoor.name || '').toUpperCase();
+    if (
+      upperName.includes('ABATIBLE SUPERIOR') ||
+      upperName.includes('BASCULANTE') ||
+      upperName.includes('ELEVABLE') ||
+      upperName.includes('PISTON') ||
+      upperName.includes('PISTÓN')
+    ) {
+      return 'top';
+    }
+    if (upperName.includes('ABATIBLE INFERIOR')) {
+      return 'bottom';
+    }
+    if (upperName.includes('DERECHA') || upperName.includes('DER')) {
+      return 'right';
+    }
+    return 'left';
+  }
+
+  /**
+   * Configura en 1 clic el modo de apertura de la puerta o vano ('left' | 'right' | 'double' | 'top' | 'bottom'),
+   * dividiendo automáticamente 1 hoja en 2 hojas simétricas (con luz central de 3 mm) o fusionando 2 hojas en 1
+   * sin duplicar ni solapar piezas.
+   */
+  configureDoorOpeningMode(partOrGroupId: string, mode: DoorConfigurationMode): Part[] {
+    if (!partOrGroupId) return [];
+    const proj = this.currentProject();
+    const allParts = proj.parts || [];
+    const groups = proj.groups || [];
+
+    const { primaryDoor, siblingDoor, groupId } = this.resolveTargetBayDoors(
+      partOrGroupId,
+      allParts,
+      groups
+    );
+
+    if (!primaryDoor) {
+      return [];
+    }
+
+    this.saveUndoSnapshot();
+
+    const m1 = this.getDoorHorizontalMetrics(primaryDoor);
+    let totalW = m1.horizW;
+    let centerCoord = m1.horizCenter;
+
+    if (siblingDoor) {
+      const m2 = this.getDoorHorizontalMetrics(siblingDoor);
+      const minCoord = Math.min(m1.minCoord, m2.minCoord);
+      const maxCoord = Math.max(m1.maxCoord, m2.maxCoord);
+      totalW = Math.round((maxCoord - minCoord) * 10) / 10;
+      centerCoord = (minCoord + maxCoord) / 2;
+    }
+
+    const prevHw: PartHardwareConfig = primaryDoor.hardwareConfig || {};
+    const prevPos = prevHw.handlePosition;
+    const isHandleNone = prevPos === 'none' || prevHw.handleType === 'none';
+    const effectiveHandleType: HandleType = isHandleNone
+      ? 'none'
+      : prevHw.handleType && prevHw.handleType !== 'none'
+        ? prevHw.handleType
+        : 'bar_modern';
+    const effectiveHandleFinish: HandleFinish = prevHw.handleFinish || 'brushed_steel';
+    const prevVerticalHandlePos: DoorHandleVerticalPosition = isHandleNone
+      ? 'none'
+      : prevPos === 'top' || prevPos === 'center' || prevPos === 'bottom'
+        ? prevPos
+        : 'center';
+
+    let resultDoors: Part[] = [];
+
+    if (mode === 'double') {
+      const leafW = Number(((totalW - 3) / 2).toFixed(1));
+      const leftCenter = Number((centerCoord - (leafW / 2 + 1.5)).toFixed(2));
+      const rightCenter = Number((centerCoord + (leafW / 2 + 1.5)).toFixed(2));
+
+      const leftHw: PartHardwareConfig = {
+        ...prevHw,
+        isMovable: true,
+        movableType: 'door',
+        openingDirection: 'left',
+        hingeType: 'straight',
+        handleType: effectiveHandleType,
+        handleFinish: effectiveHandleFinish,
+        handlePosition: prevVerticalHandlePos,
+        isOpen: Boolean(prevHw.isOpen)
+      };
+
+      const rightHw: PartHardwareConfig = {
+        ...prevHw,
+        isMovable: true,
+        movableType: 'door',
+        openingDirection: 'right',
+        hingeType: 'straight',
+        handleType: effectiveHandleType,
+        handleFinish: effectiveHandleFinish,
+        handlePosition: prevVerticalHandlePos,
+        isOpen: Boolean(prevHw.isOpen)
+      };
+
+      if (!siblingDoor) {
+        const updatedLeft: Part = {
+          ...primaryDoor,
+          name: 'PUERTA IZQUIERDA',
+          componentRole: 'door',
+          [m1.wProp]: leafW,
+          [m1.coordProp]: leftCenter,
+          hardwareConfig: leftHw
+        };
+
+        const newRightId = `${primaryDoor.id}_der_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+        const createdRight: Part = {
+          ...primaryDoor,
+          id: newRightId,
+          name: 'PUERTA DERECHA',
+          componentRole: 'door',
+          [m1.wProp]: leafW,
+          [m1.coordProp]: rightCenter,
+          hardwareConfig: rightHw
+        };
+
+        resultDoors = [updatedLeft, createdRight];
+
+        this.updateProject(p => {
+          const nextParts: Part[] = [];
+          for (const pt of p.parts) {
+            if (pt.id === primaryDoor.id) {
+              nextParts.push(updatedLeft, createdRight);
+            } else {
+              nextParts.push(pt);
+            }
+          }
+
+          const nextGroups = (p.groups || []).map(g => {
+            if (g.id !== groupId) return g;
+            const nextPartIds = g.partIds
+              ? Array.from(new Set([...g.partIds, createdRight.id]))
+              : undefined;
+            return {
+              ...g,
+              ...(nextPartIds ? { partIds: nextPartIds } : {}),
+              ...(g.parametricConfig
+                ? {
+                    parametricConfig: {
+                      ...g.parametricConfig,
+                      doorOpening: 'double' as const
+                    }
+                  }
+                : {})
+            };
+          });
+
+          return {
+            ...p,
+            parts: nextParts,
+            groups: nextGroups
+          };
+        }, false);
+      } else {
+        const m2 = this.getDoorHorizontalMetrics(siblingDoor);
+        const isPrimaryLeft = m1.horizCenter <= m2.horizCenter;
+        const leftSource = isPrimaryLeft ? primaryDoor : siblingDoor;
+        const rightSource = isPrimaryLeft ? siblingDoor : primaryDoor;
+        const leftMetrics = isPrimaryLeft ? m1 : m2;
+        const rightMetrics = isPrimaryLeft ? m2 : m1;
+
+        const updatedLeft: Part = {
+          ...leftSource,
+          name: 'PUERTA IZQUIERDA',
+          componentRole: 'door',
+          [leftMetrics.wProp]: leafW,
+          [leftMetrics.coordProp]: leftCenter,
+          hardwareConfig: leftHw
+        };
+
+        const updatedRight: Part = {
+          ...rightSource,
+          name: 'PUERTA DERECHA',
+          componentRole: 'door',
+          [rightMetrics.wProp]: leafW,
+          [rightMetrics.coordProp]: rightCenter,
+          hardwareConfig: rightHw
+        };
+
+        resultDoors = [updatedLeft, updatedRight];
+
+        this.updateProject(p => {
+          const nextParts = p.parts.map(pt => {
+            if (pt.id === updatedLeft.id) return updatedLeft;
+            if (pt.id === updatedRight.id) return updatedRight;
+            return pt;
+          });
+
+          const nextGroups = (p.groups || []).map(g => {
+            if (g.id !== groupId || !g.parametricConfig) return g;
+            return {
+              ...g,
+              parametricConfig: {
+                ...g.parametricConfig,
+                doorOpening: 'double' as const
+              }
+            };
+          });
+
+          return {
+            ...p,
+            parts: nextParts,
+            groups: nextGroups
+          };
+        }, false);
+      }
+
+      return resultDoors;
+    }
+
+    // Modo de 1 hoja ('left' | 'right' | 'top' | 'bottom')
+    const singleName =
+      mode === 'left'
+        ? 'PUERTA IZQUIERDA'
+        : mode === 'right'
+          ? 'PUERTA DERECHA'
+          : mode === 'top'
+            ? 'PUERTA ABATIBLE SUPERIOR'
+            : 'PUERTA ABATIBLE INFERIOR';
+
+    const singleHingeType: HingeType = mode === 'top' ? 'gas_piston' : 'straight';
+    const singleHandlePos: DoorHandleVerticalPosition = isHandleNone
+      ? 'none'
+      : mode === 'top' || mode === 'bottom'
+        ? 'horizontal'
+        : prevVerticalHandlePos;
+
+    const updatedSingle: Part = {
+      ...primaryDoor,
+      name: singleName,
+      componentRole: 'door',
+      [m1.wProp]: Number(totalW.toFixed(1)),
+      [m1.coordProp]: Number(centerCoord.toFixed(2)),
+      hardwareConfig: {
+        ...prevHw,
+        isMovable: true,
+        movableType: 'door',
+        openingDirection: mode,
+        hingeType: singleHingeType,
+        handleType: effectiveHandleType,
+        handleFinish: effectiveHandleFinish,
+        handlePosition: singleHandlePos,
+        isOpen: Boolean(prevHw.isOpen)
+      }
+    };
+
+    const removedSiblingId = siblingDoor?.id ?? null;
+    resultDoors = [updatedSingle];
+
+    this.updateProject(p => {
+      const nextParts = p.parts
+        .filter(pt => pt.id !== removedSiblingId)
+        .map(pt => (pt.id === updatedSingle.id ? updatedSingle : pt));
+
+      const nextGroups = (p.groups || []).map(g => {
+        if (g.id !== groupId) return g;
+        const nextPartIds =
+          g.partIds && removedSiblingId
+            ? g.partIds.filter(id => id !== removedSiblingId)
+            : g.partIds;
+        return {
+          ...g,
+          ...(nextPartIds ? { partIds: nextPartIds } : {}),
+          ...(g.parametricConfig
+            ? {
+                parametricConfig: {
+                  ...g.parametricConfig,
+                  doorOpening: mode
+                }
+              }
+            : {})
+        };
+      });
+
+      return {
+        ...p,
+        parts: nextParts,
+        groups: nextGroups
+      };
+    }, false);
+
+    if (removedSiblingId) {
+      if (this.designerSelectedPartId() === removedSiblingId) {
+        this.designerSelectedPartId.set(updatedSingle.id);
+      }
+      const curSelIds = this.designerSelectedPartIds();
+      if (curSelIds.includes(removedSiblingId)) {
+        const replaced = Array.from(
+          new Set(curSelIds.map(id => (id === removedSiblingId ? updatedSingle.id : id)))
+        );
+        this.designerSelectedPartIds.set(replaced);
+      }
+    }
+
+    return resultDoors;
+  }
+
+  /**
+   * Actualiza la posición vertical del tirador ('top' | 'center' | 'bottom' | 'none')
+   * en la puerta seleccionada y en su hoja hermana par si es puerta doble.
+   */
+  setDoorHandleVerticalPosition(
+    partOrGroupId: string,
+    position: 'top' | 'center' | 'bottom' | 'none'
+  ): void {
+    if (!partOrGroupId) return;
+    const proj = this.currentProject();
+    const allParts = proj.parts || [];
+    const groups = proj.groups || [];
+
+    const { primaryDoor, siblingDoor, groupId } = this.resolveTargetBayDoors(
+      partOrGroupId,
+      allParts,
+      groups
+    );
+
+    if (!primaryDoor) return;
+
+    this.saveUndoSnapshot();
+
+    const targetIds = new Set<string>([primaryDoor.id]);
+    if (siblingDoor) {
+      targetIds.add(siblingDoor.id);
+    }
+
+    this.updateProject(p => {
+      const nextParts: Part[] = p.parts.map((pt): Part => {
+        if (!targetIds.has(pt.id)) return pt;
+        const prevHw: PartHardwareConfig = pt.hardwareConfig || {
+          isMovable: true,
+          movableType: 'door'
+        };
+        const nextHandleType: HandleType =
+          position === 'none'
+            ? 'none'
+            : !prevHw.handleType || prevHw.handleType === 'none'
+              ? 'bar_modern'
+              : prevHw.handleType;
+
+        return {
+          ...pt,
+          hardwareConfig: {
+            ...prevHw,
+            isMovable: true,
+            movableType: 'door',
+            handlePosition: position,
+            handleType: nextHandleType
+          }
+        };
+      });
+
+      const nextGroups: PartGroup[] = (p.groups || []).map((g): PartGroup => {
+        if (g.id !== groupId || !g.parametricConfig) return g;
+        const grpHandleType: HandleType =
+          position === 'none'
+            ? 'none'
+            : !g.parametricConfig.handleType || g.parametricConfig.handleType === 'none'
+              ? 'bar_modern'
+              : g.parametricConfig.handleType;
+        return {
+          ...g,
+          parametricConfig: {
+            ...g.parametricConfig,
+            hasHandle: position !== 'none',
+            handlePosition: position,
+            handleType: grpHandleType
+          }
+        };
+      });
+
+      return {
+        ...p,
+        parts: nextParts,
+        groups: nextGroups
+      };
+    }, false);
   }
 }

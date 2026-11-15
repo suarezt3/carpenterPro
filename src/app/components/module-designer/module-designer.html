@@ -2679,22 +2679,217 @@
                       </div>
                     }
 
-                    <!-- Puertas: Solo mostrar si NO es cajonera pura -->
+                    <!-- Puertas: Configuración 1-Clic de Puerta, Herrajes y Apertura 3D -->
                     @if (!isDrawerCabinet(pCfg)) {
-                      <div class="flex items-center justify-between text-[10px]">
-                        <span class="text-slate-600 font-medium">{{ 'inspector.doors' | t }}</span>
-                        <select
-                          [value]="pCfg.doorOpening || 'none'"
-                          (change)="updateActiveGroupParametricConfig({ doorOpening: $any($event.target).value })"
-                          class="h-6 px-1.5 bg-slate-50 border border-slate-200 rounded text-[10px] font-semibold text-slate-800 cursor-pointer">
-                          <option value="none">{{ 'inspector.noDoor' | t }}</option>
-                          <option value="left">{{ 'inspector.oneDoorLeft' | t }}</option>
-                          <option value="right">{{ 'inspector.oneDoorRight' | t }}</option>
-                          <option value="double">{{ 'inspector.doubleDoors' | t }}</option>
-                          @if (isWallOrHangingCabinet(pCfg)) {
-                            <option value="top">{{ 'inspector.liftUpDoor' | t }}</option>
-                          }
-                        </select>
+                      <div class="p-2.5 bg-white border border-zinc-200 rounded-xl space-y-2.5 shadow-2xs">
+                        <!-- 1. Cabecera con Icono y Badge de Herrajes -->
+                        <div class="flex items-center justify-between gap-1.5">
+                          <div class="flex items-center gap-1.5 min-w-0">
+                            <hugeicons-icon [icon]="isSelectedDoorOrGroupOpen3D() ? icons.doorOpen : icons.doorClosed" [size]="14" [strokeWidth]="1.75" class="text-zinc-900 shrink-0"></hugeicons-icon>
+                            <span class="text-[11px] font-bold font-sans text-zinc-900 truncate">
+                              Configuración de Puerta y Apertura
+                            </span>
+                          </div>
+                          <span class="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[9px] font-bold font-numeric tabular-nums text-zinc-800 shrink-0">
+                            {{ activeDoorHingeCount().summaryBadge }}
+                          </span>
+                        </div>
+
+                        <!-- 2. 5 Botones de Configuración Rápida 1-Clic + Opción Sin Puerta -->
+                        <div class="space-y-1">
+                          <div class="grid grid-cols-2 gap-1">
+                            <button
+                              type="button"
+                              (click)="applyQuickDoorOpeningMode('left')"
+                              [class]="activeDoorConfigMode() === 'left'
+                                ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                                : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                              class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
+                              title="Bisagras a la izquierda, manija a la derecha, pivote 3D izquierdo">
+                              <hugeicons-icon [icon]="icons.arrowLeft" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                              <span class="truncate"><span class="font-numeric">1</span> Puerta Izquierda</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              (click)="applyQuickDoorOpeningMode('right')"
+                              [class]="activeDoorConfigMode() === 'right'
+                                ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                                : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                              class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
+                              title="Bisagras a la derecha, manija a la izquierda, pivote 3D derecho">
+                              <span class="truncate"><span class="font-numeric">1</span> Puerta Derecha</span>
+                              <hugeicons-icon [icon]="icons.arrowRight" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            (click)="applyQuickDoorOpeningMode('double')"
+                            [class]="activeDoorConfigMode() === 'double'
+                              ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                              : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                            class="w-full px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1.5 cursor-pointer"
+                            title="Divide automáticamente el vano en 2 hojas simétricas con luz central de 3 mm">
+                            <hugeicons-icon [icon]="icons.columns" [size]="12" [strokeWidth]="1.75" class="shrink-0"></hugeicons-icon>
+                            <span><span class="font-numeric">2</span> Puertas (Doble Hoja Par · Luz <span class="font-numeric">3 mm</span>)</span>
+                          </button>
+
+                          <div class="grid grid-cols-2 gap-1">
+                            <button
+                              type="button"
+                              (click)="applyQuickDoorOpeningMode('top')"
+                              [class]="activeDoorConfigMode() === 'top'
+                                ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                                : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                              class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
+                              title="2 bisagras superiores + 2 pistones a gas internos + manija horizontal inferior (40 mm)">
+                              <hugeicons-icon [icon]="icons.arrowUp" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                              <span class="truncate">Abatible Sup. (Pistón)</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              (click)="applyQuickDoorOpeningMode('bottom')"
+                              [class]="activeDoorConfigMode() === 'bottom'
+                                ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                                : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                              class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
+                              title="Bisagras inferiores + retenedores laterales internos + manija horizontal superior (40 mm)">
+                              <hugeicons-icon [icon]="icons.arrowDown" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                              <span class="truncate">Abatible Inf. (Abajo)</span>
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            (click)="applyQuickDoorOpeningMode('none')"
+                            [class]="activeDoorConfigMode() === 'none'
+                              ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-600 border border-zinc-200 font-medium'"
+                            class="w-full px-2 py-1 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer">
+                            <span>{{ 'inspector.noDoor' | t }} (Vano Abierto)</span>
+                          </button>
+                        </div>
+
+                        @if (activeDoorConfigMode() !== 'none') {
+                          <!-- 3. Selector Rápido de Posición de Manija -->
+                          <div class="pt-2 border-t border-zinc-200 space-y-1.5">
+                            <div class="flex items-center justify-between">
+                              <span class="text-[10px] font-semibold font-sans text-zinc-700">
+                                Posición de Manija
+                              </span>
+                              @if (activeDoorConfigMode() === 'top' || activeDoorConfigMode() === 'bottom') {
+                                <span class="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-[9px] font-semibold font-sans text-sky-600">
+                                  {{ activeDoorConfigMode() === 'top' ? 'Horizontal Inferior (' : 'Horizontal Superior (' }}<span class="font-numeric tabular-nums">40 mm</span>)
+                                </span>
+                              }
+                            </div>
+
+                            @if (activeDoorConfigMode() === 'top' || activeDoorConfigMode() === 'bottom') {
+                              <div class="grid grid-cols-2 gap-1">
+                                <button
+                                  type="button"
+                                  (click)="setQuickDoorHandlePosition(activeDoorConfigMode() === 'top' ? 'bottom' : 'top')"
+                                  [class]="activeDoorHandlePosition() !== 'none'
+                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                                  class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                                  Con Manija Horizontal
+                                </button>
+                                <button
+                                  type="button"
+                                  (click)="setQuickDoorHandlePosition('none')"
+                                  [class]="activeDoorHandlePosition() === 'none'
+                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                                  class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                                  Sin Manija (Push-to-Open)
+                                </button>
+                              </div>
+                            } @else {
+                              <div class="grid grid-cols-2 gap-1">
+                                <button
+                                  type="button"
+                                  (click)="setQuickDoorHandlePosition('top')"
+                                  [class]="activeDoorHandlePosition() === 'top'
+                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                                  class="px-2 py-1 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                                  Superior
+                                </button>
+                                <button
+                                  type="button"
+                                  (click)="setQuickDoorHandlePosition('center')"
+                                  [class]="activeDoorHandlePosition() === 'center'
+                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                                  class="px-2 py-1 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                                  Centrada Vertical
+                                </button>
+                                <button
+                                  type="button"
+                                  (click)="setQuickDoorHandlePosition('bottom')"
+                                  [class]="activeDoorHandlePosition() === 'bottom'
+                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                                  class="px-2 py-1 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                                  Inferior
+                                </button>
+                                <button
+                                  type="button"
+                                  (click)="setQuickDoorHandlePosition('none')"
+                                  [class]="activeDoorHandlePosition() === 'none'
+                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                                  class="px-2 py-1 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                                  Sin Manija (Push-to-Open)
+                                </button>
+                              </div>
+                            }
+                          </div>
+
+                          <!-- 4. Inspección Cinemática 3D en Tiempo Real -->
+                          <div class="pt-2 border-t border-zinc-200 space-y-2">
+                            <button
+                              type="button"
+                              (click)="toggleSelectedDoorOpen3D()"
+                              [class]="isSelectedDoorOrGroupOpen3D()
+                                ? 'bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-600 font-semibold'
+                                : 'bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-900 font-semibold'"
+                              class="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-sans transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs">
+                              <hugeicons-icon [icon]="isSelectedDoorOrGroupOpen3D() ? icons.doorOpen : icons.doorClosed" [size]="13" [strokeWidth]="1.75" class="shrink-0"></hugeicons-icon>
+                              <span>Abrir / Cerrar Puerta en 3D</span>
+                              <span class="px-1.5 py-0.2 rounded text-[9px] font-numeric tabular-nums"
+                                [class]="isSelectedDoorOrGroupOpen3D() ? 'bg-white text-sky-600 border border-sky-200' : 'bg-zinc-800 text-zinc-200'">
+                                {{ activeDoorOpenAngleDeg() }}°
+                              </span>
+                            </button>
+
+                            <div class="px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg space-y-1">
+                              <div class="flex items-center justify-between text-[10px]">
+                                <span class="font-medium font-sans text-zinc-600">Ángulo de Apertura 3D</span>
+                                <span class="font-bold font-numeric tabular-nums text-sky-600">
+                                  {{ activeDoorOpenAngleDeg() }}° / {{ activeDoorMaxAngleDeg() }}°
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                [max]="activeDoorMaxAngleDeg()"
+                                step="1"
+                                [value]="activeDoorOpenAngleDeg()"
+                                (input)="onSelectedDoorAngleInput($event)"
+                                aria-label="Ángulo de apertura de puerta en 3D"
+                                class="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900" />
+                              <div class="flex items-center justify-between text-[9px] font-numeric tabular-nums text-zinc-500">
+                                <span>0° (Cerrada)</span>
+                                <span>{{ Math.round(activeDoorMaxAngleDeg() / 2) }}°</span>
+                                <span>{{ activeDoorMaxAngleDeg() }}° (Abierta)</span>
+                              </div>
+                            </div>
+                          </div>
+                        }
                       </div>
                     }
 
@@ -2756,6 +2951,199 @@
                     <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2" class="text-white shrink-0"></hugeicons-icon>
                     <span>{{ 'inspector.duplicateToSide' | t }}</span>
                   </button>
+                </div>
+              }
+
+              <!-- 3A-BIS. CONFIGURACIÓN DE PUERTA Y APERTURA (GRUPOS LIBRES CON PUERTAS) -->
+              @if (!isParametricCabinetGroup() && canConfigureSelectedDoorOrModule()) {
+                <div class="p-3 bg-white border border-zinc-200 rounded-xl space-y-2.5 shadow-2xs">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <hugeicons-icon [icon]="isSelectedDoorOrGroupOpen3D() ? icons.doorOpen : icons.doorClosed" class="w-4 h-4 text-zinc-900 shrink-0" [strokeWidth]="1.75"></hugeicons-icon>
+                      <span class="text-[11px] font-bold font-sans text-zinc-900 truncate">
+                        Configuración de Puerta y Apertura
+                      </span>
+                    </div>
+                    <span class="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[9px] font-bold font-numeric tabular-nums text-zinc-800 shrink-0">
+                      {{ activeDoorHingeCount().summaryBadge }}
+                    </span>
+                  </div>
+
+                  <div class="space-y-1">
+                    <div class="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        (click)="applyQuickDoorOpeningMode('left')"
+                        [class]="activeDoorConfigMode() === 'left'
+                          ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                        class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer">
+                        <hugeicons-icon [icon]="icons.arrowLeft" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span class="truncate"><span class="font-numeric">1</span> Puerta Izquierda</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="applyQuickDoorOpeningMode('right')"
+                        [class]="activeDoorConfigMode() === 'right'
+                          ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                        class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer">
+                        <span class="truncate"><span class="font-numeric">1</span> Puerta Derecha</span>
+                        <hugeicons-icon [icon]="icons.arrowRight" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      (click)="applyQuickDoorOpeningMode('double')"
+                      [class]="activeDoorConfigMode() === 'double'
+                        ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                        : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                      class="w-full px-2.5 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1.5 cursor-pointer">
+                      <hugeicons-icon [icon]="icons.columns" [size]="12" [strokeWidth]="1.75" class="shrink-0"></hugeicons-icon>
+                      <span><span class="font-numeric">2</span> Puertas (Doble Hoja Par · Luz <span class="font-numeric">3 mm</span>)</span>
+                    </button>
+
+                    <div class="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        (click)="applyQuickDoorOpeningMode('top')"
+                        [class]="activeDoorConfigMode() === 'top'
+                          ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                        class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer">
+                        <hugeicons-icon [icon]="icons.arrowUp" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span class="truncate">Abatible Sup. (Pistón)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="applyQuickDoorOpeningMode('bottom')"
+                        [class]="activeDoorConfigMode() === 'bottom'
+                          ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                        class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer">
+                        <hugeicons-icon [icon]="icons.arrowDown" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span class="truncate">Abatible Inf. (Abajo)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="pt-2 border-t border-zinc-200 space-y-1.5">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[10px] font-semibold font-sans text-zinc-700">
+                        Posición de Manija
+                      </span>
+                      @if (activeDoorConfigMode() === 'top' || activeDoorConfigMode() === 'bottom') {
+                        <span class="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-[9px] font-semibold font-sans text-sky-600">
+                          {{ activeDoorConfigMode() === 'top' ? 'Horizontal Inferior (' : 'Horizontal Superior (' }}<span class="font-numeric tabular-nums">40 mm</span>)
+                        </span>
+                      }
+                    </div>
+
+                    @if (activeDoorConfigMode() === 'top' || activeDoorConfigMode() === 'bottom') {
+                      <div class="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition(activeDoorConfigMode() === 'top' ? 'bottom' : 'top')"
+                          [class]="activeDoorHandlePosition() !== 'none'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Con Manija Horizontal
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('none')"
+                          [class]="activeDoorHandlePosition() === 'none'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Sin Manija (Push-to-Open)
+                        </button>
+                      </div>
+                    } @else {
+                      <div class="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('top')"
+                          [class]="activeDoorHandlePosition() === 'top'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Superior
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('center')"
+                          [class]="activeDoorHandlePosition() === 'center'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Centrada Vertical
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('bottom')"
+                          [class]="activeDoorHandlePosition() === 'bottom'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Inferior
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('none')"
+                          [class]="activeDoorHandlePosition() === 'none'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Sin Manija (Push-to-Open)
+                        </button>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="pt-2 border-t border-zinc-200 space-y-2">
+                    <button
+                      type="button"
+                      (click)="toggleSelectedDoorOpen3D()"
+                      [class]="isSelectedDoorOrGroupOpen3D()
+                        ? 'bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-600 font-semibold'
+                        : 'bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-900 font-semibold'"
+                      class="w-full py-2 px-2.5 rounded-lg text-[11px] font-sans transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs">
+                      <hugeicons-icon [icon]="isSelectedDoorOrGroupOpen3D() ? icons.doorOpen : icons.doorClosed" [size]="14" [strokeWidth]="1.75" class="shrink-0"></hugeicons-icon>
+                      <span>Abrir / Cerrar Puerta en 3D</span>
+                      <span class="px-1.5 py-0.2 rounded text-[10px] font-numeric tabular-nums"
+                        [class]="isSelectedDoorOrGroupOpen3D() ? 'bg-white text-sky-600 border border-sky-200' : 'bg-zinc-800 text-zinc-200'">
+                        {{ activeDoorOpenAngleDeg() }}°
+                      </span>
+                    </button>
+
+                    <div class="px-2.5 py-2 bg-zinc-50 border border-zinc-200 rounded-lg space-y-1">
+                      <div class="flex items-center justify-between text-[10px]">
+                        <span class="font-medium font-sans text-zinc-600">Ángulo de Apertura 3D</span>
+                        <span class="font-bold font-numeric tabular-nums text-sky-600">
+                          {{ activeDoorOpenAngleDeg() }}° / {{ activeDoorMaxAngleDeg() }}°
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        [max]="activeDoorMaxAngleDeg()"
+                        step="1"
+                        [value]="activeDoorOpenAngleDeg()"
+                        (input)="onSelectedDoorAngleInput($event)"
+                        aria-label="Ángulo de apertura de puerta en 3D"
+                        class="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900" />
+                      <div class="flex items-center justify-between text-[9px] font-numeric tabular-nums text-zinc-500">
+                        <span>0° (Cerrada)</span>
+                        <span>{{ Math.round(activeDoorMaxAngleDeg() / 2) }}°</span>
+                        <span>{{ activeDoorMaxAngleDeg() }}° (Abierta)</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               }
 
@@ -4298,6 +4686,208 @@
                       <hugeicons-icon [icon]="icons.tune" class="w-3.5 h-3.5 text-sky-600 shrink-0" [strokeWidth]="1.75"></hugeicons-icon>
                       <span>Asistente...</span>
                     </button>
+                  </div>
+                </div>
+              }
+
+              <!-- 7A-BIS. CONFIGURACIÓN 1-CLIC DE PUERTA, HERRAJES Y APERTURA 3D -->
+              @if (isSelectedPartDoor()) {
+                <div class="p-3 bg-white border border-zinc-200 rounded-xl space-y-2.5 shadow-2xs">
+                  <!-- 1. Cabecera con Icono y Resumen Técnico de Herrajes -->
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <hugeicons-icon [icon]="isSelectedDoorOrGroupOpen3D() ? icons.doorOpen : icons.doorClosed" class="w-4 h-4 text-zinc-900 shrink-0" [strokeWidth]="1.75"></hugeicons-icon>
+                      <span class="text-[11px] font-bold font-sans text-zinc-900 truncate">
+                        Configuración de Puerta y Apertura
+                      </span>
+                    </div>
+                    <span class="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[9px] font-bold font-numeric tabular-nums text-zinc-800 shrink-0">
+                      {{ activeDoorHingeCount().summaryBadge }}
+                    </span>
+                  </div>
+
+                  <!-- 2. 5 Botones de Configuración Rápida 1-Clic -->
+                  <div class="space-y-1">
+                    <div class="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        (click)="applyQuickDoorOpeningMode('left')"
+                        [class]="activeDoorConfigMode() === 'left'
+                          ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                        class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
+                        title="Bisagras a la izquierda, manija a la derecha, pivote 3D izquierdo">
+                        <hugeicons-icon [icon]="icons.arrowLeft" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span class="truncate"><span class="font-numeric">1</span> Puerta Izquierda</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="applyQuickDoorOpeningMode('right')"
+                        [class]="activeDoorConfigMode() === 'right'
+                          ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                        class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
+                        title="Bisagras a la derecha, manija a la izquierda, pivote 3D derecho">
+                        <span class="truncate"><span class="font-numeric">1</span> Puerta Derecha</span>
+                        <hugeicons-icon [icon]="icons.arrowRight" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      (click)="applyQuickDoorOpeningMode('double')"
+                      [class]="activeDoorConfigMode() === 'double'
+                        ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                        : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                      class="w-full px-2.5 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="Divide automáticamente el vano W en 2 hojas simétricas (W - 3 mm) / 2 con luz central de 3 mm">
+                      <hugeicons-icon [icon]="icons.columns" [size]="12" [strokeWidth]="1.75" class="shrink-0"></hugeicons-icon>
+                      <span><span class="font-numeric">2</span> Puertas (Doble Hoja Par · Luz <span class="font-numeric">3 mm</span>)</span>
+                    </button>
+
+                    <div class="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        (click)="applyQuickDoorOpeningMode('top')"
+                        [class]="activeDoorConfigMode() === 'top'
+                          ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                        class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
+                        title="2 bisagras superiores + 2 pistones a gas internos + manija horizontal inferior a 40 mm (abre 80°)">
+                        <hugeicons-icon [icon]="icons.arrowUp" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span class="truncate">Abatible Sup. (Pistón)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="applyQuickDoorOpeningMode('bottom')"
+                        [class]="activeDoorConfigMode() === 'bottom'
+                          ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
+                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                        class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
+                        title="Bisagras inferiores + retenedores laterales internos + manija horizontal superior a 40 mm">
+                        <hugeicons-icon [icon]="icons.arrowDown" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                        <span class="truncate">Abatible Inf. (Abajo)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 3. Selector Rápido de Posición de Manija -->
+                  <div class="pt-2 border-t border-zinc-200 space-y-1.5">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[10px] font-semibold font-sans text-zinc-700">
+                        Posición de Manija
+                      </span>
+                      @if (activeDoorConfigMode() === 'top' || activeDoorConfigMode() === 'bottom') {
+                        <span class="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-[9px] font-semibold font-sans text-sky-600">
+                          {{ activeDoorConfigMode() === 'top' ? 'Horizontal Inferior (' : 'Horizontal Superior (' }}<span class="font-numeric tabular-nums">40 mm</span>)
+                        </span>
+                      }
+                    </div>
+
+                    @if (activeDoorConfigMode() === 'top' || activeDoorConfigMode() === 'bottom') {
+                      <div class="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition(activeDoorConfigMode() === 'top' ? 'bottom' : 'top')"
+                          [class]="activeDoorHandlePosition() !== 'none'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Con Manija Horizontal
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('none')"
+                          [class]="activeDoorHandlePosition() === 'none'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Sin Manija (Push-to-Open)
+                        </button>
+                      </div>
+                    } @else {
+                      <div class="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('top')"
+                          [class]="activeDoorHandlePosition() === 'top'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Superior
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('center')"
+                          [class]="activeDoorHandlePosition() === 'center'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Centrada Vertical
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('bottom')"
+                          [class]="activeDoorHandlePosition() === 'bottom'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Inferior
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setQuickDoorHandlePosition('none')"
+                          [class]="activeDoorHandlePosition() === 'none'
+                            ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
+                            : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
+                          class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
+                          Sin Manija (Push-to-Open)
+                        </button>
+                      </div>
+                    }
+                  </div>
+
+                  <!-- 4. Inspección Cinemática 3D en Tiempo Real -->
+                  <div class="pt-2 border-t border-zinc-200 space-y-2">
+                    <button
+                      type="button"
+                      (click)="toggleSelectedDoorOpen3D()"
+                      [class]="isSelectedDoorOrGroupOpen3D()
+                        ? 'bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-600 font-semibold'
+                        : 'bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-900 font-semibold'"
+                      class="w-full py-2 px-2.5 rounded-lg text-[11px] font-sans transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs">
+                      <hugeicons-icon [icon]="isSelectedDoorOrGroupOpen3D() ? icons.doorOpen : icons.doorClosed" [size]="14" [strokeWidth]="1.75" class="shrink-0"></hugeicons-icon>
+                      <span>Abrir / Cerrar Puerta en 3D</span>
+                      <span class="px-1.5 py-0.2 rounded text-[10px] font-numeric tabular-nums"
+                        [class]="isSelectedDoorOrGroupOpen3D() ? 'bg-white text-sky-600 border border-sky-200' : 'bg-zinc-800 text-zinc-200'">
+                        {{ activeDoorOpenAngleDeg() }}°
+                      </span>
+                    </button>
+
+                    <div class="px-2.5 py-2 bg-zinc-50 border border-zinc-200 rounded-lg space-y-1">
+                      <div class="flex items-center justify-between text-[10px]">
+                        <span class="font-medium font-sans text-zinc-600">Ángulo de Apertura 3D</span>
+                        <span class="font-bold font-numeric tabular-nums text-sky-600">
+                          {{ activeDoorOpenAngleDeg() }}° / {{ activeDoorMaxAngleDeg() }}°
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        [max]="activeDoorMaxAngleDeg()"
+                        step="1"
+                        [value]="activeDoorOpenAngleDeg()"
+                        (input)="onSelectedDoorAngleInput($event)"
+                        aria-label="Ángulo de apertura de puerta en 3D"
+                        class="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900" />
+                      <div class="flex items-center justify-between text-[9px] font-numeric tabular-nums text-zinc-500">
+                        <span>0° (Cerrada)</span>
+                        <span>{{ Math.round(activeDoorMaxAngleDeg() / 2) }}°</span>
+                        <span>{{ activeDoorMaxAngleDeg() }}° (Abierta)</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               }

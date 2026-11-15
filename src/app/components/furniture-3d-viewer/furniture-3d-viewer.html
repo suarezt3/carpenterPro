@@ -1445,61 +1445,143 @@
           <!-- CASO 2: MENÚ EXCLUSIVO PARA PUERTAS (SIN CORREDERAS)      -->
           <!-- ========================================================= -->
           @if (category === 'door') {
-            <div class="p-1.5 bg-zinc-50 rounded-xl border border-zinc-200 flex flex-col gap-1 my-0.5">
+            @let currentDoorMode = getDoorOpeningModeForPart(part);
+            @let currentHandlePos = getDoorHandlePositionForPart(part);
+            @let maxDoorDeg = getDoorMaxOpeningAngleDeg(part.id);
+            @let curDoorDeg = getDoorOpeningAngleDeg(part.id);
+            <div class="p-2 bg-zinc-50 rounded-xl border border-zinc-200 flex flex-col gap-1.5 my-0.5 font-sans">
+              <!-- Botón primario Abrir / Cerrar Puerta en 3D -->
               <button
                 type="button"
-                (click)="toggleContextMenuAnimation()"
+                (click)="toggleDoorOrGroupOpen3D(part.id)"
                 class="w-full py-1.5 px-2.5 bg-zinc-900 hover:bg-zinc-800 text-white font-bold rounded-lg flex items-center justify-between text-xs transition shadow-2xs cursor-pointer">
                 <div class="flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="isPartOpen(part.id) ? icons.doorOpen : icons.doorClosed" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                  <span>{{ isPartOpen(part.id) ? 'Cerrar Puerta' : 'Abrir Puerta en 3D' }}</span>
+                  <hugeicons-icon [icon]="isDoorOrGroupOpen3D(part.id) ? icons.doorOpen : icons.doorClosed" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                  <span>{{ isDoorOrGroupOpen3D(part.id) ? 'Cerrar Puerta en 3D' : 'Abrir Puerta en 3D' }}</span>
                 </div>
-                <span class="text-[10px] font-sans opacity-85 uppercase">3D</span>
+                <span class="cad-numeric text-[10px] font-semibold opacity-90">{{ curDoorDeg }}°</span>
               </button>
 
-              <div class="relative">
+              <!-- Control deslizable de ángulo de apertura en vivo (0° a 90° / 80°) -->
+              <div class="bg-white border border-zinc-200 rounded-lg px-2 py-1.5 flex flex-col gap-1">
+                <div class="flex items-center justify-between text-[10px]">
+                  <span class="font-semibold text-zinc-600">Ángulo Apertura 3D</span>
+                  <span class="cad-numeric font-bold text-sky-600">{{ curDoorDeg }}° / {{ maxDoorDeg }}°</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  [max]="maxDoorDeg"
+                  step="1"
+                  [value]="curDoorDeg"
+                  (input)="onDoorContextAngleSliderInput(part.id, $event)"
+                  aria-label="Ángulo de apertura de puerta en grados"
+                  class="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900" />
+              </div>
+
+              <!-- Configuración Rápida de Puerta y Sentido de Apertura (1 Clic) -->
+              <div class="bg-white border border-zinc-200 rounded-lg p-1.5 flex flex-col gap-1">
+                <div class="flex items-center justify-between px-0.5">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Configuración de Puerta y Apertura</span>
+                </div>
+                <div class="grid grid-cols-2 gap-1 text-[11px]">
+                  <button
+                    type="button"
+                    (click)="configureDoorModeFromViewer(part.id, 'left')"
+                    [class]="currentDoorMode === 'left' ? 'bg-zinc-900 text-white font-semibold border-zinc-900' : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'"
+                    class="px-2 py-1 rounded-md border flex items-center gap-1.5 text-left transition cursor-pointer">
+                    <hugeicons-icon [icon]="icons.arrowLeft" [size]="12" [strokeWidth]="2" [class]="currentDoorMode === 'left' ? 'text-white' : 'text-sky-600'"></hugeicons-icon>
+                    <span class="truncate">1 Puerta Izquierda</span>
+                  </button>
+                  <button
+                    type="button"
+                    (click)="configureDoorModeFromViewer(part.id, 'right')"
+                    [class]="currentDoorMode === 'right' ? 'bg-zinc-900 text-white font-semibold border-zinc-900' : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'"
+                    class="px-2 py-1 rounded-md border flex items-center gap-1.5 text-left transition cursor-pointer">
+                    <hugeicons-icon [icon]="icons.arrowRight" [size]="12" [strokeWidth]="2" [class]="currentDoorMode === 'right' ? 'text-white' : 'text-sky-600'"></hugeicons-icon>
+                    <span class="truncate">1 Puerta Derecha</span>
+                  </button>
+                  <button
+                    type="button"
+                    (click)="configureDoorModeFromViewer(part.id, 'double')"
+                    [class]="currentDoorMode === 'double' ? 'bg-zinc-900 text-white font-semibold border-zinc-900' : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'"
+                    class="col-span-2 px-2 py-1 rounded-md border flex items-center justify-between text-left transition cursor-pointer">
+                    <div class="flex items-center gap-1.5 truncate">
+                      <hugeicons-icon [icon]="icons.doorClosed" [size]="12" [strokeWidth]="2" [class]="currentDoorMode === 'double' ? 'text-white' : 'text-sky-600'"></hugeicons-icon>
+                      <span class="truncate">2 Puertas (Doble Hoja Par)</span>
+                    </div>
+                    <span class="cad-numeric text-[9px] opacity-80">2 hojas</span>
+                  </button>
+                  <button
+                    type="button"
+                    (click)="configureDoorModeFromViewer(part.id, 'top')"
+                    [class]="currentDoorMode === 'top' ? 'bg-zinc-900 text-white font-semibold border-zinc-900' : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'"
+                    class="col-span-2 px-2 py-1 rounded-md border flex items-center justify-between text-left transition cursor-pointer">
+                    <div class="flex items-center gap-1.5 truncate">
+                      <hugeicons-icon [icon]="icons.arrowUp" [size]="12" [strokeWidth]="2" [class]="currentDoorMode === 'top' ? 'text-white' : 'text-sky-600'"></hugeicons-icon>
+                      <span class="truncate">Abatible Superior (Pistón)</span>
+                    </div>
+                    <span class="cad-numeric text-[9px] opacity-80">80°</span>
+                  </button>
+                  <button
+                    type="button"
+                    (click)="configureDoorModeFromViewer(part.id, 'bottom')"
+                    [class]="currentDoorMode === 'bottom' ? 'bg-zinc-900 text-white font-semibold border-zinc-900' : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'"
+                    class="col-span-2 px-2 py-1 rounded-md border flex items-center justify-between text-left transition cursor-pointer">
+                    <div class="flex items-center gap-1.5 truncate">
+                      <hugeicons-icon [icon]="icons.arrowDown" [size]="12" [strokeWidth]="2" [class]="currentDoorMode === 'bottom' ? 'text-white' : 'text-sky-600'"></hugeicons-icon>
+                      <span class="truncate">Abatible Inferior</span>
+                    </div>
+                    <span class="cad-numeric text-[9px] opacity-80">80°</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Posición Rápida de Manija (Superior / Centrada / Inferior / Sin Manija Push) -->
+              <div class="bg-white border border-zinc-200 rounded-lg p-1.5 flex flex-col gap-1">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 px-0.5">Posición de Manija</span>
+                <div class="grid grid-cols-4 gap-1 text-[10px]">
+                  <button
+                    type="button"
+                    (click)="setDoorHandlePositionFromViewer(part.id, 'top')"
+                    [class]="currentHandlePos === 'top' ? 'bg-zinc-900 text-white font-semibold border-zinc-900' : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'"
+                    class="py-1 px-1 rounded border text-center transition cursor-pointer">
+                    Superior
+                  </button>
+                  <button
+                    type="button"
+                    (click)="setDoorHandlePositionFromViewer(part.id, 'center')"
+                    [class]="currentHandlePos === 'center' ? 'bg-zinc-900 text-white font-semibold border-zinc-900' : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'"
+                    class="py-1 px-1 rounded border text-center transition cursor-pointer">
+                    Centrada
+                  </button>
+                  <button
+                    type="button"
+                    (click)="setDoorHandlePositionFromViewer(part.id, 'bottom')"
+                    [class]="currentHandlePos === 'bottom' ? 'bg-zinc-900 text-white font-semibold border-zinc-900' : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'"
+                    class="py-1 px-1 rounded border text-center transition cursor-pointer">
+                    Inferior
+                  </button>
+                  <button
+                    type="button"
+                    (click)="setDoorHandlePositionFromViewer(part.id, 'none')"
+                    [class]="currentHandlePos === 'none' ? 'bg-zinc-900 text-white font-semibold border-zinc-900' : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'"
+                    class="py-1 px-1 rounded border text-center transition cursor-pointer"
+                    title="Sin Manija (Push-to-open)">
+                    Push
+                  </button>
+                </div>
+              </div>
+
+              @if (!part.groupId) {
                 <button
                   type="button"
-                  (click)="toggleMovableRoleSubmenu()"
-                  class="w-full px-2 py-1.5 rounded-lg hover:bg-white text-zinc-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
-                  <div class="flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
-                    <span>Sentido de Apertura</span>
-                  </div>
-                  <hugeicons-icon [icon]="showMovableRoleSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-zinc-400"></hugeicons-icon>
+                  (click)="setContextMenuPartMovable('shelf')"
+                  class="w-full px-2 py-1 rounded-lg hover:bg-white text-zinc-600 flex items-center gap-1.5 text-left text-xs transition cursor-pointer">
+                  <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-zinc-400"></hugeicons-icon>
+                  <span>Convertir en Pieza Fija</span>
                 </button>
-
-                @if (showMovableRoleSubmenu()) {
-                  <div
-                    [attr.data-submenu-align-left]="contextMenuSubmenuFlip().openLeft"
-                    [attr.data-submenu-align-up]="contextMenuSubmenuFlip().openUp"
-                    class="bg-white border border-zinc-200 rounded-xl p-1.5 my-1 flex flex-col gap-1 text-xs shadow-sm">
-                    <button type="button" (click)="setContextMenuPartMovable('door', 'left')" class="px-2 py-1 rounded-lg hover:bg-zinc-50 text-zinc-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="(part.hardwareConfig?.openingDirection ?? 'left') === 'left'">
-                      <hugeicons-icon [icon]="icons.arrowLeft" [size]="13" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
-                      <span>Bisagra a la Izquierda</span>
-                    </button>
-                    <button type="button" (click)="setContextMenuPartMovable('door', 'right')" class="px-2 py-1 rounded-lg hover:bg-zinc-50 text-zinc-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.hardwareConfig?.openingDirection === 'right'">
-                      <hugeicons-icon [icon]="icons.arrowRight" [size]="13" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
-                      <span>Bisagra a la Derecha</span>
-                    </button>
-                    <button type="button" (click)="setContextMenuPartMovable('door', 'top')" class="px-2 py-1 rounded-lg hover:bg-zinc-50 text-zinc-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.hardwareConfig?.openingDirection === 'top'">
-                      <hugeicons-icon [icon]="icons.arrowUp" [size]="13" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
-                      <span>Basculante Superior (Pistón)</span>
-                    </button>
-                    <button type="button" (click)="setContextMenuPartMovable('door', 'bottom')" class="px-2 py-1 rounded-lg hover:bg-zinc-50 text-zinc-700 flex items-center gap-1.5 text-left cursor-pointer" [class.font-bold]="part.hardwareConfig?.openingDirection === 'bottom'">
-                      <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
-                      <span>Abatible Inferior</span>
-                    </button>
-                    @if (!part.groupId) {
-                      <div class="h-px bg-zinc-100 my-0.5"></div>
-                      <button type="button" (click)="setContextMenuPartMovable('shelf')" class="px-2 py-1 rounded-lg hover:bg-zinc-50 text-zinc-600 flex items-center gap-1.5 text-left cursor-pointer">
-                        <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-zinc-400"></hugeicons-icon>
-                        <span>Convertir en Pieza Fija</span>
-                      </button>
-                    }
-                  </div>
-                }
-              </div>
+              }
 
               <div class="relative">
                 <button
@@ -1508,7 +1590,7 @@
                   class="w-full px-2 py-1.5 rounded-lg hover:bg-white text-zinc-700 flex items-center justify-between transition text-xs font-medium cursor-pointer">
                   <div class="flex items-center gap-1.5">
                     <hugeicons-icon [icon]="icons.hardwareTool" [size]="13" [strokeWidth]="2" class="text-zinc-700"></hugeicons-icon>
-                    <span>Asignar Tirador / Manija</span>
+                    <span>Modelo y Acabado de Manija</span>
                   </div>
                   <hugeicons-icon [icon]="showHandleSubmenu() ? icons.chevronUp : icons.chevronRight" [size]="13" [strokeWidth]="2" class="text-zinc-400"></hugeicons-icon>
                 </button>

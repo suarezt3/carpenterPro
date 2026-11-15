@@ -74,7 +74,35 @@ export class JoineryEngineService {
       return cached.bounds;
     }
 
-    const aabb = this.partGeometry.getWorldAABB(part);
+    // Si es una pieza de puerta sin orientación explícita (ej. en pruebas unitarias con length=alto, width=ancho),
+    // inferir orientación vertical para que la caja envolvente 3D refleje fielmente el tablero vertical.
+    let effectivePart = part;
+    if (!part.orientation) {
+      const upperName = (part.name || '').toUpperCase();
+      const isDoorPart =
+        part.componentRole === 'door' ||
+        part.hardwareConfig?.movableType === 'door' ||
+        (upperName.includes('PUERTA') && !upperName.includes('CAJ'));
+      if (isDoorPart) {
+        const rotY = Math.abs((part.rotationY || 0) % 180);
+        if (rotY === 90) {
+          effectivePart = {
+            ...part,
+            orientation: 'vertical_yz',
+            rotationY: 0
+          };
+        } else {
+          effectivePart = {
+            ...part,
+            orientation: 'vertical_xy',
+            length: part.width,
+            width: part.length
+          };
+        }
+      }
+    }
+
+    const aabb = this.partGeometry.getWorldAABB(effectivePart);
     const bounds: Part3DBounds = {
       part,
       minX: aabb.minX,
@@ -228,7 +256,7 @@ export class JoineryEngineService {
             continue;
           }
 
-          // Contacto al ras de frentes y cajas de cajón (overlay / inset) dentro de su vano
+          //Contacto al ras de frentes y cajas de cajón (overlay / inset) dentro de su vano
           const isDrawerPartA =
             b1.part.componentRole === 'drawer_front' ||
             b1.part.componentRole === 'drawer_box' ||
@@ -241,6 +269,31 @@ export class JoineryEngineService {
             b2.part.componentRole === 'drawer_lateral';
           if ((isDrawerPartA || isDrawerPartB) && Math.min(overlapX, overlapY, overlapZ) <= 1.5) {
             continue;
+          }
+
+          // Evitar falsos positivos de colisión en puertas con apertura animada (openAngleDeg) o contacto de bisagra cazoleta Ø35mm con su casco
+          const isDoorA =
+            b1.part.componentRole === 'door' ||
+            b1.part.hardwareConfig?.movableType === 'door' ||
+            b1.part.hardwareConfig?.openAngleDeg !== undefined ||
+            (nameA.includes('PUERTA') && !nameA.includes('CAJ'));
+          const isDoorB =
+            b2.part.componentRole === 'door' ||
+            b2.part.hardwareConfig?.movableType === 'door' ||
+            b2.part.hardwareConfig?.openAngleDeg !== undefined ||
+            (nameB.includes('PUERTA') && !nameB.includes('CAJ'));
+          if (isDoorA || isDoorB) {
+            const hasOpenAngle =
+              (b1.part.hardwareConfig?.openAngleDeg ?? 0) > 0 ||
+              (b2.part.hardwareConfig?.openAngleDeg ?? 0) > 0 ||
+              Boolean(b1.part.hardwareConfig?.isOpen) ||
+              Boolean(b2.part.hardwareConfig?.isOpen);
+            if (hasOpenAngle) {
+              continue;
+            }
+            if (!(isDoorA && isDoorB) && Math.min(overlapX, overlapY, overlapZ) <= 4.0) {
+              continue;
+            }
           }
 
           // Fase estrecha OBB SAT 3D + Polígonos 2D (elimina falsos positivos en piezas rotadas a 45° o con chaflán/destaje)
@@ -1179,12 +1232,11 @@ export class JoineryEngineService {
 
     // Construir firma geométrica rápida O(N): si solo cambiaron materiales, colores, cantos o capas, retornar en O(1)
     let signature = '';
-    for (let i = 0; i < parts.length; i++) {
-      const p = parts[i];
+    for (const p of parts) {
       const cutSig = p.cornerCutConfig
         ? `${p.cornerCutConfig.type},${p.cornerCutConfig.corner},${p.cornerCutConfig.cutX},${p.cornerCutConfig.cutY}`
         : '';
-      signature += `${p.id}:${p.name}:${p.length}x${p.width}x${p.thickness ?? 15}@${p.posX ?? 0},${p.posY ?? ''},${p.posZ ?? 0}:${p.orientation || 'h'}:${p.rotationX || 0},${p.rotationY || 0},${p.rotationZ || 0}:${p.componentRole || ''}:${p.groupId || ''}:${p.moduleId || ''}:${p.excludeFromCutlist ? 1 : 0}:${p.hardwareConfig?.openingDirection || ''}:${p.hardwareConfig?.movableType || ''}:${cutSig}:${p.contourPoints?.length || 0};`;
+      signature += `${p.id}:${p.name}:${p.length}x${p.width}x${p.thickness ?? 15}@${p.posX ?? 0},${p.posY ?? ''},${p.posZ ?? 0}:${p.orientation || 'h'}:${p.rotationX || 0},${p.rotationY || 0},${p.rotationZ || 0}:${p.componentRole || ''}:${p.groupId || ''}:${p.moduleId || ''}:${p.excludeFromCutlist ? 1 : 0}:${p.hardwareConfig?.openingDirection || ''}:${p.hardwareConfig?.movableType || ''}:${p.hardwareConfig?.openAngleDeg ?? ''}:${cutSig}:${p.contourPoints?.length || 0};`;
     }
 
     if (this.lastJoineryResult && this.lastJoinerySignature === signature) {
@@ -1213,9 +1265,10 @@ export class JoineryEngineService {
       const isDoor =
         !isDrawer &&
         (b.part.componentRole === 'door' ||
+          b.part.hardwareConfig?.movableType === 'door' ||
           (upperName.includes('PUERTA') && !upperName.includes('CAJ')));
 
-      if (isDoor && b.sy >= 250) {
+      if (isDoor && (b.sy >= 200 || b.sx >= 200)) {
         const holes = this.generateDoorHingeHoles(b, parts);
         for (const h of holes) {
           drillHolesByPart.get(b.part.id)?.push(h);
@@ -1470,44 +1523,67 @@ export class JoineryEngineService {
 
   private generateDoorHingeHoles(b: Part3DBounds, allParts: Part[]): DrillHole[] {
     const holes: DrillHole[] = [];
-    const height = b.sy;
     const facing = this.getPartFacingDirection(b.part, allParts);
+    const isDoorFront = facing === 'front' || facing === 'back';
 
-    let hingeSide = b.part.hardwareConfig?.openingDirection;
-    if (!hingeSide) {
-      const nameUpper = b.part.name.toUpperCase();
-      if (nameUpper.includes('BASCULANTE') || nameUpper.includes('ELEVABLE')) {
-        hingeSide = 'top';
+    let openingDir = b.part.hardwareConfig?.openingDirection;
+    if (!openingDir) {
+      const nameUpper = (b.part.name || '').toUpperCase();
+      if (nameUpper.includes('ABATIBLE INFERIOR')) {
+        openingDir = 'bottom';
+      } else if (
+        nameUpper.includes('ABATIBLE SUPERIOR') ||
+        nameUpper.includes('BASCULANTE') ||
+        nameUpper.includes('ELEVABLE') ||
+        nameUpper.includes('PISTON') ||
+        nameUpper.includes('PISTÓN') ||
+        nameUpper.includes('ALACENA')
+      ) {
+        openingDir = 'top';
       } else if (nameUpper.includes('DER') || (b.part.posX || 0) > 0) {
-        hingeSide = 'right';
+        openingDir = 'right';
       } else {
-        hingeSide = 'left';
+        openingDir = 'left';
       }
     }
 
     const sideText =
-      hingeSide === 'right'
+      openingDir === 'right'
         ? 'derecho'
-        : hingeSide === 'top'
+        : openingDir === 'top'
           ? 'superior'
-          : hingeSide === 'bottom'
+          : openingDir === 'bottom'
             ? 'inferior'
             : 'izquierdo';
 
-    if (hingeSide === 'top' || hingeSide === 'bottom') {
-      const y = hingeSide === 'top' ? b.maxY - 22 : b.minY + 22;
-      const span = facing === 'front' || facing === 'back' ? b.sx : b.sz;
-      const marginH = Math.min(100, span * 0.2);
-      const offsets =
-        facing === 'front' || facing === 'back'
-          ? [b.minX + marginH, b.maxX - marginH]
-          : [b.minZ + marginH, b.maxZ - marginH];
+    // Regla FASE 1.2: <= 900mm -> 2 bisagras (a 100mm de extremos); 901..1600mm -> 3 bisagras; > 1600mm -> 4 bisagras simétricas
+    const computeHingeSpanCoords = (minCoord: number, maxCoord: number): number[] => {
+      const span = Math.max(100, maxCoord - minCoord);
+      const margin = Math.min(100, Math.max(35, span * 0.2));
+      const start = minCoord + margin;
+      const end = maxCoord - margin;
+      if (span <= 900) {
+        return [start, end];
+      }
+      if (span <= 1600) {
+        return [start, (minCoord + maxCoord) / 2, end];
+      }
+      const step = (end - start) / 3;
+      return [start, start + step, start + 2 * step, end];
+    };
+
+    if (openingDir === 'top' || openingDir === 'bottom') {
+      const y = openingDir === 'top' ? b.maxY - 22 : b.minY + 22;
+      const offsets = isDoorFront
+        ? computeHingeSpanCoords(b.minX, b.maxX)
+        : computeHingeSpanCoords(b.minZ, b.maxZ);
 
       offsets.forEach((coord, i) => {
-        const posX = facing === 'front' || facing === 'back' ? coord : facing === 'right' ? b.maxX : b.minX;
-        const posZ = facing === 'front' ? b.maxZ : facing === 'back' ? b.minZ : coord;
-        const normalAxis: 'x' | 'z' = facing === 'front' || facing === 'back' ? 'z' : 'x';
-        const direction: 1 | -1 = facing === 'front' || facing === 'right' ? 1 : -1;
+        // Anclar SIEMPRE en la cara interior de la puerta (b.minZ para puertas frontales, b.minX para laterales)
+        const posX = isDoorFront ? coord : b.minX;
+        const posZ = isDoorFront ? b.minZ : coord;
+        const normalAxis: 'x' | 'z' = isDoorFront ? 'z' : 'x';
+        const direction: 1 | -1 = -1;
 
         holes.push({
           id: `hinge_${b.part.id}_${i}`,
@@ -1528,44 +1604,31 @@ export class JoineryEngineService {
       return holes;
     }
 
-    const marginY = Math.min(100, height * 0.15);
-    const hingeYs = [b.minY + marginY, b.maxY - marginY];
-    if (height >= 950) {
-      hingeYs.push(b.py);
-    }
+    const hingeYs = computeHingeSpanCoords(b.minY, b.maxY);
 
     for (let i = 0; i < hingeYs.length; i++) {
       const y = hingeYs[i];
       let posX = b.px;
       let posZ = b.pz;
       let normalAxis: 'x' | 'z' = 'z';
-      let direction: 1 | -1 = 1;
+      const direction: 1 | -1 = -1;
 
-      if (facing === 'front') {
+      if (isDoorFront) {
         normalAxis = 'z';
-        direction = 1;
-        posZ = b.maxZ;
-        if (hingeSide === 'left') posX = b.minX + 22;
-        else if (hingeSide === 'right') posX = b.maxX - 22;
-      } else if (facing === 'back') {
-        normalAxis = 'z';
-        direction = -1;
-        posZ = b.minZ;
-        if (hingeSide === 'left') posX = b.maxX - 22;
-        else if (hingeSide === 'right') posX = b.minX + 22;
-      } else if (facing === 'right') {
-        normalAxis = 'x';
-        direction = 1;
-        posX = b.maxX;
-        if (hingeSide === 'left') posZ = b.maxZ - 22;
-        else if (hingeSide === 'right') posZ = b.minZ + 22;
+        posZ = b.minZ; // Cara interior de la puerta (NUNCA b.maxZ exterior)
+        if (facing === 'back') {
+          posX = openingDir === 'left' ? b.maxX - 22 : b.minX + 22;
+        } else {
+          posX = openingDir === 'left' ? b.minX + 22 : b.maxX - 22;
+        }
       } else {
-        // 'left'
         normalAxis = 'x';
-        direction = -1;
-        posX = b.minX;
-        if (hingeSide === 'left') posZ = b.minZ + 22;
-        else if (hingeSide === 'right') posZ = b.maxZ - 22;
+        posX = b.minX; // Cara interior de la puerta lateral (NUNCA b.maxX exterior)
+        if (facing === 'right') {
+          posZ = openingDir === 'left' ? b.maxZ - 22 : b.minZ + 22;
+        } else {
+          posZ = openingDir === 'left' ? b.minZ + 22 : b.maxZ - 22;
+        }
       }
 
       holes.push({

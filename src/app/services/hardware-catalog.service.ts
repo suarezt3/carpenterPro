@@ -314,6 +314,31 @@ export class HardwareCatalogService {
     }
   ];
 
+  // Calcula la cantidad técnica de bisagras de cazoleta Ø35mm según el largo del borde abisagrado (FASE 1.2)
+  computeHingeCountForDoor(hingedEdgeLengthMm: number): number {
+    const span = Math.max(0, Number(hingedEdgeLengthMm) || 0);
+    if (span <= 900) return 2;
+    if (span <= 1600) return 3;
+    return 4;
+  }
+
+  // Calcula los desplazamientos centrados [-L/2, +L/2] en mm con margen de 100 mm en los extremos (FASE 1.2)
+  computeHingeOffsetsMm(hingedEdgeLengthMm: number): number[] {
+    const L = Math.max(100, Number(hingedEdgeLengthMm) || 600);
+    const margin = Math.min(100, Math.max(35, L * 0.2));
+    const start = -L / 2 + margin;
+    const end = L / 2 - margin;
+    const count = this.computeHingeCountForDoor(L);
+    if (count === 2) {
+      return [start, end];
+    }
+    if (count === 3) {
+      return [start, 0, end];
+    }
+    const step = (end - start) / 3;
+    return [start, start + step, start + 2 * step, end];
+  }
+
   // Identifica si una pieza es puerta o cajón por rol o nombre
   detectMovableType(part: Part): { movableType: 'door' | 'drawer' | 'none'; direction: OpeningDirection } {
     if (part.hardwareConfig?.movableType) {
@@ -327,7 +352,17 @@ export class HardwareCatalogService {
     const role = part.componentRole;
 
     if (role === 'door' || n.includes('PUERTA')) {
-      if (n.includes('BASCULANTE') || n.includes('ELEVABLE') || n.includes('ALACENA')) {
+      if (n.includes('ABATIBLE INFERIOR')) {
+        return { movableType: 'door', direction: 'bottom' };
+      }
+      if (
+        n.includes('ABATIBLE SUPERIOR') ||
+        n.includes('BASCULANTE') ||
+        n.includes('ELEVABLE') ||
+        n.includes('ALACENA') ||
+        n.includes('PISTON') ||
+        n.includes('PISTÓN')
+      ) {
         return { movableType: 'door', direction: 'top' };
       }
       if (n.includes('DER') || n.includes('DERECHA') || (part.posX || 0) > 0) {
@@ -349,13 +384,14 @@ export class HardwareCatalogService {
 
     if (detected.movableType === 'door') {
       const isBasculante = detected.direction === 'top';
+      const isHorizontalHandle = detected.direction === 'top' || detected.direction === 'bottom';
       return {
         isMovable: true,
         movableType: 'door',
         handleType: 'bar_modern',
         handleFinish: 'brushed_steel',
         handleLength: 160,
-        handlePosition: isBasculante ? 'horizontal' : 'vertical',
+        handlePosition: isHorizontalHandle ? 'horizontal' : 'vertical',
         hingeType: isBasculante ? 'gas_piston' : 'straight',
         openingDirection: detected.direction,
         isOpen: false
@@ -401,6 +437,7 @@ export class HardwareCatalogService {
 
   // Genera lista consolidada de herrajes requeridos para presupuesto y compra en COP
   computeRequiredHardwareList(parts: Part[], _appliances: ApplianceItem[] = []): HardwareItem[] {
+    void _appliances;
     let hingesStraight = 0;
     let hinges45 = 0;
     let hinges165 = 0;
@@ -437,31 +474,68 @@ export class HardwareCatalogService {
       const detected = this.detectMovableType(part);
       const hw = part.hardwareConfig || this.getDefaultHardwareConfig(part);
 
+      const hasPhysicalHandle =
+        Boolean(hw.handleType) &&
+        hw.handleType !== 'none' &&
+        hw.handleType !== 'push' &&
+        hw.handleType !== 'push_open' &&
+        hw.handleType !== 'gola_less' &&
+        hw.handleType !== 'finger_pull' &&
+        hw.handlePosition !== 'none';
+
       // 2. Puertas correderas de Closet
       const isSlidingDoor = (detected.movableType === 'door' || part.componentRole === 'door') &&
         (n.includes('corrediz') || notes.includes('corrediz') || notes.includes('riel') || mod.includes('closet'));
 
       if (isSlidingDoor) {
         slidingDoorsCount += qty;
-        if (hw.handleType && hw.handleType !== 'none') {
+        if (hasPhysicalHandle) {
           handlesCount += qty;
         }
         continue;
       }
 
       if (detected.movableType === 'door') {
-        const height = Math.max(part.length, part.width);
-        const hingesNeeded = (height > 1600 ? 4 : (height > 900 ? 3 : 2)) * qty;
+        const upperName = (part.name || '').toUpperCase();
+        const openingDir = hw.openingDirection || detected.direction;
+
+        // Pistones neumáticos elevables (alacenas / abatible superior)
+        const isLiftUp =
+          hw.hingeType === 'gas_piston' ||
+          openingDir === 'top' ||
+          upperName.includes('ABATIBLE SUPERIOR') ||
+          upperName.includes('PISTON') ||
+          upperName.includes('PISTÓN') ||
+          upperName.includes('BASCULANTE') ||
+          upperName.includes('ELEVABLE') ||
+          upperName.includes('ALACENA');
+
+        const isHorizontalHinge = isLiftUp || openingDir === 'bottom' || upperName.includes('ABATIBLE INFERIOR');
+        const horizontalWidth =
+          part.orientation === 'vertical_xy'
+            ? part.length
+            : part.orientation === 'vertical_yz'
+              ? part.width
+              : Math.min(part.length, part.width);
+        const verticalHeight =
+          part.orientation === 'vertical_xy'
+            ? Math.max(part.width, part.length > 900 && part.width <= 900 ? part.length : part.width)
+            : Math.max(part.length, part.width);
+
+        const hingedSpan = isHorizontalHinge ? horizontalWidth : verticalHeight;
+        const hingesNeeded = this.computeHingeCountForDoor(hingedSpan) * qty;
 
         // Bisagras angulares de 45° (esquineros pentagonales)
         const is45 = hw.hingeType === 'corner_45' || n.includes('45°') || notes.includes('45°') || part.rotationY === 45 || n.includes('diagonal');
         // Bisagras angulares de 165° (rincón ciego)
         const is165 = hw.hingeType === 'corner_165' || n.includes('165°') || notes.includes('165°') || n.includes('acceso a rincón') || notes.includes('rincón') || notes.includes('ciego') || n.includes('ciego');
-        // Pistones neumáticos elevables (alacenas)
-        const isLiftUp = hw.hingeType === 'gas_piston' || detected.direction === 'top' || n.includes('basculante') || n.includes('elevable') || n.includes('alacena');
 
         if (isLiftUp) {
-          hingesGas += (2 * qty);
+          // Puerta Abatible Superior requiere TANTO los 2 pistones a gas COMO las bisagras de cazoleta Ø35mm superiores (FASE 4.2)
+          hingesGas += 2 * qty;
+          if (hw.hingeType !== 'none') {
+            hingesStraight += hingesNeeded;
+          }
         } else if (is45) {
           hinges45 += hingesNeeded;
         } else if (is165) {
@@ -470,7 +544,7 @@ export class HardwareCatalogService {
           hingesStraight += hingesNeeded;
         }
 
-        if (hw.handleType && hw.handleType !== 'none') {
+        if (hasPhysicalHandle) {
           handlesCount += qty;
         }
       } else if (detected.movableType === 'drawer') {
@@ -490,7 +564,7 @@ export class HardwareCatalogService {
           drawersCount += qty;
         }
 
-        if (!isPushOpen && !isFingerPull && hw.handleType && hw.handleType !== 'none') {
+        if (!isPushOpen && !isFingerPull && hasPhysicalHandle) {
           handlesCount += qty;
         }
       }

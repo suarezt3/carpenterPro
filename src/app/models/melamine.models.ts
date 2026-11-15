@@ -137,15 +137,28 @@ export interface ModuleCavityInfo {
 
 export type OpeningDirection = 'left' | 'right' | 'top' | 'bottom';
 
+export type DoorConfigurationMode = 'left' | 'right' | 'double' | 'top' | 'bottom';
+
+export type DoorHandleVerticalPosition =
+  | 'top'
+  | 'center'
+  | 'bottom'
+  | 'none'
+  | 'vertical'
+  | 'horizontal'
+  | 'centered';
+
 export interface PartHardwareConfig {
   isMovable?: boolean;
   movableType?: 'door' | 'drawer' | 'none';
   handleType?: HandleType;
   handleFinish?: HandleFinish;
   handleLength?: number; // mm
-  handlePosition?: 'vertical' | 'horizontal' | 'centered';
+  handlePosition?: DoorHandleVerticalPosition;
   hingeType?: HingeType;
+  hingeCount?: number;
   openingDirection?: OpeningDirection;
+  openAngleDeg?: number;
   slideType?: SlideType;
   slideLength?: number;
   isOpen?: boolean;
@@ -157,6 +170,7 @@ export interface PartGroup {
   id: string;
   name: string; // ej. "Cajón 1", "Cajón Inferior"
   type: 'drawer' | 'door_set' | 'assembly' | 'custom';
+  partIds?: string[];
   subType?: 'drawer' | string;
   templateId?: 'modular_drawer' | string;
   isCountertop?: boolean;
@@ -232,7 +246,7 @@ export interface ParametricCabinetConfig {
   backMaterialId: string;
   handleType: HandleType;
   handleFinish: HandleFinish;
-  handlePosition?: 'vertical' | 'horizontal' | 'centered';
+  handlePosition?: DoorHandleVerticalPosition;
   facadeGap: number; // Holgura perimetral puerta (default: 3 mm)
   posX?: number;
   posY?: number; // Elevación sobre el piso
@@ -251,6 +265,8 @@ export interface ParametricCabinetConfig {
   hangingRodsCount?: 0 | 1 | 2;
   cornerReturnWidth?: number;
 }
+
+export type ParametricModuleConfig = ParametricCabinetConfig;
 
 export interface Part {
   id: string;
@@ -1262,8 +1278,8 @@ export interface RoomConfiguration {
   wallOffsetX: number;         // Desfase modular X en mm (posición del muro)
   wallOffsetZ: number;         // Desfase modular Z en mm (hacia el fondo)
   isWallsLocked?: boolean;     // Bloqueo global de todos los muros
-  lockedWalls?: { [wallId: string]: boolean | undefined }; // Bloqueo individual por muro
-  hiddenWalls?: { [wallId: string]: boolean | undefined }; // Ocultar individualmente muros
+  lockedWalls?: Record<string, boolean | undefined>; // Bloqueo individual por muro
+  hiddenWalls?: Record<string, boolean | undefined>; // Ocultar individualmente muros
   walls?: RoomWallInstance[];  // Muros independientes y divisorios en el espacio
 }
 

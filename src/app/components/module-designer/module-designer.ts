@@ -1646,6 +1646,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     wallInnerZ: number,
     mountType: string
   ): { x: number; y: number; z: number } {
+    void mountType;
     const config = this.roomConfig();
     const floorW = config.floorWidth || 5000;
     const floorD = config.floorDepth || 5000;
@@ -3415,7 +3416,6 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const selAppIds = this.selectedApplianceIds();
 
     if (selIds.length > 1 || (selIds.length > 0 && selAppIds.length > 0) || selAppIds.length > 1) {
-      const isMulti = this.isMultiSelection();
       const gCount = this.selectedGroupIds().length;
       const appCount = selAppIds.length;
       const partCount = selIds.length;
@@ -6581,4 +6581,330 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     };
     this.showToast(`📐 ${labelMap[type]} en "${sel.name}"`);
   }
+
+  // =========================================================================
+  // FASE 3: CONFIGURACIÓN 1-CLIC DE PUERTA, HERRAJES Y CINEMÁTICA 3D
+  // =========================================================================
+
+  private readonly doorOpenAnglesMap = signal<Record<string, number>>({});
+
+  isPartDoor(part: Part | null | undefined): boolean {
+    if (!part) return false;
+    if (part.componentRole === 'door') return true;
+    if (part.hardwareConfig?.movableType === 'door') return true;
+    const upperName = (part.name || '').toUpperCase();
+    return upperName.includes('PUERTA');
+  }
+
+  readonly isSelectedPartDoor = computed<boolean>(() => {
+    if (this.activeSelectedGroupId()) return false;
+    return this.isPartDoor(this.selectedPart());
+  });
+
+  readonly activeSelectedGroup = computed<PartGroup | null>(() => {
+    const gid = this.activeSelectedGroupId();
+    if (!gid) return null;
+    return this.groups().find(g => g.id === gid) || null;
+  });
+
+  findPairedDoorSibling(doorPart: Part): Part | null {
+    return this.projectService.findPairedDoorSibling(doorPart);
+  }
+
+  readonly canConfigureSelectedDoorOrModule = computed<boolean>(() => {
+    const sel = this.selectedPart();
+    if (!this.activeSelectedGroupId() && this.isPartDoor(sel)) {
+      return true;
+    }
+    const gid = this.activeSelectedGroupId();
+    if (!gid) return false;
+    const grpParts = this.selectedGroupParts();
+    if (grpParts.some(p => this.isPartDoor(p))) {
+      return true;
+    }
+    if (this.isParametricCabinetGroup()) {
+      const pCfg = this.activeGroupParametricConfig();
+      return !this.isDrawerCabinet(pCfg);
+    }
+    return false;
+  });
+
+  readonly activeDoorParts = computed<Part[]>(() => {
+    const gid = this.activeSelectedGroupId();
+    if (gid) {
+      const doors = this.selectedGroupParts().filter(p => this.isPartDoor(p));
+      return [...doors].sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
+    }
+    const sel = this.selectedPart();
+    if (this.isPartDoor(sel) && sel) {
+      const sibling = this.findPairedDoorSibling(sel);
+      if (sibling) {
+        return [sel, sibling].sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
+      }
+      return [sel];
+    }
+    return [];
+  });
+
+  readonly activeDoorTargetId = computed<string | null>(() => {
+    const gid = this.activeSelectedGroupId();
+    if (gid) return gid;
+    const sel = this.selectedPart();
+    if (this.isPartDoor(sel) && sel) return sel.id;
+    return null;
+  });
+
+  readonly activeDoorConfigMode = computed<DoorConfigMode>(() => {
+    // Asegurar reactividad sobre cambios en currentParts y groups
+    const allParts = this.currentParts();
+    const targetId = this.activeDoorTargetId();
+    if (!targetId || allParts.length === 0) return 'none';
+
+    const modeFromSvc = this.projectService.getDoorConfigurationMode(targetId);
+    if (modeFromSvc && modeFromSvc !== 'none') {
+      return modeFromSvc;
+    }
+    if (this.activeSelectedGroupId() && modeFromSvc === 'none') {
+      const grpDoors = this.activeDoorParts();
+      if (grpDoors.length === 0) {
+        return this.activeGroupParametricConfig()?.doorOpening || 'none';
+      }
+    }
+    return modeFromSvc || 'none';
+  });
+
+  readonly activeDoorHandlePosition = computed<DoorHandleVerticalPos>(() => {
+    const doors = this.activeDoorParts();
+    if (doors.length === 0) return 'center';
+    const primary = doors[0];
+    const hw = primary.hardwareConfig;
+    if (!hw) {
+      const mode = this.activeDoorConfigMode();
+      if (mode === 'top') return 'bottom';
+      if (mode === 'bottom') return 'top';
+      return 'center';
+    }
+    if (hw.handleType === 'none' || hw.handleType === 'push_open' || hw.handlePosition === 'none') {
+      return 'none';
+    }
+    if (hw.handlePosition === 'top' || hw.handlePosition === 'center' || hw.handlePosition === 'bottom') {
+      return hw.handlePosition;
+    }
+    if (hw.openingDirection === 'top') return 'bottom';
+    if (hw.openingDirection === 'bottom') return 'top';
+    return 'center';
+  });
+
+  readonly activeDoorHingeCount = computed<{
+    hingesPerLeaf: 2 | 3 | 4;
+    leafCount: number;
+    totalHinges: number;
+    hasGasPistons: boolean;
+    pistonsCount: number;
+    hasBottomStays: boolean;
+    doorHeightMm: number;
+    summaryBadge: string;
+  }>(() => {
+    const mode = this.activeDoorConfigMode();
+    const doors = this.activeDoorParts();
+    const pCfg = this.activeGroupParametricConfig();
+
+    let doorHeightMm = 700;
+    if (doors.length > 0) {
+      const d = doors[0];
+      doorHeightMm = Math.round(
+        mode === 'top' || mode === 'bottom'
+          ? (d.width || 400)
+          : Math.max(d.width || 0, d.length || 0)
+      );
+    } else if (pCfg) {
+      const tk = pCfg.hasPlinth ? (pCfg.plinthHeight || 80) : 0;
+      doorHeightMm = Math.max(300, Math.round((pCfg.height || 720) - tk));
+    }
+
+    let hingesPerLeaf: 2 | 3 | 4 = 2;
+    if (mode === 'top' || mode === 'bottom') {
+      hingesPerLeaf = 2;
+    } else if (doorHeightMm <= 900) {
+      hingesPerLeaf = 2;
+    } else if (doorHeightMm <= 1600) {
+      hingesPerLeaf = 3;
+    } else {
+      hingesPerLeaf = 4;
+    }
+
+    const leafCount = mode === 'none' ? 0 : (mode === 'double' ? Math.max(2, doors.length || 2) : 1);
+    const totalHinges = hingesPerLeaf * leafCount;
+    const hasGasPistons = mode === 'top';
+    const pistonsCount = hasGasPistons ? 2 : 0;
+    const hasBottomStays = mode === 'bottom';
+
+    let summaryBadge = `${hingesPerLeaf} Bisagras Ø35mm`;
+    if (mode === 'none') {
+      summaryBadge = 'Sin Puerta';
+    } else if (mode === 'top') {
+      summaryBadge = '2 Bisagras + 2 Pistones a Gas';
+    } else if (mode === 'bottom') {
+      summaryBadge = '2 Bisagras + 2 Retenedores';
+    } else if (mode === 'double') {
+      summaryBadge = `2 Hojas · ${totalHinges} Bisagras Ø35mm`;
+    }
+
+    return {
+      hingesPerLeaf,
+      leafCount,
+      totalHinges,
+      hasGasPistons,
+      pistonsCount,
+      hasBottomStays,
+      doorHeightMm,
+      summaryBadge
+    };
+  });
+
+  readonly activeDoorMaxAngleDeg = computed<number>(() => {
+    const mode = this.activeDoorConfigMode();
+    return (mode === 'top' || mode === 'bottom') ? 80 : 90;
+  });
+
+  readonly activeDoorOpenAngleDeg = computed<number>(() => {
+    const targetId = this.activeDoorTargetId();
+    if (!targetId) return 0;
+
+    const mapVal = this.doorOpenAnglesMap()[targetId];
+    if (mapVal !== undefined) {
+      return Math.min(this.activeDoorMaxAngleDeg(), Math.max(0, Math.round(mapVal)));
+    }
+
+    const viewer = this.viewer3d();
+    if (viewer) {
+      const fromViewer = viewer.getDoorOpeningAngleDeg(targetId);
+      if (typeof fromViewer === 'number' && !isNaN(fromViewer)) {
+        return Math.min(this.activeDoorMaxAngleDeg(), Math.max(0, Math.round(fromViewer)));
+      }
+    }
+
+    if (this.isSelectedDoorOrGroupOpen3D()) {
+      return this.activeDoorMaxAngleDeg();
+    }
+    return 0;
+  });
+
+  isSelectedDoorOrGroupOpen3D(): boolean {
+    const targetId = this.activeDoorTargetId();
+    if (!targetId) return false;
+
+    const viewer = this.viewer3d();
+    if (viewer) {
+      return viewer.isDoorOrGroupOpen3D(targetId);
+    }
+
+    const mapVal = this.doorOpenAnglesMap()[targetId];
+    return mapVal !== undefined && mapVal > 0;
+  }
+
+  toggleSelectedDoorOpen3D(): void {
+    const targetId = this.activeDoorTargetId();
+    if (!targetId) return;
+
+    const currentlyOpen = this.isSelectedDoorOrGroupOpen3D();
+    const maxDeg = this.activeDoorMaxAngleDeg();
+    const nextAngle = currentlyOpen ? 0 : maxDeg;
+
+    const viewer = this.viewer3d();
+    if (viewer) {
+      viewer.toggleDoorOrGroupOpen3D(targetId);
+      const actualAngle = viewer.getDoorOpeningAngleDeg(targetId);
+      this.setDoorAngleMapForTarget(targetId, actualAngle);
+      return;
+    }
+
+    this.setDoorAngleMapForTarget(targetId, nextAngle);
+  }
+
+  onSelectedDoorAngleInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) return;
+    const raw = Number(input.value);
+    if (isNaN(raw)) return;
+    this.setSelectedDoorOpenAngleDeg(raw);
+  }
+
+  setSelectedDoorOpenAngleDeg(angleDeg: number): void {
+    const targetId = this.activeDoorTargetId();
+    if (!targetId) return;
+
+    const maxDeg = this.activeDoorMaxAngleDeg();
+    const clamped = Math.max(0, Math.min(maxDeg, Math.round(angleDeg)));
+    this.setDoorAngleMapForTarget(targetId, clamped);
+
+    this.viewer3d()?.setDoorOpeningAngleDeg(targetId, clamped);
+  }
+
+  private setDoorAngleMapForTarget(targetId: string, angleDeg: number): void {
+    const doors = this.activeDoorParts();
+    this.doorOpenAnglesMap.update(prev => {
+      const next: Record<string, number> = { ...prev, [targetId]: angleDeg };
+      for (const d of doors) {
+        next[d.id] = angleDeg;
+      }
+      return next;
+    });
+  }
+
+  applyQuickDoorOpeningMode(mode: DoorConfigMode): void {
+    const targetId = this.activeDoorTargetId();
+    if (!targetId) return;
+
+    const isGroupSelected = !!this.activeSelectedGroupId();
+
+    if (mode === 'none') {
+      if (isGroupSelected && this.isParametricCabinetGroup()) {
+        this.updateActiveGroupParametricConfig({ doorOpening: 'none' });
+        this.setDoorAngleMapForTarget(targetId, 0);
+        this.showToast('Puertas retiradas del módulo');
+      }
+      return;
+    }
+
+    const updatedDoors = this.projectService.configureDoorOpeningMode(targetId, mode);
+    if (!isGroupSelected && updatedDoors && updatedDoors.length > 0) {
+      const currentSelId = this.selectedPartId();
+      const stillExists = updatedDoors.some(d => d.id === currentSelId);
+      if (!stillExists) {
+        this.selectedPartId.set(updatedDoors[0].id);
+        this.selectedPartIds.set([updatedDoors[0].id]);
+      }
+    }
+    this.notifyDoorOpeningModeApplied(mode);
+  }
+
+  setQuickDoorHandlePosition(position: DoorHandleVerticalPos): void {
+    const targetId = this.activeDoorTargetId();
+    if (!targetId) return;
+
+    this.projectService.setDoorHandleVerticalPosition(targetId, position);
+
+    const posLabels: Record<DoorHandleVerticalPos, string> = {
+      top: 'Manija en posición Superior',
+      center: 'Manija Centrada Verticalmente',
+      bottom: 'Manija en posición Inferior',
+      none: 'Sin Manija (Apertura Push-to-Open)'
+    };
+    this.showToast(posLabels[position]);
+  }
+
+  private notifyDoorOpeningModeApplied(mode: Exclude<DoorConfigMode, 'none'>): void {
+    const labels: Record<Exclude<DoorConfigMode, 'none'>, string> = {
+      left: '1 Puerta Izquierda configurada (bisagras a la izquierda)',
+      right: '1 Puerta Derecha configurada (bisagras a la derecha)',
+      double: '2 Puertas (Doble Hoja Par) con luz central de 3 mm',
+      top: 'Abatible Superior configurada (2 bisagras + 2 pistones a gas, 80°)',
+      bottom: 'Abatible Inferior configurada (bisagras inferiores + retenedores, 80°)'
+    };
+    this.showToast(labels[mode]);
+  }
 }
+
+export type DoorConfigMode = 'left' | 'right' | 'double' | 'top' | 'bottom' | 'none';
+export type DoorHandleVerticalPos = 'top' | 'center' | 'bottom' | 'none';

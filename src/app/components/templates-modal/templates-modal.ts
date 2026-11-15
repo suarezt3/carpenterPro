@@ -224,7 +224,15 @@ export class TemplatesModalComponent {
     this.hasHandle.set(cfg.hasHandle !== false);
     if (cfg.handleType) this.handleType.set(cfg.handleType);
     if (cfg.handleFinish) this.handleFinish.set(cfg.handleFinish);
-    if (cfg.handlePosition) this.handlePosition.set(cfg.handlePosition);
+    if (cfg.handlePosition) {
+      if (cfg.handlePosition === 'vertical' || cfg.handlePosition === 'horizontal' || cfg.handlePosition === 'centered') {
+        this.handlePosition.set(cfg.handlePosition);
+      } else if (cfg.handlePosition === 'center') {
+        this.handlePosition.set('centered');
+      } else {
+        this.handlePosition.set('vertical');
+      }
+    }
     this.shelvesCount.set(safeShelvesCount);
     this.shelfDistribution.set(cfg.shelfDistribution || 'uniform');
 

@@ -54,7 +54,6 @@ export class CabinetGeneratorService {
     // Carcass depth: if doors are present, carcass is recessed so doors sit flush with outer front
     const carcassDepth = hasDoor ? Math.max(80, d - doorT) : d;
     const innerWidth = Math.max(50, w - (2 * t));
-    const innerHeight = Math.max(50, h - (2 * t));
 
     // Coordinate centers
     const hasPlinth = config.hasPlinth === true || (config.moduleType === 'base_cabinet' && config.hasPlinth !== false);
@@ -673,7 +672,7 @@ export class CabinetGeneratorService {
       // 1 Puerta Elevable Superior (Pistón a Gas)
       parts.push({
         id: `${moduleId}_puerta_elev_${Date.now()}`,
-        name: 'Puerta Elevable (Pistón Gas)',
+        name: 'PUERTA ABATIBLE SUPERIOR',
         moduleId,
         moduleName: groupName,
         groupId,
@@ -707,7 +706,7 @@ export class CabinetGeneratorService {
       // Puerta Abatible Inferior
       parts.push({
         id: `${moduleId}_puerta_abat_${Date.now()}`,
-        name: 'Puerta Abatible Inferior',
+        name: 'PUERTA ABATIBLE INFERIOR',
         moduleId,
         moduleName: groupName,
         groupId,
@@ -1555,8 +1554,13 @@ export class CabinetGeneratorService {
       // 2. Puertas: si en 3D no hay puertas físicas, doorOpening DEBE ser 'none'.
       if (doorParts.length === 0) {
         cfg.doorOpening = 'none';
-      } else if (doorParts.length === 1 && (cfg.doorOpening === 'none' || cfg.doorOpening === 'double')) {
-        cfg.doorOpening = 'left';
+      } else if (doorParts.length === 1) {
+        const dir = doorParts[0].hardwareConfig?.openingDirection;
+        if (dir === 'left' || dir === 'right' || dir === 'top' || dir === 'bottom') {
+          cfg.doorOpening = dir;
+        } else if (cfg.doorOpening === 'none' || cfg.doorOpening === 'double') {
+          cfg.doorOpening = 'left';
+        }
       } else if (doorParts.length >= 2 && cfg.doorOpening !== 'double') {
         cfg.doorOpening = 'double';
       }
@@ -1644,9 +1648,24 @@ export class CabinetGeneratorService {
       doorOpening = 'double';
     } else if (doorParts.length === 1) {
       const hw = doorParts[0].hardwareConfig;
-      if (hw?.openingDirection === 'top') {
+      const upperDoorName = (doorParts[0].name || '').toUpperCase();
+      if (
+        hw?.openingDirection === 'top' ||
+        upperDoorName.includes('ABATIBLE SUPERIOR') ||
+        upperDoorName.includes('ELEVABLE') ||
+        upperDoorName.includes('PISTON') ||
+        upperDoorName.includes('PISTÓN')
+      ) {
         doorOpening = 'top';
-      } else if (hw?.openingDirection === 'right') {
+      } else if (
+        hw?.openingDirection === 'bottom' ||
+        upperDoorName.includes('ABATIBLE INFERIOR')
+      ) {
+        doorOpening = 'bottom';
+      } else if (
+        hw?.openingDirection === 'right' ||
+        upperDoorName.includes('DERECHA')
+      ) {
         doorOpening = 'right';
       } else {
         doorOpening = 'left';
@@ -1697,6 +1716,17 @@ export class CabinetGeneratorService {
     materials: Material[]
   ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
     return this.generateParametricCabinet(config, materials);
+  }
+
+  generateParametricCabinetParts(
+    config: ParametricCabinetConfig,
+    materials: Material[]
+  ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
+    return this.generateParametricCabinet(config, materials);
+  }
+
+  extractParametricConfigFromGroup(parts: Part[], group: PartGroup): ParametricCabinetConfig {
+    return this.reconstructConfigFromParts(parts, group);
   }
 
   /**
