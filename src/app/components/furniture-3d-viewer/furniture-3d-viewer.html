@@ -170,9 +170,10 @@
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       [title]="'designer.toolSelectMove' | t">
       <hugeicons-icon [icon]="activeTool() === 'move' ? icons.moveAxes : icons.cursorSelect" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">V</span>
     </button>
 
-    <!-- 2. HERRAMIENTA ROTAR 90° (R / Q) -->
+    <!-- 2. HERRAMIENTA ROTAR 90° (R) -->
     <button
       type="button"
       (click)="setActiveTool('rotate_90')"
@@ -180,9 +181,10 @@
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       [title]="'designer.toolRotate90' | t">
       <hugeicons-icon [icon]="icons.rotate90" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">R</span>
     </button>
 
-    <!-- 3. IMÁN INTELIGENTE (SMART MAGNET) -->
+    <!-- 3. IMÁN INTELIGENTE (S) -->
     <button
       type="button"
       (click)="toggleMagneticSnap()"
@@ -190,6 +192,7 @@
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       [title]="'designer.toolMagnet' | t">
       <hugeicons-icon [icon]="icons.magnet" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">S</span>
     </button>
 
     <!-- 4. CINTA MÉTRICA 3D (T) -->
@@ -200,19 +203,21 @@
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       [title]="'designer.toolMeasure' | t">
       <hugeicons-icon [icon]="icons.ruler" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">T</span>
     </button>
 
-    <!-- 5. ABRIR / CERRAR PUERTAS Y CAJONES -->
+    <!-- 5. ABRIR / CERRAR PUERTAS Y CAJONES (O) -->
     <button
       type="button"
-      (click)="toggleAllDoorsAndDrawers()"
-      [class]="isAllOpen() ? 'text-zinc-900 bg-zinc-100 ring-1 ring-zinc-300 font-bold' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100'"
+      (click)="toggleSmartDoorsAndDrawers()"
+      [class]="isSmartOpenActive() ? 'text-zinc-900 bg-zinc-100 ring-1 ring-zinc-300 font-bold' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100'"
       class="cad-tool-btn rounded-md flex items-center justify-center transition relative cursor-pointer shrink-0"
       [title]="'designer.toolOpenDoors' | t">
-      <hugeicons-icon [icon]="isAllOpen() ? icons.doorOpen : icons.doorClosed" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
-      @if (isAllOpen()) {
+      <hugeicons-icon [icon]="isSmartOpenActive() ? icons.doorOpen : icons.doorClosed" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      @if (isSmartOpenActive()) {
         <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zinc-900 border border-white"></span>
       }
+      <span class="cad-key-badge" aria-hidden="true">O</span>
     </button>
 
     <!-- 6. VISTAS / MODO RENDIMIENTO (60 FPS) -->
@@ -227,7 +232,7 @@
 
     <div class="cad-toolbar-divider w-5 h-px bg-zinc-200/90 shrink-0"></div>
 
-    <!-- 8. MECANIZADOS CNC (PERFORACIONES) -->
+    <!-- 7. MECANIZADOS CNC (P) -->
     <button
       type="button"
       (click)="toggleDrillHoles()"
@@ -236,13 +241,14 @@
       [title]="'designer.toolCnc' | t">
       <hugeicons-icon [icon]="icons.cncTarget" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
       @if (showDrillHoles() && allDrillHoles().length > 0) {
-        <span class="absolute -top-0.5 -right-0.5 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
+        <span class="absolute -top-0.5 -right-0.5 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-numeric tabular-nums">
           {{ allDrillHoles().length }}
         </span>
       }
+      <span class="cad-key-badge" aria-hidden="true">P</span>
     </button>
 
-    <!-- 9. COTAS 3D -->
+    <!-- 8. COTAS GENERALES EXTERIORES (D) -->
     <button
       type="button"
       (click)="toggleDimensions()"
@@ -250,9 +256,10 @@
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       [title]="'designer.toolDimensions' | t">
       <hugeicons-icon [icon]="icons.dimensions3d" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">D</span>
     </button>
 
-    <!-- 10. LUZ LIBRE -->
+    <!-- 9. COTAS DE LUZ INTERNA (K) -->
     <button
       type="button"
       (click)="toggleClearances()"
@@ -260,9 +267,10 @@
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       [title]="'designer.toolClearances' | t">
       <hugeicons-icon [icon]="icons.clearanceVert" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">K</span>
     </button>
 
-    <!-- 11. RAYOS X -->
+    <!-- 10. VISTA ESTRUCTURA / RAYOS X (X) -->
     <button
       type="button"
       (click)="toggleXRay()"
@@ -270,9 +278,21 @@
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       [title]="'designer.toolXray' | t">
       <hugeicons-icon [icon]="icons.eye" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">X</span>
     </button>
 
-    <!-- 11.5. HERRAJES Y ACCESORIOS 3D -->
+    <!-- 11. OCULTAR / MOSTRAR PIEZA (H) -->
+    <button
+      type="button"
+      (click)="toggleVisibilityFromToolbar()"
+      [class]="hiddenPartIds().size > 0 ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300' : (activeSelectedIds().length > 0 || activeSelectedApplianceIds().length > 0 ? 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100')"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
+      [title]="'designer.toolHideShow' | t">
+      <hugeicons-icon [icon]="hiddenPartIds().size > 0 && activeSelectedIds().length === 0 ? icons.eye : icons.eyeOff" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">H</span>
+    </button>
+
+    <!-- 12. VER / OCULTAR HERRAJES 3D (J) -->
     <button
       type="button"
       [disabled]="!hasHardwareSelected()"
@@ -283,41 +303,43 @@
             ? 'text-zinc-900 bg-zinc-100 font-semibold ring-1 ring-zinc-300 cursor-pointer'
             : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 cursor-pointer')"
       class="cad-tool-btn rounded-md flex items-center justify-center transition shrink-0"
-      [title]="!hasHardwareSelected()
-        ? 'Herrajes 3D: Selecciona un cajón o puerta para gestionar sus herrajes'
-        : (isSelectedHardwareVisible() ? 'Ocultar herrajes 3D del cajón seleccionado' : 'Mostrar herrajes 3D del cajón seleccionado')">
+      [title]="'designer.toolHardware' | t">
       <hugeicons-icon [icon]="icons.hardwareTool" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">J</span>
     </button>
 
-    <!-- 13. CAJONES Y GRUPOS GUARDADOS -->
+    <!-- 13. ASISTENTE RÁPIDO DE CAJONES Y GRUPOS (C) -->
     <div class="relative shrink-0">
       <button
         type="button"
         (click)="toggleGroupsFlyout()"
         [class]="showGroupsFlyout() ? 'bg-zinc-900 text-white shadow-xs' : (activePartGroups().length > 0 ? 'text-zinc-900 bg-zinc-100 hover:bg-zinc-200 ring-1 ring-zinc-300' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100')"
         class="cad-tool-btn rounded-md flex items-center justify-center transition relative cursor-pointer"
-        title="Cajones y Grupos Guardados: Administrar y seleccionar cajones completos para moverlos o animarlos">
+        [title]="'designer.toolDrawerAssistant' | t">
         <hugeicons-icon [icon]="icons.inbox" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
         @if (activePartGroups().length > 0) {
-          <span class="absolute -top-0.5 -right-0.5 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-mono tabular-nums">
+          <span class="absolute -top-0.5 -right-0.5 px-1 min-w-3.5 h-3.5 rounded-full text-[8px] font-bold bg-zinc-900 text-white flex items-center justify-center leading-none shadow-2xs font-numeric tabular-nums">
             {{ activePartGroups().length }}
           </span>
         }
+        <span class="cad-key-badge" aria-hidden="true">C</span>
       </button>
     </div>
 
     <div class="cad-toolbar-divider w-5 h-px bg-zinc-200/90 shrink-0"></div>
 
-    <!-- 14. TEMA DE ESTUDIO (CLARO / OSCURO) -->
+    <!-- 14. ILUMINACIÓN / SOMBRAS DEL ESTUDIO (I) -->
     <button
       type="button"
       (click)="toggleTheme()"
-      class="cad-tool-btn rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer shrink-0"
-      [title]="isWhiteTheme() ? 'Cambiar a modo CAD oscuro' : 'Cambiar a modo estudio claro'">
+      [class]="!isWhiteTheme() ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
+      [title]="'designer.toolStudioLighting' | t">
       <hugeicons-icon [icon]="isWhiteTheme() ? icons.sun : icons.moon" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">I</span>
     </button>
 
-    <!-- 14.5. GUÍA DE FRENTE Y ESCALA HUMANA 3D -->
+    <!-- 15. ESCALA HUMANA DE REFERENCIA (G) -->
     <button
       type="button"
       (click)="toggleReferenceGuide()"
@@ -325,15 +347,17 @@
       class="cad-tool-btn rounded-md flex items-center justify-center transition cursor-pointer shrink-0"
       [title]="'designer.toolReferenceGuide' | t">
       <hugeicons-icon [icon]="icons.humanGuide" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">G</span>
     </button>
 
-    <!-- 15. REINICIAR CÁMARA -->
+    <!-- 16. CENTRAR Y ENCUADRAR VISTA 3D (Z) -->
     <button
       type="button"
       (click)="resetCamera()"
       class="cad-tool-btn rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer shrink-0"
       [title]="'designer.toolResetCamera' | t">
       <hugeicons-icon [icon]="icons.cameraFocus" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      <span class="cad-key-badge" aria-hidden="true">Z</span>
     </button>
   </div>
 

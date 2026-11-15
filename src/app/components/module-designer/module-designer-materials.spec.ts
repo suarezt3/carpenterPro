@@ -1,8 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { ModuleDesignerComponent } from './module-designer';
-import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
-import { DEFAULT_COUNTERTOP_MATERIALS, Material, Part, ApplianceItem } from '../../models/melamine.models';
+import { Material, Part, ApplianceItem } from '../../models/melamine.models';
 
 describe('Separación Estricta de Catálogos de Materiales en ModuleDesigner (Melamina vs Mesón)', () => {
   let component: ModuleDesignerComponent;

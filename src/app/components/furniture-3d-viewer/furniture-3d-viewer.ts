@@ -469,6 +469,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     showPlinths: true,
     showAppliances: true
   });
+  readonly manageHideInternally = input<boolean>(true);
 
   // Outputs
   partSelected = output<Part | null>();
@@ -491,6 +492,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   editModuleRequested = output<string>();
   hiddenPartsChanged = output<string[]>();
   showAllRequested = output<void>();
+  hideToggleRequested = output<void>();
   roomConfigModified = output<Partial<RoomConfiguration> & { recordHistory?: boolean }>();
   wallSelected = output<string | null>();
   readonly selectedWallType = signal<string | null>(null);
@@ -950,9 +952,25 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   // Interactive 3D Doors & Drawers Open/Close State
   readonly isAllOpen = signal<boolean>(false);
+  private openStateRevisionCounter = 0;
+  private readonly openStateRevision = signal<number>(0);
   openTargetMap = new Map<string, number>();
   openCurrentMap = new Map<string, number>();
   readonly openProgressMap = this.openCurrentMap;
+
+  private bumpOpenStateRevision(): void {
+    this.openStateRevisionCounter += 1;
+    this.openStateRevision.set(this.openStateRevisionCounter);
+  }
+
+  readonly isSmartOpenActive = computed<boolean>(() => {
+    this.openStateRevision();
+    const scope = this.resolveSmartOpenScope();
+    if (scope.mode === 'global') {
+      return this.isAllOpen();
+    }
+    return scope.parts.some(p => this.isPartTargetOpen(p));
+  });
 
   isPartOpen(partId: string): boolean {
     return (this.openTargetMap.get(partId) || 0) > 0.5;
@@ -1373,6 +1391,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         }
       }
       if (changed) {
+        this.syncIsAllOpenSignal();
+        this.bumpOpenStateRevision();
         this.requestRender(55);
       }
     });
@@ -1802,6 +1822,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
     const anyStillOpen = Array.from(this.openTargetMap.values()).some(v => v > 0.5);
     this.isAllOpen.set(anyStillOpen);
+    this.bumpOpenStateRevision();
 
     if (!parts || parts.length === 0) {
       this.updateDetectedCollisions([]);
@@ -11819,6 +11840,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (this.furnitureGroup) {
       this.sceneRaycastPicker.refreshPickableMatricesAndBounds(this.furnitureGroup);
     }
+    this.syncIsAllOpenSignal();
+    this.bumpOpenStateRevision();
     this.requestRender(12);
   }
 
@@ -12677,6 +12700,26 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.closeContextMenu();
   }
 
+  toggleVisibilityFromToolbar(): void {
+    this.hideToggleRequested.emit();
+    if (this.manageHideInternally()) {
+      this.applyInternalHideToggle();
+    }
+  }
+
+  private applyInternalHideToggle(): boolean {
+    const selectedIds = this.activeSelectedIds();
+    if (selectedIds.length > 0) {
+      this.hidePartsByIds(selectedIds);
+      return true;
+    }
+    if (this.hiddenPartIds().size > 0) {
+      this.showAllParts();
+      return true;
+    }
+    return false;
+  }
+
   assignQuickMaterial(matId: string, applyToWholeGroup = false) {
     const part = this.contextMenuPart();
     const mat = this.materials().find(m => m.id === matId);
@@ -12953,6 +12996,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (this.isModularDrawerGroup(groupId) || !!movableObj) {
         this.projectStorage.setGroupSlideExtension(groupId, next);
       }
+      this.syncIsAllOpenSignal();
+      this.bumpOpenStateRevision();
       this.requestRender(60);
     }
   }
@@ -13176,11 +13221,35 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     this.partModified.emit({ part: sel, updates });
   }
 
+  private readonly singleKeyToolActions: Record<string, () => void> = {
+    m: () => this.setActiveTool('move'),
+    q: () => this.setActiveTool('rotate_90'),
+    s: () => this.toggleMagneticSnap(),
+    t: () => this.setActiveTool('measure'),
+    o: () => this.toggleSmartDoorsAndDrawers(),
+    x: () => this.toggleXRay(),
+    p: () => this.toggleDrillHoles(),
+    d: () => this.toggleDimensions(),
+    k: () => this.toggleClearances(),
+    j: () => this.toggleHardware(),
+    c: () => this.toggleGroupsFlyout(),
+    i: () => this.toggleTheme(),
+    g: () => this.toggleReferenceGuide(),
+    z: () => this.resetCamera()
+  };
+
   handleViewerKeyDown(e: KeyboardEvent) {
     if (this.isRenderingPaused) return;
 
     const target = e.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+    if (
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable ||
+        target.getAttribute?.('contenteditable') === 'true')
+    ) {
       return;
     }
 
@@ -13191,51 +13260,46 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
       }
     }
 
+    const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
+    const lowerKey = e.key.toLowerCase();
+
     // V o Barra Espaciadora: Herramienta Seleccionar
-    if (e.key === 'v' || e.key === 'V' || e.key === ' ' || e.code === 'Space') {
+    if (!hasModifier && (lowerKey === 'v' || e.key === ' ' || e.code === 'Space')) {
       e.preventDefault();
       this.setActiveTool('select');
       return;
     }
-    // M: Mover (Gizmo 3D)
-    if (e.key === 'm' || e.key === 'M') {
-      e.preventDefault();
-      this.setActiveTool('move');
-      return;
-    }
-    // R: Rotar 90° pieza, cajón, electrodoméstico o módulo seleccionado
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R')) {
+
+    // R: Rotar 90° pieza, cajón, electrodoméstico o módulo seleccionado (si vacío, activa herramienta)
+    if (!hasModifier && lowerKey === 'r') {
       const selParts = this.selectedParts();
       const selAppIds = this.activeSelectedApplianceIds();
       const targetApps = this.appliances().filter(a => selAppIds.includes(a.id));
 
-      // Si no hay nada seleccionado, activar herramienta interactiva de giro en el visor
       if (selParts.length === 0 && targetApps.length === 0) {
         e.preventDefault();
         this.setActiveTool('rotate_90');
         return;
       }
-      // Cuando hay elementos seleccionados, la rotación rígida en bloque se ejecuta canónicamente mediante rotateSelectedGroup en ModuleDesigner
       return;
     }
-    // Q: Herramienta Rotar 90° con transportador
-    if (e.key === 'q' || e.key === 'Q') {
+
+    // H: Ocultar / Mostrar pieza o selección (solo si el visor gestiona el ocultamiento internamente)
+    if (!hasModifier && lowerKey === 'h') {
+      if (this.manageHideInternally()) {
+        e.preventDefault();
+        this.applyInternalHideToggle();
+      }
+      return;
+    }
+
+    const directAction = !hasModifier ? this.singleKeyToolActions[lowerKey] : undefined;
+    if (directAction) {
       e.preventDefault();
-      this.setActiveTool('rotate_90');
+      directAction();
       return;
     }
-    // T: Cinta Métrica 3D
-    if (e.key === 't' || e.key === 'T') {
-      e.preventDefault();
-      this.setActiveTool('measure');
-      return;
-    }
-    // Z: Centrar y reiniciar cámara (sin Ctrl/Meta/Alt para no colisionar con Deshacer)
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
-      e.preventDefault();
-      this.resetCamera();
-      return;
-    }
+
     if (e.key === 'Escape') {
       e.preventDefault();
       if (this.inlineDimensionEditor()) {
@@ -13251,12 +13315,6 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
       this.cancelActiveMeasurementTrace();
       this.clearPushPullHighlight();
       this.clearRectPreview();
-      return;
-    }
-
-    if (e.key === 'g' || e.key === 'G') {
-      e.preventDefault();
-      this.toggleReferenceGuide();
       return;
     }
 
@@ -13328,16 +13386,9 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
         break;
       case 'w':
       case 'W':
-        if (!e.ctrlKey && !e.metaKey) {
+        if (!hasModifier) {
           e.preventDefault();
           this.nudgePart('y', step);
-        }
-        break;
-      case 's':
-      case 'S':
-        if (!e.ctrlKey && !e.metaKey) {
-          e.preventDefault();
-          this.nudgePart('y', -step);
         }
         break;
     }
@@ -14892,6 +14943,325 @@ private applyMagneticSnapToPosition(
     this.requestRender(12);
   }
 
+  private isCarcassStructurePart(part: Part): boolean {
+    return (
+      part.componentRole === 'side_left' ||
+      part.componentRole === 'side_right' ||
+      part.componentRole === 'top' ||
+      part.componentRole === 'bottom' ||
+      part.componentRole === 'plinth' ||
+      part.componentRole === 'back' ||
+      part.componentRole === 'shelf'
+    );
+  }
+
+  private isMovableDoorPart(part: Part): boolean {
+    const piece = this.pieceObjectMap.get(part.id);
+    if (piece) return Boolean(piece.isDoor);
+    const upperName = (part.name || '').toUpperCase();
+    return (
+      (part.hardwareConfig?.movableType === 'door' ||
+        part.componentRole === 'door' ||
+        upperName.includes('PUERTA')) &&
+      !upperName.includes('CAJ')
+    );
+  }
+
+  private isMovableDrawerPart(part: Part): boolean {
+    const piece = this.pieceObjectMap.get(part.id);
+    if (piece) return Boolean(piece.isDrawer);
+    if (this.isCarcassStructurePart(part) || this.isMovableDoorPart(part)) {
+      return false;
+    }
+    const upperName = (part.name || '').toUpperCase();
+    const isInternalBoxPart =
+      this.isDrawerSubPartRole(part) ||
+      (upperName.includes('CAJ') &&
+        (upperName.includes('LATERAL') ||
+          upperName.includes('COSTADO') ||
+          upperName.includes('TRASERA') ||
+          upperName.includes('FONDO') ||
+          upperName.includes('CONTRAFRENTE') ||
+          upperName.includes('INTERIOR')));
+    const isDrawerFront =
+      part.hardwareConfig?.movableType === 'drawer' ||
+      (upperName.includes('FRENTE') &&
+        (upperName.includes('CAJ') || upperName.includes('GAVET'))) ||
+      ((upperName.startsWith('CAJ') || upperName.startsWith('GAVET')) && !isInternalBoxPart);
+    const isInModularDrawerGroup = !!part.groupId && this.isModularDrawerGroup(part.groupId);
+    return isInModularDrawerGroup || isDrawerFront || isInternalBoxPart;
+  }
+
+  private isMovableDoorOrDrawerPart(part: Part): boolean {
+    return this.isMovableDoorPart(part) || this.isMovableDrawerPart(part);
+  }
+
+  private isPartTargetOpen(part: Part): boolean {
+    const mapVal = this.openTargetMap.get(part.id);
+    if (mapVal !== undefined) {
+      return mapVal > 0.5;
+    }
+    if (part.groupId && this.isModularDrawerGroup(part.groupId)) {
+      const grp = this.partGroups().find(g => g.id === part.groupId);
+      if (grp) {
+        const ext = grp.slideExtension !== undefined ? grp.slideExtension : (grp.isOpen ? 1 : 0);
+        return ext > 0.5;
+      }
+    }
+    return false;
+  }
+
+  private extractEmbeddedDrawerPrefix(partId: string): string {
+    const boxSubKeywords = ['_frente', '_lat_izq', '_lat_der', '_contrafrente', '_trasera', '_frente_int', '_fondo'];
+    for (const kw of boxSubKeywords) {
+      if (partId.includes(kw)) {
+        return partId.split(kw)[0];
+      }
+    }
+    if (partId.includes('caj_ind_')) {
+      const match = partId.match(/caj_ind_\d+/);
+      if (match) return match[0];
+    }
+    return '';
+  }
+
+  private syncIsAllOpenSignal(): void {
+    const movables =
+      this.pieceObjects.length > 0
+        ? this.pieceObjects.filter(p => p.isDoor || p.isDrawer).map(p => p.part)
+        : this.parts().filter(p => this.isMovableDoorOrDrawerPart(p));
+    if (movables.length === 0) {
+      this.isAllOpen.set(false);
+      return;
+    }
+    this.isAllOpen.set(movables.every(p => this.isPartTargetOpen(p)));
+  }
+
+  private collectModuleMovables(moduleGroupIds: string[]): { parts: Part[]; groupIds: string[] } {
+    const baseGroupIds = new Set(moduleGroupIds);
+    const hostedDrawerGroupIds = new Set<string>();
+    for (const grp of this.partGroups()) {
+      const hostId = grp.hostGroupId ?? grp.drawerConfig?.hostGroupId ?? grp.drawerConfig?.targetModuleId;
+      if (hostId && baseGroupIds.has(hostId) && this.isModularDrawerGroup(grp.id)) {
+        hostedDrawerGroupIds.add(grp.id);
+      }
+    }
+
+    const allTargetGroupIds = new Set<string>([...baseGroupIds, ...hostedDrawerGroupIds]);
+    const matchedParts: Part[] = [];
+    const seenPartIds = new Set<string>();
+
+    for (const part of this.parts()) {
+      const inModuleGroup = !!part.groupId && allTargetGroupIds.has(part.groupId);
+      const inModuleId = !!part.moduleId && baseGroupIds.has(part.moduleId);
+      if ((inModuleGroup || inModuleId) && this.isMovableDoorOrDrawerPart(part) && !seenPartIds.has(part.id)) {
+        seenPartIds.add(part.id);
+        matchedParts.push(part);
+      }
+    }
+
+    return {
+      parts: matchedParts,
+      groupIds: Array.from(allTargetGroupIds)
+    };
+  }
+
+  private resolveSmartOpenScope(): {
+    mode: 'single' | 'module' | 'global';
+    parts: Part[];
+    representativePart?: Part;
+    groupIds?: string[];
+  } {
+    const curGrp = this.currentSelectedGroup();
+    const selParts = this.selectedParts();
+    const allParts = this.parts();
+
+    if (selParts.length === 0 && !curGrp) {
+      return {
+        mode: 'global',
+        parts: allParts.filter(p => this.isMovableDoorOrDrawerPart(p))
+      };
+    }
+
+    // Rule 1a: Whole selection belongs to a single modular drawer sub-group
+    if (selParts.length > 0) {
+      const groupIds = Array.from(new Set(selParts.map(p => p.groupId).filter((id): id is string => !!id)));
+      if (groupIds.length === 1 && this.isModularDrawerGroup(groupIds[0])) {
+        const drawerParts = allParts.filter(p => p.groupId === groupIds[0]);
+        const rep =
+          selParts.find(p => p.componentRole === 'drawer_front') ??
+          drawerParts.find(p => p.componentRole === 'drawer_front') ??
+          selParts[0];
+        return {
+          mode: 'single',
+          representativePart: rep,
+          parts: drawerParts.length > 0 ? drawerParts : selParts,
+          groupIds: [groupIds[0]]
+        };
+      }
+    }
+
+    if (curGrp && this.isModularDrawerGroup(curGrp.id)) {
+      const drawerParts = allParts.filter(p => p.groupId === curGrp.id);
+      if (drawerParts.length > 0) {
+        const rep = drawerParts.find(p => p.componentRole === 'drawer_front') ?? drawerParts[0];
+        return {
+          mode: 'single',
+          representativePart: rep,
+          parts: drawerParts,
+          groupIds: [curGrp.id]
+        };
+      }
+    }
+
+    // Rule 1b: Single selected door or drawer piece (when not whole-module group selection)
+    if (!curGrp && selParts.length === 1) {
+      const single = selParts[0];
+      if (this.isMovableDoorPart(single)) {
+        const sibling = this.findPairedDoorSiblingForPart(single);
+        return {
+          mode: 'single',
+          representativePart: single,
+          parts: sibling ? [single, sibling] : [single]
+        };
+      }
+      if (this.isMovableDrawerPart(single)) {
+        const prefix = this.extractEmbeddedDrawerPrefix(single.id);
+        const drawerUnitParts = prefix
+          ? allParts.filter(p => p.id === single.id || p.id.startsWith(`${prefix}_`) || p.id.includes(prefix))
+          : [single];
+        return {
+          mode: 'single',
+          representativePart: single,
+          parts: drawerUnitParts
+        };
+      }
+      // Single non-movable carcass piece: try its parent module before falling back to global
+      if (single.groupId) {
+        const modScope = this.collectModuleMovables([single.groupId]);
+        if (modScope.parts.length > 0) {
+          return {
+            mode: 'module',
+            parts: modScope.parts,
+            groupIds: modScope.groupIds
+          };
+        }
+      }
+      return {
+        mode: 'global',
+        parts: allParts.filter(p => this.isMovableDoorOrDrawerPart(p))
+      };
+    }
+
+    // Rule 2: Full module group selected (non-modular-drawer)
+    if (curGrp) {
+      const modScope = this.collectModuleMovables([curGrp.id]);
+      return {
+        mode: 'module',
+        parts: modScope.parts,
+        groupIds: modScope.groupIds
+      };
+    }
+
+    // Multi-part selection without active group: full module(s) if carcass/full group selected, otherwise selected movables
+    const selectedIdSet = new Set(selParts.map(p => p.id));
+    const involvedNonDrawerGroupIds = Array.from(
+      new Set(selParts.map(p => p.groupId).filter((id): id is string => !!id && !this.isModularDrawerGroup(id)))
+    );
+    const hasCarcassOrFullGroup = involvedNonDrawerGroupIds.some(gId => {
+      const groupParts = allParts.filter(p => p.groupId === gId);
+      const allSelected = groupParts.length > 0 && groupParts.every(p => selectedIdSet.has(p.id));
+      const hasCarcassSelected = selParts.some(p => p.groupId === gId && !this.isMovableDoorOrDrawerPart(p));
+      return allSelected || hasCarcassSelected;
+    });
+
+    if (hasCarcassOrFullGroup && involvedNonDrawerGroupIds.length > 0) {
+      const modScope = this.collectModuleMovables(involvedNonDrawerGroupIds);
+      return {
+        mode: 'module',
+        parts: modScope.parts,
+        groupIds: modScope.groupIds
+      };
+    }
+
+    const selectedMovables = selParts.filter(p => this.isMovableDoorOrDrawerPart(p));
+    if (selectedMovables.length > 0) {
+      const expandedParts: Part[] = [...selectedMovables];
+      const expandedIds = new Set(expandedParts.map(p => p.id));
+      for (const m of selectedMovables) {
+        if (this.isMovableDoorPart(m)) {
+          const sibling = this.findPairedDoorSiblingForPart(m);
+          if (sibling && !expandedIds.has(sibling.id)) {
+            expandedIds.add(sibling.id);
+            expandedParts.push(sibling);
+          }
+        } else if (m.groupId && this.isModularDrawerGroup(m.groupId)) {
+          for (const gp of allParts) {
+            if (gp.groupId === m.groupId && !expandedIds.has(gp.id)) {
+              expandedIds.add(gp.id);
+              expandedParts.push(gp);
+            }
+          }
+        }
+      }
+      return {
+        mode: 'module',
+        parts: expandedParts,
+        groupIds: Array.from(
+          new Set(expandedParts.map(p => p.groupId).filter((id): id is string => !!id && this.isModularDrawerGroup(id)))
+        )
+      };
+    }
+
+    return {
+      mode: 'global',
+      parts: allParts.filter(p => this.isMovableDoorOrDrawerPart(p))
+    };
+  }
+
+  toggleSmartDoorsAndDrawers(): void {
+    const scope = this.resolveSmartOpenScope();
+
+    if (scope.mode === 'global') {
+      this.toggleAllDoorsAndDrawers();
+      return;
+    }
+
+    if (scope.mode === 'single' && scope.representativePart) {
+      this.togglePartOpen(scope.representativePart.id);
+      return;
+    }
+
+    const moduleMovables = scope.parts;
+    if (moduleMovables.length === 0) return;
+
+    const anyOpen = moduleMovables.some(p => this.isPartTargetOpen(p));
+    const next = anyOpen ? 0 : 1;
+    const targetPartIds = new Set(moduleMovables.map(p => p.id));
+    const touchedDrawerGroupIds = new Set<string>(scope.groupIds ?? []);
+
+    for (const p of moduleMovables) {
+      this.openTargetMap.set(p.id, next);
+      if (p.groupId && this.isModularDrawerGroup(p.groupId)) {
+        touchedDrawerGroupIds.add(p.groupId);
+      }
+    }
+    for (const piece of this.pieceObjects) {
+      if ((piece.isDoor || piece.isDrawer) && targetPartIds.has(piece.part.id)) {
+        this.openTargetMap.set(piece.part.id, next);
+      }
+    }
+    for (const gId of touchedDrawerGroupIds) {
+      if (this.isModularDrawerGroup(gId)) {
+        this.projectStorage.setGroupSlideExtension(gId, next);
+      }
+    }
+
+    this.syncIsAllOpenSignal();
+    this.bumpOpenStateRevision();
+    this.requestRender(60);
+  }
+
   togglePartOpen(partId: string) {
     const targetPiece = this.pieceObjects.find(p => p.part.id === partId);
     const targetPart = targetPiece?.part ?? this.parts().find(p => p.id === partId);
@@ -14933,20 +15303,7 @@ private applyMagneticSnapToPosition(
         this.projectStorage.setGroupSlideExtension(gId, next);
       } else if (targetPiece?.isDrawer) {
         const targetY = targetPiece.originalPos.y;
-
-        // Extract drawer instance identifier prefix if present
-        const boxSubKeywords = ['_frente', '_lat_izq', '_lat_der', '_contrafrente', '_trasera', '_frente_int', '_fondo'];
-        let specificPrefix = '';
-        for (const kw of boxSubKeywords) {
-          if (targetPart.id.includes(kw)) {
-            specificPrefix = targetPart.id.split(kw)[0];
-            break;
-          }
-        }
-        if (!specificPrefix && targetPart.id.includes('caj_ind_')) {
-          const match = targetPart.id.match(/caj_ind_\d+/);
-          if (match) specificPrefix = match[0];
-        }
+        const specificPrefix = this.extractEmbeddedDrawerPrefix(targetPart.id);
 
         // Synchronize ONLY sub-components that are part of the EXACT same physical drawer box
         for (const p of this.pieceObjects) {
@@ -14968,25 +15325,53 @@ private applyMagneticSnapToPosition(
             }
           }
         }
+      } else if (this.isMovableDrawerPart(targetPart)) {
+        const specificPrefix = this.extractEmbeddedDrawerPrefix(targetPart.id);
+        if (specificPrefix) {
+          for (const candidate of this.parts()) {
+            if (
+              candidate.id !== partId &&
+              (candidate.id.startsWith(specificPrefix + '_') || candidate.id.includes(specificPrefix))
+            ) {
+              this.openTargetMap.set(candidate.id, next);
+            }
+          }
+        }
       }
     }
 
-    const allDoorsDrawers = this.pieceObjects.filter(p => p.isDoor || p.isDrawer);
-    if (allDoorsDrawers.length > 0) {
-      const allOpen = allDoorsDrawers.every(p => (this.openTargetMap.get(p.part.id) || 0) > 0.5);
-      this.isAllOpen.set(allOpen);
-    }
+    this.syncIsAllOpenSignal();
+    this.bumpOpenStateRevision();
     this.requestRender(60);
   }
 
   toggleAllDoorsAndDrawers() {
     const next = !this.isAllOpen();
+    const targetVal = next ? 1 : 0;
     this.isAllOpen.set(next);
+
+    const touchedModularDrawerGroupIds = new Set<string>();
     for (const p of this.pieceObjects) {
       if (p.isDoor || p.isDrawer) {
-        this.openTargetMap.set(p.part.id, next ? 1 : 0);
+        this.openTargetMap.set(p.part.id, targetVal);
+        if (p.part.groupId && this.isModularDrawerGroup(p.part.groupId)) {
+          touchedModularDrawerGroupIds.add(p.part.groupId);
+        }
       }
     }
+    for (const part of this.parts()) {
+      if (this.isMovableDoorOrDrawerPart(part)) {
+        this.openTargetMap.set(part.id, targetVal);
+        if (part.groupId && this.isModularDrawerGroup(part.groupId)) {
+          touchedModularDrawerGroupIds.add(part.groupId);
+        }
+      }
+    }
+    for (const groupId of touchedModularDrawerGroupIds) {
+      this.projectStorage.setGroupSlideExtension(groupId, targetVal);
+    }
+
+    this.bumpOpenStateRevision();
     this.requestRender(60);
   }
 

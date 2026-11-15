@@ -140,7 +140,8 @@ export interface QuickRolePreset {
   templateUrl: './module-designer.html',
   styleUrl: './module-designer.css',
   host: {
-    '(window:keydown)': 'handleGlobalKeyDown($event)'
+    '(window:keydown)': 'handleGlobalKeyDown($event)',
+    '(document:click)': 'onDocumentClick($event)'
   }
 })
 export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
@@ -715,10 +716,111 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   readonly showGroupMaterialDropdown = signal<boolean>(false);
+  readonly isModuleMaterialDropdownOpen = signal<boolean>(false);
+  readonly isPartMaterialDropdownOpen = signal<boolean>(false);
+  readonly collapsedInspectorSections = signal<Set<string>>(new Set<string>());
+
+  readonly activeModuleMaterialId = computed<string>(() => {
+    const stats = this.selectedGroupStats();
+    if (this.isSelectedGroupCountertop()) {
+      return this.selectedCountertopMaterial()?.id || stats?.materialId || '';
+    }
+    return stats?.materialId || '';
+  });
+
+  readonly activeModuleTriggerMaterial = computed<Material | null>(() => {
+    const stats = this.selectedGroupStats();
+    if (this.isSelectedGroupCountertop()) {
+      return this.selectedCountertopMaterial() || stats?.material || null;
+    }
+    const matId = stats?.materialId;
+    if (matId) {
+      const found =
+        this.allAvailableMaterials().find(m => m.id === matId) ||
+        this.materials().find(m => m.id === matId);
+      if (found) return found;
+    }
+    return stats?.material || this.filteredMaterials()[0] || null;
+  });
+
+  readonly activePartTriggerMaterial = computed<Material | null>(() => {
+    const sel = this.selectedPart();
+    if (this.isSelectedPartCountertop()) {
+      return this.selectedCountertopMaterial() || this.selectedPartMaterial();
+    }
+    const smat = this.selectedPartMaterial();
+    if (smat) return smat;
+    if (sel?.materialId) {
+      const found =
+        this.allAvailableMaterials().find(m => m.id === sel.materialId) ||
+        this.materials().find(m => m.id === sel.materialId);
+      if (found) return found;
+    }
+    return this.filteredMaterials()[0] || null;
+  });
 
   toggleGroupMaterialDropdown(event?: Event) {
     if (event) event.stopPropagation();
     this.showGroupMaterialDropdown.update(v => !v);
+  }
+
+  toggleModuleMaterialDropdown(event?: Event): void {
+    event?.stopPropagation();
+    const next = !this.isModuleMaterialDropdownOpen();
+    this.isPartMaterialDropdownOpen.set(false);
+    this.isModuleMaterialDropdownOpen.set(next);
+  }
+
+  selectModuleMaterial(matId: string): void {
+    this.isModuleMaterialDropdownOpen.set(false);
+    this.applyGroupMaterial(matId, 'all');
+  }
+
+  togglePartMaterialDropdown(event?: Event): void {
+    event?.stopPropagation();
+    const next = !this.isPartMaterialDropdownOpen();
+    this.isModuleMaterialDropdownOpen.set(false);
+    this.isPartMaterialDropdownOpen.set(next);
+  }
+
+  selectPartMaterial(matId: string): void {
+    this.isPartMaterialDropdownOpen.set(false);
+    this.onMaterialChange(matId);
+  }
+
+  closeMaterialDropdowns(): void {
+    if (this.isModuleMaterialDropdownOpen()) {
+      this.isModuleMaterialDropdownOpen.set(false);
+    }
+    if (this.isPartMaterialDropdownOpen()) {
+      this.isPartMaterialDropdownOpen.set(false);
+    }
+  }
+
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.isModuleMaterialDropdownOpen() && !this.isPartMaterialDropdownOpen()) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest('.md-material-dropdown-container')) {
+      this.closeMaterialDropdowns();
+    }
+  }
+
+  toggleInspectorSection(key: string): void {
+    this.collapsedInspectorSections.update(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
+  isInspectorSectionCollapsed(key: string): boolean {
+    return this.collapsedInspectorSections().has(key);
   }
 
   applyGroupMaterial(materialId: string, target: 'all' | 'structure' | 'doors' = 'all') {
@@ -727,6 +829,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       this.projectService.changeGroupMaterial(gId, materialId, target);
       this.showToast('🎨 Material del módulo actualizado');
       this.showGroupMaterialDropdown.set(false);
+      this.isModuleMaterialDropdownOpen.set(false);
     }
   }
 
@@ -1104,7 +1207,11 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       }
     }
 
-    const mat = this.materials().find(m => m.id === mainMaterialId) || this.materials()[0] || null;
+    const mat =
+      this.allAvailableMaterials().find(m => m.id === mainMaterialId) ||
+      this.materials().find(m => m.id === mainMaterialId) ||
+      this.materials()[0] ||
+      null;
 
     return {
       width: Math.round(maxX - minX),
@@ -1447,8 +1554,21 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   handleGlobalKeyDown(e: KeyboardEvent) {
     if (!this.isRouteAttached) return;
 
+    if (e.key === 'Escape') {
+      if (this.isModuleMaterialDropdownOpen() || this.isPartMaterialDropdownOpen()) {
+        this.closeMaterialDropdowns();
+        return;
+      }
+    }
+
     const target = e.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+    if (
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable)
+    ) {
       return;
     }
 
@@ -1533,6 +1653,10 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       } else if (this.selectedPartId()) {
         e.preventDefault();
         this.hideSelectedPart();
+        return;
+      } else if (this.totalHiddenCount() > 0) {
+        e.preventDefault();
+        this.showAllParts();
         return;
       }
     }
@@ -5452,6 +5576,24 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     const nextLocked = !app.isLocked;
     this.projectService.updateAppliance(appId, { isLocked: nextLocked });
     this.showToast(nextLocked ? `🔒 "${app.name}" inmovilizado` : `🔓 "${app.name}" desbloqueado`);
+  }
+
+  toggleSelectionVisibility(): void {
+    if (this.isAnyGroupSelected() || this.isMultiSelection()) {
+      this.hideActiveGroup();
+      return;
+    }
+    if (this.selectedApplianceId()) {
+      this.hideSelectedAppliance();
+      return;
+    }
+    if (this.selectedPartId()) {
+      this.hideSelectedPart();
+      return;
+    }
+    if (this.totalHiddenCount() > 0) {
+      this.showAllParts();
+    }
   }
 
   showAllParts() {

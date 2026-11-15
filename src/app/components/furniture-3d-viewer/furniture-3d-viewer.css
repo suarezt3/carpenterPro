@@ -21,8 +21,37 @@
 }
 
 .cad-tool-btn {
+  position: relative;
   width: 2rem;
   height: 2rem;
+}
+
+.cad-key-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 3.5px;
+  font-family: var(--font-numeric);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #a1a1aa;
+  pointer-events: none;
+  user-select: none;
+  transition: color 150ms ease;
+}
+
+.cad-tool-btn:hover:not(:disabled) .cad-key-badge {
+  color: #52525b;
+}
+
+.cad-tool-btn.bg-zinc-900 .cad-key-badge,
+.cad-tool-btn[class*="bg-zinc-900"] .cad-key-badge,
+.cad-tool-btn.active .cad-key-badge,
+.cad-tool-btn.bg-zinc-900:hover:not(:disabled) .cad-key-badge,
+.cad-tool-btn[class*="bg-zinc-900"]:hover:not(:disabled) .cad-key-badge,
+.cad-tool-btn.active:hover:not(:disabled) .cad-key-badge {
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .cad-toolbar-divider {
