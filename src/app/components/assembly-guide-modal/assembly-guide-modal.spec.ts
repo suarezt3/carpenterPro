@@ -1257,7 +1257,7 @@ describe('AssemblyGuideModalComponent (RTA 3D OBB, Progressive Steps, Minimalist
 
       const recordedAlphas: number[] = [];
       let currentAlpha = 1;
-      const noop = (): void => {};
+      const noop = (): undefined => undefined;
       const mockCtx = {
         get globalAlpha(): number {
           return currentAlpha;

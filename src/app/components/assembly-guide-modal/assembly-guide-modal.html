@@ -386,7 +386,7 @@
                                       [class]="getSelectedSubassemblyIndex(guide.moduleId, step.stepNumber, subassemblies.length) === $index
                                         ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-900 text-white text-[11px] font-semibold transition cursor-pointer'
                                         : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-50 border border-zinc-200 text-zinc-700 hover:border-zinc-400 text-[11px] font-medium transition cursor-pointer'">
-                                      <span>{{ sub.label }}</span>
+                                      <span>{{ sub.label }}&#32;</span>
                                       <span class="font-numeric font-bold">(×{{ sub.repeatCount }})</span>
                                     </button>
                                   }
