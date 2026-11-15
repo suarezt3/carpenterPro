@@ -1,4 +1,4 @@
-import { Injectable, PLATFORM_ID, computed, DestroyRef, inject, signal } from '@angular/core';
+import { Injectable, InjectionToken, PLATFORM_ID, computed, DestroyRef, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { createClient, Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { Project } from '../models/melamine.models';
@@ -238,6 +238,27 @@ export interface SignUpEmailPayload {
   firstName: string;
   lastName?: string;
 }
+
+export interface AuthLocationLike {
+  readonly origin?: string;
+  readonly protocol?: string;
+  readonly host?: string;
+}
+
+export type AuthLocationProvider = () => AuthLocationLike | undefined;
+
+/**
+ * Proveedor inyectable de la ubicación del navegador (`window.location`).
+ * Permite resolver dinámicamente `window.location.origin` en ejecución real
+ * y simular orígenes distintos (`*.vercel.app` vs `piezo3d.com`) en pruebas unitarias deterministas.
+ */
+export const AUTH_LOCATION_PROVIDER = new InjectionToken<AuthLocationProvider>(
+  'AUTH_LOCATION_PROVIDER',
+  {
+    providedIn: 'root',
+    factory: () => () => (typeof window !== 'undefined' ? window.location : undefined)
+  }
+);
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'table_needed' | 'error';
 
@@ -663,6 +684,7 @@ export class SupabaseService {
   private readonly platformId = inject(PLATFORM_ID);
   // DestroyRef nos permite limpiar suscripciones automáticamente cuando el servicio se destruya
   private readonly destroyRef = inject(DestroyRef);
+  private readonly getAuthLocation = inject(AUTH_LOCATION_PROVIDER);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
   private client: SupabaseClient | null = null;
 
@@ -1798,6 +1820,33 @@ export class SupabaseService {
   }
 
   /**
+   * Resuelve dinámicamente el origen activo (`window.location.origin`) sin dominios fijos.
+   * Garantiza que las redirecciones de registro, OAuth y recuperación de contraseña
+   * permanezcan en el mismo entorno donde se iniciaron (`*.vercel.app`, `localhost` o `piezo3d.com`).
+   */
+  resolveDynamicAuthOrigin(): string | undefined {
+    if (!this.isBrowser) {
+      return undefined;
+    }
+
+    const locationRef = this.getAuthLocation();
+    if (!locationRef) {
+      return undefined;
+    }
+
+    const rawOrigin = locationRef.origin;
+    if (typeof rawOrigin === 'string' && rawOrigin.trim() && rawOrigin !== 'null') {
+      return rawOrigin.trim().replace(/\/+$/, '');
+    }
+
+    if (locationRef.protocol && locationRef.host) {
+      return `${locationRef.protocol}//${locationRef.host}`.replace(/\/+$/, '');
+    }
+
+    return undefined;
+  }
+
+  /**
    * Registra un nuevo usuario enviando `first_name`, `last_name` y `full_name` en `options.data`
    * para que el trigger automático cree su fila en `public.user_profiles`.
    */
@@ -1816,9 +1865,8 @@ export class SupabaseService {
       const cleanFirstName = payload.firstName.trim();
       const cleanLastName = (payload.lastName ?? '').trim();
       const fullName = [cleanFirstName, cleanLastName].filter(Boolean).join(' ');
-      const emailRedirectTo = this.isBrowser && typeof window !== 'undefined'
-        ? `${window.location.origin}/?auth_callback=1`
-        : undefined;
+      const origin = this.resolveDynamicAuthOrigin();
+      const emailRedirectTo = origin ? `${origin}/?auth_callback=1` : undefined;
 
       const { data, error } = await this.client.auth.signUp({
         email: normalizedEmail,
@@ -1863,10 +1911,11 @@ export class SupabaseService {
   }
 
   /**
-   * Inicia el flujo OAuth con Google redirigiendo al Estudio 3D (`/studio`) al completar.
+   * Inicia el flujo OAuth con Google manteniendo dinámicamente el origen activo (`redirectTo`).
    */
   async signInWithGoogle(): Promise<{ success: boolean; errorKey?: string }> {
-    if (!this.client || !this.isBrowser || typeof window === 'undefined') {
+    const origin = this.resolveDynamicAuthOrigin();
+    if (!this.client || !origin) {
       return { success: false, errorKey: 'auth.errors.serviceUnavailable' };
     }
 
@@ -1874,7 +1923,7 @@ export class SupabaseService {
       const { error } = await this.client.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/?auth_callback=1`
+          redirectTo: `${origin}/?auth_callback=1`
         }
       });
 
@@ -1889,7 +1938,8 @@ export class SupabaseService {
   }
 
   /**
-   * Envía un enlace seguro de restablecimiento de contraseña redirigiendo a `/auth?mode=reset`.
+   * Envía un enlace seguro de restablecimiento de contraseña redirigiendo a `/auth?mode=reset`
+   * en el mismo origen desde el cual se solicitó (`window.location.origin`).
    */
   async sendPasswordResetEmail(email: string): Promise<{ success: boolean; errorKey?: string }> {
     if (!this.client) {
@@ -1898,9 +1948,8 @@ export class SupabaseService {
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const redirectTo = this.isBrowser && typeof window !== 'undefined'
-        ? `${window.location.origin}/auth?mode=reset`
-        : undefined;
+      const origin = this.resolveDynamicAuthOrigin();
+      const redirectTo = origin ? `${origin}/auth?mode=reset` : undefined;
 
       const { error } = await this.client.auth.resetPasswordForEmail(
         normalizedEmail,

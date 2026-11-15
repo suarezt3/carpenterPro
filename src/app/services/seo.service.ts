@@ -21,6 +21,20 @@ export interface SiteConfig {
 
 const NORMALIZED_DOMAIN = OFFICIAL_PRODUCTION_DOMAIN.replace(/\/+$/, '');
 
+const PRODUCTION_HOSTNAME = (() => {
+  try {
+    return new URL(NORMALIZED_DOMAIN).hostname.toLowerCase();
+  } catch {
+    return 'piezo3d.com';
+  }
+})();
+
+const ALLOWED_PRODUCTION_HOSTNAMES = new Set<string>(
+  PRODUCTION_HOSTNAME.startsWith('www.')
+    ? [PRODUCTION_HOSTNAME, PRODUCTION_HOSTNAME.slice(4)]
+    : [PRODUCTION_HOSTNAME, `www.${PRODUCTION_HOSTNAME}`]
+);
+
 export const SITE_CONFIG: SiteConfig = {
   domain: OFFICIAL_PRODUCTION_DOMAIN,
   name: 'Piezo3D Studio',
@@ -258,20 +272,43 @@ export class SeoService {
     return this.document.location?.hostname ?? '';
   }
 
+  private normalizeHostname(hostname: string): string {
+    const rawHost = (hostname ?? '').trim().toLowerCase();
+    if (!rawHost) {
+      return '';
+    }
+
+    const colonCount = (rawHost.match(/:/g) ?? []).length;
+    const hostWithoutPort = rawHost.startsWith('[')
+      ? rawHost.replace(/\]:\d+$/, ']')
+      : colonCount === 1
+        ? rawHost.replace(/:\d+$/, '')
+        : rawHost;
+
+    return hostWithoutPort.replace(/\.+$/, '');
+  }
+
   private isNonProductionHostname(hostname: string): boolean {
-    const normalizedHost = (hostname ?? '').trim().toLowerCase();
+    const normalizedHost = this.normalizeHostname(hostname);
     if (!normalizedHost) {
       return true;
     }
 
-    return (
-      normalizedHost.includes('vercel.app') ||
-      normalizedHost.includes('localhost') ||
-      normalizedHost.includes('127.0.0.1') ||
+    const isVercelPreviewHost =
+      normalizedHost === 'vercel.app' || normalizedHost.endsWith('.vercel.app');
+    const isLocalHost =
+      normalizedHost === 'localhost' ||
+      normalizedHost.endsWith('.localhost') ||
+      normalizedHost === '127.0.0.1' ||
       normalizedHost === '0.0.0.0' ||
       normalizedHost === '::1' ||
-      normalizedHost === '[::1]'
-    );
+      normalizedHost === '[::1]';
+
+    if (isVercelPreviewHost || isLocalHost) {
+      return true;
+    }
+
+    return !ALLOWED_PRODUCTION_HOSTNAMES.has(normalizedHost);
   }
 
   private resolveMetadata(normalizedPath: string): RouteSeoMetadata {

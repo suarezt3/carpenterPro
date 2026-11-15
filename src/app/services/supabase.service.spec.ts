@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import {
+  AUTH_LOCATION_PROVIDER,
+  AuthLocationLike,
   AVATAR_COLOR_PRESETS,
   BillingPortalResult,
   normalizeAvatarColorHex,
@@ -1297,5 +1299,207 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
   });
 });
 
+interface MockSupabaseAuthClient {
+  signUp: ReturnType<typeof vi.fn>;
+  signInWithOAuth: ReturnType<typeof vi.fn>;
+  resetPasswordForEmail: ReturnType<typeof vi.fn>;
+}
 
+describe('SupabaseService (Redirecciones Dinámicas de Autenticación por Entorno)', () => {
+  let activeLocation: AuthLocationLike | undefined;
+  let service: SupabaseService;
+  let mockAuth: MockSupabaseAuthClient;
+
+  beforeEach(() => {
+    activeLocation = { origin: 'https://carpenterpro-git-develop.vercel.app' };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        SupabaseService,
+        {
+          provide: AUTH_LOCATION_PROVIDER,
+          useValue: (): AuthLocationLike | undefined => activeLocation
+        }
+      ]
+    });
+    service = TestBed.inject(SupabaseService);
+
+    mockAuth = {
+      signUp: vi.fn().mockResolvedValue({
+        data: {
+          user: {
+            id: 'u-redirect-1',
+            email: 'taller@ejemplo.com',
+            identities: [{ id: 'id-redirect-1', user_id: 'u-redirect-1', provider: 'email' }]
+          },
+          session: null
+        },
+        error: null
+      }),
+      signInWithOAuth: vi.fn().mockResolvedValue({ data: { provider: 'google', url: 'https://accounts.google.com' }, error: null }),
+      resetPasswordForEmail: vi.fn().mockResolvedValue({ data: {}, error: null })
+    };
+
+    (service as unknown as { client: { auth: MockSupabaseAuthClient } }).client = {
+      auth: mockAuth
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    TestBed.resetTestingModule();
+  });
+
+  const envOrigins: readonly { label: string; origin: string }[] = [
+    { label: 'preview develop en Vercel', origin: 'https://carpenterpro-git-develop.vercel.app' },
+    { label: 'producción oficial piezo3d.com', origin: 'https://piezo3d.com' }
+  ];
+
+  for (const env of envOrigins) {
+    describe(`Origen activo: ${env.label} (${env.origin})`, () => {
+      beforeEach(() => {
+        activeLocation = { origin: env.origin };
+      });
+
+      it(`signUpWithEmail debe enviar emailRedirectTo dinámico apuntando a ${env.origin}/?auth_callback=1`, async () => {
+        const result = await service.signUpWithEmail({
+          email: '  Usuario@Taller.com ',
+          password: 'Password123!',
+          firstName: 'Carlos',
+          lastName: 'Suárez'
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.needsEmailConfirmation).toBe(true);
+        expect(mockAuth.signUp).toHaveBeenCalledTimes(1);
+        expect(mockAuth.signUp).toHaveBeenCalledWith({
+          email: 'usuario@taller.com',
+          password: 'Password123!',
+          options: {
+            emailRedirectTo: `${env.origin}/?auth_callback=1`,
+            data: {
+              first_name: 'Carlos',
+              last_name: 'Suárez',
+              full_name: 'Carlos Suárez'
+            }
+          }
+        });
+      });
+
+      it(`signInWithGoogle debe enviar redirectTo dinámico apuntando a ${env.origin}/?auth_callback=1`, async () => {
+        const result = await service.signInWithGoogle();
+
+        expect(result.success).toBe(true);
+        expect(mockAuth.signInWithOAuth).toHaveBeenCalledTimes(1);
+        expect(mockAuth.signInWithOAuth).toHaveBeenCalledWith({
+          provider: 'google',
+          options: {
+            redirectTo: `${env.origin}/?auth_callback=1`
+          }
+        });
+      });
+
+      it(`sendPasswordResetEmail debe enviar redirectTo dinámico apuntando a ${env.origin}/auth?mode=reset`, async () => {
+        const result = await service.sendPasswordResetEmail('  Recuperar@Taller.com ');
+
+        expect(result.success).toBe(true);
+        expect(mockAuth.resetPasswordForEmail).toHaveBeenCalledTimes(1);
+        expect(mockAuth.resetPasswordForEmail).toHaveBeenCalledWith(
+          'recuperar@taller.com',
+          { redirectTo: `${env.origin}/auth?mode=reset` }
+        );
+      });
+    });
+  }
+
+  it('debe normalizar barras finales en origin y usar protocol + host si origin es "null"', async () => {
+    activeLocation = { origin: 'https://piezo3d.com/' };
+    await service.signInWithGoogle();
+    expect(mockAuth.signInWithOAuth).toHaveBeenLastCalledWith({
+      provider: 'google',
+      options: {
+        redirectTo: 'https://piezo3d.com/?auth_callback=1'
+      }
+    });
+
+    activeLocation = {
+      origin: 'null',
+      protocol: 'https:',
+      host: 'carpenterpro-git-develop.vercel.app'
+    };
+    await service.sendPasswordResetEmail('soporte@piezo3d.com');
+    expect(mockAuth.resetPasswordForEmail).toHaveBeenLastCalledWith(
+      'soporte@piezo3d.com',
+      { redirectTo: 'https://carpenterpro-git-develop.vercel.app/auth?mode=reset' }
+    );
+  });
+
+  it('signInWithGoogle debe retornar error serviceUnavailable sin invocar OAuth si no hay origen activo', async () => {
+    activeLocation = undefined;
+
+    const result = await service.signInWithGoogle();
+
+    expect(result.success).toBe(false);
+    expect(result.errorKey).toBe('auth.errors.serviceUnavailable');
+    expect(mockAuth.signInWithOAuth).not.toHaveBeenCalled();
+  });
+
+  it('el proveedor AUTH_LOCATION_PROVIDER por defecto debe leer window.location.origin del entorno activo', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [SupabaseService]
+    });
+    const defaultService = TestBed.inject(SupabaseService);
+    const defaultMockAuth: MockSupabaseAuthClient = {
+      signUp: vi.fn().mockResolvedValue({
+        data: { user: { id: 'u-default', email: 'default@taller.com', identities: [{ id: 'id-1' }] }, session: null },
+        error: null
+      }),
+      signInWithOAuth: vi.fn().mockResolvedValue({ data: { provider: 'google' }, error: null }),
+      resetPasswordForEmail: vi.fn().mockResolvedValue({ data: {}, error: null })
+    };
+    (defaultService as unknown as { client: { auth: MockSupabaseAuthClient } }).client = {
+      auth: defaultMockAuth
+    };
+
+    const rawOrigin = window.location.origin;
+    const expectedOrigin =
+      rawOrigin && rawOrigin !== 'null'
+        ? rawOrigin.replace(/\/+$/, '')
+        : window.location.protocol && window.location.host
+          ? `${window.location.protocol}//${window.location.host}`.replace(/\/+$/, '')
+          : undefined;
+
+    await defaultService.signUpWithEmail({
+      email: 'default@taller.com',
+      password: 'Password123!',
+      firstName: 'Ana'
+    });
+    await defaultService.signInWithGoogle();
+    await defaultService.sendPasswordResetEmail('default@taller.com');
+
+    if (expectedOrigin) {
+      expect(defaultMockAuth.signUp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({
+            emailRedirectTo: `${expectedOrigin}/?auth_callback=1`
+          })
+        })
+      );
+      expect(defaultMockAuth.signInWithOAuth).toHaveBeenCalledWith({
+        provider: 'google',
+        options: {
+          redirectTo: `${expectedOrigin}/?auth_callback=1`
+        }
+      });
+      expect(defaultMockAuth.resetPasswordForEmail).toHaveBeenCalledWith(
+        'default@taller.com',
+        { redirectTo: `${expectedOrigin}/auth?mode=reset` }
+      );
+    } else {
+      expect(defaultService.resolveDynamicAuthOrigin()).toBeUndefined();
+      expect(defaultMockAuth.signInWithOAuth).not.toHaveBeenCalled();
+    }
+  });
+});
 

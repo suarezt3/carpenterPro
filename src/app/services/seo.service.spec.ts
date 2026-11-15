@@ -170,6 +170,67 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
         );
       }
     });
+
+    it('debe forzar noindex, nofollow en previews de rama develop (*.vercel.app), localhost y dominios no oficiales en todas las rutas', () => {
+      const previewAndNonProdHosts: readonly string[] = [
+        'piezo3d-git-develop-suarezt3.vercel.app',
+        'carpenterpro-git-develop.vercel.app',
+        'piezo3d-preview-pr-42.vercel.app',
+        'vercel.app',
+        'PIEZO3D-GIT-DEVELOP-SUAREZT3.VERCEL.APP.',
+        'localhost',
+        'localhost:4200',
+        'preview.localhost',
+        '127.0.0.1',
+        '127.0.0.1:3000',
+        '0.0.0.0',
+        '::1',
+        '[::1]',
+        'develop.piezo3d.com',
+        'staging.piezo3d.com',
+        'vercel.app.evil.com',
+        'piezo3d.com.evil.com',
+      ];
+      const allRoutes: readonly string[] = [
+        '/',
+        '/auth',
+        '/terms',
+        '/privacy',
+        '/refunds',
+        '/studio',
+        '/studio/designer',
+        '/studio/parts',
+        '/admin',
+        '/admin/users',
+      ];
+
+      for (const host of previewAndNonProdHosts) {
+        for (const path of allRoutes) {
+          expect(service.resolveRobotsDirective(path, host)).toBe(ROBOTS_NOINDEX_DIRECTIVE);
+        }
+      }
+    });
+
+    it('debe normalizar mayúsculas, puertos y punto final en piezo3d.com y www.piezo3d.com manteniendo bloqueo en rutas privadas', () => {
+      const prodVariants: readonly string[] = [
+        'piezo3d.com',
+        'www.piezo3d.com',
+        'PIEZO3D.COM',
+        'WWW.PIEZO3D.COM.',
+        'piezo3d.com:443',
+      ];
+      const publicPaths: readonly string[] = ['/', '/auth', '/terms', '/privacy', '/refunds'];
+      const privatePaths: readonly string[] = ['/studio', '/studio/designer', '/studio/parts', '/admin', '/admin/settings'];
+
+      for (const host of prodVariants) {
+        for (const path of publicPaths) {
+          expect(service.resolveRobotsDirective(path, host)).toBe(ROBOTS_INDEX_DIRECTIVE);
+        }
+        for (const path of privatePaths) {
+          expect(service.resolveRobotsDirective(path, host)).toBe(ROBOTS_NOINDEX_DIRECTIVE);
+        }
+      }
+    });
   });
 
   describe('Normalización de rutas y políticas de contenido', () => {
@@ -247,6 +308,30 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
 
       service.updateSeoForUrl('/terms', 'localhost');
       expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_NOINDEX_DIRECTIVE);
+    });
+
+    it('debe inyectar <meta name="robots" content="noindex, nofollow"> en el DOM para todas las rutas bajo previews develop en *.vercel.app', () => {
+      const allRoutes: readonly string[] = [
+        '/',
+        '/auth',
+        '/terms',
+        '/privacy',
+        '/refunds',
+        '/studio',
+        '/studio/designer',
+        '/admin',
+      ];
+      const vercelDevelopHosts: readonly string[] = [
+        'piezo3d-git-develop-suarezt3.vercel.app',
+        'carpenterpro-git-develop.vercel.app',
+      ];
+
+      for (const host of vercelDevelopHosts) {
+        for (const path of allRoutes) {
+          service.updateSeoForUrl(path, host);
+          expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_NOINDEX_DIRECTIVE);
+        }
+      }
     });
 
     it('debe mantener el enlace canonical y og:url apuntando a https://piezo3d.com cuando se accede desde www.piezo3d.com', () => {
