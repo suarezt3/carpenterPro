@@ -17,6 +17,7 @@ export interface SiteConfig {
   readonly ogImagePath: string;
   readonly ogImageUrl: string;
   readonly locale: string;
+  readonly contactEmail: string;
 }
 
 const NORMALIZED_DOMAIN = OFFICIAL_PRODUCTION_DOMAIN.replace(/\/+$/, '');
@@ -41,6 +42,7 @@ export const SITE_CONFIG: SiteConfig = {
   ogImagePath: '/assets/og-preview.png',
   ogImageUrl: `${NORMALIZED_DOMAIN}/assets/og-preview.png`,
   locale: 'es_ES',
+  contactEmail: 'piezo3dstudio@gmail.com',
 };
 
 export const ROBOTS_INDEX_DIRECTIVE =

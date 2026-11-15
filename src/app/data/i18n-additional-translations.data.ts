@@ -621,6 +621,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.anonymousAuthor': 'Carpintero Profesional',
     'feedback.errorGeneric': 'No se pudo registrar la solicitud en este momento. Inténtalo nuevamente.',
     'feedback.emailInvalid': 'Ingresa un correo electrónico válido',
+    'feedback.directSupportLabel': 'Soporte directo por correo:',
 
     // Suscripciones, Facturación y Modal de Actualización de Plan
     'account.billing.statusTrial': 'En prueba',
@@ -1310,6 +1311,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.anonymousAuthor': 'Professional Woodworker',
     'feedback.errorGeneric': 'Could not submit the request at this time. Please try again.',
     'feedback.emailInvalid': 'Please enter a valid email address',
+    'feedback.directSupportLabel': 'Direct email support:',
 
     // Subscriptions, Billing & Plan Upgrade Modal
     'account.billing.statusTrial': 'Trial',
@@ -1999,6 +2001,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.anonymousAuthor': 'Marceneiro Profissional',
     'feedback.errorGeneric': 'Não foi possível registrar a solicitação no momento. Tente novamente.',
     'feedback.emailInvalid': 'Insira um e-mail válido',
+    'feedback.directSupportLabel': 'Suporte direto por e-mail:',
 
     // Assinaturas, Faturamento e Modal de Upgrade de Plano
     'account.billing.statusTrial': 'Em teste',
@@ -2688,6 +2691,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.anonymousAuthor': 'Menuisier Professionnel',
     'feedback.errorGeneric': 'Impossible d’enregistrer la demande pour le moment. Veuillez réessayer.',
     'feedback.emailInvalid': 'Veuillez saisir une adresse e-mail valide',
+    'feedback.directSupportLabel': 'Support direct par e-mail :',
 
     // Abonnements, Facturation et Modal de Mise à Niveau
     'account.billing.statusTrial': 'Essai',
@@ -3377,6 +3381,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.anonymousAuthor': 'Falegname Professionista',
     'feedback.errorGeneric': 'Impossibile registrare la richiesta in questo momento. Riprova più tardi.',
     'feedback.emailInvalid': 'Inserisci un indirizzo email valido',
+    'feedback.directSupportLabel': 'Supporto diretto via email:',
 
     // Abbonamenti, Fatturazione e Modal di Upgrade Piano
     'account.billing.statusTrial': 'In prova',
@@ -4066,6 +4071,7 @@ export const ADDITIONAL_TRANSLATIONS: Record<AppLanguage, TranslationDictionary>
     'feedback.anonymousAuthor': 'Professioneller Schreiner',
     'feedback.errorGeneric': 'Die Anfrage konnte derzeit nicht registriert werden. Bitte versuchen Sie es erneut.',
     'feedback.emailInvalid': 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
+    'feedback.directSupportLabel': 'Direkter E-Mail-Support:',
 
     // Abonnements, Abrechnung & Upgrade-Modal
     'account.billing.statusTrial': 'Testphase',

@@ -97,6 +97,35 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
       expect(SITE_CONFIG.ogImagePath).toBe('/assets/og-preview.png');
       expect(SITE_CONFIG.ogImageUrl).toBe('https://piezo3d.com/assets/og-preview.png');
       expect(SITE_CONFIG.locale).toBe('es_ES');
+      expect(SITE_CONFIG.contactEmail).toBe('piezo3dstudio@gmail.com');
+    });
+
+    it('debe definir SITE_CONFIG.contactEmail como piezo3dstudio@gmail.com y excluir correos provisionales o marcas prohibidas en metadatos', () => {
+      expect(SITE_CONFIG.contactEmail).toBe('piezo3dstudio@gmail.com');
+
+      const forbiddenBrandRegex =
+        /(sketchup|melamina\s*3d|mueble\s*m[ií]o|polyboard|promob|lepton|cutlist|opticut|click-cuisine|carpenterpro)/i;
+      const legacyEmailRegex = /eydersuarez900@gmail\.com/i;
+
+      expect(SITE_CONFIG.contactEmail).not.toMatch(legacyEmailRegex);
+      expect(SITE_CONFIG.contactEmail).not.toMatch(forbiddenBrandRegex);
+
+      const pathsToCheck = ['/', '/auth', '/terms', '/privacy', '/refunds', '/studio/designer', '/admin'];
+      for (const path of pathsToCheck) {
+        service.updateSeoForUrl(path, 'piezo3d.com');
+        const combinedText = [
+          titleService.getTitle(),
+          getMetaContent('meta[name="description"]') ?? '',
+          getMetaContent('meta[name="keywords"]') ?? '',
+          getMetaContent('meta[property="og:title"]') ?? '',
+          getMetaContent('meta[property="og:description"]') ?? '',
+          getMetaContent('meta[name="twitter:title"]') ?? '',
+          getMetaContent('meta[name="twitter:description"]') ?? '',
+        ].join(' ');
+
+        expect(combinedText).not.toMatch(legacyEmailRegex);
+        expect(combinedText).not.toMatch(forbiddenBrandRegex);
+      }
     });
   });
 
