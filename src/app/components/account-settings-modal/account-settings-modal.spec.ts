@@ -974,7 +974,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       upgradeBtn?.click();
       fixture.detectChanges();
 
-      expect(openCheckoutMock).toHaveBeenCalledWith('pro', 'monthly');
+      expect(openCheckoutMock).toHaveBeenCalledWith('industrial', 'monthly');
       expect(component.toastMessage()).toBeNull();
     });
 
