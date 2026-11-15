@@ -9,6 +9,15 @@
   animation: modalEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.assembly-highlight-pill {
+  animation: pillFadeIn 0.14s ease-out;
+}
+
+table.parts-table tbody tr:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: -2px;
+}
+
 @keyframes modalEnter {
   from {
     opacity: 0;
@@ -17,6 +26,15 @@
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes pillFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -76,7 +94,8 @@
     animation: none !important;
   }
 
-  .assembly-guide-toolbar {
+  .assembly-guide-toolbar,
+  .assembly-highlight-pill {
     display: none !important;
   }
 
@@ -123,6 +142,7 @@
   table.parts-table tr {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+    background: #ffffff !important;
   }
 
   .assembly-step-card {

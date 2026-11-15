@@ -146,35 +146,99 @@
 
               <!-- 2. DIAGRAMA GENERAL EXPLOSIVO NUMERADO (CANVAS HIGH-DPI) -->
               <section class="space-y-2.5 border border-zinc-200 rounded-xl p-4 sm:p-5 bg-white shadow-2xs print:border-zinc-300 print:shadow-none print:break-inside-avoid">
-                <div class="flex items-center justify-between border-b border-zinc-200 pb-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 pb-2.5">
                   <div class="flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-sky-600"></span>
                     <h3 class="text-sm sm:text-base font-bold text-zinc-900">
                       {{ 'assemblyGuide.explodedViewTitle' | t }}
                     </h3>
                   </div>
-                  <span class="text-[11px] text-zinc-500 hidden sm:inline">
-                    {{ 'assemblyGuide.explodedViewSubtitle' | t }}
-                  </span>
+
+                  <div class="flex items-center gap-3">
+                    @if (hasExplodedGroups(guide)) {
+                      <div
+                        class="inline-flex items-center p-0.5 rounded-lg bg-zinc-100 border border-zinc-200 print:hidden"
+                        role="group"
+                        aria-label="Modo de visualización del diagrama explosivo">
+                        <button
+                          type="button"
+                          (click)="setExplodedViewMode('grouped', guide.moduleId)"
+                          [class]="getEffectiveExplodedViewMode(guide) === 'grouped'
+                            ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 text-white text-xs font-semibold shadow-2xs transition cursor-pointer'
+                            : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-zinc-600 hover:text-zinc-900 text-xs font-medium transition cursor-pointer'">
+                          <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                          <span>Por Grupos</span>
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setExplodedViewMode('detailed', guide.moduleId)"
+                          [class]="getEffectiveExplodedViewMode(guide) === 'detailed'
+                            ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 text-white text-xs font-semibold shadow-2xs transition cursor-pointer'
+                            : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-zinc-600 hover:text-zinc-900 text-xs font-medium transition cursor-pointer'">
+                          <hugeicons-icon [icon]="icons.view" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                          <span>Todas las Piezas</span>
+                        </button>
+                      </div>
+                    } @else {
+                      <span class="text-[11px] text-zinc-500 hidden sm:inline">
+                        {{ 'assemblyGuide.explodedViewSubtitle' | t }}
+                      </span>
+                    }
+                  </div>
                 </div>
 
                 <div class="relative w-full h-[320px] sm:h-[420px] lg:h-[480px] bg-white rounded-lg overflow-hidden border border-zinc-200 print:h-[110mm]">
+                  @if (activeHighlightSummary() && guideMatchesActiveHighlight(guide)) {
+                    <div class="assembly-highlight-pill print:hidden absolute top-2.5 left-1/2 -translate-x-1/2 z-10 max-w-[calc(100%-1.5rem)] inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/95 border border-sky-600 shadow-sm text-xs text-zinc-900">
+                      <span class="w-2 h-2 rounded-full bg-sky-600 shrink-0"></span>
+                      <span class="font-medium truncate">{{ activeHighlightSummary() }}</span>
+                      @if (pinnedPartCodes().length > 0) {
+                        <button
+                          type="button"
+                          (click)="clearPinnedParts()"
+                          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 text-[10px] font-semibold shrink-0 cursor-pointer transition"
+                          title="Soltar selección">
+                          <hugeicons-icon [icon]="icons.close" [size]="11" [strokeWidth]="2.2"></hugeicons-icon>
+                          <span>Soltar</span>
+                        </button>
+                      }
+                    </div>
+                  }
+
                   <canvas
                     #explodedCanvas
-                    class="w-full h-full block cursor-crosshair">
+                    tabindex="0"
+                    aria-label="Diagrama general explosivo interactivo"
+                    (mousemove)="onCanvasMouseMove($event)"
+                    (mouseleave)="onCanvasMouseLeave()"
+                    (click)="onCanvasClick($event)"
+                    (keydown.enter)="clearPinnedParts()"
+                    (keydown.escape)="clearPinnedParts()"
+                    class="w-full h-full block cursor-crosshair focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-600">
                   </canvas>
                 </div>
               </section>
 
               <!-- 3. TABLA COMPLETA DE DESPIECE INDEXADO CON CÓDIGOS P1..Pn -->
               <section class="assembly-parts-table-section border border-zinc-200 rounded-xl overflow-hidden bg-white shadow-2xs print:border-zinc-300 print:shadow-none print:overflow-visible">
-                <div class="px-4 py-2.5 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+                <div class="px-4 py-2.5 bg-zinc-50 border-b border-zinc-200 flex flex-wrap items-center justify-between gap-2">
                   <h3 class="text-xs sm:text-sm font-bold text-zinc-900 uppercase tracking-wider">
                     {{ 'assemblyGuide.partsTableTitle' | t }} (<span class="font-numeric">{{ guide.pieces.length }}</span>)
                   </h3>
-                  <span class="text-[11px] font-sans text-zinc-500">
-                    L1/L2 = Largos · A1/A2 = Anchos
-                  </span>
+                  <div class="flex items-center gap-3">
+                    @if (pinnedPartCodes().length > 0 && guideMatchesActiveHighlight(guide)) {
+                      <button
+                        type="button"
+                        (click)="clearPinnedParts()"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 text-[11px] font-semibold cursor-pointer transition print:hidden">
+                        <hugeicons-icon [icon]="icons.close" [size]="11" [strokeWidth]="2.2"></hugeicons-icon>
+                        <span>Limpiar selección</span>
+                      </button>
+                    }
+                    <span class="text-[11px] font-sans text-zinc-500">
+                      L1/L2 = Largos · A1/A2 = Anchos
+                    </span>
+                  </div>
                 </div>
 
                 <div class="overflow-x-auto print:overflow-visible">
@@ -191,10 +255,21 @@
                     </thead>
                     <tbody class="divide-y divide-zinc-200">
                       @for (p of guide.pieces; track p.partId) {
-                        <tr class="hover:bg-zinc-50 transition print:break-inside-avoid">
+                        <tr
+                          tabindex="0"
+                          (mouseenter)="onPartHoverStart(p.code, buildSinglePieceSummary(p), 'dom')"
+                          (mouseleave)="onPartHoverEnd('dom')"
+                          (click)="onPartTogglePin(p.code, buildSinglePieceSummary(p))"
+                          (keydown.enter)="onPartTogglePin(p.code, buildSinglePieceSummary(p))"
+                          [class]="isCodeHighlighted(p.code)
+                            ? 'bg-sky-50 hover:bg-sky-50 cursor-pointer transition print:break-inside-avoid'
+                            : 'hover:bg-zinc-50 cursor-pointer transition print:break-inside-avoid'">
                           <!-- Código P1, P2... -->
                           <td class="py-2 px-3 text-center">
-                            <span class="inline-block px-2 py-0.5 rounded font-numeric font-bold text-xs bg-zinc-900 text-white">
+                            <span
+                              [class]="isCodeHighlighted(p.code)
+                                ? 'inline-block px-2 py-0.5 rounded font-numeric font-bold text-xs bg-sky-600 text-white transition'
+                                : 'inline-block px-2 py-0.5 rounded font-numeric font-bold text-xs bg-zinc-900 text-white transition'">
                               {{ p.code }}
                             </span>
                           </td>
@@ -275,50 +350,173 @@
                       <!-- Encabezado del Paso -->
                       <div class="flex items-start justify-between gap-3 border-b border-zinc-200 pb-3">
                         <div class="flex items-center gap-3">
-                          <span class="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center font-numeric font-bold text-base shrink-0">
-                            {{ formatStepNumber(step.stepNumber) }}
+                          <span class="min-w-10 h-10 px-1.5 rounded-lg bg-zinc-900 text-white flex items-center justify-center font-numeric font-bold text-sm sm:text-base shrink-0">
+                            {{ formatStepDisplayNumber(guide, step) }}
                           </span>
                           <div>
                             <h4 class="text-sm sm:text-base font-bold text-zinc-900">
-                              {{ step.titleKey | t }}
+                              {{ getStepTitle(step) }}
                             </h4>
                             <p class="text-xs text-zinc-600 mt-0.5">
-                              {{ step.descriptionKey | t }}
+                              {{ getStepDescription(step) }}
                             </p>
                           </div>
                         </div>
+
+                        @if (getEffectiveStepRenderMode(step) === 'subassembly_zoom') {
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-700 text-[10px] font-semibold uppercase tracking-wider shrink-0 print:hidden">
+                            <hugeicons-icon [icon]="icons.cube" [size]="12" [strokeWidth]="2"></hugeicons-icon>
+                            <span>Sub-ensamble</span>
+                          </span>
+                        }
                       </div>
 
                       <!-- Contenido: Mini-Diagrama Ilustrado + Ficha de Instalación -->
                       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
                         <!-- Mini-Diagrama Técnico Progresivo en Canvas (Columna 1 a 5) -->
-                        <div class="lg:col-span-5 relative w-full h-[220px] sm:h-[240px] bg-white rounded-lg border border-zinc-200 overflow-hidden print:h-[65mm]">
-                          <canvas
-                            #stepCanvas
-                            [attr.data-module-id]="guide.moduleId"
-                            [attr.data-step-number]="step.stepNumber"
-                            class="w-full h-full block">
-                          </canvas>
+                        <div class="lg:col-span-5 space-y-2">
+                          @if (getEffectiveStepRenderMode(step) === 'subassembly_zoom') {
+                            @if (getStepSubassemblies(guide, step); as subassemblies) {
+                              @if (subassemblies.length > 1) {
+                                <div class="flex flex-wrap items-center gap-1.5 print:hidden" role="group" aria-label="Selector de plantilla de sub-ensamble">
+                                  @for (sub of subassemblies; track sub.id) {
+                                    <button
+                                      type="button"
+                                      (click)="selectSubassemblyTemplate(guide.moduleId, step.stepNumber, $index)"
+                                      [class]="getSelectedSubassemblyIndex(guide.moduleId, step.stepNumber, subassemblies.length) === $index
+                                        ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-900 text-white text-[11px] font-semibold transition cursor-pointer'
+                                        : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-50 border border-zinc-200 text-zinc-700 hover:border-zinc-400 text-[11px] font-medium transition cursor-pointer'">
+                                      <span>{{ sub.label }}</span>
+                                      <span class="font-numeric font-bold">(×{{ sub.repeatCount }})</span>
+                                    </button>
+                                  }
+                                </div>
+                              }
+                            }
+                          }
+
+                          <div
+                            [class]="isStepDenseDiagram(guide, step)
+                              ? 'relative w-full h-[235px] lg:h-[260px] bg-white rounded-lg border border-zinc-200 overflow-hidden print:h-[62mm]'
+                              : 'relative w-full h-[220px] sm:h-[240px] bg-white rounded-lg border border-zinc-200 overflow-hidden print:h-[62mm]'">
+                            <canvas
+                              #stepCanvas
+                              tabindex="0"
+                              aria-label="Diagrama técnico ilustrado del paso"
+                              [attr.data-module-id]="guide.moduleId"
+                              [attr.data-step-number]="step.stepNumber"
+                              (mousemove)="onCanvasMouseMove($event)"
+                              (mouseleave)="onCanvasMouseLeave()"
+                              (click)="onCanvasClick($event)"
+                              (keydown.enter)="clearPinnedParts()"
+                              (keydown.escape)="clearPinnedParts()"
+                              class="w-full h-full block cursor-crosshair focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-600">
+                            </canvas>
+                          </div>
                         </div>
 
                         <!-- Ficha de Montaje, Piezas, Cotas y Herrajes (Columna 6 a 12) -->
                         <div class="lg:col-span-7 space-y-3">
                           <!-- Piezas a instalar -->
                           <div>
-                            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">
-                              {{ 'assemblyGuide.piecesToInstall' | t }}
-                            </span>
-                            <div class="flex flex-wrap gap-1.5">
-                              @for (p of step.parts; track p.partId) {
-                                <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-50 border border-zinc-200 text-xs font-medium text-zinc-900">
-                                  <strong class="font-numeric font-bold bg-zinc-900 text-white px-1.5 py-0.5 rounded text-[10px]">
-                                    {{ p.code }}
-                                  </strong>
-                                  <span>{{ p.translatedName }}</span>
-                                  <span class="text-[11px] text-zinc-500 font-numeric">({{ p.length }}×{{ p.width }}mm)</span>
-                                </span>
+                            <div class="flex items-center justify-between gap-2 mb-1">
+                              <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">
+                                {{ 'assemblyGuide.piecesToInstall' | t }}
+                              </span>
+
+                              @if (getStepPieceGroupsSummary(step); as groups) {
+                                <button
+                                  type="button"
+                                  (click)="toggleStepPiecesExpanded(guide.moduleId, step.stepNumber)"
+                                  class="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-600 hover:text-sky-700 hover:underline cursor-pointer print:hidden">
+                                  <hugeicons-icon
+                                    [icon]="isStepPiecesExpanded(guide.moduleId, step.stepNumber) ? icons.chevronUp : icons.chevronDown"
+                                    [size]="12"
+                                    [strokeWidth]="2.2">
+                                  </hugeicons-icon>
+                                  <span>
+                                    @if (isStepPiecesExpanded(guide.moduleId, step.stepNumber)) {
+                                      Ocultar individuales
+                                    } @else {
+                                      Ver códigos individuales (<span class="font-numeric">{{ step.parts.length }}</span>)
+                                    }
+                                  </span>
+                                </button>
                               }
                             </div>
+
+                            @if (getStepPieceGroupsSummary(step); as groups) {
+                              <div class="flex flex-wrap gap-1.5">
+                                @for (group of groups; track group.key) {
+                                  <button
+                                    type="button"
+                                    (mouseenter)="onPartHoverStart(group.codes, buildGroupPieceSummary(group), 'dom')"
+                                    (mouseleave)="onPartHoverEnd('dom')"
+                                    (click)="onPartTogglePin(group.codes, buildGroupPieceSummary(group))"
+                                    [class]="isAnyCodeHighlighted(group.codes)
+                                      ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-50 border border-sky-600 text-xs font-medium text-sky-900 cursor-pointer transition text-left'
+                                      : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-50 border border-zinc-200 hover:border-zinc-400 text-xs font-medium text-zinc-900 cursor-pointer transition text-left'">
+                                    <strong
+                                      [class]="isAnyCodeHighlighted(group.codes)
+                                        ? 'font-numeric font-bold bg-sky-600 text-white px-1.5 py-0.5 rounded text-[10px]'
+                                        : 'font-numeric font-bold bg-zinc-900 text-white px-1.5 py-0.5 rounded text-[10px]'">
+                                      {{ group.codes.length <= 4 ? group.codes.join(', ') : group.codes[0] + '–' + group.codes[group.codes.length - 1] }}
+                                    </strong>
+                                    <span>{{ group.label }}</span>
+                                    <span class="text-[11px] text-zinc-500 font-numeric">{{ group.dimensionsText }} mm</span>
+                                    <span class="px-1.5 py-0.5 rounded bg-zinc-200/70 text-zinc-900 font-numeric font-bold text-[10px]">
+                                      ×{{ group.quantity }}
+                                    </span>
+                                  </button>
+                                }
+                              </div>
+
+                              @if (isStepPiecesExpanded(guide.moduleId, step.stepNumber)) {
+                                <div class="mt-2 pt-2 border-t border-zinc-200/80 flex flex-wrap gap-1.5 print:hidden">
+                                  @for (p of step.parts; track p.partId) {
+                                    <button
+                                      type="button"
+                                      (mouseenter)="onPartHoverStart(p.code, buildSinglePieceSummary(p), 'dom')"
+                                      (mouseleave)="onPartHoverEnd('dom')"
+                                      (click)="onPartTogglePin(p.code, buildSinglePieceSummary(p))"
+                                      [class]="isCodeHighlighted(p.code)
+                                        ? 'inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-sky-50 border border-sky-600 text-xs font-medium text-sky-900 cursor-pointer transition'
+                                        : 'inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white border border-zinc-200 hover:border-zinc-400 text-xs font-medium text-zinc-900 cursor-pointer transition'">
+                                      <strong
+                                        [class]="isCodeHighlighted(p.code)
+                                          ? 'font-numeric font-bold bg-sky-600 text-white px-1.5 py-0.5 rounded text-[10px]'
+                                          : 'font-numeric font-bold bg-zinc-900 text-white px-1.5 py-0.5 rounded text-[10px]'">
+                                        {{ p.code }}
+                                      </strong>
+                                      <span>{{ p.translatedName }}</span>
+                                      <span class="text-[11px] text-zinc-500 font-numeric">({{ p.length }}×{{ p.width }}mm)</span>
+                                    </button>
+                                  }
+                                </div>
+                              }
+                            } @else {
+                              <div class="flex flex-wrap gap-1.5">
+                                @for (p of step.parts; track p.partId) {
+                                  <button
+                                    type="button"
+                                    (mouseenter)="onPartHoverStart(p.code, buildSinglePieceSummary(p), 'dom')"
+                                    (mouseleave)="onPartHoverEnd('dom')"
+                                    (click)="onPartTogglePin(p.code, buildSinglePieceSummary(p))"
+                                    [class]="isCodeHighlighted(p.code)
+                                      ? 'inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-sky-50 border border-sky-600 text-xs font-medium text-sky-900 cursor-pointer transition'
+                                      : 'inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-50 border border-zinc-200 hover:border-zinc-400 text-xs font-medium text-zinc-900 cursor-pointer transition'">
+                                    <strong
+                                      [class]="isCodeHighlighted(p.code)
+                                        ? 'font-numeric font-bold bg-sky-600 text-white px-1.5 py-0.5 rounded text-[10px]'
+                                        : 'font-numeric font-bold bg-zinc-900 text-white px-1.5 py-0.5 rounded text-[10px]'">
+                                      {{ p.code }}
+                                    </strong>
+                                    <span>{{ p.translatedName }}</span>
+                                    <span class="text-[11px] text-zinc-500 font-numeric">({{ p.length }}×{{ p.width }}mm)</span>
+                                  </button>
+                                }
+                              </div>
+                            }
                           </div>
 
                           <!-- Cotas y Alturas en mm -->
