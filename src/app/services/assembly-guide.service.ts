@@ -43,6 +43,45 @@ export interface AssemblyGuidePiece {
   resolvedRole: ComponentRole;
   worldBounds: AssemblyPieceWorldBounds;
   part: Part;
+  drawerClusterId?: string;
+  drawerUnitIndex?: number;
+}
+
+export interface AssemblyPieceGroupSummary {
+  key: string;
+  label: string;
+  role: ComponentRole;
+  dimensionsText: string;
+  quantity: number;
+  codes: string[];
+  representativeCode: string;
+}
+
+export interface AssemblyDrawerSubassembly {
+  id: string;
+  label: string;
+  repeatCount: number;
+  dimensions: { width: number; height: number; depth: number };
+  boxHeight: number;
+  drawerUnitLabels: string[];
+  representativeParts: AssemblyGuidePiece[];
+  representativeFront?: AssemblyGuidePiece;
+  allBoxPartCodes: string[];
+  allFrontPartCodes: string[];
+  allPartCodes: string[];
+  railElevationsMm: number[];
+  pieceGroupsSummary: AssemblyPieceGroupSummary[];
+}
+
+export interface AssemblyExplodedGroupCallout {
+  id: string;
+  label: string;
+  sublabel: string;
+  codes: string[];
+  primaryCode: string;
+  role: ComponentRole;
+  kind: 'part' | 'drawer_unit' | 'group';
+  drawerUnitIndex?: number;
 }
 
 export type AssemblyHardwareType =
@@ -80,12 +119,16 @@ export interface AssemblyStep {
   descriptionKey: string;
   defaultDescription: string;
   tips: string[];
-  actionType: 'carcass' | 'back' | 'shelves' | 'drawers' | 'doors' | 'accessories';
+  actionType: 'carcass' | 'back' | 'shelves' | 'drawer_subassembly' | 'drawers' | 'doors' | 'accessories';
+  renderMode?: 'full_progress' | 'subassembly_zoom' | 'carcass_mount';
   partCodes: string[];
   cumulativePriorPartCodes: string[];
   parts: AssemblyGuidePiece[];
   hardware: AssemblyHardwareItem[];
   measurements?: AssemblyStepMeasurement[];
+  subassemblyData?: AssemblyDrawerSubassembly[];
+  pieceGroupsSummary?: AssemblyPieceGroupSummary[];
+  compactCallouts?: AssemblyExplodedGroupCallout[];
 }
 
 export interface ModuleAssemblyGuide {
@@ -104,6 +147,26 @@ export interface ModuleAssemblyGuide {
   pieces: AssemblyGuidePiece[];
   steps: AssemblyStep[];
   rawParts: Part[];
+  drawerSubassemblies?: AssemblyDrawerSubassembly[];
+  explodedCalloutGroups?: AssemblyExplodedGroupCallout[];
+}
+
+interface DrawerPhysicalCluster {
+  id: string;
+  unitIndex: number;
+  label: string;
+  pieces: AssemblyGuidePiece[];
+  boxPieces: AssemblyGuidePiece[];
+  frontPiece?: AssemblyGuidePiece;
+  boxHeight: number;
+  dimensions: { width: number; height: number; depth: number };
+  bottomDimA: number;
+  bottomDimB: number;
+  hasBottom: boolean;
+  cx: number;
+  cy: number;
+  cz: number;
+  railElevationMm: number;
 }
 
 @Injectable({
@@ -492,8 +555,14 @@ export class AssemblyGuideService {
 
     const totalPartsCount = pieces.reduce((sum, p) => sum + p.quantity, 0);
 
-    // 3. Detección de elementos funcionales (cajones, puertas, repisas, divisores, fondos)
-    const drawersCount = this.detectDrawersCount(pieces, group);
+    // 3. Detección de elementos funcionales (cajones, sub-ensambles, puertas, repisas, divisores, fondos)
+    const sidePart = pieces.find(p => p.resolvedRole === 'side_left' || p.resolvedRole === 'side_right');
+    const sideMinY = sidePart ? sidePart.worldBounds.minY : minY;
+    const drawerClusters = this.clusterDrawerUnits(pieces, sideMinY);
+    const drawerSubassemblies = this.buildDrawerSubassemblies(drawerClusters);
+    const explodedCalloutGroups = this.buildExplodedCalloutGroups(pieces, drawerClusters);
+
+    const drawersCount = this.detectDrawersCount(pieces, group, drawerClusters);
     const doorParts = pieces.filter(p => p.resolvedRole === 'door');
     const doorsCount = doorParts.reduce((sum, p) => sum + p.quantity, 0);
     const shelfParts = pieces.filter(p => p.resolvedRole === 'shelf');
@@ -503,8 +572,8 @@ export class AssemblyGuideService {
     const backParts = pieces.filter(p => {
       if (p.resolvedRole === 'back') return true;
       const nameLower = (p.name || '').toLowerCase();
-      const isDrawerBottom = p.resolvedRole === 'drawer_bottom' || nameLower.includes('caj');
-      return !isDrawerBottom && p.thickness <= 3 && p.worldBounds.spanX * p.worldBounds.spanY > 80000;
+      const isDrawerPart = p.resolvedRole.startsWith('drawer_') || nameLower.includes('caj');
+      return !isDrawerPart && p.thickness <= 3 && p.worldBounds.spanX * p.worldBounds.spanY > 80000;
     });
     const hasBack = backParts.length > 0;
 
@@ -551,6 +620,8 @@ export class AssemblyGuideService {
       screwsPerJoint,
       pieces,
       drawersCount,
+      drawerClusters,
+      drawerSubassemblies,
       doorsCount,
       shelvesCount,
       dividersCount,
@@ -576,7 +647,9 @@ export class AssemblyGuideService {
       hardwareKit,
       pieces,
       steps,
-      rawParts: parts
+      rawParts: parts,
+      ...(drawerSubassemblies.length > 0 ? { drawerSubassemblies } : {}),
+      ...(explodedCalloutGroups ? { explodedCalloutGroups } : {})
     };
   }
 
@@ -653,13 +726,23 @@ export class AssemblyGuideService {
   /**
    * Detecta la cantidad real de cajones en el módulo.
    */
-  private detectDrawersCount(pieces: AssemblyGuidePiece[], group: PartGroup | null): number {
-    if (group?.parametricConfig?.drawersCount && group.parametricConfig.drawersCount > 0) {
-      return group.parametricConfig.drawersCount;
-    }
+  private detectDrawersCount(
+    pieces: AssemblyGuidePiece[],
+    group: PartGroup | null,
+    drawerClusters?: DrawerPhysicalCluster[]
+  ): number {
     const drawerFronts = pieces.filter(p => p.resolvedRole === 'drawer_front');
+    const frontQtySum = drawerFronts.reduce((sum, p) => sum + p.quantity, 0);
+    const clusterCount = drawerClusters?.length ?? 0;
+
+    if (group?.parametricConfig?.drawersCount && group.parametricConfig.drawersCount > 0) {
+      return Math.max(group.parametricConfig.drawersCount, clusterCount, frontQtySum);
+    }
+    if (clusterCount > 0) {
+      return Math.max(clusterCount, frontQtySum);
+    }
     if (drawerFronts.length > 0) {
-      return drawerFronts.reduce((sum, p) => sum + p.quantity, 0);
+      return frontQtySum;
     }
     const drawerGroups = new Set(
       pieces
@@ -682,6 +765,557 @@ export class AssemblyGuideService {
         p.name.toLowerCase().includes('cajon')
     );
     return hasLooseDrawerParts ? 1 : 0;
+  }
+
+  private isDrawerPiece(piece: AssemblyGuidePiece): boolean {
+    if (
+      piece.resolvedRole === 'drawer_front' ||
+      piece.resolvedRole === 'drawer_box' ||
+      piece.resolvedRole === 'drawer_lateral' ||
+      piece.resolvedRole === 'drawer_bottom'
+    ) {
+      return true;
+    }
+    const nameLower = (piece.name || '').toLowerCase();
+    return nameLower.includes('cajón') || nameLower.includes('cajon');
+  }
+
+  private isDrawerBottomPiece(piece: AssemblyGuidePiece): boolean {
+    if (piece.resolvedRole === 'drawer_bottom') return true;
+    if (piece.resolvedRole !== 'drawer_box') return false;
+    const nameLower = (piece.name || '').toLowerCase();
+    const wb = piece.worldBounds;
+    const isThinHorizontal = piece.thickness <= 6 && wb.spanY <= 10 && wb.spanX > 30 && wb.spanZ > 30;
+    return isThinHorizontal || (nameLower.includes('fondo') && wb.spanY <= 12);
+  }
+
+  private extractDrawerNameTag(piece: AssemblyGuidePiece): string | null {
+    const candidates = [piece.name || '', piece.part.groupName || ''];
+    for (const text of candidates) {
+      const parenMatch = text.match(/\(([^)]*(?:caj[oó]n|gaveta)[^)]*)\)/i);
+      if (parenMatch) {
+        return parenMatch[1].trim().toLowerCase().replace(/\s+/g, ' ').replace(/ó/g, 'o');
+      }
+      const directMatch = text.match(/\b((?:caj[oó]n|gaveta)\s*(?:\d+|inferior|medio|superior))\b/i);
+      if (directMatch) {
+        return directMatch[1].trim().toLowerCase().replace(/\s+/g, ' ').replace(/ó/g, 'o');
+      }
+    }
+    return null;
+  }
+
+  private mergeWorldBounds(items: AssemblyGuidePiece[]): AssemblyPieceWorldBounds {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const item of items) {
+      const b = item.worldBounds;
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxY > maxY) maxY = b.maxY;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+    }
+    const spanX = Math.round((maxX - minX) * 100) / 100;
+    const spanY = Math.round((maxY - minY) * 100) / 100;
+    const spanZ = Math.round((maxZ - minZ) * 100) / 100;
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      minZ,
+      maxZ,
+      spanX,
+      spanY,
+      spanZ,
+      cx: Math.round(((minX + maxX) / 2) * 100) / 100,
+      cy: Math.round(((minY + maxY) / 2) * 100) / 100,
+      cz: Math.round(((minZ + maxZ) / 2) * 100) / 100
+    };
+  }
+
+  private isNearXZ(a: AssemblyPieceWorldBounds, b: AssemblyPieceWorldBounds, tol: number): boolean {
+    const gapX = Math.max(0, Math.max(a.minX, b.minX) - Math.min(a.maxX, b.maxX));
+    const gapZ = Math.max(0, Math.max(a.minZ, b.minZ) - Math.min(a.maxZ, b.maxZ));
+    return gapX <= tol && gapZ <= tol;
+  }
+
+  /**
+   * Agrupa piezas de cajón en instancias físicas individuales (drawer-unit-1..N)
+   * combinando límites espaciales 3D reales y pistas nominales sin colapsar torres/columnas distintas.
+   */
+  private clusterDrawerUnits(pieces: AssemblyGuidePiece[], sideMinY: number): DrawerPhysicalCluster[] {
+    const drawerPieces = pieces.filter(p => this.isDrawerPiece(p));
+    if (drawerPieces.length === 0) return [];
+
+    const pieceOrder = new Map<string, number>();
+    pieces.forEach((p, idx) => pieceOrder.set(p.code, idx));
+
+    const fronts = drawerPieces
+      .filter(p => p.resolvedRole === 'drawer_front')
+      .sort((a, b) => {
+        const cyDiff = a.worldBounds.cy - b.worldBounds.cy;
+        if (Math.abs(cyDiff) > 2) return cyDiff;
+        const cxDiff = a.worldBounds.cx - b.worldBounds.cx;
+        if (Math.abs(cxDiff) > 2) return cxDiff;
+        return (pieceOrder.get(a.code) ?? 0) - (pieceOrder.get(b.code) ?? 0);
+      });
+
+    const boxCandidates = drawerPieces.filter(p => p.resolvedRole !== 'drawer_front');
+    const isBottomFlag = boxCandidates.map(p => this.isDrawerBottomPiece(p));
+    const tags = boxCandidates.map(p => this.extractDrawerNameTag(p));
+
+    const parent = boxCandidates.map((_, i) => i);
+    const findRoot = (x: number): number => {
+      let cur = x;
+      while (parent[cur] !== cur) {
+        parent[cur] = parent[parent[cur]];
+        cur = parent[cur];
+      }
+      return cur;
+    };
+    const unionRoots = (a: number, b: number): void => {
+      const ra = findRoot(a);
+      const rb = findRoot(b);
+      if (ra !== rb) {
+        parent[rb] = ra;
+      }
+    };
+
+    const canPairBoxPieces = (i: number, j: number): boolean => {
+      const a = boxCandidates[i];
+      const b = boxCandidates[j];
+      if (a.part.groupId && b.part.groupId && a.part.groupId !== b.part.groupId) {
+        return false;
+      }
+      if (tags[i] && tags[j] && tags[i] !== tags[j]) {
+        return false;
+      }
+      const wbA = a.worldBounds;
+      const wbB = b.worldBounds;
+      if (!this.isNearXZ(wbA, wbB, 12)) {
+        return false;
+      }
+
+      const botA = isBottomFlag[i];
+      const botB = isBottomFlag[j];
+      if (!botA && !botB) {
+        return (
+          Math.abs(wbA.cy - wbB.cy) <= 15 &&
+          Math.abs(wbA.minY - wbB.minY) <= 15 &&
+          Math.abs(wbA.maxY - wbB.maxY) <= 15
+        );
+      }
+      if (botA && botB) {
+        return Math.abs(wbA.cy - wbB.cy) <= 8;
+      }
+      const bot = botA ? wbA : wbB;
+      const wall = botA ? wbB : wbA;
+      return (
+        bot.minY >= wall.minY - 12 &&
+        bot.maxY <= wall.maxY + 4 &&
+        bot.minY <= wall.minY + Math.max(24, wall.spanY * 0.4)
+      );
+    };
+
+    for (let i = 0; i < boxCandidates.length; i++) {
+      for (let j = i + 1; j < boxCandidates.length; j++) {
+        if (canPairBoxPieces(i, j)) {
+          unionRoots(i, j);
+        }
+      }
+    }
+
+    interface RawCluster {
+      boxPieces: AssemblyGuidePiece[];
+      frontPiece?: AssemblyGuidePiece;
+    }
+
+    const boxBuckets = new Map<number, RawCluster>();
+    for (let i = 0; i < boxCandidates.length; i++) {
+      const root = findRoot(i);
+      let bucket = boxBuckets.get(root);
+      if (!bucket) {
+        bucket = { boxPieces: [] };
+        boxBuckets.set(root, bucket);
+      }
+      bucket.boxPieces.push(boxCandidates[i]);
+    }
+
+    const rawClusters: RawCluster[] = Array.from(boxBuckets.values());
+
+    // Asociar cada frente de cajón al clúster de caja espacialmente correspondiente
+    for (const front of fronts) {
+      const frontTag = this.extractDrawerNameTag(front);
+      let bestCluster: RawCluster | null = null;
+      let bestScore = -Infinity;
+
+      for (const candidate of rawClusters) {
+        if (candidate.frontPiece || candidate.boxPieces.length === 0) continue;
+
+        const hasGroupConflict = candidate.boxPieces.some(
+          bp => bp.part.groupId && front.part.groupId && bp.part.groupId !== front.part.groupId
+        );
+        if (hasGroupConflict) continue;
+
+        const clusterTags = new Set(
+          candidate.boxPieces
+            .map(bp => this.extractDrawerNameTag(bp))
+            .filter((t): t is string => Boolean(t))
+        );
+        if (frontTag && clusterTags.size > 0 && !clusterTags.has(frontTag)) {
+          continue;
+        }
+
+        const cb = this.mergeWorldBounds(candidate.boxPieces);
+        if (!this.isNearXZ(front.worldBounds, cb, 45)) continue;
+
+        const isWideX = front.worldBounds.spanX >= front.worldBounds.spanZ;
+        const alignCenterDiff = isWideX
+          ? Math.abs(front.worldBounds.cx - cb.cx)
+          : Math.abs(front.worldBounds.cz - cb.cz);
+        const alignLimit = Math.max(45, (isWideX ? cb.spanX : cb.spanZ) * 0.25);
+        if (alignCenterDiff > alignLimit) continue;
+
+        const overlapSpan = isWideX
+          ? Math.max(0, Math.min(front.worldBounds.maxX, cb.maxX) - Math.max(front.worldBounds.minX, cb.minX))
+          : Math.max(0, Math.min(front.worldBounds.maxZ, cb.maxZ) - Math.max(front.worldBounds.minZ, cb.minZ));
+        const minExpectedSpan = Math.min(
+          isWideX ? front.worldBounds.spanX : front.worldBounds.spanZ,
+          isWideX ? cb.spanX : cb.spanZ
+        );
+        if (overlapSpan < minExpectedSpan * 0.5) continue;
+
+        const vOverlap =
+          Math.min(front.worldBounds.maxY, cb.maxY) - Math.max(front.worldBounds.minY, cb.minY);
+        const cyDist = Math.abs(front.worldBounds.cy - cb.cy);
+        const verticalMatches =
+          vOverlap >= Math.min(20, cb.spanY * 0.3) ||
+          (vOverlap >= -8 && cyDist <= Math.max(45, cb.spanY * 0.65));
+        if (!verticalMatches) continue;
+
+        const tagBonus = frontTag && clusterTags.has(frontTag) ? 10000 : 0;
+        const xzDist = Math.hypot(front.worldBounds.cx - cb.cx, front.worldBounds.cz - cb.cz);
+        const score = tagBonus + vOverlap * 10 - cyDist - xzDist * 0.05;
+        if (score > bestScore) {
+          bestScore = score;
+          bestCluster = candidate;
+        }
+      }
+
+      if (bestCluster) {
+        bestCluster.frontPiece = front;
+      } else {
+        rawClusters.push({ boxPieces: [], frontPiece: front });
+      }
+    }
+
+    const clusters: DrawerPhysicalCluster[] = rawClusters.map(rc => {
+      const orderedBox = [...rc.boxPieces].sort(
+        (a, b) => (pieceOrder.get(a.code) ?? 0) - (pieceOrder.get(b.code) ?? 0)
+      );
+      const allPieces = [...orderedBox, ...(rc.frontPiece ? [rc.frontPiece] : [])].sort(
+        (a, b) => (pieceOrder.get(a.code) ?? 0) - (pieceOrder.get(b.code) ?? 0)
+      );
+      const refItems = orderedBox.length > 0 ? orderedBox : allPieces;
+      const refBounds = this.mergeWorldBounds(refItems);
+
+      const wallPieces = orderedBox.filter(p => !this.isDrawerBottomPiece(p));
+      const boxHeight = wallPieces.length > 0
+        ? Math.round(Math.max(...wallPieces.map(p => p.worldBounds.spanY)))
+        : Math.round(refBounds.spanY);
+
+      let isWideX: boolean;
+      if (rc.frontPiece) {
+        isWideX = rc.frontPiece.worldBounds.spanX >= rc.frontPiece.worldBounds.spanZ;
+      } else {
+        const hasYzWall = wallPieces.some(p => p.worldBounds.spanX <= 26 && p.worldBounds.spanZ > p.worldBounds.spanX * 2);
+        const hasXyLateral = wallPieces.some(
+          p =>
+            p.worldBounds.spanZ <= 26 &&
+            p.worldBounds.spanX > p.worldBounds.spanZ * 2 &&
+            (p.name || '').toLowerCase().includes('lateral')
+        );
+        if (hasYzWall && !hasXyLateral) {
+          isWideX = true;
+        } else if (hasXyLateral && !hasYzWall) {
+          isWideX = false;
+        } else {
+          isWideX = refBounds.spanX >= refBounds.spanZ;
+        }
+      }
+
+      const width = Math.round(isWideX ? refBounds.spanX : refBounds.spanZ);
+      const depth = Math.round(isWideX ? refBounds.spanZ : refBounds.spanX);
+      const height = Math.round(refBounds.spanY);
+
+      const bottomPiece = orderedBox.find(p => this.isDrawerBottomPiece(p));
+      const bottomDimA = bottomPiece ? Math.round(Math.max(bottomPiece.length, bottomPiece.width)) : 0;
+      const bottomDimB = bottomPiece ? Math.round(Math.min(bottomPiece.length, bottomPiece.width)) : 0;
+
+      const railElevationMm = orderedBox.length > 0
+        ? Math.max(40, Math.round(refBounds.cy - sideMinY))
+        : Math.max(40, Math.round((rc.frontPiece!.worldBounds.minY - sideMinY) + 40));
+
+      return {
+        id: '',
+        unitIndex: 0,
+        label: '',
+        pieces: allPieces,
+        boxPieces: orderedBox,
+        frontPiece: rc.frontPiece,
+        boxHeight,
+        dimensions: { width, height, depth },
+        bottomDimA,
+        bottomDimB,
+        hasBottom: Boolean(bottomPiece),
+        cx: refBounds.cx,
+        cy: refBounds.cy,
+        cz: refBounds.cz,
+        railElevationMm
+      };
+    });
+
+    clusters.sort((a, b) => {
+      const cyDiff = a.cy - b.cy;
+      if (Math.abs(cyDiff) > 2) return cyDiff;
+      const cxDiff = a.cx - b.cx;
+      if (Math.abs(cxDiff) > 2) return cxDiff;
+      return a.cz - b.cz;
+    });
+
+    clusters.forEach((cluster, idx) => {
+      const unitIndex = idx + 1;
+      cluster.unitIndex = unitIndex;
+      cluster.id = `drawer-unit-${unitIndex}`;
+      cluster.label = `Cajón ${unitIndex}`;
+      for (const piece of cluster.pieces) {
+        piece.drawerClusterId = cluster.id;
+        piece.drawerUnitIndex = unitIndex;
+      }
+    });
+
+    return clusters;
+  }
+
+  private normalizeGroupPieceLabel(name: string, role: ComponentRole): string {
+    let cleaned = (name || '')
+      .replace(/\s*\([^)]*(?:caj[oó]n|gaveta)[^)]*\)\s*/gi, ' ')
+      .replace(/^\s*(?:caj[oó]n|gaveta)\s*(?:\d+|inferior|medio|superior|[A-Z])\s*[-–:]\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (role === 'shelf' || role === 'divider' || role === 'tie' || role === 'free') {
+      cleaned = cleaned.replace(/\s+#?\d{1,2}$/, '').trim();
+    }
+
+    return cleaned || name;
+  }
+
+  /**
+   * Agrupa piezas equivalentes por rol, etiqueta normalizada y dimensiones en un resumen ×N.
+   */
+  private buildPieceGroupsSummary(pieces: AssemblyGuidePiece[]): AssemblyPieceGroupSummary[] {
+    const groups = new Map<string, AssemblyPieceGroupSummary>();
+
+    for (const piece of pieces) {
+      const normalized = this.normalizeGroupPieceLabel(piece.name, piece.resolvedRole);
+      const translatedLabel = this.i18n.translatePartName(normalized) || piece.translatedName || piece.name;
+      const dimsText = `${piece.length}×${piece.width}×${piece.thickness}`;
+      const key = `${piece.resolvedRole}::${normalized.toLowerCase()}::${dimsText}`;
+
+      let existing = groups.get(key);
+      if (!existing) {
+        existing = {
+          key,
+          label: translatedLabel,
+          role: piece.resolvedRole,
+          dimensionsText: dimsText,
+          quantity: 0,
+          codes: [],
+          representativeCode: piece.code
+        };
+        groups.set(key, existing);
+      }
+
+      existing.quantity += piece.quantity;
+      existing.codes.push(piece.code);
+    }
+
+    return Array.from(groups.values());
+  }
+
+  /**
+   * Consolida instancias físicas equivalentes de cajas de cajón en plantillas reutilizables (×N).
+   */
+  private buildDrawerSubassemblies(clusters: DrawerPhysicalCluster[]): AssemblyDrawerSubassembly[] {
+    const boxClusters = clusters.filter(c => c.boxPieces.length > 0);
+    if (boxClusters.length === 0) return [];
+
+    interface SubassemblyBucket {
+      anchor: DrawerPhysicalCluster;
+      clusters: DrawerPhysicalCluster[];
+    }
+
+    const buckets: SubassemblyBucket[] = [];
+
+    for (const cluster of boxClusters) {
+      const match = buckets.find(b => {
+        const ref = b.anchor;
+        return (
+          cluster.boxPieces.length === ref.boxPieces.length &&
+          cluster.hasBottom === ref.hasBottom &&
+          Math.abs(cluster.boxHeight - ref.boxHeight) <= 3 &&
+          Math.abs(cluster.bottomDimA - ref.bottomDimA) <= 3 &&
+          Math.abs(cluster.bottomDimB - ref.bottomDimB) <= 3 &&
+          Math.abs(cluster.dimensions.width - ref.dimensions.width) <= 3 &&
+          Math.abs(cluster.dimensions.depth - ref.dimensions.depth) <= 3
+        );
+      });
+
+      if (match) {
+        match.clusters.push(cluster);
+      } else {
+        buckets.push({ anchor: cluster, clusters: [cluster] });
+      }
+    }
+
+    const heightCounts = new Map<number, number>();
+    for (const bucket of buckets) {
+      const h = Math.round(bucket.anchor.boxHeight);
+      heightCounts.set(h, (heightCounts.get(h) ?? 0) + 1);
+    }
+
+    return buckets.map((bucket, idx) => {
+      const ref = bucket.anchor;
+      const hRounded = Math.round(ref.boxHeight);
+      const hasDuplicateHeight = (heightCounts.get(hRounded) ?? 0) > 1;
+      const label = hasDuplicateHeight
+        ? `Cajón ${hRounded}mm · ${Math.round(ref.dimensions.width)}mm`
+        : `Cajón ${hRounded}mm`;
+
+      const allBoxPieces = bucket.clusters.flatMap(c => c.boxPieces);
+      const allBoxPartCodes = allBoxPieces.map(p => p.code);
+      const allFrontPartCodes = bucket.clusters.flatMap(c => (c.frontPiece ? [c.frontPiece.code] : []));
+      const allPartCodes = bucket.clusters.flatMap(c => c.pieces.map(p => p.code));
+
+      return {
+        id: `drawer-subassembly-${idx + 1}`,
+        label,
+        repeatCount: bucket.clusters.length,
+        dimensions: { ...ref.dimensions },
+        boxHeight: ref.boxHeight,
+        drawerUnitLabels: bucket.clusters.map(c => c.label),
+        representativeParts: [...ref.boxPieces],
+        ...(ref.frontPiece ? { representativeFront: ref.frontPiece } : {}),
+        allBoxPartCodes,
+        allFrontPartCodes,
+        allPartCodes,
+        railElevationsMm: bucket.clusters.map(c => c.railElevationMm),
+        pieceGroupsSummary: this.buildPieceGroupsSummary(allBoxPieces)
+      };
+    });
+  }
+
+  private formatCompactCodeRange(codes: string[]): string {
+    if (codes.length === 0) return '';
+    const parsed = codes.map(code => {
+      const match = /^P(\d+)$/i.exec(code.trim());
+      return { code, num: match ? Number.parseInt(match[1], 10) : NaN };
+    });
+
+    if (parsed.some(item => Number.isNaN(item.num))) {
+      return codes.join(', ');
+    }
+
+    parsed.sort((a, b) => a.num - b.num);
+    const runs: string[] = [];
+    let startIdx = 0;
+
+    while (startIdx < parsed.length) {
+      let endIdx = startIdx;
+      while (endIdx + 1 < parsed.length && parsed[endIdx + 1].num === parsed[endIdx].num + 1) {
+        endIdx++;
+      }
+      const len = endIdx - startIdx + 1;
+      if (len >= 3) {
+        runs.push(`${parsed[startIdx].code}–${parsed[endIdx].code}`);
+      } else if (len === 2) {
+        runs.push(`${parsed[startIdx].code}, ${parsed[endIdx].code}`);
+      } else {
+        runs.push(parsed[startIdx].code);
+      }
+      startIdx = endIdx + 1;
+    }
+
+    return runs.join(', ');
+  }
+
+  private formatDrawerCalloutSublabel(boxCodes: string[], frontCode?: string): string {
+    const boxRange = this.formatCompactCodeRange(boxCodes);
+    if (boxRange && frontCode) {
+      return `${boxRange} · ${frontCode}`;
+    }
+    return boxRange || frontCode || '';
+  }
+
+  private buildDrawerUnitCallout(cluster: DrawerPhysicalCluster): AssemblyExplodedGroupCallout {
+    const boxCodes = cluster.boxPieces.map(p => p.code);
+    const frontCode = cluster.frontPiece?.code;
+    const allUnitCodes = cluster.pieces.map(p => p.code);
+    const primaryCode = frontCode ?? boxCodes[0] ?? cluster.pieces[0].code;
+
+    return {
+      id: cluster.id,
+      label: cluster.label,
+      sublabel: this.formatDrawerCalloutSublabel(boxCodes, frontCode),
+      codes: allUnitCodes,
+      primaryCode,
+      role: cluster.frontPiece ? 'drawer_front' : 'drawer_box',
+      kind: 'drawer_unit',
+      drawerUnitIndex: cluster.unitIndex
+    };
+  }
+
+  private buildExplodedCalloutGroups(
+    pieces: AssemblyGuidePiece[],
+    drawerClusters: DrawerPhysicalCluster[]
+  ): AssemblyExplodedGroupCallout[] | undefined {
+    if (drawerClusters.length < 2 && pieces.length <= 14) {
+      return undefined;
+    }
+
+    const callouts: AssemblyExplodedGroupCallout[] = [];
+    let emittedDrawerUnits = false;
+
+    for (const piece of pieces) {
+      if (piece.drawerClusterId) {
+        if (!emittedDrawerUnits) {
+          for (const cluster of drawerClusters) {
+            callouts.push(this.buildDrawerUnitCallout(cluster));
+          }
+          emittedDrawerUnits = true;
+        }
+        continue;
+      }
+
+      callouts.push({
+        id: `callout-part-${piece.code}`,
+        label: piece.translatedName || piece.name,
+        sublabel: `${piece.length}×${piece.width} mm`,
+        codes: [piece.code],
+        primaryCode: piece.code,
+        role: piece.resolvedRole,
+        kind: 'part'
+      });
+    }
+
+    return callouts;
   }
 
   /**
@@ -964,6 +1598,8 @@ export class AssemblyGuideService {
     screwsPerJoint: number;
     pieces: AssemblyGuidePiece[];
     drawersCount: number;
+    drawerClusters: DrawerPhysicalCluster[];
+    drawerSubassemblies: AssemblyDrawerSubassembly[];
     doorsCount: number;
     shelvesCount: number;
     dividersCount: number;
@@ -981,6 +1617,8 @@ export class AssemblyGuideService {
       screwsPerJoint,
       pieces,
       drawersCount,
+      drawerClusters,
+      drawerSubassemblies,
       doorsCount,
       dividersCount,
       hardwareKit,
@@ -1068,8 +1706,8 @@ export class AssemblyGuideService {
         if (assignedCodes.has(p.code)) return false;
         if (p.resolvedRole === 'back') return true;
         const nameLower = (p.name || '').toLowerCase();
-        const isDrawerBottom = p.resolvedRole === 'drawer_bottom' || nameLower.includes('caj');
-        return !isDrawerBottom && p.thickness <= 3 && p.worldBounds.spanX * p.worldBounds.spanY > 80000;
+        const isDrawerPart = p.resolvedRole.startsWith('drawer_') || nameLower.includes('caj');
+        return !isDrawerPart && p.thickness <= 3 && p.worldBounds.spanX * p.worldBounds.spanY > 80000;
       })
     );
 
@@ -1101,6 +1739,7 @@ export class AssemblyGuideService {
     const step3Pieces = markAssigned(
       pieces.filter(p => {
         if (assignedCodes.has(p.code)) return false;
+        if (this.isDrawerPiece(p)) return false;
         if (p.resolvedRole === 'shelf' || p.resolvedRole === 'divider') return true;
         return p.resolvedRole === 'free' && p.worldBounds.cz <= centerZ + 0.5;
       })
@@ -1169,83 +1808,171 @@ export class AssemblyGuideService {
     }
 
     // =========================================================================
-    // PASO 4: Fijación de Correderas y Armado de Cajones (Solo si tiene cajones)
+    // PASO 4: Fijación de Correderas y Armado de Cajones (Con división sub-ensamble si aplica)
     // =========================================================================
-    const drawerPieces = markAssigned(
-      pieces.filter(p => {
-        if (assignedCodes.has(p.code)) return false;
-        if (
-          p.resolvedRole === 'drawer_front' ||
-          p.resolvedRole === 'drawer_box' ||
-          p.resolvedRole === 'drawer_lateral' ||
-          p.resolvedRole === 'drawer_bottom'
-        ) {
-          return true;
-        }
-        const nameLower = (p.name || '').toLowerCase();
-        return nameLower.includes('cajón') || nameLower.includes('cajon');
-      })
-    );
+    const drawerPieces = markAssigned(pieces.filter(p => !assignedCodes.has(p.code) && this.isDrawerPiece(p)));
 
     if (drawersCount > 0 || drawerPieces.length > 0) {
       const effectiveDrawersCount = Math.max(1, drawersCount);
       const slideHardware = hardwareKit.find(h => h.id === 'telescopic_slides');
       const smallScrewHardware = hardwareKit.find(h => h.id === 'screw_hardware_15');
+      const structuralScrewHardware = hardwareKit.find(h => h.id === 'screw_structural_50');
 
-      // Calcular cotas exactas de riel telescópico desde la base inferior del lateral
-      const measurements: AssemblyStepMeasurement[] = [];
       const sidePart = pieces.find(p => p.resolvedRole === 'side_left' || p.resolvedRole === 'side_right');
       const sideMinY = sidePart ? sidePart.worldBounds.minY : minY;
 
-      const drawerFronts = drawerPieces
-        .filter(p => p.resolvedRole === 'drawer_front')
-        .sort((a, b) => a.worldBounds.minY - b.worldBounds.minY);
+      const boxPieces = drawerPieces.filter(
+        p =>
+          p.resolvedRole === 'drawer_box' ||
+          p.resolvedRole === 'drawer_lateral' ||
+          p.resolvedRole === 'drawer_bottom'
+      );
+      const boxCodeSet = new Set(boxPieces.map(p => p.code));
+      const mountPieces = drawerPieces.filter(p => !boxCodeSet.has(p.code));
 
-      for (let i = 0; i < effectiveDrawersCount; i++) {
-        let railHeightMm: number;
-        let drawerLabel: string;
+      const shouldSplitDrawerSubassembly =
+        effectiveDrawersCount >= 2 && drawerPieces.length > 8 && boxPieces.length > 0;
 
-        if (drawerFronts[i]) {
-          const df = drawerFronts[i];
-          railHeightMm = Math.max(40, Math.round((df.worldBounds.minY - sideMinY) + 40));
-          drawerLabel = `${df.code} (${df.name || 'Cajón'})`;
+      if (shouldSplitDrawerSubassembly) {
+        const totalBoxUnits = drawerSubassemblies.reduce((sum, s) => sum + s.repeatCount, 0);
+        const summaryLabels = drawerSubassemblies
+          .map(s => `${s.label} (ARMAR ×${s.repeatCount} JUEGOS IGUALES)`)
+          .join(' · ');
+        const subassemblyDesc =
+          drawerSubassemblies.length <= 1
+            ? `Arme sobre banco ${summaryLabels || `ARMAR ×${effectiveDrawersCount} JUEGOS IGUALES`} antes de montarlos en el casco. Una los laterales al contrafrente y trasera con tornillos estructurales 4.0 × 50 mm, verifique las diagonales a escuadra (90°) y asegure el fondo de 3 mm.`
+            : `Arme en mesa de trabajo las ${totalBoxUnits} cajas repetidas agrupadas por medida (${summaryLabels}) antes de instalarlas en el casco. Ensamble laterales, contrafrente y trasera a escuadra y fije el fondo de 3 mm.`;
+
+        steps.push({
+          stepNumber: stepNum++,
+          titleKey: 'assemblyGuide.stepDrawerSubassemblyTitle',
+          defaultTitle: 'Paso 4A — Armado de Caja de Cajón Típica (Zoom Sub-ensamble)',
+          descriptionKey: 'assemblyGuide.stepDrawerSubassemblyDesc',
+          defaultDescription: subassemblyDesc,
+          tips: [
+            'Arme todas las cajas idénticas en serie sobre una superficie plana y verifique que ambas diagonales de cada caja midan exactamente lo mismo (escuadra 90°).',
+            'Encaje o atornille el fondo de 3 mm para bloquear la escuadra antes de fijar el tramo móvil de la corredera.',
+            'Reserve los frentes vistos exteriores para el siguiente paso de montaje en el casco y calibración de holguras.'
+          ],
+          actionType: 'drawer_subassembly',
+          renderMode: 'subassembly_zoom',
+          partCodes: boxPieces.map(p => p.code),
+          cumulativePriorPartCodes: [],
+          parts: boxPieces,
+          subassemblyData: drawerSubassemblies,
+          pieceGroupsSummary: this.buildPieceGroupsSummary(boxPieces),
+          hardware: structuralScrewHardware
+            ? [{ ...structuralScrewHardware, quantity: Math.max(8, effectiveDrawersCount * 8) }]
+            : []
+        });
+
+        const mountMeasurements: AssemblyStepMeasurement[] = [];
+        if (drawerClusters.length > 0) {
+          for (const cluster of drawerClusters) {
+            const frontRef = cluster.frontPiece ? ` (${cluster.frontPiece.code})` : '';
+            mountMeasurements.push({
+              label: `${cluster.label}${frontRef} — Eje Central Riel`,
+              valueMm: cluster.railElevationMm,
+              referenceText: 'Medido desde el canto inferior del lateral del mueble'
+            });
+          }
         } else {
           const plinthH = paramConfig?.plinthHeight || 70;
           const innerH = Math.max(300, params.height - plinthH - 36);
           const slotH = innerH / effectiveDrawersCount;
-          railHeightMm = Math.max(40, Math.round(plinthH + 18 + 40 + (i * slotH)));
-          drawerLabel = `Cajón ${i + 1} (${i === 0 ? 'Inferior' : (i === effectiveDrawersCount - 1 ? 'Superior' : 'Medio')})`;
+          for (let i = 0; i < effectiveDrawersCount; i++) {
+            mountMeasurements.push({
+              label: `Cajón ${i + 1} — Eje Central Riel`,
+              valueMm: Math.max(40, Math.round(plinthH + 18 + 40 + i * slotH)),
+              referenceText: 'Medido desde el canto inferior del lateral del mueble'
+            });
+          }
         }
 
-        measurements.push({
-          label: `${drawerLabel} — Eje Central Riel`,
-          valueMm: railHeightMm,
-          referenceText: 'Medido desde el canto inferior del lateral del mueble'
+        const mountGroupsSummary = this.buildPieceGroupsSummary(mountPieces);
+        const hasRepeatedMountGroups = mountGroupsSummary.some(g => g.quantity > 1);
+
+        steps.push({
+          stepNumber: stepNum++,
+          titleKey: 'assemblyGuide.step4CarcassMountTitle',
+          defaultTitle: 'Paso 4B — Fijación de Correderas y Montaje de Cajones',
+          descriptionKey: 'assemblyGuide.step4CarcassMountDesc',
+          defaultDescription:
+            'Separe las correderas telescópicas presionando la pestaña plástica interior. Atornille el tramo fijo al costado interior del casco en las cotas de altura indicadas, acople las cajas ya armadas y fije los frentes vistos manteniendo una luz uniforme de 2 a 3 mm.',
+          tips: [
+            'Deje una holgura libre de 13 mm a cada lado entre la caja del cajón y el costado interior del módulo (26 mm de descuento total).',
+            'Atornille los rieles telescópicos en los agujeros rasgados para permitir micro-ajustes de nivelación antes del apriete final.',
+            'Utilice separadores calibrados de 2 a 3 mm entre frentes vistos antes de atornillar definitivamente desde el interior.'
+          ],
+          actionType: 'drawers',
+          renderMode: 'carcass_mount',
+          partCodes: mountPieces.map(p => p.code),
+          cumulativePriorPartCodes: [],
+          parts: mountPieces,
+          compactCallouts: drawerClusters.map(c => this.buildDrawerUnitCallout(c)),
+          ...(mountPieces.length > 6 || hasRepeatedMountGroups
+            ? { pieceGroupsSummary: mountGroupsSummary }
+            : {}),
+          hardware: [
+            ...(slideHardware ? [slideHardware] : []),
+            ...(smallScrewHardware ? [{ ...smallScrewHardware, quantity: effectiveDrawersCount * 8 }] : [])
+          ],
+          measurements: mountMeasurements
+        });
+      } else {
+        // Calcular cotas exactas de riel telescópico desde la base inferior del lateral
+        const measurements: AssemblyStepMeasurement[] = [];
+        const drawerFronts = drawerPieces
+          .filter(p => p.resolvedRole === 'drawer_front')
+          .sort((a, b) => a.worldBounds.minY - b.worldBounds.minY);
+
+        for (let i = 0; i < effectiveDrawersCount; i++) {
+          let railHeightMm: number;
+          let drawerLabel: string;
+
+          if (drawerFronts[i]) {
+            const df = drawerFronts[i];
+            railHeightMm = Math.max(40, Math.round((df.worldBounds.minY - sideMinY) + 40));
+            drawerLabel = `${df.code} (${df.name || 'Cajón'})`;
+          } else {
+            const plinthH = paramConfig?.plinthHeight || 70;
+            const innerH = Math.max(300, params.height - plinthH - 36);
+            const slotH = innerH / effectiveDrawersCount;
+            railHeightMm = Math.max(40, Math.round(plinthH + 18 + 40 + (i * slotH)));
+            drawerLabel = `Cajón ${i + 1} (${i === 0 ? 'Inferior' : (i === effectiveDrawersCount - 1 ? 'Superior' : 'Medio')})`;
+          }
+
+          measurements.push({
+            label: `${drawerLabel} — Eje Central Riel`,
+            valueMm: railHeightMm,
+            referenceText: 'Medido desde el canto inferior del lateral del mueble'
+          });
+        }
+
+        steps.push({
+          stepNumber: stepNum++,
+          titleKey: 'assemblyGuide.step4Title',
+          defaultTitle: 'Paso 4 — Fijación de Correderas y Armado de Cajones',
+          descriptionKey: 'assemblyGuide.step4Desc',
+          defaultDescription:
+            'Separe las correderas telescópicas presionando la pestaña plástica interior. Atornille el tramo exterior al costado del mueble en las cotas de altura indicadas. Ensamble las cajas de cajón uniendo los costados al frente y trasera con tornillos de ensamble, encaje el fondo de 3 mm en la ranura y fije el tramo móvil del riel a la caja.',
+          tips: [
+            'Cada cajón está conformado por 5 piezas: 2 costados de cajón, 1 contrafrente interior, 1 trasera interior, 1 fondo de 3 mm y 1 frente exterior visto decorativo.',
+            'Deje una holgura libre de 13 mm a cada lado entre la caja del cajón y el costado interior del módulo (26 mm de descuento total).',
+            'Atornille los rieles telescópicos en los agujeros rasgados para permitir micro-ajustes de nivelación antes del apriete final.'
+          ],
+          actionType: 'drawers',
+          renderMode: 'full_progress',
+          partCodes: drawerPieces.map(p => p.code),
+          cumulativePriorPartCodes: [],
+          parts: drawerPieces,
+          hardware: [
+            ...(slideHardware ? [slideHardware] : []),
+            ...(smallScrewHardware ? [{ ...smallScrewHardware, quantity: effectiveDrawersCount * 8 }] : [])
+          ],
+          measurements
         });
       }
-
-      steps.push({
-        stepNumber: stepNum++,
-        titleKey: 'assemblyGuide.step4Title',
-        defaultTitle: 'Paso 4 — Fijación de Correderas y Armado de Cajones',
-        descriptionKey: 'assemblyGuide.step4Desc',
-        defaultDescription:
-          'Separe las correderas telescópicas presionando la pestaña plástica interior. Atornille el tramo exterior al costado del mueble en las cotas de altura indicadas. Ensamble las cajas de cajón uniendo los costados al frente y trasera con tornillos de ensamble, encaje el fondo de 3 mm en la ranura y fije el tramo móvil del riel a la caja.',
-        tips: [
-          'Cada cajón está conformado por 5 piezas: 2 costados de cajón, 1 contrafrente interior, 1 trasera interior, 1 fondo de 3 mm y 1 frente exterior visto decorativo.',
-          'Deje una holgura libre de 13 mm a cada lado entre la caja del cajón y el costado interior del módulo (26 mm de descuento total).',
-          'Atornille los rieles telescópicos en los agujeros rasgados para permitir micro-ajustes de nivelación antes del apriete final.'
-        ],
-        actionType: 'drawers',
-        partCodes: drawerPieces.map(p => p.code),
-        cumulativePriorPartCodes: [],
-        parts: drawerPieces,
-        hardware: [
-          ...(slideHardware ? [slideHardware] : []),
-          ...(smallScrewHardware ? [{ ...smallScrewHardware, quantity: effectiveDrawersCount * 8 }] : [])
-        ],
-        measurements
-      });
     }
 
     // =========================================================================
@@ -1291,11 +2018,14 @@ export class AssemblyGuideService {
       });
     }
 
-    // Asignar códigos acumulados estrictamente previos (pasos 1 .. stepNumber - 1)
+    // Asignar códigos acumulados estrictamente previos (pasos 1 .. stepNumber - 1) y resumen en pasos densos
     const cumulativePrior: string[] = [];
     for (const step of steps) {
       step.cumulativePriorPartCodes = [...cumulativePrior];
       cumulativePrior.push(...step.partCodes);
+      if (!step.pieceGroupsSummary && step.parts.length > 6) {
+        step.pieceGroupsSummary = this.buildPieceGroupsSummary(step.parts);
+      }
     }
 
     return steps;

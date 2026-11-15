@@ -1234,4 +1234,1399 @@ describe('AssemblyGuideService', () => {
     const totalGuideParts = guides.reduce((sum, g) => sum + g.pieces.length, 0);
     expect(totalGuideParts).toBe(mixedParts.length);
   });
+
+  it('debe consolidar torre compleja de 6 cajones (3×177mm + 3×160mm = 36 piezas de cajón, 49 en total) en 2 sub-ensambles ×3, Paso 4A/4B, 100% códigos y callouts agrupados', () => {
+    const groupId = 'grp_torre_closet';
+    const groupName = 'Torre Clóset 6 Cajones';
+
+    const buildDrawerParts = (opts: {
+      idPrefix: string;
+      drawerLabel: string;
+      centerX: number;
+      boxBottomY: number;
+      boxHeight: number;
+      frontHeight: number;
+      boxWidth: number;
+      slideLength: number;
+      boxT: number;
+      frontCenterZ: number;
+      useExplicitSubRoles?: boolean;
+    }): Part[] => {
+      const {
+        idPrefix,
+        drawerLabel,
+        centerX,
+        boxBottomY,
+        boxHeight,
+        frontHeight,
+        boxWidth,
+        slideLength,
+        boxT,
+        frontCenterZ,
+        useExplicitSubRoles
+      } = opts;
+      const innerW = boxWidth - 2 * boxT;
+      const depthCenter = frontCenterZ - 11 - slideLength / 2;
+      const boxCenterY = boxBottomY + 3 + boxHeight / 2;
+      const lateralRole = useExplicitSubRoles ? 'drawer_lateral' : 'drawer_box';
+      const bottomRole = useExplicitSubRoles ? 'drawer_bottom' : 'drawer_box';
+
+      return [
+        {
+          id: `${idPrefix}_fondo`,
+          name: `Fondo MDF (${drawerLabel})`,
+          groupId,
+          groupName,
+          length: boxWidth,
+          width: slideLength,
+          thickness: 3,
+          quantity: 1,
+          materialId: 'mat_mdf',
+          materialName: 'MDF Durolac Blanco 3mm',
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX,
+          posY: boxBottomY + 1.5,
+          posZ: depthCenter,
+          orientation: 'horizontal',
+          componentRole: bottomRole
+        },
+        {
+          id: `${idPrefix}_lat_izq`,
+          name: `Lateral Izq (${drawerLabel})`,
+          groupId,
+          groupName,
+          length: slideLength,
+          width: boxHeight,
+          thickness: boxT,
+          quantity: 1,
+          materialId: 'mat_15',
+          materialName: 'Melamina Roble 15mm',
+          grain: 'length',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX - boxWidth / 2 + boxT / 2,
+          posY: boxCenterY,
+          posZ: depthCenter,
+          orientation: 'vertical_yz',
+          componentRole: lateralRole
+        },
+        {
+          id: `${idPrefix}_lat_der`,
+          name: `Lateral Der (${drawerLabel})`,
+          groupId,
+          groupName,
+          length: slideLength,
+          width: boxHeight,
+          thickness: boxT,
+          quantity: 1,
+          materialId: 'mat_15',
+          materialName: 'Melamina Roble 15mm',
+          grain: 'length',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX + boxWidth / 2 - boxT / 2,
+          posY: boxCenterY,
+          posZ: depthCenter,
+          orientation: 'vertical_yz',
+          componentRole: lateralRole
+        },
+        {
+          id: `${idPrefix}_contrafrente`,
+          name: `Contra-frente (${drawerLabel})`,
+          groupId,
+          groupName,
+          length: innerW,
+          width: boxHeight,
+          thickness: boxT,
+          quantity: 1,
+          materialId: 'mat_15',
+          materialName: 'Melamina Roble 15mm',
+          grain: 'length',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX,
+          posY: boxCenterY,
+          posZ: frontCenterZ - 11 - boxT / 2,
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_box'
+        },
+        {
+          id: `${idPrefix}_trasera`,
+          name: `Trasera (${drawerLabel})`,
+          groupId,
+          groupName,
+          length: innerW,
+          width: boxHeight,
+          thickness: boxT,
+          quantity: 1,
+          materialId: 'mat_15',
+          materialName: 'Melamina Roble 15mm',
+          grain: 'length',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX,
+          posY: boxCenterY,
+          posZ: frontCenterZ - 11 - slideLength + boxT / 2,
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_box'
+        },
+        {
+          id: `${idPrefix}_frente`,
+          name: `Frente Vista (${drawerLabel})`,
+          groupId,
+          groupName,
+          length: 596,
+          width: frontHeight,
+          thickness: 18,
+          quantity: 1,
+          materialId: 'mat_18',
+          materialName: 'Melamina Blanca 18mm',
+          grain: 'length',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX: centerX,
+          posY: boxBottomY + frontHeight / 2,
+          posZ: frontCenterZ,
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_front'
+        }
+      ];
+    };
+
+    // 12 piezas de estructura + fondo + repisas + 1 puerta + 36 piezas de cajón = 49 piezas totales
+    const carcassAndInteriorParts: Part[] = [
+      {
+        id: 't_lat_izq',
+        name: 'Lateral Izquierdo',
+        groupId,
+        groupName,
+        length: 2100,
+        width: 550,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'side_left',
+        posX: 9,
+        posY: 1050,
+        posZ: 275,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 't_lat_der',
+        name: 'Lateral Derecho',
+        groupId,
+        groupName,
+        length: 2100,
+        width: 550,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'side_right',
+        posX: 591,
+        posY: 1050,
+        posZ: 275,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 't_piso',
+        name: 'Piso Inferior',
+        groupId,
+        groupName,
+        length: 564,
+        width: 550,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'bottom',
+        posX: 300,
+        posY: 79,
+        posZ: 275,
+        orientation: 'horizontal'
+      },
+      {
+        id: 't_zocalo',
+        name: 'Zócalo Frontal',
+        groupId,
+        groupName,
+        length: 564,
+        width: 70,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'plinth',
+        posX: 300,
+        posY: 35,
+        posZ: 510,
+        orientation: 'vertical_xy'
+      },
+      {
+        id: 't_techo',
+        name: 'Techo Superior',
+        groupId,
+        groupName,
+        length: 564,
+        width: 550,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'top',
+        posX: 300,
+        posY: 2091,
+        posZ: 275,
+        orientation: 'horizontal'
+      },
+      {
+        id: 't_amarre',
+        name: 'Amarre Trasero Superior',
+        groupId,
+        groupName,
+        length: 564,
+        width: 80,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'tie',
+        posX: 300,
+        posY: 2040,
+        posZ: 15,
+        orientation: 'vertical_xy'
+      },
+      {
+        id: 't_fondo',
+        name: 'Fondo Trasero MDF',
+        groupId,
+        groupName,
+        length: 590,
+        width: 2020,
+        thickness: 3,
+        quantity: 1,
+        materialId: 'mat_mdf',
+        materialName: 'MDF Durolac Blanco 3mm',
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'back',
+        posX: 300,
+        posY: 1080,
+        posZ: 1.5,
+        orientation: 'vertical_xy'
+      },
+      {
+        id: 't_divisor',
+        name: 'Divisor Vertical Superior',
+        groupId,
+        groupName,
+        length: 550,
+        width: 530,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'divider',
+        posX: 300,
+        posY: 1800,
+        posZ: 275,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 't_repisa_1',
+        name: 'Repisa 1',
+        groupId,
+        groupName,
+        length: 564,
+        width: 520,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'shelf',
+        posX: 300,
+        posY: 750,
+        posZ: 275,
+        orientation: 'horizontal'
+      },
+      {
+        id: 't_repisa_2',
+        name: 'Repisa 2',
+        groupId,
+        groupName,
+        length: 564,
+        width: 520,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'shelf',
+        posX: 300,
+        posY: 1410,
+        posZ: 275,
+        orientation: 'horizontal'
+      },
+      {
+        id: 't_repisa_3',
+        name: 'Repisa 3',
+        groupId,
+        groupName,
+        length: 564,
+        width: 520,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'shelf',
+        posX: 300,
+        posY: 1620,
+        posZ: 275,
+        orientation: 'horizontal'
+      },
+      {
+        id: 't_repisa_4',
+        name: 'Repisa 4',
+        groupId,
+        groupName,
+        length: 564,
+        width: 520,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina Blanca 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'shelf',
+        posX: 300,
+        posY: 1830,
+        posZ: 275,
+        orientation: 'horizontal'
+      }
+    ];
+
+    // Grupo inferior: 3 cajones de 177mm nombrados (Cajón 1), (Cajón 2), (Cajón 3)
+    const lowerDrawers = [0, 1, 2].flatMap(i =>
+      buildDrawerParts({
+        idPrefix: `low_${i + 1}`,
+        drawerLabel: `Cajón ${i + 1}`,
+        centerX: 300,
+        boxBottomY: 95 + i * 218,
+        boxHeight: 177,
+        frontHeight: 212,
+        boxWidth: 544,
+        slideLength: 500,
+        boxT: 15,
+        frontCenterZ: 561
+      })
+    );
+
+    // Grupo superior: 3 cajones de 160mm TAMBIÉN nombrados (Cajón 1), (Cajón 2), (Cajón 3)
+    const upperDrawers = [0, 1, 2].flatMap(i =>
+      buildDrawerParts({
+        idPrefix: `up_${i + 1}`,
+        drawerLabel: `Cajón ${i + 1}`,
+        centerX: 300,
+        boxBottomY: 775 + i * 200,
+        boxHeight: 160,
+        frontHeight: 195,
+        boxWidth: 544,
+        slideLength: 500,
+        boxT: 15,
+        frontCenterZ: 561
+      })
+    );
+
+    const topDoor: Part = {
+      id: 't_puerta_sup',
+      name: 'Puerta Superior Torre',
+      groupId,
+      groupName,
+      length: 660,
+      width: 596,
+      thickness: 18,
+      quantity: 1,
+      materialId: 'mat_18',
+      materialName: 'Melamina Blanca 18mm',
+      grain: 'length',
+      edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+      componentRole: 'door',
+      posX: 300,
+      posY: 1760,
+      posZ: 561,
+      orientation: 'vertical_xy'
+    };
+
+    const allParts: Part[] = [...carcassAndInteriorParts, ...lowerDrawers, ...upperDrawers, topDoor];
+    expect(allParts.length).toBe(49);
+
+    const towerProject: Project = {
+      id: 'proj_tower_6_drawers',
+      name: 'Proyecto Torre 6 Cajones',
+      clientName: 'Taller',
+      date: '2026-11-15',
+      notes: '',
+      settings: {
+        sawKerf: 4,
+        trimMargin: 10,
+        thinEdgeThickness: 0.5,
+        thickEdgeThickness: 2.0,
+        thinEdgeCostPerMeter: 500,
+        thickEdgeCostPerMeter: 1200,
+        optimizationPreference: 'guillotine_length',
+        currency: 'COP'
+      },
+      materials: [
+        {
+          id: 'mat_18',
+          name: 'Melamina Blanca 18mm',
+          thickness: 18,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 150000,
+          hasGrain: false,
+          colorHex: '#ffffff'
+        },
+        {
+          id: 'mat_15',
+          name: 'Melamina Roble 15mm',
+          thickness: 15,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 140000,
+          hasGrain: true,
+          colorHex: '#d6b58d'
+        },
+        {
+          id: 'mat_mdf',
+          name: 'MDF Durolac Blanco 3mm',
+          thickness: 3,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 50000,
+          hasGrain: false,
+          colorHex: '#f8fafc'
+        }
+      ],
+      modules: [],
+      parts: allParts,
+      groups: [
+        {
+          id: groupId,
+          name: groupName,
+          type: 'assembly'
+        }
+      ],
+      hardware: [],
+      laborCost: 0,
+      laborType: 'percent',
+      profitMarginPercent: 20,
+      taxPercent: 19,
+      updatedAt: '2026-11-15T00:00:00.000Z'
+    };
+
+    const guides = service.generateGuidesForProject(towerProject);
+    expect(guides.length).toBe(1);
+
+    const guide = guides[0];
+    expect(guide.pieces.length).toBe(49);
+    expect(guide.pieces[0].code).toBe('P1');
+    expect(guide.pieces[48].code).toBe('P49');
+
+    // 1) 6 cajones físicos separados aunque el nombre repita (Cajón 1..3) dos veces
+    const drawerPieces = guide.pieces.filter(p => p.drawerClusterId);
+    expect(drawerPieces.length).toBe(36);
+    const uniqueClusters = new Set(drawerPieces.map(p => p.drawerClusterId));
+    expect(uniqueClusters.size).toBe(6);
+    for (let u = 1; u <= 6; u++) {
+      const unitPieces = drawerPieces.filter(p => p.drawerUnitIndex === u);
+      expect(unitPieces.length).toBe(6);
+    }
+
+    // 2) Exactamente 2 plantillas de sub-ensamble (3×177mm y 3×160mm)
+    expect(guide.drawerSubassemblies).toBeDefined();
+    expect(guide.drawerSubassemblies!.length).toBe(2);
+
+    const sub177 = guide.drawerSubassemblies!.find(s => s.boxHeight === 177);
+    const sub160 = guide.drawerSubassemblies!.find(s => s.boxHeight === 160);
+    expect(sub177).toBeDefined();
+    expect(sub160).toBeDefined();
+
+    expect(sub177!.repeatCount).toBe(3);
+    expect(sub177!.representativeParts.length).toBe(5);
+    expect(sub177!.representativeFront).toBeDefined();
+    expect(sub177!.allBoxPartCodes.length).toBe(15);
+    expect(sub177!.allFrontPartCodes.length).toBe(3);
+    expect(sub177!.allPartCodes.length).toBe(18);
+    expect(sub177!.railElevationsMm.length).toBe(3);
+    expect(sub177!.pieceGroupsSummary.length).toBe(5);
+    expect(sub177!.pieceGroupsSummary.every(g => g.quantity === 3)).toBe(true);
+
+    expect(sub160!.repeatCount).toBe(3);
+    expect(sub160!.representativeParts.length).toBe(5);
+    expect(sub160!.representativeFront).toBeDefined();
+    expect(sub160!.allBoxPartCodes.length).toBe(15);
+    expect(sub160!.allFrontPartCodes.length).toBe(3);
+    expect(sub160!.allPartCodes.length).toBe(18);
+    expect(sub160!.railElevationsMm.length).toBe(3);
+    expect(sub160!.pieceGroupsSummary.length).toBe(5);
+    expect(sub160!.pieceGroupsSummary.every(g => g.quantity === 3)).toBe(true);
+
+    // 3) Paso drawer_subassembly antes de drawers (carcass_mount)
+    const subIdx = guide.steps.findIndex(s => s.actionType === 'drawer_subassembly');
+    const mountIdx = guide.steps.findIndex(s => s.actionType === 'drawers');
+    expect(subIdx).toBeGreaterThan(-1);
+    expect(mountIdx).toBe(subIdx + 1);
+
+    const subStep = guide.steps[subIdx];
+    expect(subStep.renderMode).toBe('subassembly_zoom');
+    expect(subStep.parts.length).toBe(30);
+    expect(subStep.subassemblyData?.length).toBe(2);
+    expect(subStep.pieceGroupsSummary).toBeDefined();
+    const bottomSummary = subStep.pieceGroupsSummary!.find(g => g.label.includes('Fondo MDF'));
+    expect(bottomSummary).toBeDefined();
+    expect(bottomSummary!.quantity).toBe(6);
+    expect(bottomSummary!.codes.length).toBe(6);
+
+    const mountStep = guide.steps[mountIdx];
+    expect(mountStep.renderMode).toBe('carcass_mount');
+    expect(mountStep.parts.length).toBe(6);
+    expect(mountStep.compactCallouts?.length).toBe(6);
+    expect(mountStep.compactCallouts![0].label).toBe('Cajón 1');
+    expect(mountStep.compactCallouts![0].kind).toBe('drawer_unit');
+    expect(mountStep.compactCallouts![0].codes.length).toBe(6);
+    expect(mountStep.compactCallouts![0].sublabel).toMatch(/^P\d+–P\d+ · P\d+$/);
+    expect(mountStep.measurements?.length).toBe(6);
+    expect(mountStep.pieceGroupsSummary?.length).toBe(2);
+    expect(mountStep.pieceGroupsSummary!.every(g => g.quantity === 3)).toBe(true);
+    expect(mountStep.hardware.some(h => h.id === 'telescopic_slides' && h.quantity === 6)).toBe(true);
+    expect(mountStep.hardware.some(h => h.id === 'screw_hardware_15' && h.quantity === 48)).toBe(true);
+
+    // 4) Cobertura 100% disjunta P1..P49 y cumulativePriorPartCodes progresivo
+    const seenCodes = new Set<string>();
+    const expectedPrior: string[] = [];
+    for (const step of guide.steps) {
+      expect(step.cumulativePriorPartCodes).toEqual(expectedPrior);
+      for (const code of step.partCodes) {
+        expect(seenCodes.has(code)).toBe(false);
+        expect(step.cumulativePriorPartCodes).not.toContain(code);
+        seenCodes.add(code);
+      }
+      expectedPrior.push(...step.partCodes);
+    }
+    expect(seenCodes.size).toBe(49);
+    for (const piece of guide.pieces) {
+      expect(seenCodes.has(piece.code)).toBe(true);
+    }
+
+    // 5) explodedCalloutGroups consolida los 6 cajones + 13 piezas fuera de cajón = 19 callouts
+    expect(guide.explodedCalloutGroups).toBeDefined();
+    expect(guide.explodedCalloutGroups!.length).toBe(19);
+    const drawerCallouts = guide.explodedCalloutGroups!.filter(c => c.kind === 'drawer_unit');
+    const partCallouts = guide.explodedCalloutGroups!.filter(c => c.kind === 'part');
+    expect(drawerCallouts.length).toBe(6);
+    expect(partCallouts.length).toBe(13);
+
+    const calloutCoveredCodes = new Set(guide.explodedCalloutGroups!.flatMap(c => c.codes));
+    expect(calloutCoveredCodes.size).toBe(49);
+  });
+
+  it('debe separar cajones de dos columnas paralelas a la misma altura Y con nombres repetidos y agrupar dentro de tolerancia <= 3mm', () => {
+    const groupId = 'grp_double_tower';
+    const makeDrawerAt = (
+      prefix: string,
+      label: string,
+      cx: number,
+      bottomY: number,
+      boxH: number
+    ): Part[] => {
+      const boxW = 460;
+      const slideLen = 450;
+      const t = 15;
+      const innerW = boxW - 2 * t;
+      const cy = bottomY + 3 + boxH / 2;
+      return [
+        {
+          id: `${prefix}_bottom`,
+          name: `Fondo MDF (${label})`,
+          groupId,
+          length: boxW,
+          width: slideLen,
+          thickness: 3,
+          quantity: 1,
+          materialId: 'mat_mdf',
+          materialName: 'MDF 3mm',
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: cx,
+          posY: bottomY + 1.5,
+          posZ: 225,
+          orientation: 'horizontal',
+          componentRole: 'drawer_bottom'
+        },
+        {
+          id: `${prefix}_lat_l`,
+          name: `Lateral Izq (${label})`,
+          groupId,
+          length: slideLen,
+          width: boxH,
+          thickness: t,
+          quantity: 1,
+          materialId: 'mat_15',
+          materialName: 'Melamina 15mm',
+          grain: 'length',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: cx - boxW / 2 + t / 2,
+          posY: cy,
+          posZ: 225,
+          orientation: 'vertical_yz',
+          componentRole: 'drawer_lateral'
+        },
+        {
+          id: `${prefix}_lat_r`,
+          name: `Lateral Der (${label})`,
+          groupId,
+          length: slideLen,
+          width: boxH,
+          thickness: t,
+          quantity: 1,
+          materialId: 'mat_15',
+          materialName: 'Melamina 15mm',
+          grain: 'length',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: cx + boxW / 2 - t / 2,
+          posY: cy,
+          posZ: 225,
+          orientation: 'vertical_yz',
+          componentRole: 'drawer_lateral'
+        },
+        {
+          id: `${prefix}_cf`,
+          name: `Contra-frente (${label})`,
+          groupId,
+          length: innerW,
+          width: boxH,
+          thickness: t,
+          quantity: 1,
+          materialId: 'mat_15',
+          materialName: 'Melamina 15mm',
+          grain: 'length',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: cx,
+          posY: cy,
+          posZ: 442.5,
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_box'
+        },
+        {
+          id: `${prefix}_tr`,
+          name: `Trasera (${label})`,
+          groupId,
+          length: innerW,
+          width: boxH,
+          thickness: t,
+          quantity: 1,
+          materialId: 'mat_15',
+          materialName: 'Melamina 15mm',
+          grain: 'length',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: cx,
+          posY: cy,
+          posZ: 7.5,
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_box'
+        },
+        {
+          id: `${prefix}_fr`,
+          name: `Frente Vista (${label})`,
+          groupId,
+          length: 496,
+          width: 196,
+          thickness: 18,
+          quantity: 1,
+          materialId: 'mat_15',
+          materialName: 'Melamina 15mm',
+          grain: 'length',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX: cx,
+          posY: bottomY + 98,
+          posZ: 465,
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_front'
+        }
+      ];
+    };
+
+    const parts: Part[] = [
+      {
+        id: 'col_side_l',
+        name: 'Lateral Izquierdo',
+        groupId,
+        length: 900,
+        width: 500,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_15',
+        materialName: 'Melamina 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'side_left',
+        posX: 9,
+        posY: 450,
+        posZ: 250,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 'col_div',
+        name: 'Divisor Central',
+        groupId,
+        length: 864,
+        width: 500,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_15',
+        materialName: 'Melamina 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'divider',
+        posX: 520,
+        posY: 450,
+        posZ: 250,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 'col_side_r',
+        name: 'Lateral Derecho',
+        groupId,
+        length: 900,
+        width: 500,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_15',
+        materialName: 'Melamina 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'side_right',
+        posX: 1031,
+        posY: 450,
+        posZ: 250,
+        orientation: 'vertical_yz'
+      },
+      // Columna izquierda (cx = 264) y columna derecha (cx = 776) a la misma altura Y con diferencia de 2mm en boxHeight (160 vs 162)
+      ...makeDrawerAt('l1', 'Cajón 1', 264, 100, 160),
+      ...makeDrawerAt('l2', 'Cajón 2', 264, 320, 160),
+      ...makeDrawerAt('r1', 'Cajón 1', 776, 100, 162),
+      ...makeDrawerAt('r2', 'Cajón 2', 776, 320, 162)
+    ];
+
+    const project: Project = {
+      id: 'proj_double_col',
+      name: 'Módulo Doble Columna',
+      clientName: '',
+      date: '2026-11-15',
+      notes: '',
+      settings: {
+        sawKerf: 4,
+        trimMargin: 10,
+        thinEdgeThickness: 0.5,
+        thickEdgeThickness: 2.0,
+        thinEdgeCostPerMeter: 500,
+        thickEdgeCostPerMeter: 1200,
+        optimizationPreference: 'guillotine_length',
+        currency: 'COP'
+      },
+      materials: [
+        {
+          id: 'mat_15',
+          name: 'Melamina 15mm',
+          thickness: 15,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 140000,
+          hasGrain: false,
+          colorHex: '#ffffff'
+        },
+        {
+          id: 'mat_mdf',
+          name: 'MDF 3mm',
+          thickness: 3,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 50000,
+          hasGrain: false,
+          colorHex: '#f8fafc'
+        }
+      ],
+      modules: [],
+      parts,
+      groups: [{ id: groupId, name: 'Doble Columna', type: 'assembly' }],
+      hardware: [],
+      laborCost: 0,
+      laborType: 'percent',
+      profitMarginPercent: 20,
+      taxPercent: 19,
+      updatedAt: '2026-11-15T00:00:00.000Z'
+    };
+
+    const guides = service.generateGuidesForProject(project);
+    expect(guides.length).toBe(1);
+    const guide = guides[0];
+
+    const unitSet = new Set(guide.pieces.filter(p => p.drawerClusterId).map(p => p.drawerClusterId));
+    expect(unitSet.size).toBe(4);
+
+    // Ordenados por cy ascendente y luego cx ascendente: l1 (1), r1 (2), l2 (3), r2 (4)
+    const pieceMap = new Map(guide.pieces.map(p => [p.partId, p]));
+    expect(pieceMap.get('l1_fr')!.drawerUnitIndex).toBe(1);
+    expect(pieceMap.get('r1_fr')!.drawerUnitIndex).toBe(2);
+    expect(pieceMap.get('l2_fr')!.drawerUnitIndex).toBe(3);
+    expect(pieceMap.get('r2_fr')!.drawerUnitIndex).toBe(4);
+
+    // Diferencia <= 3 mm (160 vs 162) se consolida en 1 plantilla ×4
+    expect(guide.drawerSubassemblies?.length).toBe(1);
+    expect(guide.drawerSubassemblies![0].repeatCount).toBe(4);
+  });
+
+  it('debe mantener un único paso full_progress para un módulo de 1 cajón con caja completa (<= 8 piezas de cajón)', () => {
+    const groupId = 'grp_single_drawer';
+    const singleDrawerParts: Part[] = [
+      {
+        id: 'sd_lat_l',
+        name: 'Lateral Izquierdo',
+        groupId,
+        length: 700,
+        width: 500,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'side_left',
+        posX: 9,
+        posY: 350,
+        posZ: 250,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 'sd_lat_r',
+        name: 'Lateral Derecho',
+        groupId,
+        length: 700,
+        width: 500,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'side_right',
+        posX: 591,
+        posY: 350,
+        posZ: 250,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 'sd_box_fondo',
+        name: 'Fondo MDF (Cajón 1)',
+        groupId,
+        length: 544,
+        width: 450,
+        thickness: 3,
+        quantity: 1,
+        materialId: 'mat_mdf',
+        materialName: 'MDF 3mm',
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'drawer_box',
+        posX: 300,
+        posY: 121.5,
+        posZ: 250,
+        orientation: 'horizontal'
+      },
+      {
+        id: 'sd_box_lat_l',
+        name: 'Lateral Izq (Cajón 1)',
+        groupId,
+        length: 450,
+        width: 140,
+        thickness: 15,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 15mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'drawer_box',
+        posX: 35.5,
+        posY: 193,
+        posZ: 250,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 'sd_box_lat_r',
+        name: 'Lateral Der (Cajón 1)',
+        groupId,
+        length: 450,
+        width: 140,
+        thickness: 15,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 15mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'drawer_box',
+        posX: 564.5,
+        posY: 193,
+        posZ: 250,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 'sd_box_cf',
+        name: 'Contra-frente (Cajón 1)',
+        groupId,
+        length: 514,
+        width: 140,
+        thickness: 15,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 15mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'drawer_box',
+        posX: 300,
+        posY: 193,
+        posZ: 467.5,
+        orientation: 'vertical_xy'
+      },
+      {
+        id: 'sd_box_tr',
+        name: 'Trasera (Cajón 1)',
+        groupId,
+        length: 514,
+        width: 140,
+        thickness: 15,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 15mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'drawer_box',
+        posX: 300,
+        posY: 193,
+        posZ: 32.5,
+        orientation: 'vertical_xy'
+      },
+      {
+        id: 'sd_front',
+        name: 'Frente Vista (Cajón 1)',
+        groupId,
+        length: 594,
+        width: 180,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 18mm',
+        grain: 'length',
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        componentRole: 'drawer_front',
+        posX: 300,
+        posY: 200,
+        posZ: 486,
+        orientation: 'vertical_xy'
+      }
+    ];
+
+    const project: Project = {
+      id: 'proj_single_drawer',
+      name: 'Módulo 1 Cajón',
+      clientName: '',
+      date: '2026-11-15',
+      notes: '',
+      settings: {
+        sawKerf: 4,
+        trimMargin: 10,
+        thinEdgeThickness: 0.5,
+        thickEdgeThickness: 2.0,
+        thinEdgeCostPerMeter: 500,
+        thickEdgeCostPerMeter: 1200,
+        optimizationPreference: 'guillotine_length',
+        currency: 'COP'
+      },
+      materials: [
+        {
+          id: 'mat_18',
+          name: 'Melamina 18mm',
+          thickness: 18,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 150000,
+          hasGrain: false,
+          colorHex: '#ffffff'
+        },
+        {
+          id: 'mat_mdf',
+          name: 'MDF 3mm',
+          thickness: 3,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 50000,
+          hasGrain: false,
+          colorHex: '#f8fafc'
+        }
+      ],
+      modules: [],
+      parts: singleDrawerParts,
+      groups: [{ id: groupId, name: 'Módulo Simple 1 Cajón', type: 'assembly' }],
+      hardware: [],
+      laborCost: 0,
+      laborType: 'percent',
+      profitMarginPercent: 20,
+      taxPercent: 19,
+      updatedAt: '2026-11-15T00:00:00.000Z'
+    };
+
+    const guides = service.generateGuidesForProject(project);
+    expect(guides.length).toBe(1);
+    const guide = guides[0];
+
+    expect(guide.steps.some(s => s.actionType === 'drawer_subassembly')).toBe(false);
+    const drawerSteps = guide.steps.filter(s => s.actionType === 'drawers');
+    expect(drawerSteps.length).toBe(1);
+    expect(drawerSteps[0].renderMode).toBe('full_progress');
+    expect(drawerSteps[0].parts.length).toBe(6);
+    expect(guide.explodedCalloutGroups).toBeUndefined();
+  });
+
+  it('debe generar sub-ensamble ×6 para una cajonera paramétrica real de 6 gavetas producida por CabinetGeneratorService', () => {
+    const mats: Material[] = [
+      {
+        id: 'mat_18',
+        name: 'Melamina Blanca 18mm',
+        thickness: 18,
+        sheetLength: 2440,
+        sheetWidth: 1830,
+        sheetCost: 150000,
+        hasGrain: false,
+        colorHex: '#ffffff'
+      },
+      {
+        id: 'mat_mdf',
+        name: 'MDF Durolac 3mm',
+        thickness: 3,
+        sheetLength: 2440,
+        sheetWidth: 1830,
+        sheetCost: 50000,
+        hasGrain: false,
+        colorHex: '#f8fafc'
+      }
+    ];
+
+    const cfg: ParametricCabinetConfig = {
+      code: 'CAJ600',
+      name: 'Cajonera Torre 6 Gavetas',
+      moduleType: 'drawer_unit',
+      category: 'drawers',
+      width: 600,
+      height: 1200,
+      depth: 500,
+      structureThickness: 18,
+      doorThickness: 18,
+      backThickness: 3,
+      backType: 'groove',
+      shelvesCount: 0,
+      doorOpening: 'none',
+      drawersCount: 6,
+      structureMaterialId: 'mat_18',
+      doorMaterialId: 'mat_18',
+      backMaterialId: 'mat_mdf',
+      handleType: 'bar_modern',
+      handleFinish: 'black',
+      facadeGap: 3,
+      hasPlinth: true,
+      plinthHeight: 70,
+      hasTopCover: true,
+      hasBackPanel: true,
+      posX: 0,
+      posY: 600,
+      posZ: 0
+    };
+
+    const generated = cabinetGen.generateParametricCabinet(cfg, mats);
+    const project: Project = {
+      id: 'proj_caj6_gen',
+      name: 'Cajonera Real',
+      clientName: '',
+      date: '2026-11-15',
+      notes: '',
+      settings: {
+        sawKerf: 4,
+        trimMargin: 10,
+        thinEdgeThickness: 0.5,
+        thickEdgeThickness: 2.0,
+        thinEdgeCostPerMeter: 500,
+        thickEdgeCostPerMeter: 1200,
+        optimizationPreference: 'guillotine_length',
+        currency: 'COP'
+      },
+      materials: mats,
+      modules: [generated.module],
+      parts: generated.parts,
+      groups: [generated.group],
+      hardware: [],
+      laborCost: 0,
+      laborType: 'percent',
+      profitMarginPercent: 20,
+      taxPercent: 19,
+      updatedAt: '2026-11-15T00:00:00.000Z'
+    };
+
+    const guides = service.generateGuidesForProject(project);
+    expect(guides.length).toBe(1);
+    const guide = guides[0];
+
+    expect(guide.drawerSubassemblies).toBeDefined();
+    expect(guide.drawerSubassemblies!.length).toBe(1);
+    expect(guide.drawerSubassemblies![0].repeatCount).toBe(6);
+    expect(guide.drawerSubassemblies![0].representativeParts.length).toBe(5);
+    expect(guide.drawerSubassemblies![0].allBoxPartCodes.length).toBe(30);
+    expect(guide.drawerSubassemblies![0].allFrontPartCodes.length).toBe(6);
+
+    const subStep = guide.steps.find(s => s.actionType === 'drawer_subassembly');
+    const mountStep = guide.steps.find(s => s.actionType === 'drawers');
+    expect(subStep).toBeDefined();
+    expect(mountStep).toBeDefined();
+    expect(subStep!.renderMode).toBe('subassembly_zoom');
+    expect(mountStep!.renderMode).toBe('carcass_mount');
+    expect(mountStep!.compactCallouts?.length).toBe(6);
+    expect(mountStep!.measurements?.length).toBe(6);
+
+    const seen = new Set<string>();
+    for (const step of guide.steps) {
+      for (const code of step.partCodes) {
+        expect(seen.has(code)).toBe(false);
+        seen.add(code);
+      }
+    }
+    expect(seen.size).toBe(guide.pieces.length);
+    expect(guide.explodedCalloutGroups).toBeDefined();
+    expect(guide.explodedCalloutGroups!.filter(c => c.kind === 'drawer_unit').length).toBe(6);
+  });
+
+  it('debe detectar y agrupar cajones internos sin frente (frontMountType none) usando fallback firstBoxCode en compactCallouts', () => {
+    const groupId = 'grp_closet_internal';
+    const makeInternalBox = (prefix: string, label: string, bottomY: number): Part[] => [
+      {
+        id: `${prefix}_fondo`,
+        name: `Fondo MDF (${label})`,
+        groupId,
+        length: 520,
+        width: 450,
+        thickness: 3,
+        quantity: 1,
+        materialId: 'mat_mdf',
+        materialName: 'MDF 3mm',
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX: 300,
+        posY: bottomY + 1.5,
+        posZ: 250,
+        orientation: 'horizontal',
+        componentRole: 'drawer_box'
+      },
+      {
+        id: `${prefix}_lat_l`,
+        name: `Lateral Izq (${label})`,
+        groupId,
+        length: 450,
+        width: 150,
+        thickness: 15,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 15mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: 47.5,
+        posY: bottomY + 78,
+        posZ: 250,
+        orientation: 'vertical_yz',
+        componentRole: 'drawer_box'
+      },
+      {
+        id: `${prefix}_lat_r`,
+        name: `Lateral Der (${label})`,
+        groupId,
+        length: 450,
+        width: 150,
+        thickness: 15,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 15mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: 552.5,
+        posY: bottomY + 78,
+        posZ: 250,
+        orientation: 'vertical_yz',
+        componentRole: 'drawer_box'
+      },
+      {
+        id: `${prefix}_cf`,
+        name: `Contra-frente (${label})`,
+        groupId,
+        length: 490,
+        width: 150,
+        thickness: 15,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 15mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: 300,
+        posY: bottomY + 78,
+        posZ: 467.5,
+        orientation: 'vertical_xy',
+        componentRole: 'drawer_box'
+      },
+      {
+        id: `${prefix}_tr`,
+        name: `Trasera (${label})`,
+        groupId,
+        length: 490,
+        width: 150,
+        thickness: 15,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 15mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: 300,
+        posY: bottomY + 78,
+        posZ: 32.5,
+        orientation: 'vertical_xy',
+        componentRole: 'drawer_box'
+      }
+    ];
+
+    const parts: Part[] = [
+      {
+        id: 'ci_lat_l',
+        name: 'Lateral Izquierdo',
+        groupId,
+        length: 1800,
+        width: 520,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'side_left',
+        posX: 9,
+        posY: 900,
+        posZ: 260,
+        orientation: 'vertical_yz'
+      },
+      {
+        id: 'ci_lat_r',
+        name: 'Lateral Derecho',
+        groupId,
+        length: 1800,
+        width: 520,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_18',
+        materialName: 'Melamina 18mm',
+        grain: 'length',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        componentRole: 'side_right',
+        posX: 591,
+        posY: 900,
+        posZ: 260,
+        orientation: 'vertical_yz'
+      },
+      ...makeInternalBox('int1', 'Cajón 1', 100),
+      ...makeInternalBox('int2', 'Cajón 2', 300),
+      ...makeInternalBox('int3', 'Cajón 3', 500)
+    ];
+
+    const project: Project = {
+      id: 'proj_internal_boxes',
+      name: 'Closet Gavetas Internas',
+      clientName: '',
+      date: '2026-11-15',
+      notes: '',
+      settings: {
+        sawKerf: 4,
+        trimMargin: 10,
+        thinEdgeThickness: 0.5,
+        thickEdgeThickness: 2.0,
+        thinEdgeCostPerMeter: 500,
+        thickEdgeCostPerMeter: 1200,
+        optimizationPreference: 'guillotine_length',
+        currency: 'COP'
+      },
+      materials: [
+        {
+          id: 'mat_18',
+          name: 'Melamina 18mm',
+          thickness: 18,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 150000,
+          hasGrain: false,
+          colorHex: '#ffffff'
+        },
+        {
+          id: 'mat_mdf',
+          name: 'MDF 3mm',
+          thickness: 3,
+          sheetLength: 2440,
+          sheetWidth: 1830,
+          sheetCost: 50000,
+          hasGrain: false,
+          colorHex: '#f8fafc'
+        }
+      ],
+      modules: [],
+      parts,
+      groups: [{ id: groupId, name: 'Closet Gavetas Internas', type: 'assembly' }],
+      hardware: [],
+      laborCost: 0,
+      laborType: 'percent',
+      profitMarginPercent: 20,
+      taxPercent: 19,
+      updatedAt: '2026-11-15T00:00:00.000Z'
+    };
+
+    const guides = service.generateGuidesForProject(project);
+    expect(guides.length).toBe(1);
+    const guide = guides[0];
+
+    expect(guide.drawerSubassemblies?.length).toBe(1);
+    expect(guide.drawerSubassemblies![0].repeatCount).toBe(3);
+
+    const mountStep = guide.steps.find(s => s.actionType === 'drawers');
+    expect(mountStep).toBeDefined();
+    expect(mountStep!.renderMode).toBe('carcass_mount');
+    expect(mountStep!.compactCallouts?.length).toBe(3);
+    expect(mountStep!.compactCallouts![0].primaryCode).toBe('P3');
+    expect(mountStep!.compactCallouts![0].sublabel).toBe('P3–P7');
+    expect(mountStep!.hardware.some(h => h.id === 'telescopic_slides' && h.quantity === 3)).toBe(true);
+  });
 });
