@@ -69,6 +69,7 @@ function findAngularOutputDir(rootDir) {
 const SEO_STATIC_FILES = [
   'robots.txt',
   'sitemap.xml',
+  'google3765f7e6094d13dd.html',
   'assets/og-preview.png',
   'favicon.ico',
   'site.webmanifest',

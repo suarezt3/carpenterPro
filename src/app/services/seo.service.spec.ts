@@ -155,6 +155,21 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
       );
       expect(service.resolveRobotsDirective('/', 'www.piezo3d.com')).toBe(ROBOTS_INDEX_DIRECTIVE);
     });
+
+    it('debe permitir indexación en www.piezo3d.com para rutas públicas y bloquear rutas privadas', () => {
+      const publicPaths = ['/', '/auth', '/terms', '/privacy', '/refunds'];
+      const privatePaths = ['/studio', '/studio/designer', '/admin'];
+
+      for (const path of publicPaths) {
+        expect(service.resolveRobotsDirective(path, 'www.piezo3d.com')).toBe(ROBOTS_INDEX_DIRECTIVE);
+      }
+
+      for (const path of privatePaths) {
+        expect(service.resolveRobotsDirective(path, 'www.piezo3d.com')).toBe(
+          ROBOTS_NOINDEX_DIRECTIVE
+        );
+      }
+    });
   });
 
   describe('Normalización de rutas y políticas de contenido', () => {
@@ -232,6 +247,19 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
 
       service.updateSeoForUrl('/terms', 'localhost');
       expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_NOINDEX_DIRECTIVE);
+    });
+
+    it('debe mantener el enlace canonical y og:url apuntando a https://piezo3d.com cuando se accede desde www.piezo3d.com', () => {
+      service.updateSeoForUrl('/terms', 'www.piezo3d.com');
+
+      expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_INDEX_DIRECTIVE);
+      expect(doc.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.getAttribute('href')).toBe(
+        'https://piezo3d.com/terms'
+      );
+      expect(getMetaContent('meta[property="og:url"]')).toBe('https://piezo3d.com/terms');
+      expect(getMetaContent('meta[property="og:image"]')).toBe(
+        'https://piezo3d.com/assets/og-preview.png'
+      );
     });
 
     it('debe reutilizar el link[rel="canonical"] existente sin duplicar elementos en document.head', () => {
