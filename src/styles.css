@@ -118,6 +118,11 @@ input::placeholder, textarea::placeholder {
     margin: 8mm;
   }
 
+  @page labels-page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
   *,
   *::before,
   *::after {
@@ -141,10 +146,13 @@ input::placeholder, textarea::placeholder {
 
   /* Desbloquear todos los wrappers de layout de la aplicación */
   app-root > div,
+  app-studio-workspace,
+  app-studio-workspace > div,
   app-header,
   main,
   main > div,
-  main > div > div {
+  main > div > div,
+  app-labels-view {
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
@@ -158,9 +166,86 @@ input::placeholder, textarea::placeholder {
   nav,
   footer,
   app-confirm-dialog,
+  app-early-access-modal,
+  app-upgrade-plan-modal,
   .rta-print-iframe,
   .print\:hidden {
     display: none !important;
+  }
+
+  /* Flujo multipágina A4 portrait para la vista de Etiquetas (sin afectar Optimizador ni Presupuesto) */
+  html:has(> body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open)),
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) {
+    page: labels-page;
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) app-root,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) app-studio-workspace,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) app-studio-workspace > div,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) main,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) main > div,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) main > div > div,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) app-labels-view,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) app-labels-view > div {
+    page: labels-page;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) app-header,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) header,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) nav,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) footer,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) app-upgrade-plan-modal,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) router-outlet,
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) .print\:hidden {
+    display: none !important;
+  }
+
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) #labels-print-grid {
+    page: labels-page;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body.labels-printing:not(.assembly-guide-open):not(.technical-sheet-open) #labels-print-grid > .label-sticker-card {
+    width: calc(50% - 4px) !important;
+    flex: 0 0 calc(50% - 4px) !important;
+    box-sizing: border-box !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 6px 8px !important;
+    border: 1.5px solid #18181b !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* Desbloquear flujo multi-página cuando la Guía de Armado RTA se imprime directamente */

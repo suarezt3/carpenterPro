@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HardwareCatalogService } from './hardware-catalog.service';
+import { ProjectStorageService } from './project-storage.service';
 import { Part, ApplianceItem, Material, isStoneMaterial } from '../models/melamine.models';
 
 describe('Budget & Hardware Calculation (Fase 5 - Cómputo de Herrajes y Presupuesto COP)', () => {
@@ -7,7 +8,7 @@ describe('Budget & Hardware Calculation (Fase 5 - Cómputo de Herrajes y Presupu
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [HardwareCatalogService]
+      providers: [HardwareCatalogService, ProjectStorageService]
     });
     hardwareService = TestBed.inject(HardwareCatalogService);
   });
@@ -353,6 +354,176 @@ describe('Budget & Hardware Calculation (Fase 5 - Cómputo de Herrajes y Presupu
 
       expect(subtotal).toBeGreaterThan(700000);
       expect(subtotal).toBeLessThan(800000);
+    });
+  });
+
+  describe('4. Inclusión / Exclusión de Mesones de Piedra (Part.includeInBudget) y Sincronización', () => {
+    let projectService: ProjectStorageService;
+
+    const stoneMat: Material = {
+      id: 'mat_stone_calc_test',
+      name: 'Cuarzo Carrara Calc (Mesón)',
+      colorHex: '#f8fafc',
+      thickness: 30,
+      category: 'countertop',
+      family: 'stone_countertop',
+      textureType: 'stone',
+      sheetLength: 3000,
+      sheetWidth: 1600,
+      sheetCost: 1440000, // 4.8 m² -> $300.000 COP / m²
+      hasGrain: false
+    };
+
+    beforeEach(() => {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.clear();
+      }
+      projectService = TestBed.inject(ProjectStorageService);
+      projectService.updateProject(p => ({
+        ...p,
+        materials: [stoneMat],
+        groups: [
+          {
+            id: 'grp_stone_calc',
+            name: 'Mesón Piedra Calc',
+            type: 'assembly',
+            isCountertop: true,
+            facingDirection: 'front'
+          }
+        ],
+        parts: [
+          {
+            id: 'calc_stone_main',
+            name: 'Mesón Principal de Cocina',
+            groupId: 'grp_stone_calc',
+            groupName: 'Mesón Piedra Calc',
+            length: 2000,
+            width: 600,
+            thickness: 30,
+            quantity: 1,
+            materialId: stoneMat.id,
+            materialName: stoneMat.name,
+            colorHex: stoneMat.colorHex,
+            grain: 'none',
+            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+            posX: 0,
+            posY: 875,
+            posZ: 0,
+            orientation: 'horizontal',
+            componentRole: 'countertop',
+            excludeFromCutlist: true
+          },
+          {
+            id: 'calc_stone_splash',
+            name: 'Zócalo / Salpicadero Posterior Mesón',
+            groupId: 'grp_stone_calc',
+            groupName: 'Mesón Piedra Calc',
+            length: 2000,
+            width: 100,
+            thickness: 20,
+            quantity: 1,
+            materialId: stoneMat.id,
+            materialName: stoneMat.name,
+            colorHex: stoneMat.colorHex,
+            grain: 'none',
+            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+            posX: 0,
+            posY: 940.5,
+            posZ: -290,
+            orientation: 'vertical_xy',
+            componentRole: 'backsplash',
+            excludeFromCutlist: true
+          }
+        ]
+      }), false);
+    });
+
+    afterEach(() => {
+      projectService.flushPendingStorageSave();
+      if (typeof localStorage !== 'undefined') {
+        localStorage.clear();
+      }
+    });
+
+    it('debe considerar incluido cualquier mesón cuando includeInBudget es undefined o true', () => {
+      const parts = projectService.partsList();
+      expect(parts.every(pt => pt.includeInBudget !== false)).toBe(true);
+    });
+
+    it('updateMultipleParts debe persistir includeInBudget y syncCountertopBacksplashes debe preservarlo', () => {
+      projectService.updateMultipleParts([
+        { partId: 'calc_stone_splash', updates: { includeInBudget: false } }
+      ]);
+
+      let splash = projectService.partsList().find(pt => pt.id === 'calc_stone_splash');
+      let main = projectService.partsList().find(pt => pt.id === 'calc_stone_main');
+      expect(splash?.includeInBudget).toBe(false);
+      expect(main?.includeInBudget).toBeUndefined();
+
+      // Al actualizar la geometría del mesón principal, syncCountertopBacksplashes sincroniza el salpicadero
+      // y debe preservar su bandera includeInBudget: false
+      projectService.updateMultipleParts([
+        { partId: 'calc_stone_main', updates: { length: 2400, includeInBudget: false } }
+      ]);
+
+      splash = projectService.partsList().find(pt => pt.id === 'calc_stone_splash');
+      main = projectService.partsList().find(pt => pt.id === 'calc_stone_main');
+      expect(splash?.length).toBe(2400);
+      expect(splash?.includeInBudget).toBe(false);
+      expect(main?.includeInBudget).toBe(false);
+
+      // Re-habilitar ambos
+      projectService.updateMultipleParts([
+        { partId: 'calc_stone_main', updates: { includeInBudget: true } },
+        { partId: 'calc_stone_splash', updates: { includeInBudget: true } }
+      ]);
+
+      splash = projectService.partsList().find(pt => pt.id === 'calc_stone_splash');
+      main = projectService.partsList().find(pt => pt.id === 'calc_stone_main');
+      expect(main?.includeInBudget).toBe(true);
+      expect(splash?.includeInBudget).toBe(true);
+    });
+
+    it('debe sumar únicamente los mesones con includeInBudget !== false en área y costo total', () => {
+      const sheetAreaM2 = Math.max(1, (stoneMat.sheetLength * stoneMat.sheetWidth) / 1_000_000);
+      const costPerM2 = Math.round(stoneMat.sheetCost / sheetAreaM2);
+
+      const computeTotals = (parts: Part[]) => {
+        const items = parts
+          .filter(p => isStoneMaterial(stoneMat) && p.materialId === stoneMat.id)
+          .map(p => {
+            const areaM2 = Math.round(((p.length * p.width * (p.quantity || 1)) / 1_000_000) * 100) / 100;
+            const subtotal = Math.round(areaM2 * costPerM2);
+            return { part: p, areaM2, subtotal, included: p.includeInBudget !== false };
+          });
+        const included = items.filter(it => it.included);
+        return {
+          itemsCount: items.length,
+          totalStoneCost: included.reduce((acc, it) => acc + it.subtotal, 0),
+          totalAreaM2: Math.round(included.reduce((acc, it) => acc + it.areaM2, 0) * 100) / 100
+        };
+      };
+
+      const initial = computeTotals(projectService.partsList());
+      expect(initial.itemsCount).toBe(2);
+      expect(initial.totalAreaM2).toBe(1.4);
+      expect(initial.totalStoneCost).toBe(420000);
+
+      projectService.updateMultipleParts([
+        { partId: 'calc_stone_splash', updates: { includeInBudget: false } }
+      ]);
+
+      const withoutSplash = computeTotals(projectService.partsList());
+      expect(withoutSplash.itemsCount).toBe(2);
+      expect(withoutSplash.totalAreaM2).toBe(1.2);
+      expect(withoutSplash.totalStoneCost).toBe(360000);
+
+      projectService.updateMultipleParts([
+        { partId: 'calc_stone_splash', updates: { includeInBudget: true } }
+      ]);
+
+      const restored = computeTotals(projectService.partsList());
+      expect(restored).toEqual(initial);
     });
   });
 });

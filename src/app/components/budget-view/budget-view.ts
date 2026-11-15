@@ -22,10 +22,21 @@ import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { ThemeService } from '../../services/theme.service';
-import { HardwareItem, Material, isStoneMaterial } from '../../models/melamine.models';
+import { HardwareItem, Material, Part, isStoneMaterial } from '../../models/melamine.models';
 import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { I18nService } from '../../services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+
+export interface StoneCountertopBudgetItem {
+  part: Part;
+  materialName: string;
+  colorHex: string;
+  areaM2: number;
+  linearMeters: number;
+  costPerM2: number;
+  subtotal: number;
+  included: boolean;
+}
 
 /**
  * Vista de Presupuesto Financiero y Cotización Comercial de Carpintería.
@@ -34,6 +45,7 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
  */
 @Component({
   selector: 'app-budget-view',
+  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, HugeiconsIconComponent, TranslatePipe],
   templateUrl: './budget-view.html',
@@ -203,8 +215,14 @@ export class BudgetViewComponent implements OnInit {
   /**
    * Desglose de mesones y superficies de Piedra / Cuarzo / Granito / Mármol cotizados por m²
    * (excluidos del optimizador de corte de melamina).
+   * Mantiene todas las filas visibles para permitir alternar su inclusión,
+   * sumando únicamente las piezas marcadas como incluidas.
    */
-  readonly stoneCountertopsBreakdown = computed(() => {
+  readonly stoneCountertopsBreakdown = computed<{
+    items: StoneCountertopBudgetItem[];
+    totalStoneCost: number;
+    totalAreaM2: number;
+  }>(() => {
     const parts = this.projectService.partsList();
     const mats = this.materials();
     const stoneParts = parts.filter(p => {
@@ -212,7 +230,7 @@ export class BudgetViewComponent implements OnInit {
       return isStoneMaterial(m);
     });
 
-    const items = stoneParts.map(part => {
+    const items: StoneCountertopBudgetItem[] = stoneParts.map(part => {
       const mat = mats.find(m => m.id === part.materialId) ||
                   MELAMINE_MATERIALS_CATALOG.find(m => m.id === part.materialId || m.name.toLowerCase() === (part.materialName || '').toLowerCase());
       const sheetAreaM2 = Math.max(1, ((mat?.sheetLength || 3000) * (mat?.sheetWidth || 1600)) / 1_000_000);
@@ -227,13 +245,22 @@ export class BudgetViewComponent implements OnInit {
         areaM2,
         linearMeters,
         costPerM2,
-        subtotal
+        subtotal,
+        included: part.includeInBudget !== false
       };
     });
 
-    const totalStoneCost = items.reduce((acc, it) => acc + it.subtotal, 0);
-    const totalAreaM2 = Math.round(items.reduce((acc, it) => acc + it.areaM2, 0) * 100) / 100;
+    const includedItems = items.filter(it => it.included);
+    const totalStoneCost = includedItems.reduce((acc, it) => acc + it.subtotal, 0);
+    const totalAreaM2 = Math.round(includedItems.reduce((acc, it) => acc + it.areaM2, 0) * 100) / 100;
     return { items, totalStoneCost, totalAreaM2 };
+  });
+
+  /**
+   * Mesones y superficies de piedra activos para incluir en la vista de cotización PDF.
+   */
+  readonly includedStoneItems = computed<StoneCountertopBudgetItem[]>(() => {
+    return this.stoneCountertopsBreakdown().items.filter(it => it.included);
   });
 
   /**
@@ -312,6 +339,11 @@ export class BudgetViewComponent implements OnInit {
     this.toggleApplianceBudget(id, !!target?.checked);
   }
 
+  onStoneCountertopIncludeChange(partId: string, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.toggleStoneCountertopBudget(partId, !!target?.checked);
+  }
+
   onAppliancePriceChange(id: string, event: Event) {
     const target = event.target as HTMLInputElement | null;
     this.updateApplianceBudgetPrice(id, Number(target?.value) || 0);
@@ -346,6 +378,10 @@ export class BudgetViewComponent implements OnInit {
 
   toggleApplianceBudget(id: string, include: boolean) {
     this.projectService.updateAppliance(id, { includeInBudget: include });
+  }
+
+  toggleStoneCountertopBudget(partId: string, include: boolean): void {
+    this.projectService.updateMultipleParts([{ partId, updates: { includeInBudget: include } }]);
   }
 
   updateLabor(cost: number, type: 'percent' | 'fixed') {

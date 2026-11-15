@@ -303,6 +303,7 @@ export interface Part {
   contourPoints?: { x: number; y: number }[]; // Puntos del polígono 2D en mm para piezas de forma libre
   cornerCutConfig?: PartCornerCutConfig; // Configuración paramétrica de chaflanes, diagonales o destajes en L
   excludeFromCutlist?: boolean; // Si es true (ej. mesones de piedra/cuarzo/mármol), se excluye del optimizador de melamina y se cotiza por m²
+  includeInBudget?: boolean; // Si es false, la pieza (ej. mesón/salpicadero de piedra) se excluye del presupuesto y cotización PDF
   isLocked?: boolean;
   hasCustomName?: boolean;
 }
