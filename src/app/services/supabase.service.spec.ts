@@ -515,10 +515,19 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
     });
 
     describe('Superadministrador y CMS Global (platform_settings y platform_feedback)', () => {
-      it('SUPABASE_SUPERADMIN_SQL_SETUP y SUPABASE_WOMPI_PAYMENTS_SQL_SETUP deben incluir usd_to_cop_rate, payment_transactions con RLS e índice único en invoices', async () => {
+      it('SUPABASE_SUPERADMIN_SQL_SETUP y SUPABASE_WOMPI_PAYMENTS_SQL_SETUP deben incluir columnas *_cop oficiales, usd_to_cop_rate DEFAULT 3304, payment_transactions con RLS e índice único en invoices', async () => {
         const { SUPABASE_SUPERADMIN_SQL_SETUP, SUPABASE_WOMPI_PAYMENTS_SQL_SETUP } = await import('./supabase.service');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.platform_settings');
-        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('pro_monthly_cop BIGINT NOT NULL DEFAULT 49900');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('pro_annual_monthly_cop BIGINT NOT NULL DEFAULT 39920');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('pro_annual_total_cop BIGINT NOT NULL DEFAULT 479040');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('industrial_monthly_cop BIGINT NOT NULL DEFAULT 95900');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('industrial_annual_monthly_cop BIGINT NOT NULL DEFAULT 76720');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('industrial_annual_total_cop BIGINT NOT NULL DEFAULT 920640');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 3304');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain(
+          'UPDATE public.platform_settings SET usd_to_cop_rate = 3304 WHERE id = 1 AND usd_to_cop_rate = 4250;'
+        );
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.platform_feedback');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE OR REPLACE FUNCTION public.is_super_admin()');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain(
@@ -536,7 +545,16 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('USING ((select auth.uid()) = user_id OR public.is_super_admin());');
         expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('idx_subscription_invoices_wompi_tx_unique');
         expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('wompi_transaction_id TEXT');
-        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('ADD COLUMN IF NOT EXISTS pro_monthly_cop BIGINT NOT NULL DEFAULT 49900');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('ADD COLUMN IF NOT EXISTS pro_annual_monthly_cop BIGINT NOT NULL DEFAULT 39920');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('ADD COLUMN IF NOT EXISTS pro_annual_total_cop BIGINT NOT NULL DEFAULT 479040');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('ADD COLUMN IF NOT EXISTS industrial_monthly_cop BIGINT NOT NULL DEFAULT 95900');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('ADD COLUMN IF NOT EXISTS industrial_annual_monthly_cop BIGINT NOT NULL DEFAULT 76720');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('ADD COLUMN IF NOT EXISTS industrial_annual_total_cop BIGINT NOT NULL DEFAULT 920640');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 3304');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain(
+          'UPDATE public.platform_settings SET usd_to_cop_rate = 3304 WHERE id = 1 AND usd_to_cop_rate = 4250;'
+        );
       });
 
       it('buildFallbackProfile debe asignar rol super_admin y plan industrial a ambas cuentas propietarias', () => {
@@ -652,33 +670,54 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         }
       });
 
-      it('loadPlatformSettings debe retornar piezo3dstudio@gmail.com y usd_to_cop_rate=4250 por defecto y normalizar valores nulos/inválidos', async () => {
-        expect(DEFAULT_PLATFORM_SETTINGS.usd_to_cop_rate).toBe(4250);
+      it('loadPlatformSettings debe retornar piezo3dstudio@gmail.com, precios base COP y usd_to_cop_rate=3304 por defecto y normalizar valores nulos/inválidos', async () => {
+        expect(DEFAULT_PLATFORM_SETTINGS.pro_monthly_cop).toBe(49900);
+        expect(DEFAULT_PLATFORM_SETTINGS.pro_annual_monthly_cop).toBe(39920);
+        expect(DEFAULT_PLATFORM_SETTINGS.pro_annual_total_cop).toBe(479040);
+        expect(DEFAULT_PLATFORM_SETTINGS.industrial_monthly_cop).toBe(95900);
+        expect(DEFAULT_PLATFORM_SETTINGS.industrial_annual_monthly_cop).toBe(76720);
+        expect(DEFAULT_PLATFORM_SETTINGS.industrial_annual_total_cop).toBe(920640);
+        expect(DEFAULT_PLATFORM_SETTINGS.usd_to_cop_rate).toBe(3304);
         expect(service.platformSettings().support_email).toBe('piezo3dstudio@gmail.com');
-        expect(service.platformSettings().usd_to_cop_rate).toBe(4250);
+        expect(service.platformSettings().usd_to_cop_rate).toBe(3304);
+        expect(service.platformSettings().pro_monthly_cop).toBe(49900);
+        expect(service.platformSettings().industrial_annual_total_cop).toBe(920640);
 
         const settings = await service.loadPlatformSettings();
         expect(settings.id).toBe(1);
         expect(settings.app_version).toBe('v3.0.0');
         expect(settings.support_email).toBe('piezo3dstudio@gmail.com');
-        expect(settings.usd_to_cop_rate).toBe(4250);
+        expect(settings.usd_to_cop_rate).toBe(3304);
+        expect(settings.pro_monthly_cop).toBe(49900);
+        expect(settings.pro_annual_monthly_cop).toBe(39920);
+        expect(settings.pro_annual_total_cop).toBe(479040);
+        expect(settings.industrial_monthly_cop).toBe(95900);
+        expect(settings.industrial_annual_monthly_cop).toBe(76720);
+        expect(settings.industrial_annual_total_cop).toBe(920640);
         expect(service.platformSettings().pro_monthly_usd).toBe(15);
 
-        // Si Supabase devuelve el correo legado y tasa válida en platform_settings, normaliza correo y conserva tasa
+        // Si Supabase devuelve el correo legado, precios COP personalizados y tasa válida en platform_settings, normaliza correo y conserva valores
         const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
           ok: true,
-          json: async () => [{ id: 1, support_email: 'eydersuarez900@gmail.com', usd_to_cop_rate: 4320, app_version: 'v3.0.0' }]
+          json: async () => [{
+            id: 1,
+            support_email: 'eydersuarez900@gmail.com',
+            pro_monthly_cop: 52000,
+            usd_to_cop_rate: 3680,
+            app_version: 'v3.0.0'
+          }]
         } as unknown as Response);
         try {
           const normalizedLegacy = await service.loadPlatformSettings();
           expect(normalizedLegacy.support_email).toBe('piezo3dstudio@gmail.com');
-          expect(normalizedLegacy.usd_to_cop_rate).toBe(4320);
-          expect(service.platformSettings().usd_to_cop_rate).toBe(4320);
+          expect(normalizedLegacy.pro_monthly_cop).toBe(52000);
+          expect(normalizedLegacy.usd_to_cop_rate).toBe(3680);
+          expect(service.platformSettings().usd_to_cop_rate).toBe(3680);
         } finally {
           fetchSpy.mockRestore();
         }
 
-        // Si Supabase devuelve usd_to_cop_rate nulo o inválido, debe aplicar fallback seguro 4250
+        // Si Supabase devuelve usd_to_cop_rate nulo o inválido, debe aplicar fallback seguro 3304
         const fetchInvalidRateSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
           ok: true,
           json: async () => [{ id: 1, support_email: 'soporte@piezo3d.com', usd_to_cop_rate: null, app_version: 'v3.0.0' }]
@@ -686,13 +725,13 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         try {
           const customSettings = await service.loadPlatformSettings();
           expect(customSettings.support_email).toBe('soporte@piezo3d.com');
-          expect(customSettings.usd_to_cop_rate).toBe(4250);
+          expect(customSettings.usd_to_cop_rate).toBe(3304);
         } finally {
           fetchInvalidRateSpy.mockRestore();
         }
       });
 
-      it('updatePlatformSettings y adminUpdatePlatformSettings deben actualizar la señal platformSettings incluyendo usd_to_cop_rate', async () => {
+      it('updatePlatformSettings y adminUpdatePlatformSettings deben actualizar la señal platformSettings incluyendo precios *_cop y usd_to_cop_rate', async () => {
         const mockEq = vi.fn().mockResolvedValue({ error: null });
         const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
         const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
@@ -700,14 +739,18 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
 
         const res = await service.adminUpdatePlatformSettings({
           pro_monthly_usd: 19,
-          usd_to_cop_rate: 4400,
+          pro_monthly_cop: 54900,
+          industrial_annual_total_cop: 950000,
+          usd_to_cop_rate: 3500,
           announcement_enabled: true,
           announcement_text: 'Oferta Especial'
         });
 
         expect(res.success).toBe(true);
         expect(service.platformSettings().pro_monthly_usd).toBe(19);
-        expect(service.platformSettings().usd_to_cop_rate).toBe(4400);
+        expect(service.platformSettings().pro_monthly_cop).toBe(54900);
+        expect(service.platformSettings().industrial_annual_total_cop).toBe(950000);
+        expect(service.platformSettings().usd_to_cop_rate).toBe(3500);
         expect(service.platformSettings().announcement_enabled).toBe(true);
         expect(service.platformSettings().announcement_text).toBe('Oferta Especial');
         expect(mockFrom).toHaveBeenCalledWith('platform_settings');
@@ -1325,10 +1368,10 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
             success: true,
             publicKey: 'pub_test_5IPqjmLMDEC0cqUMoomPY7CzUaoGW68O',
             currency: 'COP',
-            amountInCents: 6375000,
-            amountCop: 63750,
-            amountUsd: 15,
-            exchangeRateCop: 4250,
+            amountInCents: 4990000,
+            amountCop: 49900,
+            amountUsd: 15.1,
+            exchangeRateCop: 3304,
             reference: 'P3D-PRO-MONTHLY-user1-123',
             integritySignature: 'integrity_hex_123',
             customerEmail: 'taller@piezo3d.com',
@@ -1356,7 +1399,7 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
           }
         });
         expect(sessionRes.success).toBe(true);
-        expect(sessionRes.amountInCents).toBe(6375000);
+        expect(sessionRes.amountInCents).toBe(4990000);
         expect(sessionRes.integritySignature).toBe('integrity_hex_123');
         expect(sessionRes.reference).toBe('P3D-PRO-MONTHLY-user1-123');
 

@@ -48,14 +48,14 @@ import {
 
 import { I18nService } from '../../services/i18n.service';
 import { SupabaseService } from '../../services/supabase.service';
-import { PaymentService } from '../../services/payment.service';
+import { OFFICIAL_COP_PRICING, PaymentService } from '../../services/payment.service';
 import { CurrencyExchangeService } from '../../services/currency-exchange.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { AppLanguage } from '../../data/i18n-translations.data';
 import { UserFeedbackRecord } from '../../models/feedback.models';
 import { resolvePublicSupportEmail } from '../../utils/support-email';
 
-export type PricingCurrencyCode = 'USD' | 'COP' | 'MXN' | 'EUR';
+export type PricingCurrencyCode = 'COP' | 'USD' | 'MXN' | 'EUR';
 
 export interface PricingCurrencyOption {
   code: PricingCurrencyCode;
@@ -77,6 +77,7 @@ export interface SystemAnnouncement {
 export interface PlanPriceConfig {
   monthly: number;
   yearly: number;
+  yearlyTotal?: number;
 }
 
 export interface SitePricingConfig {
@@ -205,11 +206,19 @@ export class LandingPageComponent implements OnInit {
     infoCircle: InformationCircleIcon
   };
 
-  // Configuración reactiva de precios (preparada para sincronización directa con CMS SuperAdmin)
+  // Configuración reactiva de precios oficiales en COP (sincronizada con CMS SuperAdmin)
   readonly pricingConfig = signal<SitePricingConfig>({
-    starter: { monthly: 0, yearly: 0 },
-    pro: { monthly: 15, yearly: 12 },
-    industrial: { monthly: 29, yearly: 23 }
+    starter: { monthly: 0, yearly: 0, yearlyTotal: 0 },
+    pro: {
+      monthly: OFFICIAL_COP_PRICING.pro.monthly,
+      yearly: OFFICIAL_COP_PRICING.pro.annualMonthly,
+      yearlyTotal: OFFICIAL_COP_PRICING.pro.annualTotal
+    },
+    industrial: {
+      monthly: OFFICIAL_COP_PRICING.industrial.monthly,
+      yearly: OFFICIAL_COP_PRICING.industrial.annualMonthly,
+      yearlyTotal: OFFICIAL_COP_PRICING.industrial.annualTotal
+    }
   });
 
   // Banner dinámico de avisos / mantenimiento (controlado desde CMS SuperAdmin)
@@ -224,12 +233,12 @@ export class LandingPageComponent implements OnInit {
   // Estado del ciclo de facturación (mensual / anual con 20% descuento)
   readonly billingCycle = signal<'monthly' | 'yearly'>('monthly');
 
-  // Estado de moneda de visualización referencial conectada a CurrencyExchangeService
-  readonly selectedPricingCurrency = signal<PricingCurrencyCode>('USD');
+  // Moneda inicial en COP con conversión referencial en vivo vía CurrencyExchangeService
+  readonly selectedPricingCurrency = signal<PricingCurrencyCode>('COP');
 
   readonly pricingCurrencies: readonly PricingCurrencyOption[] = [
-    { code: 'USD', label: 'USD ($)', symbol: '$' },
     { code: 'COP', label: 'COP ($)', symbol: '$' },
+    { code: 'USD', label: 'USD ($)', symbol: '$' },
     { code: 'MXN', label: 'MXN ($)', symbol: '$' },
     { code: 'EUR', label: 'EUR (€)', symbol: '€' }
   ];
@@ -497,55 +506,111 @@ export class LandingPageComponent implements OnInit {
 
   setPricingCurrency(currency: PricingCurrencyCode): void {
     this.selectedPricingCurrency.set(currency);
+    if (currency === 'COP' || currency === 'USD') {
+      const paymentWithDisplay = this.paymentService as {
+        setDisplayCurrency?: (curr: 'COP' | 'USD') => void;
+      };
+      paymentWithDisplay.setDisplayCurrency?.(currency);
+    }
   }
 
   /**
-   * Calcula la conversión estimada en tiempo real a la moneda de referencia seleccionada (COP, MXN, EUR).
-   * Devuelve null si la moneda activa es USD para mantener limpia la tarjeta.
+   * Formatea un monto oficial en Pesos Colombianos (COP), ej. "$ 49.900 COP".
    */
-  getConvertedPrice(usdAmount: number): string | null {
+  formatCopPrice(amountCop: number): string {
+    const rounded = Math.round(Math.max(0, Number(amountCop) || 0));
+    return `$ ${rounded.toLocaleString('es-CO')} COP`;
+  }
+
+  /**
+   * Formatea un monto canónico en COP convertido en vivo a la moneda seleccionada.
+   */
+  formatConvertedCurrencyPrice(amountCop: number, currency: PricingCurrencyCode): string {
+    const safeCop = Math.max(0, Number(amountCop) || 0);
+    if (currency === 'COP') {
+      return this.formatCopPrice(safeCop);
+    }
+    if (safeCop <= 0) {
+      return currency === 'EUR' ? '€ 0 EUR' : `$ 0 ${currency}`;
+    }
+
+    const converted = this.currencyExchange.convertFromCop(safeCop, currency);
+    if (currency === 'USD') {
+      const roundedUsd = Math.round(converted * 100) / 100;
+      return `$ ${roundedUsd.toFixed(2)} USD`;
+    }
+    if (currency === 'EUR') {
+      const roundedEur = Math.round(converted * 100) / 100;
+      return `€ ${roundedEur.toFixed(2)} EUR`;
+    }
+    if (currency === 'MXN') {
+      return `$ ${Math.round(converted).toLocaleString('es-MX')} MXN`;
+    }
+    return `$ ${Math.round(converted)} ${currency}`;
+  }
+
+  /**
+   * Retorna el precio canónico en COP del periodo activo (mensual o anual/mes) para el plan indicado.
+   */
+  getPlanPeriodCop(plan: 'starter' | 'pro' | 'industrial'): number {
+    if (plan === 'starter') {
+      return 0;
+    }
+    const cfg = this.pricingConfig()[plan];
+    return this.billingCycle() === 'monthly' ? cfg.monthly : cfg.yearly;
+  }
+
+  /**
+   * Retorna el total anual oficial en COP para el plan indicado.
+   */
+  getPlanAnnualTotalCop(plan: 'pro' | 'industrial'): number {
+    const cfg = this.pricingConfig()[plan];
+    return cfg.yearlyTotal && cfg.yearlyTotal > 0 ? cfg.yearlyTotal : cfg.yearly * 12;
+  }
+
+  /**
+   * Retorna el precio principal grande formateado según la moneda activa en Landing.
+   */
+  getPlanDisplayPrice(plan: 'starter' | 'pro' | 'industrial'): string {
+    return this.formatConvertedCurrencyPrice(
+      this.getPlanPeriodCop(plan),
+      this.selectedPricingCurrency()
+    );
+  }
+
+  /**
+   * Calcula la conversión referencial en vivo a USD cuando la moneda activa es COP.
+   * Cuando la moneda activa ya es extranjera ('USD' | 'MXN' | 'EUR'), retorna null porque el precio principal ya está convertido.
+   */
+  getConvertedPrice(copAmount: number): string | null {
     const curr = this.selectedPricingCurrency();
-    if (curr === 'USD') {
+    if (curr !== 'COP') {
       return null;
     }
-
-    const amountInCop = this.currencyExchange.convertToCop(usdAmount, 'USD');
-    const targetAmount = this.currencyExchange.convertFromCop(amountInCop, curr);
-
-    let formatted = '';
-    let symbol = '$';
-
-    if (curr === 'COP') {
-      symbol = '$';
-      formatted = Math.round(targetAmount).toLocaleString('es-CO');
-    } else if (curr === 'MXN') {
-      symbol = '$';
-      formatted = Math.round(targetAmount).toLocaleString('es-MX');
-    } else if (curr === 'EUR') {
-      symbol = '€';
-      formatted = Math.round(targetAmount).toLocaleString('de-DE');
-    } else {
-      formatted = Math.round(targetAmount).toString();
-    }
-
-    return `≈ ${symbol} ${formatted} ${curr}`;
+    return `≈ ${this.formatConvertedCurrencyPrice(copAmount, 'USD')}`;
   }
 
   /**
-   * Obtiene el texto de facturación anual con cálculo dinámico según pricingConfig().
-   * Garantiza que si el CMS modifica los precios anuales, el total facturado se actualice de inmediato.
+   * Construye el aviso de cobro oficial en COP por Wompi cuando se visualizan monedas extranjeras.
+   */
+  getOfficialWompiChargeText(plan: 'pro' | 'industrial'): string {
+    const prefix = this.i18n.t('landing.pricing.officialWompiPrefix');
+    if (this.billingCycle() === 'yearly') {
+      const totalCop = this.formatCopPrice(this.getPlanAnnualTotalCop(plan));
+      return `${prefix} ${totalCop} ${this.i18n.t('landing.pricing.yearlyPeriod')}`;
+    }
+    return `${prefix} ${this.formatCopPrice(this.pricingConfig()[plan].monthly)}`;
+  }
+
+  /**
+   * Obtiene el texto de facturación anual con el total dinámico según pricingConfig() y la moneda activa.
    */
   getBilledYearlyText(plan: 'pro' | 'industrial'): string {
     const key = plan === 'pro' ? 'landing.pricing.planProBilledYearly' : 'landing.pricing.planIndBilledYearly';
     const baseText = this.i18n.t(key);
-    const defaultYearly = plan === 'pro' ? 12 : 23;
-    const currentYearly = plan === 'pro' ? this.pricingConfig().pro.yearly : this.pricingConfig().industrial.yearly;
-    if (currentYearly === defaultYearly) {
-      return baseText;
-    }
-    const defaultTotal = defaultYearly * 12;
-    const currentTotal = currentYearly * 12;
-    return baseText.replace(`$${defaultTotal}`, `$${currentTotal}`);
+    const totalCop = this.getPlanAnnualTotalCop(plan);
+    const formattedTotal = this.formatConvertedCurrencyPrice(totalCop, this.selectedPricingCurrency());
+    return `${baseText} (${formattedTotal} ${this.i18n.t('landing.pricing.yearlyPeriod')})`;
   }
 
   toggleLanguageDropdown(event?: Event): void {
@@ -636,12 +701,12 @@ export class LandingPageComponent implements OnInit {
       const settingsFn = (
         this.supabaseService as {
           platformSettings?: () => {
-            pro_monthly_usd?: number;
-            pro_annual_monthly_usd?: number;
-            pro_annual_total_usd?: number;
-            industrial_monthly_usd?: number;
-            industrial_annual_monthly_usd?: number;
-            industrial_annual_total_usd?: number;
+            pro_monthly_cop?: number;
+            pro_annual_monthly_cop?: number;
+            pro_annual_total_cop?: number;
+            industrial_monthly_cop?: number;
+            industrial_annual_monthly_cop?: number;
+            industrial_annual_total_cop?: number;
             announcement_enabled?: boolean;
             announcement_text?: string;
             announcement_badge?: string;
@@ -652,15 +717,41 @@ export class LandingPageComponent implements OnInit {
       if (typeof settingsFn === 'function') {
         const s = settingsFn();
         if (s) {
+          const proMonthlyCop = Number(s.pro_monthly_cop) > 0
+            ? Math.round(Number(s.pro_monthly_cop))
+            : OFFICIAL_COP_PRICING.pro.monthly;
+          const proYearlyCop = Number(s.pro_annual_monthly_cop) > 0
+            ? Math.round(Number(s.pro_annual_monthly_cop))
+            : OFFICIAL_COP_PRICING.pro.annualMonthly;
+          const proYearlyTotalCop = Number(s.pro_annual_total_cop) > 0
+            ? Math.round(Number(s.pro_annual_total_cop))
+            : (Number(s.pro_annual_monthly_cop) > 0
+              ? proYearlyCop * 12
+              : OFFICIAL_COP_PRICING.pro.annualTotal);
+
+          const indMonthlyCop = Number(s.industrial_monthly_cop) > 0
+            ? Math.round(Number(s.industrial_monthly_cop))
+            : OFFICIAL_COP_PRICING.industrial.monthly;
+          const indYearlyCop = Number(s.industrial_annual_monthly_cop) > 0
+            ? Math.round(Number(s.industrial_annual_monthly_cop))
+            : OFFICIAL_COP_PRICING.industrial.annualMonthly;
+          const indYearlyTotalCop = Number(s.industrial_annual_total_cop) > 0
+            ? Math.round(Number(s.industrial_annual_total_cop))
+            : (Number(s.industrial_annual_monthly_cop) > 0
+              ? indYearlyCop * 12
+              : OFFICIAL_COP_PRICING.industrial.annualTotal);
+
           this.pricingConfig.set({
-            starter: { monthly: 0, yearly: 0 },
+            starter: { monthly: 0, yearly: 0, yearlyTotal: 0 },
             pro: {
-              monthly: Number(s.pro_monthly_usd ?? 15),
-              yearly: Number(s.pro_annual_monthly_usd ?? 12)
+              monthly: proMonthlyCop,
+              yearly: proYearlyCop,
+              yearlyTotal: proYearlyTotalCop
             },
             industrial: {
-              monthly: Number(s.industrial_monthly_usd ?? 29),
-              yearly: Number(s.industrial_annual_monthly_usd ?? 23)
+              monthly: indMonthlyCop,
+              yearly: indYearlyCop,
+              yearlyTotal: indYearlyTotalCop
             }
           });
 

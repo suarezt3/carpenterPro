@@ -4,7 +4,7 @@
 
 -- 1. Tasa de cambio USD -> COP administrable desde CMS / Superadmin
 ALTER TABLE IF EXISTS public.platform_settings
-  ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250;
+  ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 3304;
 
 -- 2. Columnas de monto en COP, moneda, método de pago e ID único de transacción Wompi en facturas
 -- Nota: conserva registros históricos con subscription_id duplicado usando una columna exclusiva para idempotencia Wompi.

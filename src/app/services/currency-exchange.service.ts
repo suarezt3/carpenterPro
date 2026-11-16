@@ -4,7 +4,7 @@ import { Injectable, signal } from '@angular/core';
  * Tasas de cambio de respaldo realistas (Moneda base canónica: COP).
  * Se emplean si el usuario no tiene conexión a internet o ambas APIs fallan.
  * Referencia aproximada de mercado:
- * 1 USD ≈ 4.250 COP
+ * 1 USD ≈ 3.304 COP
  * 1 EUR ≈ 4.550 COP
  * 1 MXN ≈ 212 COP
  * 1 PEN ≈ 1.140 COP
@@ -13,7 +13,7 @@ import { Injectable, signal } from '@angular/core';
  */
 export const DEFAULT_COP_RATES: Record<string, number> = {
   COP: 1,
-  USD: 1 / 4250, // ≈ 0.000235294
+  USD: 1 / 3304, // ≈ 0.000302663
   EUR: 1 / 4550, // ≈ 0.000219780
   MXN: 1 / 212,  // ≈ 0.004716981
   PEN: 1 / 1140, // ≈ 0.000877193
@@ -175,7 +175,7 @@ export class CurrencyExchangeService {
           return true;
         }
       }
-    } catch (err) {
+    } catch {
       // Registrar fallo y continuar al endpoint secundario de respaldo
     }
 
@@ -204,7 +204,7 @@ export class CurrencyExchangeService {
           return true;
         }
       }
-    } catch (err) {
+    } catch {
       // Ambos endpoints fallaron (offline o problemas de red)
     }
 
@@ -249,8 +249,21 @@ export class CurrencyExchangeService {
   }
 
   /**
+   * Devuelve la tasa de cambio vigente expresada en pesos colombianos por 1 USD (COP por USD),
+   * redondeada a 2 decimales. Utiliza la tasa en vivo o el respaldo oficial (3304 COP/USD).
+   */
+  getUsdToCopRate(): number {
+    const rawUsdPerCop = this.rates()['USD'];
+    const usdPerCop =
+      typeof rawUsdPerCop === 'number' && Number.isFinite(rawUsdPerCop) && rawUsdPerCop > 0
+        ? rawUsdPerCop
+        : 1 / 3304;
+    return Math.round((1 / usdPerCop) * 100) / 100;
+  }
+
+  /**
    * Devuelve la tasa de cambio inversa en formato legible para el usuario.
-   * Ej: '1 USD = $ 4.250 COP' o '1 MXN = $ 212 COP'.
+   * Ej: '1 USD = $ 3.304 COP' o '1 MXN = $ 212 COP'.
    * Si la moneda seleccionada es COP, devuelve 'Moneda Base (COP)'.
    */
   getInverseRateDisplay(targetCurrency: string): string {

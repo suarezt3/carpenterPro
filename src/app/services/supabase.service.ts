@@ -237,6 +237,12 @@ export interface PlatformSettingsRecord {
   industrial_monthly_usd: number;
   industrial_annual_monthly_usd: number;
   industrial_annual_total_usd: number;
+  pro_monthly_cop?: number;
+  pro_annual_monthly_cop?: number;
+  pro_annual_total_cop?: number;
+  industrial_monthly_cop?: number;
+  industrial_annual_monthly_cop?: number;
+  industrial_annual_total_cop?: number;
   usd_to_cop_rate?: number;
   announcement_enabled: boolean;
   announcement_text: string;
@@ -255,7 +261,13 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsRecord = {
   industrial_monthly_usd: 29,
   industrial_annual_monthly_usd: 23,
   industrial_annual_total_usd: 276,
-  usd_to_cop_rate: 4250,
+  pro_monthly_cop: 49900,
+  pro_annual_monthly_cop: 39920,
+  pro_annual_total_cop: 479040,
+  industrial_monthly_cop: 95900,
+  industrial_annual_monthly_cop: 76720,
+  industrial_annual_total_cop: 920640,
+  usd_to_cop_rate: 3304,
   announcement_enabled: false,
   announcement_text: '',
   announcement_badge: 'NOVEDAD',
@@ -688,7 +700,13 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
   industrial_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 29,
   industrial_annual_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 23,
   industrial_annual_total_usd NUMERIC(10,2) NOT NULL DEFAULT 276,
-  usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250,
+  pro_monthly_cop BIGINT NOT NULL DEFAULT 49900,
+  pro_annual_monthly_cop BIGINT NOT NULL DEFAULT 39920,
+  pro_annual_total_cop BIGINT NOT NULL DEFAULT 479040,
+  industrial_monthly_cop BIGINT NOT NULL DEFAULT 95900,
+  industrial_annual_monthly_cop BIGINT NOT NULL DEFAULT 76720,
+  industrial_annual_total_cop BIGINT NOT NULL DEFAULT 920640,
+  usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 3304,
   announcement_enabled BOOLEAN NOT NULL DEFAULT false,
   announcement_text TEXT NOT NULL DEFAULT '',
   announcement_badge TEXT NOT NULL DEFAULT 'NOVEDAD',
@@ -697,11 +715,20 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
 );
 
 ALTER TABLE public.platform_settings
-  ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250;
+  ADD COLUMN IF NOT EXISTS pro_monthly_cop BIGINT NOT NULL DEFAULT 49900,
+  ADD COLUMN IF NOT EXISTS pro_annual_monthly_cop BIGINT NOT NULL DEFAULT 39920,
+  ADD COLUMN IF NOT EXISTS pro_annual_total_cop BIGINT NOT NULL DEFAULT 479040,
+  ADD COLUMN IF NOT EXISTS industrial_monthly_cop BIGINT NOT NULL DEFAULT 95900,
+  ADD COLUMN IF NOT EXISTS industrial_annual_monthly_cop BIGINT NOT NULL DEFAULT 76720,
+  ADD COLUMN IF NOT EXISTS industrial_annual_total_cop BIGINT NOT NULL DEFAULT 920640,
+  ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 3304;
+
+ALTER TABLE public.platform_settings ALTER COLUMN usd_to_cop_rate SET DEFAULT 3304;
 
 INSERT INTO public.platform_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
 UPDATE public.platform_settings SET support_email = 'piezo3dstudio@gmail.com' WHERE id = 1 AND lower(support_email) = 'eydersuarez900@gmail.com';
+UPDATE public.platform_settings SET usd_to_cop_rate = 3304 WHERE id = 1 AND usd_to_cop_rate = 4250;
 
 ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
 
@@ -772,10 +799,20 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.platform_feedback TO anon, authen
  * tasa `usd_to_cop_rate` en `platform_settings` e índice único de facturas).
  */
 export const SUPABASE_WOMPI_PAYMENTS_SQL_SETUP = `-- ==========================================
--- TABLA DE TRANSACCIONES WOMPI COLOMBIA Y TASA USD -> COP
+-- TABLA DE TRANSACCIONES WOMPI COLOMBIA, PRECIOS BASE COP Y TASA USD -> COP
 -- ==========================================
 ALTER TABLE public.platform_settings
-  ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250;
+  ADD COLUMN IF NOT EXISTS pro_monthly_cop BIGINT NOT NULL DEFAULT 49900,
+  ADD COLUMN IF NOT EXISTS pro_annual_monthly_cop BIGINT NOT NULL DEFAULT 39920,
+  ADD COLUMN IF NOT EXISTS pro_annual_total_cop BIGINT NOT NULL DEFAULT 479040,
+  ADD COLUMN IF NOT EXISTS industrial_monthly_cop BIGINT NOT NULL DEFAULT 95900,
+  ADD COLUMN IF NOT EXISTS industrial_annual_monthly_cop BIGINT NOT NULL DEFAULT 76720,
+  ADD COLUMN IF NOT EXISTS industrial_annual_total_cop BIGINT NOT NULL DEFAULT 920640,
+  ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 3304;
+
+ALTER TABLE public.platform_settings ALTER COLUMN usd_to_cop_rate SET DEFAULT 3304;
+
+UPDATE public.platform_settings SET usd_to_cop_rate = 3304 WHERE id = 1 AND usd_to_cop_rate = 4250;
 
 ALTER TABLE public.subscription_invoices
   ADD COLUMN IF NOT EXISTS amount_cop BIGINT,
@@ -2921,6 +2958,24 @@ export class SupabaseService {
   // OPERACIONES DE SUPERADMINISTRADOR Y CMS GLOBAL
   // ==========================================
 
+  private resolvePositivePlatformNumber(
+    rawVal: unknown,
+    fallbackVal: number | undefined,
+    defaultVal: number,
+    roundInteger = false
+  ): number {
+    const parsed =
+      rawVal !== undefined && rawVal !== null && rawVal !== '' ? Number(rawVal) : NaN;
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return roundInteger ? Math.round(parsed) : parsed;
+    }
+    const fallbackNum = Number(fallbackVal);
+    if (Number.isFinite(fallbackNum) && fallbackNum > 0) {
+      return roundInteger ? Math.round(fallbackNum) : fallbackNum;
+    }
+    return defaultVal;
+  }
+
   private normalizePlatformSettings(
     raw: Record<string, unknown>,
     fallback: PlatformSettingsRecord
@@ -2962,18 +3017,48 @@ export class SupabaseService {
         raw['industrial_annual_total_usd'] !== null
           ? Number(raw['industrial_annual_total_usd'])
           : fallback.industrial_annual_total_usd,
-      usd_to_cop_rate: (() => {
-        const rawRate = raw['usd_to_cop_rate'];
-        const parsedRate =
-          rawRate !== undefined && rawRate !== null && rawRate !== '' ? Number(rawRate) : NaN;
-        if (Number.isFinite(parsedRate) && parsedRate > 0) {
-          return parsedRate;
-        }
-        const fallbackRate = Number(fallback.usd_to_cop_rate);
-        return Number.isFinite(fallbackRate) && fallbackRate > 0
-          ? fallbackRate
-          : (DEFAULT_PLATFORM_SETTINGS.usd_to_cop_rate ?? 4250);
-      })(),
+      pro_monthly_cop: this.resolvePositivePlatformNumber(
+        raw['pro_monthly_cop'],
+        fallback.pro_monthly_cop,
+        DEFAULT_PLATFORM_SETTINGS.pro_monthly_cop ?? 49900,
+        true
+      ),
+      pro_annual_monthly_cop: this.resolvePositivePlatformNumber(
+        raw['pro_annual_monthly_cop'],
+        fallback.pro_annual_monthly_cop,
+        DEFAULT_PLATFORM_SETTINGS.pro_annual_monthly_cop ?? 39920,
+        true
+      ),
+      pro_annual_total_cop: this.resolvePositivePlatformNumber(
+        raw['pro_annual_total_cop'],
+        fallback.pro_annual_total_cop,
+        DEFAULT_PLATFORM_SETTINGS.pro_annual_total_cop ?? 479040,
+        true
+      ),
+      industrial_monthly_cop: this.resolvePositivePlatformNumber(
+        raw['industrial_monthly_cop'],
+        fallback.industrial_monthly_cop,
+        DEFAULT_PLATFORM_SETTINGS.industrial_monthly_cop ?? 95900,
+        true
+      ),
+      industrial_annual_monthly_cop: this.resolvePositivePlatformNumber(
+        raw['industrial_annual_monthly_cop'],
+        fallback.industrial_annual_monthly_cop,
+        DEFAULT_PLATFORM_SETTINGS.industrial_annual_monthly_cop ?? 76720,
+        true
+      ),
+      industrial_annual_total_cop: this.resolvePositivePlatformNumber(
+        raw['industrial_annual_total_cop'],
+        fallback.industrial_annual_total_cop,
+        DEFAULT_PLATFORM_SETTINGS.industrial_annual_total_cop ?? 920640,
+        true
+      ),
+      usd_to_cop_rate: this.resolvePositivePlatformNumber(
+        raw['usd_to_cop_rate'],
+        fallback.usd_to_cop_rate,
+        DEFAULT_PLATFORM_SETTINGS.usd_to_cop_rate ?? 3304,
+        false
+      ),
       announcement_enabled:
         typeof raw['announcement_enabled'] === 'boolean'
           ? raw['announcement_enabled']
@@ -3157,6 +3242,24 @@ export class SupabaseService {
           Number.isFinite(numericRate) && numericRate > 0
             ? numericRate
             : nextSettings.usd_to_cop_rate;
+      }
+      const copFields = [
+        'pro_monthly_cop',
+        'pro_annual_monthly_cop',
+        'pro_annual_total_cop',
+        'industrial_monthly_cop',
+        'industrial_annual_monthly_cop',
+        'industrial_annual_total_cop'
+      ] as const;
+      for (const field of copFields) {
+        const patchVal = patch[field];
+        if (patchVal !== undefined) {
+          const numericVal = Number(patchVal);
+          payload[field] =
+            Number.isFinite(numericVal) && numericVal > 0
+              ? Math.round(numericVal)
+              : nextSettings[field];
+        }
       }
       delete payload['id'];
 

@@ -57,6 +57,7 @@ import {
   PaymentService,
   PaymentsReadinessMode
 } from '../../services/payment.service';
+import { CurrencyExchangeService } from '../../services/currency-exchange.service';
 import { OFFICIAL_SUPPORT_EMAIL, resolvePublicSupportEmail } from '../../utils/support-email';
 
 export type AdminSection = 'overview' | 'users' | 'cms' | 'testimonials' | 'support';
@@ -84,6 +85,12 @@ export interface UserProfilePatch {
 }
 
 export type AdminPlatformSettingsRecord = PlatformSettingsRecord & {
+  pro_monthly_cop?: number;
+  pro_annual_monthly_cop?: number;
+  pro_annual_total_cop?: number;
+  industrial_monthly_cop?: number;
+  industrial_annual_monthly_cop?: number;
+  industrial_annual_total_cop?: number;
   usd_to_cop_rate?: number;
 };
 
@@ -105,6 +112,11 @@ interface AdminPaymentBridge {
     plan: PaidPlan,
     cycle?: 'monthly' | 'annual' | 'yearly'
   ) => AdminCopEstimateResult;
+  getMonthlyCop?: (
+    plan: PaidPlan,
+    cycle?: 'monthly' | 'annual' | 'yearly'
+  ) => number;
+  convertCopToUsd?: (amountCop: number) => number;
   isPreparingCheckout?: () => boolean;
   lastCheckoutError?: () => string | null;
   environment?: () => 'sandbox' | 'production';
@@ -121,7 +133,13 @@ const DEFAULT_PLATFORM_SETTINGS: AdminPlatformSettingsRecord = {
   industrial_monthly_usd: 29,
   industrial_annual_monthly_usd: 23,
   industrial_annual_total_usd: 276,
-  usd_to_cop_rate: 4250,
+  pro_monthly_cop: 49900,
+  pro_annual_monthly_cop: 39920,
+  pro_annual_total_cop: 479040,
+  industrial_monthly_cop: 95900,
+  industrial_annual_monthly_cop: 76720,
+  industrial_annual_total_cop: 920640,
+  usd_to_cop_rate: 3304,
   announcement_enabled: false,
   announcement_text: '',
   announcement_badge: 'NOVEDAD',
@@ -146,6 +164,7 @@ const DEFAULT_PLATFORM_SETTINGS: AdminPlatformSettingsRecord = {
 export class AdminDashboardComponent implements OnInit {
   readonly supabase = inject(SupabaseService);
   readonly paymentService = inject(PaymentService);
+  readonly currencyExchange = inject(CurrencyExchangeService, { optional: true });
   private readonly fb = inject(NonNullableFormBuilder);
 
   readonly icons = {
@@ -236,10 +255,37 @@ export class AdminDashboardComponent implements OnInit {
     const sig = this.supabase.platformSettings;
     const raw: AdminPlatformSettingsRecord =
       typeof sig === 'function' ? sig() : DEFAULT_PLATFORM_SETTINGS;
-    const parsedRate = Number(raw.usd_to_cop_rate ?? 4250);
+    const parsedRate = Number(raw.usd_to_cop_rate ?? 3304);
+    const proMonthlyCop = Number(raw.pro_monthly_cop ?? 49900);
+    const proAnnualMonthlyCop = Number(raw.pro_annual_monthly_cop ?? 39920);
+    const proAnnualTotalCop = Number(raw.pro_annual_total_cop ?? 479040);
+    const indMonthlyCop = Number(raw.industrial_monthly_cop ?? 95900);
+    const indAnnualMonthlyCop = Number(raw.industrial_annual_monthly_cop ?? 76720);
+    const indAnnualTotalCop = Number(raw.industrial_annual_total_cop ?? 920640);
     return {
       ...raw,
-      usd_to_cop_rate: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 4250,
+      pro_monthly_cop:
+        Number.isFinite(proMonthlyCop) && proMonthlyCop >= 1500 ? proMonthlyCop : 49900,
+      pro_annual_monthly_cop:
+        Number.isFinite(proAnnualMonthlyCop) && proAnnualMonthlyCop >= 1500
+          ? proAnnualMonthlyCop
+          : 39920,
+      pro_annual_total_cop:
+        Number.isFinite(proAnnualTotalCop) && proAnnualTotalCop >= 1500
+          ? proAnnualTotalCop
+          : 479040,
+      industrial_monthly_cop:
+        Number.isFinite(indMonthlyCop) && indMonthlyCop >= 1500 ? indMonthlyCop : 95900,
+      industrial_annual_monthly_cop:
+        Number.isFinite(indAnnualMonthlyCop) && indAnnualMonthlyCop >= 1500
+          ? indAnnualMonthlyCop
+          : 76720,
+      industrial_annual_total_cop:
+        Number.isFinite(indAnnualTotalCop) && indAnnualTotalCop >= 1500
+          ? indAnnualTotalCop
+          : 920640,
+      usd_to_cop_rate:
+        Number.isFinite(parsedRate) && parsedRate > 0 && parsedRate !== 4250 ? parsedRate : 3304,
       support_email: resolvePublicSupportEmail(raw.support_email)
     };
   });
@@ -288,30 +334,79 @@ export class AdminDashboardComponent implements OnInit {
     if (
       fromService &&
       Number.isFinite(fromService.exchangeRateCop) &&
-      fromService.exchangeRateCop > 0
+      fromService.exchangeRateCop > 0 &&
+      fromService.exchangeRateCop !== 4250
     ) {
       return fromService.exchangeRateCop;
     }
-    const rate = Number(this.currentSettings().usd_to_cop_rate ?? 4250);
-    return Number.isFinite(rate) && rate > 0 ? rate : 4250;
+    const settingsRate = Number(this.currentSettings().usd_to_cop_rate ?? 3304);
+    if (Number.isFinite(settingsRate) && settingsRate > 0 && settingsRate !== 4250) {
+      return settingsRate;
+    }
+    const liveUsdPerCop = Number(this.currencyExchange?.rates?.()['USD']);
+    if (Number.isFinite(liveUsdPerCop) && liveUsdPerCop > 0) {
+      const inverseRate = Math.round((1 / liveUsdPerCop) * 100) / 100;
+      if (inverseRate > 0 && Math.round(inverseRate) !== 4250) {
+        return inverseRate;
+      }
+    }
+    return 3304;
   });
 
   readonly proMonthlyCopEstimate = computed<number>(() => {
     const fromService = this.getPaymentBridge().getCopEstimate?.('pro', 'monthly');
-    if (fromService && Number.isFinite(fromService.amountCop) && fromService.amountCop > 0) {
+    if (
+      fromService &&
+      Number.isFinite(fromService.amountCop) &&
+      fromService.amountCop > 0 &&
+      fromService.exchangeRateCop !== 4250
+    ) {
       return fromService.amountCop;
     }
-    const usd = Number(this.currentSettings().pro_monthly_usd || 15);
-    return Math.max(1500, Math.round(usd * this.effectiveUsdToCopRate()));
+    const cop = Number(this.currentSettings().pro_monthly_cop ?? 49900);
+    return Number.isFinite(cop) && cop >= 1500 ? Math.round(cop) : 49900;
   });
 
   readonly industrialMonthlyCopEstimate = computed<number>(() => {
     const fromService = this.getPaymentBridge().getCopEstimate?.('industrial', 'monthly');
-    if (fromService && Number.isFinite(fromService.amountCop) && fromService.amountCop > 0) {
+    if (
+      fromService &&
+      Number.isFinite(fromService.amountCop) &&
+      fromService.amountCop > 0 &&
+      fromService.exchangeRateCop !== 4250
+    ) {
       return fromService.amountCop;
     }
-    const usd = Number(this.currentSettings().industrial_monthly_usd || 29);
-    return Math.max(1500, Math.round(usd * this.effectiveUsdToCopRate()));
+    const cop = Number(this.currentSettings().industrial_monthly_cop ?? 95900);
+    return Number.isFinite(cop) && cop >= 1500 ? Math.round(cop) : 95900;
+  });
+
+  readonly proMonthlyUsdEstimate = computed<number>(() => {
+    const fromService = this.getPaymentBridge().getCopEstimate?.('pro', 'monthly');
+    if (
+      fromService &&
+      Number.isFinite(fromService.amountUsd) &&
+      fromService.amountUsd > 0 &&
+      fromService.exchangeRateCop !== 4250
+    ) {
+      return Math.round(fromService.amountUsd * 100) / 100;
+    }
+    return Math.round((this.proMonthlyCopEstimate() / this.effectiveUsdToCopRate()) * 100) / 100;
+  });
+
+  readonly industrialMonthlyUsdEstimate = computed<number>(() => {
+    const fromService = this.getPaymentBridge().getCopEstimate?.('industrial', 'monthly');
+    if (
+      fromService &&
+      Number.isFinite(fromService.amountUsd) &&
+      fromService.amountUsd > 0 &&
+      fromService.exchangeRateCop !== 4250
+    ) {
+      return Math.round(fromService.amountUsd * 100) / 100;
+    }
+    return (
+      Math.round((this.industrialMonthlyCopEstimate() / this.effectiveUsdToCopRate()) * 100) / 100
+    );
   });
 
   readonly isPreparingGatewayCheckout = computed<boolean>(() => {
@@ -437,13 +532,19 @@ export class AdminDashboardComponent implements OnInit {
 
   // CMS Reactive Form (Module 3)
   readonly cmsForm = this.fb.group({
+    pro_monthly_cop: [49900, [Validators.required, Validators.min(1500)]],
+    pro_annual_monthly_cop: [39920, [Validators.required, Validators.min(1500)]],
+    pro_annual_total_cop: [479040, [Validators.required, Validators.min(1500)]],
+    industrial_monthly_cop: [95900, [Validators.required, Validators.min(1500)]],
+    industrial_annual_monthly_cop: [76720, [Validators.required, Validators.min(1500)]],
+    industrial_annual_total_cop: [920640, [Validators.required, Validators.min(1500)]],
     pro_monthly_usd: [15, [Validators.required, Validators.min(0)]],
     pro_annual_monthly_usd: [12, [Validators.required, Validators.min(0)]],
     pro_annual_total_usd: [144, [Validators.required, Validators.min(0)]],
     industrial_monthly_usd: [29, [Validators.required, Validators.min(0)]],
     industrial_annual_monthly_usd: [23, [Validators.required, Validators.min(0)]],
     industrial_annual_total_usd: [276, [Validators.required, Validators.min(0)]],
-    usd_to_cop_rate: [4250, [Validators.required, Validators.min(1)]],
+    usd_to_cop_rate: [3304, [Validators.required, Validators.min(1)]],
     free_max_modules: [3, [Validators.required, Validators.min(1)]],
     app_version: ['v3.0.0', [Validators.required]],
     support_email: [OFFICIAL_SUPPORT_EMAIL, [Validators.required, Validators.email]],
@@ -573,16 +674,43 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   private syncCmsFormWithSettings(settings: AdminPlatformSettingsRecord): void {
-    const parsedRate = Number(settings.usd_to_cop_rate ?? 4250);
+    const parsedRate = Number(settings.usd_to_cop_rate ?? 3304);
+    const proMonthlyCop = Number(settings.pro_monthly_cop ?? 49900);
+    const proAnnualMonthlyCop = Number(settings.pro_annual_monthly_cop ?? 39920);
+    const proAnnualTotalCop = Number(settings.pro_annual_total_cop ?? 479040);
+    const indMonthlyCop = Number(settings.industrial_monthly_cop ?? 95900);
+    const indAnnualMonthlyCop = Number(settings.industrial_annual_monthly_cop ?? 76720);
+    const indAnnualTotalCop = Number(settings.industrial_annual_total_cop ?? 920640);
     this.cmsForm.patchValue(
       {
+        pro_monthly_cop:
+          Number.isFinite(proMonthlyCop) && proMonthlyCop >= 1500 ? proMonthlyCop : 49900,
+        pro_annual_monthly_cop:
+          Number.isFinite(proAnnualMonthlyCop) && proAnnualMonthlyCop >= 1500
+            ? proAnnualMonthlyCop
+            : 39920,
+        pro_annual_total_cop:
+          Number.isFinite(proAnnualTotalCop) && proAnnualTotalCop >= 1500
+            ? proAnnualTotalCop
+            : 479040,
+        industrial_monthly_cop:
+          Number.isFinite(indMonthlyCop) && indMonthlyCop >= 1500 ? indMonthlyCop : 95900,
+        industrial_annual_monthly_cop:
+          Number.isFinite(indAnnualMonthlyCop) && indAnnualMonthlyCop >= 1500
+            ? indAnnualMonthlyCop
+            : 76720,
+        industrial_annual_total_cop:
+          Number.isFinite(indAnnualTotalCop) && indAnnualTotalCop >= 1500
+            ? indAnnualTotalCop
+            : 920640,
         pro_monthly_usd: settings.pro_monthly_usd,
         pro_annual_monthly_usd: settings.pro_annual_monthly_usd,
         pro_annual_total_usd: settings.pro_annual_total_usd,
         industrial_monthly_usd: settings.industrial_monthly_usd,
         industrial_annual_monthly_usd: settings.industrial_annual_monthly_usd,
         industrial_annual_total_usd: settings.industrial_annual_total_usd,
-        usd_to_cop_rate: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 4250,
+        usd_to_cop_rate:
+          Number.isFinite(parsedRate) && parsedRate > 0 && parsedRate !== 4250 ? parsedRate : 3304,
         free_max_modules: settings.free_max_modules,
         app_version: settings.app_version,
         support_email: resolvePublicSupportEmail(settings.support_email),
@@ -716,13 +844,34 @@ export class AdminDashboardComponent implements OnInit {
       const raw = this.cmsForm.getRawValue();
       const parsedRate = Number(raw.usd_to_cop_rate);
       const patch: Partial<AdminPlatformSettingsRecord> = {
+        pro_monthly_cop: Math.max(1500, Math.round(Number(raw.pro_monthly_cop) || 49900)),
+        pro_annual_monthly_cop: Math.max(
+          1500,
+          Math.round(Number(raw.pro_annual_monthly_cop) || 39920)
+        ),
+        pro_annual_total_cop: Math.max(
+          1500,
+          Math.round(Number(raw.pro_annual_total_cop) || 479040)
+        ),
+        industrial_monthly_cop: Math.max(
+          1500,
+          Math.round(Number(raw.industrial_monthly_cop) || 95900)
+        ),
+        industrial_annual_monthly_cop: Math.max(
+          1500,
+          Math.round(Number(raw.industrial_annual_monthly_cop) || 76720)
+        ),
+        industrial_annual_total_cop: Math.max(
+          1500,
+          Math.round(Number(raw.industrial_annual_total_cop) || 920640)
+        ),
         pro_monthly_usd: Number(raw.pro_monthly_usd),
         pro_annual_monthly_usd: Number(raw.pro_annual_monthly_usd),
         pro_annual_total_usd: Number(raw.pro_annual_total_usd),
         industrial_monthly_usd: Number(raw.industrial_monthly_usd),
         industrial_annual_monthly_usd: Number(raw.industrial_annual_monthly_usd),
         industrial_annual_total_usd: Number(raw.industrial_annual_total_usd),
-        usd_to_cop_rate: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 4250,
+        usd_to_cop_rate: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 3304,
         free_max_modules: Number(raw.free_max_modules),
         app_version: raw.app_version.trim(),
         support_email: resolvePublicSupportEmail(raw.support_email),
@@ -1000,9 +1149,22 @@ export class AdminDashboardComponent implements OnInit {
     return `$ ${safe.toLocaleString('es-CO')} COP`;
   }
 
+  formatUsdCurrency(amount: number): string {
+    const safe = Number.isFinite(amount) && amount > 0 ? amount : 0;
+    return `$ ${safe.toFixed(2)} USD`;
+  }
+
+  computeUsdEquivalentFromForm(copAmount: number): number {
+    const rate = Number(this.cmsForm.controls.usd_to_cop_rate.value ?? 3304);
+    const safeRate =
+      Number.isFinite(rate) && rate > 0 && rate !== 4250 ? rate : this.effectiveUsdToCopRate();
+    const safeCop = Number.isFinite(copAmount) && copAmount > 0 ? copAmount : 0;
+    return Math.round((safeCop / safeRate) * 100) / 100;
+  }
+
   computeCopEstimateFromForm(usdAmount: number): number {
-    const rate = Number(this.cmsForm.controls.usd_to_cop_rate.value ?? 4250);
-    const safeRate = Number.isFinite(rate) && rate > 0 ? rate : 4250;
+    const rate = Number(this.cmsForm.controls.usd_to_cop_rate.value ?? 3304);
+    const safeRate = Number.isFinite(rate) && rate > 0 && rate !== 4250 ? rate : 3304;
     const safeUsd = Number.isFinite(usdAmount) && usdAmount > 0 ? usdAmount : 0;
     return Math.max(1500, Math.round(safeUsd * safeRate));
   }

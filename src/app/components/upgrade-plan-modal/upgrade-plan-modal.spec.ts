@@ -2,11 +2,14 @@ import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { UpgradePlanModalComponent } from './upgrade-plan-modal';
 import {
+  BillingDisplayCurrency,
   CheckoutCycleInput,
+  OFFICIAL_COP_PRICING,
   PaidPlan,
   PaymentService,
   UpgradeModalState
 } from '../../services/payment.service';
+import { CurrencyExchangeService, DEFAULT_COP_RATES } from '../../services/currency-exchange.service';
 import { I18nService } from '../../services/i18n.service';
 
 interface ProtectedEarlyAccessState {
@@ -21,23 +24,57 @@ describe('UpgradePlanModalComponent', () => {
   let upgradeStateSignal: WritableSignal<UpgradeModalState | null>;
   let earlyAccessStateSignal: WritableSignal<ProtectedEarlyAccessState | null>;
   let isProtectedSignal: WritableSignal<boolean>;
+  let displayCurrencySignal: WritableSignal<BillingDisplayCurrency>;
+  let exchangeRateCop: number;
   let mockPaymentService: {
     upgradeModalState: ReturnType<WritableSignal<UpgradeModalState | null>['asReadonly']>;
     earlyAccessModalState: ReturnType<WritableSignal<ProtectedEarlyAccessState | null>['asReadonly']>;
     isPaymentsProtected: ReturnType<WritableSignal<boolean>['asReadonly']>;
+    displayCurrency: ReturnType<WritableSignal<BillingDisplayCurrency>['asReadonly']>;
+    setDisplayCurrency: ReturnType<typeof vi.fn>;
+    getMonthlyCop: ReturnType<typeof vi.fn>;
+    getCopEstimate: ReturnType<typeof vi.fn>;
+    convertCopToUsd: ReturnType<typeof vi.fn>;
     openCheckout: ReturnType<typeof vi.fn>;
     closeUpgradeModal: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
+    localStorage.removeItem('melamipro_exchange_rates_cache_v1');
     upgradeStateSignal = signal<UpgradeModalState | null>(null);
     earlyAccessStateSignal = signal<ProtectedEarlyAccessState | null>(null);
     isProtectedSignal = signal(true);
+    displayCurrencySignal = signal<BillingDisplayCurrency>('COP');
+    exchangeRateCop = 3304;
 
     mockPaymentService = {
       upgradeModalState: upgradeStateSignal.asReadonly(),
       earlyAccessModalState: earlyAccessStateSignal.asReadonly(),
       isPaymentsProtected: isProtectedSignal.asReadonly(),
+      displayCurrency: displayCurrencySignal.asReadonly(),
+      setDisplayCurrency: vi.fn((curr: BillingDisplayCurrency) => {
+        displayCurrencySignal.set(curr === 'USD' ? 'USD' : 'COP');
+      }),
+      getMonthlyCop: vi.fn((plan: PaidPlan, cycle: CheckoutCycleInput = 'monthly') => {
+        const normalized = cycle === 'annual' || cycle === 'yearly' ? 'annual' : 'monthly';
+        return normalized === 'annual'
+          ? OFFICIAL_COP_PRICING[plan].annualMonthly
+          : OFFICIAL_COP_PRICING[plan].monthly;
+      }),
+      getCopEstimate: vi.fn((plan: PaidPlan, cycle: CheckoutCycleInput = 'monthly') => {
+        const normalized = cycle === 'annual' || cycle === 'yearly' ? 'annual' : 'monthly';
+        const amountCop =
+          normalized === 'annual'
+            ? OFFICIAL_COP_PRICING[plan].annualTotal
+            : OFFICIAL_COP_PRICING[plan].monthly;
+        return {
+          amountUsd: Math.round((amountCop / exchangeRateCop) * 100) / 100,
+          exchangeRateCop,
+          amountCop,
+          amountInCents: amountCop * 100
+        };
+      }),
+      convertCopToUsd: vi.fn((amountCop: number) => Math.round((amountCop / exchangeRateCop) * 100) / 100),
       openCheckout: vi.fn(async (plan: PaidPlan, cycle: CheckoutCycleInput = 'monthly') => {
         const normalizedCycle: 'monthly' | 'annual' = cycle === 'yearly' ? 'annual' : cycle;
         if (isProtectedSignal()) {
@@ -59,6 +96,8 @@ describe('UpgradePlanModalComponent', () => {
       providers: [{ provide: PaymentService, useValue: mockPaymentService }]
     }).compileComponents();
 
+    const exchange = TestBed.inject(CurrencyExchangeService);
+    exchange.rates.set({ ...DEFAULT_COP_RATES });
     TestBed.inject(I18nService).setLanguage('es');
     fixture = TestBed.createComponent(UpgradePlanModalComponent);
     component = fixture.componentInstance;
@@ -118,7 +157,7 @@ describe('UpgradePlanModalComponent', () => {
     expect(root.querySelector('[data-testid="upgrade-modal-cta-industrial"]')).toBeTruthy();
   });
 
-  it('debe alternar tarifas entre ciclo Mensual ($15/$29) y Anual ($12/$23)', () => {
+  it('debe alternar tarifas oficiales en COP y conversión viva en USD entre ciclo Mensual y Anual (-20%)', () => {
     upgradeStateSignal.set({
       reason: 'modules_limit',
       requiredPlan: 'pro'
@@ -126,23 +165,78 @@ describe('UpgradePlanModalComponent', () => {
     fixture.detectChanges();
 
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.textContent).toContain('$15 USD');
-    expect(root.textContent).toContain('$29 USD');
+    expect(component.displayCurrency()).toBe('COP');
+    expect(root.querySelector('[data-testid="upgrade-pro-price"]')?.textContent?.trim()).toBe('$ 49.900 COP');
+    expect(root.querySelector('[data-testid="upgrade-ind-price"]')?.textContent?.trim()).toBe('$ 95.900 COP');
+    expect(root.querySelector('[data-testid="upgrade-pro-currency-hint"]')?.textContent).toContain('≈ $ 15.10 USD');
+    expect(root.querySelector('[data-testid="upgrade-ind-currency-hint"]')?.textContent).toContain('≈ $ 29.03 USD');
+    expect(root.textContent).not.toContain('$15 USD');
+    expect(root.textContent).not.toContain('$29 USD');
 
     const annualBtn = root.querySelector('[data-testid="upgrade-cycle-annual-btn"]') as HTMLButtonElement | null;
     annualBtn?.click();
     fixture.detectChanges();
 
     expect(component.billingCycle()).toBe('annual');
-    expect(root.textContent).toContain('$12 USD');
-    expect(root.textContent).toContain('$23 USD');
+    expect(root.querySelector('[data-testid="upgrade-pro-price"]')?.textContent?.trim()).toBe('$ 39.920 COP');
+    expect(root.querySelector('[data-testid="upgrade-ind-price"]')?.textContent?.trim()).toBe('$ 76.720 COP');
+    expect(root.querySelector('[data-testid="upgrade-pro-annual-summary"]')?.textContent).toContain('-20%');
+    expect(root.querySelector('[data-testid="upgrade-pro-annual-summary"]')?.textContent).toContain('$ 479.040 COP / año');
+    expect(root.querySelector('[data-testid="upgrade-ind-annual-summary"]')?.textContent).toContain('$ 920.640 COP / año');
+    expect(root.querySelector('[data-testid="upgrade-pro-currency-hint"]')?.textContent).toContain('≈ $ 12.08 USD');
+    expect(root.querySelector('[data-testid="upgrade-ind-currency-hint"]')?.textContent).toContain('≈ $ 23.22 USD');
+    expect(root.textContent).not.toContain('$12 USD');
+    expect(root.textContent).not.toContain('$23 USD');
 
     const monthlyBtn = root.querySelector('[data-testid="upgrade-cycle-monthly-btn"]') as HTMLButtonElement | null;
     monthlyBtn?.click();
     fixture.detectChanges();
 
     expect(component.billingCycle()).toBe('monthly');
-    expect(root.textContent).toContain('$15 USD');
+    expect(root.querySelector('[data-testid="upgrade-pro-price"]')?.textContent?.trim()).toBe('$ 49.900 COP');
+  });
+
+  it('debe alternar entre COP ($) y USD ($) conectado a PaymentService.displayCurrency mostrando cobro oficial Wompi', () => {
+    upgradeStateSignal.set({
+      reason: 'modules_limit',
+      requiredPlan: 'pro'
+    });
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const usdBtn = root.querySelector('[data-testid="upgrade-currency-usd-btn"]') as HTMLButtonElement | null;
+    const copBtn = root.querySelector('[data-testid="upgrade-currency-cop-btn"]') as HTMLButtonElement | null;
+    expect(usdBtn).toBeTruthy();
+    expect(copBtn).toBeTruthy();
+
+    // Cambiar a USD en mensual
+    usdBtn?.click();
+    fixture.detectChanges();
+
+    expect(mockPaymentService.setDisplayCurrency).toHaveBeenCalledWith('USD');
+    expect(component.displayCurrency()).toBe('USD');
+    expect(root.querySelector('[data-testid="upgrade-pro-price"]')?.textContent?.trim()).toBe('≈ $ 15.10 USD');
+    expect(root.querySelector('[data-testid="upgrade-ind-price"]')?.textContent?.trim()).toBe('≈ $ 29.03 USD');
+    expect(root.querySelector('[data-testid="upgrade-pro-currency-hint"]')?.textContent).toContain('Cobro oficial Wompi:');
+    expect(root.querySelector('[data-testid="upgrade-pro-currency-hint"]')?.textContent).toContain('$ 49.900 COP');
+    expect(root.querySelector('[data-testid="upgrade-ind-currency-hint"]')?.textContent).toContain('$ 95.900 COP');
+
+    // Cambiar a anual en USD
+    const annualBtn = root.querySelector('[data-testid="upgrade-cycle-annual-btn"]') as HTMLButtonElement | null;
+    annualBtn?.click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('[data-testid="upgrade-pro-price"]')?.textContent?.trim()).toBe('≈ $ 12.08 USD');
+    expect(root.querySelector('[data-testid="upgrade-pro-annual-summary"]')?.textContent).toContain('-20%');
+    expect(root.querySelector('[data-testid="upgrade-pro-annual-summary"]')?.textContent).toContain('≈ $ 144.99 USD / año');
+    expect(root.querySelector('[data-testid="upgrade-pro-currency-hint"]')?.textContent).toContain('$ 479.040 COP / año');
+
+    // Volver a COP
+    copBtn?.click();
+    fixture.detectChanges();
+    expect(mockPaymentService.setDisplayCurrency).toHaveBeenCalledWith('COP');
+    expect(component.displayCurrency()).toBe('COP');
+    expect(root.querySelector('[data-testid="upgrade-pro-price"]')?.textContent?.trim()).toBe('$ 39.920 COP');
   });
 
   it('al elegir Plan Taller Pro en modo protegido debe delegar en openCheckout, cerrar UpgradeModal y abrir Acceso Anticipado', () => {

@@ -5,12 +5,14 @@ type BillingCycle = 'monthly' | 'annual';
 type WompiEnvironment = 'sandbox' | 'production';
 
 const SANDBOX_PUBLIC_KEY_FALLBACK = 'pub_test_5IPqjmLMDEC0cqUMoomPY7CzUaoGW68O';
-const DEFAULT_USD_TO_COP_RATE = 4250;
+const DEFAULT_USD_TO_COP_RATE = 3304;
 const MIN_COP_AMOUNT = 1500;
+const LIVE_EXCHANGE_RATE_URL = 'https://open.er-api.com/v6/latest/USD';
+const LIVE_EXCHANGE_RATE_TIMEOUT_MS = 3000;
 
-const DEFAULT_USD_PRICING: Record<PaidPlan, Record<BillingCycle, number>> = {
-  pro: { monthly: 15, annual: 144 },
-  industrial: { monthly: 29, annual: 276 }
+const DEFAULT_COP_PRICING: Record<PaidPlan, Record<BillingCycle, number>> = {
+  pro: { monthly: 49900, annual: 479040 },
+  industrial: { monthly: 95900, annual: 920640 }
 };
 
 const CORS_HEADERS: Record<string, string> = {
@@ -60,9 +62,52 @@ function sanitizeRedirectUrl(raw: unknown): string | undefined {
   return undefined;
 }
 
-function resolvePositiveNumber(raw: unknown, fallback: number): number {
+function resolveCopPrice(raw: unknown, fallback: number): number {
+  if (raw === null || raw === undefined || raw === '') return fallback;
   const numeric = Number(raw);
-  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+  return Number.isFinite(numeric) && numeric >= MIN_COP_AMOUNT ? numeric : fallback;
+}
+
+async function fetchLiveUsdToCopRate(): Promise<number | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), LIVE_EXCHANGE_RATE_TIMEOUT_MS);
+  try {
+    const response = await fetch(LIVE_EXCHANGE_RATE_URL, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+
+    const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    const rates =
+      payload?.['rates'] && typeof payload['rates'] === 'object' && !Array.isArray(payload['rates'])
+        ? (payload['rates'] as Record<string, unknown>)
+        : null;
+    const copRate = Number(rates?.['COP']);
+    const roundedRate = Math.round(copRate * 100) / 100;
+    return Number.isFinite(roundedRate) && roundedRate > 0 ? roundedRate : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function resolveExchangeRateCop(
+  settingsRow: Record<string, unknown> | null,
+  liveRate: number | null
+): number {
+  if (liveRate !== null) {
+    return liveRate;
+  }
+
+  const settingsRate = Number(settingsRow?.['usd_to_cop_rate']);
+  if (Number.isFinite(settingsRate) && settingsRate > 0 && settingsRate !== 4250) {
+    return Math.round(settingsRate * 100) / 100;
+  }
+
+  return DEFAULT_USD_TO_COP_RATE;
 }
 
 Deno.serve(async (req: Request) => {
@@ -127,42 +172,44 @@ Deno.serve(async (req: Request) => {
     const publicKey = envPublicKey || SANDBOX_PUBLIC_KEY_FALLBACK;
     const environment: WompiEnvironment = publicKey.startsWith('pub_prod_') ? 'production' : 'sandbox';
 
-    let settingsRow: Record<string, unknown> | null = null;
-    try {
-      const { data: settingsData } = await adminClient
-        .from('platform_settings')
-        .select('*')
-        .eq('id', 1)
-        .maybeSingle();
+    const [settingsRow, liveRate] = await Promise.all([
+      (async (): Promise<Record<string, unknown> | null> => {
+        try {
+          const { data: settingsData } = await adminClient
+            .from('platform_settings')
+            .select('*')
+            .eq('id', 1)
+            .maybeSingle();
 
-      if (settingsData && typeof settingsData === 'object') {
-        settingsRow = settingsData as Record<string, unknown>;
-      }
-    } catch {
-      settingsRow = null;
-    }
+          return settingsData && typeof settingsData === 'object'
+            ? (settingsData as Record<string, unknown>)
+            : null;
+        } catch {
+          return null;
+        }
+      })(),
+      fetchLiveUsdToCopRate()
+    ]);
 
-    const priceFieldMap: Record<PaidPlan, Record<BillingCycle, string>> = {
+    const copPriceFieldMap: Record<PaidPlan, Record<BillingCycle, string>> = {
       pro: {
-        monthly: 'pro_monthly_usd',
-        annual: 'pro_annual_total_usd'
+        monthly: 'pro_monthly_cop',
+        annual: 'pro_annual_total_cop'
       },
       industrial: {
-        monthly: 'industrial_monthly_usd',
-        annual: 'industrial_annual_total_usd'
+        monthly: 'industrial_monthly_cop',
+        annual: 'industrial_annual_total_cop'
       }
     };
 
-    const priceColumn = priceFieldMap[plan][billingCycle];
-    const defaultUsd = DEFAULT_USD_PRICING[plan][billingCycle];
-    const amountUsd = resolvePositiveNumber(settingsRow?.[priceColumn], defaultUsd);
-    const exchangeRateCop = resolvePositiveNumber(
-      settingsRow?.['usd_to_cop_rate'],
-      DEFAULT_USD_TO_COP_RATE
-    );
-
-    const amountCop = Math.max(MIN_COP_AMOUNT, Math.round(amountUsd * exchangeRateCop));
+    const priceColumn = copPriceFieldMap[plan][billingCycle];
+    const defaultCop = DEFAULT_COP_PRICING[plan][billingCycle];
+    const rawCop = resolveCopPrice(settingsRow?.[priceColumn], defaultCop);
+    const amountCop = Math.max(MIN_COP_AMOUNT, Math.round(rawCop));
     const amountInCents = amountCop * 100;
+
+    const exchangeRateCop = resolveExchangeRateCop(settingsRow, liveRate);
+    const amountUsd = Math.round((amountCop / exchangeRateCop) * 100) / 100;
     const reference = `P3D-${plan.toUpperCase()}-${billingCycle.toUpperCase()}-${user.id.slice(0, 8)}-${Date.now()}-${randomHex4()}`;
 
     const { error: insertErr } = await adminClient

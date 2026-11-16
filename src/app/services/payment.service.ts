@@ -1,5 +1,5 @@
 import { DOCUMENT, isPlatformBrowser } from '@angular/common';
-import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { Injectable, InjectionToken, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CurrencyExchangeService } from './currency-exchange.service';
 import {
@@ -13,11 +13,29 @@ export type PaidPlan = 'pro' | 'industrial';
 export type CheckoutCycleInput = 'monthly' | 'annual' | 'yearly';
 export type UpgradeReason = 'modules_limit' | 'workshop_export' | 'cnc_export';
 export type PaymentsReadinessMode = 'early_access_protected' | 'live_checkout';
+export type BillingDisplayCurrency = 'COP' | 'USD';
 
 export const WOMPI_SANDBOX_PUBLIC_KEY = 'pub_test_5IPqjmLMDEC0cqUMoomPY7CzUaoGW68O';
 export const WOMPI_WIDGET_SCRIPT_SRC = 'https://checkout.wompi.co/widget.js';
 export const WOMPI_WEB_CHECKOUT_URL = 'https://checkout.wompi.co/p/';
-export const DEFAULT_COP_USD_FALLBACK_RATE = 4250;
+export const DEFAULT_COP_USD_FALLBACK_RATE = 3304;
+
+export const OFFICIAL_COP_PRICING = {
+  pro: {
+    monthly: 49900,
+    annualMonthly: 39920,
+    annualTotal: 479040
+  },
+  industrial: {
+    monthly: 95900,
+    annualMonthly: 76720,
+    annualTotal: 920640
+  }
+} as const;
+
+export const WOMPI_NAVIGATION_HANDLER = new InjectionToken<(url: string) => void>(
+  'WOMPI_NAVIGATION_HANDLER'
+);
 
 export const DEFAULT_PAYMENTS_READINESS_MODE: PaymentsReadinessMode = 'live_checkout';
 export const PAYMENTS_READINESS_MODE_STORAGE_KEY = 'piezo3d_payments_readiness_mode';
@@ -32,6 +50,8 @@ export interface CheckoutVariantConfig {
   plan: PaidPlan;
   cycle: BillingCycle;
   planCode: 'P3D_PRO_MONTHLY' | 'P3D_PRO_ANNUAL' | 'P3D_IND_MONTHLY' | 'P3D_IND_ANNUAL';
+  priceCop: number;
+  monthlyEquivalentCop: number;
   priceUsd: number;
   monthlyEquivalentUsd: number;
 }
@@ -106,6 +126,8 @@ export const CHECKOUT_VARIANTS: Record<PaidPlan, Record<BillingCycle, CheckoutVa
       plan: 'pro',
       cycle: 'monthly',
       planCode: 'P3D_PRO_MONTHLY',
+      priceCop: OFFICIAL_COP_PRICING.pro.monthly,
+      monthlyEquivalentCop: OFFICIAL_COP_PRICING.pro.monthly,
       priceUsd: 15,
       monthlyEquivalentUsd: 15
     },
@@ -113,6 +135,8 @@ export const CHECKOUT_VARIANTS: Record<PaidPlan, Record<BillingCycle, CheckoutVa
       plan: 'pro',
       cycle: 'annual',
       planCode: 'P3D_PRO_ANNUAL',
+      priceCop: OFFICIAL_COP_PRICING.pro.annualTotal,
+      monthlyEquivalentCop: OFFICIAL_COP_PRICING.pro.annualMonthly,
       priceUsd: 144,
       monthlyEquivalentUsd: 12
     }
@@ -122,6 +146,8 @@ export const CHECKOUT_VARIANTS: Record<PaidPlan, Record<BillingCycle, CheckoutVa
       plan: 'industrial',
       cycle: 'monthly',
       planCode: 'P3D_IND_MONTHLY',
+      priceCop: OFFICIAL_COP_PRICING.industrial.monthly,
+      monthlyEquivalentCop: OFFICIAL_COP_PRICING.industrial.monthly,
       priceUsd: 29,
       monthlyEquivalentUsd: 29
     },
@@ -129,6 +155,8 @@ export const CHECKOUT_VARIANTS: Record<PaidPlan, Record<BillingCycle, CheckoutVa
       plan: 'industrial',
       cycle: 'annual',
       planCode: 'P3D_IND_ANNUAL',
+      priceCop: OFFICIAL_COP_PRICING.industrial.annualTotal,
+      monthlyEquivalentCop: OFFICIAL_COP_PRICING.industrial.annualMonthly,
       priceUsd: 276,
       monthlyEquivalentUsd: 23
     }
@@ -146,12 +174,14 @@ export class PaymentService {
   private readonly router = inject(Router);
   private readonly supabaseService = inject(SupabaseService);
   private readonly currencyExchange = inject(CurrencyExchangeService, { optional: true });
+  private readonly wompiNavigationHandler = inject(WOMPI_NAVIGATION_HANDLER, { optional: true });
   private readonly isBrowser = isPlatformBrowser(this.platformId);
 
   private scriptLoadPromise: Promise<boolean> | null = null;
   private readonly inFlightRedirectVerifications = new Map<string, Promise<WompiVerifyTransactionResult>>();
 
   readonly isScriptReady = signal<boolean>(false);
+  readonly displayCurrency = signal<'COP' | 'USD'>('COP');
   readonly lastCheckoutSuccessAt = signal<number | null>(null);
   readonly upgradeModalState = signal<UpgradeModalState | null>(null);
   readonly paymentsMode = signal<PaymentsReadinessMode>(this.readStoredPaymentsMode());
@@ -291,41 +321,106 @@ export class PaymentService {
   }
 
   /**
-   * Calcula el estimado exacto en Pesos Colombianos (COP) y centavos Wompi a partir de la referencia en USD.
-   * Prioriza `platformSettings.usd_to_cop_rate`, luego `CurrencyExchangeService` y finalmente `DEFAULT_COP_USD_FALLBACK_RATE`.
+   * Establece la moneda de visualización para los planes de suscripción (`COP` o `USD`).
+   */
+  setDisplayCurrency(currency: 'COP' | 'USD'): void {
+    this.displayCurrency.set(currency === 'USD' ? 'USD' : 'COP');
+  }
+
+  /**
+   * Obtiene la tarifa mensual oficial en Pesos Colombianos (COP) para un plan y ciclo,
+   * priorizando `platformSettings.*_cop` si es mayor a 0 o `OFFICIAL_COP_PRICING`.
+   */
+  getMonthlyCop(plan: PaidPlan, cycle: CheckoutCycleInput = 'monthly'): number {
+    const normalizedCycle = this.normalizeCycle(cycle);
+    const settings = this.supabaseService.platformSettings?.() ?? null;
+    const fallback =
+      normalizedCycle === 'annual'
+        ? OFFICIAL_COP_PRICING[plan].annualMonthly
+        : OFFICIAL_COP_PRICING[plan].monthly;
+
+    if (!settings) {
+      return fallback;
+    }
+
+    const candidate =
+      plan === 'pro'
+        ? normalizedCycle === 'annual'
+          ? Number(settings.pro_annual_monthly_cop)
+          : Number(settings.pro_monthly_cop)
+        : normalizedCycle === 'annual'
+          ? Number(settings.industrial_annual_monthly_cop)
+          : Number(settings.industrial_monthly_cop);
+
+    return Number.isFinite(candidate) && candidate > 0 ? Math.round(candidate) : fallback;
+  }
+
+  private getAnnualTotalCop(plan: PaidPlan): number {
+    const settings = this.supabaseService.platformSettings?.() ?? null;
+    const fallback = OFFICIAL_COP_PRICING[plan].annualTotal;
+    if (!settings) {
+      return fallback;
+    }
+
+    const candidate =
+      plan === 'pro'
+        ? Number(settings.pro_annual_total_cop)
+        : Number(settings.industrial_annual_total_cop);
+
+    return Number.isFinite(candidate) && candidate > 0 ? Math.round(candidate) : fallback;
+  }
+
+  private resolveActiveUsdToCopRate(): number {
+    const settings = this.supabaseService.platformSettings?.() ?? null;
+    const rawSettingsRate = Number(settings?.usd_to_cop_rate);
+    const hasValidSettingsRate = Number.isFinite(rawSettingsRate) && rawSettingsRate > 0;
+    const isSettingsLegacyOrDefault =
+      !hasValidSettingsRate ||
+      rawSettingsRate === 4250 ||
+      rawSettingsRate === DEFAULT_COP_USD_FALLBACK_RATE;
+
+    const usdPerCop = Number(this.currencyExchange?.rates?.()['USD']);
+    const hasExchangeUsdRate = Number.isFinite(usdPerCop) && usdPerCop > 0;
+    const methodRate = !hasExchangeUsdRate
+      ? Number(this.currencyExchange?.getUsdToCopRate?.())
+      : NaN;
+    const exchangeRateCop = hasExchangeUsdRate
+      ? Math.round((1 / usdPerCop) * 100) / 100
+      : Number.isFinite(methodRate) && methodRate > 0
+        ? Math.round(methodRate * 100) / 100
+        : null;
+    const hasLiveTimestamp =
+      typeof this.currencyExchange?.lastUpdated === 'function'
+        ? this.currencyExchange.lastUpdated() !== null
+        : false;
+
+    if (exchangeRateCop !== null && (hasLiveTimestamp || isSettingsLegacyOrDefault)) {
+      return exchangeRateCop;
+    }
+
+    if (hasValidSettingsRate && rawSettingsRate !== 4250) {
+      return rawSettingsRate;
+    }
+
+    if (exchangeRateCop !== null) {
+      return exchangeRateCop;
+    }
+
+    return DEFAULT_COP_USD_FALLBACK_RATE;
+  }
+
+  /**
+   * Calcula el precio oficial en Pesos Colombianos (COP), los centavos Wompi
+   * y la referencia equivalente en USD calculada con la TRM en vivo (o respaldo 3304 COP/USD).
    */
   getCopEstimate(plan: PaidPlan, cycle: CheckoutCycleInput = 'monthly'): CopPriceEstimate {
     const normalizedCycle = this.normalizeCycle(cycle);
-    const variant = CHECKOUT_VARIANTS[plan][normalizedCycle];
-    const settings = this.supabaseService.platformSettings?.() ?? null;
-
-    let amountUsd = variant.priceUsd;
-    if (settings) {
-      const candidateUsd =
-        plan === 'pro'
-          ? normalizedCycle === 'annual'
-            ? Number(settings.pro_annual_total_usd)
-            : Number(settings.pro_monthly_usd)
-          : normalizedCycle === 'annual'
-            ? Number(settings.industrial_annual_total_usd)
-            : Number(settings.industrial_monthly_usd);
-      if (Number.isFinite(candidateUsd) && candidateUsd > 0) {
-        amountUsd = candidateUsd;
-      }
-    }
-
-    let exchangeRateCop = DEFAULT_COP_USD_FALLBACK_RATE;
-    const settingsRate = Number(settings?.usd_to_cop_rate);
-    if (Number.isFinite(settingsRate) && settingsRate > 0) {
-      exchangeRateCop = settingsRate;
-    } else {
-      const usdPerCop = Number(this.currencyExchange?.rates?.()['USD']);
-      if (Number.isFinite(usdPerCop) && usdPerCop > 0) {
-        exchangeRateCop = Math.round((1 / usdPerCop) * 100) / 100;
-      }
-    }
-
-    const amountCop = Math.max(1500, Math.round(amountUsd * exchangeRateCop));
+    const amountCop =
+      normalizedCycle === 'annual'
+        ? this.getAnnualTotalCop(plan)
+        : this.getMonthlyCop(plan, 'monthly');
+    const exchangeRateCop = this.resolveActiveUsdToCopRate();
+    const amountUsd = Math.round((amountCop / exchangeRateCop) * 100) / 100;
     const amountInCents = amountCop * 100;
 
     return {
@@ -334,6 +429,19 @@ export class PaymentService {
       amountCop,
       amountInCents
     };
+  }
+
+  /**
+   * Convierte un monto en Pesos Colombianos (COP) a su equivalente aproximado en USD
+   * utilizando la tasa de cambio viva vigente.
+   */
+  convertCopToUsd(amountCop: number): number {
+    const numericCop = Number(amountCop);
+    if (!Number.isFinite(numericCop) || numericCop <= 0) {
+      return 0;
+    }
+    const exchangeRateCop = this.resolveActiveUsdToCopRate();
+    return Math.round((numericCop / exchangeRateCop) * 100) / 100;
   }
 
   /**
@@ -416,12 +524,19 @@ export class PaymentService {
   }
 
   /**
-   * Construye la URL de respaldo de Wompi Web Checkout para abrir en pestaña cuando el widget no está disponible.
+   * Construye la URL completa de Wompi Web Checkout (`https://checkout.wompi.co/p/`)
+   * para abrir el flujo de pago en pantalla completa con scroll nativo y retorno automático.
    */
   buildWompiWebCheckoutUrl(
     session: Pick<
       WompiCheckoutSessionResult,
-      'publicKey' | 'amountInCents' | 'reference' | 'integritySignature' | 'redirectUrl'
+      | 'publicKey'
+      | 'amountInCents'
+      | 'reference'
+      | 'integritySignature'
+      | 'redirectUrl'
+      | 'customerEmail'
+      | 'customerName'
     >,
     fallbackRedirectUrl?: string
   ): string {
@@ -436,7 +551,25 @@ export class PaymentService {
     if (effectiveRedirectUrl) {
       query.set('redirect-url', effectiveRedirectUrl);
     }
+    const customerEmail = session.customerEmail?.trim();
+    if (customerEmail) {
+      query.set('customer-data:email', customerEmail);
+    }
+    const customerName = session.customerName?.trim();
+    if (customerName) {
+      query.set('customer-data:full-name', customerName);
+    }
     return `${WOMPI_WEB_CHECKOUT_URL}?${query.toString()}`;
+  }
+
+  private navigateToWompiCheckout(url: string): void {
+    if (this.wompiNavigationHandler) {
+      this.wompiNavigationHandler(url);
+      return;
+    }
+    if (this.isBrowser && typeof window !== 'undefined' && typeof window.location?.assign === 'function') {
+      window.location.assign(url);
+    }
   }
 
   private resolveCheckoutRedirectUrl(): string {
@@ -660,55 +793,9 @@ export class PaymentService {
         return;
       }
 
-      const publicKey = sessionRes.publicKey || WOMPI_SANDBOX_PUBLIC_KEY;
       const effectiveRedirectUrl = sessionRes.redirectUrl || redirectUrl;
-
-      await this.ensureWompiScriptLoaded();
-
-      if (typeof window.WidgetCheckout === 'function') {
-        try {
-          const customerData =
-            sessionRes.customerEmail || sessionRes.customerName
-              ? {
-                  ...(sessionRes.customerEmail ? { email: sessionRes.customerEmail } : {}),
-                  ...(sessionRes.customerName ? { fullName: sessionRes.customerName } : {})
-                }
-              : undefined;
-
-          const widget = new window.WidgetCheckout({
-            currency: 'COP',
-            amountInCents: sessionRes.amountInCents,
-            reference: sessionRes.reference,
-            publicKey,
-            redirectUrl: effectiveRedirectUrl,
-            signature: {
-              integrity: sessionRes.integritySignature
-            },
-            ...(customerData ? { customerData } : {})
-          });
-
-          widget.open((result: WompiWidgetTransactionResult) => {
-            const tx = result?.transaction;
-            if (!tx?.id) {
-              return;
-            }
-            const status = String(tx.status ?? '').toUpperCase();
-            if (status === 'DECLINED' || status === 'ERROR' || status === 'VOIDED') {
-              this.lastCheckoutError.set(
-                'El pago no fue aprobado. Puedes intentar con otro medio de pago.'
-              );
-              return;
-            }
-            void this.handleWompiTransactionResult(tx);
-          });
-          return;
-        } catch {
-          // Continuar al fallback Web Checkout si el widget falla al instanciar
-        }
-      }
-
-      const fallbackUrl = this.buildWompiWebCheckoutUrl(sessionRes, effectiveRedirectUrl);
-      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+      const webCheckoutUrl = this.buildWompiWebCheckoutUrl(sessionRes, effectiveRedirectUrl);
+      this.navigateToWompiCheckout(webCheckoutUrl);
     } finally {
       this.isPreparingCheckout.set(false);
     }

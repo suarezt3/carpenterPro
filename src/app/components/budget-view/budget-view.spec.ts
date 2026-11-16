@@ -16,6 +16,9 @@ describe('BudgetViewComponent (Conversión Real de Moneda y Formato de Precio Un
   let exchangeService: CurrencyExchangeService;
 
   beforeEach(async () => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('melamipro_exchange_rates_cache_v1');
+    }
     await TestBed.configureTestingModule({
       imports: [BudgetViewComponent],
       providers: [
@@ -66,17 +69,17 @@ describe('BudgetViewComponent (Conversión Real de Moneda y Formato de Precio Un
       projectService.updateCurrency('USD');
       fixture.detectChanges();
 
-      // 425,000 COP con tasa de 1/4250 debe ser exactamente 100 USD
-      expect(component.format(425000)).toBe('$ 100.00 USD');
-      expect(component.formatUnitPrice(425000)).toBe('$ 100.00');
+      // 330,400 COP con tasa de 1/3304 debe ser exactamente 100 USD
+      expect(component.format(330400)).toBe('$ 100.00 USD');
+      expect(component.formatUnitPrice(330400)).toBe('$ 100.00');
 
-      // Un tablero de 195,000 COP debe convertirse a ~45.88 USD
+      // Un tablero de 195,000 COP debe convertirse a ~59.02 USD
       const unitPriceUsd = component.formatUnitPrice(195000);
       expect(unitPriceUsd).toContain('$');
       expect(unitPriceUsd).toContain('.');
       const numericPart = parseFloat(unitPriceUsd.replace('$', '').trim());
-      expect(numericPart).toBeGreaterThan(40);
-      expect(numericPart).toBeLessThan(50);
+      expect(numericPart).toBeGreaterThan(55);
+      expect(numericPart).toBeLessThan(65);
     });
 
     it('al cambiar a MXN, format y formatUnitPrice deben convertir a pesos mexicanos', () => {
@@ -97,7 +100,7 @@ describe('BudgetViewComponent (Conversión Real de Moneda y Formato de Precio Un
 
     it('getInverseRateDisplay debe mostrar la pastilla informativa correspondiente', () => {
       expect(exchangeService.getInverseRateDisplay('COP')).toBe('Moneda Base (COP)');
-      expect(exchangeService.getInverseRateDisplay('USD')).toBe('1 USD = $ 4.250 COP');
+      expect(exchangeService.getInverseRateDisplay('USD')).toBe('1 USD = $ 3.304 COP');
       expect(exchangeService.getInverseRateDisplay('MXN')).toBe('1 MXN = $ 212 COP');
     });
   });
@@ -174,24 +177,24 @@ describe('BudgetViewComponent (Conversión Real de Moneda y Formato de Precio Un
       // El usuario escribe 100 USD en el input de precio unitario
       const userEnteredUsd = 100;
       const calculatedCop = exchangeService.convertToCop(userEnteredUsd, 'USD');
-      expect(calculatedCop).toBe(425000);
+      expect(calculatedCop).toBe(330400);
 
       // Simulamos la llamada de blur
       component.updateMaterialCost(testMat, calculatedCop);
       fixture.detectChanges();
 
-      // En el almacenamiento interno el material ahora vale 425,000 COP
+      // En el almacenamiento interno el material ahora vale 330,400 COP
       const updatedMat = component.materials().find(m => m.id === testMat.id)!;
-      expect(updatedMat.sheetCost).toBe(425000);
+      expect(updatedMat.sheetCost).toBe(330400);
 
       // Al mostrarlo en USD en la tabla, se muestra como $ 100.00
       expect(component.formatUnitPrice(updatedMat.sheetCost)).toBe('$ 100.00');
 
-      // Si cambiamos la moneda a COP, se muestra exactamente como $ 425.000 COP
+      // Si cambiamos la moneda a COP, se muestra exactamente como $ 330.400 COP
       projectService.updateCurrency('COP');
       fixture.detectChanges();
-      expect(component.formatUnitPrice(updatedMat.sheetCost)).toBe('$ 425.000');
-      expect(component.format(updatedMat.sheetCost)).toBe('$ 425.000 COP');
+      expect(component.formatUnitPrice(updatedMat.sheetCost)).toBe('$ 330.400');
+      expect(component.format(updatedMat.sheetCost)).toBe('$ 330.400 COP');
     });
   });
 

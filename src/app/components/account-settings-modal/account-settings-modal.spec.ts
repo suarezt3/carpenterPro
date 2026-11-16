@@ -853,24 +853,86 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       expect(component.toastMessage()).toBe('account.billing.gatewayKeyMissingError');
     });
 
-    it('debe mostrar la referencia exacta de cobro en COP (1A) para Pro e Industrial en ciclo mensual y anual incluso con mock mínimo de PaymentService', () => {
+    it('debe mostrar precios oficiales en COP por defecto, equivalencia USD en tiempo real y permitir alternar a modo USD', () => {
       const el = fixture.nativeElement as HTMLElement;
+      const proMainPrice = el.querySelector('[data-testid="account-pro-main-price"]') as HTMLElement;
+      const indMainPrice = el.querySelector('[data-testid="account-industrial-main-price"]') as HTMLElement;
       const proHint = el.querySelector('[data-testid="account-pro-cop-hint"]') as HTMLElement;
       const indHint = el.querySelector('[data-testid="account-industrial-cop-hint"]') as HTMLElement;
+      const copBtn = el.querySelector('[data-testid="account-currency-cop-btn"]') as HTMLButtonElement;
+      const usdBtn = el.querySelector('[data-testid="account-currency-usd-btn"]') as HTMLButtonElement;
 
-      expect(proHint.textContent).toContain('Cobro aprox.');
-      expect(proHint.textContent).toContain('63.750 COP');
-      expect(indHint.textContent).toContain('Cobro aprox.');
-      expect(indHint.textContent).toContain('123.250 COP');
-      expect(component.formatUsdToCopHint(15)).toBe('Cobro aprox. $ 63.750 COP');
+      expect(copBtn).toBeTruthy();
+      expect(usdBtn).toBeTruthy();
+      expect(component.displayCurrency()).toBe('COP');
 
+      // Modo COP (mensual por defecto)
+      expect(proMainPrice.textContent).toContain('49.900 COP / mes');
+      expect(indMainPrice.textContent).toContain('95.900 COP / mes');
+      expect(proHint.textContent).toContain('Equiv. aprox.');
+      expect(proHint.textContent).toContain('$ 15.10 USD');
+      expect(proHint.textContent).toContain('(TRM vigente)');
+      expect(indHint.textContent).toContain('Equiv. aprox.');
+      expect(indHint.textContent).toContain('$ 29.03 USD');
+
+      // Modo COP en ciclo anual
       component.setBillingCycleSelect('annual');
       fixture.detectChanges();
 
-      expect(component.proCopEstimate().amountCop).toBe(612000);
-      expect(component.industrialCopEstimate().amountCop).toBe(1173000);
-      expect(proHint.textContent).toContain('612.000 COP');
-      expect(indHint.textContent).toContain('1.173.000 COP');
+      expect(proMainPrice.textContent).toContain('39.920 COP / mes');
+      expect(indMainPrice.textContent).toContain('76.720 COP / mes');
+      expect(component.proCopEstimate().amountCop).toBe(479040);
+      expect(component.industrialCopEstimate().amountCop).toBe(920640);
+      expect(proHint.textContent).toContain('479.040 COP / año');
+      expect(proHint.textContent).toContain('$ 144.99 USD');
+      expect(indHint.textContent).toContain('920.640 COP / año');
+      expect(indHint.textContent).toContain('$ 278.64 USD');
+
+      // Alternar a modo USD en ciclo anual
+      usdBtn.click();
+      fixture.detectChanges();
+
+      expect(component.displayCurrency()).toBe('USD');
+      expect(proMainPrice.textContent).toContain('≈ $ 12.08 USD / mes');
+      expect(indMainPrice.textContent).toContain('≈ $ 23.22 USD / mes');
+      expect(proHint.textContent).toContain('Cobro oficial Wompi:');
+      expect(proHint.textContent).toContain('479.040 COP / año');
+      expect(indHint.textContent).toContain('Cobro oficial Wompi:');
+      expect(indHint.textContent).toContain('920.640 COP / año');
+
+      // Volver a mensual en modo USD
+      component.setBillingCycleSelect('monthly');
+      fixture.detectChanges();
+
+      expect(proMainPrice.textContent).toContain('≈ $ 15.10 USD / mes');
+      expect(indMainPrice.textContent).toContain('≈ $ 29.03 USD / mes');
+      expect(proHint.textContent).toContain('Cobro oficial Wompi:');
+      expect(proHint.textContent).toContain('49.900 COP');
+      expect(indHint.textContent).toContain('Cobro oficial Wompi:');
+      expect(indHint.textContent).toContain('95.900 COP');
+
+      // Verificar botones CTA en plan free muestran monto oficial en COP
+      supabaseMock.userProfile.set({
+        id: 'u-free',
+        email: 'free@taller.com',
+        first_name: 'Free',
+        last_name: 'User',
+        role: 'user',
+        plan: 'free',
+        created_at: '2026-11-10',
+        updated_at: '2026-11-10'
+      });
+      fixture.detectChanges();
+
+      const proCtaBtn = el.querySelector('[data-testid="account-checkout-pro-btn"]') as HTMLButtonElement;
+      const indCtaBtn = el.querySelector('[data-testid="account-checkout-industrial-btn"]') as HTMLButtonElement;
+      expect(proCtaBtn.textContent).toContain('49.900 COP');
+      expect(indCtaBtn.textContent).toContain('95.900 COP');
+
+      component.setBillingCycleSelect('annual');
+      fixture.detectChanges();
+      expect(proCtaBtn.textContent).toContain('479.040 COP / año');
+      expect(indCtaBtn.textContent).toContain('920.640 COP / año');
     });
   });
 
@@ -1019,10 +1081,14 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
   describe('Estado de preparación y error de checkout Wompi en PaymentService', () => {
     let isPreparingSig: ReturnType<typeof signal<boolean>>;
     let lastErrorSig: ReturnType<typeof signal<string | null>>;
+    let displayCurrencySig: ReturnType<typeof signal<'COP' | 'USD'>>;
+    let setDisplayCurrencySpy: ReturnType<typeof vi.fn>;
 
     beforeEach(async () => {
       isPreparingSig = signal(false);
       lastErrorSig = signal<string | null>(null);
+      displayCurrencySig = signal<'COP' | 'USD'>('COP');
+      setDisplayCurrencySpy = vi.fn((curr: 'COP' | 'USD') => displayCurrencySig.set(curr));
 
       TestBed.resetTestingModule();
       await TestBed.configureTestingModule({
@@ -1036,12 +1102,31 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
               openCheckout: vi.fn().mockResolvedValue(undefined),
               isPreparingCheckout: isPreparingSig,
               lastCheckoutError: lastErrorSig,
-              getCopEstimate: vi.fn((plan: 'pro' | 'industrial') => ({
-                amountUsd: plan === 'industrial' ? 29 : 15,
-                exchangeRateCop: 4300,
-                amountCop: plan === 'industrial' ? 124700 : 64500,
-                amountInCents: (plan === 'industrial' ? 124700 : 64500) * 100
-              }))
+              displayCurrency: displayCurrencySig,
+              setDisplayCurrency: setDisplayCurrencySpy,
+              getMonthlyCop: vi.fn((plan: 'pro' | 'industrial', cycle?: string) => {
+                if (plan === 'industrial') {
+                  return cycle === 'annual' ? 76720 : 95900;
+                }
+                return cycle === 'annual' ? 39920 : 49900;
+              }),
+              convertCopToUsd: vi.fn((amountCop: number) => Math.round((amountCop / 3304) * 100) / 100),
+              getCopEstimate: vi.fn((plan: 'pro' | 'industrial', cycle?: string) => {
+                const amountCop =
+                  plan === 'industrial'
+                    ? cycle === 'annual'
+                      ? 920640
+                      : 95900
+                    : cycle === 'annual'
+                      ? 479040
+                      : 49900;
+                return {
+                  amountUsd: Math.round((amountCop / 3304) * 100) / 100,
+                  exchangeRateCop: 3304,
+                  amountCop,
+                  amountInCents: amountCop * 100
+                };
+              })
             }
           },
           { provide: ProjectStorageService, useValue: projectServiceMock },
@@ -1059,14 +1144,24 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       await fixture.whenStable();
     });
 
-    it('debe mostrar banner de preparación y banner de error cuando Wompi reporta WOMPI_CONFIG_MISSING o error de sesión', () => {
+    it('debe mostrar banner de redirección, sincronizar displayCurrency con PaymentService y mostrar error cuando Wompi reporta WOMPI_CONFIG_MISSING', () => {
       const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('[data-testid="account-pro-cop-hint"]')?.textContent).toContain('64.500 COP');
-      expect(el.querySelector('[data-testid="account-industrial-cop-hint"]')?.textContent).toContain('124.700 COP');
+      expect(el.querySelector('[data-testid="account-pro-main-price"]')?.textContent).toContain('49.900 COP / mes');
+      expect(el.querySelector('[data-testid="account-industrial-main-price"]')?.textContent).toContain('95.900 COP / mes');
+      expect(el.querySelector('[data-testid="account-pro-cop-hint"]')?.textContent).toContain('$ 15.10 USD');
+      expect(el.querySelector('[data-testid="account-industrial-cop-hint"]')?.textContent).toContain('$ 29.03 USD');
+
+      component.setDisplayCurrency('USD');
+      fixture.detectChanges();
+      expect(setDisplayCurrencySpy).toHaveBeenCalledWith('USD');
+      expect(el.querySelector('[data-testid="account-pro-cop-hint"]')?.textContent).toContain('Cobro oficial Wompi:');
+      expect(el.querySelector('[data-testid="account-pro-cop-hint"]')?.textContent).toContain('49.900 COP');
 
       isPreparingSig.set(true);
       fixture.detectChanges();
-      expect(el.querySelector('[data-testid="account-checkout-preparing-banner"]')).toBeTruthy();
+      const prepBanner = el.querySelector('[data-testid="account-checkout-preparing-banner"]') as HTMLElement;
+      expect(prepBanner).toBeTruthy();
+      expect(prepBanner.textContent).toContain('Redirigiendo al checkout seguro en COP con Wompi Colombia...');
 
       isPreparingSig.set(false);
       lastErrorSig.set('WOMPI_CONFIG_MISSING');

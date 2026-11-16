@@ -1104,29 +1104,59 @@
                     </p>
                   </div>
 
-                  <!-- Conmutador Mensual / Anual (-20%) -->
-                  <div class="inline-flex items-center p-1 rounded-lg bg-zinc-200/70 border border-zinc-300/80 self-start sm:self-auto" role="group">
-                    <button
-                      type="button"
-                      data-testid="account-cycle-monthly-btn"
-                      (click)="setBillingCycleSelect('monthly')"
-                      [class]="billingCycleSelect() === 'monthly'
-                        ? 'bg-white text-zinc-900 shadow-2xs font-bold'
-                        : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-                      class="px-3 py-1 rounded-md text-[11px] transition cursor-pointer">
-                      {{ 'landing.pricing.monthly' | t }}
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="account-cycle-annual-btn"
-                      (click)="setBillingCycleSelect('annual')"
-                      [class]="billingCycleSelect() === 'annual'
-                        ? 'bg-white text-zinc-900 shadow-2xs font-bold'
-                        : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-                      class="px-3 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1">
-                      <span>{{ 'landing.pricing.yearly' | t }}</span>
-                      <span class="px-1.5 py-0.2 rounded-sm bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">-20%</span>
-                    </button>
+                  <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                    <!-- Conmutador Moneda COP ($) / USD ($) -->
+                    <div
+                      data-testid="account-currency-toggle"
+                      class="inline-flex items-center p-1 rounded-lg bg-zinc-200/70 border border-zinc-300/80"
+                      role="group"
+                      aria-label="Moneda de visualización">
+                      <button
+                        type="button"
+                        data-testid="account-currency-cop-btn"
+                        (click)="setDisplayCurrency('COP')"
+                        [class]="displayCurrency() === 'COP'
+                          ? 'bg-white text-zinc-900 shadow-2xs font-bold'
+                          : 'text-zinc-600 hover:text-zinc-900 font-medium'"
+                        class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer">
+                        COP ($)
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="account-currency-usd-btn"
+                        (click)="setDisplayCurrency('USD')"
+                        [class]="displayCurrency() === 'USD'
+                          ? 'bg-white text-zinc-900 shadow-2xs font-bold'
+                          : 'text-zinc-600 hover:text-zinc-900 font-medium'"
+                        class="px-2.5 py-1 rounded-md text-[11px] transition cursor-pointer">
+                        USD ($)
+                      </button>
+                    </div>
+
+                    <!-- Conmutador Mensual / Anual (-20%) -->
+                    <div class="inline-flex items-center p-1 rounded-lg bg-zinc-200/70 border border-zinc-300/80" role="group">
+                      <button
+                        type="button"
+                        data-testid="account-cycle-monthly-btn"
+                        (click)="setBillingCycleSelect('monthly')"
+                        [class]="billingCycleSelect() === 'monthly'
+                          ? 'bg-white text-zinc-900 shadow-2xs font-bold'
+                          : 'text-zinc-600 hover:text-zinc-900 font-medium'"
+                        class="px-3 py-1 rounded-md text-[11px] transition cursor-pointer">
+                        {{ 'landing.pricing.monthly' | t }}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="account-cycle-annual-btn"
+                        (click)="setBillingCycleSelect('annual')"
+                        [class]="billingCycleSelect() === 'annual'
+                          ? 'bg-white text-zinc-900 shadow-2xs font-bold'
+                          : 'text-zinc-600 hover:text-zinc-900 font-medium'"
+                        class="px-3 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1">
+                        <span>{{ 'landing.pricing.yearly' | t }}</span>
+                        <span class="px-1.5 py-0.2 rounded-sm bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">-20%</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1136,7 +1166,7 @@
                     data-testid="account-checkout-preparing-banner"
                     class="p-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-xs font-medium flex items-center gap-2 font-sans">
                     <hugeicons-icon [icon]="icons.refresh" [size]="15" [strokeWidth]="2" class="text-sky-600 animate-spin shrink-0"></hugeicons-icon>
-                    <span>Preparando checkout seguro en COP con Wompi Colombia...</span>
+                    <span>Redirigiendo al checkout seguro en COP con Wompi Colombia...</span>
                   </div>
                 }
 
@@ -1156,8 +1186,14 @@
                     <div>
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs font-bold text-zinc-900">{{ 'account.billing.planProTitle' | t }}</span>
-                        <span class="text-xs font-extrabold text-zinc-900">
-                          {{ billingCycleSelect() === 'annual' ? '$' + planPrices().pro_annual_monthly_usd + ' USD / mes' : '$' + planPrices().pro_monthly_usd + ' USD / mes' }}
+                        <span
+                          data-testid="account-pro-main-price"
+                          class="text-xs font-extrabold text-zinc-900 font-numeric">
+                          @if (displayCurrency() === 'COP') {
+                            {{ formatCopCurrency(proMonthlyCop()) }} / mes
+                          } @else {
+                            ≈ {{ formatUsdCurrency(proMonthlyUsdEquivalent()) }} / mes
+                          }
                         </span>
                       </div>
                       <p class="text-[11px] text-zinc-500 mt-1">
@@ -1165,9 +1201,23 @@
                       </p>
                       <p
                         data-testid="account-pro-cop-hint"
-                        class="text-[11px] font-medium text-zinc-600 bg-zinc-50 border border-zinc-200/90 rounded-md px-2.5 py-1 mt-2 inline-flex items-center gap-1 font-sans">
-                        <span>Cobro aprox.</span>
-                        <span class="font-numeric font-bold text-zinc-900">{{ formatCopCurrency(proCopEstimate().amountCop) }}</span>
+                        class="text-[11px] font-medium text-zinc-600 bg-zinc-50 border border-zinc-200/90 rounded-md px-2.5 py-1 mt-2 inline-flex flex-wrap items-center gap-1 font-sans">
+                        @if (displayCurrency() === 'COP') {
+                          @if (billingCycleSelect() === 'annual') {
+                            <span class="font-numeric font-bold text-zinc-900">{{ formatCopCurrency(proCopEstimate().amountCop) }} / año</span>
+                            <span>·</span>
+                            <span class="font-numeric font-semibold text-zinc-700">≈ {{ formatUsdCurrency(proCopEstimate().amountUsd) }}</span>
+                          } @else {
+                            <span>Equiv. aprox.</span>
+                            <span class="font-numeric font-bold text-zinc-900">{{ formatUsdCurrency(proCopEstimate().amountUsd) }}</span>
+                            <span>(TRM vigente)</span>
+                          }
+                        } @else {
+                          <span>Cobro oficial Wompi:</span>
+                          <span class="font-numeric font-bold text-zinc-900">
+                            {{ billingCycleSelect() === 'annual' ? formatCopCurrency(proCopEstimate().amountCop) + ' / año' : formatCopCurrency(proCopEstimate().amountCop) }}
+                          </span>
+                        }
                       </p>
                     </div>
                     @if (userPlan() === 'free') {
@@ -1178,7 +1228,7 @@
                         (click)="selectPlanCheckout('pro')"
                         class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.rocket" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'landing.pricing.planProCta' | t }} ({{ billingCycleSelect() === 'annual' ? '$' + planPrices().pro_annual_total_usd + ' USD / año' : '$' + planPrices().pro_monthly_usd + ' USD' }})</span>
+                        <span>{{ 'landing.pricing.planProCta' | t }} ({{ billingCycleSelect() === 'annual' ? formatCopCurrency(proCopEstimate().amountCop) + ' / año' : formatCopCurrency(proCopEstimate().amountCop) }})</span>
                       </button>
                     } @else if (userPlan() === 'pro' && currentBillingCycle() === 'monthly' && billingCycleSelect() === 'annual') {
                       <button
@@ -1188,7 +1238,7 @@
                         (click)="selectPlanCheckout('pro', 'annual')"
                         class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} (${{ planPrices().pro_annual_total_usd }} USD / año)</span>
+                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} ({{ formatCopCurrency(proCopEstimate().amountCop) }} / año)</span>
                       </button>
                     } @else if (userPlan() === 'pro') {
                       <button
@@ -1214,8 +1264,14 @@
                     <div>
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs font-bold text-zinc-900">{{ 'account.billing.planIndTitle' | t }}</span>
-                        <span class="text-xs font-extrabold text-zinc-900">
-                          {{ billingCycleSelect() === 'annual' ? '$' + planPrices().industrial_annual_monthly_usd + ' USD / mes' : '$' + planPrices().industrial_monthly_usd + ' USD / mes' }}
+                        <span
+                          data-testid="account-industrial-main-price"
+                          class="text-xs font-extrabold text-zinc-900 font-numeric">
+                          @if (displayCurrency() === 'COP') {
+                            {{ formatCopCurrency(industrialMonthlyCop()) }} / mes
+                          } @else {
+                            ≈ {{ formatUsdCurrency(industrialMonthlyUsdEquivalent()) }} / mes
+                          }
                         </span>
                       </div>
                       <p class="text-[11px] text-zinc-500 mt-1">
@@ -1223,9 +1279,23 @@
                       </p>
                       <p
                         data-testid="account-industrial-cop-hint"
-                        class="text-[11px] font-medium text-zinc-600 bg-zinc-50 border border-zinc-200/90 rounded-md px-2.5 py-1 mt-2 inline-flex items-center gap-1 font-sans">
-                        <span>Cobro aprox.</span>
-                        <span class="font-numeric font-bold text-zinc-900">{{ formatCopCurrency(industrialCopEstimate().amountCop) }}</span>
+                        class="text-[11px] font-medium text-zinc-600 bg-zinc-50 border border-zinc-200/90 rounded-md px-2.5 py-1 mt-2 inline-flex flex-wrap items-center gap-1 font-sans">
+                        @if (displayCurrency() === 'COP') {
+                          @if (billingCycleSelect() === 'annual') {
+                            <span class="font-numeric font-bold text-zinc-900">{{ formatCopCurrency(industrialCopEstimate().amountCop) }} / año</span>
+                            <span>·</span>
+                            <span class="font-numeric font-semibold text-zinc-700">≈ {{ formatUsdCurrency(industrialCopEstimate().amountUsd) }}</span>
+                          } @else {
+                            <span>Equiv. aprox.</span>
+                            <span class="font-numeric font-bold text-zinc-900">{{ formatUsdCurrency(industrialCopEstimate().amountUsd) }}</span>
+                            <span>(TRM vigente)</span>
+                          }
+                        } @else {
+                          <span>Cobro oficial Wompi:</span>
+                          <span class="font-numeric font-bold text-zinc-900">
+                            {{ billingCycleSelect() === 'annual' ? formatCopCurrency(industrialCopEstimate().amountCop) + ' / año' : formatCopCurrency(industrialCopEstimate().amountCop) }}
+                          </span>
+                        }
                       </p>
                     </div>
                     @if (userPlan() === 'free' || userPlan() === 'pro') {
@@ -1236,7 +1306,7 @@
                         (click)="selectPlanCheckout('industrial')"
                         class="w-full py-2 px-3 rounded-lg bg-white hover:bg-zinc-100 disabled:opacity-50 text-zinc-900 border border-zinc-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.arrowRight" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }} ({{ billingCycleSelect() === 'annual' ? '$' + planPrices().industrial_annual_total_usd + ' USD / año' : '$' + planPrices().industrial_monthly_usd + ' USD' }})</span>
+                        <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }} ({{ billingCycleSelect() === 'annual' ? formatCopCurrency(industrialCopEstimate().amountCop) + ' / año' : formatCopCurrency(industrialCopEstimate().amountCop) }})</span>
                       </button>
                     } @else if (userPlan() === 'industrial' && currentBillingCycle() === 'monthly' && billingCycleSelect() === 'annual') {
                       <button
@@ -1246,7 +1316,7 @@
                         (click)="selectPlanCheckout('industrial', 'annual')"
                         class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} (${{ planPrices().industrial_annual_total_usd }} USD / año)</span>
+                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} ({{ formatCopCurrency(industrialCopEstimate().amountCop) }} / año)</span>
                       </button>
                     } @else {
                       <button

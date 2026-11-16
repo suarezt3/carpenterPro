@@ -5,10 +5,15 @@ describe('CurrencyExchangeService (Tasas de Cambio en Tiempo Real)', () => {
   let service: CurrencyExchangeService;
 
   beforeEach(() => {
+    localStorage.removeItem('melamipro_exchange_rates_cache_v1');
     TestBed.configureTestingModule({
       providers: [CurrencyExchangeService]
     });
     service = TestBed.inject(CurrencyExchangeService);
+  });
+
+  afterEach(() => {
+    localStorage.removeItem('melamipro_exchange_rates_cache_v1');
   });
 
   describe('1. Moneda Base Canónica (COP)', () => {
@@ -32,8 +37,8 @@ describe('CurrencyExchangeService (Tasas de Cambio en Tiempo Real)', () => {
 
   describe('2. Conversión Exacta a Monedas Extranjeras (USD, MXN, EUR, PEN, CLP, ARS)', () => {
     it('debe convertir montos COP a USD usando la tasa activa', () => {
-      // Con tasa por defecto 1 USD = 4,250 COP (rate = 1/4250)
-      const copAmount = 425000; // Equivalente a 100 USD
+      // Con tasa por defecto 1 USD = 3,304 COP (rate = 1/3304)
+      const copAmount = 330400; // Equivalente a 100 USD
       const usdAmount = service.convertFromCop(copAmount, 'USD');
       expect(Math.round(usdAmount)).toBe(100);
     });
@@ -55,7 +60,7 @@ describe('CurrencyExchangeService (Tasas de Cambio en Tiempo Real)', () => {
     it('debe revertir montos editados en USD de vuelta a la base canónica COP sin pérdida', () => {
       const userEditedUsd = 100;
       const copResult = service.convertToCop(userEditedUsd, 'USD');
-      expect(copResult).toBe(425000);
+      expect(copResult).toBe(330400);
     });
 
     it('debe revertir montos editados en MXN de vuelta a COP', () => {
@@ -66,9 +71,25 @@ describe('CurrencyExchangeService (Tasas de Cambio en Tiempo Real)', () => {
   });
 
   describe('3. Formato Legible de Tasa Inversa (getInverseRateDisplay)', () => {
-    it('debe mostrar la tasa legible para USD (1 USD = $ 4.250 COP)', () => {
+    it('debe mostrar la tasa legible para USD (1 USD = $ 3.304 COP)', () => {
       const display = service.getInverseRateDisplay('USD');
-      expect(display).toBe('1 USD = $ 4.250 COP');
+      expect(display).toBe('1 USD = $ 3.304 COP');
+    });
+
+    it('getUsdToCopRate debe retornar el respaldo 3304 por defecto, reflejar tasas vivas redondeadas a 2 decimales y resistir valores inválidos', () => {
+      expect(service.getUsdToCopRate()).toBe(3304);
+
+      service.rates.set({
+        ...DEFAULT_COP_RATES,
+        USD: 1 / 3456.789
+      });
+      expect(service.getUsdToCopRate()).toBe(3456.79);
+
+      service.rates.set({
+        ...DEFAULT_COP_RATES,
+        USD: 0
+      });
+      expect(service.getUsdToCopRate()).toBe(3304);
     });
 
     it('debe mostrar la tasa legible para MXN (1 MXN = $ 212 COP)', () => {

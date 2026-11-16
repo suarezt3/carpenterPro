@@ -51,6 +51,7 @@ import {
   resolveAvatarBgClass
 } from '../../services/supabase.service';
 import { PaymentService, PaidPlan } from '../../services/payment.service';
+import { CurrencyExchangeService } from '../../services/currency-exchange.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { I18nService } from '../../services/i18n.service';
 import { ThemeService, ThemeMode } from '../../services/theme.service';
@@ -60,6 +61,7 @@ import { DEFAULT_ROOM_CONFIG, ProjectSettings } from '../../models/melamine.mode
 import { isSuperAdminOwnerEmail } from '../../utils/support-email';
 
 export type AccountModalTab = 'profile' | 'workshop' | 'preferences' | 'billing';
+export type AccountDisplayCurrency = 'COP' | 'USD';
 
 export interface AvatarColorOption {
   id: string;
@@ -85,12 +87,34 @@ export interface AccountCopEstimateResult {
   amountInCents: number;
 }
 
+const DEFAULT_ACCOUNT_COP_PRICING = {
+  pro: {
+    monthly: 49900,
+    annualMonthly: 39920,
+    annualTotal: 479040
+  },
+  industrial: {
+    monthly: 95900,
+    annualMonthly: 76720,
+    annualTotal: 920640
+  }
+} as const;
+
+const DEFAULT_ACCOUNT_USD_TO_COP_RATE = 3304;
+
 interface AccountPaymentBridge {
   isPaymentsProtected?: () => boolean;
+  displayCurrency?: () => AccountDisplayCurrency;
+  setDisplayCurrency?: (currency: AccountDisplayCurrency) => void;
   getCopEstimate?: (
     plan: PaidPlan,
     cycle?: 'monthly' | 'annual' | 'yearly'
   ) => AccountCopEstimateResult;
+  getMonthlyCop?: (
+    plan: PaidPlan,
+    cycle?: 'monthly' | 'annual' | 'yearly'
+  ) => number;
+  convertCopToUsd?: (amountCop: number) => number;
   isPreparingCheckout?: () => boolean;
   lastCheckoutError?: () => string | null;
 }
@@ -118,6 +142,7 @@ export class AccountSettingsModalComponent {
   // Injected Services
   readonly supabase = inject(SupabaseService);
   readonly paymentService = inject(PaymentService);
+  readonly currencyExchange = inject(CurrencyExchangeService, { optional: true });
   readonly projectService = inject(ProjectStorageService);
   readonly i18n = inject(I18nService);
   readonly themeService = inject(ThemeService);
@@ -178,30 +203,99 @@ export class AccountSettingsModalComponent {
           industrial_monthly_usd?: number;
           industrial_annual_monthly_usd?: number;
           industrial_annual_total_usd?: number;
+          pro_monthly_cop?: number;
+          pro_annual_monthly_cop?: number;
+          pro_annual_total_cop?: number;
+          industrial_monthly_cop?: number;
+          industrial_annual_monthly_cop?: number;
+          industrial_annual_total_cop?: number;
           usd_to_cop_rate?: number;
         } | null;
       }
     ).platformSettings;
     const s = typeof settingsFn === 'function' ? settingsFn() : null;
+    const proMonthlyCop = Number(s?.pro_monthly_cop ?? DEFAULT_ACCOUNT_COP_PRICING.pro.monthly);
+    const proAnnualMonthlyCop = Number(
+      s?.pro_annual_monthly_cop ?? DEFAULT_ACCOUNT_COP_PRICING.pro.annualMonthly
+    );
+    const proAnnualTotalCop = Number(
+      s?.pro_annual_total_cop ?? DEFAULT_ACCOUNT_COP_PRICING.pro.annualTotal
+    );
+    const indMonthlyCop = Number(
+      s?.industrial_monthly_cop ?? DEFAULT_ACCOUNT_COP_PRICING.industrial.monthly
+    );
+    const indAnnualMonthlyCop = Number(
+      s?.industrial_annual_monthly_cop ?? DEFAULT_ACCOUNT_COP_PRICING.industrial.annualMonthly
+    );
+    const indAnnualTotalCop = Number(
+      s?.industrial_annual_total_cop ?? DEFAULT_ACCOUNT_COP_PRICING.industrial.annualTotal
+    );
     return {
       pro_monthly_usd: Number(s?.pro_monthly_usd ?? 15),
       pro_annual_monthly_usd: Number(s?.pro_annual_monthly_usd ?? 12),
       pro_annual_total_usd: Number(s?.pro_annual_total_usd ?? 144),
       industrial_monthly_usd: Number(s?.industrial_monthly_usd ?? 29),
       industrial_annual_monthly_usd: Number(s?.industrial_annual_monthly_usd ?? 23),
-      industrial_annual_total_usd: Number(s?.industrial_annual_total_usd ?? 276)
+      industrial_annual_total_usd: Number(s?.industrial_annual_total_usd ?? 276),
+      pro_monthly_cop:
+        Number.isFinite(proMonthlyCop) && proMonthlyCop >= 1500
+          ? proMonthlyCop
+          : DEFAULT_ACCOUNT_COP_PRICING.pro.monthly,
+      pro_annual_monthly_cop:
+        Number.isFinite(proAnnualMonthlyCop) && proAnnualMonthlyCop >= 1500
+          ? proAnnualMonthlyCop
+          : DEFAULT_ACCOUNT_COP_PRICING.pro.annualMonthly,
+      pro_annual_total_cop:
+        Number.isFinite(proAnnualTotalCop) && proAnnualTotalCop >= 1500
+          ? proAnnualTotalCop
+          : DEFAULT_ACCOUNT_COP_PRICING.pro.annualTotal,
+      industrial_monthly_cop:
+        Number.isFinite(indMonthlyCop) && indMonthlyCop >= 1500
+          ? indMonthlyCop
+          : DEFAULT_ACCOUNT_COP_PRICING.industrial.monthly,
+      industrial_annual_monthly_cop:
+        Number.isFinite(indAnnualMonthlyCop) && indAnnualMonthlyCop >= 1500
+          ? indAnnualMonthlyCop
+          : DEFAULT_ACCOUNT_COP_PRICING.industrial.annualMonthly,
+      industrial_annual_total_cop:
+        Number.isFinite(indAnnualTotalCop) && indAnnualTotalCop >= 1500
+          ? indAnnualTotalCop
+          : DEFAULT_ACCOUNT_COP_PRICING.industrial.annualTotal
     };
   });
 
   readonly usdToCopRate = computed<number>(() => {
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    const fromService = bridge.getCopEstimate?.('pro', 'monthly');
+    if (
+      fromService &&
+      Number.isFinite(fromService.exchangeRateCop) &&
+      fromService.exchangeRateCop > 0 &&
+      fromService.exchangeRateCop !== 4250
+    ) {
+      return fromService.exchangeRateCop;
+    }
+
     const settingsFn = (
       this.supabase as {
         platformSettings?: () => { usd_to_cop_rate?: number } | null;
       }
     ).platformSettings;
     const s = typeof settingsFn === 'function' ? settingsFn() : null;
-    const rate = Number(s?.usd_to_cop_rate ?? 4250);
-    return Number.isFinite(rate) && rate > 0 ? rate : 4250;
+    const settingsRate = Number(s?.usd_to_cop_rate);
+    if (Number.isFinite(settingsRate) && settingsRate > 0 && settingsRate !== 4250) {
+      return settingsRate;
+    }
+
+    const liveUsdPerCop = Number(this.currencyExchange?.rates?.()['USD']);
+    if (Number.isFinite(liveUsdPerCop) && liveUsdPerCop > 0) {
+      const inverseRate = Math.round((1 / liveUsdPerCop) * 100) / 100;
+      if (inverseRate > 0 && Math.round(inverseRate) !== 4250) {
+        return inverseRate;
+      }
+    }
+
+    return DEFAULT_ACCOUNT_USD_TO_COP_RATE;
   });
 
   goToAdminPanel(): void {
@@ -322,29 +416,83 @@ export class AccountSettingsModalComponent {
   // TAB 4: SUSCRIPCIÓN, MÉTODOS DE PAGO Y FACTURAS (F11)
   // ---------------------------------------------------------------------------
   readonly billingCycleSelect = signal<'monthly' | 'annual'>('monthly');
+  private readonly fallbackDisplayCurrency = signal<AccountDisplayCurrency>('COP');
   readonly isLoadingInvoices = signal<boolean>(false);
   readonly hasLoadedCloudInvoices = signal<boolean>(false);
   readonly cloudInvoices = signal<SubscriptionInvoice[]>([]);
   readonly showManageBillingNotice = signal<boolean>(false);
 
+  readonly displayCurrency = computed<AccountDisplayCurrency>(() => {
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    if (typeof bridge.displayCurrency === 'function') {
+      const curr = bridge.displayCurrency();
+      if (curr === 'COP' || curr === 'USD') {
+        return curr;
+      }
+    }
+    return this.fallbackDisplayCurrency();
+  });
+
+  setDisplayCurrency(currency: AccountDisplayCurrency): void {
+    this.fallbackDisplayCurrency.set(currency);
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    if (typeof bridge.setDisplayCurrency === 'function') {
+      bridge.setDisplayCurrency(currency);
+    }
+  }
+
+  getPlanMonthlyCop(plan: PaidPlan, cycleOverride?: 'monthly' | 'annual'): number {
+    const cycle = cycleOverride ?? this.billingCycleSelect();
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    const fromMonthlyMethod = bridge.getMonthlyCop?.(plan, cycle);
+    if (typeof fromMonthlyMethod === 'number' && Number.isFinite(fromMonthlyMethod) && fromMonthlyMethod > 0) {
+      return Math.round(fromMonthlyMethod);
+    }
+    const prices = this.planPrices();
+    if (plan === 'industrial') {
+      return cycle === 'annual'
+        ? prices.industrial_annual_monthly_cop
+        : prices.industrial_monthly_cop;
+    }
+    return cycle === 'annual' ? prices.pro_annual_monthly_cop : prices.pro_monthly_cop;
+  }
+
+  private convertCopAmountToUsd(amountCop: number, rateOverride?: number): number {
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    const fromBridge = bridge.convertCopToUsd?.(amountCop);
+    if (typeof fromBridge === 'number' && Number.isFinite(fromBridge) && fromBridge > 0) {
+      return Math.round(fromBridge * 100) / 100;
+    }
+    const rate =
+      typeof rateOverride === 'number' && Number.isFinite(rateOverride) && rateOverride > 0
+        ? rateOverride
+        : this.usdToCopRate();
+    return Math.round((amountCop / rate) * 100) / 100;
+  }
+
   private computePlanCopEstimate(plan: PaidPlan): AccountCopEstimateResult {
     const cycle = this.billingCycleSelect();
     const bridge = this.paymentService as unknown as AccountPaymentBridge;
     const fromService = bridge.getCopEstimate?.(plan, cycle);
-    if (fromService && Number.isFinite(fromService.amountCop) && fromService.amountCop > 0) {
+    if (
+      fromService &&
+      Number.isFinite(fromService.amountCop) &&
+      fromService.amountCop > 0 &&
+      fromService.exchangeRateCop !== 4250
+    ) {
       return fromService;
     }
     const prices = this.planPrices();
-    const amountUsd =
+    const amountCop =
       plan === 'industrial'
         ? cycle === 'annual'
-          ? prices.industrial_annual_total_usd
-          : prices.industrial_monthly_usd
+          ? prices.industrial_annual_total_cop
+          : prices.industrial_monthly_cop
         : cycle === 'annual'
-          ? prices.pro_annual_total_usd
-          : prices.pro_monthly_usd;
+          ? prices.pro_annual_total_cop
+          : prices.pro_monthly_cop;
     const rate = this.usdToCopRate();
-    const amountCop = Math.max(1500, Math.round(amountUsd * rate));
+    const amountUsd = this.convertCopAmountToUsd(amountCop, rate);
     return {
       amountUsd,
       exchangeRateCop: rate,
@@ -353,6 +501,10 @@ export class AccountSettingsModalComponent {
     };
   }
 
+  readonly proMonthlyCop = computed<number>(() => this.getPlanMonthlyCop('pro'));
+
+  readonly industrialMonthlyCop = computed<number>(() => this.getPlanMonthlyCop('industrial'));
+
   readonly proCopEstimate = computed<AccountCopEstimateResult>(() =>
     this.computePlanCopEstimate('pro')
   );
@@ -360,6 +512,40 @@ export class AccountSettingsModalComponent {
   readonly industrialCopEstimate = computed<AccountCopEstimateResult>(() =>
     this.computePlanCopEstimate('industrial')
   );
+
+  readonly proMonthlyUsdEquivalent = computed<number>(() => {
+    const cycle = this.billingCycleSelect();
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    const monthlyCop = this.proMonthlyCop();
+    if (typeof bridge.convertCopToUsd === 'function') {
+      const converted = bridge.convertCopToUsd(monthlyCop);
+      if (Number.isFinite(converted) && converted > 0) {
+        return Math.round(converted * 100) / 100;
+      }
+    }
+    const estimate = this.proCopEstimate();
+    if (cycle === 'annual') {
+      return Math.round((estimate.amountUsd / 12) * 100) / 100;
+    }
+    return Math.round(estimate.amountUsd * 100) / 100;
+  });
+
+  readonly industrialMonthlyUsdEquivalent = computed<number>(() => {
+    const cycle = this.billingCycleSelect();
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    const monthlyCop = this.industrialMonthlyCop();
+    if (typeof bridge.convertCopToUsd === 'function') {
+      const converted = bridge.convertCopToUsd(monthlyCop);
+      if (Number.isFinite(converted) && converted > 0) {
+        return Math.round(converted * 100) / 100;
+      }
+    }
+    const estimate = this.industrialCopEstimate();
+    if (cycle === 'annual') {
+      return Math.round((estimate.amountUsd / 12) * 100) / 100;
+    }
+    return Math.round(estimate.amountUsd * 100) / 100;
+  });
 
   readonly isPreparingCheckout = computed<boolean>(() => {
     const bridge = this.paymentService as unknown as AccountPaymentBridge;
@@ -387,6 +573,11 @@ export class AccountSettingsModalComponent {
   formatCopCurrency(amountCop: number): string {
     const rounded = Number.isFinite(amountCop) && amountCop > 0 ? Math.round(amountCop) : 0;
     return `$ ${rounded.toLocaleString('es-CO')} COP`;
+  }
+
+  formatUsdCurrency(amountUsd: number): string {
+    const safe = Number.isFinite(amountUsd) && amountUsd > 0 ? amountUsd : 0;
+    return `$ ${safe.toFixed(2)} USD`;
   }
 
   formatUsdToCopHint(usdAmount: number): string {

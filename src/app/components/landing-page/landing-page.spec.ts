@@ -2,7 +2,8 @@ import { signal, WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { LandingPageComponent } from './landing-page';
-import { PaymentService } from '../../services/payment.service';
+import { OFFICIAL_COP_PRICING, PaymentService } from '../../services/payment.service';
+import { CurrencyExchangeService, DEFAULT_COP_RATES } from '../../services/currency-exchange.service';
 import { SupabaseService } from '../../services/supabase.service';
 import { UserFeedbackRecord } from '../../models/feedback.models';
 import { TRANSLATIONS, AppLanguage } from '../../data/i18n-translations.data';
@@ -19,6 +20,7 @@ describe('LandingPageComponent', () => {
   };
 
   beforeEach(async () => {
+    localStorage.removeItem('melamipro_exchange_rates_cache_v1');
     isAuthSignal = signal(false);
     mockSupabase = {
       isAuthenticated: isAuthSignal,
@@ -344,64 +346,69 @@ describe('LandingPageComponent', () => {
     expect(aboutSection?.textContent).toContain('4 Herramientas en 1');
   });
 
-  describe('Sección de Precios & Conversión Multimoneda', () => {
-    it('la moneda de referencia inicial debe ser "USD" y debe poder conmutarse a COP, MXN y EUR', () => {
+  describe('Sección de Precios & Conversión Multimoneda (Base COP + TRM en Vivo)', () => {
+    it('la moneda de referencia inicial debe ser "COP", en orden COP/USD/MXN/EUR y sincronizada con PaymentService', () => {
       const fixture = TestBed.createComponent(LandingPageComponent);
       const component = fixture.componentInstance;
+      const paymentService = TestBed.inject(PaymentService);
+      const setDisplaySpy = vi.spyOn(paymentService, 'setDisplayCurrency');
 
-      expect(component.selectedPricingCurrency()).toBe('USD');
-      expect(component.pricingCurrencies.length).toBe(4);
-
-      component.setPricingCurrency('COP');
       expect(component.selectedPricingCurrency()).toBe('COP');
+      expect(component.pricingCurrencies.map((c) => c.code)).toEqual(['COP', 'USD', 'MXN', 'EUR']);
+      expect(component.pricingCurrencies.map((c) => c.label)).toEqual([
+        'COP ($)',
+        'USD ($)',
+        'MXN ($)',
+        'EUR (€)'
+      ]);
+
+      component.setPricingCurrency('USD');
+      expect(component.selectedPricingCurrency()).toBe('USD');
+      expect(setDisplaySpy).toHaveBeenCalledWith('USD');
 
       component.setPricingCurrency('MXN');
       expect(component.selectedPricingCurrency()).toBe('MXN');
+      expect(setDisplaySpy).toHaveBeenCalledTimes(1);
 
       component.setPricingCurrency('EUR');
       expect(component.selectedPricingCurrency()).toBe('EUR');
+      expect(setDisplaySpy).toHaveBeenCalledTimes(1);
 
-      component.setPricingCurrency('USD');
-      expect(component.selectedPricingCurrency()).toBe('USD');
+      component.setPricingCurrency('COP');
+      expect(component.selectedPricingCurrency()).toBe('COP');
+      expect(setDisplaySpy).toHaveBeenCalledWith('COP');
     });
 
-    it('getConvertedPrice debe devolver null para USD y valores aproximados formateados para otras monedas', () => {
+    it('getConvertedPrice debe devolver conversión en vivo a USD cuando la moneda es COP y null en monedas extranjeras', () => {
       const fixture = TestBed.createComponent(LandingPageComponent);
       const component = fixture.componentInstance;
+      const exchange = TestBed.inject(CurrencyExchangeService);
+      exchange.rates.set({ ...DEFAULT_COP_RATES });
 
-      // 1. En USD debe retornar null para no ensuciar la tarjeta
-      component.setPricingCurrency('USD');
-      expect(component.getConvertedPrice(15)).toBeNull();
-
-      // 2. En COP: 15 USD ≈ 63.750 COP
+      // 1. En COP: convierte COP -> USD en vivo (49.900 / 3304 = 15.10 USD)
       component.setPricingCurrency('COP');
-      const copPrice = component.getConvertedPrice(15);
-      expect(copPrice).toBeTruthy();
-      expect(copPrice).toContain('≈ $');
-      expect(copPrice).toContain('COP');
-      expect(copPrice).toContain('63.750');
+      const usdFromPro = component.getConvertedPrice(49900);
+      expect(usdFromPro).toBe('≈ $ 15.10 USD');
 
-      // 3. En MXN: 15 USD ≈ 301 MXN
+      const usdFromInd = component.getConvertedPrice(95900);
+      expect(usdFromInd).toBe('≈ $ 29.03 USD');
+
+      // 2. En USD, MXN y EUR retorna null porque el precio principal ya está convertido
+      component.setPricingCurrency('USD');
+      expect(component.getConvertedPrice(49900)).toBeNull();
       component.setPricingCurrency('MXN');
-      const mxnPrice = component.getConvertedPrice(15);
-      expect(mxnPrice).toBeTruthy();
-      expect(mxnPrice).toContain('≈ $');
-      expect(mxnPrice).toContain('MXN');
-      expect(mxnPrice).toContain('301');
-
-      // 4. En EUR: 15 USD ≈ 14 EUR
+      expect(component.getConvertedPrice(49900)).toBeNull();
       component.setPricingCurrency('EUR');
-      const eurPrice = component.getConvertedPrice(15);
-      expect(eurPrice).toBeTruthy();
-      expect(eurPrice).toContain('≈ €');
-      expect(eurPrice).toContain('EUR');
-      expect(eurPrice).toContain('14');
+      expect(component.getConvertedPrice(49900)).toBeNull();
     });
 
-    it('debe tener todas las claves nuevas de la sección de Precios en los 6 idiomas', () => {
+    it('debe tener todas las claves de la sección de Precios y cobro COP/Wompi en los 6 idiomas sin USD quemados en facturación anual', () => {
       const requiredPricingKeys = [
         'landing.pricing.currencyLabel',
         'landing.pricing.currencyNotice',
+        'landing.pricing.yearlyPeriod',
+        'landing.pricing.internationalCardsHint',
+        'landing.pricing.officialWompiPrefix',
         'landing.pricing.planStarterBadge',
         'landing.pricing.planStarterTitle',
         'landing.pricing.planStarterDesc',
@@ -442,7 +449,9 @@ describe('LandingPageComponent', () => {
         'landing.pricing.planIndF3',
         'landing.pricing.planIndF4',
         'landing.pricing.planIndF5',
-        'landing.pricing.planIndF6'
+        'landing.pricing.planIndF6',
+        'account.billing.copUsdToggleHint',
+        'account.billing.wompiChargeLabel'
       ];
 
       const languages: AppLanguage[] = ['es', 'en', 'pt', 'fr', 'it', 'de'];
@@ -450,13 +459,20 @@ describe('LandingPageComponent', () => {
       for (const lang of languages) {
         for (const key of requiredPricingKeys) {
           const text = TRANSLATIONS[lang]?.[key];
-          expect(text).toBeDefined();
+          expect(text, `Falta clave ${key} en ${lang}`).toBeDefined();
           expect(text!.trim().length).toBeGreaterThan(0);
         }
+
+        expect(TRANSLATIONS[lang]['landing.pricing.currencyNotice']).toContain('COP');
+        expect(TRANSLATIONS[lang]['landing.pricing.currencyNotice']).not.toContain('USD');
+        expect(TRANSLATIONS[lang]['landing.pricing.planProBilledYearly']).not.toContain('$144');
+        expect(TRANSLATIONS[lang]['landing.pricing.planProBilledYearly']).not.toContain('USD');
+        expect(TRANSLATIONS[lang]['landing.pricing.planIndBilledYearly']).not.toContain('$276');
+        expect(TRANSLATIONS[lang]['landing.pricing.planIndBilledYearly']).not.toContain('USD');
       }
     });
 
-    it('los precios principales deben indicar explícitamente USD en todos los idiomas', () => {
+    it('los precios principales en diccionario deben indicar explícitamente COP en todos los idiomas', () => {
       const languages: AppLanguage[] = ['es', 'en', 'pt', 'fr', 'it', 'de'];
 
       for (const lang of languages) {
@@ -466,16 +482,18 @@ describe('LandingPageComponent', () => {
         const indMonthly = TRANSLATIONS[lang]['landing.pricing.planIndPriceMonthly'];
         const indYearly = TRANSLATIONS[lang]['landing.pricing.planIndPriceYearly'];
 
-        expect(starterPrice).toContain('USD');
-        expect(proMonthly).toContain('USD');
-        expect(proYearly).toContain('USD');
-        expect(indMonthly).toContain('USD');
-        expect(indYearly).toContain('USD');
+        expect(starterPrice).toContain('COP');
+        expect(proMonthly).toContain('COP');
+        expect(proYearly).toContain('COP');
+        expect(indMonthly).toContain('COP');
+        expect(indYearly).toContain('COP');
       }
     });
 
-    it('debe renderizar en el DOM los precios explícitos en USD ($15 y $29), las limitaciones del Plan Inicial y la nota de valor', () => {
+    it('debe renderizar por defecto en COP ($ 49.900 COP y $ 95.900 COP) con chip de conversión en vivo USD y aviso oficial', () => {
       const fixture = TestBed.createComponent(LandingPageComponent);
+      const exchange = TestBed.inject(CurrencyExchangeService);
+      exchange.rates.set({ ...DEFAULT_COP_RATES });
       fixture.componentInstance.selectLanguage('es');
       fixture.detectChanges();
 
@@ -485,39 +503,61 @@ describe('LandingPageComponent', () => {
 
       const text = pricingSection?.textContent ?? '';
 
-      // Precios principales con USD explícito ($15 USD y $29 USD)
-      expect(text).toContain('$0 USD');
-      expect(text).toContain('$15 USD');
-      expect(text).toContain('$29 USD');
+      // Precios oficiales en COP + chip USD en vivo
+      expect(text).toContain('$ 0 COP');
+      expect(text).toContain('$ 49.900 COP');
+      expect(text).toContain('$ 95.900 COP');
+      expect(text).toContain('≈ $ 15.10 USD');
+      expect(text).toContain('≈ $ 29.03 USD');
+      expect(text).toContain('Tarjetas internacionales');
+      expect(text).toContain('Cobro oficial en COP · Ref. TRM en vivo');
 
-      // Limitaciones del Plan Inicial
+      // Limitaciones del Plan Inicial y nota de valor
       expect(text).toContain('Límite de 1 proyecto activo (máximo 3 módulos)');
       expect(text).toContain('Optimizador 2D solo en vista previa (1 tablero)');
       expect(text).toContain('Sin descargas PDF, Guías de Armado, Etiquetas ni CNC');
-
-      // Nota de valor del Plan Taller Pro
       expect(text).toContain('Se paga solo ahorrando menos de medio tablero de melamina al mes');
     });
 
-    it('al seleccionar COP como moneda de referencia en el selector debe mostrar en vivo la insignia de conversión', () => {
+    it('al seleccionar USD, MXN o EUR debe mostrar la conversión en vivo en el precio principal y el cobro oficial Wompi en COP debajo', () => {
       const fixture = TestBed.createComponent(LandingPageComponent);
       const component = fixture.componentInstance;
+      const exchange = TestBed.inject(CurrencyExchangeService);
+      exchange.rates.set({ ...DEFAULT_COP_RATES });
       component.selectLanguage('es');
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
-      let pricingSection = compiled.querySelector('#pricing');
-      expect(pricingSection?.textContent).not.toContain('≈ $');
 
-      // Seleccionar COP
-      component.setPricingCurrency('COP');
+      // 1. USD
+      const usdBtn = compiled.querySelector('[data-testid="landing-currency-USD"]') as HTMLButtonElement | null;
+      usdBtn?.click();
       fixture.detectChanges();
 
-      pricingSection = compiled.querySelector('#pricing');
-      const text = pricingSection?.textContent ?? '';
-      expect(text).toContain('≈ $');
-      expect(text).toContain('COP');
-      expect(text).toContain('/ mes');
+      expect(compiled.querySelector('[data-testid="landing-pro-price"]')?.textContent?.trim()).toBe('$ 15.10 USD');
+      expect(compiled.querySelector('[data-testid="landing-ind-price"]')?.textContent?.trim()).toBe('$ 29.03 USD');
+      expect(compiled.querySelector('[data-testid="landing-pro-subprice"]')?.textContent).toContain('Cobro oficial Wompi:');
+      expect(compiled.querySelector('[data-testid="landing-pro-subprice"]')?.textContent).toContain('$ 49.900 COP');
+      expect(compiled.querySelector('[data-testid="landing-ind-subprice"]')?.textContent).toContain('$ 95.900 COP');
+
+      // 2. MXN
+      const mxnBtn = compiled.querySelector('[data-testid="landing-currency-MXN"]') as HTMLButtonElement | null;
+      mxnBtn?.click();
+      fixture.detectChanges();
+
+      expect(compiled.querySelector('[data-testid="landing-pro-price"]')?.textContent).toContain('MXN');
+      expect(compiled.querySelector('[data-testid="landing-pro-price"]')?.textContent).toContain('235');
+      expect(compiled.querySelector('[data-testid="landing-pro-subprice"]')?.textContent).toContain('Cobro oficial Wompi:');
+      expect(compiled.querySelector('[data-testid="landing-pro-subprice"]')?.textContent).toContain('$ 49.900 COP');
+
+      // 3. EUR
+      const eurBtn = compiled.querySelector('[data-testid="landing-currency-EUR"]') as HTMLButtonElement | null;
+      eurBtn?.click();
+      fixture.detectChanges();
+
+      expect(compiled.querySelector('[data-testid="landing-pro-price"]')?.textContent?.trim()).toBe('€ 10.97 EUR');
+      expect(compiled.querySelector('[data-testid="landing-ind-price"]')?.textContent?.trim()).toBe('€ 21.08 EUR');
+      expect(compiled.querySelector('[data-testid="landing-pro-subprice"]')?.textContent).toContain('$ 49.900 COP');
     });
 
     it('debe tener mapeados los iconos Hugeicons oficiales correspondientes para checks y restricciones', () => {
@@ -530,35 +570,11 @@ describe('LandingPageComponent', () => {
       expect(component.icons.limit).toBeDefined();
     });
 
-    it('debe calcular conversiones aproximadas correctas para planes Pro ($15/$12) y CNC ($29/$23) tanto en mensual como en anual', () => {
+    it('al alternar ciclo de facturación a yearly debe mostrar $ 39.920 COP y $ 76.720 COP con totales anuales exactos en COP y USD', () => {
       const fixture = TestBed.createComponent(LandingPageComponent);
       const component = fixture.componentInstance;
-
-      // COP:
-      component.setPricingCurrency('COP');
-      expect(component.getConvertedPrice(15)).toContain('63.750');
-      expect(component.getConvertedPrice(12)).toContain('51.000');
-      expect(component.getConvertedPrice(29)).toContain('123.250');
-      expect(component.getConvertedPrice(23)).toContain('97.750');
-
-      // MXN:
-      component.setPricingCurrency('MXN');
-      expect(component.getConvertedPrice(15)).toContain('301');
-      expect(component.getConvertedPrice(12)).toContain('241');
-      expect(component.getConvertedPrice(29)).toContain('581');
-      expect(component.getConvertedPrice(23)).toContain('461');
-
-      // EUR:
-      component.setPricingCurrency('EUR');
-      expect(component.getConvertedPrice(15)).toContain('14');
-      expect(component.getConvertedPrice(12)).toContain('11');
-      expect(component.getConvertedPrice(29)).toContain('27');
-      expect(component.getConvertedPrice(23)).toContain('21');
-    });
-
-    it('al alternar ciclo de facturación a yearly debe actualizar el precio a $12 USD y $23 USD con facturación anual correcta', () => {
-      const fixture = TestBed.createComponent(LandingPageComponent);
-      const component = fixture.componentInstance;
+      const exchange = TestBed.inject(CurrencyExchangeService);
+      exchange.rates.set({ ...DEFAULT_COP_RATES });
       component.selectLanguage('es');
       fixture.detectChanges();
 
@@ -568,57 +584,85 @@ describe('LandingPageComponent', () => {
       const compiled = fixture.nativeElement as HTMLElement;
       const text = compiled.querySelector('#pricing')?.textContent ?? '';
 
-      expect(text).toContain('$12 USD');
-      expect(text).toContain('$23 USD');
-      expect(text).toContain('Facturado anualmente ($144 USD / año)');
-      expect(text).toContain('Facturado anualmente ($276 USD / año)');
+      expect(text).toContain('$ 39.920 COP');
+      expect(text).toContain('$ 76.720 COP');
+      expect(text).toContain('Facturado anualmente');
+      expect(text).toContain('$ 479.040 COP / año');
+      expect(text).toContain('$ 920.640 COP / año');
+      expect(text).toContain('≈ $ 12.08 USD');
+      expect(text).toContain('≈ $ 23.22 USD');
+
+      // Al cambiar a USD en anual debe mostrar el total oficial COP en Wompi
+      component.setPricingCurrency('USD');
+      fixture.detectChanges();
+      expect(compiled.querySelector('[data-testid="landing-pro-price"]')?.textContent?.trim()).toBe('$ 12.08 USD');
+      expect(compiled.querySelector('[data-testid="landing-pro-subprice"]')?.textContent).toContain('Cobro oficial Wompi:');
+      expect(compiled.querySelector('[data-testid="landing-pro-subprice"]')?.textContent).toContain('$ 479.040 COP');
+      expect(compiled.querySelector('[data-testid="landing-pro-subprice"]')?.textContent).toContain('/ año');
     });
 
-    it('debe gestionar pricingConfig de forma reactiva preparado para CMS y actualizar el DOM en vivo', () => {
+    it('debe sincronizarse con platformSettings COP y actualizar el DOM al modificar precios vía updateCmsConfig', () => {
+      const settingsSig = signal<{
+        pro_monthly_cop?: number;
+        pro_annual_monthly_cop?: number;
+        pro_annual_total_cop?: number;
+        industrial_monthly_cop?: number;
+        industrial_annual_monthly_cop?: number;
+        industrial_annual_total_cop?: number;
+      }>({
+        pro_monthly_cop: 52000,
+        pro_annual_monthly_cop: 41600,
+        pro_annual_total_cop: 499200,
+        industrial_monthly_cop: 99000,
+        industrial_annual_monthly_cop: 79200,
+        industrial_annual_total_cop: 950400
+      });
+      (mockSupabase as Record<string, unknown>)['platformSettings'] = settingsSig;
+
       const fixture = TestBed.createComponent(LandingPageComponent);
       const component = fixture.componentInstance;
       component.selectLanguage('es');
       fixture.detectChanges();
 
       expect(component.pricingConfig()).toEqual({
-        starter: { monthly: 0, yearly: 0 },
-        pro: { monthly: 15, yearly: 12 },
-        industrial: { monthly: 29, yearly: 23 }
+        starter: { monthly: 0, yearly: 0, yearlyTotal: 0 },
+        pro: { monthly: 52000, yearly: 41600, yearlyTotal: 499200 },
+        industrial: { monthly: 99000, yearly: 79200, yearlyTotal: 950400 }
       });
 
       const compiled = fixture.nativeElement as HTMLElement;
-      let pricingText = compiled.querySelector('#pricing')?.textContent ?? '';
-      expect(pricingText).toContain('$15 USD');
-      expect(pricingText).toContain('$29 USD');
+      expect(compiled.querySelector('[data-testid="landing-pro-price"]')?.textContent?.trim()).toBe('$ 52.000 COP');
+      expect(compiled.querySelector('[data-testid="landing-ind-price"]')?.textContent?.trim()).toBe('$ 99.000 COP');
 
       // Actualizar vía CMS
       component.updateCmsConfig({
         pricing: {
-          starter: { monthly: 0, yearly: 0 },
-          pro: { monthly: 16, yearly: 13 },
-          industrial: { monthly: 32, yearly: 25 }
+          starter: { monthly: 0, yearly: 0, yearlyTotal: 0 },
+          pro: {
+            monthly: OFFICIAL_COP_PRICING.pro.monthly,
+            yearly: OFFICIAL_COP_PRICING.pro.annualMonthly,
+            yearlyTotal: OFFICIAL_COP_PRICING.pro.annualTotal
+          },
+          industrial: {
+            monthly: OFFICIAL_COP_PRICING.industrial.monthly,
+            yearly: OFFICIAL_COP_PRICING.industrial.annualMonthly,
+            yearlyTotal: OFFICIAL_COP_PRICING.industrial.annualTotal
+          }
         }
       });
       fixture.detectChanges();
 
-      expect(component.pricingConfig().pro.monthly).toBe(16);
-      expect(component.pricingConfig().industrial.monthly).toBe(32);
-      expect(component.cmsConfig().pricing.pro.yearly).toBe(13);
+      expect(compiled.querySelector('[data-testid="landing-pro-price"]')?.textContent?.trim()).toBe('$ 49.900 COP');
+      expect(compiled.querySelector('[data-testid="landing-ind-price"]')?.textContent?.trim()).toBe('$ 95.900 COP');
 
-      // El DOM debe reflejar inmediatamente los nuevos precios en modo mensual
-      pricingText = compiled.querySelector('#pricing')?.textContent ?? '';
-      expect(pricingText).toContain('$16 USD');
-      expect(pricingText).toContain('$32 USD');
-
-      // Al alternar a ciclo anual, el DOM debe mostrar los precios anuales actualizados y recalcular subtítulos
       component.setBillingCycle('yearly');
       fixture.detectChanges();
 
-      pricingText = compiled.querySelector('#pricing')?.textContent ?? '';
-      expect(pricingText).toContain('$13 USD');
-      expect(pricingText).toContain('$25 USD');
-      expect(pricingText).toContain('Facturado anualmente ($156 USD / año)');
-      expect(pricingText).toContain('Facturado anualmente ($300 USD / año)');
+      const yearlyText = compiled.querySelector('#pricing')?.textContent ?? '';
+      expect(yearlyText).toContain('$ 39.920 COP');
+      expect(yearlyText).toContain('$ 76.720 COP');
+      expect(yearlyText).toContain('$ 479.040 COP / año');
+      expect(yearlyText).toContain('$ 920.640 COP / año');
     });
 
     it('debe reflejar el estado aria-pressed en los selectores de facturación y moneda', () => {
@@ -627,8 +671,8 @@ describe('LandingPageComponent', () => {
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
-      const monthlyBtn = compiled.querySelector('button[aria-pressed="true"]');
-      expect(monthlyBtn).toBeTruthy();
+      const copBtn = compiled.querySelector('[data-testid="landing-currency-COP"]') as HTMLButtonElement | null;
+      expect(copBtn?.getAttribute('aria-pressed')).toBe('true');
 
       component.setBillingCycle('yearly');
       component.setPricingCurrency('EUR');
@@ -636,6 +680,8 @@ describe('LandingPageComponent', () => {
 
       const pressedBtns = compiled.querySelectorAll('button[aria-pressed="true"]');
       expect(pressedBtns.length).toBeGreaterThanOrEqual(2);
+      expect(compiled.querySelector('[data-testid="landing-currency-EUR"]')?.getAttribute('aria-pressed')).toBe('true');
+      expect(copBtn?.getAttribute('aria-pressed')).toBe('false');
     });
   });
 

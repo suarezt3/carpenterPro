@@ -33,7 +33,13 @@ describe('AdminDashboardComponent', () => {
     industrial_monthly_usd: 29,
     industrial_annual_monthly_usd: 23,
     industrial_annual_total_usd: 276,
-    usd_to_cop_rate: 4250,
+    pro_monthly_cop: 49900,
+    pro_annual_monthly_cop: 39920,
+    pro_annual_total_cop: 479040,
+    industrial_monthly_cop: 95900,
+    industrial_annual_monthly_cop: 76720,
+    industrial_annual_total_cop: 920640,
+    usd_to_cop_rate: 3304,
     announcement_enabled: false,
     announcement_text: '',
     announcement_badge: 'NOVEDAD',
@@ -247,20 +253,69 @@ describe('AdminDashboardComponent', () => {
     });
   });
 
-  it('should load and save global CMS settings via updatePlatformSettings including usd_to_cop_rate', async () => {
+  it('should load and save global CMS settings via updatePlatformSettings including official *_cop fields and usd_to_cop_rate', async () => {
     component.setSection('cms');
     fixture.detectChanges();
 
+    const proMonthlyCopInput = fixture.nativeElement.querySelector(
+      '[data-testid="cms-pro-monthly-cop-input"]'
+    ) as HTMLInputElement | null;
+    const proAnnualMonthlyCopInput = fixture.nativeElement.querySelector(
+      '[data-testid="cms-pro-annual-monthly-cop-input"]'
+    ) as HTMLInputElement | null;
+    const proAnnualTotalCopInput = fixture.nativeElement.querySelector(
+      '[data-testid="cms-pro-annual-total-cop-input"]'
+    ) as HTMLInputElement | null;
+    const indMonthlyCopInput = fixture.nativeElement.querySelector(
+      '[data-testid="cms-industrial-monthly-cop-input"]'
+    ) as HTMLInputElement | null;
+    const indAnnualMonthlyCopInput = fixture.nativeElement.querySelector(
+      '[data-testid="cms-industrial-annual-monthly-cop-input"]'
+    ) as HTMLInputElement | null;
+    const indAnnualTotalCopInput = fixture.nativeElement.querySelector(
+      '[data-testid="cms-industrial-annual-total-cop-input"]'
+    ) as HTMLInputElement | null;
     const copRateInput = fixture.nativeElement.querySelector(
       '[data-testid="cms-usd-to-cop-rate-input"]'
     ) as HTMLInputElement | null;
+    const proCopPreview = fixture.nativeElement.querySelector(
+      '[data-testid="cms-pro-cop-preview"]'
+    ) as HTMLElement | null;
+    const indCopPreview = fixture.nativeElement.querySelector(
+      '[data-testid="cms-industrial-cop-preview"]'
+    ) as HTMLElement | null;
+
+    expect(proMonthlyCopInput).toBeTruthy();
+    expect(proAnnualMonthlyCopInput).toBeTruthy();
+    expect(proAnnualTotalCopInput).toBeTruthy();
+    expect(indMonthlyCopInput).toBeTruthy();
+    expect(indAnnualMonthlyCopInput).toBeTruthy();
+    expect(indAnnualTotalCopInput).toBeTruthy();
     expect(copRateInput).toBeTruthy();
-    expect(component.cmsForm.controls.usd_to_cop_rate.value).toBe(4250);
+
+    expect(component.cmsForm.controls.pro_monthly_cop.value).toBe(49900);
+    expect(component.cmsForm.controls.pro_annual_monthly_cop.value).toBe(39920);
+    expect(component.cmsForm.controls.pro_annual_total_cop.value).toBe(479040);
+    expect(component.cmsForm.controls.industrial_monthly_cop.value).toBe(95900);
+    expect(component.cmsForm.controls.industrial_annual_monthly_cop.value).toBe(76720);
+    expect(component.cmsForm.controls.industrial_annual_total_cop.value).toBe(920640);
+    expect(component.cmsForm.controls.usd_to_cop_rate.value).toBe(3304);
+
+    expect(proCopPreview?.textContent).toContain('49.900 COP');
+    expect(proCopPreview?.textContent).toContain('$ 15.10 USD');
+    expect(indCopPreview?.textContent).toContain('95.900 COP');
+    expect(indCopPreview?.textContent).toContain('$ 29.03 USD');
 
     component.cmsForm.patchValue({
+      pro_monthly_cop: 52900,
+      pro_annual_monthly_cop: 42320,
+      pro_annual_total_cop: 507840,
+      industrial_monthly_cop: 99900,
+      industrial_annual_monthly_cop: 79920,
+      industrial_annual_total_cop: 959040,
       pro_monthly_usd: 19,
       industrial_monthly_usd: 35,
-      usd_to_cop_rate: 4300,
+      usd_to_cop_rate: 3400,
       app_version: 'v3.1.0',
       announcement_enabled: true,
       announcement_badge: 'PROMO',
@@ -272,9 +327,15 @@ describe('AdminDashboardComponent', () => {
 
     expect(supabaseMock.updatePlatformSettings).toHaveBeenCalledWith(
       expect.objectContaining({
+        pro_monthly_cop: 52900,
+        pro_annual_monthly_cop: 42320,
+        pro_annual_total_cop: 507840,
+        industrial_monthly_cop: 99900,
+        industrial_annual_monthly_cop: 79920,
+        industrial_annual_total_cop: 959040,
         pro_monthly_usd: 19,
         industrial_monthly_usd: 35,
-        usd_to_cop_rate: 4300,
+        usd_to_cop_rate: 3400,
         app_version: 'v3.1.0',
         announcement_enabled: true,
         announcement_badge: 'PROMO',
@@ -377,12 +438,14 @@ describe('AdminDashboardComponent', () => {
     expect(paymentService.paymentsMode()).toBe('live_checkout');
 
     expect(envPillEl?.textContent).toContain('Ambiente: Sandbox');
-    expect(copPillEl?.textContent).toContain('4.250 COP');
-    expect(copPillEl?.textContent).toContain('63.750 COP');
-    expect(copPillEl?.textContent).toContain('123.250 COP');
+    expect(copPillEl?.textContent).toContain('3.304 COP');
+    expect(copPillEl?.textContent).toContain('49.900 COP');
+    expect(copPillEl?.textContent).toContain('$ 15.10 USD');
+    expect(copPillEl?.textContent).toContain('95.900 COP');
+    expect(copPillEl?.textContent).toContain('$ 29.03 USD');
 
-    expect(testProBtn?.textContent).toContain('Probar Checkout Pro ($15)');
-    expect(testIndBtn?.textContent).toContain('Probar Checkout Industrial ($29)');
+    expect(testProBtn?.textContent).toContain('Probar Checkout Pro ($ 49.900 COP)');
+    expect(testIndBtn?.textContent).toContain('Probar Checkout Industrial ($ 95.900 COP)');
 
     toggleBtn?.click();
     fixture.detectChanges();
@@ -431,10 +494,10 @@ describe('AdminDashboardComponent', () => {
             lastCheckoutError: errorSig,
             wompiEnvironment: () => 'sandbox',
             getCopEstimate: (plan: 'pro' | 'industrial') => ({
-              amountUsd: plan === 'industrial' ? 29 : 15,
-              exchangeRateCop: 4300,
-              amountCop: plan === 'industrial' ? 124700 : 64500,
-              amountInCents: (plan === 'industrial' ? 124700 : 64500) * 100
+              amountUsd: plan === 'industrial' ? 28.21 : 14.68,
+              exchangeRateCop: 3400,
+              amountCop: plan === 'industrial' ? 95900 : 49900,
+              amountInCents: (plan === 'industrial' ? 95900 : 49900) * 100
             }),
             togglePaymentsMode: () => {
               const next = modeSig() === 'early_access_protected' ? 'live_checkout' : 'early_access_protected';
@@ -456,9 +519,9 @@ describe('AdminDashboardComponent', () => {
     localFixture.detectChanges();
 
     const copPillEl = localFixture.nativeElement.querySelector('[data-testid="admin-wompi-cop-pill"]') as HTMLElement | null;
-    expect(copPillEl?.textContent).toContain('4.300 COP');
-    expect(copPillEl?.textContent).toContain('64.500 COP');
-    expect(copPillEl?.textContent).toContain('124.700 COP');
+    expect(copPillEl?.textContent).toContain('3.400 COP');
+    expect(copPillEl?.textContent).toContain('49.900 COP');
+    expect(copPillEl?.textContent).toContain('95.900 COP');
 
     const testProBtn = localFixture.nativeElement.querySelector('[data-testid="admin-test-checkout-pro-btn"]') as HTMLButtonElement | null;
     testProBtn?.click();

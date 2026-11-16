@@ -33,9 +33,12 @@ interface PaymentTransactionRow {
   wompi_transaction_id: string | null;
 }
 
-const DEFAULT_USD_PRICING: Record<PaidPlan, Record<BillingCycle, number>> = {
-  pro: { monthly: 15, annual: 144 },
-  industrial: { monthly: 29, annual: 276 }
+const DEFAULT_USD_TO_COP_RATE = 3304;
+const MIN_COP_AMOUNT = 1500;
+
+const DEFAULT_COP_PRICING: Record<PaidPlan, Record<BillingCycle, number>> = {
+  pro: { monthly: 49900, annual: 479040 },
+  industrial: { monthly: 95900, annual: 920640 }
 };
 
 const ALLOWED_TX_STATUSES = new Set<PaymentTxStatus>([
@@ -135,12 +138,9 @@ function computeNextPeriodEnd(
   return new Date(baseMs + durationMs).toISOString();
 }
 
-async function resolveFallbackUsdPrice(
-  supabase: SupabaseClient,
-  plan: PaidPlan,
-  cycle: BillingCycle
-): Promise<number> {
-  const defaultPrice = DEFAULT_USD_PRICING[plan][cycle];
+async function fetchPlatformSettingsRow(
+  supabase: SupabaseClient
+): Promise<Record<string, unknown> | null> {
   try {
     const { data } = await supabase
       .from('platform_settings')
@@ -148,17 +148,80 @@ async function resolveFallbackUsdPrice(
       .eq('id', 1)
       .maybeSingle();
 
-    if (!data || typeof data !== 'object') return defaultPrice;
-    const row = data as Record<string, unknown>;
-    const key =
-      plan === 'industrial'
-        ? (cycle === 'annual' ? 'industrial_annual_total_usd' : 'industrial_monthly_usd')
-        : (cycle === 'annual' ? 'pro_annual_total_usd' : 'pro_monthly_usd');
-    const numeric = Number(row[key]);
-    return Number.isFinite(numeric) && numeric > 0 ? numeric : defaultPrice;
+    return data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
   } catch {
-    return defaultPrice;
+    return null;
   }
+}
+
+function resolveExpectedCopFromSettings(
+  settingsRow: Record<string, unknown> | null,
+  plan: PaidPlan,
+  cycle: BillingCycle
+): number {
+  const defaultCop = DEFAULT_COP_PRICING[plan][cycle];
+  if (!settingsRow) return defaultCop;
+  const key =
+    plan === 'industrial'
+      ? (cycle === 'annual' ? 'industrial_annual_total_cop' : 'industrial_monthly_cop')
+      : (cycle === 'annual' ? 'pro_annual_total_cop' : 'pro_monthly_cop');
+  const numeric = Number(settingsRow[key]);
+  return Number.isFinite(numeric) && numeric >= MIN_COP_AMOUNT
+    ? Math.round(numeric)
+    : defaultCop;
+}
+
+function matchPlanCycleByAmountInCents(
+  settingsRow: Record<string, unknown> | null,
+  amountInCents: number,
+  preferredPlan: PaidPlan,
+  preferredCycle: BillingCycle
+): { plan: PaidPlan; cycle: BillingCycle } | null {
+  const candidates: Array<{ plan: PaidPlan; cycle: BillingCycle }> = [
+    { plan: preferredPlan, cycle: preferredCycle },
+    { plan: 'pro', cycle: 'monthly' },
+    { plan: 'pro', cycle: 'annual' },
+    { plan: 'industrial', cycle: 'monthly' },
+    { plan: 'industrial', cycle: 'annual' }
+  ];
+
+  for (const candidate of candidates) {
+    const expectedCop = resolveExpectedCopFromSettings(
+      settingsRow,
+      candidate.plan,
+      candidate.cycle
+    );
+    const expectedAmountInCents = Math.max(MIN_COP_AMOUNT, Math.round(expectedCop)) * 100;
+    if (Number(amountInCents) === expectedAmountInCents) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function resolveFallbackExchangeRateCop(settingsRow: Record<string, unknown> | null): number {
+  const settingsRate = Number(settingsRow?.['usd_to_cop_rate']);
+  if (Number.isFinite(settingsRate) && settingsRate > 0 && settingsRate !== 4250) {
+    return Math.round(settingsRate * 100) / 100;
+  }
+  return DEFAULT_USD_TO_COP_RATE;
+}
+
+async function resolveFallbackUsdPrice(
+  supabase: SupabaseClient,
+  plan: PaidPlan,
+  cycle: BillingCycle,
+  amountInCents?: number,
+  prefetchedSettings?: Record<string, unknown> | null
+): Promise<number> {
+  const settingsRow =
+    prefetchedSettings !== undefined ? prefetchedSettings : await fetchPlatformSettingsRow(supabase);
+  const copAmount =
+    typeof amountInCents === 'number' && Number.isFinite(amountInCents) && amountInCents > 0
+      ? Math.round(amountInCents / 100)
+      : resolveExpectedCopFromSettings(settingsRow, plan, cycle);
+  const rate = resolveFallbackExchangeRateCop(settingsRow);
+  return Math.round((copAmount / rate) * 100) / 100;
 }
 
 function resolveWompiApiBase(privateKey: string): string {
@@ -334,6 +397,10 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      let fallbackSettingsRow: Record<string, unknown> | null | undefined;
+      let matchedFromAmount: { plan: PaidPlan; cycle: BillingCycle } | null = null;
+      const parsedRef = parseReferencePlanCycle(reference);
+
       if (txRecord) {
         if (txRecord.user_id !== user.id) {
           return jsonResponse({ success: false, code: 'TRANSACTION_OWNERSHIP_MISMATCH' }, 403);
@@ -346,7 +413,6 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ success: false, code: 'TRANSACTION_INTEGRITY_MISMATCH' }, 400);
         }
       } else {
-        const parsedRef = parseReferencePlanCycle(reference);
         const profileEmail = (profile.email || user.email || '').trim().toLowerCase();
         const matchesPrefix = Boolean(parsedRef && user.id.toLowerCase().startsWith(parsedRef.userPrefix));
         const matchesEmail = Boolean(txCustomerEmail && profileEmail && txCustomerEmail === profileEmail);
@@ -357,6 +423,29 @@ Deno.serve(async (req: Request) => {
         }
         if (currency !== 'COP' || !Number.isFinite(amountInCents) || amountInCents <= 0) {
           return jsonResponse({ success: false, code: 'TRANSACTION_INTEGRITY_MISMATCH' }, 400);
+        }
+
+        fallbackSettingsRow = await fetchPlatformSettingsRow(adminClient);
+        if (parsedRef) {
+          const expectedCop = resolveExpectedCopFromSettings(
+            fallbackSettingsRow,
+            parsedRef.plan,
+            parsedRef.cycle
+          );
+          const expectedAmountInCents = Math.max(MIN_COP_AMOUNT, Math.round(expectedCop)) * 100;
+          if (Number(amountInCents) !== expectedAmountInCents) {
+            return jsonResponse({ success: false, code: 'TRANSACTION_INTEGRITY_MISMATCH' }, 400);
+          }
+        } else {
+          matchedFromAmount = matchPlanCycleByAmountInCents(
+            fallbackSettingsRow,
+            amountInCents,
+            profile.plan === 'industrial' ? 'industrial' : 'pro',
+            profile.billing_cycle === 'annual' ? 'annual' : 'monthly'
+          );
+          if (!matchedFromAmount) {
+            return jsonResponse({ success: false, code: 'TRANSACTION_INTEGRITY_MISMATCH' }, 400);
+          }
         }
       }
 
@@ -413,14 +502,15 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const parsedRef = parseReferencePlanCycle(reference);
       const resolvedPlan: PaidPlan =
         txRecord?.plan ??
         parsedRef?.plan ??
+        matchedFromAmount?.plan ??
         (profile.plan === 'industrial' ? 'industrial' : 'pro');
       const resolvedCycle: BillingCycle =
         txRecord?.billing_cycle ??
         parsedRef?.cycle ??
+        matchedFromAmount?.cycle ??
         (profile.billing_cycle === 'annual' ? 'annual' : 'monthly');
 
       const alreadyAppliedSameTx =
@@ -488,9 +578,16 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!existingInvoice) {
-        const amountUsd = txRecord
-          ? Number(txRecord.amount_usd)
-          : await resolveFallbackUsdPrice(adminClient, resolvedPlan, resolvedCycle);
+        const amountUsd =
+          txRecord && Number.isFinite(Number(txRecord.amount_usd)) && Number(txRecord.amount_usd) > 0
+            ? Number(txRecord.amount_usd)
+            : await resolveFallbackUsdPrice(
+                adminClient,
+                resolvedPlan,
+                resolvedCycle,
+                amountInCents,
+                fallbackSettingsRow
+              );
         const amountCop = Math.round(amountInCents / 100);
 
         const { error: invoiceErr } = await adminClient

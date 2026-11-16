@@ -7,29 +7,37 @@ import {
   DEFAULT_COP_USD_FALLBACK_RATE,
   DEFAULT_PAYMENTS_READINESS_MODE,
   FREE_PLAN_MAX_MODULES,
+  OFFICIAL_COP_PRICING,
   PAYMENTS_READINESS_MODE_STORAGE_KEY,
   PaymentService,
+  WOMPI_NAVIGATION_HANDLER,
   WOMPI_SANDBOX_PUBLIC_KEY,
   WOMPI_WEB_CHECKOUT_URL,
-  WOMPI_WIDGET_SCRIPT_SRC,
-  WompiWidgetCheckoutConfig,
-  WompiWidgetTransactionResult
+  WOMPI_WIDGET_SCRIPT_SRC
 } from './payment.service';
 import { DEFAULT_PLATFORM_SETTINGS, SupabaseService } from './supabase.service';
 
-describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Limits)', () => {
+describe('PaymentService (Precios Oficiales COP, TRM Viva, Wompi Web Checkout Full-Page & Plan Limits)', () => {
   let service: PaymentService;
   let supabaseService: SupabaseService;
   let router: Router;
+  let navigatedUrls: string[];
 
   beforeEach(() => {
     localStorage.removeItem(PAYMENTS_READINESS_MODE_STORAGE_KEY);
     sessionStorage.clear();
     delete window.WidgetCheckout;
+    navigatedUrls = [];
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         SupabaseService,
+        {
+          provide: WOMPI_NAVIGATION_HANDLER,
+          useValue: (url: string): void => {
+            navigatedUrls.push(url);
+          }
+        },
         PaymentService
       ]
     });
@@ -48,26 +56,38 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
     vi.restoreAllMocks();
   });
 
-  it('debe iniciar por defecto en modo live_checkout según decisión 3A', () => {
+  it('debe iniciar por defecto en modo live_checkout y moneda de visualización COP', () => {
     expect(DEFAULT_PAYMENTS_READINESS_MODE).toBe('live_checkout');
     expect(service.paymentsMode()).toBe('live_checkout');
     expect(service.isPaymentsProtected()).toBe(false);
+    expect(service.displayCurrency()).toBe('COP');
     expect(service.earlyAccessModalState()).toBeNull();
     expect(service.isPreparingCheckout()).toBe(false);
     expect(service.lastCheckoutError()).toBeNull();
     expect(service.lastVerifiedTransactionId()).toBeNull();
+
+    service.setDisplayCurrency('USD');
+    expect(service.displayCurrency()).toBe('USD');
+    service.setDisplayCurrency('COP');
+    expect(service.displayCurrency()).toBe('COP');
   });
 
-  it('debe exponer constantes oficiales de Wompi Sandbox y catálogo limpio Piezo3D/Wompi sin variantes heredadas', () => {
+  it('debe exponer OFFICIAL_COP_PRICING, DEFAULT_COP_USD_FALLBACK_RATE = 3304 y CHECKOUT_VARIANTS con precios COP y USD', () => {
     expect(WOMPI_SANDBOX_PUBLIC_KEY).toBe('pub_test_5IPqjmLMDEC0cqUMoomPY7CzUaoGW68O');
     expect(WOMPI_WIDGET_SCRIPT_SRC).toBe('https://checkout.wompi.co/widget.js');
     expect(WOMPI_WEB_CHECKOUT_URL).toBe('https://checkout.wompi.co/p/');
-    expect(DEFAULT_COP_USD_FALLBACK_RATE).toBe(4250);
+    expect(DEFAULT_COP_USD_FALLBACK_RATE).toBe(3304);
+    expect(OFFICIAL_COP_PRICING).toEqual({
+      pro: { monthly: 49900, annualMonthly: 39920, annualTotal: 479040 },
+      industrial: { monthly: 95900, annualMonthly: 76720, annualTotal: 920640 }
+    });
 
     expect(CHECKOUT_VARIANTS.pro.monthly).toEqual({
       plan: 'pro',
       cycle: 'monthly',
       planCode: 'P3D_PRO_MONTHLY',
+      priceCop: 49900,
+      monthlyEquivalentCop: 49900,
       priceUsd: 15,
       monthlyEquivalentUsd: 15
     });
@@ -75,6 +95,8 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
       plan: 'pro',
       cycle: 'annual',
       planCode: 'P3D_PRO_ANNUAL',
+      priceCop: 479040,
+      monthlyEquivalentCop: 39920,
       priceUsd: 144,
       monthlyEquivalentUsd: 12
     });
@@ -82,6 +104,8 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
       plan: 'industrial',
       cycle: 'monthly',
       planCode: 'P3D_IND_MONTHLY',
+      priceCop: 95900,
+      monthlyEquivalentCop: 95900,
       priceUsd: 29,
       monthlyEquivalentUsd: 29
     });
@@ -89,6 +113,8 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
       plan: 'industrial',
       cycle: 'annual',
       planCode: 'P3D_IND_ANNUAL',
+      priceCop: 920640,
+      monthlyEquivalentCop: 76720,
       priceUsd: 276,
       monthlyEquivalentUsd: 23
     });
@@ -182,58 +208,119 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
     expect(service.earlyAccessModalState()).toBeNull();
   });
 
-  it('debe calcular la conversión 1A en COP desde platformSettings, CurrencyExchangeService o fallback 4250', () => {
+  it('debe calcular precios fijos oficiales en COP, equivalencia USD con TRM viva y evitar que 4250 antiguo infle la conversión', () => {
+    // 1. Por defecto con DEFAULT_PLATFORM_SETTINGS (usd_to_cop_rate = 3304)
+    expect(service.getMonthlyCop('pro', 'monthly')).toBe(49900);
+    expect(service.getMonthlyCop('pro', 'annual')).toBe(39920);
+    expect(service.getMonthlyCop('industrial', 'monthly')).toBe(95900);
+    expect(service.getMonthlyCop('industrial', 'yearly')).toBe(76720);
+
+    expect(service.getCopEstimate('pro', 'monthly')).toEqual({
+      amountCop: 49900,
+      amountInCents: 4990000,
+      exchangeRateCop: 3304,
+      amountUsd: 15.1
+    });
+    expect(service.getCopEstimate('pro', 'annual')).toEqual({
+      amountCop: 479040,
+      amountInCents: 47904000,
+      exchangeRateCop: 3304,
+      amountUsd: 144.99
+    });
+    expect(service.getCopEstimate('industrial', 'monthly')).toEqual({
+      amountCop: 95900,
+      amountInCents: 9590000,
+      exchangeRateCop: 3304,
+      amountUsd: 29.03
+    });
+    expect(service.getCopEstimate('industrial', 'yearly')).toEqual({
+      amountCop: 920640,
+      amountInCents: 92064000,
+      exchangeRateCop: 3304,
+      amountUsd: 278.64
+    });
+
+    // 2. Respeta overrides *_cop y usd_to_cop_rate manual (!== 4250) cuando NO hay tasa viva de CurrencyExchangeService
     supabaseService.platformSettings.set({
       ...DEFAULT_PLATFORM_SETTINGS,
-      pro_monthly_usd: 15,
-      industrial_annual_total_usd: 276,
-      usd_to_cop_rate: 4300
+      pro_monthly_cop: 52000,
+      pro_annual_monthly_cop: 41600,
+      pro_annual_total_cop: 499200,
+      industrial_annual_total_cop: 980000,
+      usd_to_cop_rate: 3800
+    });
+    expect(service.getMonthlyCop('pro', 'monthly')).toBe(52000);
+    expect(service.getMonthlyCop('pro', 'annual')).toBe(41600);
+    expect(service.getCopEstimate('pro', 'monthly')).toEqual({
+      amountCop: 52000,
+      amountInCents: 5200000,
+      exchangeRateCop: 3800,
+      amountUsd: 13.68
+    });
+    expect(service.getCopEstimate('industrial', 'yearly')).toEqual({
+      amountCop: 980000,
+      amountInCents: 98000000,
+      exchangeRateCop: 3800,
+      amountUsd: 257.89
     });
 
-    const proMonthly = service.getCopEstimate('pro', 'monthly');
-    expect(proMonthly).toEqual({
-      amountUsd: 15,
-      exchangeRateCop: 4300,
-      amountCop: 64500,
-      amountInCents: 6450000
-    });
-
-    const indAnnual = service.getCopEstimate('industrial', 'yearly');
-    expect(indAnnual).toEqual({
-      amountUsd: 276,
-      exchangeRateCop: 4300,
-      amountCop: 1186800,
-      amountInCents: 118680000
-    });
-
-    // Fallback a CurrencyExchangeService cuando platformSettings no tiene tasa válida
+    // 3. Si platformSettings trae 4250 antiguo pero CurrencyExchangeService tiene tasa viva (lastUpdated != null),
+    //    SIEMPRE usa la TRM viva (nunca 4250)
     TestBed.resetTestingModule();
-    const exchangeMock = {
-      rates: () => ({ COP: 1, USD: 1 / 4100 })
+    const liveExchangeMock = {
+      rates: () => ({ COP: 1, USD: 1 / 3650 }),
+      lastUpdated: () => new Date('2026-11-16T18:00:00Z'),
+      getUsdToCopRate: () => 3650
     };
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         SupabaseService,
-        { provide: CurrencyExchangeService, useValue: exchangeMock },
+        { provide: CurrencyExchangeService, useValue: liveExchangeMock },
         PaymentService
       ]
     });
-    const supaWithExchange = TestBed.inject(SupabaseService);
-    const serviceWithExchange = TestBed.inject(PaymentService);
-    supaWithExchange.platformSettings.set({
+    const supaWithLive = TestBed.inject(SupabaseService);
+    const serviceWithLive = TestBed.inject(PaymentService);
+    supaWithLive.platformSettings.set({
       ...DEFAULT_PLATFORM_SETTINGS,
-      usd_to_cop_rate: 0
+      usd_to_cop_rate: 4250
     });
 
-    expect(serviceWithExchange.getCopEstimate('pro', 'monthly')).toEqual({
-      amountUsd: 15,
+    expect(serviceWithLive.getCopEstimate('pro', 'monthly')).toEqual({
+      amountCop: 49900,
+      amountInCents: 4990000,
+      exchangeRateCop: 3650,
+      amountUsd: 13.67
+    });
+    expect(serviceWithLive.convertCopToUsd(49900)).toBe(13.67);
+    expect(serviceWithLive.convertCopToUsd(0)).toBe(0);
+    expect(serviceWithLive.convertCopToUsd(-5000)).toBe(0);
+
+    // 4. Mock de CurrencyExchangeService con rates()['USD'] sin lastUpdated cuando settingsRate === 4250
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        SupabaseService,
+        { provide: CurrencyExchangeService, useValue: { rates: () => ({ COP: 1, USD: 1 / 4100 }) } },
+        PaymentService
+      ]
+    });
+    const supaLegacy4250 = TestBed.inject(SupabaseService);
+    const serviceLegacy4250 = TestBed.inject(PaymentService);
+    supaLegacy4250.platformSettings.set({
+      ...DEFAULT_PLATFORM_SETTINGS,
+      usd_to_cop_rate: 4250
+    });
+    expect(serviceLegacy4250.getCopEstimate('pro', 'monthly')).toEqual({
+      amountCop: 49900,
+      amountInCents: 4990000,
       exchangeRateCop: 4100,
-      amountCop: 61500,
-      amountInCents: 6150000
+      amountUsd: 12.17
     });
 
-    // Fallback final a DEFAULT_COP_USD_FALLBACK_RATE (4250) cuando ambos faltan
+    // 5. Fallback final a DEFAULT_COP_USD_FALLBACK_RATE (3304) si CurrencyExchangeService no tiene USD y settings es 4250 o undefined
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
@@ -247,14 +334,24 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
     const serviceFallback = TestBed.inject(PaymentService);
     supaFallback.platformSettings.set({
       ...DEFAULT_PLATFORM_SETTINGS,
-      usd_to_cop_rate: undefined
+      usd_to_cop_rate: 4250
+    });
+    expect(serviceFallback.getCopEstimate('pro', 'monthly')).toEqual({
+      amountCop: 49900,
+      amountInCents: 4990000,
+      exchangeRateCop: 3304,
+      amountUsd: 15.1
     });
 
+    supaFallback.platformSettings.set({
+      ...DEFAULT_PLATFORM_SETTINGS,
+      usd_to_cop_rate: undefined
+    });
     expect(serviceFallback.getCopEstimate('pro', 'monthly')).toEqual({
-      amountUsd: 15,
-      exchangeRateCop: 4250,
-      amountCop: 63750,
-      amountInCents: 6375000
+      amountCop: 49900,
+      amountInCents: 4990000,
+      exchangeRateCop: 3304,
+      amountUsd: 15.1
     });
   });
 
@@ -277,7 +374,52 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
     expect(pending).toEqual({ plan: 'pro', cycle: 'annual' });
   });
 
-  it('debe solicitar sesión Wompi firmada en servidor y abrir WidgetCheckout cuando el usuario está autenticado', async () => {
+  it('buildWompiWebCheckoutUrl debe generar URL completa con redirect-url y customer-data opcionales', () => {
+    const fullUrl = service.buildWompiWebCheckoutUrl(
+      {
+        publicKey: WOMPI_SANDBOX_PUBLIC_KEY,
+        amountInCents: 4990000,
+        reference: 'P3D-PRO-MONTHLY-u1-100',
+        integritySignature: 'sig_abc123',
+        redirectUrl: 'https://piezo3d.com/studio/designer?wompi_checkout=1',
+        customerEmail: 'eyder@taller.com',
+        customerName: 'Eyder Suarez'
+      },
+      'https://fallback.example.com'
+    );
+
+    const parsedFull = new URL(fullUrl);
+    expect(`${parsedFull.origin}${parsedFull.pathname}`).toBe(WOMPI_WEB_CHECKOUT_URL);
+    expect(parsedFull.searchParams.get('public-key')).toBe(WOMPI_SANDBOX_PUBLIC_KEY);
+    expect(parsedFull.searchParams.get('currency')).toBe('COP');
+    expect(parsedFull.searchParams.get('amount-in-cents')).toBe('4990000');
+    expect(parsedFull.searchParams.get('reference')).toBe('P3D-PRO-MONTHLY-u1-100');
+    expect(parsedFull.searchParams.get('signature:integrity')).toBe('sig_abc123');
+    expect(parsedFull.searchParams.get('redirect-url')).toBe(
+      'https://piezo3d.com/studio/designer?wompi_checkout=1'
+    );
+    expect(parsedFull.searchParams.get('customer-data:email')).toBe('eyder@taller.com');
+    expect(parsedFull.searchParams.get('customer-data:full-name')).toBe('Eyder Suarez');
+
+    const minimalUrl = service.buildWompiWebCheckoutUrl(
+      {
+        publicKey: WOMPI_SANDBOX_PUBLIC_KEY,
+        amountInCents: 9590000,
+        reference: 'P3D-IND-MONTHLY-u2-101',
+        integritySignature: 'sig_min999'
+      },
+      'https://piezo3d.com/studio/designer?wompi_checkout=1'
+    );
+
+    const parsedMinimal = new URL(minimalUrl);
+    expect(parsedMinimal.searchParams.get('redirect-url')).toBe(
+      'https://piezo3d.com/studio/designer?wompi_checkout=1'
+    );
+    expect(parsedMinimal.searchParams.has('customer-data:email')).toBe(false);
+    expect(parsedMinimal.searchParams.has('customer-data:full-name')).toBe(false);
+  });
+
+  it('openCheckout autenticado debe solicitar sesión firmada y navegar full-page vía WOMPI_NAVIGATION_HANDLER sin popup WidgetCheckout', async () => {
     const mockUser = {
       id: 'usr-999',
       email: 'eyder@taller.com',
@@ -305,10 +447,10 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
         success: true,
         publicKey: WOMPI_SANDBOX_PUBLIC_KEY,
         currency: 'COP',
-        amountInCents: 12325000,
-        amountCop: 123250,
-        amountUsd: 29,
-        exchangeRateCop: 4250,
+        amountInCents: 9590000,
+        amountCop: 95900,
+        amountUsd: 29.03,
+        exchangeRateCop: 3304,
         reference: 'P3D-INDUSTRIAL-MONTHLY-usr999-123',
         integritySignature: 'sha256_integrity_hex_signature',
         customerEmail: 'eyder@taller.com',
@@ -317,37 +459,9 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
         redirectUrl: 'https://piezo3d.com/studio/designer?wompi_checkout=1'
       });
 
-    const verifySpy = vi
-      .spyOn(supabaseService, 'verifyWompiTransaction')
-      .mockResolvedValue({
-        success: true,
-        approved: true,
-        status: 'APPROVED',
-        transactionId: 'tx_wompi_approved_1',
-        reference: 'P3D-INDUSTRIAL-MONTHLY-usr999-123',
-        portalUrl: 'https://checkout.wompi.co/l/tx_wompi_approved_1'
-      });
-    const refreshSpy = vi.spyOn(supabaseService, 'refreshUserProfile').mockResolvedValue(null);
-    const invoicesSpy = vi.spyOn(supabaseService, 'getSubscriptionInvoices').mockResolvedValue([]);
-    const navByUrlSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
-
-    const captured: {
-      config: WompiWidgetCheckoutConfig | null;
-      callback: ((result: WompiWidgetTransactionResult) => void) | null;
-    } = {
-      config: null,
-      callback: null
-    };
-
-    class MockWidgetCheckout {
-      constructor(config: WompiWidgetCheckoutConfig) {
-        captured.config = config;
-      }
-      open(cb: (result: WompiWidgetTransactionResult) => void): void {
-        captured.callback = cb;
-      }
-    }
-    window.WidgetCheckout = MockWidgetCheckout;
+    const widgetConstructorSpy = vi.fn();
+    window.WidgetCheckout = widgetConstructorSpy as unknown as NonNullable<Window['WidgetCheckout']>;
+    const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     await service.openCheckout('industrial', 'monthly');
 
@@ -356,55 +470,27 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
       billingCycle: 'monthly',
       redirectUrl: expect.stringContaining('/studio/designer?wompi_checkout=1')
     });
-    expect(captured.config).toEqual({
-      currency: 'COP',
-      amountInCents: 12325000,
-      reference: 'P3D-INDUSTRIAL-MONTHLY-usr999-123',
-      publicKey: WOMPI_SANDBOX_PUBLIC_KEY,
-      redirectUrl: 'https://piezo3d.com/studio/designer?wompi_checkout=1',
-      signature: { integrity: 'sha256_integrity_hex_signature' },
-      customerData: {
-        email: 'eyder@taller.com',
-        fullName: 'Eyder Suarez'
-      }
-    });
+    expect(widgetConstructorSpy).not.toHaveBeenCalled();
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+    expect(navigatedUrls.length).toBe(1);
+
+    const navigated = new URL(navigatedUrls[0]);
+    expect(`${navigated.origin}${navigated.pathname}`).toBe(WOMPI_WEB_CHECKOUT_URL);
+    expect(navigated.searchParams.get('public-key')).toBe(WOMPI_SANDBOX_PUBLIC_KEY);
+    expect(navigated.searchParams.get('currency')).toBe('COP');
+    expect(navigated.searchParams.get('amount-in-cents')).toBe('9590000');
+    expect(navigated.searchParams.get('reference')).toBe('P3D-INDUSTRIAL-MONTHLY-usr999-123');
+    expect(navigated.searchParams.get('signature:integrity')).toBe('sha256_integrity_hex_signature');
+    expect(navigated.searchParams.get('redirect-url')).toBe(
+      'https://piezo3d.com/studio/designer?wompi_checkout=1'
+    );
+    expect(navigated.searchParams.get('customer-data:email')).toBe('eyder@taller.com');
+    expect(navigated.searchParams.get('customer-data:full-name')).toBe('Eyder Suarez');
     expect(service.isPreparingCheckout()).toBe(false);
     expect(service.lastCheckoutError()).toBeNull();
-
-    // Simular respuesta aprobada desde el callback de WidgetCheckout
-    expect(captured.callback).toBeTruthy();
-    captured.callback?.({
-      transaction: {
-        id: 'tx_wompi_approved_1',
-        status: 'APPROVED',
-        reference: 'P3D-INDUSTRIAL-MONTHLY-usr999-123'
-      }
-    });
-
-    await vi.waitFor(() => {
-      expect(verifySpy).toHaveBeenCalledWith('tx_wompi_approved_1', 'P3D-INDUSTRIAL-MONTHLY-usr999-123');
-    });
-    await vi.waitFor(() => {
-      expect(service.lastVerifiedTransactionId()).toBe('tx_wompi_approved_1');
-      expect(refreshSpy).toHaveBeenCalled();
-      expect(invoicesSpy).toHaveBeenCalled();
-      expect(navByUrlSpy).toHaveBeenCalledWith('/studio/designer');
-    });
   });
 
-  it('debe inyectar https://checkout.wompi.co/widget.js en head y usar fallback Web Checkout si WidgetCheckout no carga', async () => {
-    const loadPromise = service.ensureWompiScriptLoaded();
-    const injectedScript = document.querySelector(
-      `script[src="${WOMPI_WIDGET_SCRIPT_SRC}"]`
-    ) as HTMLScriptElement | null;
-    expect(injectedScript).toBeTruthy();
-    expect(injectedScript?.defer).toBe(true);
-
-    injectedScript?.dispatchEvent(new Event('load'));
-    expect(await loadPromise).toBe(true);
-    expect(service.isScriptReady()).toBe(true);
-
-    // Ahora probar fallback cuando WidgetCheckout no está disponible
+  it('testAdminCheckout debe navegar a Wompi Web Checkout en pantalla completa preservando early_access_protected', async () => {
     service.setPaymentsMode('early_access_protected');
     supabaseService.currentUser.set({
       id: 'usr-admin',
@@ -419,27 +505,56 @@ describe('PaymentService (Wompi Colombia, Conversión 1A, Retorno PSE & Plan Lim
       success: true,
       publicKey: WOMPI_SANDBOX_PUBLIC_KEY,
       currency: 'COP',
-      amountInCents: 117300000,
+      amountInCents: 92064000,
+      amountCop: 920640,
       reference: 'P3D-INDUSTRIAL-ANNUAL-usradmin-99',
-      integritySignature: 'sig_fallback_123',
+      integritySignature: 'sig_web_123',
+      customerEmail: 'piezo3dstudio@gmail.com',
+      customerName: 'Piezo3D Studio',
       redirectUrl: 'https://piezo3d.com/studio/designer?wompi_checkout=1'
     });
-    delete window.WidgetCheckout;
-    const ensureSpy = vi.spyOn(service, 'ensureWompiScriptLoaded').mockResolvedValue(false);
     const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     await service.testAdminCheckout('industrial', 'yearly');
 
-    expect(ensureSpy).toHaveBeenCalledTimes(1);
-    expect(windowOpenSpy).toHaveBeenCalledTimes(1);
-    const fallbackUrl = windowOpenSpy.mock.calls[0][0] as string;
-    expect(fallbackUrl).toContain(`${WOMPI_WEB_CHECKOUT_URL}?`);
-    expect(fallbackUrl).toContain(`public-key=${WOMPI_SANDBOX_PUBLIC_KEY}`);
-    expect(fallbackUrl).toContain('currency=COP');
-    expect(fallbackUrl).toContain('amount-in-cents=117300000');
-    expect(fallbackUrl).toContain('reference=P3D-INDUSTRIAL-ANNUAL-usradmin-99');
-    expect(fallbackUrl).toContain('signature%3Aintegrity=sig_fallback_123');
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+    expect(navigatedUrls.length).toBe(1);
+    const parsed = new URL(navigatedUrls[0]);
+    expect(`${parsed.origin}${parsed.pathname}`).toBe(WOMPI_WEB_CHECKOUT_URL);
+    expect(parsed.searchParams.get('amount-in-cents')).toBe('92064000');
+    expect(parsed.searchParams.get('reference')).toBe('P3D-INDUSTRIAL-ANNUAL-usradmin-99');
+    expect(parsed.searchParams.get('signature:integrity')).toBe('sig_web_123');
+    expect(parsed.searchParams.get('customer-data:email')).toBe('piezo3dstudio@gmail.com');
+    expect(parsed.searchParams.get('customer-data:full-name')).toBe('Piezo3D Studio');
     expect(service.paymentsMode()).toBe('early_access_protected');
+  });
+
+  it('handleWompiTransactionResult debe seguir verificando transacciones por compatibilidad', async () => {
+    const verifySpy = vi
+      .spyOn(supabaseService, 'verifyWompiTransaction')
+      .mockResolvedValue({
+        success: true,
+        approved: true,
+        status: 'APPROVED',
+        transactionId: 'tx_wompi_compat_1',
+        reference: 'P3D-PRO-MONTHLY-u1-1'
+      });
+    const refreshSpy = vi.spyOn(supabaseService, 'refreshUserProfile').mockResolvedValue(null);
+    const invoicesSpy = vi.spyOn(supabaseService, 'getSubscriptionInvoices').mockResolvedValue([]);
+    const navByUrlSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    const res = await service.handleWompiTransactionResult({
+      id: 'tx_wompi_compat_1',
+      status: 'APPROVED',
+      reference: 'P3D-PRO-MONTHLY-u1-1'
+    });
+
+    expect(res.approved).toBe(true);
+    expect(verifySpy).toHaveBeenCalledWith('tx_wompi_compat_1', 'P3D-PRO-MONTHLY-u1-1');
+    expect(service.lastVerifiedTransactionId()).toBe('tx_wompi_compat_1');
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(invoicesSpy).toHaveBeenCalled();
+    expect(navByUrlSpy).toHaveBeenCalledWith('/studio/designer');
   });
 
   it('debe registrar error claro en lastCheckoutError cuando createWompiCheckoutSession devuelve WOMPI_CONFIG_MISSING', async () => {
