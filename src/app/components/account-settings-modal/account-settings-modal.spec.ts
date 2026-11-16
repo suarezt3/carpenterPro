@@ -109,8 +109,8 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       getSubscriptionInvoices: vi.fn().mockResolvedValue([]),
       getBillingPortalUrl: vi.fn().mockResolvedValue({
         success: true,
-        portalUrl: 'https://piezo3d.lemonsqueezy.com/billing',
-        source: 'lemon_squeezy_api'
+        portalUrl: 'https://checkout.wompi.co/l/tx_test_202',
+        source: 'wompi_api'
       }),
       cancelSubscription: vi.fn().mockResolvedValue({ success: true }),
       reactivateSubscription: vi.fn().mockResolvedValue({ success: true }),
@@ -440,8 +440,8 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
         plan: 'pro',
         billing_cycle: 'monthly',
         subscription_status: 'active',
-        subscription_id: 'ls-sub-1',
-        customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+        subscription_id: 'tx_test_1',
+        customer_portal_url: 'https://checkout.wompi.co/l/tx_test_1',
         card_brand: 'Mastercard',
         card_last_four: '8812',
         created_at: '2026-11-10T00:00:00Z',
@@ -598,8 +598,8 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
         plan: 'pro',
         billing_cycle: 'monthly',
         subscription_status: 'active',
-        subscription_id: 'ls-sub-1',
-        customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+        subscription_id: 'tx_test_1',
+        customer_portal_url: 'https://checkout.wompi.co/l/tx_test_1',
         card_brand: 'VISA',
         card_last_four: '4242',
         current_period_end: '2027-01-15T00:00:00Z',
@@ -659,8 +659,8 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
         plan: 'pro',
         billing_cycle: 'monthly',
         subscription_status: 'cancelled',
-        subscription_id: 'ls-sub-1',
-        customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+        subscription_id: 'tx_test_1',
+        customer_portal_url: 'https://checkout.wompi.co/l/tx_test_1',
         card_brand: 'VISA',
         card_last_four: '4242',
         current_period_end: '2027-01-15T00:00:00Z',
@@ -757,8 +757,8 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
           plan: 'pro',
           billing_cycle: 'monthly',
           subscription_status: 'active',
-          subscription_id: 'ls-sub-202',
-          customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+          subscription_id: 'tx_test_202',
+          customer_portal_url: 'https://checkout.wompi.co/l/tx_test_202',
           card_brand: 'Visa',
           card_last_four: '4242',
           created_at: '2026-11-10T00:00:00Z',
@@ -775,7 +775,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
 
         expect(supabaseMock.getBillingPortalUrl).toHaveBeenCalledTimes(1);
         expect(openSpy).toHaveBeenCalledWith(
-          'https://piezo3d.lemonsqueezy.com/billing',
+          'https://checkout.wompi.co/l/tx_test_202',
           '_blank',
           'noopener,noreferrer'
         );
@@ -799,7 +799,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       }
     });
 
-    it('debe mostrar error de pasarela y conservar fallback de portal cuando cancelación o reactivación externa devuelve LEMON_API_KEY_MISSING', async () => {
+    it('debe mostrar error de pasarela y conservar fallback de comprobante cuando cancelación o reactivación externa devuelve WOMPI_CONFIG_MISSING', async () => {
       supabaseMock.userProfile.set({
         id: 'u-1',
         email: 'eyder@taller.com',
@@ -809,7 +809,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
         plan: 'pro',
         billing_cycle: 'monthly',
         subscription_status: 'active',
-        subscription_id: 'ls-sub-303',
+        subscription_id: 'tx_test_303',
         created_at: '2026-11-10T00:00:00Z',
         updated_at: '2026-11-12T00:00:00Z'
       });
@@ -817,9 +817,9 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
 
       supabaseMock.cancelSubscription.mockResolvedValueOnce({
         success: false,
-        errorCode: 'LEMON_API_KEY_MISSING',
+        errorCode: 'WOMPI_CONFIG_MISSING',
         errorKey: 'account.billing.gatewayKeyMissingError',
-        portalUrl: 'https://piezo3d.lemonsqueezy.com/billing'
+        portalUrl: 'https://checkout.wompi.co/l/tx_test_303'
       });
 
       const el = fixture.nativeElement as HTMLElement;
@@ -838,12 +838,12 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       });
       expect(component.toastType()).toBe('error');
       expect(component.toastMessage()).toBe('account.billing.gatewayKeyMissingError');
-      expect(component.fallbackPortalUrl()).toBe('https://piezo3d.lemonsqueezy.com/billing');
+      expect(component.fallbackPortalUrl()).toBe('https://checkout.wompi.co/l/tx_test_303');
       expect(component.canOpenExternalPortal()).toBe(true);
 
       supabaseMock.reactivateSubscription.mockResolvedValueOnce({
         success: false,
-        errorCode: 'LEMON_API_KEY_MISSING'
+        errorCode: 'WOMPI_CONFIG_MISSING'
       });
 
       await component.reactivateSubscription();
@@ -851,6 +851,26 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
 
       expect(component.toastType()).toBe('error');
       expect(component.toastMessage()).toBe('account.billing.gatewayKeyMissingError');
+    });
+
+    it('debe mostrar la referencia exacta de cobro en COP (1A) para Pro e Industrial en ciclo mensual y anual incluso con mock mínimo de PaymentService', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      const proHint = el.querySelector('[data-testid="account-pro-cop-hint"]') as HTMLElement;
+      const indHint = el.querySelector('[data-testid="account-industrial-cop-hint"]') as HTMLElement;
+
+      expect(proHint.textContent).toContain('Cobro aprox.');
+      expect(proHint.textContent).toContain('63.750 COP');
+      expect(indHint.textContent).toContain('Cobro aprox.');
+      expect(indHint.textContent).toContain('123.250 COP');
+      expect(component.formatUsdToCopHint(15)).toBe('Cobro aprox. $ 63.750 COP');
+
+      component.setBillingCycleSelect('annual');
+      fixture.detectChanges();
+
+      expect(component.proCopEstimate().amountCop).toBe(612000);
+      expect(component.industrialCopEstimate().amountCop).toBe(1173000);
+      expect(proHint.textContent).toContain('612.000 COP');
+      expect(indHint.textContent).toContain('1.173.000 COP');
     });
   });
 
@@ -993,6 +1013,67 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
 
       expect(component.toastMessage()).toBe('account.billing.upgradeMockToast');
       expect(openCheckoutMock).toHaveBeenCalledWith('pro', 'monthly');
+    });
+  });
+
+  describe('Estado de preparación y error de checkout Wompi en PaymentService', () => {
+    let isPreparingSig: ReturnType<typeof signal<boolean>>;
+    let lastErrorSig: ReturnType<typeof signal<string | null>>;
+
+    beforeEach(async () => {
+      isPreparingSig = signal(false);
+      lastErrorSig = signal<string | null>(null);
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [AccountSettingsModalComponent],
+        providers: [
+          provideRouter([]),
+          { provide: SupabaseService, useValue: supabaseMock },
+          {
+            provide: PaymentService,
+            useValue: {
+              openCheckout: vi.fn().mockResolvedValue(undefined),
+              isPreparingCheckout: isPreparingSig,
+              lastCheckoutError: lastErrorSig,
+              getCopEstimate: vi.fn((plan: 'pro' | 'industrial') => ({
+                amountUsd: plan === 'industrial' ? 29 : 15,
+                exchangeRateCop: 4300,
+                amountCop: plan === 'industrial' ? 124700 : 64500,
+                amountInCents: (plan === 'industrial' ? 124700 : 64500) * 100
+              }))
+            }
+          },
+          { provide: ProjectStorageService, useValue: projectServiceMock },
+          { provide: I18nService, useValue: i18nMock },
+          { provide: ThemeService, useValue: themeServiceMock }
+        ]
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(AccountSettingsModalComponent);
+      component = fixture.componentInstance;
+      componentRef = fixture.componentRef;
+      componentRef.setInput('isOpen', true);
+      componentRef.setInput('initialTab', 'billing');
+      fixture.detectChanges();
+      await fixture.whenStable();
+    });
+
+    it('debe mostrar banner de preparación y banner de error cuando Wompi reporta WOMPI_CONFIG_MISSING o error de sesión', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="account-pro-cop-hint"]')?.textContent).toContain('64.500 COP');
+      expect(el.querySelector('[data-testid="account-industrial-cop-hint"]')?.textContent).toContain('124.700 COP');
+
+      isPreparingSig.set(true);
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="account-checkout-preparing-banner"]')).toBeTruthy();
+
+      isPreparingSig.set(false);
+      lastErrorSig.set('WOMPI_CONFIG_MISSING');
+      fixture.detectChanges();
+      const errBanner = el.querySelector('[data-testid="account-checkout-error-banner"]') as HTMLElement;
+      expect(errBanner).toBeTruthy();
+      expect(errBanner.textContent).toContain('account.billing.gatewayKeyMissingError');
     });
   });
 });

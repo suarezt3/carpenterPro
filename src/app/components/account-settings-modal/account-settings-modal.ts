@@ -78,6 +78,23 @@ export interface InvoiceMock {
   invoiceUrl?: string | null;
 }
 
+export interface AccountCopEstimateResult {
+  amountUsd: number;
+  exchangeRateCop: number;
+  amountCop: number;
+  amountInCents: number;
+}
+
+interface AccountPaymentBridge {
+  isPaymentsProtected?: () => boolean;
+  getCopEstimate?: (
+    plan: PaidPlan,
+    cycle?: 'monthly' | 'annual' | 'yearly'
+  ) => AccountCopEstimateResult;
+  isPreparingCheckout?: () => boolean;
+  lastCheckoutError?: () => string | null;
+}
+
 @Component({
   selector: 'app-account-settings-modal',
   standalone: true,
@@ -161,6 +178,7 @@ export class AccountSettingsModalComponent {
           industrial_monthly_usd?: number;
           industrial_annual_monthly_usd?: number;
           industrial_annual_total_usd?: number;
+          usd_to_cop_rate?: number;
         } | null;
       }
     ).platformSettings;
@@ -173,6 +191,17 @@ export class AccountSettingsModalComponent {
       industrial_annual_monthly_usd: Number(s?.industrial_annual_monthly_usd ?? 23),
       industrial_annual_total_usd: Number(s?.industrial_annual_total_usd ?? 276)
     };
+  });
+
+  readonly usdToCopRate = computed<number>(() => {
+    const settingsFn = (
+      this.supabase as {
+        platformSettings?: () => { usd_to_cop_rate?: number } | null;
+      }
+    ).platformSettings;
+    const s = typeof settingsFn === 'function' ? settingsFn() : null;
+    const rate = Number(s?.usd_to_cop_rate ?? 4250);
+    return Number.isFinite(rate) && rate > 0 ? rate : 4250;
   });
 
   goToAdminPanel(): void {
@@ -297,6 +326,74 @@ export class AccountSettingsModalComponent {
   readonly hasLoadedCloudInvoices = signal<boolean>(false);
   readonly cloudInvoices = signal<SubscriptionInvoice[]>([]);
   readonly showManageBillingNotice = signal<boolean>(false);
+
+  private computePlanCopEstimate(plan: PaidPlan): AccountCopEstimateResult {
+    const cycle = this.billingCycleSelect();
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    const fromService = bridge.getCopEstimate?.(plan, cycle);
+    if (fromService && Number.isFinite(fromService.amountCop) && fromService.amountCop > 0) {
+      return fromService;
+    }
+    const prices = this.planPrices();
+    const amountUsd =
+      plan === 'industrial'
+        ? cycle === 'annual'
+          ? prices.industrial_annual_total_usd
+          : prices.industrial_monthly_usd
+        : cycle === 'annual'
+          ? prices.pro_annual_total_usd
+          : prices.pro_monthly_usd;
+    const rate = this.usdToCopRate();
+    const amountCop = Math.max(1500, Math.round(amountUsd * rate));
+    return {
+      amountUsd,
+      exchangeRateCop: rate,
+      amountCop,
+      amountInCents: amountCop * 100
+    };
+  }
+
+  readonly proCopEstimate = computed<AccountCopEstimateResult>(() =>
+    this.computePlanCopEstimate('pro')
+  );
+
+  readonly industrialCopEstimate = computed<AccountCopEstimateResult>(() =>
+    this.computePlanCopEstimate('industrial')
+  );
+
+  readonly isPreparingCheckout = computed<boolean>(() => {
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    return typeof bridge.isPreparingCheckout === 'function'
+      ? Boolean(bridge.isPreparingCheckout())
+      : false;
+  });
+
+  readonly checkoutGatewayError = computed<string | null>(() => {
+    const bridge = this.paymentService as unknown as AccountPaymentBridge;
+    const raw =
+      typeof bridge.lastCheckoutError === 'function' ? bridge.lastCheckoutError() : null;
+    if (typeof raw !== 'string' || !raw.trim()) {
+      return null;
+    }
+    if (raw === 'WOMPI_CONFIG_MISSING') {
+      return this.i18n.t('account.billing.gatewayKeyMissingError');
+    }
+    if (raw.startsWith('account.') || raw.startsWith('earlyAccess.')) {
+      return this.i18n.t(raw);
+    }
+    return raw;
+  });
+
+  formatCopCurrency(amountCop: number): string {
+    const rounded = Number.isFinite(amountCop) && amountCop > 0 ? Math.round(amountCop) : 0;
+    return `$ ${rounded.toLocaleString('es-CO')} COP`;
+  }
+
+  formatUsdToCopHint(usdAmount: number): string {
+    const rate = this.usdToCopRate();
+    const amountCop = Math.max(1500, Math.round((Number(usdAmount) || 0) * rate));
+    return `Cobro aprox. ${this.formatCopCurrency(amountCop)}`;
+  }
 
   readonly isManagingSubscription = signal<boolean>(false);
   readonly isConfirmingCancel = signal<boolean>(false);
@@ -482,7 +579,7 @@ export class AccountSettingsModalComponent {
       this.previousIsOpen = open;
     });
 
-    // Recargar facturas automáticamente si se completa un Checkout.Success mientras el modal está abierto
+    // Recargar facturas automáticamente si se completa un pago en Wompi mientras el modal está abierto
     effect(() => {
       const successAt = this.paymentService.lastCheckoutSuccessAt?.() ?? null;
       if (successAt && this.isOpen()) {
@@ -890,7 +987,7 @@ export class AccountSettingsModalComponent {
           this.fallbackPortalUrl.set(portalUrl);
         }
         const msgKey =
-          result.errorCode === 'LEMON_API_KEY_MISSING'
+          result.errorCode === 'WOMPI_CONFIG_MISSING'
             ? 'account.billing.gatewayKeyMissingError'
             : (result.errorKey ?? 'account.billing.cancelErrorToast');
         this.showToast(this.i18n.t(msgKey), 'error');
@@ -918,7 +1015,7 @@ export class AccountSettingsModalComponent {
           this.fallbackPortalUrl.set(portalUrl);
         }
         const msgKey =
-          result.errorCode === 'LEMON_API_KEY_MISSING'
+          result.errorCode === 'WOMPI_CONFIG_MISSING'
             ? 'account.billing.gatewayKeyMissingError'
             : (result.errorKey ?? 'account.billing.reactivateErrorToast');
         this.showToast(this.i18n.t(msgKey), 'error');
@@ -958,7 +1055,7 @@ export class AccountSettingsModalComponent {
       }
 
       const recoveryUrl =
-        result.errorCode === 'LEMON_API_KEY_MISSING'
+        result.errorCode === 'WOMPI_CONFIG_MISSING'
           ? this.sanitizeExternalUrl(this.fallbackPortalUrl() ?? this.customerPortalUrl())
           : null;
       if (recoveryUrl) {
@@ -967,7 +1064,7 @@ export class AccountSettingsModalComponent {
       }
 
       const msgKey =
-        result.errorCode === 'LEMON_API_KEY_MISSING'
+        result.errorCode === 'WOMPI_CONFIG_MISSING'
           ? 'account.billing.gatewayKeyMissingError'
           : (result.errorKey ?? 'account.billing.portalUnavailableToast');
       this.showToast(this.i18n.t(msgKey), 'error');
@@ -1007,9 +1104,7 @@ export class AccountSettingsModalComponent {
   }
 
   upgradePlan(plan?: PaidPlan, cycleOverride?: 'monthly' | 'annual'): void {
-    const paymentBridge = this.paymentService as unknown as {
-      isPaymentsProtected?: () => boolean;
-    };
+    const paymentBridge = this.paymentService as unknown as AccountPaymentBridge;
     const isPaymentsProtected = paymentBridge.isPaymentsProtected?.() ?? false;
     if (!isPaymentsProtected) {
       this.showToast(this.i18n.t('account.billing.upgradeMockToast'));

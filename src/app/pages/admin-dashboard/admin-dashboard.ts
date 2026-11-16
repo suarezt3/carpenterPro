@@ -83,7 +83,35 @@ export interface UserProfilePatch {
   is_suspended?: boolean;
 }
 
-const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsRecord = {
+export type AdminPlatformSettingsRecord = PlatformSettingsRecord & {
+  usd_to_cop_rate?: number;
+};
+
+export interface AdminCopEstimateResult {
+  amountUsd: number;
+  exchangeRateCop: number;
+  amountCop: number;
+  amountInCents: number;
+}
+
+interface AdminPaymentBridge {
+  paymentsMode?: () => PaymentsReadinessMode;
+  togglePaymentsMode?: () => PaymentsReadinessMode;
+  testAdminCheckout?: (
+    plan: PaidPlan,
+    cycle?: 'monthly' | 'annual' | 'yearly'
+  ) => Promise<void>;
+  getCopEstimate?: (
+    plan: PaidPlan,
+    cycle?: 'monthly' | 'annual' | 'yearly'
+  ) => AdminCopEstimateResult;
+  isPreparingCheckout?: () => boolean;
+  lastCheckoutError?: () => string | null;
+  environment?: () => 'sandbox' | 'production';
+  wompiEnvironment?: () => 'sandbox' | 'production';
+}
+
+const DEFAULT_PLATFORM_SETTINGS: AdminPlatformSettingsRecord = {
   id: 1,
   app_version: 'v3.0.0',
   support_email: OFFICIAL_SUPPORT_EMAIL,
@@ -93,6 +121,7 @@ const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsRecord = {
   industrial_monthly_usd: 29,
   industrial_annual_monthly_usd: 23,
   industrial_annual_total_usd: 276,
+  usd_to_cop_rate: 4250,
   announcement_enabled: false,
   announcement_text: '',
   announcement_badge: 'NOVEDAD',
@@ -203,14 +232,21 @@ export class AdminDashboardComponent implements OnInit {
   readonly ticketStatusDraft = signal<Record<string, PlatformFeedbackStatus>>({});
 
   // Current Settings Computed
-  readonly currentSettings = computed<PlatformSettingsRecord>(() => {
+  readonly currentSettings = computed<AdminPlatformSettingsRecord>(() => {
     const sig = this.supabase.platformSettings;
-    const raw = typeof sig === 'function' ? sig() : DEFAULT_PLATFORM_SETTINGS;
+    const raw: AdminPlatformSettingsRecord =
+      typeof sig === 'function' ? sig() : DEFAULT_PLATFORM_SETTINGS;
+    const parsedRate = Number(raw.usd_to_cop_rate ?? 4250);
     return {
       ...raw,
+      usd_to_cop_rate: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 4250,
       support_email: resolvePublicSupportEmail(raw.support_email)
     };
   });
+
+  private getPaymentBridge(): AdminPaymentBridge {
+    return this.paymentService as unknown as AdminPaymentBridge;
+  }
 
   // Payments Readiness Guard (SuperAdmin Switch)
   readonly paymentsMode = computed<PaymentsReadinessMode>(() =>
@@ -222,6 +258,75 @@ export class AdminDashboardComponent implements OnInit {
   readonly isPaymentsProtected = computed<boolean>(
     () => this.paymentsMode() === 'early_access_protected'
   );
+
+  readonly wompiEnvironment = computed<'sandbox' | 'production'>(() => {
+    const bridge = this.getPaymentBridge();
+    const fromService =
+      typeof bridge.wompiEnvironment === 'function'
+        ? bridge.wompiEnvironment()
+        : typeof bridge.environment === 'function'
+          ? bridge.environment()
+          : null;
+    if (fromService === 'production' || fromService === 'sandbox') {
+      return fromService;
+    }
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname.toLowerCase();
+      if (host === 'piezo3d.com' || host === 'www.piezo3d.com') {
+        return 'production';
+      }
+    }
+    return 'sandbox';
+  });
+
+  readonly wompiEnvironmentLabel = computed<string>(() =>
+    this.wompiEnvironment() === 'production' ? 'Producción' : 'Sandbox'
+  );
+
+  readonly effectiveUsdToCopRate = computed<number>(() => {
+    const fromService = this.getPaymentBridge().getCopEstimate?.('pro', 'monthly');
+    if (
+      fromService &&
+      Number.isFinite(fromService.exchangeRateCop) &&
+      fromService.exchangeRateCop > 0
+    ) {
+      return fromService.exchangeRateCop;
+    }
+    const rate = Number(this.currentSettings().usd_to_cop_rate ?? 4250);
+    return Number.isFinite(rate) && rate > 0 ? rate : 4250;
+  });
+
+  readonly proMonthlyCopEstimate = computed<number>(() => {
+    const fromService = this.getPaymentBridge().getCopEstimate?.('pro', 'monthly');
+    if (fromService && Number.isFinite(fromService.amountCop) && fromService.amountCop > 0) {
+      return fromService.amountCop;
+    }
+    const usd = Number(this.currentSettings().pro_monthly_usd || 15);
+    return Math.max(1500, Math.round(usd * this.effectiveUsdToCopRate()));
+  });
+
+  readonly industrialMonthlyCopEstimate = computed<number>(() => {
+    const fromService = this.getPaymentBridge().getCopEstimate?.('industrial', 'monthly');
+    if (fromService && Number.isFinite(fromService.amountCop) && fromService.amountCop > 0) {
+      return fromService.amountCop;
+    }
+    const usd = Number(this.currentSettings().industrial_monthly_usd || 29);
+    return Math.max(1500, Math.round(usd * this.effectiveUsdToCopRate()));
+  });
+
+  readonly isPreparingGatewayCheckout = computed<boolean>(() => {
+    const bridge = this.getPaymentBridge();
+    return typeof bridge.isPreparingCheckout === 'function'
+      ? Boolean(bridge.isPreparingCheckout())
+      : false;
+  });
+
+  readonly gatewayCheckoutError = computed<string | null>(() => {
+    const bridge = this.getPaymentBridge();
+    const err =
+      typeof bridge.lastCheckoutError === 'function' ? bridge.lastCheckoutError() : null;
+    return typeof err === 'string' && err.trim() ? err.trim() : null;
+  });
 
   // KPI Computed Signals (Module 1)
   readonly totalUsersCount = computed<number>(() => this.profiles().length);
@@ -338,6 +443,7 @@ export class AdminDashboardComponent implements OnInit {
     industrial_monthly_usd: [29, [Validators.required, Validators.min(0)]],
     industrial_annual_monthly_usd: [23, [Validators.required, Validators.min(0)]],
     industrial_annual_total_usd: [276, [Validators.required, Validators.min(0)]],
+    usd_to_cop_rate: [4250, [Validators.required, Validators.min(1)]],
     free_max_modules: [3, [Validators.required, Validators.min(1)]],
     app_version: ['v3.0.0', [Validators.required]],
     support_email: [OFFICIAL_SUPPORT_EMAIL, [Validators.required, Validators.email]],
@@ -412,7 +518,7 @@ export class AdminDashboardComponent implements OnInit {
 
     if (nextMode === 'live_checkout') {
       this.showToast(
-        'Pasarela de pagos activada en Modo en Vivo (Checkout Lemon Squeezy activo).',
+        'Pasarela de pagos activada en Modo en Vivo (Checkout Wompi Colombia activo).',
         'success'
       );
       return;
@@ -425,7 +531,15 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   testAdminCheckout(plan: PaidPlan): void {
-    void this.paymentService.testAdminCheckout?.(plan, 'monthly');
+    const maybePromise = this.getPaymentBridge().testAdminCheckout?.(plan, 'monthly');
+    if (maybePromise && typeof maybePromise.then === 'function') {
+      void maybePromise.then(() => {
+        const err = this.gatewayCheckoutError();
+        if (err) {
+          this.showToast(err, 'error');
+        }
+      });
+    }
   }
 
   async reloadAllData(): Promise<void> {
@@ -458,7 +572,8 @@ export class AdminDashboardComponent implements OnInit {
     }
   }
 
-  private syncCmsFormWithSettings(settings: PlatformSettingsRecord): void {
+  private syncCmsFormWithSettings(settings: AdminPlatformSettingsRecord): void {
+    const parsedRate = Number(settings.usd_to_cop_rate ?? 4250);
     this.cmsForm.patchValue(
       {
         pro_monthly_usd: settings.pro_monthly_usd,
@@ -467,6 +582,7 @@ export class AdminDashboardComponent implements OnInit {
         industrial_monthly_usd: settings.industrial_monthly_usd,
         industrial_annual_monthly_usd: settings.industrial_annual_monthly_usd,
         industrial_annual_total_usd: settings.industrial_annual_total_usd,
+        usd_to_cop_rate: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 4250,
         free_max_modules: settings.free_max_modules,
         app_version: settings.app_version,
         support_email: resolvePublicSupportEmail(settings.support_email),
@@ -598,13 +714,15 @@ export class AdminDashboardComponent implements OnInit {
     this.isSavingCms.set(true);
     try {
       const raw = this.cmsForm.getRawValue();
-      const patch: Partial<PlatformSettingsRecord> = {
+      const parsedRate = Number(raw.usd_to_cop_rate);
+      const patch: Partial<AdminPlatformSettingsRecord> = {
         pro_monthly_usd: Number(raw.pro_monthly_usd),
         pro_annual_monthly_usd: Number(raw.pro_annual_monthly_usd),
         pro_annual_total_usd: Number(raw.pro_annual_total_usd),
         industrial_monthly_usd: Number(raw.industrial_monthly_usd),
         industrial_annual_monthly_usd: Number(raw.industrial_annual_monthly_usd),
         industrial_annual_total_usd: Number(raw.industrial_annual_total_usd),
+        usd_to_cop_rate: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 4250,
         free_max_modules: Number(raw.free_max_modules),
         app_version: raw.app_version.trim(),
         support_email: resolvePublicSupportEmail(raw.support_email),
@@ -875,6 +993,18 @@ export class AdminDashboardComponent implements OnInit {
     if (category === 'bug') return 'Reporte de Bug';
     if (category === 'testimonial') return 'Testimonio';
     return 'Soporte Técnico';
+  }
+
+  formatCopCurrency(amount: number): string {
+    const safe = Number.isFinite(amount) && amount > 0 ? Math.round(amount) : 0;
+    return `$ ${safe.toLocaleString('es-CO')} COP`;
+  }
+
+  computeCopEstimateFromForm(usdAmount: number): number {
+    const rate = Number(this.cmsForm.controls.usd_to_cop_rate.value ?? 4250);
+    const safeRate = Number.isFinite(rate) && rate > 0 ? rate : 4250;
+    const safeUsd = Number.isFinite(usdAmount) && usdAmount > 0 ? usdAmount : 0;
+    return Math.max(1500, Math.round(safeUsd * safeRate));
   }
 
   formatShortDate(isoDate?: string | null): string {

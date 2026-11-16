@@ -1130,6 +1130,26 @@
                   </div>
                 </div>
 
+                @if (isPreparingCheckout()) {
+                  <div
+                    role="status"
+                    data-testid="account-checkout-preparing-banner"
+                    class="p-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-xs font-medium flex items-center gap-2 font-sans">
+                    <hugeicons-icon [icon]="icons.refresh" [size]="15" [strokeWidth]="2" class="text-sky-600 animate-spin shrink-0"></hugeicons-icon>
+                    <span>Preparando checkout seguro en COP con Wompi Colombia...</span>
+                  </div>
+                }
+
+                @if (checkoutGatewayError(); as gatewayErr) {
+                  <div
+                    role="alert"
+                    data-testid="account-checkout-error-banner"
+                    class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2 font-sans">
+                    <hugeicons-icon [icon]="icons.alert" [size]="15" [strokeWidth]="2" class="text-red-600 shrink-0"></hugeicons-icon>
+                    <span>{{ gatewayErr }}</span>
+                  </div>
+                }
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <!-- Tarjeta Plan Taller Pro -->
                   <div class="p-3.5 rounded-xl bg-white border border-zinc-200 flex flex-col justify-between gap-3 shadow-2xs">
@@ -1143,13 +1163,20 @@
                       <p class="text-[11px] text-zinc-500 mt-1">
                         {{ 'account.billing.planProDesc' | t }}
                       </p>
+                      <p
+                        data-testid="account-pro-cop-hint"
+                        class="text-[11px] font-medium text-zinc-600 bg-zinc-50 border border-zinc-200/90 rounded-md px-2.5 py-1 mt-2 inline-flex items-center gap-1 font-sans">
+                        <span>Cobro aprox.</span>
+                        <span class="font-numeric font-bold text-zinc-900">{{ formatCopCurrency(proCopEstimate().amountCop) }}</span>
+                      </p>
                     </div>
                     @if (userPlan() === 'free') {
                       <button
                         type="button"
                         data-testid="account-checkout-pro-btn"
+                        [disabled]="isPreparingCheckout()"
                         (click)="selectPlanCheckout('pro')"
-                        class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.rocket" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
                         <span>{{ 'landing.pricing.planProCta' | t }} ({{ billingCycleSelect() === 'annual' ? '$' + planPrices().pro_annual_total_usd + ' USD / año' : '$' + planPrices().pro_monthly_usd + ' USD' }})</span>
                       </button>
@@ -1157,8 +1184,9 @@
                       <button
                         type="button"
                         data-testid="account-checkout-pro-btn"
+                        [disabled]="isPreparingCheckout()"
                         (click)="selectPlanCheckout('pro', 'annual')"
-                        class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
                         <span>{{ 'account.billing.switchToAnnualBtn' | t }} (${{ planPrices().pro_annual_total_usd }} USD / año)</span>
                       </button>
@@ -1193,13 +1221,20 @@
                       <p class="text-[11px] text-zinc-500 mt-1">
                         {{ 'account.billing.planIndDesc' | t }}
                       </p>
+                      <p
+                        data-testid="account-industrial-cop-hint"
+                        class="text-[11px] font-medium text-zinc-600 bg-zinc-50 border border-zinc-200/90 rounded-md px-2.5 py-1 mt-2 inline-flex items-center gap-1 font-sans">
+                        <span>Cobro aprox.</span>
+                        <span class="font-numeric font-bold text-zinc-900">{{ formatCopCurrency(industrialCopEstimate().amountCop) }}</span>
+                      </p>
                     </div>
                     @if (userPlan() === 'free' || userPlan() === 'pro') {
                       <button
                         type="button"
                         data-testid="account-checkout-industrial-btn"
+                        [disabled]="isPreparingCheckout()"
                         (click)="selectPlanCheckout('industrial')"
-                        class="w-full py-2 px-3 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        class="w-full py-2 px-3 rounded-lg bg-white hover:bg-zinc-100 disabled:opacity-50 text-zinc-900 border border-zinc-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.arrowRight" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
                         <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }} ({{ billingCycleSelect() === 'annual' ? '$' + planPrices().industrial_annual_total_usd + ' USD / año' : '$' + planPrices().industrial_monthly_usd + ' USD' }})</span>
                       </button>
@@ -1207,8 +1242,9 @@
                       <button
                         type="button"
                         data-testid="account-checkout-industrial-btn"
+                        [disabled]="isPreparingCheckout()"
                         (click)="selectPlanCheckout('industrial', 'annual')"
-                        class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                         <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
                         <span>{{ 'account.billing.switchToAnnualBtn' | t }} (${{ planPrices().industrial_annual_total_usd }} USD / año)</span>
                       </button>

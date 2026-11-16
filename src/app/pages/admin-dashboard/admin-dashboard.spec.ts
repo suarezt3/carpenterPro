@@ -1,7 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
-import { AdminDashboardComponent } from './admin-dashboard';
+import {
+  AdminDashboardComponent,
+  AdminPlatformSettingsRecord
+} from './admin-dashboard';
 import {
   PlatformFeedbackRecord,
   PlatformSettingsRecord,
@@ -20,7 +23,7 @@ describe('AdminDashboardComponent', () => {
   let fixture: ComponentFixture<AdminDashboardComponent>;
   let supabaseMock: Partial<SupabaseService>;
 
-  const mockSettings: PlatformSettingsRecord = {
+  const mockSettings: AdminPlatformSettingsRecord = {
     id: 1,
     app_version: 'v3.0.0',
     support_email: 'piezo3dstudio@gmail.com',
@@ -30,6 +33,7 @@ describe('AdminDashboardComponent', () => {
     industrial_monthly_usd: 29,
     industrial_annual_monthly_usd: 23,
     industrial_annual_total_usd: 276,
+    usd_to_cop_rate: 4250,
     announcement_enabled: false,
     announcement_text: '',
     announcement_badge: 'NOVEDAD',
@@ -243,18 +247,26 @@ describe('AdminDashboardComponent', () => {
     });
   });
 
-  it('should load and save global CMS settings via updatePlatformSettings', async () => {
+  it('should load and save global CMS settings via updatePlatformSettings including usd_to_cop_rate', async () => {
     component.setSection('cms');
     fixture.detectChanges();
+
+    const copRateInput = fixture.nativeElement.querySelector(
+      '[data-testid="cms-usd-to-cop-rate-input"]'
+    ) as HTMLInputElement | null;
+    expect(copRateInput).toBeTruthy();
+    expect(component.cmsForm.controls.usd_to_cop_rate.value).toBe(4250);
 
     component.cmsForm.patchValue({
       pro_monthly_usd: 19,
       industrial_monthly_usd: 35,
+      usd_to_cop_rate: 4300,
       app_version: 'v3.1.0',
       announcement_enabled: true,
       announcement_badge: 'PROMO',
       announcement_text: 'Descuento especial en planes anuales'
     });
+    fixture.detectChanges();
 
     await component.saveCmsSettings();
 
@@ -262,6 +274,7 @@ describe('AdminDashboardComponent', () => {
       expect.objectContaining({
         pro_monthly_usd: 19,
         industrial_monthly_usd: 35,
+        usd_to_cop_rate: 4300,
         app_version: 'v3.1.0',
         announcement_enabled: true,
         announcement_badge: 'PROMO',
@@ -347,19 +360,26 @@ describe('AdminDashboardComponent', () => {
     expect(isSuperAdminOwnerEmail('piezo3dstudio@gmail.com')).toBe(true);
   });
 
-  it('should render Control de Pasarela de Pagos card, toggle Modo Protegido <-> Modo en Vivo, and trigger admin checkout tests', () => {
+  it('should render Control de Pasarela de Pagos (Wompi Colombia) card with Modo en Vivo by default, toggle to Modo Protegido, show COP pills, and trigger admin checkout tests', () => {
     const paymentService = TestBed.inject(PaymentService);
     const cardEl = fixture.nativeElement.querySelector('[data-testid="admin-payments-readiness-card"]') as HTMLElement | null;
     const badgeEl = fixture.nativeElement.querySelector('[data-testid="admin-payments-mode-badge"]') as HTMLElement | null;
+    const envPillEl = fixture.nativeElement.querySelector('[data-testid="admin-wompi-env-pill"]') as HTMLElement | null;
+    const copPillEl = fixture.nativeElement.querySelector('[data-testid="admin-wompi-cop-pill"]') as HTMLElement | null;
     const toggleBtn = fixture.nativeElement.querySelector('[data-testid="admin-toggle-payments-mode-btn"]') as HTMLButtonElement | null;
     const testProBtn = fixture.nativeElement.querySelector('[data-testid="admin-test-checkout-pro-btn"]') as HTMLButtonElement | null;
     const testIndBtn = fixture.nativeElement.querySelector('[data-testid="admin-test-checkout-industrial-btn"]') as HTMLButtonElement | null;
 
     expect(cardEl).toBeTruthy();
-    expect(cardEl?.textContent).toContain('Control de Pasarela de Pagos (Lemon Squeezy)');
-    expect(badgeEl?.textContent).toContain('Modo Protegido (Acceso Anticipado — Cobros Pausados)');
-    expect(component.isPaymentsProtected()).toBe(true);
-    expect(paymentService.paymentsMode()).toBe('early_access_protected');
+    expect(cardEl?.textContent).toContain('Control de Pasarela de Pagos (Wompi Colombia)');
+    expect(badgeEl?.textContent).toContain('Modo en Vivo (Checkout Wompi Activo)');
+    expect(component.isPaymentsProtected()).toBe(false);
+    expect(paymentService.paymentsMode()).toBe('live_checkout');
+
+    expect(envPillEl?.textContent).toContain('Ambiente: Sandbox');
+    expect(copPillEl?.textContent).toContain('4.250 COP');
+    expect(copPillEl?.textContent).toContain('63.750 COP');
+    expect(copPillEl?.textContent).toContain('123.250 COP');
 
     expect(testProBtn?.textContent).toContain('Probar Checkout Pro ($15)');
     expect(testIndBtn?.textContent).toContain('Probar Checkout Industrial ($29)');
@@ -367,11 +387,11 @@ describe('AdminDashboardComponent', () => {
     toggleBtn?.click();
     fixture.detectChanges();
 
-    expect(component.isPaymentsProtected()).toBe(false);
-    expect(paymentService.paymentsMode()).toBe('live_checkout');
-    expect(badgeEl?.textContent).toContain('Modo en Vivo (Checkout Lemon Squeezy Activo)');
+    expect(component.isPaymentsProtected()).toBe(true);
+    expect(paymentService.paymentsMode()).toBe('early_access_protected');
+    expect(badgeEl?.textContent).toContain('Modo Protegido (Acceso Anticipado — Cobros Pausados)');
     expect(component.toastBanner()?.type).toBe('success');
-    expect(component.toastBanner()?.text).toContain('Modo en Vivo');
+    expect(component.toastBanner()?.text).toContain('Modo Protegido');
 
     const testAdminSpy = vi.spyOn(paymentService, 'testAdminCheckout').mockResolvedValue(undefined);
     testProBtn?.click();
@@ -383,8 +403,71 @@ describe('AdminDashboardComponent', () => {
     toggleBtn?.click();
     fixture.detectChanges();
 
-    expect(component.isPaymentsProtected()).toBe(true);
-    expect(paymentService.paymentsMode()).toBe('early_access_protected');
-    expect(badgeEl?.textContent).toContain('Modo Protegido (Acceso Anticipado — Cobros Pausados)');
+    expect(component.isPaymentsProtected()).toBe(false);
+    expect(paymentService.paymentsMode()).toBe('live_checkout');
+    expect(badgeEl?.textContent).toContain('Modo en Vivo (Checkout Wompi Activo)');
+    expect(component.toastBanner()?.type).toBe('success');
+    expect(component.toastBanner()?.text).toBe(
+      'Pasarela de pagos activada en Modo en Vivo (Checkout Wompi Colombia activo).'
+    );
+  });
+
+  it('should display Wompi COP estimates from PaymentService and surface lastCheckoutError in card and toast banner', async () => {
+    const modeSig = signal<'early_access_protected' | 'live_checkout'>('live_checkout');
+    const isPreparingSig = signal<boolean>(false);
+    const errorSig = signal<string | null>(null);
+
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [AdminDashboardComponent],
+      providers: [
+        provideRouter([]),
+        { provide: SupabaseService, useValue: supabaseMock },
+        {
+          provide: PaymentService,
+          useValue: {
+            paymentsMode: modeSig,
+            isPreparingCheckout: isPreparingSig,
+            lastCheckoutError: errorSig,
+            wompiEnvironment: () => 'sandbox',
+            getCopEstimate: (plan: 'pro' | 'industrial') => ({
+              amountUsd: plan === 'industrial' ? 29 : 15,
+              exchangeRateCop: 4300,
+              amountCop: plan === 'industrial' ? 124700 : 64500,
+              amountInCents: (plan === 'industrial' ? 124700 : 64500) * 100
+            }),
+            togglePaymentsMode: () => {
+              const next = modeSig() === 'early_access_protected' ? 'live_checkout' : 'early_access_protected';
+              modeSig.set(next);
+              return next;
+            },
+            testAdminCheckout: vi.fn().mockImplementation(async () => {
+              errorSig.set('Falta configurar WOMPI_INTEGRITY_SECRET en el servidor.');
+            })
+          }
+        }
+      ]
+    }).compileComponents();
+
+    const localFixture = TestBed.createComponent(AdminDashboardComponent);
+    const localComponent = localFixture.componentInstance;
+    localFixture.detectChanges();
+    await localFixture.whenStable();
+    localFixture.detectChanges();
+
+    const copPillEl = localFixture.nativeElement.querySelector('[data-testid="admin-wompi-cop-pill"]') as HTMLElement | null;
+    expect(copPillEl?.textContent).toContain('4.300 COP');
+    expect(copPillEl?.textContent).toContain('64.500 COP');
+    expect(copPillEl?.textContent).toContain('124.700 COP');
+
+    const testProBtn = localFixture.nativeElement.querySelector('[data-testid="admin-test-checkout-pro-btn"]') as HTMLButtonElement | null;
+    testProBtn?.click();
+    await localFixture.whenStable();
+    localFixture.detectChanges();
+
+    const errorBanner = localFixture.nativeElement.querySelector('[data-testid="admin-payments-error-banner"]') as HTMLElement | null;
+    expect(errorBanner?.textContent).toContain('Falta configurar WOMPI_INTEGRITY_SECRET en el servidor.');
+    expect(localComponent.toastBanner()?.type).toBe('error');
+    expect(localComponent.toastBanner()?.text).toContain('WOMPI_INTEGRITY_SECRET');
   });
 });

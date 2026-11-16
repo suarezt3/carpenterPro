@@ -49,8 +49,8 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       updateUserProfile: vi.fn().mockResolvedValue({ success: true }),
       getBillingPortalUrl: vi.fn().mockResolvedValue({
         success: true,
-        portalUrl: 'https://piezo3d.lemonsqueezy.com/billing',
-        source: 'lemon_squeezy_api'
+        portalUrl: 'https://checkout.wompi.co/l/tx_test_202',
+        source: 'wompi_api'
       }),
       cancelSubscription: vi.fn().mockResolvedValue({ success: true }),
       reactivateSubscription: vi.fn().mockResolvedValue({ success: true }),
@@ -477,7 +477,7 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       expect(projectService.currentProject().roomConfig?.showClearances).toBe(false);
     });
 
-    it('Step 4.4: Pestaña 4 (Facturación) muestra portal alojado sin capturar PAN/CVC, sincroniza tarjeta y gestiona cancelación externa', async () => {
+    it('Step 4.4: Pestaña 4 (Facturación) muestra comprobante Wompi seguro sin capturar PAN/CVC, sincroniza tarjeta y gestiona cancelación externa', async () => {
       modalComponent.selectTab('billing');
       await modalComponent.loadBillingData();
       modalFixture.detectChanges();
@@ -503,8 +503,8 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
         plan: 'pro',
         billing_cycle: 'monthly',
         subscription_status: 'active',
-        subscription_id: 'ls-sub-401',
-        customer_portal_url: 'https://piezo3d.lemonsqueezy.com/billing',
+        subscription_id: 'tx_test_202',
+        customer_portal_url: 'https://checkout.wompi.co/l/tx_test_202',
         card_brand: 'Visa',
         card_last_four: '4242',
         current_period_end: '2027-02-01T00:00:00Z',
@@ -528,7 +528,7 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
 
         expect(mockSupabase.getBillingPortalUrl).toHaveBeenCalledTimes(1);
         expect(openSpy).toHaveBeenCalledWith(
-          'https://piezo3d.lemonsqueezy.com/billing',
+          'https://checkout.wompi.co/l/tx_test_202',
           '_blank',
           'noopener,noreferrer'
         );
@@ -538,7 +538,7 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
         openSpy.mockRestore();
       }
 
-      // Panel de gestión con suscripción externa: oculta cancelación inmediata y maneja error de API key faltante
+      // Panel de gestión con suscripción externa: oculta cancelación inmediata y maneja error de configuración Wompi faltante
       (el.querySelector('[data-testid="account-customer-portal-btn"]') as HTMLButtonElement).click();
       modalFixture.detectChanges();
       (el.querySelector('[data-testid="account-cancel-subscription-btn"]') as HTMLButtonElement).click();
@@ -549,9 +549,9 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
 
       (mockSupabase.cancelSubscription as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         success: false,
-        errorCode: 'LEMON_API_KEY_MISSING',
+        errorCode: 'WOMPI_CONFIG_MISSING',
         errorKey: 'account.billing.gatewayKeyMissingError',
-        portalUrl: 'https://piezo3d.lemonsqueezy.com/billing'
+        portalUrl: 'https://checkout.wompi.co/l/tx_test_202'
       });
 
       (el.querySelector('[data-testid="account-confirm-cancel-btn"]') as HTMLButtonElement).click();
