@@ -4,6 +4,7 @@ import {
   AuthLocationLike,
   AVATAR_COLOR_PRESETS,
   BillingPortalResult,
+  DEFAULT_PLATFORM_SETTINGS,
   normalizeAvatarColorHex,
   resolveAvatarBgClass,
   resolveAvatarColorId,
@@ -209,9 +210,11 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
   });
 
   describe('Autenticación Reactiva, Perfiles de Usuario y Privacidad de Errores (user_profiles)', () => {
-    it('SUPABASE_USER_PROFILES_SQL_SETUP debe definir public.user_profiles con RLS y trigger fn_handle_new_auth_user', async () => {
+    it('SUPABASE_USER_PROFILES_SQL_SETUP debe definir public.user_profiles con RLS, índice único en invoices y trigger fn_handle_new_auth_user', async () => {
       const { SUPABASE_USER_PROFILES_SQL_SETUP } = await import('./supabase.service');
       expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.user_profiles');
+      expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('idx_subscription_invoices_subscription_id_unique');
+      expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('amount_cop BIGINT');
       expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;');
       expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('CREATE POLICY "Users can view own profile"');
       expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('CREATE POLICY "Users can update own profile"');
@@ -511,9 +514,10 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
     });
 
     describe('Superadministrador y CMS Global (platform_settings y platform_feedback)', () => {
-      it('SUPABASE_SUPERADMIN_SQL_SETUP debe incluir platform_settings, ambos correos SuperAdmin y default piezo3dstudio@gmail.com', async () => {
-        const { SUPABASE_SUPERADMIN_SQL_SETUP } = await import('./supabase.service');
+      it('SUPABASE_SUPERADMIN_SQL_SETUP y SUPABASE_WOMPI_PAYMENTS_SQL_SETUP deben incluir usd_to_cop_rate, payment_transactions con RLS e índice único en invoices', async () => {
+        const { SUPABASE_SUPERADMIN_SQL_SETUP, SUPABASE_WOMPI_PAYMENTS_SQL_SETUP } = await import('./supabase.service');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.platform_settings');
+        expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.platform_feedback');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain('CREATE OR REPLACE FUNCTION public.is_super_admin()');
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain(
@@ -525,6 +529,12 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(SUPABASE_SUPERADMIN_SQL_SETUP).toContain(
           "UPDATE public.platform_settings SET support_email = 'piezo3dstudio@gmail.com' WHERE id = 1 AND lower(support_email) = 'eydersuarez900@gmail.com';"
         );
+
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.payment_transactions');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('USING ((select auth.uid()) = user_id OR public.is_super_admin());');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('idx_subscription_invoices_subscription_id_unique');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250');
       });
 
       it('buildFallbackProfile debe asignar rol super_admin y plan industrial a ambas cuentas propietarias', () => {
@@ -640,55 +650,62 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         }
       });
 
-      it('loadPlatformSettings debe retornar piezo3dstudio@gmail.com por defecto y normalizar el valor legado', async () => {
+      it('loadPlatformSettings debe retornar piezo3dstudio@gmail.com y usd_to_cop_rate=4250 por defecto y normalizar valores nulos/inválidos', async () => {
+        expect(DEFAULT_PLATFORM_SETTINGS.usd_to_cop_rate).toBe(4250);
         expect(service.platformSettings().support_email).toBe('piezo3dstudio@gmail.com');
+        expect(service.platformSettings().usd_to_cop_rate).toBe(4250);
 
         const settings = await service.loadPlatformSettings();
         expect(settings.id).toBe(1);
         expect(settings.app_version).toBe('v3.0.0');
         expect(settings.support_email).toBe('piezo3dstudio@gmail.com');
+        expect(settings.usd_to_cop_rate).toBe(4250);
         expect(service.platformSettings().pro_monthly_usd).toBe(15);
 
-        // Si Supabase devuelve el correo legado en la fila de platform_settings, debe normalizarse a piezo3dstudio@gmail.com
+        // Si Supabase devuelve el correo legado y tasa válida en platform_settings, normaliza correo y conserva tasa
         const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
           ok: true,
-          json: async () => [{ id: 1, support_email: 'eydersuarez900@gmail.com', app_version: 'v3.0.0' }]
+          json: async () => [{ id: 1, support_email: 'eydersuarez900@gmail.com', usd_to_cop_rate: 4320, app_version: 'v3.0.0' }]
         } as unknown as Response);
         try {
           const normalizedLegacy = await service.loadPlatformSettings();
           expect(normalizedLegacy.support_email).toBe('piezo3dstudio@gmail.com');
-          expect(service.platformSettings().support_email).toBe('piezo3dstudio@gmail.com');
+          expect(normalizedLegacy.usd_to_cop_rate).toBe(4320);
+          expect(service.platformSettings().usd_to_cop_rate).toBe(4320);
         } finally {
           fetchSpy.mockRestore();
         }
 
-        // Si Supabase devuelve un correo corporativo personalizado, debe conservarse
-        const fetchCustomSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        // Si Supabase devuelve usd_to_cop_rate nulo o inválido, debe aplicar fallback seguro 4250
+        const fetchInvalidRateSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
           ok: true,
-          json: async () => [{ id: 1, support_email: 'soporte@piezo3d.com', app_version: 'v3.0.0' }]
+          json: async () => [{ id: 1, support_email: 'soporte@piezo3d.com', usd_to_cop_rate: null, app_version: 'v3.0.0' }]
         } as unknown as Response);
         try {
           const customSettings = await service.loadPlatformSettings();
           expect(customSettings.support_email).toBe('soporte@piezo3d.com');
+          expect(customSettings.usd_to_cop_rate).toBe(4250);
         } finally {
-          fetchCustomSpy.mockRestore();
+          fetchInvalidRateSpy.mockRestore();
         }
       });
 
-      it('updatePlatformSettings debe actualizar la señal platformSettings localmente y llamar a la base de datos', async () => {
+      it('updatePlatformSettings y adminUpdatePlatformSettings deben actualizar la señal platformSettings incluyendo usd_to_cop_rate', async () => {
         const mockEq = vi.fn().mockResolvedValue({ error: null });
         const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
         const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
         (service as unknown as { client: { from: typeof mockFrom } }).client = { from: mockFrom };
 
-        const res = await service.updatePlatformSettings({
+        const res = await service.adminUpdatePlatformSettings({
           pro_monthly_usd: 19,
+          usd_to_cop_rate: 4400,
           announcement_enabled: true,
           announcement_text: 'Oferta Especial'
         });
 
         expect(res.success).toBe(true);
         expect(service.platformSettings().pro_monthly_usd).toBe(19);
+        expect(service.platformSettings().usd_to_cop_rate).toBe(4400);
         expect(service.platformSettings().announcement_enabled).toBe(true);
         expect(service.platformSettings().announcement_text).toBe('Oferta Especial');
         expect(mockFrom).toHaveBeenCalledWith('platform_settings');
@@ -1212,7 +1229,7 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(service.userProfile()?.subscription_status).toBe('active');
       });
 
-      it('getBillingPortalUrl debe invocar la Edge Function, sincronizar userProfile y manejar caché/errores', async () => {
+      it('getBillingPortalUrl debe invocar wompi-manage-subscription, sincronizar userProfile y manejar caché/errores', async () => {
         service.currentUser.set(null);
         const unauthRes: BillingPortalResult = await service.getBillingPortalUrl();
         expect(unauthRes.success).toBe(false);
@@ -1222,8 +1239,8 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         const initialProfile = createUserProfile({
           plan: 'pro',
           subscription_status: 'active',
-          subscription_id: 'sub_ls_100',
-          customer_portal_url: 'https://app.lemonsqueezy.com/my-orders/cached'
+          subscription_id: 'tx_wompi_100',
+          customer_portal_url: 'https://checkout.wompi.co/l/tx_wompi_100_cached'
         });
         service.currentUser.set(user);
         service.userProfile.set(initialProfile);
@@ -1231,10 +1248,10 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         const mockInvoke = vi.fn().mockResolvedValue({
           data: {
             success: true,
-            source: 'lemon_squeezy_api',
-            portalUrl: 'https://app.lemonsqueezy.com/my-orders/live-update',
-            updatePaymentMethodUrl: 'https://app.lemonsqueezy.com/my-orders/live-update',
-            customerPortalUrl: 'https://app.lemonsqueezy.com/my-orders/customer',
+            source: 'wompi_api',
+            portalUrl: 'https://checkout.wompi.co/l/tx_wompi_100',
+            updatePaymentMethodUrl: null,
+            customerPortalUrl: 'https://checkout.wompi.co/l/tx_wompi_100_receipt',
             subscription_status: 'active',
             current_period_end: '2027-01-15T00:00:00Z',
             cardBrand: 'mastercard',
@@ -1247,39 +1264,39 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         };
 
         const liveRes = await service.getBillingPortalUrl();
-        expect(mockInvoke).toHaveBeenCalledWith('lemon-squeezy-manage-subscription', {
+        expect(mockInvoke).toHaveBeenCalledWith('wompi-manage-subscription', {
           body: { action: 'get_portal_url' }
         });
         expect(liveRes.success).toBe(true);
-        expect(liveRes.source).toBe('lemon_squeezy_api');
-        expect(liveRes.portalUrl).toBe('https://app.lemonsqueezy.com/my-orders/live-update');
+        expect(liveRes.source).toBe('wompi_api');
+        expect(liveRes.portalUrl).toBe('https://checkout.wompi.co/l/tx_wompi_100');
         expect(liveRes.cardBrand).toBe('MASTERCARD');
         expect(liveRes.cardLastFour).toBe('5511');
         expect(service.userProfile()).not.toBe(initialProfile);
-        expect(service.userProfile()?.customer_portal_url).toBe('https://app.lemonsqueezy.com/my-orders/customer');
+        expect(service.userProfile()?.customer_portal_url).toBe('https://checkout.wompi.co/l/tx_wompi_100_receipt');
         expect(service.userProfile()?.current_period_end).toBe('2027-01-15T00:00:00Z');
         expect(service.userProfile()?.card_brand).toBe('MASTERCARD');
         expect(service.userProfile()?.card_last_four).toBe('5511');
 
         // Fallback seguro a customer_portal_url cacheada cuando falla la Edge Function
         mockInvoke.mockResolvedValueOnce({
-          data: { success: false, code: 'LEMON_API_KEY_MISSING' },
+          data: { success: false, code: 'WOMPI_CONFIG_MISSING' },
           error: null
         });
         const cachedRes = await service.getBillingPortalUrl();
         expect(cachedRes.success).toBe(true);
         expect(cachedRes.source).toBe('cached_portal_url');
-        expect(cachedRes.portalUrl).toBe('https://app.lemonsqueezy.com/my-orders/customer');
+        expect(cachedRes.portalUrl).toBe('https://checkout.wompi.co/l/tx_wompi_100_receipt');
 
-        // Sin caché: LEMON_API_KEY_MISSING y error genérico devuelven claves i18n precisas
+        // Sin caché: WOMPI_CONFIG_MISSING y error genérico devuelven claves i18n precisas
         service.userProfile.set({ ...initialProfile, customer_portal_url: null });
         mockInvoke.mockResolvedValueOnce({
-          data: { success: false, code: 'LEMON_API_KEY_MISSING' },
+          data: { success: false, code: 'WOMPI_CONFIG_MISSING' },
           error: null
         });
         const missingKeyRes = await service.getBillingPortalUrl();
         expect(missingKeyRes.success).toBe(false);
-        expect(missingKeyRes.errorCode).toBe('LEMON_API_KEY_MISSING');
+        expect(missingKeyRes.errorCode).toBe('WOMPI_CONFIG_MISSING');
         expect(missingKeyRes.errorKey).toBe('account.billing.gatewayKeyMissingError');
 
         mockInvoke.mockResolvedValueOnce({
@@ -1292,13 +1309,117 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(genericErrRes.errorKey).toBe('account.billing.portalUnavailableToast');
       });
 
+      it('createWompiCheckoutSession y verifyWompiTransaction deben invocar las Edge Functions de Wompi y sincronizar perfil al aprobar', async () => {
+        const user = createAuthUser();
+        const initialProfile = createUserProfile({
+          plan: 'free',
+          subscription_status: 'free'
+        });
+        service.currentUser.set(user);
+        service.userProfile.set(initialProfile);
+
+        const mockInvoke = vi.fn().mockResolvedValueOnce({
+          data: {
+            success: true,
+            publicKey: 'pub_test_5IPqjmLMDEC0cqUMoomPY7CzUaoGW68O',
+            currency: 'COP',
+            amountInCents: 6375000,
+            amountCop: 63750,
+            amountUsd: 15,
+            exchangeRateCop: 4250,
+            reference: 'P3D-PRO-MONTHLY-user1-123',
+            integritySignature: 'integrity_hex_123',
+            customerEmail: 'taller@piezo3d.com',
+            customerName: 'Taller Demo',
+            environment: 'sandbox',
+            redirectUrl: 'https://piezo3d.com/studio/designer?wompi_checkout=1'
+          },
+          error: null
+        });
+        (service as unknown as { client: { functions: { invoke: typeof mockInvoke } } }).client = {
+          functions: { invoke: mockInvoke }
+        };
+
+        const sessionRes = await service.createWompiCheckoutSession({
+          plan: 'pro',
+          billingCycle: 'monthly',
+          redirectUrl: 'https://piezo3d.com/studio/designer?wompi_checkout=1'
+        });
+
+        expect(mockInvoke).toHaveBeenCalledWith('wompi-create-checkout', {
+          body: {
+            plan: 'pro',
+            billingCycle: 'monthly',
+            redirectUrl: 'https://piezo3d.com/studio/designer?wompi_checkout=1'
+          }
+        });
+        expect(sessionRes.success).toBe(true);
+        expect(sessionRes.amountInCents).toBe(6375000);
+        expect(sessionRes.integritySignature).toBe('integrity_hex_123');
+        expect(sessionRes.reference).toBe('P3D-PRO-MONTHLY-user1-123');
+
+        mockInvoke.mockResolvedValueOnce({
+          data: { success: false, code: 'WOMPI_CONFIG_MISSING' },
+          error: null
+        });
+        const missingConfigSession = await service.createWompiCheckoutSession({
+          plan: 'pro',
+          billingCycle: 'monthly'
+        });
+        expect(missingConfigSession.success).toBe(false);
+        expect(missingConfigSession.errorCode).toBe('WOMPI_CONFIG_MISSING');
+        expect(missingConfigSession.errorKey).toBe('account.billing.gatewayKeyMissingError');
+
+        // Verificar transacción aprobada sincroniza plan y estado activo
+        mockInvoke.mockResolvedValueOnce({
+          data: {
+            success: true,
+            approved: true,
+            status: 'APPROVED',
+            transactionId: 'tx_wompi_900',
+            reference: 'P3D-PRO-MONTHLY-user1-123',
+            plan: 'pro',
+            billing_cycle: 'monthly',
+            current_period_end: '2027-02-01T00:00:00Z',
+            portalUrl: 'https://checkout.wompi.co/l/tx_wompi_900',
+            cardBrand: 'PSE',
+            cardLastFour: null
+          },
+          error: null
+        });
+
+        const verifyRes = await service.verifyWompiTransaction('tx_wompi_900', 'P3D-PRO-MONTHLY-user1-123');
+        expect(mockInvoke).toHaveBeenLastCalledWith('wompi-manage-subscription', {
+          body: {
+            action: 'verify_transaction',
+            transactionId: 'tx_wompi_900',
+            reference: 'P3D-PRO-MONTHLY-user1-123'
+          }
+        });
+        expect(verifyRes.success).toBe(true);
+        expect(verifyRes.approved).toBe(true);
+        expect(verifyRes.portalUrl).toBe('https://checkout.wompi.co/l/tx_wompi_900');
+        expect(service.userProfile()?.plan).toBe('pro');
+        expect(service.userProfile()?.subscription_status).toBe('active');
+        expect(service.userProfile()?.customer_portal_url).toBe('https://checkout.wompi.co/l/tx_wompi_900');
+
+        mockInvoke.mockResolvedValueOnce({
+          data: { success: false, code: 'WOMPI_CONFIG_MISSING' },
+          error: null
+        });
+        const missingVerify = await service.verifyWompiTransaction('tx_wompi_901');
+        expect(missingVerify.success).toBe(false);
+        expect(missingVerify.errorCode).toBe('WOMPI_CONFIG_MISSING');
+        expect(missingVerify.errorKey).toBe('account.billing.gatewayKeyMissingError');
+      });
+
       it('cancelSubscription y reactivateSubscription vía functions.invoke deben sincronizar éxito y rechazar errores sin falsos positivos', async () => {
         const user = createAuthUser();
         const activeExtProfile = createUserProfile({
           plan: 'pro',
           subscription_status: 'active',
-          subscription_id: 'sub_ls_200',
-          customer_portal_url: 'https://app.lemonsqueezy.com/my-orders/sub200'
+          subscription_id: 'tx_wompi_200',
+          customer_portal_url: 'https://checkout.wompi.co/l/tx_wompi_200'
         });
         service.currentUser.set(user);
         service.userProfile.set(activeExtProfile);
@@ -1318,34 +1439,34 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
           functions: { invoke: mockInvoke }
         };
 
-        // LEMON_API_KEY_MISSING jamás finge éxito ni altera userProfile
+        // WOMPI_CONFIG_MISSING jamás finge éxito ni altera userProfile
         mockInvoke.mockResolvedValueOnce({
           data: {
             success: false,
-            code: 'LEMON_API_KEY_MISSING',
-            portalUrl: 'https://app.lemonsqueezy.com/my-orders/sub200'
+            code: 'WOMPI_CONFIG_MISSING',
+            portalUrl: 'https://checkout.wompi.co/l/tx_wompi_200'
           },
           error: null
         });
         const missingKeyCancel = await service.cancelSubscription({ immediate: false, reason: 'cost' });
-        expect(mockInvoke).toHaveBeenCalledWith('lemon-squeezy-manage-subscription', {
+        expect(mockInvoke).toHaveBeenCalledWith('wompi-manage-subscription', {
           body: { action: 'cancel', immediate: false, reason: 'cost' }
         });
         expect(missingKeyCancel.success).toBe(false);
-        expect(missingKeyCancel.errorCode).toBe('LEMON_API_KEY_MISSING');
+        expect(missingKeyCancel.errorCode).toBe('WOMPI_CONFIG_MISSING');
         expect(missingKeyCancel.errorKey).toBe('account.billing.gatewayKeyMissingError');
-        expect(missingKeyCancel.portalUrl).toBe('https://app.lemonsqueezy.com/my-orders/sub200');
+        expect(missingKeyCancel.portalUrl).toBe('https://checkout.wompi.co/l/tx_wompi_200');
         expect(service.userProfile()).toBe(activeExtProfile);
         expect(service.userProfile()?.subscription_status).toBe('active');
 
         // Error de Edge Function tampoco finge éxito
         mockInvoke.mockResolvedValueOnce({
-          data: { success: false, code: 'LEMON_API_ERROR' },
+          data: { success: false, code: 'WOMPI_API_ERROR' },
           error: null
         });
         const apiErrCancel = await service.cancelSubscription({ immediate: true });
         expect(apiErrCancel.success).toBe(false);
-        expect(apiErrCancel.errorCode).toBe('LEMON_API_ERROR');
+        expect(apiErrCancel.errorCode).toBe('WOMPI_API_ERROR');
         expect(apiErrCancel.errorKey).toBe('account.billing.cancelErrorToast');
         expect(service.userProfile()?.subscription_status).toBe('active');
 
@@ -1353,10 +1474,10 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         mockInvoke.mockResolvedValueOnce({
           data: {
             success: true,
-            mode: 'lemon_squeezy',
+            mode: 'wompi',
             subscription_status: 'cancelled',
             current_period_end: '2027-02-01T00:00:00Z',
-            customerPortalUrl: 'https://app.lemonsqueezy.com/my-orders/sub200-new',
+            customerPortalUrl: 'https://checkout.wompi.co/l/tx_wompi_200_new',
             cardBrand: 'visa',
             cardLastFour: '1111'
           },
@@ -1370,19 +1491,19 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(afterCancelProfile?.plan).toBe('pro');
         expect(afterCancelProfile?.card_brand).toBe('VISA');
         expect(afterCancelProfile?.card_last_four).toBe('1111');
-        expect(afterCancelProfile?.customer_portal_url).toBe('https://app.lemonsqueezy.com/my-orders/sub200-new');
+        expect(afterCancelProfile?.customer_portal_url).toBe('https://checkout.wompi.co/l/tx_wompi_200_new');
 
-        // Reactivación fallida por falta de API Key no muta estado cancelado
+        // Reactivación fallida por falta de llave no muta estado cancelado
         mockInvoke.mockResolvedValueOnce({
-          data: { success: false, code: 'LEMON_API_KEY_MISSING' },
+          data: { success: false, code: 'WOMPI_CONFIG_MISSING' },
           error: null
         });
         const failResume = await service.reactivateSubscription();
-        expect(mockInvoke).toHaveBeenLastCalledWith('lemon-squeezy-manage-subscription', {
+        expect(mockInvoke).toHaveBeenLastCalledWith('wompi-manage-subscription', {
           body: { action: 'resume' }
         });
         expect(failResume.success).toBe(false);
-        expect(failResume.errorCode).toBe('LEMON_API_KEY_MISSING');
+        expect(failResume.errorCode).toBe('WOMPI_CONFIG_MISSING');
         expect(failResume.errorKey).toBe('account.billing.gatewayKeyMissingError');
         expect(service.userProfile()?.subscription_status).toBe('cancelled');
 
@@ -1390,7 +1511,7 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         mockInvoke.mockResolvedValueOnce({
           data: {
             success: true,
-            mode: 'lemon_squeezy',
+            mode: 'wompi',
             subscription_status: 'active',
             current_period_end: '2027-03-01T00:00:00Z'
           },

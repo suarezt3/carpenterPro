@@ -165,7 +165,7 @@ export interface UserProfile {
 }
 
 /**
- * Resultado de consulta del portal seguro de pagos en la pasarela externa.
+ * Resultado de consulta del comprobante o estado de pago en Wompi Colombia.
  */
 export interface BillingPortalResult {
   success: boolean;
@@ -174,9 +174,44 @@ export interface BillingPortalResult {
   customerPortalUrl?: string | null;
   cardBrand?: string | null;
   cardLastFour?: string | null;
-  source?: 'lemon_squeezy_api' | 'cached_portal_url';
+  source?: 'wompi_api' | 'cached_portal_url';
   errorKey?: string;
   errorCode?: string;
+}
+
+/**
+ * Sesión de checkout firmada en servidor para abrir la pasarela Wompi Colombia.
+ */
+export interface WompiCheckoutSessionResult {
+  success: boolean;
+  publicKey?: string;
+  currency?: 'COP';
+  amountInCents?: number;
+  amountCop?: number;
+  amountUsd?: number;
+  exchangeRateCop?: number;
+  reference?: string;
+  integritySignature?: string;
+  customerEmail?: string;
+  customerName?: string;
+  environment?: 'sandbox' | 'production';
+  redirectUrl?: string;
+  errorCode?: string;
+  errorKey?: string;
+}
+
+/**
+ * Resultado de verificación de una transacción Wompi contra el API seguro en servidor.
+ */
+export interface WompiVerifyTransactionResult {
+  success: boolean;
+  approved?: boolean;
+  status?: string;
+  transactionId?: string;
+  reference?: string;
+  portalUrl?: string | null;
+  errorCode?: string;
+  errorKey?: string;
 }
 
 /**
@@ -202,12 +237,31 @@ export interface PlatformSettingsRecord {
   industrial_monthly_usd: number;
   industrial_annual_monthly_usd: number;
   industrial_annual_total_usd: number;
+  usd_to_cop_rate?: number;
   announcement_enabled: boolean;
   announcement_text: string;
   announcement_badge: string;
   free_max_modules: number;
   updated_at: string;
 }
+
+export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsRecord = {
+  id: 1,
+  app_version: 'v3.0.0',
+  support_email: OFFICIAL_SUPPORT_EMAIL,
+  pro_monthly_usd: 15,
+  pro_annual_monthly_usd: 12,
+  pro_annual_total_usd: 144,
+  industrial_monthly_usd: 29,
+  industrial_annual_monthly_usd: 23,
+  industrial_annual_total_usd: 276,
+  usd_to_cop_rate: 4250,
+  announcement_enabled: false,
+  announcement_text: '',
+  announcement_badge: 'NOVEDAD',
+  free_max_modules: 3,
+  updated_at: '2026-11-16T00:00:00.000Z'
+};
 
 export type PlatformFeedbackCategory = 'support' | 'bug' | 'testimonial';
 export type PlatformFeedbackStatus = 'pending' | 'in_progress' | 'resolved' | 'approved' | 'rejected';
@@ -242,6 +296,9 @@ export interface SubscriptionInvoice {
   plan: UserPlan;
   billing_cycle: BillingCycle;
   amount_usd: number;
+  amount_cop?: number | null;
+  currency?: string | null;
+  payment_method?: string | null;
   status: string;
   invoice_url?: string | null;
   created_at: string;
@@ -443,12 +500,21 @@ CREATE TABLE IF NOT EXISTS public.subscription_invoices (
   plan TEXT NOT NULL CHECK (plan IN ('free', 'pro', 'industrial')),
   billing_cycle TEXT NOT NULL CHECK (billing_cycle IN ('monthly', 'annual')),
   amount_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
+  amount_cop BIGINT,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  payment_method TEXT,
   status TEXT NOT NULL DEFAULT 'paid',
   invoice_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.subscription_invoices
+  ADD COLUMN IF NOT EXISTS amount_cop BIGINT,
+  ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD',
+  ADD COLUMN IF NOT EXISTS payment_method TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_subscription_invoices_user_id ON public.subscription_invoices(user_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_invoices_subscription_id_unique ON public.subscription_invoices(subscription_id) WHERE subscription_id IS NOT NULL;
 ALTER TABLE public.subscription_invoices ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view own invoices" ON public.subscription_invoices;
@@ -618,12 +684,16 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
   industrial_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 29,
   industrial_annual_monthly_usd NUMERIC(10,2) NOT NULL DEFAULT 23,
   industrial_annual_total_usd NUMERIC(10,2) NOT NULL DEFAULT 276,
+  usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250,
   announcement_enabled BOOLEAN NOT NULL DEFAULT false,
   announcement_text TEXT NOT NULL DEFAULT '',
   announcement_badge TEXT NOT NULL DEFAULT 'NOVEDAD',
   free_max_modules INTEGER NOT NULL DEFAULT 3,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.platform_settings
+  ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250;
 
 INSERT INTO public.platform_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
@@ -693,6 +763,64 @@ GRANT UPDATE ON public.platform_settings TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.platform_feedback TO anon, authenticated;
 `;
 
+/**
+ * Script SQL idempotente para pagos en COP vía Wompi Colombia (`public.payment_transactions`,
+ * tasa `usd_to_cop_rate` en `platform_settings` e índice único de facturas).
+ */
+export const SUPABASE_WOMPI_PAYMENTS_SQL_SETUP = `-- ==========================================
+-- TABLA DE TRANSACCIONES WOMPI COLOMBIA Y TASA USD -> COP
+-- ==========================================
+ALTER TABLE public.platform_settings
+  ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250;
+
+ALTER TABLE public.subscription_invoices
+  ADD COLUMN IF NOT EXISTS amount_cop BIGINT,
+  ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD',
+  ADD COLUMN IF NOT EXISTS payment_method TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_invoices_subscription_id_unique
+  ON public.subscription_invoices(subscription_id)
+  WHERE subscription_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS public.payment_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  reference TEXT UNIQUE NOT NULL,
+  plan TEXT NOT NULL CHECK (plan IN ('pro', 'industrial')),
+  billing_cycle TEXT NOT NULL CHECK (billing_cycle IN ('monthly', 'annual')),
+  amount_usd NUMERIC(10,2) NOT NULL,
+  exchange_rate_cop NUMERIC(12,2) NOT NULL,
+  amount_in_cents BIGINT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'COP' CHECK (currency = 'COP'),
+  environment TEXT NOT NULL DEFAULT 'sandbox' CHECK (environment IN ('sandbox', 'production')),
+  wompi_transaction_id TEXT,
+  payment_method_type TEXT,
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'DECLINED', 'VOIDED', 'ERROR')),
+  raw_status_reason TEXT,
+  receipt_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_user_created
+  ON public.payment_transactions(user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_wompi_tx
+  ON public.payment_transactions(wompi_transaction_id)
+  WHERE wompi_transaction_id IS NOT NULL;
+
+ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own payment transactions" ON public.payment_transactions;
+CREATE POLICY "Users can view own payment transactions"
+  ON public.payment_transactions
+  FOR SELECT
+  TO authenticated
+  USING ((select auth.uid()) = user_id OR public.is_super_admin());
+
+NOTIFY pgrst, 'reload schema';
+`;
+
 @Injectable({
   providedIn: 'root'
 })
@@ -721,19 +849,7 @@ export class SupabaseService {
 
   // Configuración global del CMS y verificación de Superadmin
   readonly platformSettings = signal<PlatformSettingsRecord>({
-    id: 1,
-    app_version: 'v3.0.0',
-    support_email: OFFICIAL_SUPPORT_EMAIL,
-    pro_monthly_usd: 15,
-    pro_annual_monthly_usd: 12,
-    pro_annual_total_usd: 144,
-    industrial_monthly_usd: 29,
-    industrial_annual_monthly_usd: 23,
-    industrial_annual_total_usd: 276,
-    announcement_enabled: false,
-    announcement_text: '',
-    announcement_badge: 'NOVEDAD',
-    free_max_modules: 3,
+    ...DEFAULT_PLATFORM_SETTINGS,
     updated_at: new Date().toISOString()
   });
 
@@ -1264,10 +1380,18 @@ export class SupabaseService {
     const parsedPlan: UserPlan | undefined =
       rawPlan === 'free' || rawPlan === 'pro' || rawPlan === 'industrial' ? rawPlan : undefined;
     const nextPlan = parsedPlan ?? defaults?.plan ?? base.plan;
+    const rawCycle = payload['billing_cycle'] ?? payload['billingCycle'];
+    const nextBillingCycle: BillingCycle | null | undefined =
+      rawCycle === 'monthly' || rawCycle === 'annual' ? rawCycle : base.billing_cycle;
     const nextStatus =
       parseSubscriptionStatus(payload['subscription_status']) ??
       defaults?.subscription_status ??
       base.subscription_status;
+    const rawSubId = payload['subscription_id'] ?? payload['transactionId'];
+    const nextSubscriptionId =
+      typeof rawSubId === 'string' && rawSubId.trim()
+        ? rawSubId.trim()
+        : (base.subscription_id ?? null);
     const rawPeriodEnd = payload['current_period_end'];
     const nextPeriodEnd =
       typeof rawPeriodEnd === 'string' && rawPeriodEnd.trim()
@@ -1287,13 +1411,226 @@ export class SupabaseService {
     this.userProfile.set({
       ...base,
       plan: nextPlan,
+      ...(nextBillingCycle !== undefined ? { billing_cycle: nextBillingCycle } : {}),
       subscription_status: nextStatus,
+      subscription_id: nextSubscriptionId,
       current_period_end: nextPeriodEnd,
       customer_portal_url: nextPortalUrl,
       card_brand: nextCardBrand,
       card_last_four: nextCardLastFour,
       updated_at: new Date().toISOString()
     });
+  }
+
+  /**
+   * Solicita al servidor una sesión firmada de Wompi Colombia (referencia, monto en centavos COP y firma de integridad SHA-256).
+   */
+  async createWompiCheckoutSession(params: {
+    plan: 'pro' | 'industrial';
+    billingCycle: BillingCycle;
+    redirectUrl?: string;
+  }): Promise<WompiCheckoutSessionResult> {
+    const user = this.currentUser();
+    if (!user) {
+      return {
+        success: false,
+        errorCode: 'UNAUTHENTICATED',
+        errorKey: 'account.profileUpdateNoUser'
+      };
+    }
+
+    const isConfigured = Boolean(this.config.url && this.config.publishableKey);
+    if (
+      !this.isBrowser ||
+      !isConfigured ||
+      !this.client ||
+      typeof this.client.functions?.invoke !== 'function'
+    ) {
+      return {
+        success: false,
+        errorCode: 'EDGE_CLIENT_UNAVAILABLE',
+        errorKey: 'account.billing.portalUnavailableToast'
+      };
+    }
+
+    try {
+      const { data, error } = await this.client.functions.invoke('wompi-create-checkout', {
+        body: params
+      });
+      const payload = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+      const reference = typeof payload['reference'] === 'string' ? payload['reference'].trim() : '';
+      const amountInCents = Number(payload['amountInCents']);
+      const integritySignature =
+        typeof payload['integritySignature'] === 'string' ? payload['integritySignature'].trim() : '';
+
+      if (
+        !error &&
+        payload['success'] === true &&
+        reference &&
+        Number.isFinite(amountInCents) &&
+        amountInCents > 0 &&
+        integritySignature
+      ) {
+        const roundedCents = Math.round(amountInCents);
+        const parsedCop = Number(payload['amountCop']);
+        const parsedUsd = Number(payload['amountUsd']);
+        const parsedRate = Number(payload['exchangeRateCop']);
+
+        return {
+          success: true,
+          publicKey:
+            typeof payload['publicKey'] === 'string' && payload['publicKey'].trim()
+              ? payload['publicKey'].trim()
+              : undefined,
+          currency: 'COP',
+          amountInCents: roundedCents,
+          amountCop: Number.isFinite(parsedCop) && parsedCop > 0 ? Math.round(parsedCop) : Math.round(roundedCents / 100),
+          amountUsd: Number.isFinite(parsedUsd) && parsedUsd > 0 ? parsedUsd : undefined,
+          exchangeRateCop: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : undefined,
+          reference,
+          integritySignature,
+          customerEmail:
+            typeof payload['customerEmail'] === 'string' && payload['customerEmail'].trim()
+              ? payload['customerEmail'].trim()
+              : undefined,
+          customerName:
+            typeof payload['customerName'] === 'string' && payload['customerName'].trim()
+              ? payload['customerName'].trim()
+              : undefined,
+          environment: payload['environment'] === 'production' ? 'production' : 'sandbox',
+          redirectUrl:
+            typeof payload['redirectUrl'] === 'string' && payload['redirectUrl'].trim()
+              ? payload['redirectUrl'].trim()
+              : params.redirectUrl
+        };
+      }
+
+      const rawCode = payload['code'];
+      const errorCode =
+        typeof rawCode === 'string' && rawCode.trim()
+          ? rawCode.trim()
+          : error
+            ? 'EDGE_INVOKE_ERROR'
+            : 'WOMPI_CHECKOUT_INIT_FAILED';
+      const errorKey =
+        errorCode === 'WOMPI_CONFIG_MISSING'
+          ? 'account.billing.gatewayKeyMissingError'
+          : 'account.billing.portalUnavailableToast';
+
+      return { success: false, errorCode, errorKey };
+    } catch {
+      return {
+        success: false,
+        errorCode: 'EDGE_INVOKE_EXCEPTION',
+        errorKey: 'account.billing.portalUnavailableToast'
+      };
+    }
+  }
+
+  /**
+   * Verifica una transacción Wompi en el servidor, sincroniza el plan en `userProfile` si fue aprobada
+   * y retorna el estado y enlace de comprobante oficial.
+   */
+  async verifyWompiTransaction(
+    transactionId: string,
+    reference?: string
+  ): Promise<WompiVerifyTransactionResult> {
+    const trimmedTxId = typeof transactionId === 'string' ? transactionId.trim() : '';
+    if (!trimmedTxId) {
+      return {
+        success: false,
+        errorCode: 'INVALID_TRANSACTION_ID',
+        errorKey: 'account.billing.portalUnavailableToast'
+      };
+    }
+
+    const user = this.currentUser();
+    if (!user) {
+      return {
+        success: false,
+        errorCode: 'UNAUTHENTICATED',
+        errorKey: 'account.profileUpdateNoUser'
+      };
+    }
+
+    const isConfigured = Boolean(this.config.url && this.config.publishableKey);
+    if (
+      !this.isBrowser ||
+      !isConfigured ||
+      !this.client ||
+      typeof this.client.functions?.invoke !== 'function'
+    ) {
+      return {
+        success: false,
+        errorCode: 'EDGE_CLIENT_UNAVAILABLE',
+        errorKey: 'account.billing.portalUnavailableToast'
+      };
+    }
+
+    try {
+      const { data, error } = await this.client.functions.invoke('wompi-manage-subscription', {
+        body: {
+          action: 'verify_transaction',
+          transactionId: trimmedTxId,
+          reference
+        }
+      });
+      const payload = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+
+      if (!error && payload['success'] === true) {
+        const isApproved = payload['approved'] === true;
+        const rawPlan = payload['plan'];
+        const parsedPlan: UserPlan | undefined =
+          rawPlan === 'free' || rawPlan === 'pro' || rawPlan === 'industrial'
+            ? rawPlan
+            : undefined;
+        this.applyBillingSyncToProfile(user, payload, {
+          ...(isApproved
+            ? {
+                ...(parsedPlan ? { plan: parsedPlan } : {}),
+                subscription_status: 'active' as const
+              }
+            : {})
+        });
+        const portalUrl = sanitizePortalUrl(
+          payload['portalUrl'] ?? payload['customerPortalUrl'] ?? payload['customer_portal_url']
+        );
+        return {
+          success: true,
+          approved: isApproved,
+          status: typeof payload['status'] === 'string' ? payload['status'] : undefined,
+          transactionId:
+            typeof payload['transactionId'] === 'string' && payload['transactionId'].trim()
+              ? payload['transactionId'].trim()
+              : trimmedTxId,
+          reference:
+            typeof payload['reference'] === 'string' && payload['reference'].trim()
+              ? payload['reference'].trim()
+              : reference,
+          portalUrl
+        };
+      }
+
+      const rawCode = payload['code'];
+      const errorCode =
+        typeof rawCode === 'string' && rawCode.trim()
+          ? rawCode.trim()
+          : error
+            ? 'EDGE_INVOKE_ERROR'
+            : 'WOMPI_VERIFY_FAILED';
+      const errorKey =
+        errorCode === 'WOMPI_CONFIG_MISSING'
+          ? 'account.billing.gatewayKeyMissingError'
+          : 'account.billing.portalUnavailableToast';
+
+      return { success: false, errorCode, errorKey };
+    } catch {
+      return {
+        success: false,
+        errorCode: 'EDGE_INVOKE_EXCEPTION',
+        errorKey: 'account.billing.portalUnavailableToast'
+      };
+    }
   }
 
   private async invokeSubscriptionMutation(params: {
@@ -1328,7 +1665,7 @@ export class SupabaseService {
             ? { action: 'cancel', immediate: Boolean(params.immediate), reason: params.reason }
             : { action: 'resume' };
 
-        const { data, error } = await this.client.functions.invoke('lemon-squeezy-manage-subscription', {
+        const { data, error } = await this.client.functions.invoke('wompi-manage-subscription', {
           body
         });
         const payload = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
@@ -1351,7 +1688,7 @@ export class SupabaseService {
               ? 'EDGE_INVOKE_ERROR'
               : 'EDGE_ERROR';
         const errorKey =
-          errorCode === 'LEMON_API_KEY_MISSING'
+          errorCode === 'WOMPI_CONFIG_MISSING'
             ? 'account.billing.gatewayKeyMissingError'
             : params.fallbackErrorKey;
         const portalUrl =
@@ -1414,8 +1751,8 @@ export class SupabaseService {
   }
 
   /**
-   * Obtiene la URL segura del portal alojado de pagos para gestionar tarjetas,
-   * facturas y suscripción en la pasarela externa, sincronizando metadatos en perfil.
+   * Obtiene la URL segura del comprobante o estado de pago en Wompi Colombia,
+   * sincronizando metadatos en perfil.
    */
   async getBillingPortalUrl(): Promise<BillingPortalResult> {
     const user = this.currentUser();
@@ -1463,7 +1800,7 @@ export class SupabaseService {
     }
 
     try {
-      const { data, error } = await this.client.functions.invoke('lemon-squeezy-manage-subscription', {
+      const { data, error } = await this.client.functions.invoke('wompi-manage-subscription', {
         body: { action: 'get_portal_url' }
       });
       const payload = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
@@ -1483,7 +1820,7 @@ export class SupabaseService {
           normalizeCardLastFour(payload['cardLastFour'] ?? payload['card_last_four']) ??
           this.userProfile()?.card_last_four ??
           null;
-        const source = payload['source'] === 'cached_portal_url' ? 'cached_portal_url' : 'lemon_squeezy_api';
+        const source = payload['source'] === 'cached_portal_url' ? 'cached_portal_url' : 'wompi_api';
 
         return {
           success: true,
@@ -1508,7 +1845,7 @@ export class SupabaseService {
             ? 'EDGE_INVOKE_ERROR'
             : 'PORTAL_UNAVAILABLE';
       const errorKey =
-        errorCode === 'LEMON_API_KEY_MISSING'
+        errorCode === 'WOMPI_CONFIG_MISSING'
           ? 'account.billing.gatewayKeyMissingError'
           : 'account.billing.portalUnavailableToast';
 
@@ -2614,6 +2951,18 @@ export class SupabaseService {
         raw['industrial_annual_total_usd'] !== null
           ? Number(raw['industrial_annual_total_usd'])
           : fallback.industrial_annual_total_usd,
+      usd_to_cop_rate: (() => {
+        const rawRate = raw['usd_to_cop_rate'];
+        const parsedRate =
+          rawRate !== undefined && rawRate !== null && rawRate !== '' ? Number(rawRate) : NaN;
+        if (Number.isFinite(parsedRate) && parsedRate > 0) {
+          return parsedRate;
+        }
+        const fallbackRate = Number(fallback.usd_to_cop_rate);
+        return Number.isFinite(fallbackRate) && fallbackRate > 0
+          ? fallbackRate
+          : (DEFAULT_PLATFORM_SETTINGS.usd_to_cop_rate ?? 4250);
+      })(),
       announcement_enabled:
         typeof raw['announcement_enabled'] === 'boolean'
           ? raw['announcement_enabled']
@@ -2725,10 +3074,14 @@ export class SupabaseService {
           .maybeSingle();
 
         if (!error && data) {
-          const normalized = this.normalizePlatformSettings(
-            data as Record<string, unknown>,
-            fallback
-          );
+          const rawRecord = data as Record<string, unknown>;
+          const safeFallback =
+            rawRecord['usd_to_cop_rate'] === null ||
+            (rawRecord['usd_to_cop_rate'] !== undefined &&
+              !(Number(rawRecord['usd_to_cop_rate']) > 0))
+              ? { ...fallback, usd_to_cop_rate: DEFAULT_PLATFORM_SETTINGS.usd_to_cop_rate }
+              : fallback;
+          const normalized = this.normalizePlatformSettings(rawRecord, safeFallback);
           this.platformSettings.set(normalized);
           return normalized;
         }
@@ -2743,7 +3096,14 @@ export class SupabaseService {
       if (!res.ok) return fallback;
       const rows = (await res.json()) as Record<string, unknown>[];
       if (Array.isArray(rows) && rows.length > 0 && rows[0]) {
-        const normalized = this.normalizePlatformSettings(rows[0], fallback);
+        const rawRecord = rows[0];
+        const safeFallback =
+          rawRecord['usd_to_cop_rate'] === null ||
+          (rawRecord['usd_to_cop_rate'] !== undefined &&
+            !(Number(rawRecord['usd_to_cop_rate']) > 0))
+            ? { ...fallback, usd_to_cop_rate: DEFAULT_PLATFORM_SETTINGS.usd_to_cop_rate }
+            : fallback;
+        const normalized = this.normalizePlatformSettings(rawRecord, safeFallback);
         this.platformSettings.set(normalized);
         return normalized;
       }
@@ -2780,6 +3140,13 @@ export class SupabaseService {
       if (typeof patch.support_email === 'string') {
         payload['support_email'] = resolvePublicSupportEmail(patch.support_email);
       }
+      if (patch.usd_to_cop_rate !== undefined) {
+        const numericRate = Number(patch.usd_to_cop_rate);
+        payload['usd_to_cop_rate'] =
+          Number.isFinite(numericRate) && numericRate > 0
+            ? numericRate
+            : nextSettings.usd_to_cop_rate;
+      }
       delete payload['id'];
 
       const { error } = await this.client
@@ -2797,6 +3164,15 @@ export class SupabaseService {
       const msg = err instanceof Error ? err.message : String(err);
       return { success: false, error: this.cleanErrorMessage(msg) };
     }
+  }
+
+  /**
+   * Alias administrativo para actualizar la configuración global del CMS (incluyendo `usd_to_cop_rate`).
+   */
+  async adminUpdatePlatformSettings(
+    patch: Partial<PlatformSettingsRecord>
+  ): Promise<{ success: boolean; data?: PlatformSettingsRecord; error?: string }> {
+    return this.updatePlatformSettings(patch);
   }
 
   /**

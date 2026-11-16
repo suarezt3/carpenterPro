@@ -46,6 +46,7 @@ export class StudioWorkspaceComponent {
 
   readonly activeTab = signal<MainTab>('modules');
   readonly canGenerateAssemblyGuide = this.assemblyGuideService.canGenerateAssemblyGuide;
+  private lastTriggeredWompiTxId: string | null = null;
 
   constructor() {
     this.syncTabFromUrl(this.router.url);
@@ -56,7 +57,11 @@ export class StudioWorkspaceComponent {
         takeUntilDestroyed()
       )
       .subscribe((event) => {
-        this.syncTabFromUrl(event.urlAfterRedirects || event.url);
+        const nextUrl = event.urlAfterRedirects || event.url;
+        this.syncTabFromUrl(nextUrl);
+        if (this.supabaseService.isAuthenticated?.() ?? true) {
+          this.checkWompiRedirectReturn(nextUrl);
+        }
       });
 
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
@@ -69,7 +74,11 @@ export class StudioWorkspaceComponent {
       });
     }
 
-    // Si el usuario regresa autenticado desde OAuth o registro con una intención de compra pendiente, abrir el Checkout Overlay
+    if (this.supabaseService.isAuthenticated?.() ?? true) {
+      this.checkWompiRedirectReturn();
+    }
+
+    // Si el usuario regresa autenticado desde OAuth o registro con una intención de compra pendiente o retorno de Wompi, procesarlo
     effect(() => {
       const isAuth = this.supabaseService.isAuthenticated?.() ?? false;
       if (isAuth) {
@@ -78,9 +87,40 @@ export class StudioWorkspaceComponent {
           if (pending) {
             void this.paymentService.openCheckout(pending.plan, pending.cycle);
           }
+          this.checkWompiRedirectReturn();
         });
       }
     });
+  }
+
+  private resolveWompiCandidateUrl(explicitUrl?: string): string {
+    if (explicitUrl && (explicitUrl.includes('wompi_checkout=') || explicitUrl.includes('id='))) {
+      return explicitUrl;
+    }
+    const routerUrl = this.router.url || '';
+    if (routerUrl.includes('wompi_checkout=') || routerUrl.includes('id=')) {
+      return routerUrl;
+    }
+    if (typeof window !== 'undefined' && window.location?.search) {
+      return `${window.location.pathname || ''}${window.location.search}`;
+    }
+    return explicitUrl || routerUrl;
+  }
+
+  private checkWompiRedirectReturn(explicitUrl?: string): void {
+    const candidateUrl = this.resolveWompiCandidateUrl(explicitUrl);
+    if (!candidateUrl || !candidateUrl.includes('?')) {
+      return;
+    }
+    const query = candidateUrl.slice(candidateUrl.indexOf('?') + 1);
+    const params = new URLSearchParams(query);
+    const txId = params.get('id')?.trim() ?? '';
+    const hasWompiMarker = params.get('wompi_checkout') === '1' || params.has('env');
+    if (!txId || !hasWompiMarker || txId === this.lastTriggeredWompiTxId) {
+      return;
+    }
+    this.lastTriggeredWompiTxId = txId;
+    void this.paymentService.processWompiRedirectReturn?.();
   }
 
   async handleOfflineDisconnect(): Promise<void> {

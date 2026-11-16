@@ -1,15 +1,22 @@
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { User } from '@supabase/supabase-js';
 import { StudioWorkspaceComponent } from './studio-workspace';
 import { routes } from '../../app.routes';
+import { PaymentService } from '../../services/payment.service';
 import { SupabaseService } from '../../services/supabase.service';
 
 describe('StudioWorkspaceComponent', () => {
+  let isAuthenticatedSig: WritableSignal<boolean>;
+  let paymentService: PaymentService;
+  let processWompiReturnSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(async () => {
+    window.history.replaceState({}, '', '/');
+    isAuthenticatedSig = signal(true);
     const mockSupabase = {
-      isAuthenticated: signal(true),
+      isAuthenticated: isAuthenticatedSig,
       isAuthLoading: signal(false),
       currentUser: signal<User | null>({
         id: 'user-mock',
@@ -38,12 +45,23 @@ describe('StudioWorkspaceComponent', () => {
         { provide: SupabaseService, useValue: mockSupabase }
       ]
     }).compileComponents();
+
+    paymentService = TestBed.inject(PaymentService);
+    processWompiReturnSpy = vi
+      .spyOn(paymentService, 'processWompiRedirectReturn')
+      .mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    window.history.replaceState({}, '', '/');
+    vi.restoreAllMocks();
   });
 
   it('debe crearse correctamente', () => {
     const fixture = TestBed.createComponent(StudioWorkspaceComponent);
     const component = fixture.componentInstance;
     expect(component).toBeTruthy();
+    expect(processWompiReturnSpy).not.toHaveBeenCalled();
   });
 
   it('debe inicializar en la pestaña modules por defecto', () => {
@@ -84,5 +102,27 @@ describe('StudioWorkspaceComponent', () => {
 
     await router.navigateByUrl('/studio/labels');
     expect(component.activeTab()).toBe('labels');
+  });
+
+  it('debe invocar processWompiRedirectReturn cuando la URL inicial contiene parámetros de retorno de Wompi', () => {
+    window.history.replaceState({}, '', '/studio/designer?wompi_checkout=1&id=tx_pse_initial_1&env=test');
+
+    const fixture = TestBed.createComponent(StudioWorkspaceComponent);
+    fixture.detectChanges();
+
+    expect(processWompiReturnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('debe esperar autenticación y procesar processWompiRedirectReturn tras autenticar si la URL inicial trae ?id=...&env=...', () => {
+    isAuthenticatedSig.set(false);
+    window.history.replaceState({}, '', '/studio/designer?id=tx_bancolombia_2&env=test');
+
+    const fixture = TestBed.createComponent(StudioWorkspaceComponent);
+    fixture.detectChanges();
+    expect(processWompiReturnSpy).not.toHaveBeenCalled();
+
+    isAuthenticatedSig.set(true);
+    fixture.detectChanges();
+    expect(processWompiReturnSpy).toHaveBeenCalledTimes(1);
   });
 });
