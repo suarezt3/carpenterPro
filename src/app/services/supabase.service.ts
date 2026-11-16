@@ -497,6 +497,7 @@ CREATE TABLE IF NOT EXISTS public.subscription_invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   subscription_id TEXT,
+  wompi_transaction_id TEXT,
   plan TEXT NOT NULL CHECK (plan IN ('free', 'pro', 'industrial')),
   billing_cycle TEXT NOT NULL CHECK (billing_cycle IN ('monthly', 'annual')),
   amount_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
@@ -511,10 +512,13 @@ CREATE TABLE IF NOT EXISTS public.subscription_invoices (
 ALTER TABLE public.subscription_invoices
   ADD COLUMN IF NOT EXISTS amount_cop BIGINT,
   ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD',
-  ADD COLUMN IF NOT EXISTS payment_method TEXT;
+  ADD COLUMN IF NOT EXISTS payment_method TEXT,
+  ADD COLUMN IF NOT EXISTS wompi_transaction_id TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_subscription_invoices_user_id ON public.subscription_invoices(user_id, created_at DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_invoices_subscription_id_unique ON public.subscription_invoices(subscription_id) WHERE subscription_id IS NOT NULL;
+DROP INDEX IF EXISTS public.idx_subscription_invoices_subscription_id_unique;
+CREATE INDEX IF NOT EXISTS idx_subscription_invoices_subscription_id ON public.subscription_invoices(subscription_id) WHERE subscription_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_invoices_wompi_tx_unique ON public.subscription_invoices(wompi_transaction_id) WHERE wompi_transaction_id IS NOT NULL;
 ALTER TABLE public.subscription_invoices ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view own invoices" ON public.subscription_invoices;
@@ -776,11 +780,18 @@ ALTER TABLE public.platform_settings
 ALTER TABLE public.subscription_invoices
   ADD COLUMN IF NOT EXISTS amount_cop BIGINT,
   ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD',
-  ADD COLUMN IF NOT EXISTS payment_method TEXT;
+  ADD COLUMN IF NOT EXISTS payment_method TEXT,
+  ADD COLUMN IF NOT EXISTS wompi_transaction_id TEXT;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_invoices_subscription_id_unique
+DROP INDEX IF EXISTS public.idx_subscription_invoices_subscription_id_unique;
+
+CREATE INDEX IF NOT EXISTS idx_subscription_invoices_subscription_id
   ON public.subscription_invoices(subscription_id)
   WHERE subscription_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_invoices_wompi_tx_unique
+  ON public.subscription_invoices(wompi_transaction_id)
+  WHERE wompi_transaction_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.payment_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

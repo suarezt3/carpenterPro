@@ -213,7 +213,8 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
     it('SUPABASE_USER_PROFILES_SQL_SETUP debe definir public.user_profiles con RLS, índice único en invoices y trigger fn_handle_new_auth_user', async () => {
       const { SUPABASE_USER_PROFILES_SQL_SETUP } = await import('./supabase.service');
       expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.user_profiles');
-      expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('idx_subscription_invoices_subscription_id_unique');
+      expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('idx_subscription_invoices_wompi_tx_unique');
+      expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('wompi_transaction_id TEXT');
       expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('amount_cop BIGINT');
       expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;');
       expect(SUPABASE_USER_PROFILES_SQL_SETUP).toContain('CREATE POLICY "Users can view own profile"');
@@ -533,7 +534,8 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
         expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('CREATE TABLE IF NOT EXISTS public.payment_transactions');
         expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;');
         expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('USING ((select auth.uid()) = user_id OR public.is_super_admin());');
-        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('idx_subscription_invoices_subscription_id_unique');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('idx_subscription_invoices_wompi_tx_unique');
+        expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('wompi_transaction_id TEXT');
         expect(SUPABASE_WOMPI_PAYMENTS_SQL_SETUP).toContain('usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250');
       });
 

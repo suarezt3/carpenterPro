@@ -516,11 +516,27 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ error: profileUpdateErr.message }, 500);
       }
 
-      const { data: existingInvoice } = await supabase
+      let existingInvoice: { id: string } | null = null;
+      const { data: byWompiTx, error: byWompiTxErr } = await supabase
         .from('subscription_invoices')
         .select('id')
-        .eq('subscription_id', txId)
+        .eq('wompi_transaction_id', txId)
+        .limit(1)
         .maybeSingle();
+
+      if (!byWompiTxErr && byWompiTx) {
+        existingInvoice = byWompiTx as { id: string };
+      } else {
+        const { data: bySubId } = await supabase
+          .from('subscription_invoices')
+          .select('id')
+          .eq('subscription_id', txId)
+          .limit(1)
+          .maybeSingle();
+        if (bySubId) {
+          existingInvoice = bySubId as { id: string };
+        }
+      }
 
       if (!existingInvoice) {
         const amountUsd = txRecord
@@ -533,6 +549,7 @@ Deno.serve(async (req: Request) => {
           .insert({
             user_id: userId,
             subscription_id: txId,
+            wompi_transaction_id: txId,
             plan: resolvedPlan,
             billing_cycle: resolvedCycle,
             amount_usd: amountUsd,

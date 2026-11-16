@@ -6,15 +6,23 @@
 ALTER TABLE IF EXISTS public.platform_settings
   ADD COLUMN IF NOT EXISTS usd_to_cop_rate NUMERIC(12,2) NOT NULL DEFAULT 4250;
 
--- 2. Columnas de monto en COP, moneda y método de pago en facturas, más índice único idempotente
+-- 2. Columnas de monto en COP, moneda, método de pago e ID único de transacción Wompi en facturas
+-- Nota: conserva registros históricos con subscription_id duplicado usando una columna exclusiva para idempotencia Wompi.
 ALTER TABLE IF EXISTS public.subscription_invoices
   ADD COLUMN IF NOT EXISTS amount_cop BIGINT,
   ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD',
-  ADD COLUMN IF NOT EXISTS payment_method TEXT;
+  ADD COLUMN IF NOT EXISTS payment_method TEXT,
+  ADD COLUMN IF NOT EXISTS wompi_transaction_id TEXT;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_invoices_subscription_id_unique
+DROP INDEX IF EXISTS public.idx_subscription_invoices_subscription_id_unique;
+
+CREATE INDEX IF NOT EXISTS idx_subscription_invoices_subscription_id
   ON public.subscription_invoices(subscription_id)
   WHERE subscription_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_invoices_wompi_tx_unique
+  ON public.subscription_invoices(wompi_transaction_id)
+  WHERE wompi_transaction_id IS NOT NULL;
 
 -- 3. Tabla de transacciones de pago con firma e integridad verificada en servidor
 CREATE TABLE IF NOT EXISTS public.payment_transactions (
