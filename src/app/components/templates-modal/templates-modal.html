@@ -1,1210 +1,377 @@
 @if (isOpen()) {
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+    class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/55 backdrop-blur-xs font-sans"
     role="dialog"
     aria-modal="true"
+    aria-labelledby="templates-modal-title"
     tabindex="-1"
     (keydown.escape)="close()"
     (click)="close()">
 
-    <!-- Modal Window: Modern Clean Architectural Light Theme -->
     <div
-      class="relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-lg shadow-2xl overflow-hidden border border-zinc-200 bg-white text-zinc-800 transition-all"
+      class="modal-shell relative w-full max-w-6xl max-h-[92vh] lg:h-[min(90vh,780px)] flex flex-col rounded-xl shadow-2xl overflow-hidden border border-zinc-200 bg-white text-zinc-900 font-sans"
       role="document"
       tabindex="0"
       (keydown)="$event.stopPropagation()"
       (click)="$event.stopPropagation()">
 
-      <!-- HEADER MODAL: Pure White, Soft Zinc Borders & CAD Technical Accents -->
-      <div class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-zinc-200 bg-white shrink-0">
-
+      <!-- Encabezado Minimalist Studio -->
+      <header class="flex items-center justify-between gap-4 px-5 sm:px-6 py-3.5 border-b border-zinc-200 bg-white shrink-0">
         <div class="flex items-center gap-3 min-w-0">
-          <div class="w-8 h-8 rounded-md flex items-center justify-center bg-zinc-100 text-zinc-700 border border-zinc-200 shadow-xs shrink-0">
-            <hugeicons-icon [icon]="icons.tune" [size]="18" [strokeWidth]="1.9"></hugeicons-icon>
+          <div class="w-9 h-9 rounded-lg flex items-center justify-center bg-zinc-100 text-zinc-800 border border-zinc-200 shrink-0">
+            <hugeicons-icon [icon]="icons.catalog" [size]="18" [strokeWidth]="1.9"></hugeicons-icon>
           </div>
           <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <h2 class="text-base font-bold tracking-tight text-zinc-900">
-                {{ editingGroupId() ? 'Editar Módulo Paramétrico' : 'Plantillas & Asistente Modular' }}
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 id="templates-modal-title" class="text-base font-bold tracking-tight text-zinc-900">
+                Catálogo de Plantillas 3D
               </h2>
-              <span class="text-[10px] font-mono font-medium uppercase tracking-wider px-2 py-0.5 rounded-md"
-                [class]="editingGroupId() ? 'bg-amber-50 text-amber-800 border border-amber-300' : 'bg-zinc-100 text-zinc-700 border border-zinc-200'">
-                {{ editingGroupId() ? 'Modo Edición' : 'Módulos Paramétricos' }}
+              <span class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
+                <span class="font-numeric font-semibold text-zinc-900">{{ catalogService.templates.length }}</span>
+                <span>modelos</span>
               </span>
             </div>
-            <p class="text-xs text-zinc-500 font-normal truncate">
-              {{ editingGroupId() ? ('Modifica medidas, puertas o entrepaños de: ' + moduleName()) : 'Crea muebles a medida con despiece milimétrico, puertas, manijas y entrepaños.' }}
+            <p class="text-xs text-zinc-500 font-normal truncate mt-0.5">
+              Inspecciona en 360°, inserta directamente en el lienzo o abre el asistente paramétrico por zonas.
             </p>
           </div>
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
-          <!-- Conmutador de Vistas: Asistente vs Catálogo -->
-          <div class="flex items-center p-0.5 bg-zinc-100 rounded-md border border-zinc-200 text-xs font-medium">
-            <button
-              type="button"
-              (click)="activeView.set('assistant')"
-              [class]="activeView() === 'assistant' ? 'bg-zinc-900 text-white shadow-xs font-medium' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-              class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5 cursor-pointer">
-              <hugeicons-icon [icon]="icons.magicWand" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-              <span>Asistente</span>
-            </button>
-            <button
-              type="button"
-              (click)="activeView.set('catalog')"
-              [class]="activeView() === 'catalog' ? 'bg-zinc-900 text-white shadow-xs font-medium' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-              class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5 cursor-pointer">
-              <hugeicons-icon [icon]="icons.book" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-              <span>Catálogo ({{ catalogService.templates.length }})</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            (click)="onStartBlank()"
+            class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-lg inline-flex items-center gap-1.5 transition cursor-pointer">
+            <hugeicons-icon [icon]="icons.blank" [size]="14" [strokeWidth]="1.9" class="text-zinc-500 shrink-0"></hugeicons-icon>
+            <span class="hidden sm:inline">Lienzo en Blanco</span>
+          </button>
 
-          <!-- Cerrar modal -->
           <button
             type="button"
             (click)="close()"
-            class="w-8 h-8 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 border border-zinc-200 transition cursor-pointer"
-            title="Cerrar (Esc)">
+            aria-label="Cerrar catálogo de plantillas"
+            title="Cerrar (Esc)"
+            class="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 border border-zinc-200 transition cursor-pointer">
             <hugeicons-icon [icon]="icons.close" [size]="16" [strokeWidth]="2"></hugeicons-icon>
           </button>
         </div>
-      </div>
+      </header>
 
-      <!-- ========================================== -->
-      <!-- VISTA 1: ASISTENTE PARAMÉTRICO INTERACTIVO -->
-      <!-- ========================================== -->
-      @if (activeView() === 'assistant') {
+      <!-- Cuerpo en 2 Columnas -->
+      <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 overflow-y-auto lg:overflow-hidden bg-[#FAFAFA]">
 
-        <!-- BARRA DE CATEGORÍAS PRESETS (Cocina, Closet, Baño, etc.) -->
-        <div class="px-5 sm:px-6 py-2.5 border-b border-zinc-200 bg-zinc-50 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
-          <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mr-1 shrink-0">Tipo:</span>
+        <!-- COLUMNA IZQUIERDA: Filtros, Buscador y Catálogo -->
+        <section
+          aria-label="Listado de plantillas"
+          class="lg:col-span-6 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-zinc-200 bg-[#FAFAFA]">
 
-          <button
-            type="button"
-            (click)="selectPreset('kitchen_base')"
-            [class]="activePreset() === 'kitchen_base' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
-            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
-            <hugeicons-icon [icon]="icons.countertop" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-            <span>Cocina Bajo (Base)</span>
-          </button>
-
-          <button
-            type="button"
-            (click)="selectPreset('drawers')"
-            [class]="activePreset() === 'drawers' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
-            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
-            <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-            <span>Cajonera (Gavetas)</span>
-          </button>
-
-          <button
-            type="button"
-            (click)="selectPreset('kitchen_wall')"
-            [class]="activePreset() === 'kitchen_wall' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
-            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
-            <hugeicons-icon [icon]="icons.kitchen" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-            <span>Cocina Alto (Alacena)</span>
-          </button>
-
-          <button
-            type="button"
-            (click)="selectPreset('closet')"
-            [class]="activePreset() === 'closet' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
-            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
-            <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-            <span>Closet / Armario</span>
-          </button>
-
-          <button
-            type="button"
-            (click)="selectPreset('vanity')"
-            [class]="activePreset() === 'vanity' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
-            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
-            <hugeicons-icon [icon]="icons.vanity" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-            <span>Baño / Vanitorio</span>
-          </button>
-
-          <button
-            type="button"
-            (click)="selectPreset('bookshelf')"
-            [class]="activePreset() === 'bookshelf' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
-            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
-            <hugeicons-icon [icon]="icons.shelves" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-            <span>Estantería / Abierto</span>
-          </button>
-
-          <button
-            type="button"
-            (click)="selectPreset('custom')"
-            [class]="activePreset() === 'custom' ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium'"
-            class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer border">
-            <hugeicons-icon [icon]="icons.tune" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-            <span>Personalizado</span>
-          </button>
-
-          @if (activePreset() === 'oven_base' || activePreset() === 'sink_base' || activePreset() === 'corner_base' || activePreset() === 'oven_tower') {
-            <span class="px-3 py-1.5 rounded-md text-xs bg-zinc-800 text-zinc-100 font-medium shadow-xs flex items-center gap-1.5 shrink-0 border border-zinc-700">
-              <hugeicons-icon [icon]="icons.kitchen" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-              <span>
-                @switch (activePreset()) {
-                  @case ('oven_base') { Cocina Pro: Horno Empotrado }
-                  @case ('sink_base') { Cocina Pro: Bajo Lavaplatos }
-                  @case ('corner_base') { Cocina Pro: Esquinero 45° }
-                  @case ('oven_tower') { Cocina Pro: Torre Hornos }
-                }
-              </span>
-            </span>
-          }
-        </div>
-
-        <!-- CUERPO PRINCIPAL DEL ASISTENTE (2 COLUMNAS) -->
-        <div class="flex-1 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 bg-zinc-50/50">
-
-          <!-- COLUMNA 1: FORMULARIO PARAMÉTRICO DE ENTRADA (7 cols) -->
-          <div class="lg:col-span-7 space-y-4">
-
-            <!-- 1. Nombre del Módulo -->
-            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs">
-              <label for="module-name-input" class="block text-xs font-semibold text-zinc-700 mb-1">
-                Nombre del Módulo
-              </label>
+          <!-- Barra de Búsqueda y Categorías -->
+          <div class="p-4 border-b border-zinc-200 bg-white space-y-3 shrink-0">
+            <div class="relative">
+              <label for="catalog-search-input" class="sr-only">Buscar plantilla en el catálogo</label>
+              <hugeicons-icon
+                [icon]="icons.search"
+                [size]="15"
+                [strokeWidth]="2"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"></hugeicons-icon>
               <input
-                id="module-name-input"
+                id="catalog-search-input"
                 type="text"
-                [value]="moduleName()"
-                (input)="moduleName.set($any($event.target).value)"
-                class="w-full px-3 py-1.5 text-xs font-medium bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden transition"
-                placeholder="ej. Módulo Cocina Bajo 1, Alacena 2P" />
-            </div>
-
-            <!-- 2. Dimensiones Exteriores (Ancho, Alto, Fondo) -->
-            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.ruler" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                  <span>Dimensiones Exteriores (mm)</span>
-                </span>
-                <span class="text-[11px] font-mono tabular-nums font-medium text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200">
-                  {{ width() }} × {{ height() }} × {{ depth() }} mm
-                </span>
-              </div>
-
-              <!-- Ancho exterior (X) -->
-              <div>
-                <div class="flex items-center justify-between mb-1 text-xs">
-                  <label for="width-input-param" class="font-semibold text-zinc-700 flex items-center gap-1">
-                    <span class="w-2 h-2 rounded-full bg-red-500"></span>
-                    <span>Ancho exterior: (X)</span>
-                  </label>
-                  <div class="flex items-center gap-1">
-                    @for (pw of widthPresets(); track pw) {
-                      <button
-                        type="button"
-                        (click)="width.set(pw)"
-                        [class]="width() === pw ? 'bg-zinc-900 text-white font-medium' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'"
-                        class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums transition cursor-pointer">
-                        {{ pw }}
-                      </button>
-                    }
-                  </div>
-                </div>
-                <div class="relative">
-                  <input
-                    id="width-input-param"
-                    type="number"
-                    [value]="width()"
-                    (input)="width.set(+$any($event.target).value)"
-                    min="150"
-                    max="2400"
-                    step="10"
-                    class="w-full px-3 py-1.5 text-xs font-mono tabular-nums font-bold bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden transition" />
-                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-mono">mm</span>
-                </div>
-              </div>
-
-              <!-- Altura exterior (Z) -->
-              <div>
-                <div class="flex items-center justify-between mb-1 text-xs">
-                  <label for="height-input-param" class="font-semibold text-zinc-700 flex items-center gap-1">
-                    <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-                    <span>Altura exterior: (Z)</span>
-                  </label>
-                  <div class="flex items-center gap-1">
-                    @for (ph of heightPresets(); track ph) {
-                      <button
-                        type="button"
-                        (click)="height.set(ph)"
-                        [class]="height() === ph ? 'bg-zinc-900 text-white font-medium' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'"
-                        class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums transition cursor-pointer">
-                        {{ ph }}
-                      </button>
-                    }
-                  </div>
-                </div>
-                <div class="relative">
-                  <input
-                    id="height-input-param"
-                    type="number"
-                    [value]="height()"
-                    (input)="height.set(+$any($event.target).value)"
-                    min="200"
-                    max="2600"
-                    step="10"
-                    class="w-full px-3 py-1.5 text-xs font-mono tabular-nums font-bold bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden transition" />
-                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-mono">mm</span>
-                </div>
-              </div>
-
-              <!-- Profundidad exterior (Y) -->
-              <div>
-                <div class="flex items-center justify-between mb-1 text-xs">
-                  <label for="depth-input-param" class="font-semibold text-zinc-700 flex items-center gap-1">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Profundidad / Fondo: (Y)</span>
-                  </label>
-                  <div class="flex items-center gap-1">
-                    @for (pd of depthPresets(); track pd) {
-                      <button
-                        type="button"
-                        (click)="depth.set(pd)"
-                        [class]="depth() === pd ? 'bg-zinc-900 text-white font-medium' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'"
-                        class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums transition cursor-pointer">
-                        {{ pd }}
-                      </button>
-                    }
-                  </div>
-                </div>
-                <div class="relative">
-                  <input
-                    id="depth-input-param"
-                    type="number"
-                    [value]="depth()"
-                    (input)="depth.set(+$any($event.target).value)"
-                    min="150"
-                    max="1000"
-                    step="10"
-                    class="w-full px-3 py-1.5 text-xs font-mono tabular-nums font-bold bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden transition" />
-                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-mono">mm</span>
-                </div>
-              </div>
-
-              <!-- Espesor de la melamina estructura -->
-              <div class="pt-2 border-t border-zinc-100 flex items-center justify-between text-xs">
-                <span class="font-semibold text-zinc-700">Espesor Melamina Estructura:</span>
-                <div class="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    (click)="structureThickness.set(15)"
-                    [class]="structureThickness() === 15 ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
-                    class="px-3 py-1 rounded-md font-mono tabular-nums text-xs transition cursor-pointer border">
-                    15 mm
-                  </button>
-                  <button
-                    type="button"
-                    (click)="structureThickness.set(18)"
-                    [class]="structureThickness() === 18 ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
-                    class="px-3 py-1 rounded-md font-mono tabular-nums text-xs transition cursor-pointer border">
-                    18 mm
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            @if (activePreset() === 'drawers') {
-              <!-- 3. Configuración de Cajones / Gavetas -->
-              <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                    <span>Configuración de Cajones</span>
-                  </span>
-                  <span class="text-xs font-mono tabular-nums font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200">
-                    {{ drawersCount() }} Gavetas
-                  </span>
-                </div>
-
-                <!-- Selector de 2 a 6 cajones -->
-                <div>
-                  <span class="block text-[11px] font-semibold text-zinc-700 mb-1.5">Número de Gavetas:</span>
-                  <div class="grid grid-cols-5 gap-2">
-                    @for (cnt of [2, 3, 4, 5, 6]; track cnt) {
-                      <button
-                        type="button"
-                        (click)="setDrawersCount(cnt)"
-                        [class]="drawersCount() === cnt ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900' : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
-                        class="py-2 rounded-md text-center transition cursor-pointer flex flex-col items-center gap-0.5 border">
-                        <span class="text-sm font-bold font-mono tabular-nums">{{ cnt }}</span>
-                        <span class="text-[9px] uppercase tracking-wider opacity-80">{{ cnt === 1 ? 'Cajón' : 'Cajones' }}</span>
-                      </button>
-                    }
-                  </div>
-                </div>
-
-                <!-- Opciones de Corredera y Tipo de Frente -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-zinc-100">
-                  <div>
-                    <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Tipo de Correderas:</span>
-                    <select
-                      [value]="drawerSlideType()"
-                      (change)="drawerSlideType.set($any($event.target).value)"
-                      class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-800 focus:border-zinc-900 focus:outline-hidden">
-                      <option value="telescopic">Telescópica Estándar (45kg)</option>
-                      <option value="soft_close">Telescópica Cierre Suave (Soft-Close)</option>
-                      <option value="telescopic_35">Telescópica Liviana (35mm)</option>
-                      <option value="undermount">Oculta / Extracción Bajo Fondo</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Montaje de Frentes:</span>
-                    <select
-                      [value]="drawerFrontType()"
-                      (change)="drawerFrontType.set($any($event.target).value)"
-                      class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-800 focus:border-zinc-900 focus:outline-hidden">
-                      <option value="overlay">Sobrepuesto / Parche (Cubre costados)</option>
-                      <option value="inset">Embutido / Inset (Enrasado interno)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- Zócalo Inferior -->
-                <div class="pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <label class="flex items-center gap-2 cursor-pointer font-semibold text-zinc-700">
-                    <input
-                      type="checkbox"
-                      [checked]="hasPlinth()"
-                      (change)="hasPlinth.set($any($event.target).checked)"
-                      class="rounded text-zinc-900 accent-zinc-900" />
-                    <span>Incluir Zócalo Inferior</span>
-                  </label>
-
-                  @if (hasPlinth()) {
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-[11px] text-zinc-500">Altura:</span>
-                      @for (ph of [50, 70, 100, 120]; track ph) {
-                        <button
-                          type="button"
-                          (click)="plinthHeight.set(ph)"
-                          [class]="plinthHeight() === ph ? 'bg-zinc-900 text-white font-medium' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'"
-                          class="px-2 py-0.5 rounded text-[10px] font-mono tabular-nums transition cursor-pointer">
-                          {{ ph }}mm
-                        </button>
-                      }
-                    </div>
-                  }
-                </div>
-              </div>
-
-              <!-- 4. Tiradores de Cajón -->
-              <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.knob" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                    <span>Tiradores de Cajón</span>
-                  </span>
-
-                  <label class="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      [checked]="hasHandle()"
-                      (change)="hasHandle.set($any($event.target).checked)"
-                      class="sr-only peer" />
-                    <div class="w-9 h-5 bg-zinc-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900"></div>
-                    <span class="ml-2 text-xs font-semibold text-zinc-700">
-                      {{ hasHandle() ? 'Con Tirador' : 'Sin Tirador (Push)' }}
-                    </span>
-                  </label>
-                </div>
-
-                @if (hasHandle()) {
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Modelo de Tirador:</span>
-                      <select
-                        [value]="handleType()"
-                        (change)="handleType.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-800 focus:border-zinc-900 focus:outline-hidden">
-                        <option value="bar_modern">Barra Tubular Centrada</option>
-                        <option value="bar_black">Perfil Negro Minimalista</option>
-                        <option value="knob_round">Tirador Botón Centrado</option>
-                        <option value="knob_square">Tirador Cuadrado</option>
-                        <option value="cup_vintage">Concha Clásica</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Acabado / Material:</span>
-                      <select
-                        [value]="handleFinish()"
-                        (change)="handleFinish.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-800 focus:border-zinc-900 focus:outline-hidden">
-                        <option value="brushed_steel">Acero Inox Cepillado</option>
-                        <option value="black">Negro Mate</option>
-                        <option value="gold">Dorado / Oro Satinado</option>
-                        <option value="chrome">Cromo Brillante</option>
-                        <option value="white">Blanco Nieve</option>
-                      </select>
-                    </div>
-                  </div>
-                }
-              </div>
-            } @else {
-              <!-- 3. Configuración de Puertas -->
-              <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.closetDoor" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                <span>Configuración de Puertas</span>
-              </span>
-
-              <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-
-                <!-- Sin Puerta -->
+                [value]="searchQuery()"
+                (input)="onSearchInput($event)"
+                placeholder="Buscar plantilla por nombre, uso o medida..."
+                autocomplete="off"
+                class="w-full pl-9 pr-8 py-2 text-xs bg-[#FAFAFA] border border-zinc-200 focus:bg-white focus:border-zinc-900 rounded-lg outline-hidden text-zinc-900 font-medium placeholder:text-zinc-400 transition" />
+              @if (searchQuery()) {
                 <button
                   type="button"
-                  (click)="doorOpening.set('none')"
-                  [class]="doorOpening() === 'none' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
-                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.squareShape" [size]="17" [strokeWidth]="1.9" [class.text-white]="doorOpening() === 'none'" [class.text-zinc-500]="doorOpening() !== 'none'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">Sin Puerta</span>
-                  <span class="text-[9px] opacity-70">Abierto</span>
+                  (click)="clearSearch()"
+                  aria-label="Borrar búsqueda"
+                  title="Borrar búsqueda"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 transition cursor-pointer flex items-center justify-center">
+                  <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
                 </button>
-
-                <!-- Abre Izquierda -->
-                <button
-                  type="button"
-                  (click)="doorOpening.set('left')"
-                  [class]="doorOpening() === 'left' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
-                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.arrowLeft" [size]="17" [strokeWidth]="2" [class.text-white]="doorOpening() === 'left'" [class.text-zinc-500]="doorOpening() !== 'left'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">1 Puerta</span>
-                  <span class="text-[9px] opacity-70">Abre Izq</span>
-                </button>
-
-                <!-- Abre Derecha -->
-                <button
-                  type="button"
-                  (click)="doorOpening.set('right')"
-                  [class]="doorOpening() === 'right' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
-                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.arrowRight" [size]="17" [strokeWidth]="2" [class.text-white]="doorOpening() === 'right'" [class.text-zinc-500]="doorOpening() !== 'right'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">1 Puerta</span>
-                  <span class="text-[9px] opacity-70">Abre Der</span>
-                </button>
-
-                <!-- Doble Puerta -->
-                <button
-                  type="button"
-                  (click)="doorOpening.set('double')"
-                  [class]="doorOpening() === 'double' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
-                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer">
-                  <hugeicons-icon [icon]="icons.doubleArrows" [size]="17" [strokeWidth]="1.9" [class.text-white]="doorOpening() === 'double'" [class.text-zinc-500]="doorOpening() !== 'double'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">2 Puertas</span>
-                  <span class="text-[9px] opacity-70">Dobles</span>
-                </button>
-
-                <!-- Elevable Gas -->
-                <button
-                  type="button"
-                  (click)="doorOpening.set('top')"
-                  [class]="doorOpening() === 'top' ? 'bg-zinc-900 border-zinc-900 text-white font-medium shadow-xs' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-medium'"
-                  class="p-2 rounded-md border text-center transition flex flex-col items-center gap-1 cursor-pointer col-span-2 sm:col-span-1">
-                  <hugeicons-icon [icon]="icons.arrowUp" [size]="17" [strokeWidth]="2" [class.text-white]="doorOpening() === 'top'" [class.text-zinc-500]="doorOpening() !== 'top'"></hugeicons-icon>
-                  <span class="text-[11px] font-bold">Elevable</span>
-                  <span class="text-[9px] opacity-70">Pistón Gas</span>
-                </button>
-              </div>
-
-              @if (doorOpening() !== 'none') {
-                <div class="pt-2 border-t border-zinc-100 flex items-center justify-between text-xs">
-                  <span class="font-semibold text-zinc-700">Espesor Puerta(s):</span>
-                  <div class="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      (click)="doorThickness.set(15)"
-                      [class]="doorThickness() === 15 ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
-                      class="px-2.5 py-1 rounded-md font-mono tabular-nums text-xs transition cursor-pointer border">
-                      15 mm
-                    </button>
-                    <button
-                      type="button"
-                      (click)="doorThickness.set(18)"
-                      [class]="doorThickness() === 18 ? 'bg-zinc-900 text-white font-medium border-zinc-900 shadow-xs' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
-                      class="px-2.5 py-1 rounded-md font-mono tabular-nums text-xs transition cursor-pointer border">
-                      18 mm
-                    </button>
-                  </div>
-                </div>
               }
             </div>
 
-            <!-- 4. Manijas y Tiradores (visible si tiene puerta) -->
-            @if (doorOpening() !== 'none') {
-              <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                    <hugeicons-icon [icon]="icons.knob" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                    <span>Manijas y Tiradores</span>
-                  </span>
-
-                  <!-- Toggle Con/Sin Manija -->
-                  <label class="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      [checked]="hasHandle()"
-                      (change)="hasHandle.set($any($event.target).checked)"
-                      class="sr-only peer" />
-                    <div class="w-9 h-5 bg-zinc-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900"></div>
-                    <span class="ml-2 text-xs font-semibold text-zinc-700">
-                      {{ hasHandle() ? 'Con Manija' : 'Sin Manija (Push)' }}
-                    </span>
-                  </label>
-                </div>
-
-                @if (hasHandle()) {
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-
-                    <!-- Tipo de Manija -->
-                    <div>
-                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Modelo de Manija:</span>
-                      <select
-                        [value]="handleType()"
-                        (change)="handleType.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden">
-                        <option value="bar_modern">Barra Tubular Moderna</option>
-                        <option value="bar_black">Perfil Negro Minimalista</option>
-                        <option value="knob_round">Tirador Botón Redondo</option>
-                        <option value="knob_square">Tirador Cuadrado</option>
-                        <option value="cup_vintage">Concha Clásica</option>
-                      </select>
-                    </div>
-
-                    <!-- Acabado / Color Manija -->
-                    <div>
-                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Acabado:</span>
-                      <select
-                        [value]="handleFinish()"
-                        (change)="handleFinish.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden">
-                        <option value="brushed_steel">Acero Inox Cepillado</option>
-                        <option value="black">Negro Mate</option>
-                        <option value="gold">Dorado / Oro Satinado</option>
-                        <option value="chrome">Cromo Brillante</option>
-                        <option value="white">Blanco Nieve</option>
-                      </select>
-                    </div>
-
-                    <!-- Posición -->
-                    <div>
-                      <span class="block text-[11px] font-semibold text-zinc-700 mb-1">Orientación:</span>
-                      <select
-                        [value]="handlePosition()"
-                        (change)="handlePosition.set($any($event.target).value)"
-                        class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-900 focus:border-zinc-900 focus:outline-hidden">
-                        <option value="vertical">Vertical</option>
-                        <option value="horizontal">Horizontal</option>
-                        <option value="centered">Centrado</option>
-                      </select>
-                    </div>
-                  </div>
-                }
-              </div>
-            }
-
-            <!-- 5. Entrepaños y Repisas (Uniforme vs Manual) -->
-            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.tableRows" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                  <span>Entrepaños / Repisas</span>
-                </span>
-
-                <!-- Stepper de cantidad -->
-                <div class="flex items-center gap-1.5 bg-zinc-100 p-0.5 rounded-md border border-zinc-200">
-                  <button
-                    type="button"
-                    (click)="setShelvesCount(shelvesCount() - 1)"
-                    [disabled]="shelvesCount() <= 0"
-                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-zinc-200 text-zinc-700 disabled:opacity-40 transition cursor-pointer font-bold border border-zinc-200">
-                    -
-                  </button>
-                  <span class="text-xs font-mono tabular-nums font-semibold px-2 text-zinc-900">
-                    {{ shelvesCount() }} {{ shelvesCount() === 1 ? 'entrepaño' : 'entrepaños' }}
-                  </span>
-                  <button
-                    type="button"
-                    (click)="setShelvesCount(shelvesCount() + 1)"
-                    [disabled]="shelvesCount() >= 8"
-                    class="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-zinc-200 text-zinc-700 disabled:opacity-40 transition cursor-pointer font-bold border border-zinc-200">
-                    +
-                  </button>
-                </div>
-              </div>
-
-              @if (shelvesCount() > 0) {
-                <!-- Selector Distribución: Uniforme vs Manual -->
-                <div class="flex items-center gap-2 pt-1">
-                  <span class="text-xs text-zinc-500 font-medium">Distribución:</span>
-                  <div class="flex items-center p-0.5 bg-zinc-100 rounded-md border border-zinc-200 text-xs">
-                    <button
-                      type="button"
-                      (click)="setShelfDistribution('uniform')"
-                      [class]="shelfDistribution() === 'uniform' ? 'bg-zinc-900 text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
-                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
-                      <hugeicons-icon [icon]="icons.equalizer" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                      <span>Uniforme Automática</span>
-                    </button>
-                    <button
-                      type="button"
-                      (click)="setShelfDistribution('manual')"
-                      [class]="shelfDistribution() === 'manual' ? 'bg-zinc-900 text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
-                      class="px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5">
-                      <hugeicons-icon [icon]="icons.editAttributes" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                      <span>Ajuste Manual</span>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Detalle de distribución -->
-                @if (shelfDistribution() === 'uniform') {
-                  <div class="p-2.5 rounded-md bg-zinc-50 border border-zinc-200 text-[11px] text-zinc-800 flex items-center justify-between">
-                    <div class="flex items-center gap-1.5 font-medium">
-                      <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                      <span>Luz libre uniforme entre cada nivel:</span>
-                    </div>
-                    <strong class="font-mono tabular-nums text-zinc-900 font-bold text-xs">
-                      {{ uniformShelfGap() }} mm
-                    </strong>
-                  </div>
-                } @else {
-                  <!-- Modo Manual: Inputs de cota por cada entrepaño -->
-                  <div class="space-y-2 pt-1 border-t border-zinc-100">
-                    <span class="text-[11px] text-zinc-500 font-medium block">
-                      Indica la cota exacta (altura en mm desde la base interior del mueble):
-                    </span>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      @for (s of effectiveShelvesList(); track s.index) {
-                        <div class="flex items-center justify-between p-2 rounded-md bg-zinc-50 border border-zinc-200">
-                          <span class="text-xs font-semibold text-zinc-700">Entrepaño {{ s.index }}:</span>
-                          <div class="relative w-24">
-                            <input
-                              type="number"
-                              [value]="s.offset"
-                              (input)="updateManualShelfOffset(s.index - 1, +$any($event.target).value)"
-                              min="30"
-                              [max]="innerHeight() - 30"
-                              step="5"
-                              class="w-full pr-6 pl-2 py-1 text-xs font-mono tabular-nums font-bold bg-white border border-zinc-200 rounded text-right focus:border-zinc-900 focus:outline-hidden" />
-                            <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400 font-mono">mm</span>
-                          </div>
-                        </div>
-                      }
-                    </div>
-                  </div>
-                }
-              }
-            </div>
-          }
-
-            <!-- 6. Fondo Trasero MDF 3mm -->
-            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs flex items-center justify-between">
-              <div>
-                <span class="text-xs font-semibold text-zinc-800 block">Fondo Trasero (MDF 3mm)</span>
-                <span class="text-[11px] text-zinc-500">Panel posterior para cuadratura y rigidez</span>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  [checked]="hasBackPanel()"
-                  (change)="hasBackPanel.set($any($event.target).checked)"
-                  class="sr-only peer" />
-                <div class="w-9 h-5 bg-zinc-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900"></div>
-                <span class="ml-2 text-xs font-semibold text-zinc-700">
-                  {{ hasBackPanel() ? 'Con Fondo' : 'Sin Fondo' }}
-                </span>
-              </label>
-            </div>
-
-            <!-- 7. Materiales & Acabados Iniciales -->
-            <div class="p-3.5 rounded-md border border-zinc-200/90 bg-white shadow-2xs space-y-3">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.palette" [size]="14" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                <span>Material / Color Inicial</span>
-              </span>
-
-              <!-- Selector Material Estructura -->
-              <div>
-                <span class="block text-[11px] font-semibold text-zinc-700 mb-1.5">
-                  Material de la Estructura (Laterales, Piso, Techo, Repisas):
-                </span>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  @for (mat of materials(); track mat.id) {
-                    <button
-                      type="button"
-                      (click)="structureMaterialId.set(mat.id)"
-                      [class]="selectedStructureMat()?.id === mat.id ? 'bg-white border-zinc-900 text-zinc-950 ring-1 ring-zinc-900/20 shadow-xs' : 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-white'"
-                      class="p-2 rounded-md border text-left flex items-center gap-2 transition cursor-pointer min-w-0">
-                      <span
-                        class="w-5 h-5 rounded border border-black/10 shrink-0 shadow-2xs"
-                        [style.background-color]="mat.colorHex || '#f1f5f9'"></span>
-                      <div class="min-w-0">
-                        <span class="text-xs font-semibold block truncate">{{ mat.name }}</span>
-                        <span class="text-[10px] text-zinc-400 font-mono tabular-nums">{{ mat.thickness }} mm</span>
-                      </div>
-                    </button>
-                  }
-                </div>
-              </div>
-
-              <!-- Material Puerta / Frente -->
-              @if (activePreset() === 'drawers' || doorOpening() !== 'none') {
-                <div class="pt-2 border-t border-zinc-100 space-y-2">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-zinc-700">
-                      {{ activePreset() === 'drawers' ? 'Material de los Frentes de Cajón:' : 'Material de las Puertas:' }}
-                    </span>
-                    <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-600">
-                      <input
-                        type="checkbox"
-                        [checked]="useSameMaterialForDoors()"
-                        (change)="useSameMaterialForDoors.set($any($event.target).checked)"
-                        class="rounded text-zinc-900 accent-zinc-900 focus:ring-0" />
-                      <span>Mismo que estructura</span>
-                    </label>
-                  </div>
-
-                  @if (!useSameMaterialForDoors()) {
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-                      @for (mat of materials(); track mat.id) {
-                        <button
-                          type="button"
-                          (click)="doorMaterialId.set(mat.id)"
-                          [class]="selectedDoorMat()?.id === mat.id ? 'bg-white border-zinc-900 text-zinc-950 ring-1 ring-zinc-900/20 shadow-xs' : 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-white'"
-                          class="p-2 rounded-md border text-left flex items-center gap-2 transition cursor-pointer min-w-0">
-                          <span
-                            class="w-5 h-5 rounded border border-black/10 shrink-0 shadow-2xs"
-                            [style.background-color]="mat.colorHex || '#f1f5f9'"></span>
-                          <div class="min-w-0">
-                            <span class="text-xs font-semibold block truncate">{{ mat.name }}</span>
-                            <span class="text-[10px] text-zinc-400 font-mono tabular-nums">{{ mat.thickness }} mm</span>
-                          </div>
-                        </button>
-                      }
-                    </div>
-                  }
-                </div>
-              }
-            </div>
-          </div>
-
-          <!-- COLUMNA 2: DIAGRAMA BLUEPRINT 2D & RESUMEN CONSTRUCTIVO (5 cols) -->
-          <div class="lg:col-span-5 flex flex-col gap-4">
-
-            <!-- TARJETA BLUEPRINT SVG TÉCNICO INTERACTIVO -->
-            <div class="p-4 rounded-md border border-zinc-200/90 bg-white shadow-2xs flex flex-col items-center">
-
-              <div class="w-full flex items-center justify-between mb-2">
-                <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.compass" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                  <span>Alzado Técnico de Fachada</span>
-                </span>
-                <span class="text-[10px] font-mono tabular-nums font-medium px-1.5 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200">
-                  Escala Dinámica
-                </span>
-              </div>
-
-              <!-- Canvas Blueprint Técnico SVG -->
-              <div class="w-full h-64 bg-zinc-50 rounded-md border border-zinc-200 flex items-center justify-center p-3 relative overflow-hidden shadow-inner">
-                <svg
-                  viewBox="0 0 200 240"
-                  class="w-full h-full max-h-60 drop-shadow-xs"
-                  xmlns="http://www.w3.org/2000/svg">
-
-                  <!-- Carcasa Exterior del Mueble -->
-                  <rect x="25" y="20" width="150" height="200" fill="#f8fafc" stroke="#64748b" stroke-width="2" rx="2" />
-
-                  <!-- Espesor interior de laterales y tapas -->
-                  <rect x="30" y="25" width="140" height="190" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
-
-                  <!-- Fachada / Puertas O Cajones -->
-                  @if (activePreset() === 'drawers') {
-                    <!-- Frentes de Cajón Apilados -->
-                    @for (box of drawerBoxesBlueprint(); track box.index) {
-                      <rect
-                        x="27"
-                        [attr.y]="box.y"
-                        width="146"
-                        [attr.height]="box.height"
-                        fill="rgba(24, 24, 27, 0.04)"
-                        stroke="#18181b"
-                        stroke-width="1.8"
-                        rx="1" />
-                      <!-- Tirador Centrado Horizontal -->
-                      @if (hasHandle()) {
-                        <rect
-                          x="82"
-                          [attr.y]="box.handleY"
-                          width="36"
-                          height="4"
-                          fill="#18181b"
-                          rx="1" />
-                      }
-                      <!-- Correderas Laterales Guía -->
-                      <line x1="28" [attr.y1]="box.y + (box.height / 2)" x2="33" [attr.y2]="box.y + (box.height / 2)" stroke="#52525b" stroke-width="2" />
-                      <line x1="167" [attr.y1]="box.y + (box.height / 2)" x2="172" [attr.y2]="box.y + (box.height / 2)" stroke="#52525b" stroke-width="2" />
-                    }
-                    <!-- Zócalo si está activo -->
-                    @if (hasPlinth()) {
-                      <rect x="30" y="195" width="140" height="20" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1" />
-                      <text x="100" y="209" font-size="8" font-family="monospace" font-weight="bold" fill="#64748b" text-anchor="middle">ZÓCALO {{ plinthHeight() }}mm</text>
-                    }
-                  } @else {
-                    <!-- Entrepaños / Repisas calculadas -->
-                    @for (s of effectiveShelvesList(); track s.index) {
-                      @let shelfSvgY = 215 - (190 * (s.percentage / 100));
-                      <line x1="30" [attr.y1]="shelfSvgY" x2="170" [attr.y2]="shelfSvgY" stroke="#64748b" stroke-width="3" />
-                    }
-
-                    <!-- Fachada / Puertas -->
-                    @if (doorOpening() === 'left') {
-                      <!-- 1 Puerta completa (Abre Izq) -->
-                      <rect x="27" y="22" width="146" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
-                      <!-- Líneas punteadas de abatimiento (Vértice en la derecha) -->
-                      <line x1="27" y1="22" x2="173" y2="120" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
-                      <line x1="27" y1="218" x2="173" y2="120" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
-                      <!-- Bisagras a la izquierda -->
-                      <rect x="23" y="38" width="4" height="14" fill="#52525b" rx="1" />
-                      <rect x="23" y="188" width="4" height="14" fill="#52525b" rx="1" />
-                      <!-- Manija a la derecha -->
-                      @if (hasHandle()) {
-                        <rect x="162" y="105" width="4" height="28" fill="#18181b" rx="1" />
-                      }
-                    } @else if (doorOpening() === 'right') {
-                      <!-- 1 Puerta completa (Abre Der) -->
-                      <rect x="27" y="22" width="146" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
-                      <!-- Líneas punteadas de abatimiento (Vértice en la izquierda) -->
-                      <line x1="173" y1="22" x2="27" y2="120" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
-                      <line x1="173" y1="218" x2="27" y2="120" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
-                      <!-- Bisagras a la derecha -->
-                      <rect x="173" y="38" width="4" height="14" fill="#52525b" rx="1" />
-                      <rect x="173" y="188" width="4" height="14" fill="#52525b" rx="1" />
-                      <!-- Manija a la izquierda -->
-                      @if (hasHandle()) {
-                        <rect x="34" y="105" width="4" height="28" fill="#18181b" rx="1" />
-                      }
-                    } @else if (doorOpening() === 'double') {
-                      <!-- 2 Puertas Dobles (Puerta Izquierda y Derecha) -->
-                      <rect x="27" y="22" width="71" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
-                      <rect x="102" y="22" width="71" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
-                      <!-- Abatimiento puerta izq -->
-                      <line x1="27" y1="22" x2="98" y2="120" stroke="#18181b" stroke-dasharray="3 2" stroke-width="1.2" />
-                      <line x1="27" y1="218" x2="98" y2="120" stroke="#18181b" stroke-dasharray="3 2" stroke-width="1.2" />
-                      <!-- Abatimiento puerta der -->
-                      <line x1="173" y1="22" x2="102" y2="120" stroke="#18181b" stroke-dasharray="3 2" stroke-width="1.2" />
-                      <line x1="173" y1="218" x2="102" y2="120" stroke="#18181b" stroke-dasharray="3 2" stroke-width="1.2" />
-                      <!-- Manijas en el centro -->
-                      @if (hasHandle()) {
-                        <rect x="91" y="105" width="3" height="26" fill="#18181b" rx="1" />
-                        <rect x="106" y="105" width="3" height="26" fill="#18181b" rx="1" />
-                      }
-                    } @else if (doorOpening() === 'top') {
-                      <!-- 1 Puerta Elevable Superior -->
-                      <rect x="27" y="22" width="146" height="196" fill="rgba(24, 24, 27, 0.04)" stroke="#18181b" stroke-width="1.8" rx="1" />
-                      <line x1="27" y1="22" x2="100" y2="218" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
-                      <line x1="173" y1="22" x2="100" y2="218" stroke="#18181b" stroke-dasharray="4 3" stroke-width="1.5" />
-                      @if (hasHandle()) {
-                        <rect x="85" y="206" width="30" height="4" fill="#18181b" rx="1" />
-                      }
-                    }
-                  }
-
-                  <!-- Cotas Técnicas (X y Z) -->
-                  <text x="100" y="13" font-size="9" font-family="monospace" font-weight="bold" fill="#18181b" text-anchor="middle">
-                    {{ width() }} mm
-                  </text>
-                  <text x="12" y="120" font-size="9" font-family="monospace" font-weight="bold" fill="#52525b" text-anchor="middle" transform="rotate(-90 12 120)">
-                    {{ height() }} mm
-                  </text>
-                </svg>
-              </div>
-
-              <!-- Resumen constructivo milimétrico -->
-              <div class="w-full mt-3 grid grid-cols-2 gap-2 text-[11px] font-mono tabular-nums">
-                <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200">
-                  <span class="text-zinc-500 block font-sans text-[10px]">Luz Interior:</span>
-                  <strong class="text-zinc-800 font-semibold">{{ innerWidth() }} × {{ innerHeight() }} × {{ innerDepth() }} mm</strong>
-                </div>
-                <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200">
-                  @if (activePreset() === 'drawers') {
-                    <span class="text-zinc-500 block font-sans text-[10px]">Frentes de Cajón:</span>
-                    <strong class="text-zinc-900 font-semibold">
-                      {{ drawerFrontWidth() }} × {{ drawerFrontHeight() }} mm (×{{ drawersCount() }})
-                    </strong>
-                  } @else if (doorOpening() !== 'none') {
-                    <span class="text-zinc-500 block font-sans text-[10px]">Corte Puerta(s):</span>
-                    <strong class="text-zinc-900 font-semibold">
-                      {{ doorCutWidth() }} × {{ doorCutHeight() }} mm
-                      @if (doorOpening() === 'double') {
-                        <span>(×2)</span>
-                      }
-                    </strong>
-                  } @else {
-                    <span class="text-zinc-400 block font-sans text-[10px]">Corte Puerta(s):</span>
-                    <strong class="text-zinc-400 font-normal">Sin puertas</strong>
-                  }
-                </div>
-              </div>
-
-              @if (activePreset() === 'drawers') {
-                <div class="w-full mt-2 p-2 rounded-md bg-zinc-50 border border-zinc-200 flex items-center justify-between text-[11px] font-mono tabular-nums">
-                  <span class="text-zinc-600 font-sans text-[10px] font-semibold">Correderas:</span>
-                  <strong class="text-zinc-900 font-semibold">{{ recommendedSlideLength() }} mm ({{ drawerSlideType() === 'soft_close' ? 'Cierre Suave' : drawerSlideType() === 'undermount' ? 'Oculta' : 'Telescópica' }})</strong>
-                </div>
-              }
-            </div>
-
-            <!-- TARJETA INFORMATIVA DE EDICIÓN POSTERIOR -->
-            <div class="p-3.5 rounded-md bg-amber-50/70 border border-amber-300/80 text-xs text-amber-950 flex items-start gap-2.5">
-              <hugeicons-icon [icon]="icons.lightbulb" [size]="16" [strokeWidth]="2" class="text-amber-600 shrink-0 mt-0.5"></hugeicons-icon>
-              <div>
-                <strong class="font-bold text-amber-950 block">Edición post-creación:</strong>
-                <p class="text-zinc-600 text-[11px] mt-0.5 leading-relaxed">
-                  Al pulsar "Crear Módulo", todas las piezas se insertarán en 3D ensambladas y agrupadas. Podrás cambiar el material o color del mueble completo o de piezas individuales en cualquier momento desde el inspector.
-                </p>
-              </div>
-            </div>
-
-            <!-- Resumen de piezas generadas -->
-            <div class="p-3 rounded-md border border-zinc-200 bg-white flex items-center justify-between text-xs font-semibold text-zinc-700">
-              <div class="flex items-center gap-1.5">
-                <hugeicons-icon [icon]="icons.cube3d" [size]="15" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                <span>Piezas listas para despiece:</span>
-              </div>
-              <span class="font-mono tabular-nums font-semibold text-zinc-800 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md">
-                {{ totalPartsCount() }} piezas ensambladas
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- PIE DE MODAL (ACCIONES CLARAS) -->
-        <div class="px-5 sm:px-6 py-3.5 border-t border-zinc-200 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
-
-          <!-- Selector de Modo o Indicador de Edición -->
-          @if (!editingGroupId()) {
-            <div class="flex items-center gap-2 text-xs">
-              <span class="text-zinc-500 font-medium">Modo de inserción:</span>
-              <div class="flex items-center p-0.5 bg-zinc-100 rounded-md border border-zinc-200">
-                <button
-                  type="button"
-                  (click)="creationMode.set('append')"
-                  [class]="creationMode() === 'append' ? 'bg-zinc-900 text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
-                  class="px-2.5 py-1 rounded-md transition cursor-pointer">
-                  Añadir al taller
-                </button>
-                <button
-                  type="button"
-                  (click)="creationMode.set('replace')"
-                  [class]="creationMode() === 'replace' ? 'bg-zinc-900 text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
-                  class="px-2.5 py-1 rounded-md transition cursor-pointer">
-                  Reemplazar actual
-                </button>
-              </div>
-            </div>
-          } @else {
-            <div class="flex items-center gap-1.5 text-xs text-amber-800 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-300">
-              <hugeicons-icon [icon]="icons.info" [size]="14" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
-              <span>Actualizando módulo en su posición 3D actual.</span>
-            </div>
-          }
-
-          <!-- Botones de Acción -->
-          <div class="flex items-center gap-2 justify-end">
-            <button
-              type="button"
-              (click)="close()"
-              class="px-4 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-100 border border-zinc-200 rounded-md transition cursor-pointer">
-              Cancelar
-            </button>
-            <button
-              type="button"
-              (click)="onSubmitAssistant()"
-              class="px-5 py-2 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 active:scale-98 text-white rounded-md shadow-xs flex items-center gap-2 transition cursor-pointer">
-              <hugeicons-icon [icon]="editingGroupId() ? icons.checkCircle : icons.cube3d" [size]="15" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-              <span>{{ editingGroupId() ? 'Guardar Cambios del Módulo' : 'Crear Módulo en 3D' }}</span>
-            </button>
-          </div>
-        </div>
-
-      } @else {
-        <!-- ========================================== -->
-        <!-- VISTA 2: CATÁLOGO DE PLANTILLAS PREDISEÑADAS -->
-        <!-- ========================================== -->
-        <div class="px-5 sm:px-6 py-2.5 border-b border-zinc-200 bg-zinc-50 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shrink-0">
-
-          <!-- Categorías Tabs con Botones de Navegación Compactos -->
-          <div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
-            <button
-              type="button"
-              (click)="scrollCategories('left')"
-              class="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-zinc-900 bg-white hover:bg-zinc-100 border border-zinc-200 transition shrink-0 cursor-pointer"
-              title="Desplazar a la izquierda">
-              <hugeicons-icon [icon]="icons.chevronLeft" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-            </button>
-
-            <div
-              #categoriesNav
-              (wheel)="onCategoryWheel($event)"
-              class="flex items-center gap-1.5 overflow-x-auto py-1 scroll-smooth scrollbar-none flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtrar plantillas por categoría">
               @for (cat of categories(); track cat.id) {
                 <button
                   type="button"
                   (click)="selectCategory(cat.id)"
+                  [attr.aria-pressed]="activeCategory() === cat.id"
                   [class]="activeCategory() === cat.id
-                    ? 'bg-zinc-900 text-white font-medium shadow-xs border-zinc-900'
-                    : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium'"
-                  class="px-3 py-1.5 rounded-md text-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border">
-                  <hugeicons-icon [icon]="getCatalogIcon(cat.icon)" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
+                    ? 'bg-[#18181B] text-white border-[#18181B] shadow-xs'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900'"
+                  class="px-2.5 py-1.5 rounded-lg text-xs font-medium border transition inline-flex items-center gap-1.5 cursor-pointer">
+                  <hugeicons-icon [icon]="cat.icon" [size]="13" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
                   <span>{{ cat.label }}</span>
-                  <span class="text-[10px] px-1.5 py-0.2 rounded font-mono tabular-nums font-medium"
-                    [class]="activeCategory() === cat.id ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600'">
+                  <span
+                    class="font-numeric text-[10px] px-1.5 py-0.2 rounded-md"
+                    [class]="activeCategory() === cat.id ? 'bg-zinc-700 text-zinc-100' : 'bg-zinc-100 text-zinc-600'">
                     {{ cat.count }}
                   </span>
                 </button>
               }
             </div>
-
-            <button
-              type="button"
-              (click)="scrollCategories('right')"
-              class="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-zinc-900 bg-white hover:bg-zinc-100 border border-zinc-200 transition shrink-0 cursor-pointer"
-              title="Desplazar a la derecha">
-              <hugeicons-icon [icon]="icons.chevronRight" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-            </button>
           </div>
 
-          <!-- Buscador Limpio -->
-          <div class="relative w-full md:w-60 shrink-0">
-            <hugeicons-icon [icon]="icons.search" [size]="15" [strokeWidth]="2" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"></hugeicons-icon>
-            <input
-              type="text"
-              [value]="searchQuery()"
-              (input)="searchQuery.set($any($event.target).value)"
-              placeholder="Filtrar plantilla..."
-              autocomplete="off"
-              class="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-zinc-200 focus:border-zinc-900 rounded-md outline-hidden text-zinc-900 font-medium placeholder:text-zinc-400 transition" />
-            @if (searchQuery()) {
-              <button
-                type="button"
-                (click)="searchQuery.set('')"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition cursor-pointer flex items-center justify-center"
-                title="Borrar búsqueda">
-                <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-              </button>
-            }
-          </div>
-        </div>
+          <!-- Lista / Grid de Plantillas -->
+          <div class="flex-1 min-h-0 lg:overflow-y-auto p-4 scrollbar-thin">
+            @if (filteredTemplates().length === 0) {
+              <div class="h-full min-h-[240px] p-8 rounded-xl border border-dashed border-zinc-300 bg-white text-center flex flex-col items-center justify-center gap-2.5">
+                <div class="w-11 h-11 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500">
+                  <hugeicons-icon [icon]="icons.search" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
+                </div>
+                <div class="space-y-1">
+                  <p class="text-sm font-semibold text-zinc-900">No se encontraron plantillas</p>
+                  <p class="text-xs text-zinc-500 max-w-xs">
+                    Prueba cambiando el término de búsqueda o selecciona otra categoría del catálogo.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  (click)="resetFilters()"
+                  class="mt-1 px-3.5 py-2 bg-[#18181B] hover:bg-[#27272A] text-white font-medium rounded-lg text-xs transition cursor-pointer">
+                  Ver todas las plantillas
+                </button>
+              </div>
+            } @else {
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                @for (tpl of filteredTemplates(); track tpl.id) {
+                  @let isSelected = selectedTemplate()?.id === tpl.id;
+                  <button
+                    type="button"
+                    (click)="selectTemplate(tpl)"
+                    [attr.aria-pressed]="isSelected"
+                    [class]="isSelected
+                      ? 'border-sky-600 bg-sky-50/40 ring-1 ring-sky-600/25 shadow-xs'
+                      : 'border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-xs'"
+                    class="w-full text-left rounded-xl border p-3.5 flex flex-col gap-2.5 transition-all duration-150 cursor-pointer group">
 
-        <!-- GRID DE PLANTILLAS -->
-        <div class="flex-1 overflow-y-auto p-5 sm:p-6 min-h-0 bg-zinc-50/50 scrollbar-thin">
-          @if (filteredTemplates().length === 0) {
-            <div class="p-12 text-center text-xs text-zinc-500 flex flex-col items-center gap-2">
-              <hugeicons-icon [icon]="icons.search" [size]="34" [strokeWidth]="1.6" class="text-zinc-400"></hugeicons-icon>
-              <span class="font-bold text-zinc-800 text-sm">No se encontraron plantillas</span>
-              <span class="text-zinc-500">Prueba cambiando el término de búsqueda o selecciona otra categoría.</span>
-              <button
-                type="button"
-                (click)="searchQuery.set(''); activeCategory.set('all')"
-                class="mt-2 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-md text-xs transition cursor-pointer">
-                Ver todas las plantillas
-              </button>
-            </div>
-          } @else {
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              @for (tpl of filteredTemplates(); track tpl.id) {
-                <div class="rounded-md border border-zinc-200 bg-white hover:border-zinc-400 hover:shadow-md flex flex-col justify-between transition-all duration-150 overflow-hidden group">
-
-                  <div class="p-4 flex flex-col flex-1">
-                    <div class="flex items-start justify-between gap-3 mb-2">
-                      <div class="flex items-center gap-2.5 min-w-0">
-                        <div class="w-9 h-9 rounded-md flex items-center justify-center shrink-0 border border-zinc-200 bg-zinc-50 text-zinc-700 transition-transform group-hover:scale-105">
-                          <hugeicons-icon [icon]="getCatalogIcon(tpl.icon || 'kitchen')" [size]="18" [strokeWidth]="1.8"></hugeicons-icon>
-                        </div>
-                        <div class="min-w-0">
-                          <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">
-                            {{ tpl.categoryLabel }}
-                          </span>
-                          <h3 class="text-sm font-bold tracking-tight text-zinc-900 group-hover:text-zinc-950 transition-colors leading-tight truncate">
-                            {{ tpl.name }}
-                          </h3>
-                        </div>
+                    <div class="flex items-start justify-between gap-2 w-full">
+                      <div
+                        class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border transition-colors"
+                        [class]="isSelected
+                          ? 'bg-sky-50 border-sky-200 text-sky-600'
+                          : 'bg-zinc-50 border-zinc-200 text-zinc-600 group-hover:text-zinc-900'">
+                        <hugeicons-icon
+                          [icon]="getCatalogIcon(tpl.icon, tpl.category)"
+                          [size]="16"
+                          [strokeWidth]="1.85"></hugeicons-icon>
                       </div>
-                      <span class="text-[11px] font-mono tabular-nums font-medium text-zinc-700 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shrink-0">
-                        {{ tpl.partsCount }} piezas
+
+                      <span
+                        class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border shrink-0"
+                        [class]="isSelected
+                          ? 'bg-sky-50 text-sky-700 border-sky-200'
+                          : 'bg-zinc-100 text-zinc-600 border-zinc-200'">
+                        {{ getCategoryBadgeLabel(tpl.category) }}
                       </span>
                     </div>
 
-                    <p class="text-xs leading-relaxed text-zinc-500 font-normal mt-1 mb-3">
-                      {{ tpl.description }}
-                    </p>
+                    <div class="space-y-1 w-full">
+                      <h3 class="text-[13px] font-semibold tracking-tight text-zinc-900 leading-snug line-clamp-2">
+                        {{ tpl.name }}
+                      </h3>
+                      <p class="text-[11px] text-zinc-500 leading-relaxed line-clamp-2">
+                        {{ tpl.description }}
+                      </p>
+                    </div>
 
-                    <!-- Dimensiones -->
-                    <div class="mt-auto flex items-center justify-between text-xs font-mono tabular-nums px-2.5 py-1.5 rounded-md border border-zinc-200 bg-zinc-50 text-zinc-700">
-                      <span class="font-sans text-[11px] font-medium text-zinc-400 flex items-center gap-1">
-                        <hugeicons-icon [icon]="icons.ruler" [size]="12" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                        <span>Medidas:</span>
+                    <div class="mt-auto pt-2.5 border-t border-zinc-200/80 flex items-center justify-between gap-2 w-full">
+                      <span class="font-numeric text-[11px] font-semibold text-zinc-800">
+                        {{ tpl.dimensions.width }} × {{ tpl.dimensions.height }} × {{ tpl.dimensions.depth }} mm
                       </span>
-                      <div class="flex items-center gap-1 font-bold text-zinc-900">
-                        <span>{{ tpl.dimensions.width }}</span>
-                        <span class="text-zinc-400 text-[10px]">×</span>
-                        <span>{{ tpl.dimensions.height }}</span>
-                        <span class="text-zinc-400 text-[10px]">×</span>
-                        <span>{{ tpl.dimensions.depth }}</span>
-                        <span class="text-[10px] text-zinc-400 font-normal">mm</span>
-                      </div>
+                      <span class="font-numeric text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-zinc-100 text-zinc-600 border border-zinc-200 shrink-0">
+                        {{ tpl.partsCount }} pzs
+                      </span>
+                    </div>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- COLUMNA DERECHA: Escenario de Vista Previa 360° y Acciones -->
+        <section
+          aria-label="Vista previa 3D de la plantilla seleccionada"
+          class="lg:col-span-6 flex flex-col min-h-0 bg-white">
+
+          @if (selectedTemplate(); as tpl) {
+            <!-- Cabecera de la plantilla seleccionada -->
+            <div class="px-5 pt-4 pb-2.5 border-b border-zinc-100 shrink-0">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200">
+                  {{ getCategoryBadgeLabel(tpl.category) }}
+                </span>
+                <span class="text-[11px] font-medium text-zinc-500">
+                  {{ tpl.badge }}
+                </span>
+              </div>
+              <h3 class="text-sm sm:text-base font-bold tracking-tight text-zinc-900 leading-snug">
+                {{ tpl.name }}
+              </h3>
+              <p class="text-xs text-zinc-500 mt-0.5 line-clamp-2">
+                {{ tpl.description }}
+              </p>
+            </div>
+
+            <!-- Visor 3D Interactivo 360° -->
+            <div class="px-5 pt-3 pb-2 flex-1 min-h-[250px] lg:min-h-0 flex flex-col">
+              <div class="w-full h-full min-h-[250px] lg:min-h-0 flex-1">
+                <app-template-preview-3d
+                  [template]="tpl"
+                  [materials]="materials()"
+                  [autoRotate]="true" />
+              </div>
+            </div>
+
+            <!-- Resumen Técnico + Modo + CTAs -->
+            <div class="px-5 pb-4 pt-2 space-y-3 shrink-0 bg-white">
+              @if (selectedSummary(); as summary) {
+                <div class="rounded-xl border border-zinc-200 bg-[#FAFAFA] p-3.5 space-y-2.5">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="text-[11px] font-medium text-zinc-500 inline-flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.ruler" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                        <span>Ancho × Alto × Profundidad</span>
+                      </span>
+                      <span class="font-numeric text-xs font-bold text-zinc-900">
+                        {{ tpl.dimensions.width }} × {{ tpl.dimensions.height }} × {{ tpl.dimensions.depth }} mm
+                      </span>
+                    </div>
+
+                    <div class="flex flex-col gap-0.5 sm:items-end">
+                      <span class="text-[11px] font-medium text-zinc-500 inline-flex items-center gap-1.5">
+                        <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                        <span>Piezas generadas</span>
+                      </span>
+                      <span class="font-numeric text-xs font-bold text-zinc-900">
+                        {{ summary.partsCount }} piezas
+                      </span>
                     </div>
                   </div>
 
-                  <!-- Acciones de tarjeta -->
-                  <div class="px-4 py-3 border-t border-zinc-100 bg-zinc-50/60 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      (click)="onSelectTemplate(tpl, 'append')"
-                      class="py-1.5 px-3 text-xs font-medium bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-md flex items-center gap-1.5 transition cursor-pointer">
-                      <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.2" class="shrink-0"></hugeicons-icon>
-                      <span>Añadir</span>
-                    </button>
-                    <button
-                      type="button"
-                      (click)="onSelectTemplate(tpl, 'replace')"
-                      class="py-1.5 px-3 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer">
-                      <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                      <span>Cargar en 3D</span>
-                    </button>
+                  <div class="pt-2 border-t border-zinc-200/80 flex flex-wrap items-center gap-1.5">
+                    <span class="text-[11px] font-medium text-zinc-500 inline-flex items-center gap-1 mr-0.5">
+                      <hugeicons-icon [icon]="icons.layers" [size]="12" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                      <span>Incluye:</span>
+                    </span>
+
+                    @if (summary.doorsCount > 0) {
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-zinc-200 text-[11px] text-zinc-700">
+                        <span class="font-numeric font-semibold text-zinc-900">{{ summary.doorsCount }}</span>
+                        <span>{{ summary.doorsCount === 1 ? 'Puerta' : 'Puertas' }}</span>
+                      </span>
+                    }
+
+                    @if (summary.drawersCount > 0) {
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-zinc-200 text-[11px] text-zinc-700">
+                        <span class="font-numeric font-semibold text-zinc-900">{{ summary.drawersCount }}</span>
+                        <span>{{ summary.drawersCount === 1 ? 'Cajón' : 'Cajones' }}</span>
+                      </span>
+                    }
+
+                    @if (summary.shelvesCount > 0) {
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-zinc-200 text-[11px] text-zinc-700">
+                        <span class="font-numeric font-semibold text-zinc-900">{{ summary.shelvesCount }}</span>
+                        <span>{{ summary.shelvesCount === 1 ? 'Repisa' : 'Repisas' }}</span>
+                      </span>
+                    }
+
+                    @if (summary.rodsCount > 0) {
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-zinc-200 text-[11px] text-zinc-700">
+                        <span class="font-numeric font-semibold text-zinc-900">{{ summary.rodsCount }}</span>
+                        <span>{{ summary.rodsCount === 1 ? 'Barra colgadora' : 'Barras colgadoras' }}</span>
+                      </span>
+                    }
+
+                    @if (
+                      summary.doorsCount === 0 &&
+                      summary.drawersCount === 0 &&
+                      summary.shelvesCount === 0 &&
+                      summary.rodsCount === 0
+                    ) {
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-white border border-zinc-200 text-[11px] text-zinc-600">
+                        Estructura abierta
+                      </span>
+                    }
                   </div>
                 </div>
               }
+
+              <!-- Selector de modo de inserción -->
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-xs font-medium text-zinc-600">Modo de inserción:</span>
+                <div
+                  class="inline-flex items-center p-0.5 bg-zinc-100 rounded-lg border border-zinc-200"
+                  role="group"
+                  aria-label="Modo de inserción en el lienzo">
+                  <button
+                    type="button"
+                    (click)="setCreationMode('append')"
+                    [attr.aria-pressed]="creationMode() === 'append'"
+                    [class]="creationMode() === 'append'
+                      ? 'bg-[#18181B] text-white shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900'"
+                    class="px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer">
+                    Añadir al proyecto
+                  </button>
+                  <button
+                    type="button"
+                    (click)="setCreationMode('replace')"
+                    [attr.aria-pressed]="creationMode() === 'replace'"
+                    [class]="creationMode() === 'replace'
+                      ? 'bg-[#18181B] text-white shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900'"
+                    class="px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer">
+                    Reemplazar escena
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dos botones de acción principales -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  (click)="confirmSelectedTemplate()"
+                  class="w-full px-4 py-2.5 text-xs font-semibold bg-[#18181B] hover:bg-[#27272A] text-white rounded-lg shadow-xs inline-flex items-center justify-center gap-2 transition cursor-pointer">
+                  <hugeicons-icon [icon]="icons.cube3d" [size]="15" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  <span>+ Insertar Mueble en el Lienzo</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="customizeSelectedTemplate()"
+                  class="w-full px-4 py-2.5 text-xs font-semibold bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-300 hover:border-zinc-400 rounded-lg inline-flex items-center justify-center gap-2 transition cursor-pointer">
+                  <hugeicons-icon [icon]="icons.sliders" [size]="15" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
+                  <span>Abrir y Personalizar en Asistente</span>
+                </button>
+              </div>
+            </div>
+          } @else {
+            <div class="flex-1 flex flex-col items-center justify-center p-8 m-5 rounded-xl border border-dashed border-zinc-300 bg-[#FAFAFA] text-center gap-3">
+              <div class="w-12 h-12 rounded-xl bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 shadow-xs">
+                <hugeicons-icon [icon]="icons.cube3d" [size]="22" [strokeWidth]="1.8"></hugeicons-icon>
+              </div>
+              <div class="space-y-1 max-w-xs">
+                <p class="text-sm font-semibold text-zinc-900">Vista previa 360°</p>
+                <p class="text-xs text-zinc-500">
+                  Selecciona una plantilla del catálogo o restablece los filtros activos para inspeccionarla en 3D.
+                </p>
+              </div>
+              <button
+                type="button"
+                (click)="resetFilters()"
+                class="px-3.5 py-2 bg-[#18181B] hover:bg-[#27272A] text-white font-medium rounded-lg text-xs transition cursor-pointer">
+                Restablecer filtros
+              </button>
             </div>
           }
-        </div>
-
-        <!-- PIE DE CATÁLOGO -->
-        <div class="px-5 sm:px-6 py-3 border-t border-zinc-200 bg-white flex items-center justify-between shrink-0">
-          <button
-            type="button"
-            (click)="onStartBlank()"
-            class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-md flex items-center gap-1.5 transition cursor-pointer">
-            <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="1.9" class="text-zinc-400 shrink-0"></hugeicons-icon>
-            <span>Lienzo en Blanco</span>
-          </button>
-          <button
-            type="button"
-            (click)="activeView.set('assistant')"
-            class="px-4 py-1.5 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition cursor-pointer flex items-center gap-1.5 shadow-xs">
-            <hugeicons-icon [icon]="icons.magicWand" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
-            <span>Volver al Asistente Paramétrico</span>
-          </button>
-        </div>
-      }
+        </section>
+      </div>
     </div>
   </div>
 }

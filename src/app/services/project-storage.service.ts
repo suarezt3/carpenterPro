@@ -966,6 +966,164 @@ export class ProjectStorageService {
     return modules.filter(m => usedModuleIds.has(m.id));
   }
 
+  private filterOrphanDrawerHardware(
+    hardware: HardwareItem[],
+    remainingGroups: PartGroup[],
+    forceRemoveGroupId?: string
+  ): HardwareItem[] {
+    if (!hardware || hardware.length === 0) return [];
+    const activeGroupIds = new Set(remainingGroups.map(g => g.id));
+    const seenIds = new Set<string>();
+    const cleaned: HardwareItem[] = [];
+
+    for (const item of hardware) {
+      if (!item || !item.id || seenIds.has(item.id)) continue;
+      if (item.id.startsWith('hw_slide_') || item.id.startsWith('hw_handle_')) {
+        const ownerGroupId = item.id.startsWith('hw_slide_')
+          ? item.id.slice('hw_slide_'.length)
+          : item.id.slice('hw_handle_'.length);
+        if (forceRemoveGroupId && ownerGroupId === forceRemoveGroupId) {
+          continue;
+        }
+        if (ownerGroupId && !activeGroupIds.has(ownerGroupId)) {
+          continue;
+        }
+      }
+      seenIds.add(item.id);
+      cleaned.push(item);
+    }
+
+    return cleaned;
+  }
+
+  private cloneParametricConfig(cfg: ParametricCabinetConfig): ParametricCabinetConfig {
+    if (typeof structuredClone === 'function') {
+      try {
+        return structuredClone(cfg);
+      } catch {
+        // Fallback a JSON si algún campo no fuera clonable
+      }
+    }
+    return JSON.parse(JSON.stringify(cfg)) as ParametricCabinetConfig;
+  }
+
+  private transformPartsToGroupFrame(
+    parts: Part[],
+    targetCx: number,
+    targetMinY: number,
+    targetCz: number,
+    facing: 'front' | 'right' | 'back' | 'left'
+  ): Part[] {
+    if (parts.length === 0) return parts;
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const pt of parts) {
+      const b = this.joineryEngine.getPartBounds(pt);
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+    }
+
+    const srcCx = (minX + maxX) / 2;
+    const srcCz = (minZ + maxZ) / 2;
+    const angleDelta: 0 | 90 | -90 | 180 =
+      facing === 'right' ? 90 : facing === 'left' ? -90 : facing === 'back' ? 180 : 0;
+
+    const rotated = parts.map(pt => {
+      if (angleDelta === 0) return pt;
+      const b = this.joineryEngine.getPartBounds(pt);
+      const dx = b.px - srcCx;
+      const dz = b.pz - srcCz;
+      let newDx = dx;
+      let newDz = dz;
+      if (angleDelta === 90) {
+        newDx = dz;
+        newDz = -dx;
+      } else if (angleDelta === -90) {
+        newDx = -dz;
+        newDz = dx;
+      } else if (angleDelta === 180) {
+        newDx = -dx;
+        newDz = -dz;
+      }
+
+      const curOrient = pt.orientation || 'horizontal';
+      let newOrient = curOrient;
+      let newLength = pt.length;
+      let newWidth = pt.width;
+
+      if (Math.abs(angleDelta) === 90) {
+        if (curOrient === 'horizontal') {
+          newOrient = 'horizontal';
+          newLength = pt.width;
+          newWidth = pt.length;
+        } else if (curOrient === 'vertical_xy') {
+          newOrient = 'vertical_yz';
+          const horiz = b.sx;
+          const vert = b.sy;
+          const isPlinth =
+            pt.componentRole === 'plinth' ||
+            pt.name.toUpperCase().includes('ZOCALO') ||
+            pt.name.toUpperCase().includes('ZÓCALO');
+          const isDrawerBox =
+            pt.componentRole === 'drawer_box' ||
+            pt.componentRole === 'drawer_lateral';
+          if (isDrawerBox || (isPlinth && horiz > vert)) {
+            newLength = horiz;
+            newWidth = vert;
+          } else {
+            newLength = vert;
+            newWidth = horiz;
+          }
+        } else if (curOrient === 'vertical_yz') {
+          newOrient = 'vertical_xy';
+          newLength = b.sz;
+          newWidth = b.sy;
+        }
+      }
+
+      return {
+        ...pt,
+        posX: Math.round((srcCx + newDx) * 10) / 10,
+        posZ: Math.round((srcCz + newDz) * 10) / 10,
+        orientation: newOrient,
+        length: newLength,
+        width: newWidth
+      };
+    });
+
+    let rotMinX = Infinity;
+    let rotMaxX = -Infinity;
+    let rotMinY = Infinity;
+    let rotMinZ = Infinity;
+    let rotMaxZ = -Infinity;
+    for (const pt of rotated) {
+      const b = this.joineryEngine.getPartBounds(pt);
+      if (b.minX < rotMinX) rotMinX = b.minX;
+      if (b.maxX > rotMaxX) rotMaxX = b.maxX;
+      if (b.minY < rotMinY) rotMinY = b.minY;
+      if (b.minZ < rotMinZ) rotMinZ = b.minZ;
+      if (b.maxZ > rotMaxZ) rotMaxZ = b.maxZ;
+    }
+
+    const dxMove = Math.round((targetCx - (rotMinX + rotMaxX) / 2) * 10) / 10;
+    const dyMove = Math.round((targetMinY - rotMinY) * 10) / 10;
+    const dzMove = Math.round((targetCz - (rotMinZ + rotMaxZ) / 2) * 10) / 10;
+
+    return rotated.map(pt => ({
+      ...pt,
+      posX: Math.round(((pt.posX ?? 0) + dxMove) * 10) / 10,
+      posY: Math.round(((pt.posY ?? 0) + dyMove) * 10) / 10,
+      posZ: Math.round(((pt.posZ ?? 0) + dzMove) * 10) / 10
+    }));
+  }
+
   addParametricCabinet(cabinet: { module: FurnitureModule; parts: Part[]; group: PartGroup }) {
     this.updateProject(p => ({
       ...p,
@@ -982,6 +1140,51 @@ export class ProjectStorageService {
     newConfig?: ParametricCabinetConfig,
     newModule?: FurnitureModule
   ) {
+    this.applyParametricModulePartsUpdate(
+      groupId,
+      newParts,
+      newName,
+      newConfig,
+      newModule,
+      true,
+      false
+    );
+  }
+
+  /**
+   * Actualiza en vivo las piezas y configuración de un módulo paramétrico/por zonas sin saturar
+   * el historial Undo/Redo (`pushHistory = false` por defecto para vista previa en 60 FPS),
+   * preservando `groupId`, limpiando módulos/herrajes huérfanos y sincronizando Despiece,
+   * Optimizador 2D, Presupuesto, Etiquetas y Guía de Armado.
+   */
+  liveUpdateParametricModuleParts(
+    groupId: string,
+    parts: Part[],
+    name?: string,
+    config?: ParametricCabinetConfig,
+    pushHistory = false,
+    options?: { preserveTransform?: boolean; module?: FurnitureModule }
+  ) {
+    this.applyParametricModulePartsUpdate(
+      groupId,
+      parts,
+      name,
+      config,
+      options?.module,
+      pushHistory,
+      Boolean(options?.preserveTransform)
+    );
+  }
+
+  private applyParametricModulePartsUpdate(
+    groupId: string,
+    newParts: Part[],
+    newName: string | undefined,
+    newConfig: ParametricCabinetConfig | undefined,
+    newModule: FurnitureModule | undefined,
+    pushHistory: boolean,
+    preserveTransform: boolean
+  ) {
     const currentProj = this.currentProject();
     if (!currentProj) return;
 
@@ -993,27 +1196,74 @@ export class ProjectStorageService {
       return;
     }
 
+    const resolvedName = newName || group?.name || newParts[0]?.groupName || 'Módulo Paramétrico';
+    let preparedParts: Part[] = newParts.map(pt => ({
+      ...pt,
+      groupId,
+      groupName: resolvedName,
+      moduleName: pt.moduleName || resolvedName
+    }));
+
+    if (preserveTransform && groupParts.length > 0 && preparedParts.length > 0) {
+      let oldMinX = Infinity;
+      let oldMaxX = -Infinity;
+      let oldMinY = Infinity;
+      let oldMinZ = Infinity;
+      let oldMaxZ = -Infinity;
+      for (const gp of groupParts) {
+        const b = this.joineryEngine.getPartBounds(gp);
+        if (b.minX < oldMinX) oldMinX = b.minX;
+        if (b.maxX > oldMaxX) oldMaxX = b.maxX;
+        if (b.minY < oldMinY) oldMinY = b.minY;
+        if (b.minZ < oldMinZ) oldMinZ = b.minZ;
+        if (b.maxZ > oldMaxZ) oldMaxZ = b.maxZ;
+      }
+      if (Number.isFinite(oldMinX)) {
+        const facing = this.getGroupFacingDirection(groupId);
+        preparedParts = this.transformPartsToGroupFrame(
+          preparedParts,
+          (oldMinX + oldMaxX) / 2,
+          oldMinY,
+          (oldMinZ + oldMaxZ) / 2,
+          facing
+        );
+      }
+    }
+
+    const clonedConfig = newConfig ? this.cloneParametricConfig(newConfig) : undefined;
+    const partIdList = preparedParts.map(pt => pt.id);
+
     this.updateProject(p => {
       const nextParts = [
         ...p.parts.filter(pt => pt.groupId !== groupId),
-        ...newParts
+        ...preparedParts
       ];
       let nextModules = this.filterOrphanModules(p.modules || [], nextParts);
       if (newModule && !nextModules.some(m => m.id === newModule.id)) {
         nextModules = [...nextModules, newModule];
       }
+      const nextGroups = (p.groups || []).map(g =>
+        g.id === groupId
+          ? {
+              ...g,
+              name: resolvedName,
+              ...(g.partIds ? { partIds: partIdList } : {}),
+              ...(clonedConfig
+                ? { type: (clonedConfig.moduleType === 'drawer_unit' ? ('drawer' as const) : ('assembly' as const)) }
+                : {}),
+              parametricConfig: clonedConfig || g.parametricConfig
+            }
+          : g
+      );
+      const nextHardware = this.filterOrphanDrawerHardware(p.hardware || [], nextGroups, groupId);
       return {
         ...p,
         modules: nextModules,
-        groups: (p.groups || []).map(g => g.id === groupId ? {
-          ...g,
-          name: newName || g.name,
-          ...(newConfig ? { type: (newConfig.moduleType === 'drawer_unit' ? ('drawer' as const) : ('assembly' as const)) } : {}),
-          parametricConfig: newConfig || g.parametricConfig
-        } : g),
-        parts: nextParts
+        groups: nextGroups,
+        parts: nextParts,
+        hardware: nextHardware
       };
-    });
+    }, pushHistory);
   }
 
   clearFurniture() {
@@ -1058,39 +1308,65 @@ export class ProjectStorageService {
       };
       const res = this.cabinetGen.generateParametricCabinet(cfg, mats);
       newParts = res.parts;
-      templateGroup = res.group;
+      const hydratedConfig = this.cabinetGen.hydrateConfigFromPartsOrTemplate(
+        newParts,
+        res.group,
+        template,
+        mats
+      );
+      templateGroup = {
+        ...res.group,
+        parametricConfig: hydratedConfig
+      };
       templateModule = res.module;
     } else {
       newParts = template.generateParts(mats, offsetX);
       const groupId = 'group_' + template.id + '_' + crypto.randomUUID().slice(0, 6);
-      templateGroup = {
+      const baseGroup: PartGroup = {
         id: groupId,
         name: template.name,
         type: 'assembly',
-        colorHex: template.previewColor?.accent || '#6366f1'
+        colorHex: template.previewColor?.accent || '#0284c7'
       };
       newParts = newParts.map(p => ({
         ...p,
         groupId,
         groupName: template.name
       }));
+      const hydratedConfig = this.cabinetGen.hydrateConfigFromPartsOrTemplate(
+        newParts,
+        baseGroup,
+        template,
+        mats
+      );
+      templateGroup = {
+        ...baseGroup,
+        parametricConfig: hydratedConfig
+      };
     }
 
     if (mode === 'replace') {
-      this.updateProject(p => ({
-        ...p,
-        name: template.name,
-        modules: templateModule ? [templateModule] : [],
-        groups: templateGroup ? [templateGroup] : [],
-        parts: newParts
-      }));
+      this.updateProject(p => {
+        const nextGroups = templateGroup ? [templateGroup] : [];
+        return {
+          ...p,
+          name: template.name,
+          modules: templateModule ? [templateModule] : [],
+          groups: nextGroups,
+          parts: newParts,
+          hardware: this.filterOrphanDrawerHardware(p.hardware || [], nextGroups)
+        };
+      });
     } else {
-      this.updateProject(p => ({
-        ...p,
-        modules: templateModule ? [...p.modules, templateModule] : p.modules,
-        groups: templateGroup ? [...(p.groups || []), templateGroup] : (p.groups || []),
-        parts: [...p.parts, ...newParts]
-      }));
+      this.updateProject(p => {
+        const nextGroups = templateGroup ? [...(p.groups || []), templateGroup] : (p.groups || []);
+        return {
+          ...p,
+          modules: templateModule ? [...p.modules, templateModule] : p.modules,
+          groups: nextGroups,
+          parts: [...p.parts, ...newParts]
+        };
+      });
     }
   }
 
@@ -1629,12 +1905,14 @@ export class ProjectStorageService {
       const remainingAppliances = (p.appliances || []).filter(
         a => !(a.groupId && removedGroupIds.has(a.groupId))
       );
+      const filteredHardware = this.filterOrphanDrawerHardware(p.hardware || [], filteredGroups);
       return {
         ...p,
         modules: filteredModules,
         parts: remainingParts,
         groups: filteredGroups,
-        appliances: remainingAppliances
+        appliances: remainingAppliances,
+        hardware: filteredHardware
       };
     });
   }
@@ -1652,12 +1930,14 @@ export class ProjectStorageService {
       const remainingAppliances = (p.appliances || []).filter(
         a => !(a.groupId && removedGroupIds.has(a.groupId))
       );
+      const filteredHardware = this.filterOrphanDrawerHardware(p.hardware || [], filteredGroups);
       return {
         ...p,
         modules: filteredModules,
         parts: remainingParts,
         groups: filteredGroups,
-        appliances: remainingAppliances
+        appliances: remainingAppliances,
+        hardware: filteredHardware
       };
     });
   }
@@ -1676,12 +1956,14 @@ export class ProjectStorageService {
       const remainingAppliances = (p.appliances || []).filter(
         a => !appIdsSet.has(a.id) && !(a.groupId && removedGroupIds.has(a.groupId))
       );
+      const filteredHardware = this.filterOrphanDrawerHardware(p.hardware || [], filteredGroups);
       return {
         ...p,
         modules: filteredModules,
         parts: remainingParts,
         groups: filteredGroups,
-        appliances: remainingAppliances
+        appliances: remainingAppliances,
+        hardware: filteredHardware
       };
     });
   }
@@ -1890,12 +2172,14 @@ export class ProjectStorageService {
           return a;
         });
       }
+      const filteredHardware = this.filterOrphanDrawerHardware(p.hardware || [], currentGroups);
       return {
         ...p,
         modules: updatedModules,
         groups: currentGroups,
         parts: updatedParts,
-        appliances: updatedAppliances
+        appliances: updatedAppliances,
+        hardware: filteredHardware
       };
     });
   }
@@ -2014,7 +2298,7 @@ export class ProjectStorageService {
       slideExtension: 0,
       parametricConfig: group.parametricConfig
         ? {
-            ...group.parametricConfig,
+            ...this.cloneParametricConfig(group.parametricConfig),
             id: newModuleId || group.parametricConfig.id,
             name: nextName,
             posX: Math.round(((group.parametricConfig.posX ?? 0) + deltaX) * 10) / 10

@@ -6,6 +6,7 @@ import { PartGeometryService } from './part-geometry.service';
 import { ModuleDesignerComponent } from '../components/module-designer/module-designer';
 import {
   ApplianceItem,
+  CabinetZoneNode,
   Material,
   ModuleCavityInfo,
   ParametricCabinetConfig,
@@ -176,17 +177,12 @@ describe('Motor de Cavidades y Cajoneras Modulares (Escenarios 1-8)', () => {
       expect(wallCavity.isUpperCabinet).toBe(true);
       expect(wallCavity.optimalSlideLength).toBeLessThanOrEqual(250);
 
-      // Excluida por defecto cuando showUpperCabinetsInDrawerWizard() === false
-      expect(designer.showUpperCabinetsInDrawerWizard()).toBe(false);
-      expect(
-        designer.availableCabinetModulesForDrawer().some(g => g.id === wallGroup.id)
-      ).toBe(false);
-
-      // Al activar el toggle sí aparece disponible
-      designer.toggleShowUpperCabinetsInDrawerWizard(true);
-      expect(
-        designer.availableCabinetModulesForDrawer().some(g => g.id === wallGroup.id)
-      ).toBe(true);
+      // Enrutamiento al Constructor por Zonas para la alacena aérea y limpieza antes de insertar por cavidad
+      designer.openDrawerWizard(wallGroup.id);
+      expect(designer.isZoneBuilderOpen()).toBe(true);
+      expect(designer.zoneBuilderEditingGroupId()).toBe(wallGroup.id);
+      designer.onZoneBuilderCancelled();
+      expect(designer.isZoneBuilderOpen()).toBe(false);
 
       // Insertar cajón con corredera óptima sin chocar con Fondo Trasero Ranurado
       const created = projectService.addParametricDrawersToCavity(wallCavity, 1, {
@@ -341,9 +337,10 @@ describe('Motor de Cavidades y Cajoneras Modulares (Escenarios 1-8)', () => {
       expect(sceneCavities.filter(c => c.groupId === ovenBase.group.id).length).toBe(0);
       expect(sceneCavities.filter(c => c.groupId === ovenTower.group.id).length).toBe(2);
 
-      const wizardModules = designer.availableCabinetModulesForDrawer();
-      expect(wizardModules.some(g => g.id === ovenBase.group.id)).toBe(false);
-      expect(wizardModules.some(g => g.id === ovenTower.group.id)).toBe(true);
+      expect(designer.isGroupApplianceProtected(ovenBase.group.id)).toBe(true);
+      expect(designer.isGroupApplianceProtected(ovenTower.group.id)).toBe(true);
+      designer.openZoneBuilderForExistingGroup(ovenBase.group.id);
+      expect(designer.isZoneBuilderOpen()).toBe(false);
     });
 
     it('debe aislar la Torre Columna de Horno y Microondas (insertSpecializedKitchenModule) conservando solo los vanos superior e inferior libres y 0 colisiones al insertar cajón', () => {
@@ -368,9 +365,7 @@ describe('Motor de Cavidades y Cajoneras Modulares (Escenarios 1-8)', () => {
         towerCavities.some(c => c.centerY !== undefined && c.centerY > 750 && c.centerY < 1750)
       ).toBe(false);
 
-      expect(
-        designer.availableCabinetModulesForDrawer().some(g => g.id === towerGroup.id)
-      ).toBe(true);
+      expect(designer.isGroupApplianceProtected(towerGroup.id)).toBe(true);
 
       const lowerCavity = towerCavities[0];
       designer.selectEntireGroup(towerGroup.id);
@@ -426,9 +421,9 @@ describe('Motor de Cavidades y Cajoneras Modulares (Escenarios 1-8)', () => {
         projectService.currentProject().appliances
       );
       expect(sinkCavities.length).toBe(0);
-      expect(
-        designer.availableCabinetModulesForDrawer().some(g => g.id === sinkBase.group.id)
-      ).toBe(false);
+      expect(designer.isGroupApplianceProtected(sinkBase.group.id)).toBe(true);
+      designer.openZoneBuilderForExistingGroup(sinkBase.group.id);
+      expect(designer.isZoneBuilderOpen()).toBe(false);
     });
   });
 
@@ -873,7 +868,7 @@ describe('Motor de Cavidades y Cajoneras Modulares (Escenarios 1-8)', () => {
       expectZeroCollisions(projectService.currentProject().parts);
     });
 
-    it('debe sincronizar el Asistente de Cajón Modular (openDrawerWizard, setDrawerWizardFrontMount, submitDrawerWizard) con 0 colisiones', () => {
+    it('debe enrutar openDrawerWizard(groupId) al Constructor por Zonas en vivo e insertar 3 cajones inset con 0 colisiones', () => {
       const { group } = addGeneratedCabinet({
         code: 'MOD_WIZ_UI',
         name: 'Módulo Wizard',
@@ -886,24 +881,54 @@ describe('Motor de Cavidades y Cajoneras Modulares (Escenarios 1-8)', () => {
       });
 
       designer.openDrawerWizard(group.id);
-      expect(designer.showDrawerWizard()).toBe(true);
-      expect(designer.drawerWizardTargetModuleId()).toBe(group.id);
-      expect(designer.selectedDrawerWizardCavity()).not.toBeNull();
+      expect(designer.isZoneBuilderOpen()).toBe(true);
+      expect(designer.zoneBuilderEditingGroupId()).toBe(group.id);
 
-      designer.setDrawerWizardCount(3);
-      designer.setDrawerWizardFrontMount('inset');
-      expect(designer.drawerForm().frontMountType).toBe('inset');
-      expect(designer.drawerForm().slideLength).toBeLessThanOrEqual(
-        designer.drawerWizardMaxSafeSlideLength() ?? 999
-      );
+      const hydrated = designer.zoneBuilderConfig();
+      expect(hydrated).not.toBeNull();
+      expect(hydrated!.zoneTree).toBeDefined();
 
-      designer.submitDrawerWizard();
-      expect(designer.showDrawerWizard()).toBe(false);
+      const updatedZoneTree: CabinetZoneNode = {
+        id: hydrated!.zoneTree!.id,
+        splitDirection: 'none',
+        content: {
+          type: 'drawers',
+          drawers: {
+            count: 3,
+            frontMount: 'inset',
+            deductTopMm: 0,
+            deductBottomMm: 0,
+            deductLeftMm: 0,
+            deductRightMm: 0,
+            openingSystem: 'handle',
+            slideType: 'telescopic',
+            bottomType: 'grooved'
+          }
+        }
+      };
+      const updatedCfg: ParametricCabinetConfig = {
+        ...hydrated!,
+        drawersCount: 3,
+        drawerFrontType: 'inset',
+        doorOpening: 'none',
+        zoneTree: updatedZoneTree
+      };
 
-      const drawerGroups = (projectService.currentProject().groups || []).filter(
-        g => g.templateId === 'modular_drawer'
-      );
-      expect(drawerGroups.length).toBe(3);
+      designer.onZoneBuilderLiveChange(updatedCfg);
+      designer.onZoneBuilderConfirmed(updatedCfg);
+      expect(designer.isZoneBuilderOpen()).toBe(false);
+
+      const activeGroups = projectService.currentProject().groups || [];
+      expect(activeGroups.filter(g => g.id === group.id).length).toBe(1);
+
+      const updatedFronts = projectService
+        .currentProject()
+        .parts.filter(p => p.groupId === group.id && p.componentRole === 'drawer_front');
+      expect(updatedFronts.length).toBe(3);
+      for (const front of updatedFronts) {
+        expect(front.hardwareConfig?.frontMountType).toBe('inset');
+        expect(front.hardwareConfig?.slideLength).toBeLessThanOrEqual(500);
+      }
       expectZeroCollisions(projectService.currentProject().parts);
     });
   });

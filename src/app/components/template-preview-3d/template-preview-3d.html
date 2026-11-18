@@ -1,0 +1,81 @@
+<div
+  #previewContainer
+  class="preview-stage relative w-full h-full min-h-[220px] rounded-xl border border-zinc-200 overflow-hidden select-none font-sans">
+
+  @if (!webglUnavailable()) {
+    <canvas
+      #previewCanvas
+      class="w-full h-full block cursor-grab active:cursor-grabbing"
+      [attr.aria-label]="'Vista previa 3D interactiva de ' + template().name"></canvas>
+
+    <!-- Badge superior izquierdo: Cotas técnicas -->
+    <div
+      class="pointer-events-none absolute top-2.5 left-2.5 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/90 backdrop-blur-sm border border-zinc-200/90 shadow-xs">
+      <hugeicons-icon
+        [icon]="icons.rotate360"
+        [size]="13"
+        [strokeWidth]="2"
+        class="text-sky-600 shrink-0"></hugeicons-icon>
+      <span class="font-numeric text-[11px] font-semibold tracking-tight text-zinc-800 whitespace-nowrap">
+        {{ dimensionsLabel() }}
+      </span>
+    </div>
+
+    <!-- HUD flotante inferior derecho: Control 360° y Cámara -->
+    <div class="absolute bottom-2.5 right-2.5 z-10 flex items-center gap-1.5">
+      <button
+        type="button"
+        (click)="toggleAutoRotate()"
+        [attr.aria-pressed]="isAutoRotating()"
+        [attr.aria-label]="isAutoRotating() ? 'Pausar rotación 360 grados' : 'Reanudar rotación 360 grados'"
+        [title]="isAutoRotating() ? 'Pausar rotación 360°' : 'Reanudar rotación 360°'"
+        [class]="isAutoRotating()
+          ? 'bg-zinc-900 text-white border-zinc-900 hover:bg-zinc-800'
+          : 'bg-white/95 text-zinc-700 border-zinc-200 hover:bg-zinc-100 hover:text-zinc-900'"
+        class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border font-sans text-xs font-medium shadow-xs backdrop-blur-sm transition-colors cursor-pointer">
+        @if (isAutoRotating()) {
+          <hugeicons-icon [icon]="icons.pause" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
+        } @else {
+          <hugeicons-icon [icon]="icons.play" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
+        }
+        <span class="text-[11px] font-semibold leading-none">360°</span>
+      </button>
+
+      <button
+        type="button"
+        (click)="resetCamera()"
+        aria-label="Restablecer cámara 3D"
+        title="Restablecer cámara"
+        class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/95 text-zinc-700 border border-zinc-200 hover:bg-zinc-100 hover:text-zinc-900 shadow-xs backdrop-blur-sm transition-colors cursor-pointer">
+        <hugeicons-icon [icon]="icons.resetCamera" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+      </button>
+    </div>
+
+    <!-- Sugerencia sutil inferior izquierda -->
+    <div class="pointer-events-none absolute bottom-3 left-3 z-10 hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
+      <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span>
+      <span>Arrastra para orbitar · Rueda para zoom</span>
+    </div>
+  } @else {
+    <!-- Degradación segura cuando WebGL no está disponible (SSR o pruebas unitarias) -->
+    <div
+      class="preview-fallback w-full h-full min-h-[220px] flex flex-col items-center justify-center gap-3 p-6 text-center bg-[#FAFAFA]"
+      [attr.aria-label]="'Resumen dimensional de ' + template().name">
+      <div class="w-12 h-12 rounded-xl bg-white border border-zinc-200 flex items-center justify-center shadow-xs">
+        <hugeicons-icon [icon]="icons.cube" [size]="24" [strokeWidth]="1.75" class="text-sky-600"></hugeicons-icon>
+      </div>
+      <div class="space-y-1 max-w-xs">
+        <p class="text-xs font-semibold text-zinc-900">{{ template().name }}</p>
+        <p class="text-[11px] text-zinc-500">Vista previa 3D no disponible en este entorno</p>
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-1.5">
+        <span class="font-numeric inline-flex items-center px-2.5 py-1 rounded-md bg-white border border-zinc-200 text-[11px] font-semibold text-zinc-800">
+          {{ dimensionsLabel() }}
+        </span>
+        <span class="font-numeric inline-flex items-center px-2 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-[11px] font-medium text-zinc-600">
+          {{ renderedPartsCount() }} piezas
+        </span>
+      </div>
+    </div>
+  }
+</div>

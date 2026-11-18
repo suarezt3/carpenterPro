@@ -29,6 +29,7 @@ export type ComponentRole =
   | 'tie'
   | 'countertop'
   | 'backsplash'
+  | 'accessory'
   | 'free';
 
 export type SpecialCutPresetType =
@@ -164,6 +165,81 @@ export interface PartHardwareConfig {
   isOpen?: boolean;
   frontMountType?: DrawerFrontMountType;
   drawerOpeningSystem?: DrawerOpeningSystem;
+  isMovableShelf?: boolean;
+}
+
+export type CabinetBaseType = 'none' | 'plinth' | 'legs';
+
+export type ZoneContentType = 'empty' | 'shelves' | 'drawers' | 'doors' | 'hanging_rod';
+
+export interface CabinetZoneDrawerConfig {
+  count: number;
+  frontMount: 'overlay' | 'inset';
+  deductTopMm: number;
+  deductBottomMm: number;
+  deductLeftMm: number;
+  deductRightMm: number;
+  openingSystem: 'handle' | 'push' | 'finger_pull';
+  slideType: 'telescopic' | 'undermount' | 'push_open';
+  bottomType: 'grooved' | 'nailed';
+}
+
+export interface CabinetZoneDoorConfig {
+  opening: 'left' | 'right' | 'double' | 'sliding';
+  mount: 'overlay' | 'inset';
+  hasHandle: boolean;
+  handleType?: HandleType;
+  handleFinish?: HandleFinish;
+}
+
+export interface CabinetZoneContent {
+  type: ZoneContentType;
+  shelvesCount?: number;
+  shelfSetbackMm?: number;
+  drawers?: CabinetZoneDrawerConfig;
+  doors?: CabinetZoneDoorConfig;
+  hangingRodsCount?: 1 | 2;
+}
+
+export interface CabinetZoneNode {
+  id: string;
+  splitDirection: 'none' | 'horizontal' | 'vertical';
+  exactSizeMm?: number;
+  sizeRatio?: number;
+  children?: CabinetZoneNode[];
+  content?: CabinetZoneContent;
+}
+
+export interface CabinetZoneHighlightBox {
+  zoneId: string;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+}
+
+export interface CabinetZoneLayoutNode {
+  zoneId: string;
+  splitDirection: 'none' | 'horizontal' | 'vertical';
+  isLeaf: boolean;
+  depth: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+  innerWidth: number;
+  innerHeight: number;
+  innerDepth: number;
+  coverMinX: number;
+  coverMaxX: number;
+  coverMinY: number;
+  coverMaxY: number;
+  content?: CabinetZoneContent;
+  children: CabinetZoneLayoutNode[];
 }
 
 export interface PartGroup {
@@ -264,6 +340,9 @@ export interface ParametricCabinetConfig {
   siphonCutout?: { enabled: boolean; width: number; depth: number };
   hangingRodsCount?: 0 | 1 | 2;
   cornerReturnWidth?: number;
+  baseType?: CabinetBaseType;
+  zoneTree?: CabinetZoneNode;
+  highlightedZoneId?: string;
 }
 
 export type ParametricModuleConfig = ParametricCabinetConfig;
@@ -306,6 +385,7 @@ export interface Part {
   includeInBudget?: boolean; // Si es false, la pieza (ej. mesón/salpicadero de piedra) se excluye del presupuesto y cotización PDF
   isLocked?: boolean;
   hasCustomName?: boolean;
+  zoneId?: string;
 }
 
 export type FurnitureModuleType =

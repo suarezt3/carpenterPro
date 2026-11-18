@@ -3,10 +3,13 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { User } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TemplatesModalComponent } from './templates-modal';
-import { Material, ParametricCabinetConfig } from '../../models/melamine.models';
+import { Material } from '../../models/melamine.models';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { SupabaseService, SyncStatus } from '../../services/supabase.service';
-import { TemplatesCatalogService } from '../../services/templates-catalog.service';
+import {
+  FurnitureTemplate,
+  TemplatesCatalogService
+} from '../../services/templates-catalog.service';
 import { ThemeService } from '../../services/theme.service';
 
 function createMockSupabase(): Partial<SupabaseService> {
@@ -35,36 +38,21 @@ const TEST_MATERIALS: Material[] = [
     hasGrain: false,
     colorHex: '#f8fafc',
     category: 'board'
+  },
+  {
+    id: 'mat_test_mdf_3',
+    name: 'Fondo MDF Blanco 3mm',
+    thickness: 3,
+    sheetLength: 2440,
+    sheetWidth: 1830,
+    sheetCost: 38000,
+    hasGrain: false,
+    colorHex: '#e4e4e7',
+    category: 'mdf'
   }
 ];
 
-function createEditConfig(): ParametricCabinetConfig {
-  return {
-    code: 'CLO_EDIT',
-    name: 'Closet Principal Editado',
-    moduleType: 'closet',
-    category: 'closet',
-    width: 1000,
-    height: 2100,
-    depth: 600,
-    structureThickness: 18,
-    doorThickness: 18,
-    backThickness: 3,
-    backType: 'groove',
-    shelvesCount: 3,
-    doorOpening: 'double',
-    hasHandle: true,
-    hasBackPanel: true,
-    structureMaterialId: 'mat_test_white_15',
-    doorMaterialId: 'mat_test_white_15',
-    backMaterialId: 'mat_test_white_15',
-    handleType: 'bar_modern',
-    handleFinish: 'brushed_steel',
-    facadeGap: 3
-  };
-}
-
-describe('TemplatesModalComponent: initialView, environmentLine y Visibilidad Completa de Plantillas (TAREA 1 & 3)', () => {
+describe('TemplatesModalComponent: Catálogo 3D, Vista 360°, Filtros y Personalización en Asistente', () => {
   let fixture: ComponentFixture<TemplatesModalComponent>;
   let component: TemplatesModalComponent;
   let hostEl: HTMLElement;
@@ -100,94 +88,23 @@ describe('TemplatesModalComponent: initialView, environmentLine y Visibilidad Co
     }
   });
 
-  it('debe tener initialView = "assistant" y environmentLine = undefined por defecto', () => {
-    expect(component.initialView()).toBe('assistant');
-    expect(component.environmentLine()).toBeUndefined();
-    expect(component.activeView()).toBe('assistant');
-  });
+  it('debe permanecer cerrado por defecto y mostrar todas las plantillas al abrir sin filtros ocultos', () => {
+    expect(component.isOpen()).toBe(false);
+    expect(hostEl.querySelector('[role="dialog"]')).toBeNull();
+    expect(component.selectedTemplate()).toBeNull();
+    expect(component.creationMode()).toBe('append');
 
-  it('debe abrir en vista "assistant" cuando initialView = "assistant" en modo creación', () => {
-    fixture.componentRef.setInput('initialView', 'assistant');
     fixture.componentRef.setInput('isOpen', true);
     fixture.detectChanges();
 
-    expect(component.activeView()).toBe('assistant');
-    expect(hostEl.textContent).toContain('Dimensiones Exteriores (mm)');
-    expect(hostEl.textContent).toContain('Crear Módulo en 3D');
-    expect(hostEl.querySelector('input[placeholder="Filtrar plantilla..."]')).toBeNull();
-  });
-
-  it('debe abrir directamente en vista "catalog" cuando initialView = "catalog" en modo creación', () => {
-    fixture.componentRef.setInput('initialView', 'catalog');
-    fixture.componentRef.setInput('isOpen', true);
-    fixture.detectChanges();
-
-    expect(component.activeView()).toBe('catalog');
-    expect(hostEl.querySelector('input[placeholder="Filtrar plantilla..."]')).toBeTruthy();
-    expect(hostEl.textContent).toContain('Todas las Plantillas');
-  });
-
-  it('debe alternar correctamente entre "catalog" y "assistant" al reabrir con distinto initialView', () => {
-    fixture.componentRef.setInput('initialView', 'catalog');
-    fixture.componentRef.setInput('isOpen', true);
-    fixture.detectChanges();
-    expect(component.activeView()).toBe('catalog');
-
-    fixture.componentRef.setInput('isOpen', false);
-    fixture.detectChanges();
-
-    fixture.componentRef.setInput('initialView', 'assistant');
-    fixture.componentRef.setInput('isOpen', true);
-    fixture.detectChanges();
-    expect(component.activeView()).toBe('assistant');
-  });
-
-  it('en modo edición debe forzar "assistant" vía loadConfig incluso si initialView = "catalog"', () => {
-    const editCfg = createEditConfig();
-    fixture.componentRef.setInput('initialView', 'catalog');
-    fixture.componentRef.setInput('editingGroupId', 'group-edit-1');
-    fixture.componentRef.setInput('editingConfig', editCfg);
-    fixture.componentRef.setInput('isOpen', true);
-    fixture.detectChanges();
-
-    expect(component.activeView()).toBe('assistant');
-    expect(component.moduleName()).toBe('Closet Principal Editado');
-    expect(component.width()).toBe(1000);
-    expect(component.height()).toBe(2100);
-    expect(hostEl.textContent).toContain('Guardar Cambios del Módulo');
-  });
-
-  it('con environmentLine = undefined no debe sobrescribir el preset elegido al abrir en modo creación', () => {
-    component.selectPreset('drawers');
-    expect(component.activePreset()).toBe('drawers');
-
-    fixture.componentRef.setInput('initialView', 'assistant');
-    fixture.componentRef.setInput('isOpen', true);
-    fixture.detectChanges();
-
-    expect(component.environmentLine()).toBeUndefined();
-    expect(component.activePreset()).toBe('drawers');
-  });
-
-  it('cuando environmentLine recibe un valor explícito sí aplica el preset mapeado correspondiente', () => {
-    fixture.componentRef.setInput('environmentLine', 'bathroom');
-    fixture.componentRef.setInput('initialView', 'assistant');
-    fixture.componentRef.setInput('isOpen', true);
-    fixture.detectChanges();
-
-    expect(component.activePreset()).toBe('vanity');
-    expect(component.moduleName()).toBe('Vanitorio Baño');
-  });
-
-  it('filteredTemplates en categoría "all" debe mostrar TODAS las plantillas sin filtro oculto por environmentLine', () => {
-    fixture.componentRef.setInput('environmentLine', 'kitchen');
-    fixture.componentRef.setInput('initialView', 'catalog');
-    fixture.componentRef.setInput('isOpen', true);
-    fixture.detectChanges();
-
+    expect(hostEl.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(hostEl.textContent).toContain('Catálogo de Plantillas 3D');
     expect(component.activeCategory()).toBe('all');
+    expect(component.creationMode()).toBe('append');
+
     const allTemplates = component.filteredTemplates();
     expect(allTemplates.length).toBe(catalogService.templates.length);
+    expect(component.selectedTemplate()?.id).toBe(catalogService.templates[0].id);
 
     const linesPresent = new Set(allTemplates.map(t => t.environmentLine));
     expect(linesPresent.has('kitchen')).toBe(true);
@@ -195,19 +112,46 @@ describe('TemplatesModalComponent: initialView, environmentLine y Visibilidad Co
     expect(linesPresent.has('bathroom')).toBe(true);
     expect(linesPresent.has('living_office')).toBe(true);
 
-    const renderedCards = hostEl.querySelectorAll('h3');
-    expect(renderedCards.length).toBe(catalogService.templates.length);
+    const cards = hostEl.querySelectorAll('section[aria-label="Listado de plantillas"] h3');
+    expect(cards.length).toBe(catalogService.templates.length);
   });
 
-  it('debe filtrar plantillas por categoría y búsqueda en la vista catálogo', () => {
-    fixture.componentRef.setInput('initialView', 'catalog');
+  it('debe preseleccionar initialTemplateId al abrir y sincronizar cambios mientras el modal permanece abierto', () => {
+    const targetTpl = catalogService.templates.find(t => t.category === 'bano');
+    expect(targetTpl).toBeDefined();
+
+    fixture.componentRef.setInput('initialTemplateId', targetTpl!.id);
     fixture.componentRef.setInput('isOpen', true);
     fixture.detectChanges();
 
-    const categoryButtons = Array.from(hostEl.querySelectorAll('button'));
-    const banoBtn = categoryButtons.find(btn => btn.textContent?.includes('Baños'));
-    expect(banoBtn).toBeTruthy();
+    expect(component.selectedTemplate()?.id).toBe(targetTpl!.id);
 
+    // Filtrar por otra categoría y cambiar initialTemplateId debe restaurar visibilidad y seleccionarlo
+    component.selectCategory('cocina');
+    fixture.detectChanges();
+    expect(component.selectedTemplate()?.category).toBe('cocina');
+
+    const closetTpl = catalogService.templates.find(t => t.category === 'closets');
+    expect(closetTpl).toBeDefined();
+    fixture.componentRef.setInput('initialTemplateId', closetTpl!.id);
+    fixture.detectChanges();
+
+    expect(component.activeCategory()).toBe('all');
+    expect(component.selectedTemplate()?.id).toBe(closetTpl!.id);
+  });
+
+  it('debe mostrar conteos dinámicos por categoría, filtrar por categoría y búsqueda, y permitir restablecer filtros', () => {
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    const cats = component.categories();
+    expect(cats.length).toBe(7);
+    expect(cats.find(c => c.id === 'all')?.count).toBe(catalogService.templates.length);
+
+    const banoBtn = Array.from(hostEl.querySelectorAll('button')).find(btn =>
+      btn.textContent?.includes('Baño')
+    );
+    expect(banoBtn).toBeTruthy();
     banoBtn!.click();
     fixture.detectChanges();
 
@@ -215,17 +159,152 @@ describe('TemplatesModalComponent: initialView, environmentLine y Visibilidad Co
     const expectedBano = catalogService.templates.filter(t => t.category === 'bano');
     expect(component.filteredTemplates().length).toBe(expectedBano.length);
     expect(component.filteredTemplates().every(t => t.category === 'bano')).toBe(true);
+    expect(component.selectedTemplate()?.category).toBe('bano');
 
     component.selectCategory('all');
-    component.searchQuery.set('Vanitory');
     fixture.detectChanges();
+
+    const searchInput = hostEl.querySelector('input#catalog-search-input') as HTMLInputElement | null;
+    expect(searchInput).toBeTruthy();
+    searchInput!.value = 'Vanitory';
+    searchInput!.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(component.searchQuery()).toBe('Vanitory');
     expect(component.filteredTemplates().length).toBeGreaterThan(0);
     expect(
-      component.filteredTemplates().every(t =>
-        t.name.toLowerCase().includes('vanitory') ||
-        t.description.toLowerCase().includes('vanitory') ||
-        t.categoryLabel.toLowerCase().includes('vanitory')
+      component.filteredTemplates().every(
+        t =>
+          t.name.toLowerCase().includes('vanitory') ||
+          t.description.toLowerCase().includes('vanitory') ||
+          t.badge.toLowerCase().includes('vanitory') ||
+          t.categoryLabel.toLowerCase().includes('vanitory')
       )
     ).toBe(true);
+
+    // Búsqueda sin resultados -> estado vacío + botón restablecer
+    searchInput!.value = 'ZZZ_INEXISTENTE_999';
+    searchInput!.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(component.filteredTemplates().length).toBe(0);
+    expect(component.selectedTemplate()).toBeNull();
+    expect(hostEl.textContent).toContain('No se encontraron plantillas');
+
+    const resetBtn = Array.from(hostEl.querySelectorAll('button')).find(
+      b => b.textContent?.trim() === 'Ver todas las plantillas'
+    );
+    expect(resetBtn).toBeTruthy();
+    resetBtn!.click();
+    fixture.detectChanges();
+
+    expect(component.searchQuery()).toBe('');
+    expect(component.activeCategory()).toBe('all');
+    expect(component.filteredTemplates().length).toBe(catalogService.templates.length);
+    expect(component.selectedTemplate()).not.toBeNull();
+  });
+
+  it('debe renderizar de forma segura app-template-preview-3d en jsdom con resumen de piezas y componentes', () => {
+    const drawerTpl = catalogService.templates.find(t => t.id === 'cajonera_3_cajones');
+    expect(drawerTpl).toBeDefined();
+
+    fixture.componentRef.setInput('initialTemplateId', drawerTpl!.id);
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    const previewEl = hostEl.querySelector('app-template-preview-3d') as HTMLElement | null;
+    expect(previewEl).toBeTruthy();
+    expect(previewEl?.querySelector('.preview-stage')).toBeTruthy();
+
+    const dimsText = `${drawerTpl!.dimensions.width} × ${drawerTpl!.dimensions.height} × ${drawerTpl!.dimensions.depth} mm`;
+    expect(previewEl?.textContent).toContain(dimsText);
+
+    const summary = component.selectedSummary();
+    expect(summary).not.toBeNull();
+    expect(summary!.partsCount).toBeGreaterThan(0);
+    expect(summary!.drawersCount).toBe(3);
+
+    const summarySection = hostEl.querySelector(
+      'section[aria-label="Vista previa 3D de la plantilla seleccionada"]'
+    ) as HTMLElement;
+    expect(summarySection.textContent).toContain(`${summary!.partsCount} piezas`);
+    expect(summarySection.textContent).toContain('3 Cajones');
+  });
+
+  it('debe emitir templateSelected con modo elegido, customizeTemplateRequested y startBlankRequested al accionar los botones', () => {
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    const selectedEvents: { template: FurnitureTemplate; mode: 'replace' | 'append' }[] = [];
+    const customizeEvents: FurnitureTemplate[] = [];
+    let blankCalls = 0;
+    let closeCalls = 0;
+
+    component.templateSelected.subscribe(ev => selectedEvents.push(ev));
+    component.customizeTemplateRequested.subscribe(tpl => customizeEvents.push(tpl));
+    component.startBlankRequested.subscribe(() => {
+      blankCalls += 1;
+    });
+    component.modalClose.subscribe(() => {
+      closeCalls += 1;
+    });
+
+    const firstTpl = component.selectedTemplate()!;
+    const replaceBtn = Array.from(hostEl.querySelectorAll('button')).find(
+      b => b.textContent?.trim() === 'Reemplazar escena'
+    );
+    expect(replaceBtn).toBeTruthy();
+    replaceBtn!.click();
+    fixture.detectChanges();
+    expect(component.creationMode()).toBe('replace');
+
+    const insertBtn = Array.from(hostEl.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('+ Insertar Mueble en el Lienzo')
+    );
+    expect(insertBtn).toBeTruthy();
+    insertBtn!.click();
+    fixture.detectChanges();
+
+    expect(selectedEvents.length).toBe(1);
+    expect(selectedEvents[0].template.id).toBe(firstTpl.id);
+    expect(selectedEvents[0].mode).toBe('replace');
+    expect(closeCalls).toBe(1);
+
+    // Reabrir y probar "Abrir y Personalizar en Asistente"
+    fixture.componentRef.setInput('isOpen', false);
+    fixture.detectChanges();
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    const secondTpl = catalogService.templates[1] ?? catalogService.templates[0];
+    component.selectTemplate(secondTpl);
+    fixture.detectChanges();
+
+    const customizeBtn = Array.from(hostEl.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('Abrir y Personalizar en Asistente')
+    );
+    expect(customizeBtn).toBeTruthy();
+    customizeBtn!.click();
+    fixture.detectChanges();
+
+    expect(customizeEvents.length).toBe(1);
+    expect(customizeEvents[0].id).toBe(secondTpl.id);
+    expect(closeCalls).toBe(2);
+
+    // Reabrir y probar "Lienzo en Blanco"
+    fixture.componentRef.setInput('isOpen', false);
+    fixture.detectChanges();
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    const blankBtn = Array.from(hostEl.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('Lienzo en Blanco')
+    );
+    expect(blankBtn).toBeTruthy();
+    blankBtn!.click();
+    fixture.detectChanges();
+
+    expect(blankCalls).toBe(1);
+    expect(closeCalls).toBe(3);
   });
 });

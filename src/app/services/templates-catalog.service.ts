@@ -1921,4 +1921,30 @@ export class TemplatesCatalogService {
     if (maxX === -Infinity) return 0;
     return Math.round(maxX + (templateWidth / 2) + 200); // 200 mm clearance between furniture
   }
+
+  /**
+   * Hidrata la configuración paramétrica completa (incluyendo `zoneTree` editable) de cualquier plantilla del catálogo.
+   */
+  getHydratedTemplateConfig(
+    template: FurnitureTemplate,
+    materials: Material[]
+  ): ParametricCabinetConfig {
+    return this.cabinetGen.hydrateTemplateConfig(template, materials);
+  }
+
+  /**
+   * Resume los componentes físicos generados por una plantilla (piezas, puertas, cajones, repisas y barras).
+   */
+  getTemplateComponentsSummary(
+    template: FurnitureTemplate,
+    materials: Material[]
+  ): {
+    partsCount: number;
+    doorsCount: number;
+    drawersCount: number;
+    shelvesCount: number;
+    rodsCount: number;
+  } {
+    return this.cabinetGen.summarizeTemplateComponents(template, materials);
+  }
 }

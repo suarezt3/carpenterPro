@@ -444,9 +444,12 @@ export class HardwareCatalogService {
     let hingesGas = 0;
     let drawersCount = 0;
     let pushDrawersCount = 0;
+    let undermountDrawersCount = 0;
     let handlesCount = 0;
     let slidingDoorsCount = 0;
     let hangingRodsCount = 0;
+    let movableShelvesCount = 0;
+    let cabinetLegsCount = 0;
 
     for (const part of parts) {
       const n = (part.name || '').toLowerCase();
@@ -454,11 +457,41 @@ export class HardwareCatalogService {
       const mod = (part.moduleName || part.groupName || '').toLowerCase();
       const qty = Number(part.quantity) || 1;
 
-      // 1. Tubo Colgador Ovalado (Closets / Armarios)
-      const isRod = (part.shapeType === 'circle' && (n.includes('tubo') || n.includes('colgador') || n.includes('barra'))) ||
-                    notes.includes('colgador') || notes.includes('tubo') || n.includes('colgador');
+      // 0. Patas niveladoras físicas de módulo (excluye appliances)
+      const isCabinetLeg =
+        part.componentRole === 'accessory' &&
+        (part.materialId === 'hw_leg_inox' || (n.includes('pata') && n.includes('niveladora')));
+      if (isCabinetLeg) {
+        cabinetLegsCount += qty;
+        continue;
+      }
+
+      // 1. Tubo Colgador Ovalado (Closets / Armarios / Zonas)
+      const isRod =
+        (part.componentRole === 'accessory' && part.materialId === 'hw_rod_chrome') ||
+        (part.shapeType === 'circle' && (n.includes('tubo') || n.includes('colgador') || n.includes('barra'))) ||
+        notes.includes('colgador') ||
+        notes.includes('tubo') ||
+        n.includes('colgador');
       if (isRod) {
         hangingRodsCount += qty;
+        continue;
+      }
+
+      // 1b. Repisas móviles regulables (4 soportes metálicos por repisa móvil)
+      const isShelfPart =
+        part.componentRole === 'shelf' ||
+        n.includes('repisa') ||
+        n.includes('entrepaño') ||
+        n.includes('entrepano');
+      const isMovableShelf =
+        isShelfPart &&
+        (part.hardwareConfig?.isMovableShelf === true ||
+          notes.includes('móvil') ||
+          notes.includes('movil') ||
+          notes.includes('regulable'));
+      if (isMovableShelf) {
+        movableShelvesCount += qty;
         continue;
       }
 
@@ -466,6 +499,7 @@ export class HardwareCatalogService {
       const isDrawerBoxInternal =
         part.componentRole === 'drawer_box' ||
         part.componentRole === 'drawer_lateral' ||
+        part.componentRole === 'drawer_bottom' ||
         (part.thickness !== undefined && part.thickness <= 6 && (n.includes('fondo') || n.includes('caj')));
       if (isDrawerBoxInternal && !part.hardwareConfig?.isMovable) {
         continue;
@@ -483,9 +517,21 @@ export class HardwareCatalogService {
         hw.handleType !== 'finger_pull' &&
         hw.handlePosition !== 'none';
 
-      // 2. Puertas correderas de Closet
-      const isSlidingDoor = (detected.movableType === 'door' || part.componentRole === 'door') &&
-        (n.includes('corrediz') || notes.includes('corrediz') || notes.includes('riel') || mod.includes('closet'));
+      // 2. Puertas corredizas (detecta por nombre/notas sin exigir 'closet' en el nombre del módulo)
+      const isExplicitlyHinged =
+        notes.includes('abatible') ||
+        hw.hingeType === 'straight' ||
+        hw.hingeType === 'half_cranked' ||
+        hw.hingeType === 'full_cranked' ||
+        hw.hingeType === 'corner_45' ||
+        hw.hingeType === 'corner_165' ||
+        hw.hingeType === 'gas_piston';
+      const isSlidingDoor =
+        (detected.movableType === 'door' || part.componentRole === 'door') &&
+        (n.includes('corrediz') ||
+          notes.includes('corrediz') ||
+          notes.includes('riel') ||
+          (mod.includes('closet') && !isExplicitlyHinged));
 
       if (isSlidingDoor) {
         slidingDoorsCount += qty;
@@ -548,17 +594,27 @@ export class HardwareCatalogService {
           handlesCount += qty;
         }
       } else if (detected.movableType === 'drawer') {
+        const isUndermount =
+          hw.slideType === 'undermount' ||
+          notes.includes('oculta') ||
+          notes.includes('undermount');
         const isPushOpen =
           hw.slideType === 'push_open' ||
           hw.drawerOpeningSystem === 'push' ||
+          hw.handleType === 'push' ||
+          hw.handleType === 'push_open' ||
           notes.includes('push-to-open') ||
           notes.includes('apertura por presión');
         const isFingerPull =
           hw.drawerOpeningSystem === 'finger_pull' ||
+          hw.handleType === 'finger_pull' ||
+          hw.handleType === 'gola_less' ||
           notes.includes('uñero') ||
           notes.includes('gola');
 
-        if (isPushOpen) {
+        if (isUndermount) {
+          undermountDrawersCount += qty;
+        } else if (isPushOpen) {
           pushDrawersCount += qty;
         } else {
           drawersCount += qty;
@@ -644,6 +700,18 @@ export class HardwareCatalogService {
       });
     }
 
+    if (undermountDrawersCount > 0) {
+      items.push({
+        id: 'hw_correderas_oculta',
+        name: 'Par Correderas Ocultas Cierre Suave',
+        category: 'slide',
+        unit: 'par',
+        quantity: undermountDrawersCount,
+        unitCost: 58000,
+        notes: 'Extracción total oculta bajo cajón con gatillos 3D de desacople rápido'
+      });
+    }
+
     if (slidingDoorsCount > 0) {
       const closetSlidingKits = Math.max(1, Math.ceil(slidingDoorsCount / 2));
       items.push({
@@ -666,6 +734,30 @@ export class HardwareCatalogService {
         quantity: hangingRodsCount,
         unitCost: 28000,
         notes: 'Tubo de acero cromado ovalado reforzado con bridas atornillables'
+      });
+    }
+
+    if (movableShelvesCount > 0) {
+      items.push({
+        id: 'hw_soportes_repisa',
+        name: 'Soporte Metálico para Repisa',
+        category: 'support',
+        unit: 'und',
+        quantity: movableShelvesCount * 4,
+        unitCost: 1200,
+        notes: '4 soportes/pines metálicos Ø5mm por cada repisa móvil regulable'
+      });
+    }
+
+    if (cabinetLegsCount > 0) {
+      items.push({
+        id: 'hw_patas_niveladoras',
+        name: 'Pata Cilíndrica Niveladora Inox',
+        category: 'support',
+        unit: 'und',
+        quantity: cabinetLegsCount,
+        unitCost: 18000,
+        notes: 'Pata metálica niveladora regulable para base de mueble'
       });
     }
 

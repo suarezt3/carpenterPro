@@ -45,7 +45,9 @@ import {
   Wardrobe01Icon,
   LayoutLinearIcon,
   LayoutLIcon,
-  LayoutUIcon
+  LayoutUIcon,
+  RefreshIcon,
+  SlidersHorizontalIcon
 } from '@hugeicons/core-free-icons';
 import { RouteReuseLifecycleAware } from '../../strategies/designer-route-reuse.strategy';
 import { ProjectStorageService } from '../../services/project-storage.service';
@@ -89,7 +91,8 @@ import {
   DEFAULT_COUNTERTOP_MATERIALS,
   DrawerFrontMountType,
   DrawerOpeningSystem,
-  ModuleCavityInfo
+  ModuleCavityInfo,
+  CabinetZoneHighlightBox
 } from '../../models/melamine.models';
 import { Furniture3dViewerComponent, ClearanceInfo } from '../furniture-3d-viewer/furniture-3d-viewer';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
@@ -101,6 +104,7 @@ import { HardwareCatalogService } from '../../services/hardware-catalog.service'
 import { CabinetGeneratorService } from '../../services/cabinet-generator.service';
 import { TechnicalSheetModalComponent } from '../technical-sheet-modal/technical-sheet-modal';
 import { TemplatesModalComponent } from '../templates-modal/templates-modal';
+import { ZoneCabinetBuilderComponent } from '../zone-cabinet-builder/zone-cabinet-builder';
 import { FurnitureTemplate, TemplatesCatalogService } from '../../services/templates-catalog.service';
 import { MELAMINE_FAMILIES, MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { I18nService } from '../../services/i18n.service';
@@ -143,6 +147,7 @@ export interface QuickRolePreset {
     Furniture3dViewerComponent,
     TechnicalSheetModalComponent,
     TemplatesModalComponent,
+    ZoneCabinetBuilderComponent,
     TranslatePipe
   ],
   templateUrl: './module-designer.html',
@@ -204,6 +209,8 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     ]),
     cabinetModule: Cabinet01Icon,
     tune: Settings01Icon,
+    sliders: SlidersHorizontalIcon,
+    refresh: RefreshIcon,
     delete: Delete02Icon,
     sidebarToggle: cadSvg([
       'M4 5A1 1 0 0 1 5 4H19A1 1 0 0 1 20 5V19A1 1 0 0 1 19 20H5A1 1 0 0 1 4 19V5Z',
@@ -658,18 +665,6 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     this.materialSelectedFamily.set('all');
   }
 
-  // Configuración paramétrica seleccionada
-  readonly selectedParametricConfig = signal<ParametricCabinetConfig | null>(null);
-
-  /**
-   * Inserta directamente el módulo paramétrico en la escena 3D sin fricción de modal redundante.
-   */
-  onConfigureParametric(template: FurnitureTemplate) {
-    if (template.parametricConfig) {
-      this.onCabinetSubmitted(template.parametricConfig as ParametricCabinetConfig);
-    }
-  }
-
   /**
    * Cuenta los módulos de carpintería activos en la escena 3D (excluyendo mesones y cajones internos)
    * y valida si el plan activo permite agregar un nuevo módulo.
@@ -694,40 +689,6 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       return false;
     }
     return true;
-  }
-
-  /**
-   * Genera e inserta un nuevo módulo paramétrico en la escena 3D calculando su desplazamiento X
-   * automático para no superponerse con muebles existentes.
-   */
-  onCabinetSubmitted(config: ParametricCabinetConfig) {
-    if (!this.checkCanAddModuleToScene()) {
-      return;
-    }
-    let targetX = config.posX ?? 0;
-    if (this.currentParts().length > 0 && targetX === 0) {
-      targetX = this.templatesCatalog.calculateTemplateOffset(this.currentParts(), config.width);
-    }
-    const finalConfig = { ...config, posX: targetX };
-    const res = this.cabinetGen.generateParametricWallCabinet(finalConfig, this.materials());
-    this.projectService.addParametricCabinet(res);
-
-    const partIds = res.parts.map(p => p.id);
-    this.selectedPartIds.set(partIds);
-    const doorPart = res.parts.find(p => p.componentRole === 'door') || res.parts[0];
-    if (doorPart) {
-      this.selectedPartId.set(doorPart.id);
-      this.activeDockTab.set('piece');
-    }
-    this.showToast(`✨ Módulo "${res.module.name}" insertado. Puedes moverlo libremente en 3D.`);
-  }
-
-  onCabinetCreated(event: { config: ParametricCabinetConfig; mode: 'replace' | 'append' }) {
-    if (event.mode === 'replace') {
-      this.projectService.clearFurniture();
-    }
-    this.onCabinetSubmitted(event.config);
-    this.showTemplatesModal.set(false);
   }
 
   readonly showGroupMaterialDropdown = signal<boolean>(false);
@@ -1261,93 +1222,6 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
 
   readonly openGroupCardIds = signal<Set<string>>(new Set());
 
-  // Estado del Asistente de Cajón Modular (Smart Cavity Fit + Montaje Solapado/A Ras + Apertura Push/Uñero)
-  readonly showDrawerWizard = signal<boolean>(false);
-  readonly drawerWizardTargetModuleId = signal<string>('floor');
-  readonly drawerWizardTargetCavityId = signal<string>('');
-  readonly drawerWizardCount = signal<1 | 2 | 3 | 4 | 5 | 6>(1);
-  readonly showUpperCabinetsInDrawerWizard = signal<boolean>(false);
-  readonly clearCoveringDoorsInDrawerWizard = signal<boolean>(true);
-  readonly drawerWizardCountOptions: readonly (1 | 2 | 3 | 4 | 5 | 6)[] = [1, 2, 3, 4, 5, 6];
-  readonly drawerWizardSlideOptions: readonly number[] = [200, 250, 300, 350, 400, 450, 500];
-
-  readonly drawerForm = signal<ParametricDrawerConfig>({
-    name: 'Cajón 1',
-    outerWidth: 400,
-    slideLength: 450,
-    boxHeight: 140,
-    boxThickness: 15,
-    bottomThickness: 3,
-    slideGap: 26,
-    includeFront: true,
-    frontMountType: 'overlay',
-    handleType: 'handle',
-    frontHeight: 180,
-    frontWidth: 432,
-    frontThickness: 15,
-    sideThickness: 18,
-    posX: 0,
-    posY: 120,
-    posZ: 0,
-    rotationY: 0
-  });
-
-  private isLooseStructureCavity(cavity: ModuleCavityInfo): boolean {
-    return cavity.groupId === '__loose_structure__' || cavity.moduleId === '__loose_structure__';
-  }
-
-  private getCavitiesForDrawerModuleId(modId: string): ModuleCavityInfo[] {
-    if (!modId || modId === 'floor') return [];
-    const parts = this.currentParts();
-    const apps = this.appliances();
-    if (modId === '__loose_structure__') {
-      return this.partGeometry
-        .detectAllSceneCavities(parts, this.groups(), apps)
-        .filter(c => this.isLooseStructureCavity(c) && !c.isOccupiedByAppliance);
-    }
-    const grp = this.groups().find(g => g.id === modId);
-    return this.partGeometry
-      .detectModuleCavities(modId, parts, grp || 'Módulo', apps)
-      .filter(c => !c.isOccupiedByAppliance);
-  }
-
-  readonly availableCabinetModulesForDrawer = computed<PartGroup[]>(() => {
-    const grps = this.groups();
-    const parts = this.currentParts();
-    const apps = this.appliances();
-    const showUpper = this.showUpperCabinetsInDrawerWizard();
-    const allCavities = this.partGeometry.detectAllSceneCavities(parts, grps, apps);
-
-    const cabinetModules = grps.filter(g => {
-      if (this.isCountertopGroup(g.id) || this.isModularDrawerGroup(g.id)) return false;
-      const modCavities = allCavities.filter(c => c.moduleId === g.id && !c.isOccupiedByAppliance);
-      if (modCavities.length === 0) return false;
-      if (!showUpper && modCavities.every(c => c.isUpperCabinet === true)) {
-        return false;
-      }
-      return true;
-    });
-
-    const hasLooseStructureCavities = allCavities.some(
-      c => this.isLooseStructureCavity(c) && !c.isOccupiedByAppliance
-    );
-    if (hasLooseStructureCavities) {
-      return [
-        ...cabinetModules,
-        {
-          id: '__loose_structure__',
-          name: 'Estructura de Piezas Sueltas (Hueco Detectado)',
-          type: 'custom'
-        }
-      ];
-    }
-    return cabinetModules;
-  });
-
-  readonly availableCavitiesForDrawerModule = computed<ModuleCavityInfo[]>(() => {
-    return this.getCavitiesForDrawerModuleId(this.drawerWizardTargetModuleId());
-  });
-
   readonly selectedPartSurroundingCavity = computed<ModuleCavityInfo | null>(() => {
     const part = this.selectedPart();
     if (!part) return null;
@@ -1386,47 +1260,6 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       );
     });
     return interiorMatch || null;
-  });
-
-  readonly drawerWizardMaxSafeSlideLength = computed<number | null>(() => {
-    const cav = this.selectedDrawerWizardCavity();
-    if (!cav) return null;
-    const form = this.drawerForm();
-    const mount = form.frontMountType ?? 'overlay';
-    const frontT = form.frontThickness || 15;
-    const hasCoveringDoor = (cav.coveringDoorIds?.length ?? 0) > 0;
-    const setback =
-      mount === 'inset'
-        ? Math.max(12, frontT) + 2
-        : mount === 'none'
-          ? (hasCoveringDoor ? 22 : 5)
-          : !this.clearCoveringDoorsInDrawerWizard() && hasCoveringDoor
-            ? 22
-            : 0;
-    return Math.max(150, Math.floor(cav.internalDepth - setback - 5));
-  });
-
-  readonly selectedDrawerWizardCavity = computed<ModuleCavityInfo | null>(() => {
-    const cavities = this.availableCavitiesForDrawerModule();
-    if (cavities.length === 0) return null;
-    const targetId = this.drawerWizardTargetCavityId();
-    return cavities.find(c => c.id === targetId) || cavities[0] || null;
-  });
-
-  readonly computedDrawerWizardEffectiveFrontHeight = computed<number>(() => {
-    const cfg = this.drawerForm();
-    const mount = cfg.frontMountType ?? (cfg.includeFront ? 'overlay' : 'none');
-    if (mount === 'none') return 0;
-    const rawH = cfg.frontHeight || 180;
-    return cfg.handleType === 'finger_pull' ? Math.max(80, Math.round(rawH - 28)) : Math.round(rawH);
-  });
-
-  readonly computedDrawerWizardEffectiveBoxHeight = computed<number>(() => {
-    const cfg = this.drawerForm();
-    const mount = cfg.frontMountType ?? (cfg.includeFront ? 'overlay' : 'none');
-    if (mount === 'none') return Math.round(cfg.boxHeight);
-    const effFrontH = this.computedDrawerWizardEffectiveFrontHeight();
-    return Math.min(Math.round(cfg.boxHeight), Math.max(60, effFrontH - 20));
   });
 
   readonly isSelectedGroupModularDrawer = computed<boolean>(() => {
@@ -1488,16 +1321,6 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
   });
 
   readonly suggestedUniqueGroupName = computed(() => {
-    return this.getNextUniqueGroupName('Cajón');
-  });
-
-  readonly isDrawerWizardNameDuplicate = computed(() => {
-    const name = this.drawerForm().name.trim();
-    if (!name) return false;
-    return this.isGroupNameTaken(name);
-  });
-
-  readonly suggestedDrawerWizardName = computed(() => {
     return this.getNextUniqueGroupName('Cajón');
   });
 
@@ -1588,6 +1411,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     }
 
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+      if (this.isZoneBuilderOpen()) return;
       e.preventDefault();
       if (this.projectService.canUndo()) {
         this.projectService.undo();
@@ -1598,6 +1422,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
 
     if (((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) ||
         ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z'))) {
+      if (this.isZoneBuilderOpen()) return;
       e.preventDefault();
       if (this.projectService.canRedo()) {
         this.projectService.redo();
@@ -1607,6 +1432,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     }
 
     if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Del') {
+      if (this.isZoneBuilderOpen()) return;
       if (this.workspaceMode() === 'room' && this.selectedWall()) {
         e.preventDefault();
         this.deleteWall(this.selectedWall()!);
@@ -2217,22 +2043,78 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     }
   }
 
-  // Control de colapso de la bandeja lateral y modal de plantillas/edición de módulos
+  // Control de colapso de la bandeja lateral, modal de plantillas y Constructor en Vivo por Zonas
   readonly isSidebarCollapsed = signal<boolean>(false);
   readonly showTemplatesDropdown = signal<boolean>(false);
   readonly showTemplatesModal = signal<boolean>(false);
-  readonly templatesModalInitialView = signal<'assistant' | 'catalog'>('assistant');
-  readonly editingGroupId = signal<string | null>(null);
-  readonly editingGroupConfig = signal<ParametricCabinetConfig | null>(null);
+
+  readonly isZoneBuilderOpen = signal<boolean>(false);
+  readonly zoneBuilderConfig = signal<ParametricCabinetConfig | null>(null);
+  readonly zoneBuilderEditingGroupId = signal<string | null>(null);
+  readonly highlightedZoneBox = signal<CabinetZoneHighlightBox | null>(null);
+
+  private zoneBuilderLatestConfig: ParametricCabinetConfig | null = null;
+  private zoneBuilderAnchor: {
+    centerX: number;
+    minY: number;
+    centerZ: number;
+    facing: 'front' | 'right' | 'back' | 'left';
+    moduleId?: string;
+  } | null = null;
+  private zoneBuilderIsNewDraft = false;
+  private zoneBuilderPreEditSelection: {
+    selectedPartId: string | null;
+    selectedPartIds: string[];
+    activeDockTab: 'piece' | 'catalog' | 'appliances';
+  } | null = null;
+
+  readonly viewerExplodedPercent = computed<number>(() => this.viewer3d()?.explodedPercent() ?? 0);
+  readonly isViewerExploded = computed<boolean>(() => this.viewerExplodedPercent() > 0);
+  readonly viewerIsolatedTarget = computed<{ kind: 'group' | 'part'; id: string; label: string } | null>(
+    () => this.viewer3d()?.isolatedTarget() ?? null
+  );
+
+  isGroupApplianceProtected(groupId: string | null | undefined): boolean {
+    if (!groupId) return false;
+    return this.appliances().some(a => a.groupId === groupId);
+  }
+
+  isolateGroupById(groupId: string): void {
+    if (!groupId) return;
+    this.viewer3d()?.isolateGroupById(groupId);
+  }
+
+  isolateActiveGroup(): void {
+    const gId = this.activeSelectedGroupId() || this.selectedPart()?.groupId || null;
+    if (!gId) return;
+    this.viewer3d()?.isolateGroupById(gId);
+  }
+
+  isolateSelectedPart(): void {
+    const pId = this.selectedPartId();
+    if (!pId) return;
+    this.viewer3d()?.isolatePartById(pId);
+  }
+
+  toggleExplodedView3D(): void {
+    this.viewer3d()?.toggleExplodedView(50);
+  }
+
+  onExplodedPercentInput(event: Event): void {
+    const raw = Number((event.target as HTMLInputElement | null)?.value);
+    if (!Number.isFinite(raw)) return;
+    this.viewer3d()?.setExplodedPercent(raw);
+  }
+
+  resetExplodedView3D(): void {
+    this.viewer3d()?.resetExploded();
+  }
 
   toggleSidebar() {
     this.isSidebarCollapsed.update(v => !v);
   }
 
-  openTemplatesModal(initialView: 'assistant' | 'catalog' = 'assistant') {
-    this.editingGroupId.set(null);
-    this.editingGroupConfig.set(null);
-    this.templatesModalInitialView.set(initialView);
+  openTemplatesModal() {
     this.showTemplatesDropdown.set(false);
     this.showTemplatesModal.set(true);
   }
@@ -2246,8 +2128,486 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
 
   closeTemplatesModal() {
     this.showTemplatesModal.set(false);
-    this.editingGroupId.set(null);
-    this.editingGroupConfig.set(null);
+  }
+
+  private closeZoneBuilderSilently(): void {
+    this.isZoneBuilderOpen.set(false);
+    this.zoneBuilderConfig.set(null);
+    this.zoneBuilderEditingGroupId.set(null);
+    this.highlightedZoneBox.set(null);
+    this.zoneBuilderLatestConfig = null;
+    this.zoneBuilderAnchor = null;
+    this.zoneBuilderIsNewDraft = false;
+    this.zoneBuilderPreEditSelection = null;
+  }
+
+  private resolveDefaultZoneBoardMaterial(): Material | undefined {
+    const boards = this.melamineBoardMaterials().filter(
+      m => (m.thickness ?? 15) > 6 && m.family !== 'mdf_back'
+    );
+    return (
+      boards.find(m => m.name.toLowerCase().includes('blanco')) ||
+      boards[0] ||
+      this.melamineBoardMaterials()[0]
+    );
+  }
+
+  private resolveDefaultZoneBackMaterial(fallback?: Material): Material | undefined {
+    return (
+      this.melamineBoardMaterials().find(m => (m.thickness ?? 15) <= 6) || fallback
+    );
+  }
+
+  private computePartsAnchor(
+    parts: Part[],
+    facing: 'front' | 'right' | 'back' | 'left',
+    moduleId?: string
+  ): {
+    centerX: number;
+    minY: number;
+    centerZ: number;
+    facing: 'front' | 'right' | 'back' | 'left';
+    moduleId?: string;
+  } {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const p of parts) {
+      const b = this.joineryEngine.getPartBounds(p);
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+    }
+    const hasBounds = parts.length > 0 && Number.isFinite(minX);
+    return {
+      centerX: hasBounds ? (minX + maxX) / 2 : 0,
+      minY: hasBounds ? minY : 0,
+      centerZ: hasBounds ? (minZ + maxZ) / 2 : 0,
+      facing,
+      moduleId
+    };
+  }
+
+  private transformZonePartsToAnchor(
+    parts: Part[],
+    anchor: {
+      centerX: number;
+      minY: number;
+      centerZ: number;
+      facing: 'front' | 'right' | 'back' | 'left';
+    }
+  ): Part[] {
+    if (parts.length === 0) return parts;
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const pt of parts) {
+      const b = this.joineryEngine.getPartBounds(pt);
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+    }
+
+    const srcCx = (minX + maxX) / 2;
+    const srcCz = (minZ + maxZ) / 2;
+    const angleDelta: 0 | 90 | -90 | 180 =
+      anchor.facing === 'right'
+        ? 90
+        : anchor.facing === 'left'
+          ? -90
+          : anchor.facing === 'back'
+            ? 180
+            : 0;
+
+    const rotated = parts.map(pt => {
+      if (angleDelta === 0) return pt;
+      const b = this.joineryEngine.getPartBounds(pt);
+      const dx = b.px - srcCx;
+      const dz = b.pz - srcCz;
+      let newDx = dx;
+      let newDz = dz;
+      if (angleDelta === 90) {
+        newDx = dz;
+        newDz = -dx;
+      } else if (angleDelta === -90) {
+        newDx = -dz;
+        newDz = dx;
+      } else if (angleDelta === 180) {
+        newDx = -dx;
+        newDz = -dz;
+      }
+
+      const curOrient = pt.orientation || 'horizontal';
+      let newOrient = curOrient;
+      let newLength = pt.length;
+      let newWidth = pt.width;
+
+      if (Math.abs(angleDelta) === 90) {
+        if (curOrient === 'horizontal') {
+          newOrient = 'horizontal';
+          newLength = pt.width;
+          newWidth = pt.length;
+        } else if (curOrient === 'vertical_xy') {
+          newOrient = 'vertical_yz';
+          const horiz = b.sx;
+          const vert = b.sy;
+          const isPlinth =
+            pt.componentRole === 'plinth' ||
+            pt.name.toUpperCase().includes('ZOCALO') ||
+            pt.name.toUpperCase().includes('ZÓCALO');
+          const isDrawerBox =
+            pt.componentRole === 'drawer_box' ||
+            pt.componentRole === 'drawer_lateral';
+          if (isDrawerBox || (isPlinth && horiz > vert)) {
+            newLength = horiz;
+            newWidth = vert;
+          } else {
+            newLength = vert;
+            newWidth = horiz;
+          }
+        } else if (curOrient === 'vertical_yz') {
+          newOrient = 'vertical_xy';
+          newLength = b.sz;
+          newWidth = b.sy;
+        }
+      }
+
+      return {
+        ...pt,
+        posX: Math.round((srcCx + newDx) * 10) / 10,
+        posZ: Math.round((srcCz + newDz) * 10) / 10,
+        orientation: newOrient,
+        length: newLength,
+        width: newWidth
+      };
+    });
+
+    let rotMinX = Infinity;
+    let rotMaxX = -Infinity;
+    let rotMinY = Infinity;
+    let rotMinZ = Infinity;
+    let rotMaxZ = -Infinity;
+    for (const pt of rotated) {
+      const b = this.joineryEngine.getPartBounds(pt);
+      if (b.minX < rotMinX) rotMinX = b.minX;
+      if (b.maxX > rotMaxX) rotMaxX = b.maxX;
+      if (b.minY < rotMinY) rotMinY = b.minY;
+      if (b.minZ < rotMinZ) rotMinZ = b.minZ;
+      if (b.maxZ > rotMaxZ) rotMaxZ = b.maxZ;
+    }
+
+    const dxMove = Math.round((anchor.centerX - (rotMinX + rotMaxX) / 2) * 10) / 10;
+    const dyMove = Math.round((anchor.minY - rotMinY) * 10) / 10;
+    const dzMove = Math.round((anchor.centerZ - (rotMinZ + rotMaxZ) / 2) * 10) / 10;
+
+    return rotated.map(pt => ({
+      ...pt,
+      posX: Math.round(((pt.posX ?? 0) + dxMove) * 10) / 10,
+      posY: Math.round(((pt.posY ?? 0) + dyMove) * 10) / 10,
+      posZ: Math.round(((pt.posZ ?? 0) + dzMove) * 10) / 10
+    }));
+  }
+
+  private spawnLiveZoneBuilderFromConfig(
+    baseConfig: ParametricCabinetConfig,
+    fallbackName: string,
+    placementOverride?: { posX: number; posY?: number; posZ: number }
+  ): void {
+    if (!this.checkCanAddModuleToScene()) {
+      return;
+    }
+    this.viewer3d()?.cancelActiveInteractions();
+    if (this.isZoneBuilderOpen()) {
+      this.onZoneBuilderCancelled();
+    }
+
+    this.zoneBuilderPreEditSelection = {
+      selectedPartId: this.selectedPartId(),
+      selectedPartIds: [...this.selectedPartIds()],
+      activeDockTab: this.activeDockTab()
+    };
+
+    const hydrated = this.cabinetGen.hydrateZoneTreeFromConfig(baseConfig);
+    const widthMm = Math.max(150, Number(hydrated.width) || 600);
+    const offsetX =
+      placementOverride?.posX !== undefined
+        ? placementOverride.posX
+        : this.currentParts().length > 0
+          ? this.templatesCatalog.calculateTemplateOffset(this.currentParts(), widthMm)
+          : 0;
+    const uniqueName = this.getNextUniqueGroupName(hydrated.name || fallbackName);
+    const initialZoneId = hydrated.highlightedZoneId || hydrated.zoneTree?.id || 'zone_root';
+
+    const initialCfg: ParametricCabinetConfig = {
+      ...hydrated,
+      name: uniqueName,
+      posX: offsetX,
+      posY: placementOverride?.posY,
+      posZ: placementOverride?.posZ ?? 0,
+      highlightedZoneId: initialZoneId
+    };
+
+    const res = this.cabinetGen.generateZoneCabinet(initialCfg, this.allAvailableMaterials());
+    this.projectService.addParametricCabinet(res);
+
+    const spawnedParts = this.currentParts().filter(p => p.groupId === res.group.id);
+    this.zoneBuilderAnchor = this.computePartsAnchor(spawnedParts, 'front', res.module.id);
+    this.zoneBuilderIsNewDraft = true;
+    this.zoneBuilderEditingGroupId.set(res.group.id);
+    this.zoneBuilderConfig.set(initialCfg);
+    this.zoneBuilderLatestConfig = initialCfg;
+    this.isSidebarCollapsed.set(false);
+    this.isZoneBuilderOpen.set(true);
+
+    this.selectEntireGroup(res.group.id);
+    const boxMap = this.cabinetGen.computeZoneHighlightBoxes(initialCfg, spawnedParts);
+    this.highlightedZoneBox.set(boxMap.get(initialZoneId) ?? null);
+  }
+
+  openZoneBuilderNew(): void {
+    this.showTemplatesDropdown.set(false);
+    this.showTemplatesModal.set(false);
+
+    const defaultBoard = this.resolveDefaultZoneBoardMaterial();
+    const backBoard = this.resolveDefaultZoneBackMaterial(defaultBoard);
+    const defaultT = this.defaultBoardThickness();
+
+    const defaultConfig: ParametricCabinetConfig = {
+      code: `ZON${String(this.groups().length + 1).padStart(3, '0')}`,
+      name: 'Módulo a Medida',
+      moduleType: 'base_cabinet',
+      category: 'custom',
+      width: 600,
+      height: 820,
+      depth: 580,
+      structureThickness: defaultT,
+      doorThickness: defaultT,
+      backThickness: backBoard && (backBoard.thickness ?? 15) <= 6 ? (backBoard.thickness || 3) : 3,
+      backType: 'groove',
+      hasBackPanel: true,
+      shelvesCount: 0,
+      doorOpening: 'none',
+      hasHandle: true,
+      handleType: 'bar_modern',
+      handleFinish: 'brushed_steel',
+      handlePosition: 'vertical',
+      structureMaterialId: defaultBoard?.id || 'mat-1',
+      doorMaterialId: defaultBoard?.id || 'mat-1',
+      backMaterialId: backBoard?.id || defaultBoard?.id || 'mat-1',
+      facadeGap: 3,
+      baseType: 'plinth',
+      hasPlinth: true,
+      plinthHeight: 80,
+      hasTopCover: true,
+      topTieStrips: false,
+      zoneTree: {
+        id: 'zone_root',
+        splitDirection: 'none',
+        content: { type: 'empty' }
+      },
+      highlightedZoneId: 'zone_root'
+    };
+
+    this.spawnLiveZoneBuilderFromConfig(defaultConfig, 'Módulo a Medida');
+  }
+
+  onCustomizeTemplateInZoneBuilder(template: FurnitureTemplate): void {
+    this.showTemplatesModal.set(false);
+    this.showTemplatesDropdown.set(false);
+    const hydrated = this.templatesCatalog.getHydratedTemplateConfig(
+      template,
+      this.melamineBoardMaterials()
+    );
+    this.spawnLiveZoneBuilderFromConfig(hydrated, template.name);
+  }
+
+  openZoneBuilderForExistingGroup(groupId: string, preferredZoneId?: string): void {
+    this.viewer3d()?.cancelActiveInteractions();
+    this.showTemplatesDropdown.set(false);
+    this.showTemplatesModal.set(false);
+
+    if (this.isZoneBuilderOpen() && this.zoneBuilderEditingGroupId() === groupId) {
+      return;
+    }
+    if (this.isZoneBuilderOpen()) {
+      this.onZoneBuilderCancelled();
+    }
+
+    const parts = this.currentParts().filter(p => p.groupId === groupId);
+    if (parts.length === 0) {
+      this.showToast('No se encontraron piezas para editar en este módulo');
+      return;
+    }
+
+    if (this.isCountertopGroup(groupId)) {
+      this.openEditGroup(groupId);
+      return;
+    }
+
+    if (this.isGroupApplianceProtected(groupId)) {
+      this.showToast('Módulo Pro protegido con equipos integrados. Ajusta sus medidas desde el inspector.');
+      return;
+    }
+
+    this.zoneBuilderPreEditSelection = {
+      selectedPartId: this.selectedPartId(),
+      selectedPartIds: [...this.selectedPartIds()],
+      activeDockTab: this.activeDockTab()
+    };
+
+    this.projectService.saveUndoSnapshot();
+
+    const group = this.groups().find(g => g.id === groupId) || {
+      id: groupId,
+      name: parts[0]?.groupName || parts[0]?.moduleName || 'Módulo Paramétrico',
+      type: 'assembly' as const
+    };
+
+    const reconstructed = this.cabinetGen.reconstructConfigFromParts(parts, group);
+    const hydrated = this.cabinetGen.hydrateZoneTreeFromConfig(reconstructed);
+    const initialZoneId =
+      preferredZoneId || hydrated.highlightedZoneId || hydrated.zoneTree?.id || 'zone_root';
+    const readyConfig: ParametricCabinetConfig = {
+      ...hydrated,
+      highlightedZoneId: initialZoneId
+    };
+
+    const facing = this.projectService.getGroupFacingDirection(groupId);
+    this.zoneBuilderAnchor = this.computePartsAnchor(parts, facing, parts[0]?.moduleId);
+    this.zoneBuilderIsNewDraft = false;
+    this.zoneBuilderEditingGroupId.set(groupId);
+    this.zoneBuilderConfig.set(readyConfig);
+    this.zoneBuilderLatestConfig = readyConfig;
+    this.isSidebarCollapsed.set(false);
+    this.isZoneBuilderOpen.set(true);
+
+    this.selectEntireGroup(groupId);
+    const boxMap = this.cabinetGen.computeZoneHighlightBoxes(readyConfig, parts);
+    this.highlightedZoneBox.set(boxMap.get(initialZoneId) ?? null);
+  }
+
+  onZoneBuilderLiveChange(cfg: ParametricCabinetConfig): void {
+    const groupId = this.zoneBuilderEditingGroupId();
+    if (!groupId || this.isCountertopGroup(groupId)) return;
+
+    this.zoneBuilderLatestConfig = cfg;
+    const anchor = this.zoneBuilderAnchor;
+    const h = Math.max(150, Number(cfg.height) || 800);
+    const canonicalConfig: ParametricCabinetConfig = {
+      ...cfg,
+      posX: 0,
+      posY: h / 2,
+      posZ: 0
+    };
+
+    const res = this.cabinetGen.generateZoneCabinet(
+      canonicalConfig,
+      this.allAvailableMaterials(),
+      {
+        groupId,
+        moduleId: anchor?.moduleId
+      }
+    );
+
+    const storedConfig: ParametricCabinetConfig = {
+      ...(res.group.parametricConfig ?? cfg),
+      ...(anchor
+        ? {
+            posX: Math.round(anchor.centerX * 10) / 10,
+            posY: Math.round((anchor.minY + h / 2) * 10) / 10,
+            posZ: Math.round(anchor.centerZ * 10) / 10
+          }
+        : {}),
+      highlightedZoneId: cfg.highlightedZoneId
+    };
+
+    const positionedParts = anchor
+      ? this.transformZonePartsToAnchor(res.parts, anchor)
+      : res.parts;
+
+    this.projectService.liveUpdateParametricModuleParts(
+      groupId,
+      positionedParts,
+      cfg.name,
+      storedConfig,
+      false,
+      { preserveTransform: false, module: res.module }
+    );
+
+    const afterParts = this.currentParts().filter(p => p.groupId === groupId);
+    const afterIds = afterParts.map(p => p.id);
+    this.selectedPartIds.set(afterIds);
+    if (afterIds.length > 0 && (!this.selectedPartId() || !afterIds.includes(this.selectedPartId()!))) {
+      this.selectedPartId.set(afterIds[0]);
+    }
+
+    const boxMap = this.cabinetGen.computeZoneHighlightBoxes(storedConfig, afterParts);
+    const zoneId = cfg.highlightedZoneId || cfg.zoneTree?.id || 'zone_root';
+    this.highlightedZoneBox.set(boxMap.get(zoneId) ?? null);
+  }
+
+  onZoneBuilderHighlightChange(zoneId: string | null): void {
+    const groupId = this.zoneBuilderEditingGroupId();
+    const cfg = this.zoneBuilderLatestConfig || this.zoneBuilderConfig();
+    if (!zoneId || !cfg || !groupId) {
+      this.highlightedZoneBox.set(null);
+      return;
+    }
+    const afterParts = this.currentParts().filter(p => p.groupId === groupId);
+    const boxMap = this.cabinetGen.computeZoneHighlightBoxes(cfg, afterParts);
+    this.highlightedZoneBox.set(boxMap.get(zoneId) ?? null);
+  }
+
+  onZoneBuilderConfirmed(finalCfg: ParametricCabinetConfig): void {
+    const groupId = this.zoneBuilderEditingGroupId();
+    if (groupId) {
+      this.onZoneBuilderLiveChange(finalCfg);
+    }
+    this.closeZoneBuilderSilently();
+    if (groupId && this.currentParts().some(p => p.groupId === groupId)) {
+      this.selectEntireGroup(groupId);
+      this.activeDockTab.set('piece');
+    }
+    this.showToast(`Módulo "${finalCfg.name}" confirmado en la escena 3D`);
+  }
+
+  onZoneBuilderCancelled(): void {
+    const prevSel = this.zoneBuilderPreEditSelection;
+    const wasNew = this.zoneBuilderIsNewDraft;
+
+    if (this.projectService.canUndo()) {
+      this.projectService.undo();
+    }
+
+    this.closeZoneBuilderSilently();
+
+    if (prevSel && !wasNew) {
+      const validIds = prevSel.selectedPartIds.filter(id =>
+        this.currentParts().some(p => p.id === id)
+      );
+      this.selectedPartIds.set(validIds);
+      const validSingle =
+        prevSel.selectedPartId && validIds.includes(prevSel.selectedPartId)
+          ? prevSel.selectedPartId
+          : (validIds[0] ?? null);
+      this.selectedPartId.set(validSingle);
+      this.activeDockTab.set(validIds.length > 0 ? prevSel.activeDockTab : 'catalog');
+    } else {
+      this.selectedPartId.set(null);
+      this.selectedPartIds.set([]);
+      this.activeDockTab.set('catalog');
+    }
+
+    this.showToast(wasNew ? 'Creación de módulo cancelada' : 'Cambios del módulo descartados');
   }
 
   isCountertopGroup(groupId: string | null | undefined): boolean {
@@ -2338,9 +2698,8 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
   }
 
   /**
-   * Abre el asistente paramétrico cargando las dimensiones actuales del grupo seleccionado.
+   * Abre el Constructor por Zonas en vivo cargando las dimensiones y árbol del grupo seleccionado.
    * Si el grupo es un Mesón / Encimera 3D, abre la pestaña Mesones 3D de Cocina Pro Studio.
-   * Si el grupo es un Cajón Modular, abre el Inspector Contextual Exclusivo en el panel derecho.
    */
   openEditGroup(groupId: string, event?: Event) {
     event?.stopPropagation();
@@ -2348,22 +2707,12 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
 
     const parts = this.currentParts().filter(p => p.groupId === groupId);
     if (parts.length === 0) {
-      this.showToast('⚠️ No se encontraron piezas para editar en este módulo');
+      this.showToast('No se encontraron piezas para editar en este módulo');
       return;
     }
 
-    if (this.isModularDrawerGroup(groupId)) {
-      this.showTemplatesDropdown.set(false);
-      this.showTemplatesModal.set(false);
-      this.isSidebarCollapsed.set(false);
-      this.selectEntireGroup(groupId);
-      this.activeDockTab.set('piece');
-      this.showToast('Inspector de Cajón Modular activo en el panel derecho');
-      return;
-    }
-
-    if (this.appliances().some(a => a.groupId === groupId)) {
-      this.showToast('ℹ️ Módulo Pro protegido con equipos integrados. Para cambiar dimensiones usa el inspector derecho.');
+    if (this.isGroupApplianceProtected(groupId)) {
+      this.showToast('Módulo Pro protegido con equipos integrados. Para cambiar dimensiones usa el inspector derecho.');
       return;
     }
 
@@ -2403,21 +2752,11 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           }
         }
       }
-      this.showToast('🪨 Configura el mesón en Cocina Pro o ajusta sus medidas directamente en el panel derecho');
+      this.showToast('Configura el mesón en Cocina Pro o ajusta sus medidas directamente en el panel derecho');
       return;
     }
 
-    const group = this.groups().find(g => g.id === groupId) || {
-      id: groupId,
-      name: parts[0]?.groupName || parts[0]?.moduleName || 'Módulo Paramétrico',
-      type: 'assembly' as const
-    };
-
-    const safeConfig = this.cabinetGen.reconstructConfigFromParts(parts, group);
-    this.editingGroupConfig.set({ ...safeConfig });
-    this.editingGroupId.set(groupId);
-    this.showTemplatesDropdown.set(false);
-    this.showTemplatesModal.set(true);
+    this.openZoneBuilderForExistingGroup(groupId);
   }
 
   /**
@@ -4332,6 +4671,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       });
       if (!confirmed) return;
     }
+    this.closeZoneBuilderSilently();
     this.projectService.clearFurniture();
     this.selectedPartId.set(null);
     this.selectedPartIds.set([]);
@@ -4345,8 +4685,18 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     if (event.mode === 'append' && !this.checkCanAddModuleToScene()) {
       return;
     }
+    this.closeZoneBuilderSilently();
     this.projectService.loadTemplateFurniture(event.template, event.mode);
+    this.showTemplatesModal.set(false);
+
+    const groups = this.groups();
     const parts = this.currentParts();
+    const lastGroup = groups.length > 0 ? groups[groups.length - 1] : null;
+    if (lastGroup && parts.some(p => p.groupId === lastGroup.id)) {
+      this.selectEntireGroup(lastGroup.id);
+      this.showToast(`Plantilla "${event.template.name}" insertada en escena`);
+      return;
+    }
     if (parts.length > 0) {
       const top = parts.find(p => p.name.toUpperCase().includes('TECHO') || p.name.toUpperCase().includes('TAPA') || p.name.toUpperCase().includes('ENCIMERA')) || parts[0];
       this.selectedPartId.set(top.id);
@@ -4356,6 +4706,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
   }
 
   loadDeskBarTemplate() {
+    this.closeZoneBuilderSilently();
     this.projectService.loadDeskBarFurniture();
     const parts = this.currentParts();
     const top = parts.find(p => p.id === 'desk_top') || parts[0];
@@ -4366,6 +4717,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
   }
 
   loadStandardBaseCabinet() {
+    this.closeZoneBuilderSilently();
     this.projectService.resetToDemo();
     const parts = this.currentParts();
     if (parts.length > 0) {
@@ -4418,371 +4770,138 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     return this.openGroupCardIds().has(groupId);
   }
 
-  // --- ASISTENTE DE CAJÓN MODULAR (SMART CAVITY FIT + MONTAJE SOLAPADO/A RAS + APERTURA PUSH/UÑERO) ---
+  // --- ENRUTAMIENTO DE ASISTENTE POR ZONAS PARA CAJONES Y HUECOS ---
 
-  openDrawerWizard(preselectedModuleId?: string, preselectedPartId?: string, preselectedCavityId?: string) {
-    const uniqueName = this.getNextUniqueGroupName('Cajón');
-    const defaultMat = this.materials()[0];
-    const mdfMat = this.materials().find(m => m.thickness === 3) || defaultMat;
-    const defaultT = this.defaultBoardThickness();
+  openDrawerWizard(preselectedModuleId?: string, preselectedPartId?: string) {
+    let targetModId = preselectedModuleId && preselectedModuleId !== 'floor' ? preselectedModuleId : '';
+    const refPartId = preselectedPartId || this.selectedPartId();
+    const refPart = refPartId ? this.currentParts().find(p => p.id === refPartId) : undefined;
+    const preferredZoneId = refPart?.zoneId;
 
-    this.clearCoveringDoorsInDrawerWizard.set(true);
-
-    // Detectar si el usuario tiene seleccionado un módulo de gabinete o hueco en piezas sueltas
-    let targetModId = preselectedModuleId || 'floor';
-    let fallbackCavityId = preselectedCavityId;
-    if (targetModId === 'floor') {
-      const activeGid = this.activeSelectedGroupId() || this.selectedPart()?.groupId;
-      if (activeGid && !this.isCountertopGroup(activeGid) && !this.isModularDrawerGroup(activeGid)) {
-        const modCavities = this.getCavitiesForDrawerModuleId(activeGid);
-        const isOnlyUpper = modCavities.length > 0 && modCavities.every(c => c.isUpperCabinet === true);
-        if (modCavities.length > 0 && (!isOnlyUpper || this.showUpperCabinetsInDrawerWizard())) {
-          targetModId = activeGid;
-        }
-      }
-      if (targetModId === 'floor') {
+    if (!targetModId) {
+      const activeGid = this.activeSelectedGroupId() || this.selectedPart()?.groupId || '';
+      if (
+        activeGid &&
+        !this.isCountertopGroup(activeGid) &&
+        !this.isGroupApplianceProtected(activeGid) &&
+        !this.isModularDrawerGroup(activeGid)
+      ) {
+        targetModId = activeGid;
+      } else {
         const surrounding = this.selectedPartSurroundingCavity();
-        if (surrounding) {
-          targetModId = this.isLooseStructureCavity(surrounding)
-            ? '__loose_structure__'
-            : (surrounding.moduleId || surrounding.groupId);
-          fallbackCavityId = fallbackCavityId || surrounding.id;
+        const cavModId = surrounding?.moduleId || surrounding?.groupId || '';
+        if (cavModId && cavModId !== '__loose_structure__') {
+          targetModId = cavModId;
         }
-      }
-    } else {
-      const preCavs = this.getCavitiesForDrawerModuleId(targetModId);
-      if (preCavs.length === 0) {
-        targetModId = 'floor';
-      } else if (preCavs.every(c => c.isUpperCabinet === true)) {
-        this.showUpperCabinetsInDrawerWizard.set(true);
       }
     }
 
-    this.drawerWizardTargetModuleId.set(targetModId);
-    this.drawerWizardCount.set(1);
-
-    if (targetModId !== 'floor') {
-      const cavities = this.getCavitiesForDrawerModuleId(targetModId);
-      if (cavities.length > 0) {
-        let chosenCavity = (fallbackCavityId && cavities.find(c => c.id === fallbackCavityId)) || cavities[0];
-        if (!fallbackCavityId) {
-          const refPartId = preselectedPartId || this.selectedPartId();
-          if (refPartId) {
-            const refPart = this.currentParts().find(p => p.id === refPartId);
-            if (refPart) {
-              const py = refPart.posY ?? 0;
-              const match = cavities.find(c => py >= c.minY - 25 && py <= c.maxY + 25);
-              if (match) chosenCavity = match;
-            }
-          }
-        }
-        this.drawerForm.set({
-          name: uniqueName,
-          outerWidth: chosenCavity.internalWidth,
-          slideLength: chosenCavity.optimalSlideLength,
-          boxHeight: 140,
-          boxThickness: defaultT,
-          bottomThickness: 3,
-          slideGap: 26,
-          includeFront: true,
-          frontMountType: 'overlay',
-          handleType: 'handle',
-          frontHeight: 180,
-          frontWidth: chosenCavity.internalWidth,
-          frontThickness: defaultT,
-          sideThickness: chosenCavity.sideThickness,
-          posX: chosenCavity.centerX,
-          posY: Math.round(chosenCavity.minY + 2),
-          posZ: chosenCavity.centerZ,
-          rotationY: chosenCavity.rotationY,
-          targetModuleId: chosenCavity.moduleId,
-          targetCavityId: chosenCavity.id,
-          materialId: defaultMat ? defaultMat.id : 'mat-1',
-          bottomMaterialId: mdfMat ? mdfMat.id : 'mat_mdf_3'
-        });
-        this.applyCavityToDrawerWizardForm(chosenCavity);
-        this.showDrawerWizard.set(true);
-        return;
-      }
-      this.drawerWizardTargetModuleId.set('floor');
+    if (
+      targetModId &&
+      targetModId !== '__loose_structure__' &&
+      this.groups().some(g => g.id === targetModId) &&
+      !this.isCountertopGroup(targetModId) &&
+      !this.isGroupApplianceProtected(targetModId)
+    ) {
+      this.openZoneBuilderForExistingGroup(targetModId, preferredZoneId);
+      return;
     }
 
-    this.drawerWizardTargetCavityId.set('');
-    this.drawerForm.set({
-      name: uniqueName,
-      outerWidth: 400,
-      slideLength: 450,
-      boxHeight: 140,
-      boxThickness: defaultT,
-      bottomThickness: 3,
-      slideGap: 26,
-      includeFront: true,
-      frontMountType: 'overlay',
-      handleType: 'handle',
-      frontHeight: 180,
-      frontWidth: 432,
-      frontThickness: defaultT,
-      sideThickness: 18,
-      posX: 0,
-      posY: 100 + (this.groups().length) * 200,
-      posZ: 0,
-      rotationY: 0,
-      materialId: defaultMat ? defaultMat.id : 'mat-1',
-      bottomMaterialId: mdfMat ? mdfMat.id : 'mat_mdf_3'
-    });
-    this.showDrawerWizard.set(true);
+    this.openZoneBuilderNewDrawerModule();
   }
 
   openDrawerWizardForCavity(target: ModuleCavityInfo | { groupId: string; partId?: string }) {
     if ('internalWidth' in target) {
-      const modId = this.isLooseStructureCavity(target)
-        ? '__loose_structure__'
-        : (target.moduleId || target.groupId);
-      this.openDrawerWizard(modId, undefined, target.id);
+      const modId = target.moduleId || target.groupId;
+      if (
+        modId &&
+        modId !== '__loose_structure__' &&
+        this.groups().some(g => g.id === modId) &&
+        !this.isCountertopGroup(modId) &&
+        !this.isGroupApplianceProtected(modId)
+      ) {
+        const refPartIds = [target.bottomPartId, target.topPartId, target.leftPartId, target.rightPartId].filter(Boolean);
+        const zonePart = this.currentParts().find(p => refPartIds.includes(p.id) && !!p.zoneId);
+        this.openZoneBuilderForExistingGroup(modId, zonePart?.zoneId);
+        return;
+      }
+      this.openZoneBuilderNewDrawerModule(target);
       return;
     }
     this.openDrawerWizard(target.groupId, target.partId);
   }
 
-  closeDrawerWizard() {
-    this.showDrawerWizard.set(false);
-  }
+  private openZoneBuilderNewDrawerModule(cavity?: ModuleCavityInfo): void {
+    this.showTemplatesDropdown.set(false);
+    this.showTemplatesModal.set(false);
 
-  onDrawerWizardTargetModuleChange(event: Event) {
-    const modId = (event.target as HTMLSelectElement).value || 'floor';
-    this.drawerWizardTargetModuleId.set(modId);
-    if (modId === 'floor') {
-      this.resetDrawerWizardToFloor();
-      return;
-    }
-    const cavities = this.availableCavitiesForDrawerModule();
-    if (cavities.length > 0) {
-      this.applyCavityToDrawerWizardForm(cavities[0]);
-    }
-  }
+    const defaultBoard = this.resolveDefaultZoneBoardMaterial();
+    const backBoard = this.resolveDefaultZoneBackMaterial(defaultBoard);
+    const defaultT = this.defaultBoardThickness();
 
-  onDrawerWizardTargetCavityChange(event: Event) {
-    const cavId = (event.target as HTMLSelectElement).value;
-    const cav = this.availableCavitiesForDrawerModule().find(c => c.id === cavId);
-    if (cav) {
-      this.applyCavityToDrawerWizardForm(cav);
-    }
-  }
+    const width = cavity ? Math.max(200, Math.round(cavity.internalWidth)) : 600;
+    const height = cavity ? Math.max(200, Math.round(cavity.internalHeight)) : 820;
+    const depth = cavity ? Math.max(200, Math.min(800, Math.round(cavity.internalDepth))) : 500;
 
-  private applyCavityToDrawerWizardForm(cavity: ModuleCavityInfo) {
-    this.drawerWizardTargetCavityId.set(cavity.id);
-    const cur = this.drawerForm();
-    const mount = cur.frontMountType ?? 'overlay';
-    const frontT = cur.frontThickness || 15;
-    const hasCoveringDoor = (cavity.coveringDoorIds?.length ?? 0) > 0;
-    const optSlide =
-      mount === 'overlay' && this.clearCoveringDoorsInDrawerWizard() && cavity.optimalSlideLength
-        ? cavity.optimalSlideLength
-        : this.partGeometry.getOptimalCommercialSlideLength(
-            cavity.internalDepth,
-            mount,
-            frontT,
-            (mount === 'none' || !this.clearCoveringDoorsInDrawerWizard()) && hasCoveringDoor
-          );
-    const frontW = mount === 'inset'
-      ? Math.max(80, Math.round(cavity.internalWidth - 4))
-      : Math.max(80, Math.round(cavity.internalWidth + 2 * cavity.sideThickness - 4));
-    const count = this.drawerWizardCount();
-    const gapBetween = cur.handleType === 'finger_pull' ? 28 : 3;
-    const slotH = Math.floor((cavity.internalHeight - 4 - (count - 1) * gapBetween) / count);
-    const frontH = count === 1
-      ? Math.max(100, Math.min(cur.frontHeight || 180, Math.round(cavity.internalHeight - 4)))
-      : Math.max(80, slotH);
-    const effFrontH = cur.handleType === 'finger_pull' ? Math.max(80, frontH - 28) : frontH;
-    const boxH = Math.max(70, Math.min(160, effFrontH - 25));
-
-    this.drawerForm.update(prev => ({
-      ...prev,
-      outerWidth: cavity.internalWidth,
-      slideLength: optSlide,
-      boxHeight: boxH,
-      frontHeight: frontH,
-      frontWidth: frontW,
-      sideThickness: cavity.sideThickness,
-      posX: cavity.centerX,
-      posY: Math.round(cavity.minY + 2),
-      posZ: cavity.centerZ,
-      rotationY: cavity.rotationY,
-      targetModuleId: cavity.moduleId,
-      targetCavityId: cavity.id
-    }));
-  }
-
-  setDrawerWizardCount(count: 1 | 2 | 3 | 4 | 5 | 6) {
-    this.drawerWizardCount.set(count);
-    const cav = this.selectedDrawerWizardCavity();
-    if (cav) {
-      this.applyCavityToDrawerWizardForm(cav);
-    }
-  }
-
-  toggleShowUpperCabinetsInDrawerWizard(checked: boolean) {
-    this.showUpperCabinetsInDrawerWizard.set(checked);
-    if (!checked) {
-      const currentTarget = this.drawerWizardTargetModuleId();
-      if (
-        currentTarget !== 'floor' &&
-        !this.availableCabinetModulesForDrawer().some(g => g.id === currentTarget)
-      ) {
-        this.drawerWizardTargetModuleId.set('floor');
-        this.resetDrawerWizardToFloor();
-      }
-    }
-  }
-
-  private resetDrawerWizardToFloor(): void {
-    this.drawerWizardTargetCavityId.set('');
-    this.drawerForm.update(cur => ({
-      ...cur,
-      slideLength: cur.slideLength < 300 ? 450 : cur.slideLength,
-      targetModuleId: undefined,
-      targetCavityId: undefined,
-      rotationY: 0
-    }));
-  }
-
-  toggleClearCoveringDoorsInDrawerWizard(checked: boolean) {
-    this.clearCoveringDoorsInDrawerWizard.set(checked);
-    const cav = this.selectedDrawerWizardCavity();
-    if (cav) {
-      this.applyCavityToDrawerWizardForm(cav);
-    }
-  }
-
-  setDrawerWizardFrontMount(mountType: DrawerFrontMountType) {
-    const cur = this.drawerForm();
-    const cav = this.selectedDrawerWizardCavity();
-    const sideT = cav ? cav.sideThickness : (cur.sideThickness || 18);
-    const outerW = cur.outerWidth || 400;
-    const frontW = mountType === 'inset'
-      ? Math.max(80, Math.round(outerW - 4))
-      : Math.max(80, Math.round(outerW + 2 * sideT - 4));
-    let slideLen = cur.slideLength;
-    if (cav) {
-      const hasCoveringDoor = (cav.coveringDoorIds?.length ?? 0) > 0;
-      slideLen = this.partGeometry.getOptimalCommercialSlideLength(
-        cav.internalDepth,
-        mountType,
-        cur.frontThickness || 15,
-        (mountType === 'none' || !this.clearCoveringDoorsInDrawerWizard()) && hasCoveringDoor
-      );
-    }
-    this.drawerForm.update(prev => ({
-      ...prev,
-      frontMountType: mountType,
-      includeFront: mountType !== 'none',
-      frontWidth: frontW,
-      slideLength: slideLen
-    }));
-  }
-
-  setDrawerWizardOpeningSystem(handleType: DrawerOpeningSystem) {
-    this.drawerForm.update(prev => ({
-      ...prev,
-      handleType
-    }));
-    const cav = this.selectedDrawerWizardCavity();
-    if (cav && this.drawerWizardCount() > 1) {
-      this.applyCavityToDrawerWizardForm(cav);
-    }
-  }
-
-  onDrawerWizardTextInput(field: 'name', event: Event) {
-    const val = (event.target as HTMLInputElement).value;
-    this.updateDrawerFormField(field, val);
-  }
-
-  onDrawerWizardNumberInput(
-    field: 'outerWidth' | 'slideLength' | 'boxHeight' | 'boxThickness' | 'bottomThickness' | 'slideGap' | 'frontHeight' | 'frontWidth' | 'frontThickness' | 'posY',
-    event: Event
-  ) {
-    const num = Number((event.target as HTMLInputElement).value);
-    if (isNaN(num)) return;
-    if (field === 'outerWidth') {
-      const cur = this.drawerForm();
-      const mount = cur.frontMountType ?? 'overlay';
-      const sideT = cur.sideThickness || 18;
-      const nextFrontW = mount === 'inset'
-        ? Math.max(80, Math.round(num - 4))
-        : Math.max(80, Math.round(num + 2 * sideT - 4));
-      this.drawerForm.update(prev => ({
-        ...prev,
-        outerWidth: num,
-        frontWidth: nextFrontW
-      }));
-      return;
-    }
-    this.updateDrawerFormField(field, num);
-  }
-
-  updateDrawerFormField<K extends keyof ParametricDrawerConfig>(field: K, value: ParametricDrawerConfig[K]) {
-    this.drawerForm.update(cur => ({ ...cur, [field]: value }));
-  }
-
-  submitDrawerWizard() {
-    const config = this.drawerForm();
-    const cleanName = (config.name || '').trim();
-    if (!cleanName) {
-      this.showToast('Ingresa un nombre para el cajón');
-      return;
-    }
-    if (this.isGroupNameTaken(cleanName)) {
-      const suggestion = this.getNextUniqueGroupName('Cajón');
-      this.showToast(`Ya existe un cajón llamado "${cleanName}". Sugerencia: ${suggestion}`);
-      return;
-    }
-
-    const cav = this.selectedDrawerWizardCavity();
-    const count = this.drawerWizardCount();
-
-    if (cav && this.drawerWizardTargetModuleId() !== 'floor') {
-      const createdGroups = this.projectService.addParametricDrawersToCavity(
-        cav,
-        count,
-        {
-          ...config,
-          name: cleanName
-        },
-        {
-          clearCoveringDoors: this.clearCoveringDoorsInDrawerWizard()
+    const drawerModuleCfg: ParametricCabinetConfig = {
+      code: `CAJ${String(this.groups().length + 1).padStart(3, '0')}`,
+      name: 'Cajonera por Zonas',
+      moduleType: 'drawer_unit',
+      category: 'drawers',
+      width,
+      height,
+      depth,
+      structureThickness: defaultT,
+      doorThickness: defaultT,
+      backThickness: backBoard && (backBoard.thickness ?? 15) <= 6 ? (backBoard.thickness || 3) : 3,
+      backType: 'groove',
+      hasBackPanel: true,
+      shelvesCount: 0,
+      drawersCount: 3,
+      doorOpening: 'none',
+      hasHandle: true,
+      handleType: 'bar_modern',
+      handleFinish: 'brushed_steel',
+      handlePosition: 'horizontal',
+      structureMaterialId: defaultBoard?.id || 'mat-1',
+      doorMaterialId: defaultBoard?.id || 'mat-1',
+      backMaterialId: backBoard?.id || defaultBoard?.id || 'mat-1',
+      facadeGap: 3,
+      baseType: cavity ? 'none' : 'plinth',
+      hasPlinth: !cavity,
+      plinthHeight: cavity ? 0 : 80,
+      hasTopCover: true,
+      topTieStrips: false,
+      zoneTree: {
+        id: 'zone_root',
+        splitDirection: 'none',
+        content: {
+          type: 'drawers',
+          drawers: {
+            count: 3,
+            frontMount: 'overlay',
+            deductTopMm: 0,
+            deductBottomMm: 0,
+            deductLeftMm: 0,
+            deductRightMm: 0,
+            openingSystem: 'handle',
+            slideType: 'telescopic',
+            bottomType: 'grooved'
+          }
         }
-      );
-      this.showDrawerWizard.set(false);
-      if (createdGroups.length > 0) {
-        const lastGrp = createdGroups[createdGroups.length - 1];
-        this.selectEntireGroup(lastGrp.id);
-        this.openGroupCardIds.update(s => {
-          const next = new Set(s);
-          for (const g of createdGroups) next.add(g.id);
-          return next;
-        });
-        this.showToast(
-          createdGroups.length === 1
-            ? `${lastGrp.name} encajado automáticamente sin colisiones`
-            : `Batería de ${createdGroups.length} cajones encajada en el hueco sin colisiones`
-        );
-      }
-      return;
-    }
+      },
+      highlightedZoneId: 'zone_root'
+    };
 
-    const createdFloorGroups = this.projectService.addParametricDrawerStackOnFloor(
-      { ...config, name: cleanName },
-      count
-    );
-    this.showDrawerWizard.set(false);
-    const primaryGrp = this.selectAndExpandCreatedDrawerGroups(createdFloorGroups);
-    if (primaryGrp) {
-      const toastMsg =
-        createdFloorGroups.length > 1
-          ? `Torre de ${createdFloorGroups.length} cajones generada con piezas ensambladas`
-          : `${primaryGrp.name} generado con piezas ensambladas`;
-      this.showToast(toastMsg);
-    }
+    const placementOverride = cavity
+      ? {
+          posX: Math.round(cavity.centerX),
+          posY: Math.round(cavity.minY + height / 2),
+          posZ: Math.round(cavity.centerZ)
+        }
+      : undefined;
+
+    this.spawnLiveZoneBuilderFromConfig(drawerModuleCfg, 'Cajonera', placementOverride);
   }
 
   /** Selects the primary created drawer group and expands all generated cards in the tree. */

@@ -1,19 +1,882 @@
 import { inject, Injectable } from '@angular/core';
 import {
+  CabinetBaseType,
+  CabinetZoneContent,
+  CabinetZoneDoorConfig,
+  CabinetZoneDrawerConfig,
+  CabinetZoneHighlightBox,
+  CabinetZoneLayoutNode,
+  CabinetZoneNode,
   FurnitureModule,
+  HandleFinish,
+  HandleType,
+  HingeType,
   Material,
-  Part,
   ParametricCabinetConfig,
+  Part,
+  PartCornerCutConfig,
   PartGroup,
-  PartCornerCutConfig
+  SlideType
 } from '../models/melamine.models';
 import { PartGeometryService } from './part-geometry.service';
+import type { FurnitureTemplate } from './templates-catalog.service';
+
+interface ZoneCarcassFrame {
+  w: number;
+  h: number;
+  d: number;
+  t: number;
+  doorT: number;
+  backT: number;
+  gap: number;
+  baseType: CabinetBaseType;
+  plinthH: number;
+  sideH: number;
+  posX: number;
+  posY: number;
+  posZ: number;
+  carcassDepth: number;
+  carcassCenterZ: number;
+  carcassBackZ: number;
+  carcassFrontZ: number;
+  bottomOfCarcassY: number;
+  sideCenterY: number;
+  topY: number;
+  innerWidth: number;
+  hasTopStructure: boolean;
+  topTieStrips: boolean;
+  includeBack: boolean;
+  effectiveBackType: 'groove' | 'rebate' | 'overlay' | 'none';
+  zoneMinZ: number;
+  rootInnerMinY: number;
+  rootInnerMaxY: number;
+}
+
+interface AutoZoneSignature {
+  shelves: number;
+  drawers: number;
+  doorOpening: string;
+  rods: number;
+  plinth: boolean;
+  tieStrips: boolean;
+  moduleType: string;
+  split: 'none' | 'horizontal' | 'vertical';
+}
+
+function deepCloneZoneNode(node: CabinetZoneNode): CabinetZoneNode {
+  return {
+    ...node,
+    content: node.content
+      ? {
+          ...node.content,
+          drawers: node.content.drawers ? { ...node.content.drawers } : undefined,
+          doors: node.content.doors ? { ...node.content.doors } : undefined
+        }
+      : undefined,
+    children: node.children ? node.children.map(child => deepCloneZoneNode(child)) : undefined
+  };
+}
+
+function computeChildZoneSpans(
+  totalParentSpan: number,
+  dividerThickness: number,
+  children: readonly CabinetZoneNode[]
+): number[] {
+  const count = children.length;
+  if (count === 0) return [];
+  if (count === 1) return [Math.max(20, Math.round(totalParentSpan * 10) / 10)];
+
+  const availableSpan = Math.max(20 * count, totalParentSpan - (count - 1) * dividerThickness);
+  const fixedIndices: number[] = [];
+  const flexIndices: number[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const exact = Number(children[i].exactSizeMm);
+    if (Number.isFinite(exact) && exact > 0) {
+      fixedIndices.push(i);
+    } else {
+      flexIndices.push(i);
+    }
+  }
+
+  const spans = new Array<number>(count).fill(0);
+  let sumFixed = 0;
+  for (const idx of fixedIndices) {
+    const raw = Math.max(20, Number(children[idx].exactSizeMm));
+    spans[idx] = raw;
+    sumFixed += raw;
+  }
+
+  if (flexIndices.length === 0) {
+    if (Math.abs(sumFixed - availableSpan) <= 0.1) {
+      return spans.map(s => Math.round(s * 10) / 10);
+    }
+    const scale = availableSpan / Math.max(1, sumFixed);
+    let running = 0;
+    for (let i = 0; i < count - 1; i++) {
+      spans[i] = Math.max(20, Math.round(spans[i] * scale * 10) / 10);
+      running += spans[i];
+    }
+    spans[count - 1] = Math.max(20, Math.round((availableSpan - running) * 10) / 10);
+    return spans;
+  }
+
+  const minFlexTotal = 20 * flexIndices.length;
+  if (sumFixed > availableSpan - minFlexTotal && sumFixed > 0) {
+    const maxFixedBudget = Math.max(20 * fixedIndices.length, availableSpan - minFlexTotal);
+    const fixedScale = maxFixedBudget / sumFixed;
+    sumFixed = 0;
+    for (const idx of fixedIndices) {
+      spans[idx] = Math.max(20, Math.round(spans[idx] * fixedScale * 10) / 10);
+      sumFixed += spans[idx];
+    }
+  }
+
+  const remainingForFlex = Math.max(minFlexTotal, availableSpan - sumFixed);
+  let totalRatio = 0;
+  for (const idx of flexIndices) {
+    const ratio = Number(children[idx].sizeRatio);
+    totalRatio += Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  }
+  if (totalRatio <= 0) totalRatio = flexIndices.length;
+
+  let flexRunning = 0;
+  for (let k = 0; k < flexIndices.length - 1; k++) {
+    const idx = flexIndices[k];
+    const ratio = Number(children[idx].sizeRatio);
+    const safeRatio = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+    const val = Math.max(20, Math.round((remainingForFlex * (safeRatio / totalRatio)) * 10) / 10);
+    spans[idx] = val;
+    flexRunning += val;
+  }
+  const lastFlexIdx = flexIndices[flexIndices.length - 1];
+  spans[lastFlexIdx] = Math.max(20, Math.round((remainingForFlex - flexRunning) * 10) / 10);
+
+  return spans;
+}
+
+/**
+ * Calcula de forma pura y determinista el árbol de cotas 3D de todas las zonas de un módulo paramétrico.
+ * Convención de orden:
+ * - splitDirection === 'vertical': `children[0..n-1]` de izquierda (-X) a derecha (+X).
+ * - splitDirection === 'horizontal': `children[0..n-1]` de arriba (+Y) hacia abajo (-Y).
+ */
+export function computeZoneBoundsLayout(config: ParametricCabinetConfig): CabinetZoneLayoutNode {
+  const frame = resolveZoneCarcassFrame(config);
+  const rootTree: CabinetZoneNode = config.zoneTree
+    ? deepCloneZoneNode(config.zoneTree)
+    : buildAutoZoneTreeFromConfig(config);
+
+  const rootMinX = frame.posX - frame.w / 2 + frame.t;
+  const rootMaxX = frame.posX + frame.w / 2 - frame.t;
+  const rootMinY = frame.rootInnerMinY;
+  const rootMaxY = frame.rootInnerMaxY;
+  const rootCoverMinX = frame.posX - frame.w / 2 + frame.gap / 2;
+  const rootCoverMaxX = frame.posX + frame.w / 2 - frame.gap / 2;
+  const rootCoverMinY = frame.bottomOfCarcassY + frame.gap / 2;
+  const rootCoverMaxY = frame.bottomOfCarcassY + frame.sideH - frame.gap / 2;
+
+  const buildNode = (
+    node: CabinetZoneNode,
+    depth: number,
+    minX: number,
+    maxX: number,
+    minY: number,
+    maxY: number,
+    minZ: number,
+    maxZ: number,
+    coverMinX: number,
+    coverMaxX: number,
+    coverMinY: number,
+    coverMaxY: number
+  ): CabinetZoneLayoutNode => {
+    const hasSplit =
+      node.splitDirection !== 'none' &&
+      Array.isArray(node.children) &&
+      node.children.length > 0;
+    const hasInsetDoorOnNode =
+      node.content?.type === 'doors' && node.content.doors?.mount === 'inset';
+    const hasSlidingInsetOnNode =
+      hasInsetDoorOnNode && node.content?.doors?.opening === 'sliding';
+    const childMaxZ = hasSlidingInsetOnNode
+      ? Math.max(minZ + 40, maxZ - 2 * frame.doorT - 6)
+      : hasInsetDoorOnNode
+        ? Math.max(minZ + 40, maxZ - frame.doorT - 2)
+        : maxZ;
+
+    if (!hasSplit) {
+      return {
+        zoneId: node.id,
+        splitDirection: 'none',
+        isLeaf: true,
+        depth,
+        minX,
+        maxX,
+        minY,
+        maxY,
+        minZ,
+        maxZ,
+        innerWidth: Math.max(0, Math.round((maxX - minX) * 10) / 10),
+        innerHeight: Math.max(0, Math.round((maxY - minY) * 10) / 10),
+        innerDepth: Math.max(0, Math.round((maxZ - minZ) * 10) / 10),
+        coverMinX,
+        coverMaxX,
+        coverMinY,
+        coverMaxY,
+        content: node.content,
+        children: []
+      };
+    }
+
+    const rawChildren = node.children ?? [];
+    const childNodes: CabinetZoneLayoutNode[] = [];
+
+    if (node.splitDirection === 'vertical') {
+      const spans = computeChildZoneSpans(maxX - minX, frame.t, rawChildren);
+      let cursorX = minX;
+      for (let i = 0; i < rawChildren.length; i++) {
+        const cMinX = cursorX;
+        const cMaxX = i === rawChildren.length - 1 ? maxX : Math.min(maxX, cursorX + spans[i]);
+        const cCoverMinX = i === 0 ? coverMinX : cMinX - frame.t / 2 + frame.gap / 2;
+        const cCoverMaxX = i === rawChildren.length - 1 ? coverMaxX : cMaxX + frame.t / 2 - frame.gap / 2;
+
+        childNodes.push(
+          buildNode(
+            rawChildren[i],
+            depth + 1,
+            cMinX,
+            cMaxX,
+            minY,
+            maxY,
+            minZ,
+            childMaxZ,
+            cCoverMinX,
+            cCoverMaxX,
+            coverMinY,
+            coverMaxY
+          )
+        );
+        cursorX = cMaxX + frame.t;
+      }
+    } else {
+      // 'horizontal': top-to-bottom (children[0] = superior, children[n-1] = inferior)
+      const spans = computeChildZoneSpans(maxY - minY, frame.t, rawChildren);
+      let cursorY = maxY;
+      for (let i = 0; i < rawChildren.length; i++) {
+        const cMaxY = cursorY;
+        const cMinY = i === rawChildren.length - 1 ? minY : Math.max(minY, cursorY - spans[i]);
+        const cCoverMaxY = i === 0 ? coverMaxY : cMaxY + frame.t / 2 - frame.gap / 2;
+        const cCoverMinY = i === rawChildren.length - 1 ? coverMinY : cMinY - frame.t / 2 + frame.gap / 2;
+
+        childNodes.push(
+          buildNode(
+            rawChildren[i],
+            depth + 1,
+            minX,
+            maxX,
+            cMinY,
+            cMaxY,
+            minZ,
+            childMaxZ,
+            coverMinX,
+            coverMaxX,
+            cCoverMinY,
+            cCoverMaxY
+          )
+        );
+        cursorY = cMinY - frame.t;
+      }
+    }
+
+    return {
+      zoneId: node.id,
+      splitDirection: node.splitDirection,
+      isLeaf: false,
+      depth,
+      minX,
+      maxX,
+      minY,
+      maxY,
+      minZ,
+      maxZ,
+      innerWidth: Math.max(0, Math.round((maxX - minX) * 10) / 10),
+      innerHeight: Math.max(0, Math.round((maxY - minY) * 10) / 10),
+      innerDepth: Math.max(0, Math.round((maxZ - minZ) * 10) / 10),
+      coverMinX,
+      coverMaxX,
+      coverMinY,
+      coverMaxY,
+      content: node.content,
+      children: childNodes
+    };
+  };
+
+  return buildNode(
+    rootTree,
+    0,
+    rootMinX,
+    rootMaxX,
+    rootMinY,
+    rootMaxY,
+    frame.zoneMinZ,
+    frame.carcassFrontZ,
+    rootCoverMinX,
+    rootCoverMaxX,
+    rootCoverMinY,
+    rootCoverMaxY
+  );
+}
+
+function inspectZoneFrontProjection(node: CabinetZoneNode | undefined): {
+  hasOverlayFront: boolean;
+  hasSlidingOverlay: boolean;
+} {
+  if (!node) return { hasOverlayFront: false, hasSlidingOverlay: false };
+  let hasOverlayFront = false;
+  let hasSlidingOverlay = false;
+
+  const visit = (cur: CabinetZoneNode) => {
+    const c = cur.content;
+    if (c?.type === 'doors' && c.doors) {
+      if (c.doors.opening === 'sliding' && c.doors.mount !== 'inset') {
+        hasSlidingOverlay = true;
+        hasOverlayFront = true;
+      } else if (c.doors.mount !== 'inset') {
+        hasOverlayFront = true;
+      }
+    } else if (c?.type === 'drawers' && c.drawers) {
+      if (c.drawers.frontMount !== 'inset') {
+        hasOverlayFront = true;
+      }
+    }
+    if (cur.children) {
+      for (const ch of cur.children) {
+        visit(ch);
+      }
+    }
+  };
+
+  visit(node);
+  return { hasOverlayFront, hasSlidingOverlay };
+}
+
+function resolveCabinetBaseType(config: ParametricCabinetConfig): CabinetBaseType {
+  if (config.baseType === 'none' || config.baseType === 'plinth' || config.baseType === 'legs') {
+    return config.baseType;
+  }
+  const isWall =
+    config.moduleType === 'wall_cabinet' ||
+    config.category === 'kitchen_wall' ||
+    config.category === 'bathroom_wall' ||
+    config.moduleType === 'vanity';
+  if (isWall) {
+    return config.hasPlinth === true ? 'plinth' : 'none';
+  }
+  if (config.hasPlinth === false) {
+    return 'none';
+  }
+  if (config.hasPlinth === true) {
+    return 'plinth';
+  }
+  if (config.plinthHeight === 0) {
+    return 'none';
+  }
+  return 'plinth';
+}
+
+function resolveZoneCarcassFrame(
+  config: ParametricCabinetConfig,
+  mainThicknessFallback = 15,
+  doorThicknessFallback = 15,
+  backThicknessFallback = 3
+): ZoneCarcassFrame {
+  const w = Math.max(150, Number(config.width) || 600);
+  const h = Math.max(150, Number(config.height) || 800);
+  const d = Math.max(120, Number(config.depth) || 400);
+  const t = Math.max(9, Math.min(30, Number(config.structureThickness) || mainThicknessFallback));
+  const doorT = Math.max(9, Math.min(30, Number(config.doorThickness) || doorThicknessFallback || t));
+  const backT = Math.max(3, Number(config.backThickness) || backThicknessFallback);
+  const gap = Number.isFinite(Number(config.facadeGap)) ? Math.max(1, Number(config.facadeGap)) : 3;
+
+  const baseType = resolveCabinetBaseType(config);
+  const plinthH =
+    baseType === 'none'
+      ? 0
+      : baseType === 'legs'
+        ? Math.max(50, Math.min(250, Number(config.plinthHeight) || 120))
+        : Math.max(40, Math.min(250, Number(config.plinthHeight) || 80));
+
+  const sideH = Math.max(80, h - plinthH);
+  const posX = Number.isFinite(Number(config.posX)) ? Number(config.posX) : 0;
+  const posZ = Number.isFinite(Number(config.posZ)) ? Number(config.posZ) : 0;
+
+  let posY = config.posY;
+  if (posY === undefined || !Number.isFinite(Number(posY))) {
+    if (config.elevationY !== undefined && Number.isFinite(Number(config.elevationY))) {
+      posY = Number(config.elevationY) + h / 2;
+    } else if (config.moduleType === 'wall_cabinet') {
+      posY = 1450 + h / 2;
+    } else if (config.moduleType === 'vanity') {
+      posY = 450 + h / 2;
+    } else {
+      posY = h / 2;
+    }
+  } else {
+    posY = Number(posY);
+  }
+
+  const frontProj = config.zoneTree
+    ? inspectZoneFrontProjection(config.zoneTree)
+    : {
+        hasOverlayFront:
+          (config.doorOpening && config.doorOpening !== 'none') ||
+          ((config.drawersCount ?? 0) > 0 && config.drawerFrontType !== 'inset'),
+        hasSlidingOverlay: false
+      };
+
+  const frontRecess = frontProj.hasSlidingOverlay
+    ? 2 * doorT + 4
+    : frontProj.hasOverlayFront
+      ? doorT
+      : 0;
+
+  const carcassDepth = Math.max(80, d - frontRecess);
+  const carcassCenterZ = posZ - frontRecess / 2;
+  const carcassBackZ = carcassCenterZ - carcassDepth / 2;
+  const carcassFrontZ = carcassCenterZ + carcassDepth / 2;
+
+  const bottomOfCarcassY = posY - h / 2 + plinthH;
+  const sideCenterY = bottomOfCarcassY + sideH / 2;
+  const topY = bottomOfCarcassY + sideH - t / 2;
+  const innerWidth = Math.max(40, w - 2 * t);
+
+  const topTieStrips =
+    config.topTieStrips === true ||
+    (config.moduleType === 'base_cabinet' && config.hasTopCover === false);
+  const hasTopStructure = topTieStrips || config.hasTopCover !== false;
+
+  const includeBack = config.backType !== 'none' && config.hasBackPanel !== false;
+  const effectiveBackType: 'groove' | 'rebate' | 'overlay' | 'none' = includeBack
+    ? config.backType || 'groove'
+    : 'none';
+
+  let zoneMinZ = carcassBackZ + 2;
+  if (effectiveBackType === 'groove') {
+    zoneMinZ = carcassBackZ + 15 + backT + 2;
+  } else if (effectiveBackType === 'rebate') {
+    zoneMinZ = carcassBackZ + backT + 2;
+  }
+  zoneMinZ = Math.min(zoneMinZ, carcassFrontZ - 40);
+
+  const rootInnerMinY = bottomOfCarcassY + t;
+  const rootInnerMaxY = hasTopStructure ? bottomOfCarcassY + sideH - t : bottomOfCarcassY + sideH;
+
+  return {
+    w,
+    h,
+    d,
+    t,
+    doorT,
+    backT,
+    gap,
+    baseType,
+    plinthH,
+    sideH,
+    posX,
+    posY,
+    posZ,
+    carcassDepth,
+    carcassCenterZ,
+    carcassBackZ,
+    carcassFrontZ,
+    bottomOfCarcassY,
+    sideCenterY,
+    topY,
+    innerWidth,
+    hasTopStructure,
+    topTieStrips,
+    includeBack,
+    effectiveBackType,
+    zoneMinZ,
+    rootInnerMinY,
+    rootInnerMaxY
+  };
+}
+
+function buildAutoZoneSignature(sig: AutoZoneSignature): string {
+  return `zone_auto_root__s${sig.shelves}_d${sig.drawers}_o${sig.doorOpening}_r${sig.rods}_p${sig.plinth ? 1 : 0}_t${sig.tieStrips ? 1 : 0}_m${sig.moduleType}_sp${sig.split}`;
+}
+
+function parseAutoZoneSignature(id: string): AutoZoneSignature | null {
+  if (!id.startsWith('zone_auto_root__')) return null;
+  const match = id.match(
+    /^zone_auto_root__s(\d+)_d(\d+)_o([^_]+)_r(\d+)_p([01])_t([01])_m(.+)_sp(none|horizontal|vertical)$/
+  );
+  if (!match) return null;
+  return {
+    shelves: Number(match[1]),
+    drawers: Number(match[2]),
+    doorOpening: match[3],
+    rods: Number(match[4]),
+    plinth: match[5] === '1',
+    tieStrips: match[6] === '1',
+    moduleType: match[7],
+    split: match[8] as 'none' | 'horizontal' | 'vertical'
+  };
+}
+
+function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZoneNode {
+  const isWall =
+    config.moduleType === 'wall_cabinet' ||
+    config.category === 'kitchen_wall' ||
+    config.category === 'bathroom_wall';
+  const isDrawerUnit =
+    config.moduleType === 'drawer_unit' ||
+    config.category === 'drawers' ||
+    config.category === 'cajones';
+
+  const drawersCount = isWall
+    ? 0
+    : Math.max(0, Math.min(6, Math.floor(Number(config.drawersCount) || (isDrawerUnit ? 3 : 0))));
+  const shelvesCount = isDrawerUnit
+    ? 0
+    : Math.max(0, Math.min(8, Math.floor(Number(config.shelvesCount) || 0)));
+  const rodsCount: 0 | 1 | 2 =
+    config.hangingRodsCount === 2 ? 2 : config.hangingRodsCount === 1 ? 1 : 0;
+  const doorOpening = isDrawerUnit ? 'none' : config.doorOpening || 'none';
+  const hasPlinth = resolveCabinetBaseType(config) !== 'none';
+  const tieStrips = Boolean(config.topTieStrips);
+
+  // Torre de Horno + Microondas -> 4 zonas verticales ordenadas arriba -> abajo
+  if (config.category === 'oven_tower') {
+    const h = Math.max(400, Number(config.height) || 2150);
+    const plinthH = hasPlinth ? Number(config.plinthHeight) || 80 : 0;
+    const sideH = h - plinthH;
+    const lowerZoneH = Math.max(480, Math.round(sideH * 0.32));
+    const hasHandle = config.hasHandle !== false && config.handleType !== 'none';
+    const sigId = buildAutoZoneSignature({
+      shelves: shelvesCount,
+      drawers: 0,
+      doorOpening,
+      rods: 0,
+      plinth: hasPlinth,
+      tieStrips,
+      moduleType: config.moduleType,
+      split: 'horizontal'
+    });
+    return {
+      id: sigId,
+      splitDirection: 'horizontal',
+      children: [
+        {
+          id: 'zone_auto_tower_top',
+          splitDirection: 'none',
+          sizeRatio: 1,
+          content: {
+            type: 'doors',
+            doors: {
+              opening: doorOpening === 'double' ? 'double' : doorOpening === 'right' ? 'right' : 'left',
+              mount: 'overlay',
+              hasHandle,
+              handleType: config.handleType || 'bar_modern',
+              handleFinish: config.handleFinish || 'brushed_steel'
+            }
+          }
+        },
+        {
+          id: 'zone_auto_tower_micro',
+          splitDirection: 'none',
+          exactSizeMm: 388,
+          content: { type: 'empty' }
+        },
+        {
+          id: 'zone_auto_tower_oven',
+          splitDirection: 'none',
+          exactSizeMm: 595,
+          content: { type: 'empty' }
+        },
+        {
+          id: 'zone_auto_tower_bottom',
+          splitDirection: 'none',
+          exactSizeMm: lowerZoneH,
+          content: {
+            type: 'doors',
+            doors: {
+              opening: doorOpening === 'double' ? 'double' : doorOpening === 'right' ? 'right' : 'left',
+              mount: 'overlay',
+              hasHandle,
+              handleType: config.handleType || 'bar_modern',
+              handleFinish: config.handleFinish || 'brushed_steel'
+            }
+          }
+        }
+      ]
+    };
+  }
+
+  // Módulo Bajo Horno -> 2 zonas verticales: nicho de horno (arriba) + gaveta inferior (abajo)
+  if (config.category === 'oven_base') {
+    const hasHandle = config.hasHandle !== false && config.handleType !== 'none';
+    const sigId = buildAutoZoneSignature({
+      shelves: shelvesCount,
+      drawers: 0,
+      doorOpening,
+      rods: 0,
+      plinth: hasPlinth,
+      tieStrips,
+      moduleType: config.moduleType,
+      split: 'horizontal'
+    });
+    return {
+      id: sigId,
+      splitDirection: 'horizontal',
+      children: [
+        {
+          id: 'zone_auto_oven_niche',
+          splitDirection: 'none',
+          exactSizeMm: 595,
+          content: { type: 'empty' }
+        },
+        {
+          id: 'zone_auto_oven_drawer',
+          splitDirection: 'none',
+          sizeRatio: 1,
+          content: {
+            type: 'drawers',
+            drawers: {
+              count: 1,
+              frontMount: 'overlay',
+              deductTopMm: 0,
+              deductBottomMm: 0,
+              deductLeftMm: 0,
+              deductRightMm: 0,
+              openingSystem: hasHandle ? 'handle' : 'push',
+              slideType: hasHandle ? 'telescopic' : 'push_open',
+              bottomType: 'grooved'
+            }
+          }
+        }
+      ]
+    };
+  }
+
+  const sigId = buildAutoZoneSignature({
+    shelves: shelvesCount,
+    drawers: drawersCount,
+    doorOpening,
+    rods: rodsCount,
+    plinth: hasPlinth,
+    tieStrips,
+    moduleType: config.moduleType,
+    split: 'none'
+  });
+
+  if (drawersCount > 0) {
+    const rawSlide = config.drawerSlideType || 'telescopic';
+    const zoneSlide: CabinetZoneDrawerConfig['slideType'] =
+      rawSlide === 'undermount'
+        ? 'undermount'
+        : rawSlide === 'push_open'
+          ? 'push_open'
+          : 'telescopic';
+    const openingSystem: CabinetZoneDrawerConfig['openingSystem'] =
+      zoneSlide === 'push_open' || config.handleType === 'push' || config.handleType === 'push_open'
+        ? 'push'
+        : config.handleType === 'finger_pull' || config.handleType === 'gola_less'
+          ? 'finger_pull'
+          : config.hasHandle === false
+            ? 'push'
+            : 'handle';
+    return {
+      id: sigId,
+      splitDirection: 'none',
+      content: {
+        type: 'drawers',
+        drawers: {
+          count: drawersCount,
+          frontMount: config.drawerFrontType === 'inset' ? 'inset' : 'overlay',
+          deductTopMm: 0,
+          deductBottomMm: 0,
+          deductLeftMm: 0,
+          deductRightMm: 0,
+          openingSystem,
+          slideType: zoneSlide,
+          bottomType: 'grooved'
+        }
+      }
+    };
+  }
+
+  const nonZeroRods: 1 | 2 | undefined = rodsCount === 2 ? 2 : rodsCount === 1 ? 1 : undefined;
+
+  if (doorOpening !== 'none') {
+    const hasHandle = config.hasHandle !== false && config.handleType !== 'none';
+    const mappedOpening: CabinetZoneDoorConfig['opening'] =
+      doorOpening === 'double' ? 'double' : doorOpening === 'right' ? 'right' : 'left';
+    return {
+      id: sigId,
+      splitDirection: 'none',
+      content: {
+        type: 'doors',
+        doors: {
+          opening: mappedOpening,
+          mount: 'overlay',
+          hasHandle,
+          handleType: hasHandle ? config.handleType || 'bar_modern' : 'none',
+          handleFinish: config.handleFinish || 'brushed_steel'
+        },
+        ...(shelvesCount > 0 ? { shelvesCount, shelfSetbackMm: 20 } : {}),
+        ...(nonZeroRods ? { hangingRodsCount: nonZeroRods } : {})
+      }
+    };
+  }
+
+  if (nonZeroRods) {
+    return {
+      id: sigId,
+      splitDirection: 'none',
+      content: {
+        type: 'hanging_rod',
+        hangingRodsCount: nonZeroRods,
+        ...(shelvesCount > 0 ? { shelvesCount, shelfSetbackMm: 10 } : {})
+      }
+    };
+  }
+
+  if (shelvesCount > 0) {
+    return {
+      id: sigId,
+      splitDirection: 'none',
+      content: {
+        type: 'shelves',
+        shelvesCount,
+        shelfSetbackMm: 10
+      }
+    };
+  }
+
+  return {
+    id: sigId,
+    splitDirection: 'none',
+    content: { type: 'empty' }
+  };
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class CabinetGeneratorService {
   private readonly partGeometry = inject(PartGeometryService);
+
+  private isZoneTreeMatchingAutoSignature(node: CabinetZoneNode, sig: AutoZoneSignature): boolean {
+    if (node.splitDirection !== sig.split) return false;
+    if (sig.split !== 'none') {
+      if (!node.id.startsWith('zone_auto_root__') || !Array.isArray(node.children)) {
+        return false;
+      }
+      if (node.children.length === 4 && node.children[1]?.id === 'zone_auto_tower_micro') {
+        return (
+          node.children[0]?.content?.type === 'doors' &&
+          node.children[1]?.content?.type === 'empty' &&
+          node.children[2]?.content?.type === 'empty' &&
+          node.children[3]?.content?.type === 'doors'
+        );
+      }
+      if (node.children.length === 2 && node.children[0]?.id === 'zone_auto_oven_niche') {
+        return (
+          node.children[0]?.content?.type === 'empty' &&
+          node.children[1]?.content?.type === 'drawers'
+        );
+      }
+      return node.children.every(ch => ch.id.startsWith('zone_auto_'));
+    }
+    const c = node.content;
+    if (!c) return sig.drawers === 0 && sig.shelves === 0 && sig.doorOpening === 'none' && sig.rods === 0;
+    if (sig.drawers > 0) {
+      return c.type === 'drawers' && (c.drawers?.count ?? 0) === sig.drawers;
+    }
+    if (sig.doorOpening !== 'none') {
+      const expectedOpening =
+        sig.doorOpening === 'double' ? 'double' : sig.doorOpening === 'right' ? 'right' : 'left';
+      return (
+        c.type === 'doors' &&
+        c.doors?.opening === expectedOpening &&
+        (c.shelvesCount ?? 0) === sig.shelves &&
+        (c.hangingRodsCount ?? 0) === sig.rods
+      );
+    }
+    if (sig.rods > 0) {
+      return c.type === 'hanging_rod' && (c.hangingRodsCount ?? 0) === sig.rods;
+    }
+    if (sig.shelves > 0) {
+      return c.type === 'shelves' && (c.shelvesCount ?? 0) === sig.shelves;
+    }
+    return c.type === 'empty';
+  }
+
+  private hasFlatConfigDivergedFromSignature(
+    config: ParametricCabinetConfig,
+    sig: AutoZoneSignature
+  ): boolean {
+    const isDrawerUnit =
+      config.moduleType === 'drawer_unit' ||
+      config.category === 'drawers' ||
+      config.category === 'cajones';
+    const isWall =
+      config.moduleType === 'wall_cabinet' ||
+      config.category === 'kitchen_wall' ||
+      config.category === 'bathroom_wall';
+    const curDrawers = isWall
+      ? 0
+      : Math.max(0, Math.min(6, Math.floor(Number(config.drawersCount) || (isDrawerUnit ? 3 : 0))));
+    const curShelves = isDrawerUnit
+      ? 0
+      : Math.max(0, Math.min(8, Math.floor(Number(config.shelvesCount) || 0)));
+    const curDoor = isDrawerUnit ? 'none' : config.doorOpening || 'none';
+    const curRods = config.hangingRodsCount === 2 ? 2 : config.hangingRodsCount === 1 ? 1 : 0;
+    const curPlinth = config.hasPlinth !== false && resolveCabinetBaseType(config) !== 'none';
+    const curTie = Boolean(config.topTieStrips);
+
+    return (
+      curDrawers !== sig.drawers ||
+      curShelves !== sig.shelves ||
+      curDoor !== sig.doorOpening ||
+      curRods !== sig.rods ||
+      curPlinth !== sig.plinth ||
+      curTie !== sig.tieStrips ||
+      config.moduleType !== sig.moduleType
+    );
+  }
+
+  private shouldUseZoneEngine(config: ParametricCabinetConfig): boolean {
+    if (!config.zoneTree) return false;
+    const sig = parseAutoZoneSignature(config.zoneTree.id);
+    if (!sig) {
+      return true;
+    }
+    if (!this.isZoneTreeMatchingAutoSignature(config.zoneTree, sig)) {
+      return true;
+    }
+    if (config.baseType === 'legs' || config.backType === 'rebate') {
+      return true;
+    }
+    const isSpecialized =
+      config.category === 'oven_base' ||
+      config.category === 'sink_base' ||
+      config.category === 'corner_base' ||
+      config.category === 'blind_corner_base' ||
+      config.category === 'oven_tower';
+    if (isSpecialized) {
+      return false;
+    }
+    if (config.doorOpening === 'top' || config.doorOpening === 'bottom' || config.siphonCutout?.enabled) {
+      return false;
+    }
+    if (this.hasFlatConfigDivergedFromSignature(config, sig)) {
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Generates a fully parametric furniture module (Kitchen Base, Wall Cabinet, Closet,
@@ -24,11 +887,18 @@ export class CabinetGeneratorService {
     config: ParametricCabinetConfig, 
     materials: Material[]
   ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
-    if (config.category === 'oven_base' || config.category === 'sink_base' || config.category === 'corner_base' || config.category === 'blind_corner_base' || config.category === 'oven_tower') {
-      return this.generateSpecializedKitchenModule(config, materials);
+    if (this.shouldUseZoneEngine(config)) {
+      return this.generateZoneCabinet(config, materials);
     }
-    if (config.moduleType === 'drawer_unit' || config.category === 'drawers' || config.category === 'cajones' || (config.drawersCount && config.drawersCount > 0 && config.moduleType !== 'wall_cabinet')) {
-      return this.generateParametricDrawerUnit(config, materials);
+    const cleanCfg: ParametricCabinetConfig = config.zoneTree
+      ? { ...config, zoneTree: undefined }
+      : config;
+
+    if (cleanCfg.category === 'oven_base' || cleanCfg.category === 'sink_base' || cleanCfg.category === 'corner_base' || cleanCfg.category === 'blind_corner_base' || cleanCfg.category === 'oven_tower') {
+      return this.generateSpecializedKitchenModule(cleanCfg, materials);
+    }
+    if (cleanCfg.moduleType === 'drawer_unit' || cleanCfg.category === 'drawers' || cleanCfg.category === 'cajones' || (cleanCfg.drawersCount && cleanCfg.drawersCount > 0 && cleanCfg.moduleType !== 'wall_cabinet')) {
+      return this.generateParametricDrawerUnit(cleanCfg, materials);
     }
 
     const moduleId = config.id || `module_cab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -1470,6 +2340,28 @@ export class CabinetGeneratorService {
         ? { enabled: true, width: Number(raw.siphonCutout.width) || 200, depth: Number(raw.siphonCutout.depth) || 250 }
         : { enabled: false, width: 200, depth: 250 };
 
+      const resolvedBaseType: CabinetBaseType | undefined =
+        raw.baseType === 'none' || raw.baseType === 'plinth' || raw.baseType === 'legs'
+          ? raw.baseType
+          : undefined;
+      const effectiveHasPlinth = resolvedBaseType
+        ? resolvedBaseType === 'plinth'
+        : isWallType
+          ? false
+          : raw.hasPlinth !== undefined
+            ? Boolean(raw.hasPlinth)
+            : true;
+      const effectivePlinthH =
+        resolvedBaseType === 'legs'
+          ? Math.max(50, Number(raw.plinthHeight) || 120)
+          : resolvedBaseType === 'none'
+            ? 0
+            : isWallType
+              ? 0
+              : effectiveHasPlinth
+                ? Number(raw.plinthHeight) || 70
+                : 0;
+
       return {
         name: raw.name || group.name || 'Módulo Paramétrico',
         code: raw.code || ('MOD_' + group.id.slice(-4)),
@@ -1502,12 +2394,15 @@ export class CabinetGeneratorService {
         drawersCount: resolvedDrawersCount,
         drawerSlideType: raw.drawerSlideType || 'telescopic',
         drawerFrontType: raw.drawerFrontType || 'overlay',
-        hasPlinth: isWallType ? false : (raw.hasPlinth !== undefined ? Boolean(raw.hasPlinth) : true),
-        plinthHeight: isWallType ? 0 : (Number(raw.plinthHeight) || 70),
+        hasPlinth: effectiveHasPlinth,
+        plinthHeight: effectivePlinthH,
+        baseType: resolvedBaseType,
         topTieStrips: isWallType ? false : Boolean(raw.topTieStrips),
         hasTopCover: isWallType ? true : (raw.hasTopCover !== undefined ? Boolean(raw.hasTopCover) : true),
         hangingRodsCount: safeHangingRodsCount,
-        siphonCutout: safeSiphonCutout
+        siphonCutout: safeSiphonCutout,
+        zoneTree: raw.zoneTree ? deepCloneZoneNode(raw.zoneTree) : undefined,
+        highlightedZoneId: raw.highlightedZoneId
       };
     };
 
@@ -1532,7 +2427,14 @@ export class CabinetGeneratorService {
     const doorParts = parts.filter(p => p.componentRole === 'door');
     const shelfParts = parts.filter(p => p.componentRole === 'shelf');
     const backPart = parts.find(p => p.componentRole === 'back');
-    const rodParts = parts.filter(p => p.name.includes('Tubo Colgador') || p.notes?.includes('colgado') || p.materialId === 'hw_rod_chrome');
+    const legParts = parts.filter(
+      p => p.componentRole === 'accessory' && (p.materialId === 'hw_leg_inox' || p.name.toLowerCase().includes('pata'))
+    );
+    const rodParts = parts.filter(
+      p =>
+        !legParts.includes(p) &&
+        (p.name.includes('Tubo Colgador') || p.notes?.includes('colgado') || p.materialId === 'hw_rod_chrome')
+    );
     const actualRodCount: 0 | 1 | 2 = rodParts.length >= 2 ? 2 : (rodParts.length === 1 ? 1 : 0);
     const actualDrawerCount = drawerFronts.length > 0
       ? drawerFronts.length
@@ -1581,15 +2483,29 @@ export class CabinetGeneratorService {
         cfg.hangingRodsCount = actualRodCount;
       }
 
+      if (!cfg.baseType) {
+        cfg.baseType = legParts.length > 0 ? 'legs' : resolveCabinetBaseType(cfg);
+      }
+      if (!cfg.zoneTree) {
+        cfg.zoneTree = buildAutoZoneTreeFromConfig(cfg);
+      }
+
       return cfg;
     }
 
     const sidePart = parts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || parts[0];
     const topOrBottom = parts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
+    const plinthPart = parts.find(p => p.componentRole === 'plinth');
+    const detectedBaseH = legParts.length > 0
+      ? Math.max(50, Number(legParts[0]?.thickness) || 120)
+      : plinthPart
+        ? Math.max(40, Number(plinthPart.width) || 70)
+        : 0;
+    const detectedBaseType: CabinetBaseType = legParts.length > 0 ? 'legs' : plinthPart ? 'plinth' : 'none';
 
     const t = Number(sidePart?.thickness) || 15;
     const sideLocal = sidePart ? this.partGeometry.getLocalDimensions(sidePart) : null;
-    const height = sideLocal ? sideLocal.sy : 800;
+    const height = sideLocal ? sideLocal.sy + detectedBaseH : 800;
     const innerWidth = topOrBottom
       ? Number(sidePart?.orientation === 'vertical_xy' ? topOrBottom.width : topOrBottom.length) || 570
       : 570;
@@ -1607,9 +2523,8 @@ export class CabinetGeneratorService {
       const drawersCount = actualDrawerCount;
       const frontPart = drawerFronts[0];
       const hw = frontPart?.hardwareConfig;
-      const plinthPart = parts.find(p => p.componentRole === 'plinth');
 
-      return normalizeConfig({
+      const drawerCfg = normalizeConfig({
         name: group.name || 'Cajonera Paramétrica',
         code: 'CAJ_' + group.id.slice(-4),
         moduleType: 'drawer_unit',
@@ -1626,9 +2541,10 @@ export class CabinetGeneratorService {
         doorOpening: 'none',
         drawersCount,
         drawerSlideType: (hw?.slideType && hw.slideType !== 'none') ? hw.slideType : 'telescopic',
-        drawerFrontType: 'overlay',
-        hasPlinth: !!plinthPart,
-        plinthHeight: plinthPart ? Number(plinthPart.width || 70) : 0,
+        drawerFrontType: hw?.frontMountType === 'inset' ? 'inset' : 'overlay',
+        hasPlinth: detectedBaseType === 'plinth',
+        plinthHeight: detectedBaseH,
+        baseType: detectedBaseType,
         hasHandle: hw?.handleType !== 'none',
         handleType: hw?.handleType || 'bar_modern',
         handleFinish: hw?.handleFinish || 'brushed_steel',
@@ -1641,6 +2557,8 @@ export class CabinetGeneratorService {
         posY: sidePart?.posY !== undefined ? Number(sidePart.posY) : undefined,
         posZ: Number(parts[0]?.posZ) || 0
       });
+      drawerCfg.zoneTree = buildAutoZoneTreeFromConfig(drawerCfg);
+      return drawerCfg;
     }
 
     let doorOpening: ParametricCabinetConfig['doorOpening'] = 'none';
@@ -1676,7 +2594,7 @@ export class CabinetGeneratorService {
     const hangingRodsCount: 0 | 1 | 2 = actualRodCount;
     const isWallByPosition = parts[0]?.name.toLowerCase().includes('alacena') || (sidePart?.posY !== undefined && sidePart.posY > 1000);
 
-    return normalizeConfig({
+    const baseCfg = normalizeConfig({
       name: group.name,
       code: 'MOD_' + group.id.slice(-4),
       moduleType: isWallByPosition ? 'wall_cabinet' : 'base_cabinet',
@@ -1694,6 +2612,9 @@ export class CabinetGeneratorService {
       doorOpening,
       drawersCount: 0,
       hangingRodsCount,
+      hasPlinth: detectedBaseType === 'plinth',
+      plinthHeight: detectedBaseH,
+      baseType: detectedBaseType,
       hasHandle: doorParts[0]?.hardwareConfig?.handleType !== 'none',
       handleType: doorParts[0]?.hardwareConfig?.handleType || 'bar_modern',
       handleFinish: doorParts[0]?.hardwareConfig?.handleFinish || 'brushed_steel',
@@ -1706,6 +2627,95 @@ export class CabinetGeneratorService {
       posY: sidePart?.posY !== undefined ? Number(sidePart.posY) : undefined,
       posZ: Number(parts[0]?.posZ) || 0
     });
+
+    const dividerParts = parts
+      .filter(p => p.componentRole === 'divider')
+      .sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
+
+    if (dividerParts.length > 0 && sidePart) {
+      const bayBoundariesX: number[] = [];
+      const minXSide = (parts.find(p => p.componentRole === 'side_left')?.posX ?? ((baseCfg.posX ?? 0) - width / 2 + t / 2)) + t / 2;
+      const maxXSide = (parts.find(p => p.componentRole === 'side_right')?.posX ?? ((baseCfg.posX ?? 0) + width / 2 - t / 2)) - t / 2;
+      bayBoundariesX.push(minXSide);
+      for (const div of dividerParts) {
+        const divX = div.posX ?? 0;
+        bayBoundariesX.push(divX - t / 2, divX + t / 2);
+      }
+      bayBoundariesX.push(maxXSide);
+
+      const bayChildren: CabinetZoneNode[] = [];
+      for (let bIdx = 0; bIdx + 1 < bayBoundariesX.length; bIdx += 2) {
+        const bMinX = bayBoundariesX[bIdx];
+        const bMaxX = bayBoundariesX[bIdx + 1];
+        const bayW = Math.max(50, Math.round(bMaxX - bMinX));
+        const inBay = (p: Part): boolean => (p.posX ?? 0) >= bMinX - 2 && (p.posX ?? 0) <= bMaxX + 2;
+        const bayDoors = doorParts.filter(inBay);
+        const bayShelves = shelfParts.filter(inBay).length;
+        const bayRods = rodParts.filter(inBay).length;
+        const bayDrawers = drawerFronts.filter(inBay).length;
+
+        let bayContent: CabinetZoneContent = { type: 'empty' };
+        if (bayDrawers > 0) {
+          bayContent = {
+            type: 'drawers',
+            drawers: {
+              count: Math.min(6, bayDrawers),
+              frontMount: 'overlay',
+              deductTopMm: 0,
+              deductBottomMm: 0,
+              deductLeftMm: 0,
+              deductRightMm: 0,
+              openingSystem: 'handle',
+              slideType: 'telescopic',
+              bottomType: 'grooved'
+            }
+          };
+        } else if (bayDoors.length > 0) {
+          bayContent = {
+            type: 'doors',
+            doors: {
+              opening: bayDoors.length >= 2 ? 'double' : (bayDoors[0].hardwareConfig?.openingDirection === 'right' ? 'right' : 'left'),
+              mount: 'overlay',
+              hasHandle: bayDoors[0].hardwareConfig?.handleType !== 'none',
+              handleType: bayDoors[0].hardwareConfig?.handleType || 'bar_modern',
+              handleFinish: bayDoors[0].hardwareConfig?.handleFinish || 'brushed_steel'
+            },
+            ...(bayShelves > 0 ? { shelvesCount: bayShelves, shelfSetbackMm: 20 } : {}),
+            ...(bayRods > 0 ? { hangingRodsCount: bayRods >= 2 ? 2 : 1 } : {})
+          };
+        } else if (bayRods > 0) {
+          bayContent = { type: 'hanging_rod', hangingRodsCount: bayRods >= 2 ? 2 : 1 };
+        } else if (bayShelves > 0) {
+          bayContent = { type: 'shelves', shelvesCount: bayShelves, shelfSetbackMm: 10 };
+        }
+
+        bayChildren.push({
+          id: `zone_auto_bay_${bIdx / 2 + 1}`,
+          splitDirection: 'none',
+          exactSizeMm: bayW,
+          content: bayContent
+        });
+      }
+
+      baseCfg.zoneTree = {
+        id: buildAutoZoneSignature({
+          shelves: shelvesCount,
+          drawers: 0,
+          doorOpening,
+          rods: hangingRodsCount,
+          plinth: detectedBaseType !== 'none',
+          tieStrips: false,
+          moduleType: baseCfg.moduleType,
+          split: 'vertical'
+        }),
+        splitDirection: 'vertical',
+        children: bayChildren
+      };
+    } else {
+      baseCfg.zoneTree = buildAutoZoneTreeFromConfig(baseCfg);
+    }
+
+    return baseCfg;
   }
 
   /**
@@ -2952,6 +3962,1654 @@ export class CabinetGeneratorService {
         ...config,
         drawersCount: 0,
         hangingRodsCount: 0
+      }
+    };
+
+    return { module, parts, group };
+  }
+
+  /**
+   * Calcula de forma determinista el árbol completo de cotas 3D de todas las zonas del mueble.
+   * Orden en `splitDirection === 'vertical'`: izquierda (-X) -> derecha (+X).
+   * Orden en `splitDirection === 'horizontal'`: arriba (+Y) -> abajo (-Y).
+   */
+  computeZoneBoundsLayout(config: ParametricCabinetConfig): CabinetZoneLayoutNode {
+    return computeZoneBoundsLayout(config);
+  }
+
+  /**
+   * Calcula las cajas envolventes 3D de resaltado por cada zona (`zoneId`) para la escena 3D.
+   * Si se entregan `groupParts`, alinea automáticamente las cajas al centro y rotación real del módulo en escena.
+   */
+  computeZoneHighlightBoxes(
+    config: ParametricCabinetConfig,
+    groupParts?: Part[]
+  ): Map<string, CabinetZoneHighlightBox> {
+    const layout = computeZoneBoundsLayout(config);
+    const frame = resolveZoneCarcassFrame(config);
+    const map = new Map<string, CabinetZoneHighlightBox>();
+
+    let facing: 'front' | 'right' | 'back' | 'left' = 'front';
+    let offsetX = 0;
+    let offsetY = 0;
+    let offsetZ = 0;
+    let pivotX = frame.posX;
+    let pivotZ = frame.carcassCenterZ;
+    let targetCx = frame.posX;
+    let targetCz = frame.carcassCenterZ;
+
+    if (groupParts && groupParts.length > 0) {
+      const carcassParts = groupParts.filter(
+        p =>
+          p.componentRole === 'side_left' ||
+          p.componentRole === 'side_right' ||
+          p.componentRole === 'top' ||
+          p.componentRole === 'bottom' ||
+          p.componentRole === 'tie' ||
+          p.componentRole === 'plinth'
+      );
+      const refParts = carcassParts.length > 0 ? carcassParts : groupParts;
+
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (const p of refParts) {
+        const b = this.partGeometry.getWorldAABB(p);
+        if (b.minX < minX) minX = b.minX;
+        if (b.maxX > maxX) maxX = b.maxX;
+        if (b.minY < minY) minY = b.minY;
+        if (b.maxY > maxY) maxY = b.maxY;
+        if (b.minZ < minZ) minZ = b.minZ;
+        if (b.maxZ > maxZ) maxZ = b.maxZ;
+      }
+
+      if (Number.isFinite(minX)) {
+        targetCx = (minX + maxX) / 2;
+        targetCz = (minZ + maxZ) / 2;
+        const canonicalMinY = frame.posY - frame.h / 2;
+        offsetY = minY - canonicalMinY;
+        offsetX = targetCx - frame.posX;
+        offsetZ = targetCz - frame.carcassCenterZ;
+        pivotX = frame.posX;
+        pivotZ = frame.carcassCenterZ;
+
+        const sideLeft = groupParts.find(p => p.componentRole === 'side_left');
+        const backPart = groupParts.find(p => p.componentRole === 'back');
+        const frontPart = groupParts.find(p => p.componentRole === 'door' || p.componentRole === 'drawer_front');
+
+        if (sideLeft?.orientation === 'vertical_xy') {
+          if (frontPart) {
+            facing = (frontPart.posX ?? targetCx) >= targetCx ? 'right' : 'left';
+          } else if (backPart) {
+            facing = (backPart.posX ?? targetCx) <= targetCx ? 'right' : 'left';
+          } else {
+            facing = 'right';
+          }
+        } else if (backPart && (backPart.posZ ?? targetCz) > targetCz) {
+          facing = 'back';
+        } else if (frontPart && (frontPart.posZ ?? targetCz) < targetCz) {
+          facing = 'back';
+        }
+      }
+    }
+
+    const transformPoint = (x: number, y: number, z: number): { x: number; y: number; z: number } => {
+      const dx = x - pivotX;
+      const dz = z - pivotZ;
+      let rx = dx;
+      let rz = dz;
+      if (facing === 'right') {
+        rx = dz;
+        rz = -dx;
+      } else if (facing === 'left') {
+        rx = -dz;
+        rz = dx;
+      } else if (facing === 'back') {
+        rx = -dx;
+        rz = -dz;
+      }
+      return {
+        x: Math.round((pivotX + rx + offsetX) * 10) / 10,
+        y: Math.round((y + offsetY) * 10) / 10,
+        z: Math.round((pivotZ + rz + offsetZ) * 10) / 10
+      };
+    };
+
+    const collect = (node: CabinetZoneLayoutNode) => {
+      const p1 = transformPoint(node.minX, node.minY, node.minZ);
+      const p2 = transformPoint(node.maxX, node.maxY, node.maxZ);
+      map.set(node.zoneId, {
+        zoneId: node.zoneId,
+        minX: Math.min(p1.x, p2.x),
+        maxX: Math.max(p1.x, p2.x),
+        minY: Math.min(p1.y, p2.y),
+        maxY: Math.max(p1.y, p2.y),
+        minZ: Math.min(p1.z, p2.z),
+        maxZ: Math.max(p1.z, p2.z)
+      });
+      for (const ch of node.children) {
+        collect(ch);
+      }
+    };
+
+    collect(layout);
+    return map;
+  }
+
+  /**
+   * Hidrata un `zoneTree` editable y `baseType` a partir de cualquier configuración paramétrica plana.
+   */
+  hydrateZoneTreeFromConfig(cfg: ParametricCabinetConfig): ParametricCabinetConfig {
+    if (cfg.zoneTree) {
+      return {
+        ...cfg,
+        baseType: resolveCabinetBaseType(cfg),
+        zoneTree: deepCloneZoneNode(cfg.zoneTree)
+      };
+    }
+    const baseType = resolveCabinetBaseType(cfg);
+    return {
+      ...cfg,
+      baseType,
+      zoneTree: buildAutoZoneTreeFromConfig({ ...cfg, baseType })
+    };
+  }
+
+  /**
+   * Hidrata una configuración paramétrica completa con `zoneTree` desde una plantilla del catálogo.
+   */
+  hydrateTemplateConfig(
+    template: FurnitureTemplate,
+    materials: Material[]
+  ): ParametricCabinetConfig {
+    const fallbackMat = materials.find(m => m.textureType !== 'stone' && m.thickness >= 12) ||
+      materials[0] || {
+        id: 'mat_default',
+        name: 'Melamina Blanco Frost Mate',
+        thickness: 15,
+        sheetLength: 2440,
+        sheetWidth: 1830,
+        sheetCost: 185000,
+        hasGrain: false,
+        colorHex: '#f8fafc'
+      };
+    const backMat = materials.find(m => m.thickness <= 6) || fallbackMat;
+    const whiteMat = materials.find(m => m.name.toLowerCase().includes('blanco') && m.thickness >= 12) || fallbackMat;
+
+    if (template.parametricConfig) {
+      const partial = template.parametricConfig;
+      const w = Number(partial.width) || template.dimensions.width || 600;
+      const h = Number(partial.height) || template.dimensions.height || 800;
+      const d = Number(partial.depth) || template.dimensions.depth || 400;
+      const baseCfg: ParametricCabinetConfig = {
+        code: partial.code || template.id.toUpperCase().slice(0, 10),
+        name: partial.name || template.name,
+        moduleType: partial.moduleType || 'base_cabinet',
+        category: partial.category || 'kitchen_base',
+        environmentLine: partial.environmentLine || template.environmentLine,
+        width: w,
+        height: h,
+        depth: d,
+        structureThickness: Number(partial.structureThickness) || whiteMat.thickness || 15,
+        doorThickness: Number(partial.doorThickness) || whiteMat.thickness || 15,
+        backThickness: Number(partial.backThickness) || 3,
+        backType: partial.backType || (partial.hasBackPanel === false ? 'none' : 'groove'),
+        hasBackPanel: partial.hasBackPanel !== undefined ? partial.hasBackPanel : (partial.backType !== 'none'),
+        shelvesCount: Number(partial.shelvesCount) || 0,
+        shelfDistribution: partial.shelfDistribution || 'uniform',
+        shelfManualOffsets: partial.shelfManualOffsets,
+        doorOpening: partial.doorOpening || 'none',
+        hasHandle: partial.hasHandle !== undefined ? partial.hasHandle : true,
+        handleType: partial.handleType || 'bar_modern',
+        handleFinish: partial.handleFinish || 'brushed_steel',
+        handlePosition: partial.handlePosition || 'vertical',
+        structureMaterialId: partial.structureMaterialId || whiteMat.id,
+        doorMaterialId: partial.doorMaterialId || whiteMat.id,
+        backMaterialId: partial.backMaterialId || backMat.id,
+        facadeGap: partial.facadeGap ?? 3,
+        drawersCount: partial.drawersCount,
+        drawerSlideType: partial.drawerSlideType,
+        drawerFrontType: partial.drawerFrontType,
+        hasPlinth: partial.hasPlinth,
+        plinthHeight: partial.plinthHeight,
+        hasTopCover: partial.hasTopCover,
+        topTieStrips: partial.topTieStrips,
+        elevationY: partial.elevationY,
+        siphonCutout: partial.siphonCutout,
+        hangingRodsCount: partial.hangingRodsCount,
+        cornerReturnWidth: partial.cornerReturnWidth,
+        baseType: partial.baseType,
+        zoneTree: partial.zoneTree ? deepCloneZoneNode(partial.zoneTree) : undefined
+      };
+      return this.hydrateZoneTreeFromConfig(baseCfg);
+    }
+
+    const parts = template.generateParts(materials.length > 0 ? materials : [whiteMat, backMat], 0);
+    const dummyGroup: PartGroup = {
+      id: `grp_${template.id}`,
+      name: template.name,
+      type: 'assembly'
+    };
+    const reconstructed = this.reconstructConfigFromParts(parts, dummyGroup);
+    return this.hydrateZoneTreeFromConfig({
+      ...reconstructed,
+      environmentLine: template.environmentLine,
+      width: template.dimensions.width || reconstructed.width,
+      height: template.dimensions.height || reconstructed.height,
+      depth: template.dimensions.depth || reconstructed.depth
+    });
+  }
+
+  /**
+   * Hidrata un `ParametricCabinetConfig` con `zoneTree` a partir de piezas colocadas y/o plantilla origen.
+   */
+  hydrateConfigFromPartsOrTemplate(
+    parts: Part[],
+    group: PartGroup,
+    template?: FurnitureTemplate,
+    materials: Material[] = []
+  ): ParametricCabinetConfig {
+    if (group.parametricConfig) {
+      const reconstructed = this.reconstructConfigFromParts(parts, group);
+      return this.hydrateZoneTreeFromConfig(reconstructed);
+    }
+    if (template) {
+      const fromTemplate = this.hydrateTemplateConfig(template, materials);
+      const sidePart = parts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || parts[0];
+      return {
+        ...fromTemplate,
+        name: group.name || fromTemplate.name,
+        posX: Number.isFinite(Number(parts[0]?.posX)) ? Number(parts[0]?.posX) : fromTemplate.posX,
+        posY: sidePart?.posY !== undefined ? Number(sidePart.posY) : fromTemplate.posY,
+        posZ: Number.isFinite(Number(parts[0]?.posZ)) ? Number(parts[0]?.posZ) : fromTemplate.posZ
+      };
+    }
+    return this.hydrateZoneTreeFromConfig(this.reconstructConfigFromParts(parts, group));
+  }
+
+  /**
+   * Resume los componentes reales generados por una plantilla (piezas, puertas, cajones, repisas y tubos).
+   */
+  summarizeTemplateComponents(
+    template: FurnitureTemplate,
+    materials: Material[]
+  ): {
+    partsCount: number;
+    doorsCount: number;
+    drawersCount: number;
+    shelvesCount: number;
+    rodsCount: number;
+  } {
+    const parts = template.generateParts(materials, 0);
+    let partsCount = 0;
+    let doorsCount = 0;
+    let drawersCount = 0;
+    let shelvesCount = 0;
+    let rodsCount = 0;
+
+    for (const p of parts) {
+      const qty = Math.max(1, Number(p.quantity) || 1);
+      partsCount += qty;
+      if (p.componentRole === 'door') {
+        doorsCount += qty;
+      } else if (p.componentRole === 'drawer_front') {
+        drawersCount += qty;
+      } else if (p.componentRole === 'shelf') {
+        shelvesCount += qty;
+      } else if (
+        p.shapeType === 'circle' &&
+        (p.materialId === 'hw_rod_chrome' ||
+          p.name.toLowerCase().includes('tubo') ||
+          p.name.toLowerCase().includes('colgador'))
+      ) {
+        rodsCount += qty;
+      }
+    }
+
+    return {
+      partsCount,
+      doorsCount,
+      drawersCount,
+      shelvesCount,
+      rodsCount
+    };
+  }
+
+  /**
+   * Motor Paramétrico Recursivo por Zonas:
+   * - Paso A: Casco exterior (laterales, piso, techo/amarres, fondo ranurado/galce/sobrepuesto/sin fondo, zócalo o patas).
+   * - Paso B: Subdivisión recursiva vertical (izquierda -> derecha) u horizontal (arriba -> abajo)
+   *   con contenidos independientes por zona y cero colisiones físicas.
+   */
+  generateZoneCabinet(
+    config: ParametricCabinetConfig,
+    materials: Material[],
+    options?: { groupId?: string; moduleId?: string }
+  ): { module: FurnitureModule; parts: Part[]; group: PartGroup } {
+    const stamp = Date.now().toString(36);
+    const rand = Math.random().toString(36).substring(2, 6);
+    const moduleId = options?.moduleId || config.id || `module_zone_${stamp}_${rand}`;
+    const groupId = options?.groupId || `group_zone_${stamp}_${rand}`;
+    const groupName = config.name || `Módulo por Zonas (${config.code || 'ZON001'})`;
+
+    const fallbackMat: Material = {
+      id: 'mat_default',
+      name: 'Melamina Blanco Frost Mate',
+      thickness: 15,
+      sheetLength: 2440,
+      sheetWidth: 1830,
+      sheetCost: 185000,
+      hasGrain: false,
+      colorHex: '#f8fafc',
+      textureType: 'solid'
+    };
+    const mainMat =
+      materials.find(m => m.id === config.structureMaterialId) ||
+      materials.find(m => m.textureType !== 'stone' && m.thickness >= 12) ||
+      materials[0] ||
+      fallbackMat;
+    const doorMat = materials.find(m => m.id === config.doorMaterialId) || mainMat;
+    const backMat =
+      materials.find(m => m.id === config.backMaterialId) ||
+      materials.find(m => m.thickness <= 6) ||
+      mainMat;
+
+    const effectiveTree: CabinetZoneNode = config.zoneTree
+      ? deepCloneZoneNode(config.zoneTree)
+      : buildAutoZoneTreeFromConfig(config);
+
+    const effT = Math.max(9, Math.min(30, Number(config.structureThickness) || mainMat.thickness || 15));
+    const effDoorT = Math.max(9, Math.min(30, Number(config.doorThickness) || doorMat.thickness || effT));
+    const effBackT = Math.max(3, Number(config.backThickness) || (backMat.thickness <= 6 ? backMat.thickness : 3));
+
+    const effectiveConfig: ParametricCabinetConfig = {
+      ...config,
+      structureThickness: effT,
+      doorThickness: effDoorT,
+      backThickness: effBackT,
+      baseType: resolveCabinetBaseType(config),
+      zoneTree: effectiveTree
+    };
+
+    const frame = resolveZoneCarcassFrame(effectiveConfig, effT, effDoorT, effBackT);
+    const layout = computeZoneBoundsLayout(effectiveConfig);
+    const parts: Part[] = [];
+    let uidCounter = 1;
+    const nextId = (slug: string): string => `${moduleId}_${slug}_${uidCounter++}_${stamp}`;
+
+    const roundMm = (val: number): number => Math.round(val * 10) / 10;
+
+    // --- PASO A: CASCO EXTERIOR ---
+    // 1. Lateral Izquierdo y Derecho
+    parts.push({
+      id: nextId('lat_izq'),
+      name: 'Lateral Izquierdo',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: roundMm(frame.sideH),
+      width: roundMm(frame.carcassDepth),
+      thickness: frame.t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      colorHex: mainMat.colorHex,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+      posX: roundMm(frame.posX - frame.w / 2 + frame.t / 2),
+      posY: roundMm(frame.sideCenterY),
+      posZ: roundMm(frame.carcassCenterZ),
+      orientation: 'vertical_yz',
+      componentRole: 'side_left',
+      notes: 'Lateral exterior izquierdo'
+    });
+
+    parts.push({
+      id: nextId('lat_der'),
+      name: 'Lateral Derecho',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: roundMm(frame.sideH),
+      width: roundMm(frame.carcassDepth),
+      thickness: frame.t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      colorHex: mainMat.colorHex,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
+      posX: roundMm(frame.posX + frame.w / 2 - frame.t / 2),
+      posY: roundMm(frame.sideCenterY),
+      posZ: roundMm(frame.carcassCenterZ),
+      orientation: 'vertical_yz',
+      componentRole: 'side_right',
+      notes: 'Lateral exterior derecho'
+    });
+
+    // 2. Techo Superior o Amarres Superiores
+    if (frame.topTieStrips) {
+      const tieWidth = Math.min(90, Math.max(40, Math.floor(frame.carcassDepth / 3)));
+      parts.push({
+        id: nextId('tirante_front'),
+        name: 'Amarre Superior Frontal',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: roundMm(frame.innerWidth),
+        width: tieWidth,
+        thickness: frame.t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        colorHex: mainMat.colorHex,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: roundMm(frame.posX),
+        posY: roundMm(frame.topY),
+        posZ: roundMm(frame.carcassFrontZ - tieWidth / 2),
+        orientation: 'horizontal',
+        componentRole: 'tie',
+        notes: 'Amarre frontal superior para mesón'
+      });
+      parts.push({
+        id: nextId('tirante_back'),
+        name: 'Amarre Superior Trasero',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: roundMm(frame.innerWidth),
+        width: tieWidth,
+        thickness: frame.t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        colorHex: mainMat.colorHex,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: roundMm(frame.posX),
+        posY: roundMm(frame.topY),
+        posZ: roundMm(frame.carcassBackZ + tieWidth / 2),
+        orientation: 'horizontal',
+        componentRole: 'tie',
+        notes: 'Amarre trasero superior para mesón'
+      });
+    } else if (effectiveConfig.hasTopCover !== false) {
+      const topPart: Part = {
+        id: nextId('techo'),
+        name: 'Techo Superior',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: roundMm(frame.innerWidth),
+        width: roundMm(frame.carcassDepth),
+        thickness: frame.t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        colorHex: mainMat.colorHex,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: roundMm(frame.posX),
+        posY: roundMm(frame.topY),
+        posZ: roundMm(frame.carcassCenterZ),
+        orientation: 'horizontal',
+        componentRole: 'top',
+        notes: 'Tapa superior estructural'
+      };
+      if (effectiveConfig.siphonCutout?.enabled) {
+        topPart.cornerCutConfig = {
+          type: 'u_siphon_cutout',
+          corner: 'back_left',
+          cutX: effectiveConfig.siphonCutout.width || 200,
+          cutY: effectiveConfig.siphonCutout.depth || 250
+        };
+      }
+      parts.push(topPart);
+    }
+
+    // 3. Piso Inferior
+    parts.push({
+      id: nextId('base'),
+      name: 'Piso Inferior',
+      moduleId,
+      moduleName: groupName,
+      groupId,
+      groupName,
+      length: roundMm(frame.innerWidth),
+      width: roundMm(frame.carcassDepth),
+      thickness: frame.t,
+      quantity: 1,
+      materialId: mainMat.id,
+      materialName: mainMat.name,
+      colorHex: mainMat.colorHex,
+      grain: mainMat.hasGrain ? 'length' : 'none',
+      edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+      posX: roundMm(frame.posX),
+      posY: roundMm(frame.bottomOfCarcassY + frame.t / 2),
+      posZ: roundMm(frame.carcassCenterZ),
+      orientation: 'horizontal',
+      componentRole: 'bottom',
+      notes: 'Base inferior estructural'
+    });
+
+    // 4. Base Inferior: Zócalo Perimetral o Patas Cilíndricas Niveladoras
+    if (frame.baseType === 'plinth' && frame.plinthH > 0) {
+      const recess = Math.min(25, Math.floor(frame.carcassDepth / 6));
+      const plinthOuterW = Math.max(40, frame.w - 2 * recess);
+      const plinthOuterD = Math.max(40, frame.carcassDepth - 2 * recess);
+      const plinthInnerD = Math.max(30, plinthOuterD - 2 * frame.t);
+      const plinthCenterY = frame.posY - frame.h / 2 + frame.plinthH / 2;
+
+      parts.push({
+        id: nextId('zocalo_f'),
+        name: 'Zócalo Frontal',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: roundMm(plinthOuterW),
+        width: roundMm(frame.plinthH),
+        thickness: frame.t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        colorHex: mainMat.colorHex,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: roundMm(frame.posX),
+        posY: roundMm(plinthCenterY),
+        posZ: roundMm(frame.carcassFrontZ - recess - frame.t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo frontal perimetral'
+      });
+      parts.push({
+        id: nextId('zocalo_t'),
+        name: 'Zócalo Trasero',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: roundMm(plinthOuterW),
+        width: roundMm(frame.plinthH),
+        thickness: frame.t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        colorHex: mainMat.colorHex,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: roundMm(frame.posX),
+        posY: roundMm(plinthCenterY),
+        posZ: roundMm(frame.carcassBackZ + recess + frame.t / 2),
+        orientation: 'vertical_xy',
+        componentRole: 'plinth',
+        notes: 'Zócalo trasero perimetral'
+      });
+      parts.push({
+        id: nextId('zocalo_li'),
+        name: 'Zócalo Lateral Izquierdo',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: roundMm(plinthInnerD),
+        width: roundMm(frame.plinthH),
+        thickness: frame.t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        colorHex: mainMat.colorHex,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: roundMm(frame.posX - frame.w / 2 + recess + frame.t / 2),
+        posY: roundMm(plinthCenterY),
+        posZ: roundMm(frame.carcassCenterZ),
+        orientation: 'vertical_yz',
+        componentRole: 'plinth',
+        notes: 'Zócalo lateral izquierdo perimetral'
+      });
+      parts.push({
+        id: nextId('zocalo_ld'),
+        name: 'Zócalo Lateral Derecho',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: roundMm(plinthInnerD),
+        width: roundMm(frame.plinthH),
+        thickness: frame.t,
+        quantity: 1,
+        materialId: mainMat.id,
+        materialName: mainMat.name,
+        colorHex: mainMat.colorHex,
+        grain: mainMat.hasGrain ? 'length' : 'none',
+        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+        posX: roundMm(frame.posX + frame.w / 2 - recess - frame.t / 2),
+        posY: roundMm(plinthCenterY),
+        posZ: roundMm(frame.carcassCenterZ),
+        orientation: 'vertical_yz',
+        componentRole: 'plinth',
+        notes: 'Zócalo lateral derecho perimetral'
+      });
+    } else if (frame.baseType === 'legs' && frame.plinthH > 0) {
+      const legDiameter = 36;
+      const legRadius = legDiameter / 2;
+      const insetX = Math.min(45, Math.max(legRadius + 4, frame.w * 0.12));
+      const insetZ = Math.min(45, Math.max(legRadius + 4, frame.carcassDepth * 0.14));
+      const legCenterY = frame.posY - frame.h / 2 + frame.plinthH / 2;
+
+      const legOffsets: { label: string; x: number; z: number }[] = [
+        { label: 'Frontal Izquierda', x: frame.posX - frame.w / 2 + insetX, z: frame.carcassFrontZ - insetZ },
+        { label: 'Frontal Derecha', x: frame.posX + frame.w / 2 - insetX, z: frame.carcassFrontZ - insetZ },
+        { label: 'Trasera Izquierda', x: frame.posX - frame.w / 2 + insetX, z: frame.carcassBackZ + insetZ },
+        { label: 'Trasera Derecha', x: frame.posX + frame.w / 2 - insetX, z: frame.carcassBackZ + insetZ }
+      ];
+
+      for (const leg of legOffsets) {
+        parts.push({
+          id: nextId('pata'),
+          name: `Pata Niveladora Inox (${leg.label})`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: legDiameter,
+          width: legDiameter,
+          thickness: roundMm(frame.plinthH),
+          quantity: 1,
+          materialId: 'hw_leg_inox',
+          materialName: 'Pata Niveladora Inox',
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: roundMm(leg.x),
+          posY: roundMm(legCenterY),
+          posZ: roundMm(leg.z),
+          orientation: 'vertical_xy',
+          componentRole: 'accessory',
+          shapeType: 'circle',
+          radius: legRadius,
+          diameter: legDiameter,
+          colorHex: '#94a3b8',
+          excludeFromCutlist: true,
+          notes: `Pata metálica niveladora ${frame.plinthH}mm para base de mueble`
+        });
+      }
+    }
+
+    // 5. Fondo Trasero (Groove / Rebate / Overlay / None)
+    if (frame.effectiveBackType !== 'none') {
+      const innerH = Math.max(40, frame.rootInnerMaxY - frame.rootInnerMinY);
+      const innerCenterY = frame.rootInnerMinY + innerH / 2;
+      const isOverlayBack = frame.effectiveBackType === 'overlay';
+      const isRebateBack = frame.effectiveBackType === 'rebate';
+
+      const backPosZ = isOverlayBack
+        ? frame.carcassBackZ - frame.backT / 2
+        : isRebateBack
+          ? frame.carcassBackZ + frame.backT / 2
+          : frame.carcassBackZ + 15 + frame.backT / 2;
+
+      const backLength = isOverlayBack
+        ? Math.max(40, frame.w - 4)
+        : Math.max(40, frame.innerWidth - 2);
+      const backHeight = isOverlayBack
+        ? Math.max(40, frame.sideH - 4)
+        : Math.max(40, innerH - 2);
+      const backPosY = isOverlayBack ? frame.sideCenterY : innerCenterY;
+
+      parts.push({
+        id: nextId('fondo'),
+        name: isOverlayBack
+          ? 'Fondo Trasero Sobrepuesto'
+          : isRebateBack
+            ? 'Fondo Trasero Rebajado (Galce)'
+            : 'Fondo Trasero Ranurado',
+        moduleId,
+        moduleName: groupName,
+        groupId,
+        groupName,
+        length: roundMm(backLength),
+        width: roundMm(backHeight),
+        thickness: frame.backT,
+        quantity: 1,
+        materialId: backMat.id,
+        materialName: backMat.name,
+        colorHex: backMat.colorHex,
+        grain: 'none',
+        edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+        posX: roundMm(frame.posX),
+        posY: roundMm(backPosY),
+        posZ: roundMm(backPosZ),
+        orientation: 'vertical_xy',
+        componentRole: 'back',
+        notes: isOverlayBack
+          ? `Fondo MDF ${frame.backT}mm sobrepuesto clavado al dorso`
+          : isRebateBack
+            ? `Fondo MDF ${frame.backT}mm en galce/rebaje trasero`
+            : `Fondo MDF ${frame.backT}mm ranurado a 15mm`
+      });
+    }
+
+    // --- PASO B: SUBDIVISIÓN RECURSIVA Y CONTENIDOS POR ZONA ---
+    let generatedDoorsCount = 0;
+    let generatedDrawersCount = 0;
+    let generatedShelvesCount = 0;
+    let generatedRodsCount = 0;
+    let lastDoorOpening: ParametricCabinetConfig['doorOpening'] = 'none';
+
+    const emitDoorContent = (
+      node: CabinetZoneLayoutNode,
+      doorCfg: CabinetZoneDoorConfig
+    ) => {
+      const isSliding = doorCfg.opening === 'sliding';
+      const isInset = doorCfg.mount === 'inset';
+      const dMinX = isInset ? node.minX + frame.gap / 2 : node.coverMinX;
+      const dMaxX = isInset ? node.maxX - frame.gap / 2 : node.coverMaxX;
+      const dMinY = isInset ? node.minY + frame.gap / 2 : node.coverMinY;
+      const dMaxY = isInset ? node.maxY - frame.gap / 2 : node.coverMaxY;
+
+      const totalW = Math.max(40, roundMm(dMaxX - dMinX));
+      const doorH = Math.max(40, roundMm(dMaxY - dMinY));
+      const doorCenterX = roundMm((dMinX + dMaxX) / 2);
+      const doorCenterY = roundMm((dMinY + dMaxY) / 2);
+
+      const hasPhysicalHandle =
+        doorCfg.hasHandle &&
+        doorCfg.handleType !== 'none' &&
+        doorCfg.handleType !== 'push' &&
+        doorCfg.handleType !== 'push_open' &&
+        doorCfg.handleType !== 'gola_less' &&
+        doorCfg.handleType !== 'finger_pull';
+      const resolvedHandleType: HandleType = hasPhysicalHandle
+        ? doorCfg.handleType || (config.handleType && config.handleType !== 'none' ? config.handleType : 'bar_modern')
+        : 'none';
+      const resolvedFinish: HandleFinish = doorCfg.handleFinish || config.handleFinish || 'brushed_steel';
+
+      if (isSliding) {
+        const overlap = Math.min(25, Math.max(10, Math.round(totalW * 0.04)));
+        const leafW = Math.max(40, roundMm(totalW / 2 + overlap / 2));
+        const leftX = roundMm(dMinX + leafW / 2);
+        const rightX = roundMm(dMaxX - leafW / 2);
+        const rail1Z = isInset
+          ? roundMm(frame.carcassFrontZ - frame.doorT / 2)
+          : roundMm(frame.carcassFrontZ + frame.doorT / 2);
+        const rail2Z = isInset
+          ? roundMm(frame.carcassFrontZ - 1.5 * frame.doorT - 4)
+          : roundMm(frame.carcassFrontZ + 1.5 * frame.doorT + 4);
+
+        const slidingLeaves: { label: string; dir: 'left' | 'right'; x: number; z: number }[] = [
+          { label: 'Puerta Corrediza Izquierda', dir: 'left', x: leftX, z: rail1Z },
+          { label: 'Puerta Corrediza Derecha', dir: 'right', x: rightX, z: rail2Z }
+        ];
+        for (const leaf of slidingLeaves) {
+          parts.push({
+            id: nextId(`puerta_corr_${leaf.dir}`),
+            name: leaf.label,
+            moduleId,
+            moduleName: groupName,
+            groupId,
+            groupName,
+            zoneId: node.zoneId,
+            length: leafW,
+            width: doorH,
+            thickness: frame.doorT,
+            quantity: 1,
+            materialId: doorMat.id,
+            materialName: doorMat.name,
+            colorHex: doorMat.colorHex,
+            grain: doorMat.hasGrain ? 'length' : 'none',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: leaf.x,
+            posY: doorCenterY,
+            posZ: leaf.z,
+            orientation: 'vertical_xy',
+            componentRole: 'door',
+            notes: `Puerta corrediza ${isInset ? 'embutida' : 'exterior'} con riel superior/inferior`,
+            hardwareConfig: {
+              isMovable: true,
+              movableType: 'door',
+              openingDirection: leaf.dir,
+              hingeType: 'none',
+              handleType: resolvedHandleType,
+              handleFinish: resolvedFinish,
+              handlePosition: config.handlePosition || 'vertical',
+              isOpen: false
+            }
+          });
+          generatedDoorsCount++;
+        }
+        lastDoorOpening = 'double';
+        return;
+      }
+
+      const hingeType: HingeType = isInset ? 'full_cranked' : 'straight';
+      const doorPosZ = isInset
+        ? roundMm(frame.carcassFrontZ - frame.doorT / 2)
+        : roundMm(frame.carcassFrontZ + frame.doorT / 2);
+
+      if (doorCfg.opening === 'double') {
+        const leafW = Math.max(40, roundMm((totalW - frame.gap) / 2));
+        const leftX = roundMm(dMinX + leafW / 2);
+        const rightX = roundMm(dMaxX - leafW / 2);
+
+        const leaves: { name: string; dir: 'left' | 'right'; x: number }[] = [
+          { name: 'Puerta Izquierda (Doble)', dir: 'left', x: leftX },
+          { name: 'Puerta Derecha (Doble)', dir: 'right', x: rightX }
+        ];
+        for (const lf of leaves) {
+          parts.push({
+            id: nextId(`puerta_${lf.dir}`),
+            name: lf.name,
+            moduleId,
+            moduleName: groupName,
+            groupId,
+            groupName,
+            zoneId: node.zoneId,
+            length: leafW,
+            width: doorH,
+            thickness: frame.doorT,
+            quantity: 1,
+            materialId: doorMat.id,
+            materialName: doorMat.name,
+            colorHex: doorMat.colorHex,
+            grain: doorMat.hasGrain ? 'length' : 'none',
+            edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            posX: lf.x,
+            posY: doorCenterY,
+            posZ: doorPosZ,
+            orientation: 'vertical_xy',
+            componentRole: 'door',
+            notes: `Puerta ${lf.dir === 'left' ? 'izquierda' : 'derecha'} abatible ${isInset ? 'embutida' : 'solapada'}`,
+            hardwareConfig: {
+              isMovable: true,
+              movableType: 'door',
+              openingDirection: lf.dir,
+              hingeType,
+              handleType: resolvedHandleType,
+              handleFinish: resolvedFinish,
+              handlePosition: config.handlePosition || 'vertical',
+              isOpen: false
+            }
+          });
+          generatedDoorsCount++;
+        }
+        lastDoorOpening = 'double';
+      } else {
+        const dir: 'left' | 'right' = doorCfg.opening === 'right' ? 'right' : 'left';
+        parts.push({
+          id: nextId(`puerta_${dir}`),
+          name: `Puerta Frontal (Abre: ${dir === 'left' ? 'Izquierda' : 'Derecha'})`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: totalW,
+          width: doorH,
+          thickness: frame.doorT,
+          quantity: 1,
+          materialId: doorMat.id,
+          materialName: doorMat.name,
+          colorHex: doorMat.colorHex,
+          grain: doorMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX: doorCenterX,
+          posY: doorCenterY,
+          posZ: doorPosZ,
+          orientation: 'vertical_xy',
+          componentRole: 'door',
+          notes: `Puerta abatible hacia ${dir} (${isInset ? 'embutida' : 'solapada'})`,
+          hardwareConfig: {
+            isMovable: true,
+            movableType: 'door',
+            openingDirection: dir,
+            hingeType,
+            handleType: resolvedHandleType,
+            handleFinish: resolvedFinish,
+            handlePosition: config.handlePosition || 'vertical',
+            isOpen: false
+          }
+        });
+        generatedDoorsCount++;
+        lastDoorOpening = dir;
+      }
+    };
+
+    const emitMovableShelves = (
+      node: CabinetZoneLayoutNode,
+      count: number,
+      setbackMm: number,
+      hasInsetFrontOnSelf: boolean,
+      hasSlidingInsetOnSelf: boolean
+    ) => {
+      if (count <= 0) return;
+      const rearGap = 2;
+      const doorInsetClearance = hasSlidingInsetOnSelf
+        ? 2 * frame.doorT + 14
+        : hasInsetFrontOnSelf
+          ? frame.doorT + 10
+          : 0;
+      const effectiveSetback = Math.max(setbackMm, doorInsetClearance);
+      const minZ = node.minZ + rearGap;
+      const maxZ = Math.max(minZ + 30, node.maxZ - effectiveSetback);
+      const shelfDepth = roundMm(maxZ - minZ);
+      const shelfCenterZ = roundMm(minZ + shelfDepth / 2);
+      const shelfLength = Math.max(20, roundMm(node.innerWidth - 2));
+      const centerX = roundMm((node.minX + node.maxX) / 2);
+
+      const safeCount = Math.min(count, Math.max(0, Math.floor((node.innerHeight - 20) / (frame.t + 16))));
+      if (safeCount <= 0) return;
+
+      const stepY = (node.maxY - node.minY) / (safeCount + 1);
+      for (let i = 1; i <= safeCount; i++) {
+        const shelfY = roundMm(node.minY + stepY * i);
+        parts.push({
+          id: nextId(`repisa_${i}`),
+          name: `Repisa Móvil ${i}`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: shelfLength,
+          width: shelfDepth,
+          thickness: frame.t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX,
+          posY: shelfY,
+          posZ: shelfCenterZ,
+          orientation: 'horizontal',
+          componentRole: 'shelf',
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            isMovableShelf: true
+          },
+          notes: `Repisa móvil regulable con soportes (remetida ${Math.round(effectiveSetback)}mm)`
+        });
+        generatedShelvesCount++;
+      }
+    };
+
+    const emitHangingRods = (
+      node: CabinetZoneLayoutNode,
+      rodsCount: 1 | 2,
+      hasInsetFrontOnSelf: boolean,
+      hasSlidingInsetOnSelf: boolean
+    ) => {
+      const doorInsetClearance = hasSlidingInsetOnSelf
+        ? 2 * frame.doorT + 14
+        : hasInsetFrontOnSelf
+          ? frame.doorT + 10
+          : 0;
+      const effMaxZ = Math.max(node.minZ + 40, node.maxZ - doorInsetClearance);
+      const rodZ = roundMm((node.minZ + effMaxZ) / 2);
+      const rodLen = Math.max(40, roundMm(node.innerWidth - 4));
+      const centerX = roundMm((node.minX + node.maxX) / 2);
+
+      if (rodsCount === 1) {
+        const rodY = roundMm(Math.max(node.minY + 30, node.maxY - 80));
+        parts.push({
+          id: nextId('tubo_colgador'),
+          name: 'Tubo Colgador Cromado',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: rodLen,
+          width: 25,
+          thickness: 25,
+          quantity: 1,
+          materialId: 'hw_rod_chrome',
+          materialName: 'Tubo Oval Cromado',
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX,
+          posY: rodY,
+          posZ: rodZ,
+          orientation: 'horizontal',
+          componentRole: 'accessory',
+          shapeType: 'circle',
+          diameter: 25,
+          colorHex: '#94a3b8',
+          excludeFromCutlist: true,
+          notes: 'Tubo de colgado simple para perchas'
+        });
+        generatedRodsCount++;
+      } else {
+        const midY = roundMm((node.minY + node.maxY) / 2);
+        const shelfDepth = Math.max(40, roundMm(effMaxZ - node.minZ - 4));
+        parts.push({
+          id: nextId('repisa_colgado'),
+          name: 'Entrepaño Divisor Colgado',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: Math.max(30, roundMm(node.innerWidth - 2)),
+          width: shelfDepth,
+          thickness: frame.t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX,
+          posY: midY,
+          posZ: roundMm(node.minZ + 2 + shelfDepth / 2),
+          orientation: 'horizontal',
+          componentRole: 'shelf',
+          notes: 'Divisor fijo de colgado doble'
+        });
+        generatedShelvesCount++;
+
+        const upperRodY = roundMm(Math.max(midY + frame.t / 2 + 25, node.maxY - 70));
+        const lowerRodY = roundMm(Math.max(node.minY + 25, midY - frame.t / 2 - 70));
+
+        parts.push({
+          id: nextId('tubo_sup'),
+          name: 'Tubo Colgador Superior',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: rodLen,
+          width: 25,
+          thickness: 25,
+          quantity: 1,
+          materialId: 'hw_rod_chrome',
+          materialName: 'Tubo Oval Cromado',
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX,
+          posY: upperRodY,
+          posZ: rodZ,
+          orientation: 'horizontal',
+          componentRole: 'accessory',
+          shapeType: 'circle',
+          diameter: 25,
+          colorHex: '#94a3b8',
+          excludeFromCutlist: true,
+          notes: 'Tubo de colgado nivel superior'
+        });
+        parts.push({
+          id: nextId('tubo_inf'),
+          name: 'Tubo Colgador Inferior',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: rodLen,
+          width: 25,
+          thickness: 25,
+          quantity: 1,
+          materialId: 'hw_rod_chrome',
+          materialName: 'Tubo Oval Cromado',
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: centerX,
+          posY: lowerRodY,
+          posZ: rodZ,
+          orientation: 'horizontal',
+          componentRole: 'accessory',
+          shapeType: 'circle',
+          diameter: 25,
+          colorHex: '#94a3b8',
+          excludeFromCutlist: true,
+          notes: 'Tubo de colgado nivel inferior'
+        });
+        generatedRodsCount += 2;
+      }
+    };
+
+    const emitDrawersContent = (
+      node: CabinetZoneLayoutNode,
+      dCfg: CabinetZoneDrawerConfig,
+      hasAncestorDoors = false
+    ) => {
+      const count = Math.max(1, Math.min(6, Math.floor(Number(dCfg.count) || 1)));
+      const isInset = dCfg.frontMount === 'inset';
+      const useInsetBounds = isInset || hasAncestorDoors;
+      const behindDoorGap = hasAncestorDoors ? 4 : 0;
+      const interGap = Math.max(2, frame.gap);
+      const openingSystem = dCfg.openingSystem || 'handle';
+      const slideType: SlideType =
+        openingSystem === 'push'
+          ? 'push_open'
+          : dCfg.slideType === 'undermount'
+            ? 'undermount'
+            : dCfg.slideType === 'push_open'
+              ? 'push_open'
+              : 'telescopic';
+      const bottomType = dCfg.bottomType === 'nailed' ? 'nailed' : 'grooved';
+
+      const safeInsetPad = (val: number | undefined): number => {
+        const n = Number(val);
+        return Number.isFinite(n) && n > 0 ? Math.max(1.6, n) : 2;
+      };
+      const safeOverlayPad = (val: number | undefined): number => {
+        const n = Number(val);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+      };
+
+      const frontMinX = useInsetBounds
+        ? node.minX + safeInsetPad(dCfg.deductLeftMm)
+        : node.coverMinX + safeOverlayPad(dCfg.deductLeftMm);
+      const frontMaxX = useInsetBounds
+        ? node.maxX - safeInsetPad(dCfg.deductRightMm)
+        : node.coverMaxX - safeOverlayPad(dCfg.deductRightMm);
+      const frontMinY = useInsetBounds
+        ? node.minY + safeInsetPad(dCfg.deductBottomMm)
+        : node.coverMinY + safeOverlayPad(dCfg.deductBottomMm);
+      const frontMaxY = useInsetBounds
+        ? node.maxY - safeInsetPad(dCfg.deductTopMm)
+        : node.coverMaxY - safeOverlayPad(dCfg.deductTopMm);
+
+      const frontWidth = Math.max(40, roundMm(frontMaxX - frontMinX));
+      const frontCenterX = roundMm((frontMinX + frontMaxX) / 2);
+      const availFrontH = Math.max(30 * count, frontMaxY - frontMinY - interGap * (count - 1));
+      const nominalSlotH = Math.floor((availFrontH / count) * 10) / 10;
+
+      const fingerPullCut =
+        openingSystem === 'finger_pull'
+          ? nominalSlotH > 75
+            ? 28
+            : Math.min(20, Math.floor(nominalSlotH * 0.25))
+          : 0;
+      const effFrontH = Math.max(28, roundMm(nominalSlotH - fingerPullCut));
+
+      const recessFrontZ = node.maxZ - behindDoorGap;
+      const frontCenterZ = useInsetBounds
+        ? roundMm(recessFrontZ - frame.doorT / 2)
+        : roundMm(recessFrontZ + frame.doorT / 2);
+      const boxFrontZ = useInsetBounds
+        ? roundMm(recessFrontZ - frame.doorT - 2)
+        : roundMm(recessFrontZ - 2);
+
+      const standardSlideLengths = [250, 300, 350, 400, 450, 500, 550, 600];
+      const availBoxDepth = Math.max(40, boxFrontZ - node.minZ - 8);
+      const slideLength =
+        standardSlideLengths.filter(l => l <= availBoxDepth).pop() ||
+        Math.max(40, Math.floor(availBoxDepth / 10) * 10);
+
+      const sideClearance = slideType === 'undermount' ? 5 : 13;
+      const boxWallT = Math.min(frame.t, 15);
+      const boxOuterWidth = Math.max(45, roundMm(node.innerWidth - 2 * sideClearance));
+      const boxInnerWidth = Math.max(20, roundMm(boxOuterWidth - 2 * boxWallT));
+      const boxCenterX = roundMm((node.minX + node.maxX) / 2);
+
+      const drawerHandleType: HandleType =
+        openingSystem === 'push'
+          ? 'push_open'
+          : openingSystem === 'finger_pull'
+            ? 'finger_pull'
+            : config.handleType && config.handleType !== 'none'
+              ? config.handleType
+              : 'bar_modern';
+      const drawerHandleFinish: HandleFinish = config.handleFinish || 'brushed_steel';
+
+      const mountTag = hasAncestorDoors
+        ? 'Interior (bajo puerta)'
+        : isInset
+          ? 'Embutido'
+          : 'Solapado';
+      const openTag =
+        openingSystem === 'push'
+          ? 'Push-to-Open'
+          : openingSystem === 'finger_pull'
+            ? 'Uñero (-28mm)'
+            : 'Con Tirador';
+      const slideTag =
+        slideType === 'undermount'
+          ? 'Corredera Oculta'
+          : slideType === 'push_open'
+            ? 'Push-to-Open'
+            : 'Telescópica';
+
+      for (let i = 0; i < count; i++) {
+        const drawerIdx = i + 1;
+        const drawerLabel =
+          count === 3
+            ? i === 0
+              ? 'Cajón Inferior'
+              : i === 1
+                ? 'Cajón Medio'
+                : 'Cajón Superior'
+            : `Cajón ${drawerIdx}`;
+
+        const frontBottomY = frontMinY + i * (nominalSlotH + interGap);
+        const frontTopY = frontBottomY + effFrontH;
+        const frontCenterY = roundMm(frontBottomY + effFrontH / 2);
+
+        // Frente Vista
+        parts.push({
+          id: nextId(`caj_${drawerIdx}_frente`),
+          name: `${drawerLabel} - Frente Vista`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: frontWidth,
+          width: effFrontH,
+          thickness: frame.doorT,
+          quantity: 1,
+          materialId: doorMat.id,
+          materialName: doorMat.name,
+          colorHex: doorMat.colorHex,
+          grain: doorMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          posX: frontCenterX,
+          posY: frontCenterY,
+          posZ: frontCenterZ,
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_front',
+          hardwareConfig: {
+            isMovable: true,
+            movableType: 'drawer',
+            slideType,
+            slideLength,
+            drawerOpeningSystem: openingSystem,
+            frontMountType: dCfg.frontMount,
+            handleType: drawerHandleType,
+            handleFinish: drawerHandleFinish,
+            handlePosition: 'horizontal',
+            isOpen: false
+          },
+          notes: `Frente ${mountTag} · ${openTag} · ${slideTag} · Fondo ${bottomType === 'nailed' ? 'Clavado' : 'Ranurado'}`
+        });
+        generatedDrawersCount++;
+
+        // Ventana vertical segura dentro de la cavidad de zona para evitar colisiones
+        const bottomPad = slideType === 'undermount' ? 14 : 5;
+        const safeMinY = Math.max(frontBottomY + 3, node.minY + bottomPad);
+        const safeMaxY = Math.min(frontTopY - 5, node.maxY - 5);
+        const availBoxH = safeMaxY - safeMinY;
+        if (availBoxH < 24) {
+          continue;
+        }
+
+        const totalBoxSpanH = Math.min(
+          Math.floor(availBoxH),
+          Math.max(24, Math.floor(effFrontH * 0.7))
+        );
+        const boxBaseY = safeMinY + Math.min(4, Math.max(0, (availBoxH - totalBoxSpanH) * 0.2));
+
+        const wallBottomY = bottomType === 'nailed' ? boxBaseY + frame.backT : boxBaseY;
+        const wallH =
+          bottomType === 'nailed'
+            ? Math.max(18, roundMm(totalBoxSpanH - frame.backT))
+            : roundMm(totalBoxSpanH);
+        const wallCenterY = roundMm(wallBottomY + wallH / 2);
+        const boxCenterZ = roundMm(boxFrontZ - slideLength / 2);
+
+        // Lateral Izquierdo de Caja
+        parts.push({
+          id: nextId(`caj_${drawerIdx}_lat_izq`),
+          name: `${drawerLabel} - Lateral Izquierdo`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: slideLength,
+          width: wallH,
+          thickness: boxWallT,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: roundMm(boxCenterX - boxOuterWidth / 2 + boxWallT / 2),
+          posY: wallCenterY,
+          posZ: boxCenterZ,
+          orientation: 'vertical_yz',
+          componentRole: 'drawer_box',
+          notes: `Lateral cajón corredera ${slideLength}mm`
+        });
+
+        // Lateral Derecho de Caja
+        parts.push({
+          id: nextId(`caj_${drawerIdx}_lat_der`),
+          name: `${drawerLabel} - Lateral Derecho`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: slideLength,
+          width: wallH,
+          thickness: boxWallT,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: roundMm(boxCenterX + boxOuterWidth / 2 - boxWallT / 2),
+          posY: wallCenterY,
+          posZ: boxCenterZ,
+          orientation: 'vertical_yz',
+          componentRole: 'drawer_box',
+          notes: `Lateral cajón corredera ${slideLength}mm`
+        });
+
+        // Contrafrente Interior
+        parts.push({
+          id: nextId(`caj_${drawerIdx}_contrafrente`),
+          name: `${drawerLabel} - Contrafrente Interior`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: boxInnerWidth,
+          width: wallH,
+          thickness: boxWallT,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: boxCenterX,
+          posY: wallCenterY,
+          posZ: roundMm(boxFrontZ - boxWallT / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_box',
+          notes: 'Frente interior atornillado al frente vista'
+        });
+
+        // Trasera Interior
+        parts.push({
+          id: nextId(`caj_${drawerIdx}_trasera`),
+          name: `${drawerLabel} - Trasera Interior`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: boxInnerWidth,
+          width: wallH,
+          thickness: boxWallT,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: boxCenterX,
+          posY: wallCenterY,
+          posZ: roundMm(boxFrontZ - slideLength + boxWallT / 2),
+          orientation: 'vertical_xy',
+          componentRole: 'drawer_box',
+          notes: 'Trasera de caja interior'
+        });
+
+        // Fondo MDF de Caja (Ranurado entre laterales o Clavado debajo)
+        const isTopDrawer = i === count - 1;
+        const bottomLength = bottomType === 'nailed' ? boxOuterWidth : boxInnerWidth;
+        const bottomWidth =
+          bottomType === 'nailed'
+            ? slideLength
+            : Math.max(20, roundMm(slideLength - 2 * boxWallT));
+        const bottomCenterY =
+          bottomType === 'nailed'
+            ? roundMm(boxBaseY + frame.backT / 2)
+            : roundMm(wallBottomY + Math.min(8, Math.floor(wallH * 0.25)) + frame.backT / 2);
+
+        const drawerBottomPart: Part = {
+          id: nextId(`caj_${drawerIdx}_fondo`),
+          name: `${drawerLabel} - Fondo MDF`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: bottomLength,
+          width: bottomWidth,
+          thickness: frame.backT,
+          quantity: 1,
+          materialId: backMat.id,
+          materialName: backMat.name,
+          colorHex: backMat.colorHex,
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: boxCenterX,
+          posY: bottomCenterY,
+          posZ: boxCenterZ,
+          orientation: 'horizontal',
+          componentRole: 'drawer_box',
+          notes:
+            bottomType === 'nailed'
+              ? `Fondo de cajón MDF ${frame.backT}mm clavado por debajo`
+              : `Fondo de cajón MDF ${frame.backT}mm ranurado`
+        };
+
+        if (isTopDrawer && effectiveConfig.siphonCutout?.enabled) {
+          drawerBottomPart.cornerCutConfig = {
+            type: 'u_siphon_cutout',
+            corner: 'back_left',
+            cutX: Math.min(Math.max(30, bottomLength - 40), effectiveConfig.siphonCutout.width || 180),
+            cutY: Math.min(Math.max(30, bottomWidth - 20), effectiveConfig.siphonCutout.depth || 180)
+          };
+        }
+        parts.push(drawerBottomPart);
+      }
+    };
+
+    const traverseLayout = (node: CabinetZoneLayoutNode, hasAncestorDoors = false) => {
+      if (!node.isLeaf && node.children.length > 0) {
+        const hasInsetOnNode =
+          node.content?.type === 'doors' && node.content.doors?.mount === 'inset';
+        const hasSlidingInsetOnNode =
+          hasInsetOnNode && node.content?.doors?.opening === 'sliding';
+        const insetDeduct = hasSlidingInsetOnNode
+          ? 2 * frame.doorT + 6
+          : hasInsetOnNode
+            ? frame.doorT + 2
+            : 0;
+        const dividerDepth = Math.max(
+          30,
+          roundMm((node.maxZ - insetDeduct) - node.minZ)
+        );
+        const dividerCenterZ = roundMm(node.minZ + dividerDepth / 2);
+
+        if (node.splitDirection === 'vertical') {
+          for (let i = 0; i < node.children.length - 1; i++) {
+            const leftChild = node.children[i];
+            parts.push({
+              id: nextId(`divisor_v_${i + 1}`),
+              name: `Divisor Vertical Zona ${i + 1}`,
+              moduleId,
+              moduleName: groupName,
+              groupId,
+              groupName,
+              zoneId: node.zoneId,
+              length: roundMm(node.innerHeight),
+              width: dividerDepth,
+              thickness: frame.t,
+              quantity: 1,
+              materialId: mainMat.id,
+              materialName: mainMat.name,
+              colorHex: mainMat.colorHex,
+              grain: mainMat.hasGrain ? 'length' : 'none',
+              edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+              posX: roundMm(leftChild.maxX + frame.t / 2),
+              posY: roundMm((node.minY + node.maxY) / 2),
+              posZ: dividerCenterZ,
+              orientation: 'vertical_yz',
+              componentRole: 'divider',
+              notes: 'Divisor vertical estructural entre zonas'
+            });
+          }
+        } else if (node.splitDirection === 'horizontal') {
+          for (let i = 0; i < node.children.length - 1; i++) {
+            const topChild = node.children[i];
+            parts.push({
+              id: nextId(`entrepano_fijo_${i + 1}`),
+              name: `Entrepaño Fijo Zona ${i + 1}`,
+              moduleId,
+              moduleName: groupName,
+              groupId,
+              groupName,
+              zoneId: node.zoneId,
+              length: roundMm(node.innerWidth),
+              width: dividerDepth,
+              thickness: frame.t,
+              quantity: 1,
+              materialId: mainMat.id,
+              materialName: mainMat.name,
+              colorHex: mainMat.colorHex,
+              grain: mainMat.hasGrain ? 'length' : 'none',
+              edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+              posX: roundMm((node.minX + node.maxX) / 2),
+              posY: roundMm(topChild.minY - frame.t / 2),
+              posZ: dividerCenterZ,
+              orientation: 'horizontal',
+              componentRole: 'shelf',
+              notes: 'Entrepaño fijo divisor horizontal de zona'
+            });
+            generatedShelvesCount++;
+          }
+        }
+
+        const hasDoorsOnNode = node.content?.type === 'doors' && Boolean(node.content.doors);
+        if (hasDoorsOnNode && node.content?.doors) {
+          emitDoorContent(node, node.content.doors);
+        }
+
+        const nextAncestorDoors = hasAncestorDoors || hasDoorsOnNode;
+        for (const ch of node.children) {
+          traverseLayout(ch, nextAncestorDoors);
+        }
+        return;
+      }
+
+      const content = node.content;
+      if (!content || content.type === 'empty') {
+        return;
+      }
+
+      if (content.type === 'shelves') {
+        const count = Math.max(0, Math.floor(Number(content.shelvesCount) || 0));
+        const setback = Number.isFinite(Number(content.shelfSetbackMm))
+          ? Number(content.shelfSetbackMm)
+          : 15;
+        emitMovableShelves(node, count, setback, false, false);
+      } else if (content.type === 'hanging_rod') {
+        const rods: 1 | 2 = content.hangingRodsCount === 2 ? 2 : 1;
+        emitHangingRods(node, rods, false, false);
+        if ((content.shelvesCount ?? 0) > 0) {
+          emitMovableShelves(
+            node,
+            Math.floor(Number(content.shelvesCount)),
+            Number(content.shelfSetbackMm ?? 15),
+            false,
+            false
+          );
+        }
+      } else if (content.type === 'drawers' && content.drawers) {
+        emitDrawersContent(node, content.drawers, hasAncestorDoors);
+      } else if (content.type === 'doors' && content.doors) {
+        emitDoorContent(node, content.doors);
+        const isInsetDoor = content.doors.mount === 'inset';
+        const isSlidingInset = content.doors.opening === 'sliding' && isInsetDoor;
+        if ((content.shelvesCount ?? 0) > 0) {
+          emitMovableShelves(
+            node,
+            Math.floor(Number(content.shelvesCount)),
+            Number(content.shelfSetbackMm ?? 20),
+            isInsetDoor,
+            isSlidingInset
+          );
+        }
+        if ((content.hangingRodsCount ?? 0) > 0) {
+          const rods: 1 | 2 = content.hangingRodsCount === 2 ? 2 : 1;
+          emitHangingRods(node, rods, isInsetDoor, isSlidingInset);
+        }
+      }
+    };
+
+    traverseLayout(layout);
+
+    const resolvedRods: 0 | 1 | 2 =
+      generatedRodsCount >= 2 ? 2 : generatedRodsCount === 1 ? 1 : 0;
+
+    const moduleTypeResolved: FurnitureModule['type'] =
+      effectiveConfig.moduleType === 'wall_cabinet' ||
+      effectiveConfig.moduleType === 'base_cabinet' ||
+      effectiveConfig.moduleType === 'tall_cabinet' ||
+      effectiveConfig.moduleType === 'drawer_unit'
+        ? effectiveConfig.moduleType
+        : 'base_cabinet';
+
+    const module: FurnitureModule = {
+      id: moduleId,
+      name: groupName,
+      type: moduleTypeResolved,
+      width: frame.w,
+      height: frame.h,
+      depth: frame.d,
+      boardThickness: frame.t,
+      backThickness: frame.backT,
+      backType: frame.effectiveBackType,
+      shelvesCount: generatedShelvesCount,
+      doorsCount: generatedDoorsCount,
+      doorsType: 'overlay',
+      drawersCount: generatedDrawersCount,
+      hasPlinth: frame.baseType === 'plinth',
+      plinthHeight: frame.plinthH,
+      materialId: mainMat.id,
+      backMaterialId: backMat.id,
+      defaultThinEdge: true,
+      defaultThickDoors: true
+    };
+
+    const group: PartGroup = {
+      id: groupId,
+      name: groupName,
+      type:
+        generatedDrawersCount > 0 && generatedDoorsCount === 0 && effectiveConfig.moduleType === 'drawer_unit'
+          ? 'drawer'
+          : 'assembly',
+      isOpen: false,
+      parametricConfig: {
+        ...effectiveConfig,
+        baseType: frame.baseType,
+        hasPlinth: frame.baseType === 'plinth',
+        plinthHeight: frame.plinthH,
+        shelvesCount: generatedShelvesCount,
+        drawersCount: generatedDrawersCount,
+        hangingRodsCount: resolvedRods,
+        doorOpening:
+          generatedDoorsCount >= 2
+            ? 'double'
+            : generatedDoorsCount === 1
+              ? lastDoorOpening
+              : 'none',
+        zoneTree: deepCloneZoneNode(effectiveTree)
       }
     };
 

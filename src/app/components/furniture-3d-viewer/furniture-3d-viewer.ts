@@ -27,12 +27,14 @@ import {
   Cancel01Icon,
   CheckmarkCircle02Icon,
   Compass01Icon,
+  CubeIcon,
   Delete02Icon,
   Edit02Icon,
   Layers01Icon,
   LockIcon,
   Moon02Icon,
   PaintBoardIcon,
+  RefreshIcon,
   RulerIcon,
   Settings01Icon,
   Sun01Icon,
@@ -63,6 +65,7 @@ import {
   getWallHalfSpans,
   DEFAULT_ROOM_CONFIG,
   ApplianceItem,
+  CabinetZoneHighlightBox,
   ModuleCavityInfo,
   ParametricDrawerConfig
 } from '../../models/melamine.models';
@@ -170,6 +173,32 @@ interface PieceMeshData {
   slideGroup?: THREE.Group;
   slideAxis?: 'x' | 'y' | 'z';
   slideDir?: number;
+}
+
+interface ExplosionAABBStats {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+  cx: number;
+  cy: number;
+  cz: number;
+  sx: number;
+  sy: number;
+  sz: number;
+  count: number;
+  facing: 'front' | 'right' | 'back' | 'left';
+}
+
+interface PreparedExplosionRenderEntry {
+  part: Part;
+  role: string;
+  nameLow: string;
+  baseBounds: PartWorldAABB;
+  localDims: { sx: number; sy: number; sz: number; lengthLocalAxis: 'x' | 'y' | 'z' };
+  explosionGroupId: string | null;
 }
 
 interface GizmoHitData {
@@ -433,7 +462,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
       'M5 10H19',
       'M8 6.5V7.5',
       'M8 13V16'
-    ])
+    ]),
+    explodedView: CubeIcon,
+    reset: RefreshIcon
   };
 
   onSelectedDimensionInput(prop: 'length' | 'width' | 'thickness', event: Event) {
@@ -470,6 +501,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     showAppliances: true
   });
   readonly manageHideInternally = input<boolean>(true);
+  readonly highlightedZoneBox = input<CabinetZoneHighlightBox | null>(null);
 
   // Outputs
   partSelected = output<Part | null>();
@@ -617,7 +649,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   // Hidden / Isolated Parts & Appliances
   readonly hiddenPartIds = signal<Set<string>>(new Set());
-  readonly hiddenAppliancesCount = computed(() => this.appliances().filter(a => a.isHidden).length);
+  readonly internalHiddenApplianceIds = signal<Set<string>>(new Set());
+  readonly isolatedTarget = signal<{ kind: 'group' | 'part'; id: string; label: string } | null>(null);
+  readonly isolationToast = signal<string | null>(null);
+  private isolationToastTimer: ReturnType<typeof setTimeout> | null = null;
+  private prevApplianceHiddenInputMap = new Map<string, boolean>();
+  readonly hiddenAppliancesCount = computed(
+    () =>
+      this.appliances().filter(
+        a => Boolean(a.isHidden) || this.internalHiddenApplianceIds().has(a.id)
+      ).length
+  );
   readonly totalHiddenCount = computed(() => this.hiddenPartIds().size + this.hiddenAppliancesCount());
 
   // Draw 3D Rectangle Tool State
@@ -1054,6 +1096,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private magneticSnapGroup = new THREE.Group();
   private drillGroup = new THREE.Group();
   private pushPullHighlightGroup = new THREE.Group();
+  private zoneHighlightGroup = new THREE.Group();
   private gridHelper: THREE.GridHelper | null = null;
   private floorMesh: THREE.Mesh | null = null;
   private keyLightRef: THREE.DirectionalLight | null = null;
@@ -1340,16 +1383,50 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
     });
 
-    // 6. Update 3D Appliances when appliances, selectedApplianceId, selectedApplianceIds or layerVisibility change
+    // 6. Update 3D Appliances when appliances, selectedApplianceId, selectedApplianceIds, layerVisibility or isolation change
     effect(() => {
       const appls = this.appliances();
       const selId = this.selectedApplianceId();
       this.selectedApplianceIds();
       this.layerVisibility();
+      this.internalHiddenApplianceIds();
       if (this.scene) {
         this.updateAppliancesScene(appls, selId);
         this.requestRender(10);
       }
+    });
+
+    // 6b. Sincronizar estado interno de aislamiento cuando el padre elimina o vuelve visibles equipos
+    effect(() => {
+      const appls = this.appliances();
+      untracked(() => {
+        const currentIds = new Set(appls.map(a => a.id));
+        const nextInternal = new Set(this.internalHiddenApplianceIds());
+        let changed = false;
+
+        for (const id of Array.from(nextInternal)) {
+          if (!currentIds.has(id)) {
+            nextInternal.delete(id);
+            changed = true;
+          }
+        }
+
+        const nextPrevMap = new Map<string, boolean>();
+        for (const app of appls) {
+          const wasHidden = this.prevApplianceHiddenInputMap.get(app.id) ?? false;
+          const isHiddenNow = Boolean(app.isHidden);
+          if (wasHidden && !isHiddenNow && nextInternal.has(app.id)) {
+            nextInternal.delete(app.id);
+            changed = true;
+          }
+          nextPrevMap.set(app.id, isHiddenNow);
+        }
+        this.prevApplianceHiddenInputMap = nextPrevMap;
+
+        if (changed) {
+          this.internalHiddenApplianceIds.set(nextInternal);
+        }
+      });
     });
 
     // 7. Actualizar Guía de Referencia Espacial, Escala Humana 3D y GridHelper al cambiar tamaño de escenario o idioma
@@ -1394,6 +1471,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.syncIsAllOpenSignal();
         this.bumpOpenStateRevision();
         this.requestRender(55);
+      }
+    });
+
+    // 9. Resaltar en 3D la zona/compartimento activo del configurador por zonas
+    effect(() => {
+      const zoneBox = this.highlightedZoneBox();
+      if (this.scene) {
+        this.updateZoneHighlightScene(zoneBox);
+        this.requestRender(6);
       }
     });
   }
@@ -1504,6 +1590,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.magneticSnapGroup);
     this.scene.add(this.drillGroup);
     this.scene.add(this.pushPullHighlightGroup);
+    this.zoneHighlightGroup.renderOrder = 950;
+    this.scene.add(this.zoneHighlightGroup);
     this.scene.add(this.rectPreviewGroup);
     this.scene.add(this.circlePreviewGroup);
     this.scene.add(this.freehandPreviewGroup);
@@ -1532,6 +1620,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.isXRay(),
       this.show3dDimensions()
     );
+    this.updateExplodedOffsets(this.explodedPercent());
+    this.updateZoneHighlightScene(this.highlightedZoneBox());
 
     // 8, 9 y 10. Ejecutar el bucle WebGL y eventos continuos estrictamente fuera de NgZone
     // para no disparar ciclos innecesarios de detección de cambios en Angular
@@ -1848,6 +1938,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const vis = this.layerVisibility();
     const cutoutAppliances = (this.appliances() || []).filter(a => a.type === 'sink' || a.type === 'cooktop');
 
+    const visibleRenderEntries: PreparedExplosionRenderEntry[] = [];
+    const presentRawGroupIds = new Set<string>();
     for (const part of parts) {
       if (this.hiddenPartIds().has(part.id)) {
         continue;
@@ -1868,6 +1960,30 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       const baseBounds = this.partGeometry.getWorldAABB(part);
       const localDims = this.partGeometry.getLocalDimensions(part);
+      if (part.groupId) {
+        presentRawGroupIds.add(part.groupId);
+      }
+      visibleRenderEntries.push({
+        part,
+        role,
+        nameLow,
+        baseBounds,
+        localDims,
+        explosionGroupId: part.groupId || null
+      });
+    }
+
+    const partGroupMap = new Map<string, PartGroup>();
+    for (const grp of this.partGroups()) {
+      partGroupMap.set(grp.id, grp);
+    }
+    for (const entry of visibleRenderEntries) {
+      entry.explosionGroupId = this.resolveExplosionGroupId(entry.part, partGroupMap, presentRawGroupIds);
+    }
+    const { sceneStats, groupStatsMap } = this.computeExplosionStats(visibleRenderEntries, partGroupMap);
+
+    for (const entry of visibleRenderEntries) {
+      const { part, role, nameLow, baseBounds, localDims, explosionGroupId } = entry;
       const sx = baseBounds.sx;
       const sy = baseBounds.sy;
       const sz = baseBounds.sz;
@@ -1974,13 +2090,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
       edgeLines.userData = { isOutline: true, isAuxiliaryVisual: true };
       mesh.add(edgeLines);
 
-      // Exploded vector
-      const explodedOffset = new THREE.Vector3(
-        px * 0.45,
-        (py - 400) * 0.4,
-        pz * 0.45
-      );
-
       const hw = part.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(part);
       const isDoor =
         (hw.movableType === 'door' || part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
@@ -2023,6 +2132,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
         (isPartInDrawerGroup ||
           isDrawerFront ||
           isInternalBoxPart);
+
+      const groupStats = explosionGroupId ? groupStatsMap.get(explosionGroupId) : undefined;
+      const explodedOffset = this.computePartExplodedOffset(
+        part,
+        baseBounds,
+        isDoor,
+        isDrawer,
+        groupStats,
+        sceneStats
+      );
 
       let doorPivot: THREE.Group | undefined;
       let doorBaseRotation: THREE.Euler | undefined;
@@ -7095,30 +7214,395 @@ export class Furniture3dViewerComponent implements OnDestroy {
     );
   }
 
+  private resolveExplosionGroupId(
+    part: Part,
+    partGroupMap: Map<string, PartGroup>,
+    presentRawGroupIds: Set<string>
+  ): string | null {
+    const rawGroupId = part.groupId || null;
+    if (!rawGroupId) return null;
+    const grp = partGroupMap.get(rawGroupId);
+    if (grp && grp.type === 'drawer') {
+      const hostId = grp.hostGroupId ?? grp.drawerConfig?.hostGroupId ?? grp.drawerConfig?.targetModuleId;
+      if (hostId && presentRawGroupIds.has(hostId)) {
+        return hostId;
+      }
+    }
+    return rawGroupId;
+  }
+
+  private resolveExplosionGroupFacing(
+    entries: PreparedExplosionRenderEntry[],
+    cx: number,
+    cz: number,
+    groupId: string | null,
+    partGroupMap: Map<string, PartGroup>
+  ): 'front' | 'right' | 'back' | 'left' {
+    const explicitFacing = groupId ? partGroupMap.get(groupId)?.facingDirection : undefined;
+    if (explicitFacing === 'front' || explicitFacing === 'right' || explicitFacing === 'back' || explicitFacing === 'left') {
+      return explicitFacing;
+    }
+
+    const frontEntries = entries.filter(
+      e => e.role === 'door' || e.role === 'drawer_front' || e.role === 'front'
+    );
+    if (frontEntries.length > 0) {
+      let sumDx = 0;
+      let sumDz = 0;
+      for (const e of frontEntries) {
+        sumDx += e.baseBounds.px - cx;
+        sumDz += e.baseBounds.pz - cz;
+      }
+      const avgDx = sumDx / frontEntries.length;
+      const avgDz = sumDz / frontEntries.length;
+      if (Math.abs(avgDx) > 10 || Math.abs(avgDz) > 10) {
+        if (Math.abs(avgDx) > Math.abs(avgDz)) {
+          return avgDx >= 0 ? 'right' : 'left';
+        }
+        return avgDz >= 0 ? 'front' : 'back';
+      }
+    }
+
+    const backEntries = entries.filter(e => e.role === 'back');
+    if (backEntries.length > 0) {
+      let sumDx = 0;
+      let sumDz = 0;
+      for (const e of backEntries) {
+        sumDx += cx - e.baseBounds.px;
+        sumDz += cz - e.baseBounds.pz;
+      }
+      const avgDx = sumDx / backEntries.length;
+      const avgDz = sumDz / backEntries.length;
+      if (Math.abs(avgDx) > 10 || Math.abs(avgDz) > 10) {
+        if (Math.abs(avgDx) > Math.abs(avgDz)) {
+          return avgDx >= 0 ? 'right' : 'left';
+        }
+        return avgDz >= 0 ? 'front' : 'back';
+      }
+    }
+
+    const sideEntry = entries.find(e => e.role === 'side_left' || e.role === 'side_right');
+    if (sideEntry && sideEntry.baseBounds.sx > sideEntry.baseBounds.sz) {
+      return 'right';
+    }
+    return 'front';
+  }
+
+  private buildExplosionAABBStats(
+    entries: PreparedExplosionRenderEntry[],
+    groupId: string | null,
+    partGroupMap: Map<string, PartGroup>
+  ): ExplosionAABBStats {
+    if (entries.length === 0) {
+      return {
+        minX: 0,
+        maxX: 0,
+        minY: 0,
+        maxY: 0,
+        minZ: 0,
+        maxZ: 0,
+        cx: 0,
+        cy: 400,
+        cz: 0,
+        sx: 0,
+        sy: 0,
+        sz: 0,
+        count: 0,
+        facing: 'front'
+      };
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+
+    for (const e of entries) {
+      const b = e.baseBounds;
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxY > maxY) maxY = b.maxY;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+    }
+
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const cz = (minZ + maxZ) / 2;
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      minZ,
+      maxZ,
+      cx,
+      cy,
+      cz,
+      sx: Math.max(0, maxX - minX),
+      sy: Math.max(0, maxY - minY),
+      sz: Math.max(0, maxZ - minZ),
+      count: entries.length,
+      facing: this.resolveExplosionGroupFacing(entries, cx, cz, groupId, partGroupMap)
+    };
+  }
+
+  private computeExplosionStats(
+    entries: PreparedExplosionRenderEntry[],
+    partGroupMap: Map<string, PartGroup>
+  ): {
+    sceneStats: ExplosionAABBStats;
+    groupStatsMap: Map<string, ExplosionAABBStats>;
+  } {
+    const grouped = new Map<string, PreparedExplosionRenderEntry[]>();
+    for (const e of entries) {
+      if (!e.explosionGroupId) continue;
+      let list = grouped.get(e.explosionGroupId);
+      if (!list) {
+        list = [];
+        grouped.set(e.explosionGroupId, list);
+      }
+      list.push(e);
+    }
+
+    const groupStatsMap = new Map<string, ExplosionAABBStats>();
+    for (const [gid, list] of grouped.entries()) {
+      groupStatsMap.set(gid, this.buildExplosionAABBStats(list, gid, partGroupMap));
+    }
+
+    const sceneStats = this.buildExplosionAABBStats(entries, null, partGroupMap);
+    return { sceneStats, groupStatsMap };
+  }
+
+  private computePartExplodedOffset(
+    part: Part,
+    baseBounds: PartWorldAABB,
+    isDoor: boolean,
+    isDrawer: boolean,
+    groupStats: ExplosionAABBStats | undefined,
+    sceneStats: ExplosionAABBStats
+  ): THREE.Vector3 {
+    const stats = groupStats && groupStats.count > 1 ? groupStats : sceneStats;
+    if (stats.count <= 1) {
+      return new THREE.Vector3(0, 0, 0);
+    }
+
+    const dx = baseBounds.px - stats.cx;
+    const dy = baseBounds.py - stats.cy;
+    const dz = baseBounds.pz - stats.cz;
+
+    let fx = 0;
+    let fz = 1;
+    let lx = 1;
+    let lz = 0;
+    if (stats.facing === 'back') {
+      fx = 0;
+      fz = -1;
+      lx = 1;
+      lz = 0;
+    } else if (stats.facing === 'right') {
+      fx = 1;
+      fz = 0;
+      lx = 0;
+      lz = 1;
+    } else if (stats.facing === 'left') {
+      fx = -1;
+      fz = 0;
+      lx = 0;
+      lz = 1;
+    }
+
+    const groupDepth = Math.max(200, Math.abs(fx) > 0.5 ? stats.sx : stats.sz);
+    const curForward = dx * fx + dz * fz;
+    const curLateral = dx * lx + dz * lz;
+    const role = part.componentRole || 'free';
+    const nameLow = (part.name || '').toLowerCase();
+
+    let dForward = curForward * 0.48;
+    let dLateral = curLateral * 0.48;
+    let dyOut = dy * 0.44;
+
+    if (isDoor || role === 'door' || role === 'front') {
+      dForward = Math.max(160, Math.min(280, groupDepth * 0.46)) + Math.max(0, curForward) * 0.35;
+      dLateral = curLateral * 0.34;
+      dyOut = dy * 0.25;
+    } else if (role === 'drawer_front') {
+      dForward = Math.max(175, Math.min(300, groupDepth * 0.48)) + Math.max(0, curForward) * 0.35;
+      dLateral = curLateral * 0.3;
+      dyOut = dy * 0.42;
+    } else if (isDrawer || role === 'drawer_box' || role === 'drawer_lateral' || role === 'drawer_bottom') {
+      const hasCarcass = stats.count > 4;
+      if (hasCarcass) {
+        dForward = Math.max(115, Math.min(220, groupDepth * 0.32)) + curForward * 0.25;
+        dLateral = curLateral * 0.38;
+        dyOut = dy * 0.42 + (role === 'drawer_bottom' ? -32 : 0);
+      } else {
+        dForward = curForward * 0.55;
+        dLateral = curLateral * 0.55;
+        dyOut = dy * 0.55 + (role === 'drawer_bottom' ? -30 : 0);
+      }
+    } else if (role === 'back') {
+      dForward = -Math.max(130, Math.abs(curForward) * 0.65, Math.min(220, groupDepth * 0.38));
+      dLateral = curLateral * 0.25;
+      dyOut = dy * 0.2;
+    } else if (role === 'side_left' || role === 'side_right') {
+      const latSign = curLateral !== 0 ? Math.sign(curLateral) : role === 'side_left' ? -1 : 1;
+      dLateral = latSign * Math.max(Math.abs(curLateral) * 0.48, 120);
+      dForward = curForward * 0.18;
+      dyOut = dy * 0.18;
+    } else if (role === 'shelf' || role === 'accessory') {
+      dForward = Math.max(120, Math.min(220, groupDepth * 0.34)) + curForward * 0.25;
+      dLateral = curLateral * 0.42;
+      dyOut = dy * 0.36;
+    } else if (role === 'divider') {
+      dForward = Math.max(90, Math.min(180, groupDepth * 0.24)) + curForward * 0.22;
+      dLateral = curLateral * 0.48;
+      dyOut = dy * 0.24;
+    } else if (role === 'top' || role === 'tie') {
+      dyOut = Math.max(dy * 0.48, 105);
+      dLateral = curLateral * 0.25;
+      dForward = curForward * 0.25;
+    } else if (role === 'countertop') {
+      dyOut = Math.max(dy * 0.55, 160);
+      dLateral = curLateral * 0.22;
+      dForward = curForward * 0.22;
+    } else if (role === 'backsplash') {
+      dyOut = Math.max(dy * 0.55, 165);
+      dForward = -Math.max(95, Math.abs(curForward) * 0.45);
+      dLateral = curLateral * 0.22;
+    } else if (role === 'bottom') {
+      dyOut = Math.min(dy * 0.48, -105);
+      dLateral = curLateral * 0.25;
+      dForward = curForward * 0.25;
+    } else if (role === 'plinth' || nameLow.includes('pata') || nameLow.includes('zócalo') || nameLow.includes('zocalo')) {
+      dyOut = Math.min(dy * 0.55, -135);
+      dLateral = curLateral * 0.35;
+      dForward = curForward * 0.35;
+    }
+
+    return new THREE.Vector3(
+      fx * dForward + lx * dLateral,
+      dyOut,
+      fz * dForward + lz * dLateral
+    );
+  }
+
+  private updateZoneHighlightScene(box: CabinetZoneHighlightBox | null): void {
+    if (!this.scene) return;
+    const hadChildren = this.zoneHighlightGroup.children.length > 0;
+    this.disposeGroup(this.zoneHighlightGroup);
+
+    if (!box) {
+      this.zoneHighlightGroup.visible = false;
+      if (hadChildren) {
+        this.requestRender(4);
+      }
+      return;
+    }
+
+    const { minX, maxX, minY, maxY, minZ, maxZ } = box;
+    if (
+      !Number.isFinite(minX) ||
+      !Number.isFinite(maxX) ||
+      !Number.isFinite(minY) ||
+      !Number.isFinite(maxY) ||
+      !Number.isFinite(minZ) ||
+      !Number.isFinite(maxZ)
+    ) {
+      this.zoneHighlightGroup.visible = false;
+      return;
+    }
+
+    const sx = Math.max(4, maxX - minX);
+    const sy = Math.max(4, maxY - minY);
+    const sz = Math.max(4, maxZ - minZ);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const cz = (minZ + maxZ) / 2;
+
+    const boxGeo = new THREE.BoxGeometry(sx, sy, sz);
+    const fillMat = new THREE.MeshBasicMaterial({
+      color: 0x0284c7,
+      transparent: true,
+      opacity: 0.16,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false
+    });
+    const fillMesh = new THREE.Mesh(boxGeo, fillMat);
+    fillMesh.position.set(cx, cy, cz);
+    fillMesh.renderOrder = 950;
+    fillMesh.userData = {
+      isAuxiliaryVisual: true,
+      isBoxHelper: true,
+      isZoneHighlight: true,
+      zoneId: box.zoneId
+    };
+    fillMesh.raycast = () => {
+      // No seleccionable por raycasting
+    };
+
+    const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: 0x0284c7,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      depthTest: false
+    });
+    const edgeLines = new THREE.LineSegments(edgesGeo, edgeMat);
+    edgeLines.position.set(cx, cy, cz);
+    edgeLines.renderOrder = 951;
+    edgeLines.userData = {
+      isAuxiliaryVisual: true,
+      isOutline: true,
+      isZoneHighlight: true,
+      zoneId: box.zoneId
+    };
+    edgeLines.raycast = () => {
+      // No seleccionable por raycasting
+    };
+
+    this.zoneHighlightGroup.visible = true;
+    this.zoneHighlightGroup.userData = {
+      isAuxiliaryVisual: true,
+      isZoneHighlight: true,
+      zoneId: box.zoneId
+    };
+    this.zoneHighlightGroup.add(fillMesh);
+    this.zoneHighlightGroup.add(edgeLines);
+  }
+
   private updateExplodedOffsets(percent: number) {
-    const factor = percent / 100;
+    const factor = Math.max(0, Math.min(1, Number(percent) / 100 || 0));
     for (const item of this.pieceObjects) {
       if (item.isDoor && item.doorPivot && item.doorPivotOriginalPos && item.doorLocalMeshPos) {
-        const targetPivotPos = item.doorPivotOriginalPos
-          .clone()
-          .addScaledVector(item.explodedOffset, factor);
-        item.doorPivot.position.copy(targetPivotPos);
+        if (factor === 0) {
+          item.doorPivot.position.copy(item.doorPivotOriginalPos);
+        } else {
+          item.doorPivot.position.copy(item.doorPivotOriginalPos).addScaledVector(item.explodedOffset, factor);
+        }
         item.mesh.position.copy(item.doorLocalMeshPos);
       } else if (item.isDrawer) {
         const curOpen = this.openCurrentMap.get(item.part.id) || 0;
-        const targetPos = item.originalPos
-          .clone()
-          .addScaledVector(item.explodedOffset, factor);
+        const targetPos = item.originalPos.clone();
+        if (factor > 0) {
+          targetPos.addScaledVector(item.explodedOffset, factor);
+        }
         const axis = item.slideAxis || 'z';
         const dir = item.slideDir || 1;
         const maxSlide = 320;
         targetPos[axis] += curOpen * maxSlide * dir;
         item.mesh.position.copy(targetPos);
       } else {
-        const targetPos = item.originalPos
-          .clone()
-          .addScaledVector(item.explodedOffset, factor);
-        item.mesh.position.copy(targetPos);
+        if (factor === 0) {
+          item.mesh.position.copy(item.originalPos);
+        } else {
+          item.mesh.position.copy(item.originalPos).addScaledVector(item.explodedOffset, factor);
+        }
       }
     }
     this.sceneRaycastPicker.refreshPickableMatricesAndBounds(this.furnitureGroup);
@@ -11976,9 +12460,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   isolateContextMenuGroup() {
     const grp = this.contextMenuGroup();
     if (!grp) return;
-    const otherIds = new Set(this.parts().filter(p => p.groupId !== grp.id).map(p => p.id));
-    this.hiddenPartIds.set(otherIds);
-    this.hiddenPartsChanged.emit(Array.from(otherIds));
+    this.isolateGroupById(grp.id);
     this.closeContextMenu();
   }
 
@@ -12621,10 +13103,105 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.closeContextMenu();
   }
 
+  private isApplianceVisuallyHidden(app: ApplianceItem): boolean {
+    return Boolean(app.isHidden) || this.internalHiddenApplianceIds().has(app.id);
+  }
+
+  private showIsolationToast(message: string): void {
+    if (this.isolationToastTimer !== null) {
+      clearTimeout(this.isolationToastTimer);
+      this.isolationToastTimer = null;
+    }
+    this.ngZone.run(() => {
+      this.isolationToast.set(message);
+    });
+    this.isolationToastTimer = setTimeout(() => {
+      this.isolationToastTimer = null;
+      this.ngZone.run(() => {
+        this.isolationToast.set(null);
+      });
+    }, 3200);
+  }
+
+  dismissIsolationToast(): void {
+    if (this.isolationToastTimer !== null) {
+      clearTimeout(this.isolationToastTimer);
+      this.isolationToastTimer = null;
+    }
+    this.ngZone.run(() => {
+      this.isolationToast.set(null);
+    });
+  }
+
+  isolateGroupById(groupId: string): void {
+    const cleanGroupId = (groupId || '').trim();
+    if (!cleanGroupId) return;
+
+    const keepGroupIds = new Set<string>([cleanGroupId]);
+    for (const grp of this.partGroups()) {
+      const hostId = grp.hostGroupId ?? grp.drawerConfig?.hostGroupId ?? grp.drawerConfig?.targetModuleId;
+      if (hostId === cleanGroupId) {
+        keepGroupIds.add(grp.id);
+      }
+    }
+
+    const allParts = this.parts();
+    const otherPartIds = allParts
+      .filter(p => !p.groupId || !keepGroupIds.has(p.groupId))
+      .map(p => p.id);
+    this.hiddenPartIds.set(new Set(otherPartIds));
+    this.hiddenPartsChanged.emit(otherPartIds);
+
+    const allApps = this.appliances();
+    const hiddenAppIds = new Set<string>();
+    const appUpdates: { id: string; updates: Partial<ApplianceItem> }[] = [];
+    for (const app of allApps) {
+      const isLinked = Boolean(app.groupId && keepGroupIds.has(app.groupId));
+      if (!isLinked) {
+        hiddenAppIds.add(app.id);
+      }
+      if (Boolean(app.isHidden) !== !isLinked) {
+        appUpdates.push({ id: app.id, updates: { isHidden: !isLinked } });
+      }
+    }
+    this.internalHiddenApplianceIds.set(hiddenAppIds);
+    if (appUpdates.length > 0) {
+      this.multipleAppliancesModified.emit({ updates: appUpdates });
+    }
+
+    const groupObj = this.partGroups().find(g => g.id === cleanGroupId);
+    const firstPart = allParts.find(p => p.groupId === cleanGroupId);
+    const label = groupObj?.name || firstPart?.groupName || firstPart?.moduleName || 'Módulo';
+    this.isolatedTarget.set({ kind: 'group', id: cleanGroupId, label });
+    this.showIsolationToast(`Módulo aislado: ${label}`);
+  }
+
+  isolatePartById(partId: string): void {
+    const cleanPartId = (partId || '').trim();
+    if (!cleanPartId) return;
+
+    const allParts = this.parts();
+    const targetPart = allParts.find(p => p.id === cleanPartId) || null;
+    const otherPartIds = allParts.filter(p => p.id !== cleanPartId).map(p => p.id);
+    this.hiddenPartIds.set(new Set(otherPartIds));
+    this.hiddenPartsChanged.emit(otherPartIds);
+
+    const allApps = this.appliances();
+    this.internalHiddenApplianceIds.set(new Set(allApps.map(a => a.id)));
+    const appUpdates = allApps
+      .filter(a => !a.isHidden)
+      .map(a => ({ id: a.id, updates: { isHidden: true } }));
+    if (appUpdates.length > 0) {
+      this.multipleAppliancesModified.emit({ updates: appUpdates });
+    }
+
+    const label = targetPart?.name || 'Pieza';
+    this.isolatedTarget.set({ kind: 'part', id: cleanPartId, label });
+    this.showIsolationToast(`Pieza aislada: ${label}`);
+  }
+
   isolatePart(part: Part) {
-    const allOther = new Set(this.parts().filter(p => p.id !== part.id).map(p => p.id));
-    this.hiddenPartIds.set(allOther);
-    this.hiddenPartsChanged.emit(Array.from(allOther));
+    this.isolatePartById(part.id);
     this.closeContextMenu();
   }
 
@@ -12652,6 +13229,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     next.delete(partId);
     this.hiddenPartIds.set(next);
     this.hiddenPartsChanged.emit(Array.from(next));
+    if (next.size === 0 && this.hiddenAppliancesCount() === 0) {
+      this.isolatedTarget.set(null);
+    }
   }
 
   togglePartVisibility(partId: string) {
@@ -12666,6 +13246,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
     this.hiddenPartIds.set(next);
     this.hiddenPartsChanged.emit(Array.from(next));
+    if (next.size === 0 && this.hiddenAppliancesCount() === 0) {
+      this.isolatedTarget.set(null);
+    }
   }
 
   hidePartsByIds(partIds: string[]) {
@@ -12685,18 +13268,33 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
     this.hiddenPartIds.set(next);
     this.hiddenPartsChanged.emit(Array.from(next));
+    if (next.size === 0 && this.hiddenAppliancesCount() === 0) {
+      this.isolatedTarget.set(null);
+    }
   }
 
   setHiddenParts(ids: Set<string> | string[]) {
     const s = new Set(ids);
     this.hiddenPartIds.set(s);
     this.hiddenPartsChanged.emit(Array.from(s));
+    if (s.size === 0 && this.hiddenAppliancesCount() === 0) {
+      this.isolatedTarget.set(null);
+    }
   }
 
   showAllParts() {
     this.hiddenPartIds.set(new Set());
+    this.internalHiddenApplianceIds.set(new Set());
+    this.isolatedTarget.set(null);
+    const hiddenApps = this.appliances().filter(a => a.isHidden);
+    if (hiddenApps.length > 0) {
+      this.multipleAppliancesModified.emit({
+        updates: hiddenApps.map(a => ({ id: a.id, updates: { isHidden: false } }))
+      });
+    }
     this.hiddenPartsChanged.emit([]);
     this.showAllRequested.emit();
+    this.dismissIsolationToast();
     this.closeContextMenu();
   }
 
@@ -12834,14 +13432,26 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.showExplodedSlider.set(false);
   }
 
+  setExplodedPercent(percent: number): void {
+    const numeric = Number(percent);
+    const clamped = Number.isFinite(numeric)
+      ? Math.max(0, Math.min(100, Math.round(numeric)))
+      : 0;
+    this.explodedPercent.set(clamped);
+  }
+
+  toggleExplodedView(defaultPercent = 50): void {
+    this.setExplodedPercent(this.explodedPercent() > 0 ? 0 : defaultPercent);
+  }
+
   resetExploded() {
-    this.explodedPercent.set(0);
+    this.setExplodedPercent(0);
   }
 
   onExplodedSliderInput(e: Event) {
     const target = e.target as HTMLInputElement | null;
     if (target) {
-      this.explodedPercent.set(Number(target.value));
+      this.setExplodedPercent(Number(target.value));
     }
   }
 
@@ -15917,7 +16527,9 @@ private applyMagneticSnapToPosition(
     }
 
     // 2. Retirar electrodomésticos eliminados u ocultos
-    const activeAppIds = new Set(appls.filter(a => !a.isHidden).map(a => a.id));
+    const activeAppIds = new Set(
+      appls.filter(a => !this.isApplianceVisuallyHidden(a)).map(a => a.id)
+    );
     for (const [id, grp] of this.applianceMeshMap.entries()) {
       if (!activeAppIds.has(id)) {
         this.appliancesGroup.remove(grp);
@@ -15928,7 +16540,7 @@ private applyMagneticSnapToPosition(
 
     // 3. Actualización diferencial por ID: sólo se reconstruye si cambian dimensiones o tipo
     for (const app of appls) {
-      if (app.isHidden) continue;
+      if (this.isApplianceVisuallyHidden(app)) continue;
 
       const isMountedSink = app.type === 'sink' && ((app.mountType === 'countertop' && app.position.y > 60) || app.position.y >= 350);
       const isMountedCooktop = app.type === 'cooktop' && ((app.mountType === 'countertop' && app.position.y > 60) || app.position.y >= 350);
@@ -16289,6 +16901,10 @@ private applyMagneticSnapToPosition(
       clearTimeout(this.clearanceToastTimer);
       this.clearanceToastTimer = null;
     }
+    if (this.isolationToastTimer !== null) {
+      clearTimeout(this.isolationToastTimer);
+      this.isolationToastTimer = null;
+    }
     if (typeof window !== 'undefined') {
       window.removeEventListener('pointermove', this.boundPointerMove);
       window.removeEventListener('pointerup', this.boundPointerUp);
@@ -16311,6 +16927,7 @@ private applyMagneticSnapToPosition(
     this.disposeGroup(this.measureGroup);
     this.disposeGroup(this.magneticSnapGroup);
     this.disposeGroup(this.pushPullHighlightGroup);
+    this.disposeGroup(this.zoneHighlightGroup);
     this.disposeGroup(this.rectPreviewGroup);
     this.disposeGroup(this.circlePreviewGroup);
     this.disposeGroup(this.freehandPreviewGroup);

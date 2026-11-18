@@ -92,6 +92,27 @@
     </div>
   }
 
+  <!-- TOAST TRANSITORIO DE AISLAMIENTO 3D -->
+  @if (isolationToast(); as isoToast) {
+    <div
+      role="status"
+      aria-live="polite"
+      data-testid="isolation-toast"
+      class="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-white/95 border border-zinc-200 shadow-lg text-zinc-900 font-sans text-xs font-medium pointer-events-auto backdrop-blur-md">
+      <span class="flex items-center justify-center w-6 h-6 rounded-md bg-sky-50 text-sky-600 border border-sky-600/25 shrink-0">
+        <hugeicons-icon [icon]="icons.cameraFocus" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+      </span>
+      <span class="font-sans leading-snug">{{ isoToast }}</span>
+      <button
+        type="button"
+        (click)="dismissIsolationToast()"
+        class="ml-1 p-1 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer"
+        aria-label="Cerrar notificación">
+        <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+      </button>
+    </div>
+  }
+
   <!-- INLINE 3D DIMENSION / CLEARANCE EDITOR (Edición Directa al Clic sobre Cotas 3D) -->
   @if (inlineDimensionEditor(); as editor) {
     <div
@@ -326,6 +347,21 @@
       </button>
     </div>
 
+    <!-- 13b. VISTA EXPLOSIVA 3D (EXPLOSIONAR PIEZAS) -->
+    <button
+      type="button"
+      data-testid="cad-exploded-btn"
+      (click)="toggleExplodedSlider()"
+      [class]="showExplodedSlider() || explodedPercent() > 0 ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'"
+      class="cad-tool-btn rounded-md flex items-center justify-center transition relative cursor-pointer shrink-0 font-sans"
+      [attr.aria-expanded]="showExplodedSlider()"
+      title="Vista Explosiva 3D (Explosionar Piezas)">
+      <hugeicons-icon [icon]="icons.explodedView" [size]="15" [strokeWidth]="1.75"></hugeicons-icon>
+      @if (explodedPercent() > 0) {
+        <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-sky-600 border border-white"></span>
+      }
+    </button>
+
     <div class="cad-toolbar-divider w-5 h-px bg-zinc-200/90 shrink-0"></div>
 
     <!-- 14. ILUMINACIÓN / SOMBRAS DEL ESTUDIO (I) -->
@@ -543,27 +579,130 @@
     </div>
   }
 
-  <!-- BANNER DE ELEMENTOS OCULTOS (PIEZAS Y ELECTRODOMÉSTICOS) -->
-  @if (totalHiddenCount() > 0) {
-    <div class="absolute top-12 left-14 z-20 max-w-[calc(100%-4.5rem)] pointer-events-auto animate-in fade-in duration-150">
-      <div class="flex items-center gap-2 bg-amber-500 text-slate-950 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-lg text-xs font-bold border border-amber-400">
-        <hugeicons-icon [icon]="icons.eyeOff" [size]="15" [strokeWidth]="2.2" class="text-slate-950 shrink-0"></hugeicons-icon>
-        <span>
-          @if (hiddenPartIds().size > 0 && hiddenAppliancesCount() > 0) {
-            {{ hiddenPartIds().size }} pieza(s) y {{ hiddenAppliancesCount() }} equipo(s) oculto(s)
+  <!-- POPOVER FLOTANTE: VISTA EXPLOSIVA 3D (0% - 100%) -->
+  @if (showExplodedSlider()) {
+    <button
+      type="button"
+      aria-label="Cerrar panel de vista explosiva"
+      class="absolute inset-0 z-35 bg-black/5 backdrop-blur-2xs cursor-default w-full h-full border-none outline-hidden"
+      (click)="closeExplodedSlider()">
+    </button>
+    <div
+      role="dialog"
+      aria-label="Vista Explosiva 3D"
+      data-testid="exploded-popover"
+      class="absolute left-14 top-44 z-40 bg-white/95 text-zinc-900 backdrop-blur-md border border-zinc-200 rounded-xl shadow-2xl p-3.5 w-72 max-w-[calc(100%-4.5rem)] max-h-[calc(100%-3rem)] overflow-y-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto font-sans">
+      <div class="flex items-center justify-between pb-2 border-b border-zinc-200">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-7 h-7 rounded-lg bg-zinc-100 text-zinc-900 border border-zinc-200 flex items-center justify-center shrink-0">
+            <hugeicons-icon [icon]="icons.explodedView" [size]="15" [strokeWidth]="1.8" class="text-sky-600"></hugeicons-icon>
+          </div>
+          <div class="min-w-0">
+            <h4 class="font-semibold text-xs text-zinc-900 leading-tight truncate font-sans">Vista Explosiva 3D</h4>
+            <p class="text-[10px] text-zinc-500 font-medium font-sans truncate">Separación desde el centro del módulo</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span
+            data-testid="exploded-percent-readout"
+            class="cad-numeric text-[11px] font-semibold px-1.5 py-0.5 rounded bg-sky-50 text-sky-600 border border-sky-600/30">
+            {{ explodedPercent() }}%
+          </span>
+          <button
+            type="button"
+            (click)="closeExplodedSlider()"
+            class="p-1 rounded-lg text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer"
+            aria-label="Cerrar vista explosiva"
+            title="Cerrar panel">
+            <hugeicons-icon [icon]="icons.close" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+          </button>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        data-testid="exploded-toggle-btn"
+        (click)="setExplodedPercent(explodedPercent() > 0 ? 0 : 45)"
+        [class]="explodedPercent() > 0 ? 'bg-zinc-900 hover:bg-zinc-800 text-white' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200'"
+        class="w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer font-sans">
+        <hugeicons-icon [icon]="icons.explodedView" [size]="14" [strokeWidth]="1.8"></hugeicons-icon>
+        <span>{{ explodedPercent() > 0 ? 'Reagrupar Piezas (0%)' : 'Explosionar Piezas (45%)' }}</span>
+      </button>
+
+      <div class="flex flex-col gap-1.5">
+        <div class="flex items-center justify-between text-[11px] text-zinc-600 font-sans">
+          <span>Separación radial</span>
+          <span class="cad-numeric font-semibold text-zinc-900">{{ explodedPercent() }}%</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          data-testid="exploded-slider"
+          aria-label="Porcentaje de vista explosiva 3D"
+          [value]="explodedPercent()"
+          (input)="onExplodedSliderInput($event)"
+          class="cad-exploded-range w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-sky-600" />
+        <div class="flex items-center justify-between text-[10px] text-zinc-500 cad-numeric">
+          <span>0%</span>
+          <span>50%</span>
+          <span>100%</span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-2 pt-1 border-t border-zinc-100">
+        <button
+          type="button"
+          data-testid="exploded-reset-btn"
+          [disabled]="explodedPercent() === 0"
+          (click)="resetExploded()"
+          [class]="explodedPercent() === 0 ? 'opacity-40 cursor-not-allowed bg-zinc-50 text-zinc-400 border-zinc-200' : 'bg-white hover:bg-zinc-100 text-zinc-900 border-zinc-300 cursor-pointer'"
+          class="w-full py-1.5 px-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition font-sans">
+          <hugeicons-icon [icon]="icons.reset" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+          <span>Restaurar Ensamble (0%)</span>
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- BANNER DE ELEMENTOS OCULTOS O AISLADOS (PIEZAS Y ELECTRODOMÉSTICOS) -->
+  @if (totalHiddenCount() > 0 || isolatedTarget() !== null) {
+    <div
+      data-testid="hidden-isolated-banner"
+      class="absolute top-12 left-14 z-20 max-w-[calc(100%-4.5rem)] pointer-events-auto animate-in fade-in duration-150 font-sans">
+      <div class="flex items-center gap-2 bg-white/95 text-zinc-900 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium border border-zinc-200">
+        <hugeicons-icon
+          [icon]="isolatedTarget() ? icons.cameraFocus : icons.eyeOff"
+          [size]="15"
+          [strokeWidth]="2"
+          class="text-sky-600 shrink-0"></hugeicons-icon>
+        <span class="font-sans">
+          @if (isolatedTarget(); as iso) {
+            <span class="font-semibold text-zinc-900">
+              {{ iso.kind === 'group' ? 'Módulo aislado:' : 'Pieza aislada:' }} {{ iso.label }}
+            </span>
+            @if (totalHiddenCount() > 0) {
+              <span class="text-zinc-500 ml-1">
+                (<span class="cad-numeric">{{ totalHiddenCount() }}</span> oculto(s))
+              </span>
+            }
+          } @else if (hiddenPartIds().size > 0 && hiddenAppliancesCount() > 0) {
+            <span class="cad-numeric font-semibold">{{ hiddenPartIds().size }}</span> pieza(s) y <span class="cad-numeric font-semibold">{{ hiddenAppliancesCount() }}</span> equipo(s) oculto(s)
           } @else if (hiddenPartIds().size > 0) {
-            {{ hiddenPartIds().size }} pieza(s) oculta(s)
+            <span class="cad-numeric font-semibold">{{ hiddenPartIds().size }}</span> pieza(s) oculta(s)
           } @else {
-            {{ hiddenAppliancesCount() }} equipo(s) oculto(s)
+            <span class="cad-numeric font-semibold">{{ hiddenAppliancesCount() }}</span> equipo(s) oculto(s)
           }
         </span>
         <button
           type="button"
+          data-testid="show-all-banner-btn"
           (click)="showAllParts()"
-          class="bg-slate-950 hover:bg-slate-800 text-white px-2.5 py-0.5 rounded-lg text-[11px] font-bold ml-1.5 cursor-pointer transition shadow-xs flex items-center gap-1">
+          class="bg-zinc-900 hover:bg-zinc-800 text-white px-2.5 py-0.5 rounded-lg text-[11px] font-semibold ml-1.5 cursor-pointer transition shadow-xs flex items-center gap-1 font-sans">
           <hugeicons-icon [icon]="icons.eye" [size]="12" [strokeWidth]="2"></hugeicons-icon>
           <span>{{ 'designer.showAll' | t }}</span>
-          <span class="text-[9px] text-slate-400 font-mono">Alt+H</span>
+          <span class="text-[9px] text-zinc-400 font-sans">Alt+H</span>
         </button>
       </div>
     </div>

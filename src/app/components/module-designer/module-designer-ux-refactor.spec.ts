@@ -250,21 +250,21 @@ describe('ModuleDesignerComponent: Refactor UX/UI Completo (TAREA 1, 2, 3 y 4)',
     });
   });
 
-  describe('TAREA 3: + Catálogo Unificado (CONSTRUCCIÓN Y MÓDULOS 3D con 4 Botones Diferenciados)', () => {
-    it('debe renderizar CONSTRUCCIÓN Y MÓDULOS 3D con las 4 acciones diferenciadas y conservar Cajón Modular', () => {
+  describe('TAREA 3: + Catálogo Unificado (CONSTRUCCIÓN Y MÓDULOS 3D con 4 Vías y Constructor en Vivo)', () => {
+    it('debe renderizar CONSTRUCCIÓN Y MÓDULOS 3D con las 4 acciones diferenciadas y sin botón legacy de Cajón Modular', () => {
       component.activeDockTab.set('catalog');
       fixture.detectChanges();
 
       const inspector = hostEl.querySelector('.md-inspector-panel') as HTMLElement;
       expect(inspector.textContent).toContain('CONSTRUCCIÓN Y MÓDULOS 3D');
-      expect(inspector.textContent).toContain('Cajón Modular (Asistente)');
+      expect(inspector.textContent).not.toContain('Cajón Modular (Asistente)');
 
       const buttons = Array.from(inspector.querySelectorAll('button'));
       const assistantBtn = buttons.find(b =>
-        b.textContent?.includes('+ Crear Módulo a Medida (Asistente)')
+        b.textContent?.includes('Crear con Asistente')
       );
       const templatesBtn = buttons.find(b =>
-        b.textContent?.includes('Plantillas de Muebles 3D')
+        b.textContent?.includes('Catálogo de Plantillas 3D')
       );
       const freeBoardBtn = buttons.find(b =>
         b.textContent?.includes('+ Tablero / Pieza Libre')
@@ -281,7 +281,8 @@ describe('ModuleDesignerComponent: Refactor UX/UI Completo (TAREA 1, 2, 3 y 4)',
       expect(countertopBtn).toBeTruthy();
     });
 
-    it('las 4 acciones de CONSTRUCCIÓN Y MÓDULOS 3D deben abrir Asistente, Catálogo, crear Tablero Libre y abrir Mesón de Piedra', async () => {
+    it('las 4 acciones de CONSTRUCCIÓN Y MÓDULOS 3D deben abrir Constructor en Vivo por Zonas, Catálogo 360°, Tablero Libre y Mesón de Piedra', async () => {
+      projectService.clearFurniture();
       component.activeDockTab.set('catalog');
       fixture.detectChanges();
 
@@ -289,35 +290,54 @@ describe('ModuleDesignerComponent: Refactor UX/UI Completo (TAREA 1, 2, 3 y 4)',
       const findCatBtn = (text: string) =>
         Array.from(inspector.querySelectorAll('button')).find(b => b.textContent?.includes(text))!;
 
-      // 1. + Crear Módulo a Medida (Asistente)
-      findCatBtn('+ Crear Módulo a Medida (Asistente)').click();
+      // 1. Crear con Asistente -> abre Constructor por Zonas inline con borrador en vivo y rollback limpio al cancelar
+      const countInitial = component.currentParts().length;
+      findCatBtn('Crear con Asistente').click();
+      fixture.detectChanges();
+
+      expect(component.showTemplatesModal()).toBe(false);
+      expect(component.isZoneBuilderOpen()).toBe(true);
+      expect(component.zoneBuilderEditingGroupId()).toBeTruthy();
+      expect(component.highlightedZoneBox()).not.toBeNull();
+      expect(component.currentParts().length).toBeGreaterThan(countInitial);
+
+      const zoneBuilderEl = hostEl.querySelector('app-zone-cabinet-builder') as HTMLElement | null;
+      expect(zoneBuilderEl).toBeTruthy();
+      expect(zoneBuilderEl?.textContent).toContain('Constructor por Zonas');
+      expect(zoneBuilderEl?.textContent).toContain('Paso A — Caja Exterior (Casco)');
+      expect(zoneBuilderEl?.textContent).toContain('Paso B — Esquema Frontal 2D y Zonas');
+
+      const cancelBuilderBtn = Array.from(zoneBuilderEl!.querySelectorAll('button')).find(
+        b => b.textContent?.trim() === 'Cancelar'
+      );
+      expect(cancelBuilderBtn).toBeTruthy();
+      cancelBuilderBtn!.click();
+      fixture.detectChanges();
+
+      expect(component.isZoneBuilderOpen()).toBe(false);
+      expect(component.highlightedZoneBox()).toBeNull();
+      expect(component.currentParts().length).toBe(countInitial);
+      expect(component.activeDockTab()).toBe('catalog');
+
+      // 2. Catálogo de Plantillas 3D
+      findCatBtn('Catálogo de Plantillas 3D').click();
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
 
       expect(component.showTemplatesModal()).toBe(true);
-      expect(component.templatesModalInitialView()).toBe('assistant');
-      const modalOnAssistant = hostEl.querySelector('app-templates-modal') as HTMLElement | null;
-      expect(modalOnAssistant).toBeTruthy();
-      expect(modalOnAssistant?.textContent).toContain('Dimensiones Exteriores (mm)');
+      const modalOnCatalog = hostEl.querySelector('app-templates-modal') as HTMLElement | null;
+      expect(modalOnCatalog).toBeTruthy();
+      expect(
+        modalOnCatalog?.querySelector('input#catalog-search-input')
+      ).toBeTruthy();
+      expect(modalOnCatalog?.querySelector('app-template-preview-3d')).toBeTruthy();
+      expect(modalOnCatalog?.textContent).toContain('+ Insertar Mueble en el Lienzo');
+      expect(modalOnCatalog?.textContent).toContain('Abrir y Personalizar en Asistente');
 
       component.closeTemplatesModal();
       fixture.detectChanges();
       expect(component.showTemplatesModal()).toBe(false);
-
-      // 2. Plantillas de Muebles 3D
-      findCatBtn('Plantillas de Muebles 3D').click();
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      expect(component.showTemplatesModal()).toBe(true);
-      expect(component.templatesModalInitialView()).toBe('catalog');
-      const modalOnCatalog = hostEl.querySelector('app-templates-modal') as HTMLElement | null;
-      expect(modalOnCatalog?.querySelector('input[placeholder="Filtrar plantilla..."]')).toBeTruthy();
-
-      component.closeTemplatesModal();
-      fixture.detectChanges();
 
       // 3. + Tablero / Pieza Libre
       const countBefore = component.currentParts().length;
