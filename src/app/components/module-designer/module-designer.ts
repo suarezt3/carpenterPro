@@ -5,9 +5,11 @@ import {
   DestroyRef,
   ElementRef,
   inject,
+  OnInit,
   signal,
   viewChild
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
@@ -21,17 +23,22 @@ import {
   BathIcon,
   Bookshelf01Icon,
   Cabinet01Icon,
+  Cabinet02Icon,
   Cancel01Icon,
   CheckListIcon,
   CheckmarkCircle02Icon,
   Compass01Icon,
+  CubeIcon,
   Delete02Icon,
   Edit02Icon,
   InformationCircleIcon,
   Layers01Icon,
+  Mouse01Icon,
   PaintBoardIcon,
   RulerIcon,
   Settings01Icon,
+  ShieldCheckIcon,
+  SquareIcon,
   Tag01Icon,
   Tick02Icon,
   ViewIcon,
@@ -80,7 +87,6 @@ import {
   SpecialCutPresetType,
   isCountertopMaterial,
   DEFAULT_COUNTERTOP_MATERIALS,
-  EnvironmentLine,
   DrawerFrontMountType,
   DrawerOpeningSystem,
   ModuleCavityInfo
@@ -128,8 +134,10 @@ export interface QuickRolePreset {
  */
 @Component({
   selector: 'app-module-designer',
+  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     ReactiveFormsModule,
     HugeiconsIconComponent,
     Furniture3dViewerComponent,
@@ -144,7 +152,7 @@ export interface QuickRolePreset {
     '(document:click)': 'onDocumentClick($event)'
   }
 })
-export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
+export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware {
   readonly i18n = inject(I18nService);
   readonly paymentService = inject(PaymentService);
   readonly projectService = inject(ProjectStorageService);
@@ -180,17 +188,13 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
 
   // Registro centralizado de iconos vectoriales para las barras flotantes, el panel derecho y los modales
   readonly icons = {
-    cube3d: cadSvg([
-      'M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z',
-      'M12 12L20 7.5',
-      'M12 12L4 7.5',
-      'M12 12V21'
-    ]),
+    cube3d: CubeIcon,
     homeRoof: cadSvg([
       'M3 10.5L12 3L21 10.5',
       'M5 9.5V20H19V9.5',
       'M9.5 20V14H14.5V20'
     ]),
+    roomLayout: LayoutUIcon,
     templatesGrid: cadSvg([
       'M4 4H10V10H4V4Z',
       'M14 4H20V10H14V4Z',
@@ -198,6 +202,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       'M17 14V20',
       'M14 17H20'
     ]),
+    cabinetModule: Cabinet01Icon,
     tune: Settings01Icon,
     delete: Delete02Icon,
     sidebarToggle: cadSvg([
@@ -261,10 +266,11 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       'M9.9 5.1A10.5 10.5 0 0 1 12 5C17 5 20.5 9 21.5 12C21 13.4 20.1 14.9 18.8 16.1',
       'M6.2 6.2C4.4 7.5 3.1 9.5 2.5 12C3.5 15 7 19 12 19C13.8 19 15.4 18.5 16.8 17.6'
     ]),
-    squareShape: cadSvg(['M4 4H20V20H4V4Z']),
+    squareShape: SquareIcon,
     circleShape: cadSvg(['M21 12A9 9 0 1 1 3 12A9 9 0 0 1 21 12Z']),
     freehandWave: cadSvg(['M3.5 16.5C6.5 8.5 10 8.5 12 12.5C14 16.5 17.5 16.5 20.5 7.5']),
     magnet: cadSvg(['M6 4V11A6 6 0 0 0 18 11V4', 'M6 8H9', 'M15 8H18']),
+    snapCollision: ShieldCheckIcon,
     ruler: RulerIcon,
     alignLeft: cadSvg(['M4 4V20', 'M8 7H20V11H8V7Z', 'M8 13H16V17H8V13Z']),
     alignRight: cadSvg(['M20 4V20', 'M4 7H16V11H4V7Z', 'M8 13H16V17H8V13Z']),
@@ -338,7 +344,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       'M7 4H17L14.5 20H9.5L7 4Z',
       'M8.5 16H15.5'
     ]),
-    cursorSelect: cadSvg(['M4.5 3.5L19.5 10.5L12.5 13L10 20L4.5 3.5Z']),
+    cursorSelect: Mouse01Icon,
     tableRows: cadSvg([
       'M4 4H20V20H4V4Z',
       'M4 9.5H20',
@@ -423,11 +429,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       'M12 4V20',
       'M4 12H20'
     ]),
-    countertopPro: cadSvg([
-      'M3 7H21V11H3V7Z',
-      'M5 11V19H19V11',
-      'M12 11V19'
-    ]),
+    countertopPro: Cabinet02Icon,
     chamferCut: cadSvg([
       'M4 4H14L20 10V20H4V4Z',
       'M14 4V10H20'
@@ -549,6 +551,19 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   readonly viewer3d = viewChild<Furniture3dViewerComponent>('viewer3d');
   readonly viewer3dRef = this.viewer3d;
   readonly chipsScrollContainer = viewChild<ElementRef<HTMLDivElement>>('chipsScrollContainer');
+
+  readonly isMagneticSnap = computed<boolean>(() => this.viewer3d()?.isMagneticSnap() ?? true);
+
+  toggleMagneticSnap(): void {
+    const v = this.viewer3d();
+    if (!v) return;
+    v.toggleMagneticSnap();
+    this.showToast(
+      v.isMagneticSnap()
+        ? 'Imán y colisiones 3D activos'
+        : 'Imán 3D desactivado (movimiento libre)'
+    );
+  }
 
   toggleViewerPerformanceMode() {
     const v = this.viewer3d();
@@ -1718,18 +1733,10 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     | 'electronics'
     | 'office'
   >('all');
-  readonly applianceFilterByEnvironment = signal<boolean>(true);
 
   readonly filteredAppliances = computed(() => {
     const cat = this.activeApplianceCategory();
-    const env = this.selectedEnvironmentLine();
-    const byEnv = this.applianceFilterByEnvironment();
-
-    let list = this.appliancesCatalog;
-    // Si el filtrado por ambiente está activo y estamos en 'all', mostrar contextualmente los equipos de la línea activa
-    if (byEnv && env && cat === 'all') {
-      list = list.filter(a => !a.environmentLines || a.environmentLines.length === 0 || a.environmentLines.includes(env));
-    }
+    const list = this.appliancesCatalog;
     if (cat === 'all') return list;
     return list.filter(a => a.category === cat);
   });
@@ -2028,6 +2035,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     if (id) {
       this.selectedPartId.set(null);
       this.selectedPartIds.set([]);
+      this.selectedWall.set(null);
       this.activeDockTab.set('appliances');
     }
   }
@@ -2140,7 +2148,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       this.selectedPartId.set(null);
       this.selectedPartIds.set([]);
       this.selectedWall.set(null);
-      this.activeDockTab.set('appliances');
+      this.activeDockTab.set('piece');
     } else {
       this.projectService.selectAppliance(null);
       this.projectService.selectAppliances([]);
@@ -2150,12 +2158,11 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   onAppliancesSelectedFrom3D(appIds: string[]) {
     this.projectService.selectAppliances(appIds);
     if (appIds.length > 0) {
+      this.selectedWall.set(null);
       if (appIds.length === 1 && this.selectedPartIds().length === 0) {
         this.projectService.selectAppliance(appIds[0]);
-        this.activeDockTab.set('appliances');
-      } else {
-        this.activeDockTab.set('piece');
       }
+      this.activeDockTab.set('piece');
     }
   }
 
@@ -2166,9 +2173,10 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   selectOnlyAppliance(appId: string) {
     this.selectedPartIds.set([]);
     this.selectedPartId.set(null);
+    this.selectedWall.set(null);
     this.projectService.selectAppliance(appId);
     this.projectService.selectAppliances([appId]);
-    this.activeDockTab.set('appliances');
+    this.activeDockTab.set('piece');
   }
 
   toggleApplianceInSelection(appId: string) {
@@ -2213,6 +2221,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   readonly isSidebarCollapsed = signal<boolean>(false);
   readonly showTemplatesDropdown = signal<boolean>(false);
   readonly showTemplatesModal = signal<boolean>(false);
+  readonly templatesModalInitialView = signal<'assistant' | 'catalog'>('assistant');
   readonly editingGroupId = signal<string | null>(null);
   readonly editingGroupConfig = signal<ParametricCabinetConfig | null>(null);
 
@@ -2220,11 +2229,19 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.isSidebarCollapsed.update(v => !v);
   }
 
-  openTemplatesModal() {
+  openTemplatesModal(initialView: 'assistant' | 'catalog' = 'assistant') {
     this.editingGroupId.set(null);
     this.editingGroupConfig.set(null);
+    this.templatesModalInitialView.set(initialView);
     this.showTemplatesDropdown.set(false);
     this.showTemplatesModal.set(true);
+  }
+
+  openCountertopConfig() {
+    this.showTemplatesDropdown.set(false);
+    this.showTemplatesModal.set(false);
+    this.showKitchenProPanel.set(true);
+    this.kitchenProTab.set('countertop');
   }
 
   closeTemplatesModal() {
@@ -2610,18 +2627,36 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.isDimensionsWidgetMinimized.update(v => !v);
   }
 
+  private hasActiveSelection(): boolean {
+    return Boolean(
+      this.selectedPartId() ||
+      this.selectedPartIds().length > 0 ||
+      this.selectedApplianceId() ||
+      this.selectedApplianceIds().length > 0 ||
+      this.selectedWall()
+    );
+  }
+
+  private enforceInitialCatalogTab(): void {
+    if (!this.hasActiveSelection()) {
+      this.activeDockTab.set('catalog');
+    }
+  }
+
   constructor() {
     if (!this.projectService.designerSessionInitialized()) {
       const parts = this.currentParts();
       if (this.workspaceMode() === 'room') {
         this.selectedPartId.set(null);
         this.selectedPartIds.set([]);
-        this.activeDockTab.set('piece');
+        this.activeDockTab.set('catalog');
       } else if (parts.length > 0) {
         const topPart = parts.find(p => p.name.toUpperCase().includes('TECHO') || p.id === 'desk_top') || parts[0];
         this.selectedPartId.set(topPart.id);
         this.selectedPartIds.set([topPart.id]);
         this.activeDockTab.set('piece');
+      } else {
+        this.activeDockTab.set('catalog');
       }
       this.projectService.designerSessionInitialized.set(true);
     }
@@ -2631,6 +2666,10 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
         clearTimeout(this.toastTimer);
       }
     });
+  }
+
+  ngOnInit(): void {
+    this.enforceInitialCatalogTab();
   }
 
   // --- SELECCIÓN DE PIEZAS Y GRUPOS ---
@@ -2717,6 +2756,12 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     this.selectPartById(id, event);
   }
 
+  private clearNonPartSelections(): void {
+    this.selectedWall.set(null);
+    this.projectService.selectAppliance(null);
+    this.projectService.selectAppliances([]);
+  }
+
   selectSinglePartById(id: string, event?: Event) {
     event?.stopPropagation();
     const targetPart = this.currentParts().find(p => p.id === id);
@@ -2728,6 +2773,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       this.selectEntireGroup(targetPart.groupId, id);
       return;
     }
+    this.clearNonPartSelections();
     this.selectedPartId.set(id);
     this.selectedPartIds.set([id]);
     this.activeDockTab.set('piece');
@@ -2756,6 +2802,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       this.selectedPartIds.set(cur);
       this.selectedPartId.set(cur.length > 0 ? (cur.includes(id) ? id : cur[0]) : null);
       if (cur.length > 0) {
+        this.selectedWall.set(null);
         this.activeDockTab.set('piece');
       }
     } else {
@@ -2766,6 +2813,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       if (targetPart?.groupId && !this.isCountertopGroup(targetPart.groupId)) {
         this.selectEntireGroup(targetPart.groupId, id);
       } else {
+        this.clearNonPartSelections();
         this.selectedPartId.set(id);
         this.selectedPartIds.set([id]);
         this.activeDockTab.set('piece');
@@ -3411,9 +3459,9 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   selectOnlyPart(partId: string) {
+    this.clearNonPartSelections();
     this.selectedPartIds.set([partId]);
     this.selectedPartId.set(partId);
-    this.projectService.selectAppliances([]);
     this.activeDockTab.set('piece');
   }
 
@@ -3525,10 +3573,13 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
    * Aísla y selecciona exclusivamente el módulo especificado, pasando al modo inspector individual.
    */
   selectOnlyGroup(groupId: string) {
+    this.clearNonPartSelections();
     const groupPartIds = this.currentParts().filter(p => p.groupId === groupId).map(p => p.id);
     this.selectedPartIds.set(groupPartIds);
     this.selectedPartId.set(groupPartIds.length > 0 ? groupPartIds[0] : null);
-    this.activeDockTab.set('piece');
+    if (groupPartIds.length > 0) {
+      this.activeDockTab.set('piece');
+    }
   }
 
   /**
@@ -5084,12 +5135,15 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
   }
 
   selectEntireGroup(groupId: string, preferredPartId?: string) {
+    this.clearNonPartSelections();
     const groupParts = this.currentParts().filter(p => p.groupId === groupId);
     const ids = groupParts.map(p => p.id);
     this.selectedPartIds.set(ids);
     const activeId = preferredPartId && ids.includes(preferredPartId) ? preferredPartId : (ids[0] || null);
     this.selectedPartId.set(activeId);
-    this.activeDockTab.set('piece');
+    if (ids.length > 0) {
+      this.activeDockTab.set('piece');
+    }
   }
 
   updateActiveGroupName(rawName: string) {
@@ -6491,19 +6545,6 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
     }
   }
 
-  readonly selectedEnvironmentLine = signal<EnvironmentLine>('kitchen');
-
-  setEnvironmentLine(env: EnvironmentLine) {
-    this.selectedEnvironmentLine.set(env);
-    const labelMap: Record<EnvironmentLine, string> = {
-      kitchen: 'Cocinas',
-      closet: 'Closets y Dormitorios',
-      bathroom: 'Muebles de Baño',
-      living_office: 'Hogar y Estudio'
-    };
-    this.showToast(`✨ Línea activa: ${labelMap[env]}`);
-  }
-
   readonly isParametricCabinetGroup = computed<boolean>(() => {
     const gid = this.activeSelectedGroupId();
     if (!gid) return false;
@@ -6700,7 +6741,7 @@ export class ModuleDesignerComponent implements RouteReuseLifecycleAware {
       width: 400,
       orientation: 'horizontal'
     });
-    this.showToast('📄 Tablero libre añadido al lienzo 3D');
+    this.showToast('Tablero libre añadido al lienzo 3D');
   }
 
   applySpecialCutToSelectedPart(type: SpecialCutPresetType) {

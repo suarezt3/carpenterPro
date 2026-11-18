@@ -32,7 +32,6 @@ import {
   Delete02Icon,
   Exchange01Icon,
   InformationCircleIcon,
-  KitchenUtensilsIcon,
   Layers01Icon,
   MagicWand01Icon,
   PaintBoardIcon,
@@ -62,8 +61,16 @@ export type ModuleCategoryPreset =
   | 'oven_tower'
   | 'custom';
 
+const ENVIRONMENT_PRESET_MAP: Record<EnvironmentLine, ModuleCategoryPreset> = {
+  kitchen: 'kitchen_base',
+  closet: 'closet',
+  bathroom: 'vanity',
+  living_office: 'bookshelf'
+};
+
 @Component({
   selector: 'app-templates-modal',
+  standalone: true,
   imports: [HugeiconsIconComponent],
   templateUrl: './templates-modal.html',
   styleUrl: './templates-modal.css',
@@ -150,6 +157,7 @@ export class TemplatesModalComponent {
   }
 
   isOpen = input<boolean>(false);
+  initialView = input<'assistant' | 'catalog'>('assistant');
   environmentLine = input<EnvironmentLine | undefined>(undefined);
   materials = input<Material[]>([]);
   editingGroupId = input<string | null>(null);
@@ -487,11 +495,9 @@ export class TemplatesModalComponent {
   filteredTemplates = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
     const cat = this.activeCategory();
-    const env = this.environmentLine();
 
     return this.catalogService.templates.filter(t => {
-      const matchEnv = !env || cat !== 'all' || t.environmentLine === env;
-      const matchCat = cat === 'all' ? matchEnv : t.category === cat;
+      const matchCat = cat === 'all' || t.category === cat;
       if (!matchCat) return false;
       if (!q) return true;
       const inName = t.name.toLowerCase().includes(q);
@@ -508,7 +514,7 @@ export class TemplatesModalComponent {
   private wasEditingGroup = false;
 
   constructor() {
-    // 1. Cargar configuración del módulo a editar: SOLO depende de isOpen(), editingGroupId() y editingConfig()
+    // 1. Sincronizar vista inicial, modo edición y presets: SOLO depende de isOpen(), initialView(), editingGroupId() y editingConfig()
     effect(() => {
       const open = this.isOpen();
       const groupId = this.editingGroupId();
@@ -519,16 +525,14 @@ export class TemplatesModalComponent {
           this.loadConfig(cfg);
         });
       } else if (open && !groupId) {
+        const view = this.initialView();
         untracked(() => {
+          this.activeView.set(view);
           const env = this.environmentLine();
-          if (env === 'kitchen') {
-            this.selectPreset('kitchen_base');
-          } else if (env === 'closet') {
-            this.selectPreset('closet');
-          } else if (env === 'bathroom') {
-            this.selectPreset('vanity');
-          } else if (env === 'living_office') {
-            this.selectPreset('bookshelf');
+          const envPreset = env ? ENVIRONMENT_PRESET_MAP[env] : undefined;
+          if (envPreset) {
+            this.wasEditingGroup = false;
+            this.selectPreset(envPreset);
           } else if (this.wasEditingGroup || (this.structureThickness() !== 15 && this.structureThickness() !== 18)) {
             this.wasEditingGroup = false;
             const p = this.activePreset();

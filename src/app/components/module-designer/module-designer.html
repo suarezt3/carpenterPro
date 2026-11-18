@@ -1,132 +1,27 @@
 <div class="md-designer-shell w-full h-full flex flex-col p-1.5 sm:p-2 2xl:p-2.5 gap-1.5 xl:gap-2 min-h-0 overflow-hidden">
 
-  <!-- BARRA SUPERIOR (ZONA 1): Selector Multi-Ambiente y Acciones Primarias -->
-  <div class="md-top-bar h-9.5 xl:h-10 px-2 xl:px-3 bg-white border border-slate-200 rounded-xl flex flex-nowrap items-center justify-between gap-2 xl:gap-3 shrink-0 shadow-xs overflow-x-auto overflow-y-hidden no-scrollbar">
-    
-    <!-- Bloque Izquierdo: Título y Selector Rápido Multi-Ambiente (4 Líneas) -->
-    <div class="flex items-center gap-1.5 xl:gap-2 shrink-0">
-      <div class="hidden 2xl:flex items-center gap-1.5 shrink-0">
-        <hugeicons-icon [icon]="icons.cube3d" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-        <span class="text-xs font-bold text-slate-900 tracking-tight whitespace-nowrap">{{ 'designer.modeler3d' | t }}</span>
-      </div>
+  <!-- BARRA SUPERIOR (ZONA 1): Título Limpio y Controles de Entorno y Escenario 3D -->
+  <div class="md-top-bar h-9.5 xl:h-10 px-2.5 xl:px-3 bg-white border border-zinc-200 rounded-xl flex flex-nowrap items-center justify-between gap-2 xl:gap-3 shrink-0 shadow-xs overflow-x-auto overflow-y-hidden no-scrollbar">
 
-      <span class="text-slate-300 hidden 2xl:inline shrink-0">|</span>
-
-      <!-- SELECTOR RÁPIDO MULTI-AMBIENTE EN 4 LÍNEAS ENTERPRISE -->
-      <div class="flex items-center p-0.5 bg-zinc-100 rounded-lg border border-zinc-200/90 shadow-2xs shrink-0">
-        <button
-          type="button"
-          (click)="setEnvironmentLine('kitchen')"
-          [class]="selectedEnvironmentLine() === 'kitchen'
-            ? 'bg-zinc-900 text-white font-semibold shadow-xs'
-            : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-          class="h-6 min-[1440px]:h-6.5 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs rounded-md flex items-center gap-1 transition cursor-pointer whitespace-nowrap shrink-0"
-          title="Línea Cocinas: Gabinetes bajos, aéreos, esquineros 45° y rectos ciegos">
-          <hugeicons-icon [icon]="icons.kitchen" [size]="13" [strokeWidth]="2" [class.text-amber-400]="selectedEnvironmentLine() === 'kitchen'"></hugeicons-icon>
-          <span class="whitespace-nowrap">{{ 'designer.kitchens' | t }}</span>
-        </button>
-
-        <button
-          type="button"
-          (click)="setEnvironmentLine('closet')"
-          [class]="selectedEnvironmentLine() === 'closet'
-            ? 'bg-zinc-900 text-white font-semibold shadow-xs'
-            : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-          class="h-6 min-[1440px]:h-6.5 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs rounded-md flex items-center gap-1 transition cursor-pointer whitespace-nowrap shrink-0"
-          title="Línea Closets y Dormitorios: Roperos, armarios dobles con barras de colgado y organizadores">
-          <hugeicons-icon [icon]="icons.closetDoor" [size]="13" [strokeWidth]="2" [class.text-sky-500]="selectedEnvironmentLine() === 'closet'"></hugeicons-icon>
-          <span class="whitespace-nowrap">{{ 'designer.closets' | t }}</span>
-        </button>
-
-        <button
-          type="button"
-          (click)="setEnvironmentLine('bathroom')"
-          [class]="selectedEnvironmentLine() === 'bathroom'
-            ? 'bg-zinc-900 text-white font-semibold shadow-xs'
-            : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-          class="h-6 min-[1440px]:h-6.5 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs rounded-md flex items-center gap-1 transition cursor-pointer whitespace-nowrap shrink-0"
-          title="Línea Muebles de Baño: Vanities flotantes con destaje de sifón en U y botiquines">
-          <hugeicons-icon [icon]="icons.vanity" [size]="13" [strokeWidth]="2" [class.text-sky-400]="selectedEnvironmentLine() === 'bathroom'"></hugeicons-icon>
-          <span class="whitespace-nowrap">{{ 'designer.bathrooms' | t }}</span>
-        </button>
-
-        <button
-          type="button"
-          (click)="setEnvironmentLine('living_office')"
-          [class]="selectedEnvironmentLine() === 'living_office'
-            ? 'bg-zinc-900 text-white font-semibold shadow-xs'
-            : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-          class="h-6 min-[1440px]:h-6.5 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs rounded-md flex items-center gap-1 transition cursor-pointer whitespace-nowrap shrink-0"
-          title="Línea Hogar y Estudio: Racks flotantes TV, escritorios home office y libreros">
-          <hugeicons-icon [icon]="icons.shelves" [size]="13" [strokeWidth]="2" [class.text-emerald-400]="selectedEnvironmentLine() === 'living_office'"></hugeicons-icon>
-          <span class="whitespace-nowrap">{{ 'designer.livingOffice' | t }}</span>
-        </button>
-      </div>
+    <!-- Bloque Izquierdo: Título Limpio del Modelador 3D -->
+    <div class="flex items-center gap-2 shrink-0">
+      <hugeicons-icon [icon]="icons.cube3d" [size]="16" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+      <span class="text-xs font-semibold text-zinc-900 tracking-tight whitespace-nowrap font-sans">{{ 'designer.modeler3d' | t }}</span>
     </div>
 
-    <!-- Bloque Derecho: Acciones Primarias -->
+    <!-- Bloque Derecho: Entorno y Escenario 3D -->
     <div class="flex items-center gap-1.5 min-[1440px]:gap-2 shrink-0">
 
-      <!-- BOTÓN + MÓDULO (Plantillas Paramétricas) -->
-      <button
-        type="button"
-        (click)="openTemplatesModal()"
-        class="h-6.5 xl:h-7 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-800 active:scale-95 rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
-        title="Insertar nuevo módulo paramétrico desde catálogo">
-        <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.4" class="shrink-0 text-white"></hugeicons-icon>
-        <span class="whitespace-nowrap">{{ 'designer.addModule' | t }}</span>
-      </button>
-
-      <!-- BOTÓN + MESÓN / CUBIERTA 3D -->
-      <button
-        type="button"
-        (click)="toggleKitchenProPanel()"
-        [class]="showKitchenProPanel()
-          ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
-          : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-200 shadow-2xs'"
-        class="h-6.5 xl:h-7 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs font-semibold border rounded-md flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0"
-        title="Diseñar mesón o cubierta 3D continua para los muebles">
-        <hugeicons-icon [icon]="icons.countertopPro" [size]="13" [strokeWidth]="2" [class]="showKitchenProPanel() ? 'text-white shrink-0' : 'text-zinc-700 shrink-0'"></hugeicons-icon>
-        <span class="inline whitespace-nowrap">{{ 'designer.addCountertop' | t }}</span>
-      </button>
-
-      <!-- BOTÓN + EQUIPO 3D -->
-      <button
-        type="button"
-        (click)="activeDockTab.set('appliances')"
-        [class]="activeDockTab() === 'appliances'
-          ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
-          : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-200 shadow-2xs'"
-        class="h-6.5 xl:h-7 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs font-medium border rounded-md flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0"
-        title="Insertar electrodomésticos, fregaderos o accesorios 3D">
-        <hugeicons-icon [icon]="icons.appliance" [size]="13" [strokeWidth]="2" class="shrink-0" [class]="activeDockTab() === 'appliances' ? 'text-white' : 'text-zinc-700'"></hugeicons-icon>
-        <span class="hidden 2xl:inline whitespace-nowrap">{{ 'designer.addAppliance' | t }}</span>
-        <span class="2xl:hidden whitespace-nowrap">{{ 'designer.addApplianceShort' | t }}</span>
-      </button>
-
-      <!-- BOTÓN + TABLERO LIBRE -->
-      <button
-        type="button"
-        (click)="addFreeBoard()"
-        class="h-6.5 xl:h-7 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-100 border border-zinc-200/90 rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
-        title="Añadir un tablero o pieza libre al lienzo 3D">
-        <hugeicons-icon [icon]="icons.squareShape" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-        <span class="hidden 2xl:inline whitespace-nowrap">{{ 'designer.addFreeBoard' | t }}</span>
-        <span class="2xl:hidden whitespace-nowrap">{{ 'designer.addFreeBoardShort' | t }}</span>
-      </button>
-
-      <span class="text-slate-300 hidden sm:inline shrink-0">|</span>
-
-      <!-- TOGGLE MODO MÓDULO vs HABITACIÓN 3D -->
+      <!-- TOGGLE MODO MÓDULO vs CUARTO 3D -->
       <button
         type="button"
         (click)="setWorkspaceMode(workspaceMode() === 'room' ? 'module' : 'room')"
         [class]="workspaceMode() === 'room'
-          ? 'bg-zinc-900 text-white font-medium shadow-xs'
-          : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200/90 font-medium shadow-2xs'"
-        class="h-6.5 xl:h-7 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs rounded-md flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0"
-        title="Alternar entre modo taller (Módulo aislado) y contexto arquitectónico (Habitación 3D)">
-        <hugeicons-icon [icon]="icons.homeRoof" [size]="13" [strokeWidth]="2" [class.text-zinc-400]="workspaceMode() !== 'room'"></hugeicons-icon>
+          ? 'bg-zinc-900 text-white border-zinc-900 font-medium shadow-xs'
+          : 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200/90 font-medium shadow-2xs'"
+        class="h-6.5 xl:h-7 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs font-sans border rounded-md flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0"
+        title="Alternar entre modo taller (Módulo aislado) y contexto arquitectónico (Cuarto 3D)">
+        <hugeicons-icon [icon]="icons.roomLayout" [size]="13" [strokeWidth]="2" [class]="workspaceMode() === 'room' ? 'text-white shrink-0' : 'text-zinc-500 shrink-0'"></hugeicons-icon>
         @if (workspaceMode() === 'room') {
           <span class="whitespace-nowrap">{{ 'designer.roomOn' | t }}</span>
         } @else {
@@ -140,31 +35,32 @@
         <button
           type="button"
           (click)="openRoomSettings()"
-          class="h-6.5 xl:h-7 px-2 py-1 text-[11px] xl:text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-100 border border-zinc-200/90 rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer animate-in fade-in whitespace-nowrap shrink-0"
+          class="h-6.5 xl:h-7 px-2 py-1 text-[11px] xl:text-xs font-sans font-medium text-zinc-700 bg-white hover:bg-zinc-100 border border-zinc-200/90 rounded-md flex items-center gap-1.5 transition shadow-2xs cursor-pointer animate-in fade-in whitespace-nowrap shrink-0"
           title="Configurar medidas de paredes, piso y catálogo de texturas">
           <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-          <span class="hidden lg:inline whitespace-nowrap">{{ 'designer.environment' | t }}</span>
+          <span class="hidden sm:inline whitespace-nowrap">{{ 'designer.environment' | t }}</span>
         </button>
       }
 
-      <!-- MODO RENDIMIENTO 60 FPS -->
+      <!-- TOGGLE IMÁN / COLISIONES 3D -->
       <button
         type="button"
-        (click)="toggleViewerPerformanceMode()"
-        [class]="viewer3d.isPerformanceMode()
-          ? 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border-emerald-300 ring-1 ring-emerald-500/20 font-semibold'
-          : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900 border-zinc-200/90 font-medium'"
-        class="h-6.5 xl:h-7 px-2 py-1 text-[11px] rounded-md border flex items-center gap-1 transition cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
-        [title]="viewer3d.isPerformanceMode()
-          ? 'Modo Rendimiento ACTIVO (60 FPS): Sombras GPU optimizadas. Clic para calidad alta'
-          : 'Activar Modo Rendimiento (60 FPS)'">
+        (click)="toggleMagneticSnap()"
+        [class]="isMagneticSnap()
+          ? 'bg-zinc-900 text-white border-zinc-900 font-medium shadow-xs'
+          : 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200/90 font-medium shadow-2xs'"
+        class="h-6.5 xl:h-7 px-2 py-1 min-[1440px]:px-2.5 text-[11px] xl:text-xs font-sans rounded-md border flex items-center gap-1.5 transition cursor-pointer shrink-0 whitespace-nowrap"
+        [title]="isMagneticSnap()
+          ? 'Imán y colisiones 3D activos (S): alinea caras a 0 mm y evita solapamientos. Clic para desactivar'
+          : 'Imán y colisiones 3D desactivados (S). Clic para activar'">
         <hugeicons-icon
-          [icon]="icons.performanceBolt"
+          [icon]="icons.snapCollision"
           [size]="13"
           [strokeWidth]="2"
-          [class]="viewer3d.isPerformanceMode() ? 'text-emerald-600 shrink-0' : 'text-zinc-400 shrink-0'">
+          [class]="isMagneticSnap() ? 'text-sky-400 shrink-0' : 'text-zinc-500 shrink-0'">
         </hugeicons-icon>
-        <span class="hidden min-[1480px]:inline whitespace-nowrap">{{ 'designer.performance60fps' | t }}</span>
+        <span class="hidden md:inline whitespace-nowrap">Imán / Colisiones 3D</span>
+        <span class="md:hidden whitespace-nowrap">Imán 3D</span>
       </button>
 
       <!-- Botón Mostrar/Ocultar Bandeja Lateral -->
@@ -172,9 +68,9 @@
         type="button"
         (click)="toggleSidebar()"
         [class]="isSidebarCollapsed() ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs' : 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200/90 shadow-2xs'"
-        class="h-6.5 xl:h-7 px-2 py-1 text-[11px] xl:text-xs font-medium rounded-md border flex items-center gap-1 transition cursor-pointer shrink-0 whitespace-nowrap"
+        class="h-6.5 xl:h-7 px-2 py-1 text-[11px] xl:text-xs font-sans font-medium rounded-md border flex items-center gap-1 transition cursor-pointer shrink-0 whitespace-nowrap"
         [title]="isSidebarCollapsed() ? 'Mostrar bandeja de propiedades' : 'Ocultar bandeja para lienzo 3D al 100% de pantalla'">
-        <hugeicons-icon [icon]="icons.sidebarToggle" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
+        <hugeicons-icon [icon]="isSidebarCollapsed() ? icons.chevronLeft : icons.chevronRight" [size]="14" [strokeWidth]="1.9" class="shrink-0"></hugeicons-icon>
         <span class="hidden min-[1480px]:inline text-[11px] whitespace-nowrap">{{ isSidebarCollapsed() ? ('designer.show' | t) : ('designer.hide' | t) }}</span>
       </button>
     </div>
@@ -1533,11 +1429,11 @@
                 : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 font-medium'"
               class="flex-1 min-w-0 py-1.5 px-1.5 2xl:px-2 text-[11px] 2xl:text-xs rounded-md flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap">
               <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="shrink-0" [class.text-zinc-400]="activeDockTab() !== 'piece'"></hugeicons-icon>
-              <span class="truncate">{{ selectedWall() ? ('designer.tabWall' | t) : (selectedPart() ? ('designer.tabPiece' | t) : ('designer.tabProperties' | t)) }}</span>
+              <span class="truncate">{{ selectedWall() ? ('designer.tabWall' | t) : (selectedPart() ? ('designer.tabPiece' | t) : (selectedAppliance() ? 'Equipo' : ('designer.tabProperties' | t))) }}</span>
               @if (selectedWall()) {
-                <span class="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0 animate-pulse"></span>
-              } @else if (selectedPart()) {
-                <span class="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0 animate-pulse"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0 animate-pulse"></span>
+              } @else if (selectedPart() || selectedAppliance()) {
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0 animate-pulse"></span>
               }
             </button>
 
@@ -5580,6 +5476,12 @@
                 </button>
               </div>
 
+            } @else if (selectedAppliance(); as selApp) {
+
+              <ng-container
+                [ngTemplateOutlet]="selectedApplianceInspectorTpl"
+                [ngTemplateOutletContext]="{ $implicit: selApp }" />
+
             } @else if (selectedWallInstance() || workspaceMode() === 'room') {
 
               <!-- ======================================================== -->
@@ -6402,33 +6304,23 @@
 
             } @else {
 
-              <!-- ESTADO VACÍO CON ONBOARDING AMIGABLE -->
-              <div class="p-6 bg-white border border-zinc-300 rounded-xl shadow-xs text-center space-y-4 font-sans">
-                <div class="w-12 h-12 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center mx-auto text-zinc-700 shadow-2xs">
-                  <hugeicons-icon [icon]="icons.cursorSelect" [size]="22" [strokeWidth]="1.8"></hugeicons-icon>
+              <!-- ESTADO VACÍO MINIMALISTA -->
+              <div class="p-6 bg-white border border-zinc-200/90 rounded-xl shadow-xs text-center space-y-3 font-sans">
+                <div class="w-11 h-11 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-center mx-auto text-zinc-700">
+                  <hugeicons-icon [icon]="icons.cursorSelect" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
                 </div>
                 <div class="space-y-1">
-                  <h4 class="text-sm font-semibold text-zinc-900">Selecciona una pieza en 3D</h4>
-                  <p class="text-xs text-zinc-600 leading-relaxed">
-                    Haz clic sobre cualquier tabla o módulo en el lienzo 3D para editar sus medidas, material, tapacantos y posición.
+                  <h4 class="text-sm font-semibold text-zinc-900">Ninguna pieza seleccionada</h4>
+                  <p class="text-xs text-zinc-500 leading-relaxed">
+                    Haz clic sobre cualquier pieza, módulo o equipo en el lienzo 3D para editar sus medidas, material, tapacantos y posición.
                   </p>
                 </div>
-
-                <div class="space-y-2 pt-1">
+                <div class="pt-0.5">
                   <button
                     type="button"
                     (click)="activeDockTab.set('catalog')"
-                    class="w-full py-2 px-3 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                    <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2.2"></hugeicons-icon>
-                    <span>Añadir Piezas o Cajones (Catálogo)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    (click)="openTemplatesModal()"
-                    class="w-full py-2 px-3 text-xs font-semibold bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-300 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer">
-                    <hugeicons-icon [icon]="icons.templatesGrid" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                    <span>Explorar Plantillas de Muebles</span>
+                    class="inline-flex items-center justify-center text-xs font-medium text-sky-600 hover:text-sky-700 hover:underline transition cursor-pointer bg-transparent border-0 p-0">
+                    Ir a + Catálogo
                   </button>
                 </div>
               </div>
@@ -6441,42 +6333,48 @@
         @if (activeDockTab() === 'catalog') {
           <div class="bg-[#F1F1F4] p-3 pb-4 space-y-3.5 overflow-y-auto scrollbar-thin flex-1 min-h-0">
 
-            <!-- 1. ASISTENTES RÁPIDOS DE CREACIÓN (ONBOARDING) -->
-            <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
+            <!-- 1. CONSTRUCCIÓN Y MÓDULOS 3D (ÚNICO PUNTO DE ENTRADA) -->
+            <div class="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs">
               <div class="bg-zinc-50 border-b border-zinc-200 px-3.5 py-2.5 flex items-center justify-between gap-2">
                 <span class="text-[11px] font-sans font-bold uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
-                  <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
-                  <span>Construcción Rápida</span>
+                  <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
+                  <span>CONSTRUCCIÓN Y MÓDULOS 3D</span>
                 </span>
-                <span class="text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-md bg-white text-zinc-700 border border-zinc-200">Asistentes <span class="font-numeric">3D</span></span>
               </div>
-              <div class="p-3.5 space-y-2 bg-white">
-
-              <button
-                type="button"
-                (click)="openDrawerWizard()"
-                class="w-full py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-md text-xs font-medium transition flex items-center justify-center gap-2 shadow-xs cursor-pointer">
-                <hugeicons-icon [icon]="icons.inbox" [size]="15" [strokeWidth]="2"></hugeicons-icon>
-                <span>+ Crear Cajón Modular (Asistente)</span>
-              </button>
-
-              <div class="grid grid-cols-2 gap-1.5">
+              <div class="p-3.5 space-y-2 bg-white font-sans">
                 <button
                   type="button"
-                  (click)="addPieceFromCatalog('free')"
-                  class="py-1.5 px-2 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-md text-[11px] font-medium text-zinc-700 hover:text-zinc-900 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer">
-                  <hugeicons-icon [icon]="icons.add" [size]="13" [strokeWidth]="2.2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                  <span class="truncate">Pieza Libre</span>
+                  (click)="openTemplatesModal('assistant')"
+                  class="w-full py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
+                  <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2.2" class="text-white shrink-0"></hugeicons-icon>
+                  <span>+ Crear Módulo a Medida (Asistente)</span>
                 </button>
 
                 <button
                   type="button"
-                  (click)="openTemplatesModal()"
-                  class="py-1.5 px-2 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-md text-[11px] font-medium text-zinc-700 hover:text-zinc-900 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer">
-                  <hugeicons-icon [icon]="icons.templatesGrid" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
-                  <span class="truncate">Plantillas 3D</span>
+                  (click)="openTemplatesModal('catalog')"
+                  class="w-full py-2 px-3 bg-white hover:bg-zinc-50 text-zinc-800 hover:text-zinc-900 border border-zinc-200 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer">
+                  <hugeicons-icon [icon]="icons.cabinetModule" [size]="14" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
+                  <span>Plantillas de Muebles 3D</span>
                 </button>
-              </div>
+
+                <div class="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    (click)="addFreeBoard()"
+                    class="py-1.5 px-2 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-medium text-zinc-700 hover:text-zinc-900 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer">
+                    <hugeicons-icon [icon]="icons.squareShape" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                    <span class="truncate">+ Tablero / Pieza Libre</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    (click)="openCountertopConfig()"
+                    class="py-1.5 px-2 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-medium text-zinc-700 hover:text-zinc-900 transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer">
+                    <hugeicons-icon [icon]="icons.countertopPro" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
+                    <span class="truncate">+ Mesón de Piedra</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -6489,6 +6387,22 @@
                 </span>
                 <span class="text-[10px] text-zinc-500">Medidas base</span>
               </div>
+
+              <button
+                type="button"
+                (click)="openDrawerWizard()"
+                class="w-full p-2 bg-white hover:bg-zinc-50 border border-zinc-200/90 hover:border-zinc-300 rounded-md flex items-center justify-between text-xs font-sans text-zinc-800 transition cursor-pointer shadow-2xs">
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="w-6.5 h-6.5 rounded-md bg-zinc-100 border border-zinc-200/60 flex items-center justify-center shrink-0 text-zinc-700">
+                    <hugeicons-icon [icon]="icons.inbox" [size]="14" [strokeWidth]="1.9"></hugeicons-icon>
+                  </div>
+                  <div class="min-w-0 text-left">
+                    <span class="text-zinc-900 font-medium text-[11px] block truncate leading-tight">Cajón Modular (Asistente)</span>
+                    <span class="text-[10px] text-zinc-500 block leading-none mt-0.5 truncate">Caja, rieles y frente a medida</span>
+                  </div>
+                </div>
+                <span class="text-[10px] font-medium text-sky-600 shrink-0">+ Crear</span>
+              </button>
 
               <div class="grid grid-cols-2 gap-1.5 text-xs">
                 <button
@@ -6839,276 +6753,9 @@
 
             <!-- 1. INSPECTOR DE EQUIPO SELECCIONADO EN 3D -->
             @if (selectedAppliance(); as selApp) {
-              <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
-                <div class="bg-zinc-50 border-b border-zinc-200 px-3.5 py-2.5 flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <hugeicons-icon [icon]="icons.appliance" [size]="14" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
-                    <span class="text-[11px] font-sans font-bold uppercase tracking-wider text-zinc-900 truncate">
-                      Equipo Seleccionado
-                    </span>
-                  </div>
-                  <div class="flex items-center gap-0.5 shrink-0">
-                    <button
-                      type="button"
-                      (click)="duplicateSelectedAppliance()"
-                      class="p-1 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/70 rounded-md transition cursor-pointer flex items-center justify-center"
-                      title="Duplicar equipo">
-                      <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2"></hugeicons-icon>
-                    </button>
-                    <button
-                      type="button"
-                      (click)="deleteSelectedAppliance()"
-                      class="p-1 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-md transition cursor-pointer flex items-center justify-center"
-                      title="Eliminar equipo">
-                      <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="2"></hugeicons-icon>
-                    </button>
-                    <button
-                      type="button"
-                      (click)="selectAppliance(null)"
-                      class="p-1 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/70 rounded-md transition cursor-pointer flex items-center justify-center"
-                      title="Cerrar inspector de equipo">
-                      <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="p-3.5 space-y-3 bg-white font-sans">
-                  <input
-                    type="text"
-                    [value]="selApp.name"
-                    (change)="updateApplianceName($any($event.target).value)"
-                    class="w-full text-xs font-sans font-semibold text-zinc-900 bg-zinc-50 border border-zinc-300 focus:bg-white focus:border-zinc-900 focus:outline-hidden rounded-lg px-2.5 py-1.5 transition"
-                    title="Editar nombre del electrodoméstico" />
-
-                  <!-- Dimensiones Paramétricas (Ancho, Profundidad, Alto) -->
-                  <div class="space-y-1.5">
-                    <div class="flex items-center justify-between">
-                      <span class="text-[10px] font-sans font-bold text-zinc-700 uppercase tracking-wider">Dimensiones (mm)</span>
-                      <span class="text-[10px] font-numeric tabular-nums text-zinc-900 font-semibold">{{ selApp.width }} × {{ selApp.depth }} × {{ selApp.height }}</span>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-1.5 text-center">
-                      <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200 shadow-2xs">
-                        <span class="text-[9px] font-sans font-semibold text-zinc-600 uppercase block">Ancho (X)</span>
-                        <input
-                          type="number"
-                          [value]="selApp.width"
-                          (change)="updateApplianceDimension('width', $any($event.target).value)"
-                          class="w-full mt-0.5 text-center font-numeric tabular-nums font-semibold text-xs text-zinc-900 bg-white border border-zinc-300 rounded-md py-0.5 focus:outline-hidden focus:border-zinc-900" />
-                        <div class="flex items-center justify-center gap-1 mt-1">
-                          <button type="button" (click)="updateApplianceDimension('width', selApp.width - 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">-20</button>
-                          <button type="button" (click)="updateApplianceDimension('width', selApp.width + 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">+20</button>
-                        </div>
-                      </div>
-
-                      <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200 shadow-2xs">
-                        <span class="text-[9px] font-sans font-semibold text-zinc-600 uppercase block">Prof (Z)</span>
-                        <input
-                          type="number"
-                          [value]="selApp.depth"
-                          (change)="updateApplianceDimension('depth', $any($event.target).value)"
-                          class="w-full mt-0.5 text-center font-numeric tabular-nums font-semibold text-xs text-zinc-900 bg-white border border-zinc-300 rounded-md py-0.5 focus:outline-hidden focus:border-zinc-900" />
-                        <div class="flex items-center justify-center gap-1 mt-1">
-                          <button type="button" (click)="updateApplianceDimension('depth', selApp.depth - 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">-20</button>
-                          <button type="button" (click)="updateApplianceDimension('depth', selApp.depth + 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">+20</button>
-                        </div>
-                      </div>
-
-                      <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200 shadow-2xs">
-                        <span class="text-[9px] font-sans font-semibold text-zinc-600 uppercase block">Alto (Y)</span>
-                        <input
-                          type="number"
-                          [value]="selApp.height"
-                          (change)="updateApplianceDimension('height', $any($event.target).value)"
-                          class="w-full mt-0.5 text-center font-numeric tabular-nums font-semibold text-xs text-zinc-900 bg-white border border-zinc-300 rounded-md py-0.5 focus:outline-hidden focus:border-zinc-900" />
-                        <div class="flex items-center justify-center gap-1 mt-1">
-                          <button type="button" (click)="updateApplianceDimension('height', selApp.height - 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">-20</button>
-                          <button type="button" (click)="updateApplianceDimension('height', selApp.height + 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">+20</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Selector de Acabados Visuales Compacto -->
-                  <div class="space-y-1.5">
-                    <span class="text-[10px] font-sans font-bold text-zinc-700 block uppercase tracking-wider">Acabado Visual</span>
-                    <div class="grid grid-cols-3 gap-1">
-                      @for (opt of applianceFinishOptions; track opt.id) {
-                        <button
-                          type="button"
-                          (click)="updateApplianceFinish(opt.id)"
-                          [class]="selApp.finish === opt.id
-                            ? 'border-zinc-900 bg-zinc-900 text-white font-semibold shadow-xs'
-                            : 'border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700 font-medium'"
-                          class="p-1.5 rounded-lg border flex items-center gap-1.5 transition text-[10px] font-sans cursor-pointer">
-                          <span
-                            class="w-3.5 h-3.5 rounded-full border border-black/15 shadow-2xs shrink-0"
-                            [style.background-color]="opt.color"></span>
-                          <span class="truncate leading-tight">{{ opt.label }}</span>
-                        </button>
-                      }
-                    </div>
-                  </div>
-
-                  <!-- Imán de Contacto Automático -->
-                  <div class="grid grid-cols-3 gap-1.5 pt-0.5 font-sans">
-                    <button
-                      type="button"
-                      (click)="snapSelectedAppliance('floor')"
-                      class="py-1.5 px-1.5 bg-white hover:bg-zinc-50 border border-zinc-300 rounded-lg text-[10px] font-semibold text-zinc-800 flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
-                      title="Adherir al suelo (Y=0 mm)">
-                      <hugeicons-icon [icon]="icons.alignBottom" [size]="11" [strokeWidth]="2" class="text-zinc-700 shrink-0"></hugeicons-icon>
-                      <span>Al Piso</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      (click)="snapSelectedAppliance('countertop')"
-                      class="py-1.5 px-1.5 bg-white hover:bg-zinc-50 border border-zinc-300 rounded-lg text-[10px] font-semibold text-zinc-800 flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
-                      title="Apoyar sobre la mesada o mueble bajo">
-                      <hugeicons-icon [icon]="icons.tableBar" [size]="11" [strokeWidth]="2" class="text-zinc-700 shrink-0"></hugeicons-icon>
-                      <span>A Mesada</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      (click)="snapSelectedAppliance('wall')"
-                      class="py-1.5 px-1.5 bg-white hover:bg-zinc-50 border border-zinc-300 rounded-lg text-[10px] font-semibold text-zinc-800 flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
-                      title="Pegar contra la pared principal">
-                      <hugeicons-icon [icon]="icons.alignLeft" [size]="11" [strokeWidth]="2" class="text-zinc-700 shrink-0"></hugeicons-icon>
-                      <span>A Pared</span>
-                    </button>
-                  </div>
-
-                  <!-- Posición 3D y Giro -->
-                  <div class="space-y-1.5 pt-2 border-t border-zinc-200">
-                    <div class="flex items-center justify-between">
-                      <span class="text-[10px] font-sans font-bold text-zinc-700 uppercase tracking-wider">Posición & Giro</span>
-                      <div class="flex items-center gap-1">
-                        <button
-                          type="button"
-                          (click)="rotateAppliance(90)"
-                          class="px-2 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-300 rounded-md text-[10px] font-sans font-semibold text-zinc-800 flex items-center gap-1 transition cursor-pointer shadow-2xs">
-                          <hugeicons-icon [icon]="icons.rotateRight" [size]="11" [strokeWidth]="2" class="shrink-0 text-zinc-700"></hugeicons-icon>
-                          <span>Girar <span class="font-numeric">90°</span></span>
-                        </button>
-                        <span class="text-[10px] font-numeric tabular-nums font-semibold text-zinc-800 bg-zinc-100 px-1.5 py-0.5 rounded-md border border-zinc-200">
-                          {{ selApp.rotation }}°
-                        </span>
-                      </div>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-1.5 text-center">
-                      <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200">
-                        <span class="text-[9px] text-zinc-600 block font-sans font-semibold">X (mm)</span>
-                        <input
-                          type="number"
-                          [value]="selApp.position.x"
-                          (change)="setAppliancePositionDirect('x', $any($event.target).value)"
-                          class="w-full text-center font-numeric tabular-nums font-semibold text-xs bg-transparent focus:outline-hidden text-zinc-900" />
-                        <div class="flex justify-center gap-1 mt-0.5">
-                          <button type="button" (click)="updateAppliancePosition('x', -50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">-50</button>
-                          <button type="button" (click)="updateAppliancePosition('x', 50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">+50</button>
-                        </div>
-                      </div>
-
-                      <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200">
-                        <span class="text-[9px] text-zinc-600 block font-sans font-semibold">Y (Altura)</span>
-                        <input
-                          type="number"
-                          [value]="selApp.position.y"
-                          (change)="setAppliancePositionDirect('y', $any($event.target).value)"
-                          class="w-full text-center font-numeric tabular-nums font-semibold text-xs bg-transparent focus:outline-hidden text-zinc-900" />
-                        <div class="flex justify-center gap-1 mt-0.5">
-                          <button type="button" (click)="updateAppliancePosition('y', -50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">-50</button>
-                          <button type="button" (click)="updateAppliancePosition('y', 50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">+50</button>
-                        </div>
-                      </div>
-
-                      <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200">
-                        <span class="text-[9px] text-zinc-600 block font-sans font-semibold">Z (Prof)</span>
-                        <input
-                          type="number"
-                          [value]="selApp.position.z"
-                          (change)="setAppliancePositionDirect('z', $any($event.target).value)"
-                          class="w-full text-center font-numeric tabular-nums font-semibold text-xs bg-transparent focus:outline-hidden text-zinc-900" />
-                        <div class="flex justify-center gap-1 mt-0.5">
-                          <button type="button" (click)="updateAppliancePosition('z', -50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">-50</button>
-                          <button type="button" (click)="updateAppliancePosition('z', 50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">+50</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Vínculo con Módulo / Mueble -->
-                  <div class="p-2.5 bg-zinc-50 rounded-lg border border-zinc-200 space-y-1.5">
-                    <div class="flex items-center justify-between">
-                      <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-zinc-800 flex items-center gap-1">
-                        <hugeicons-icon [icon]="icons.link" [size]="12" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
-                        <span>Vínculo con Módulo</span>
-                      </span>
-                      @if (selApp.groupId) {
-                        <span class="text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-md bg-zinc-900 text-white">Vinculado</span>
-                      } @else {
-                        <span class="text-[9px] font-sans font-medium px-1.5 py-0.5 rounded-md bg-white border border-zinc-200 text-zinc-600">Independiente</span>
-                      }
-                    </div>
-
-                    @if (selApp.groupId) {
-                      <div class="flex items-center justify-between gap-1 pt-0.5">
-                        <span class="text-[11px] font-sans font-semibold text-zinc-900 truncate">
-                          {{ getGroupName(selApp.groupId) }}
-                        </span>
-                        <button
-                          type="button"
-                          (click)="toggleApplianceModuleLink(selApp.id, null)"
-                          class="px-2 py-0.5 text-[9px] font-sans font-semibold text-red-600 hover:bg-red-50 border border-red-200 rounded-md transition cursor-pointer shrink-0">
-                          Desvincular
-                        </button>
-                      </div>
-                    } @else {
-                      <div class="flex items-center gap-1.5 pt-0.5">
-                        <select
-                          (change)="toggleApplianceModuleLink(selApp.id, $any($event.target).value)"
-                          class="w-full text-[10px] font-sans font-medium bg-white border border-zinc-300 rounded-md px-1.5 py-1 text-zinc-800 focus:outline-hidden focus:border-zinc-900">
-                          <option value="">-- Vincular a un módulo... --</option>
-                          @for (grp of groups(); track grp.id) {
-                            <option [value]="grp.id">{{ grp.name }}</option>
-                          }
-                        </select>
-                      </div>
-                    }
-                  </div>
-
-                  <!-- Presupuesto e Integración Financiera -->
-                  <div class="p-2.5 bg-zinc-50 rounded-lg border border-zinc-200 space-y-1.5">
-                    <div class="flex items-center justify-between">
-                      <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-zinc-800 flex items-center gap-1">
-                        <hugeicons-icon [icon]="icons.currency" [size]="12" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
-                        <span>Incluir en Presupuesto</span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        [checked]="selApp.includeInBudget"
-                        (change)="toggleApplianceBudgetInclusion()"
-                        class="w-3.5 h-3.5 text-zinc-900 rounded cursor-pointer" />
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                      <input
-                        type="number"
-                        [value]="selApp.price"
-                        (change)="updateAppliancePrice($any($event.target).value)"
-                        class="w-28 font-numeric tabular-nums font-semibold text-xs px-2 py-1 bg-white border border-zinc-300 rounded-md text-zinc-900 focus:outline-hidden focus:border-zinc-900"
-                        placeholder="Precio..." />
-                      <span class="text-[11px] font-numeric tabular-nums font-semibold text-zinc-900 truncate">
-                        {{ projectService.formatCurrency(selApp.price) }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
+              <ng-container
+                [ngTemplateOutlet]="selectedApplianceInspectorTpl"
+                [ngTemplateOutletContext]="{ $implicit: selApp }" />
             }
 
             <!-- 2. LISTA DE EQUIPOS COLOCADOS EN EL PROYECTO -->
@@ -7215,25 +6862,14 @@
               </div>
             }
 
-            <!-- 3. CATÁLOGO DE ELECTRODOMÉSTICOS Y PATAS 3D (8 FAMILIAS SIEMPRE VISIBLES) -->
+            <!-- 3. CATÁLOGO DE ELECTRODOMÉSTICOS Y PATAS 3D (TODAS LAS CATEGORÍAS) -->
             <div class="space-y-2.5 pt-1 border-t border-zinc-200">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
+                <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1.5 font-sans">
                   <hugeicons-icon [icon]="icons.templatesGrid" [size]="13" [strokeWidth]="2" class="text-zinc-500 shrink-0"></hugeicons-icon>
                   <span>Catálogo de Equipos y Patas 3D</span>
                 </span>
-                <div class="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    (click)="applianceFilterByEnvironment.set(!applianceFilterByEnvironment())"
-                    [class]="applianceFilterByEnvironment() ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-zinc-100 text-zinc-500 border-zinc-200'"
-                    class="px-1.5 py-0.5 rounded text-[9px] font-semibold border transition cursor-pointer flex items-center gap-1"
-                    title="Filtrar automáticamente por el ambiente 3D seleccionado">
-                    <span>Línea: {{ selectedEnvironmentLine() === 'kitchen' ? 'Cocina' : (selectedEnvironmentLine() === 'closet' ? 'Closet' : (selectedEnvironmentLine() === 'bathroom' ? 'Baño' : 'Hogar/Oficina')) }}</span>
-                    <span class="w-1.5 h-1.5 rounded-full" [class]="applianceFilterByEnvironment() ? 'bg-sky-500' : 'bg-zinc-400'"></span>
-                  </button>
-                  <span class="text-[10px] font-mono tabular-nums text-zinc-500">{{ filteredAppliances().length }} ítems</span>
-                </div>
+                <span class="text-[10px] font-numeric tabular-nums text-zinc-500">{{ filteredAppliances().length }} ítems</span>
               </div>
 
               <!-- Cuadrícula de Categorías (Unificada a Graphite Activo / Neutral Inactivo) -->
@@ -8557,11 +8193,284 @@
   </div>
 }
 
+<!-- PLANTILLA COMPARTIDA: INSPECTOR DE EQUIPO SELECCIONADO EN 3D -->
+<ng-template #selectedApplianceInspectorTpl let-selApp>
+  <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
+    <div class="bg-zinc-50 border-b border-zinc-200 px-3.5 py-2.5 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <hugeicons-icon [icon]="icons.appliance" [size]="14" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
+        <span class="text-[11px] font-sans font-bold uppercase tracking-wider text-zinc-900 truncate">
+          Equipo Seleccionado
+        </span>
+      </div>
+      <div class="flex items-center gap-0.5 shrink-0">
+        <button
+          type="button"
+          (click)="duplicateSelectedAppliance()"
+          class="p-1 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/70 rounded-md transition cursor-pointer flex items-center justify-center"
+          title="Duplicar equipo">
+          <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+        </button>
+        <button
+          type="button"
+          (click)="deleteSelectedAppliance()"
+          class="p-1 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-md transition cursor-pointer flex items-center justify-center"
+          title="Eliminar equipo">
+          <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+        </button>
+        <button
+          type="button"
+          (click)="selectAppliance(null)"
+          class="p-1 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/70 rounded-md transition cursor-pointer flex items-center justify-center"
+          title="Cerrar inspector de equipo">
+          <hugeicons-icon [icon]="icons.close" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="p-3.5 space-y-3 bg-white font-sans">
+      <input
+        type="text"
+        [value]="selApp.name"
+        (change)="updateApplianceName($any($event.target).value)"
+        class="w-full text-xs font-sans font-semibold text-zinc-900 bg-zinc-50 border border-zinc-300 focus:bg-white focus:border-zinc-900 focus:outline-hidden rounded-lg px-2.5 py-1.5 transition"
+        title="Editar nombre del electrodoméstico" />
+
+      <!-- Dimensiones Paramétricas (Ancho, Profundidad, Alto) -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-sans font-bold text-zinc-700 uppercase tracking-wider">Dimensiones (mm)</span>
+          <span class="text-[10px] font-numeric tabular-nums text-zinc-900 font-semibold">{{ selApp.width }} × {{ selApp.depth }} × {{ selApp.height }}</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-1.5 text-center">
+          <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200 shadow-2xs">
+            <span class="text-[9px] font-sans font-semibold text-zinc-600 uppercase block">Ancho (X)</span>
+            <input
+              type="number"
+              [value]="selApp.width"
+              (change)="updateApplianceDimension('width', $any($event.target).value)"
+              class="w-full mt-0.5 text-center font-numeric tabular-nums font-semibold text-xs text-zinc-900 bg-white border border-zinc-300 rounded-md py-0.5 focus:outline-hidden focus:border-zinc-900" />
+            <div class="flex items-center justify-center gap-1 mt-1">
+              <button type="button" (click)="updateApplianceDimension('width', selApp.width - 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">-20</button>
+              <button type="button" (click)="updateApplianceDimension('width', selApp.width + 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">+20</button>
+            </div>
+          </div>
+
+          <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200 shadow-2xs">
+            <span class="text-[9px] font-sans font-semibold text-zinc-600 uppercase block">Prof (Z)</span>
+            <input
+              type="number"
+              [value]="selApp.depth"
+              (change)="updateApplianceDimension('depth', $any($event.target).value)"
+              class="w-full mt-0.5 text-center font-numeric tabular-nums font-semibold text-xs text-zinc-900 bg-white border border-zinc-300 rounded-md py-0.5 focus:outline-hidden focus:border-zinc-900" />
+            <div class="flex items-center justify-center gap-1 mt-1">
+              <button type="button" (click)="updateApplianceDimension('depth', selApp.depth - 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">-20</button>
+              <button type="button" (click)="updateApplianceDimension('depth', selApp.depth + 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">+20</button>
+            </div>
+          </div>
+
+          <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200 shadow-2xs">
+            <span class="text-[9px] font-sans font-semibold text-zinc-600 uppercase block">Alto (Y)</span>
+            <input
+              type="number"
+              [value]="selApp.height"
+              (change)="updateApplianceDimension('height', $any($event.target).value)"
+              class="w-full mt-0.5 text-center font-numeric tabular-nums font-semibold text-xs text-zinc-900 bg-white border border-zinc-300 rounded-md py-0.5 focus:outline-hidden focus:border-zinc-900" />
+            <div class="flex items-center justify-center gap-1 mt-1">
+              <button type="button" (click)="updateApplianceDimension('height', selApp.height - 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">-20</button>
+              <button type="button" (click)="updateApplianceDimension('height', selApp.height + 20)" class="text-[9px] px-1 py-0.2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 rounded font-numeric font-medium cursor-pointer">+20</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selector de Acabados Visuales Compacto -->
+      <div class="space-y-1.5">
+        <span class="text-[10px] font-sans font-bold text-zinc-700 block uppercase tracking-wider">Acabado Visual</span>
+        <div class="grid grid-cols-3 gap-1">
+          @for (opt of applianceFinishOptions; track opt.id) {
+            <button
+              type="button"
+              (click)="updateApplianceFinish(opt.id)"
+              [class]="selApp.finish === opt.id
+                ? 'border-zinc-900 bg-zinc-900 text-white font-semibold shadow-xs'
+                : 'border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700 font-medium'"
+              class="p-1.5 rounded-lg border flex items-center gap-1.5 transition text-[10px] font-sans cursor-pointer">
+              <span
+                class="w-3.5 h-3.5 rounded-full border border-black/15 shadow-2xs shrink-0"
+                [style.background-color]="opt.color"></span>
+              <span class="truncate leading-tight">{{ opt.label }}</span>
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Imán de Contacto Automático -->
+      <div class="grid grid-cols-3 gap-1.5 pt-0.5 font-sans">
+        <button
+          type="button"
+          (click)="snapSelectedAppliance('floor')"
+          class="py-1.5 px-1.5 bg-white hover:bg-zinc-50 border border-zinc-300 rounded-lg text-[10px] font-semibold text-zinc-800 flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
+          title="Adherir al suelo (Y=0 mm)">
+          <hugeicons-icon [icon]="icons.alignBottom" [size]="11" [strokeWidth]="2" class="text-zinc-700 shrink-0"></hugeicons-icon>
+          <span>Al Piso</span>
+        </button>
+
+        <button
+          type="button"
+          (click)="snapSelectedAppliance('countertop')"
+          class="py-1.5 px-1.5 bg-white hover:bg-zinc-50 border border-zinc-300 rounded-lg text-[10px] font-semibold text-zinc-800 flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
+          title="Apoyar sobre la mesada o mueble bajo">
+          <hugeicons-icon [icon]="icons.tableBar" [size]="11" [strokeWidth]="2" class="text-zinc-700 shrink-0"></hugeicons-icon>
+          <span>A Mesada</span>
+        </button>
+
+        <button
+          type="button"
+          (click)="snapSelectedAppliance('wall')"
+          class="py-1.5 px-1.5 bg-white hover:bg-zinc-50 border border-zinc-300 rounded-lg text-[10px] font-semibold text-zinc-800 flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
+          title="Pegar contra la pared principal">
+          <hugeicons-icon [icon]="icons.alignLeft" [size]="11" [strokeWidth]="2" class="text-zinc-700 shrink-0"></hugeicons-icon>
+          <span>A Pared</span>
+        </button>
+      </div>
+
+      <!-- Posición 3D y Giro -->
+      <div class="space-y-1.5 pt-2 border-t border-zinc-200">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-sans font-bold text-zinc-700 uppercase tracking-wider">Posición & Giro</span>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              (click)="rotateAppliance(90)"
+              class="px-2 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-300 rounded-md text-[10px] font-sans font-semibold text-zinc-800 flex items-center gap-1 transition cursor-pointer shadow-2xs">
+              <hugeicons-icon [icon]="icons.rotateRight" [size]="11" [strokeWidth]="2" class="shrink-0 text-zinc-700"></hugeicons-icon>
+              <span>Girar <span class="font-numeric">90°</span></span>
+            </button>
+            <span class="text-[10px] font-numeric tabular-nums font-semibold text-zinc-800 bg-zinc-100 px-1.5 py-0.5 rounded-md border border-zinc-200">
+              {{ selApp.rotation }}°
+            </span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-1.5 text-center">
+          <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200">
+            <span class="text-[9px] text-zinc-600 block font-sans font-semibold">X (mm)</span>
+            <input
+              type="number"
+              [value]="selApp.position.x"
+              (change)="setAppliancePositionDirect('x', $any($event.target).value)"
+              class="w-full text-center font-numeric tabular-nums font-semibold text-xs bg-transparent focus:outline-hidden text-zinc-900" />
+            <div class="flex justify-center gap-1 mt-0.5">
+              <button type="button" (click)="updateAppliancePosition('x', -50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">-50</button>
+              <button type="button" (click)="updateAppliancePosition('x', 50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">+50</button>
+            </div>
+          </div>
+
+          <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200">
+            <span class="text-[9px] text-zinc-600 block font-sans font-semibold">Y (Altura)</span>
+            <input
+              type="number"
+              [value]="selApp.position.y"
+              (change)="setAppliancePositionDirect('y', $any($event.target).value)"
+              class="w-full text-center font-numeric tabular-nums font-semibold text-xs bg-transparent focus:outline-hidden text-zinc-900" />
+            <div class="flex justify-center gap-1 mt-0.5">
+              <button type="button" (click)="updateAppliancePosition('y', -50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">-50</button>
+              <button type="button" (click)="updateAppliancePosition('y', 50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">+50</button>
+            </div>
+          </div>
+
+          <div class="bg-zinc-50 p-1.5 rounded-lg border border-zinc-200">
+            <span class="text-[9px] text-zinc-600 block font-sans font-semibold">Z (Prof)</span>
+            <input
+              type="number"
+              [value]="selApp.position.z"
+              (change)="setAppliancePositionDirect('z', $any($event.target).value)"
+              class="w-full text-center font-numeric tabular-nums font-semibold text-xs bg-transparent focus:outline-hidden text-zinc-900" />
+            <div class="flex justify-center gap-1 mt-0.5">
+              <button type="button" (click)="updateAppliancePosition('z', -50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">-50</button>
+              <button type="button" (click)="updateAppliancePosition('z', 50)" class="text-[9px] px-1 bg-white hover:bg-zinc-100 border border-zinc-300 rounded font-numeric font-medium cursor-pointer text-zinc-700">+50</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vínculo con Módulo / Mueble -->
+      <div class="p-2.5 bg-zinc-50 rounded-lg border border-zinc-200 space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-zinc-800 flex items-center gap-1">
+            <hugeicons-icon [icon]="icons.link" [size]="12" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
+            <span>Vínculo con Módulo</span>
+          </span>
+          @if (selApp.groupId) {
+            <span class="text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-md bg-zinc-900 text-white">Vinculado</span>
+          } @else {
+            <span class="text-[9px] font-sans font-medium px-1.5 py-0.5 rounded-md bg-white border border-zinc-200 text-zinc-600">Independiente</span>
+          }
+        </div>
+
+        @if (selApp.groupId) {
+          <div class="flex items-center justify-between gap-1 pt-0.5">
+            <span class="text-[11px] font-sans font-semibold text-zinc-900 truncate">
+              {{ getGroupName(selApp.groupId) }}
+            </span>
+            <button
+              type="button"
+              (click)="toggleApplianceModuleLink(selApp.id, null)"
+              class="px-2 py-0.5 text-[9px] font-sans font-semibold text-red-600 hover:bg-red-50 border border-red-200 rounded-md transition cursor-pointer shrink-0">
+              Desvincular
+            </button>
+          </div>
+        } @else {
+          <div class="flex items-center gap-1.5 pt-0.5">
+            <select
+              (change)="toggleApplianceModuleLink(selApp.id, $any($event.target).value)"
+              class="w-full text-[10px] font-sans font-medium bg-white border border-zinc-300 rounded-md px-1.5 py-1 text-zinc-800 focus:outline-hidden focus:border-zinc-900">
+              <option value="">-- Vincular a un módulo... --</option>
+              @for (grp of groups(); track grp.id) {
+                <option [value]="grp.id">{{ grp.name }}</option>
+              }
+            </select>
+          </div>
+        }
+      </div>
+
+      <!-- Presupuesto e Integración Financiera -->
+      <div class="p-2.5 bg-zinc-50 rounded-lg border border-zinc-200 space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-zinc-800 flex items-center gap-1">
+            <hugeicons-icon [icon]="icons.currency" [size]="12" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
+            <span>Incluir en Presupuesto</span>
+          </span>
+          <input
+            type="checkbox"
+            [checked]="selApp.includeInBudget"
+            (change)="toggleApplianceBudgetInclusion()"
+            class="w-3.5 h-3.5 text-zinc-900 rounded cursor-pointer" />
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input
+            type="number"
+            [value]="selApp.price"
+            (change)="updateAppliancePrice($any($event.target).value)"
+            class="w-28 font-numeric tabular-nums font-semibold text-xs px-2 py-1 bg-white border border-zinc-300 rounded-md text-zinc-900 focus:outline-hidden focus:border-zinc-900"
+            placeholder="Precio..." />
+          <span class="text-[11px] font-numeric tabular-nums font-semibold text-zinc-900 truncate">
+            {{ projectService.formatCurrency(selApp.price) }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
 <!-- MODAL: CATÁLOGO DE PLANTILLAS MULTI-CATEGORÍA -->
 @defer (when showTemplatesModal()) {
   <app-templates-modal
     [isOpen]="showTemplatesModal()"
-    [environmentLine]="selectedEnvironmentLine()"
+    [initialView]="templatesModalInitialView()"
     [materials]="melamineBoardMaterials()"
     [editingGroupId]="editingGroupId()"
     [editingConfig]="editingGroupConfig()"

@@ -104,76 +104,67 @@ describe('ModuleDesigner & Studio Responsive Laptop Adaptability (FASE 2 y FASE 
       expect(cls).toContain('no-scrollbar');
     });
 
-    it('debe ocultar la etiqueta redundante Modelador 3D por debajo de 2xl (1536px)', () => {
+    it('debe mostrar siempre el título limpio Modelador 3D sin los 4 botones de líneas de ambiente en .md-top-bar', () => {
       const topBar = hostEl.querySelector('.md-top-bar') as HTMLElement;
       const modelerHeading = Array.from(topBar.querySelectorAll('div')).find(
         div =>
-          div.classList.contains('2xl:flex') &&
+          div.classList.contains('flex') &&
           div.textContent?.includes(i18n.t('designer.modeler3d'))
       );
 
       expect(modelerHeading).toBeTruthy();
-      expect(modelerHeading?.className).toContain('hidden');
-      expect(modelerHeading?.className).toContain('2xl:flex');
+      expect(modelerHeading?.className).not.toContain('hidden');
       expect(modelerHeading?.className).toContain('shrink-0');
+      expect(modelerHeading?.querySelector('hugeicons-icon')).toBeTruthy();
+
+      const buttons = Array.from(topBar.querySelectorAll('button'));
+      for (const removedEnvKey of [
+        'designer.kitchens',
+        'designer.closets',
+        'designer.bathrooms',
+        'designer.livingOffice'
+      ]) {
+        const envBtn = buttons.find(btn => btn.textContent?.includes(i18n.t(removedEnvKey)));
+        expect(envBtn).toBeUndefined();
+      }
     });
 
-    it('debe mantener visibles los 4 botones primarios de creación y compactar etiquetas bajo 2xl', () => {
+    it('debe mantener .md-top-bar libre de botones de creación duplicados y 60 FPS', () => {
       const topBar = hostEl.querySelector('.md-top-bar') as HTMLElement;
       const buttons = Array.from(topBar.querySelectorAll('button'));
 
       const findBtnByKey = (key: string) =>
         buttons.find(btn => btn.textContent?.includes(i18n.t(key)));
 
-      const addModuleBtn = findBtnByKey('designer.addModule');
-      const addCountertopBtn = findBtnByKey('designer.addCountertop');
-      const addApplianceBtn = findBtnByKey('designer.addAppliance');
-      const addFreeBoardBtn = findBtnByKey('designer.addFreeBoard');
-
-      expect(addModuleBtn).toBeTruthy();
-      expect(addCountertopBtn).toBeTruthy();
-      expect(addApplianceBtn).toBeTruthy();
-      expect(addFreeBoardBtn).toBeTruthy();
-
-      for (const btn of [addModuleBtn, addCountertopBtn, addApplianceBtn, addFreeBoardBtn]) {
-        expect(btn?.className).toContain('whitespace-nowrap');
-        expect(btn?.className).toContain('shrink-0');
-        expect(btn?.className).toContain('min-[1440px]:px-2.5');
+      for (const removedKey of [
+        'designer.addModule',
+        'designer.addCountertop',
+        'designer.addAppliance',
+        'designer.addFreeBoard',
+        'designer.performance60fps'
+      ]) {
+        expect(findBtnByKey(removedKey)).toBeUndefined();
       }
 
-      const countertopLabel = Array.from(addCountertopBtn!.querySelectorAll('span')).find(sp =>
-        sp.textContent?.includes(i18n.t('designer.addCountertop'))
+      const roomBtn = findBtnByKey('designer.room3d');
+      const snapBtn = buttons.find(btn => btn.textContent?.includes('Imán / Colisiones 3D'));
+      const togglePanelBtn = buttons.find(btn =>
+        btn.textContent?.includes(i18n.t('designer.hide')) ||
+        btn.textContent?.includes(i18n.t('designer.show'))
       );
-      expect(countertopLabel).toBeTruthy();
-      expect(countertopLabel?.className).toContain('inline');
-      expect(countertopLabel?.className).not.toContain('hidden');
 
-      const applianceFullSpan = findSpanWithClasses(addApplianceBtn!, ['hidden', '2xl:inline']);
-      const applianceShortSpan = findSpanWithClasses(addApplianceBtn!, ['2xl:hidden']);
-      expect(applianceFullSpan?.textContent).toContain(i18n.t('designer.addAppliance'));
-      expect(applianceShortSpan).toBeTruthy();
+      expect(buttons.length).toBe(3);
+      expect(roomBtn).toBeTruthy();
+      expect(snapBtn).toBeTruthy();
+      expect(togglePanelBtn).toBeTruthy();
 
-      const freeBoardFullSpan = findSpanWithClasses(addFreeBoardBtn!, ['hidden', '2xl:inline']);
-      const freeBoardShortSpan = findSpanWithClasses(addFreeBoardBtn!, ['2xl:hidden']);
-      expect(freeBoardFullSpan?.textContent).toContain(i18n.t('designer.addFreeBoard'));
-      expect(freeBoardShortSpan).toBeTruthy();
-
-      for (const envKey of [
-        'designer.kitchens',
-        'designer.closets',
-        'designer.bathrooms',
-        'designer.livingOffice'
-      ]) {
-        const envPill = findBtnByKey(envKey);
-        expect(envPill).toBeTruthy();
-        expect(envPill?.className).toContain('px-2');
-        expect(envPill?.className).toContain('min-[1440px]:px-2.5');
-        expect(envPill?.className).toContain('whitespace-nowrap');
-        expect(envPill?.className).toContain('shrink-0');
+      for (const btn of [roomBtn, snapBtn, togglePanelBtn]) {
+        expect(btn?.className).toContain('whitespace-nowrap');
+        expect(btn?.className).toContain('shrink-0');
       }
     });
 
-    it('debe compactar el bloque derecho de .md-top-bar (Habitación 3D abreviado, 60 FPS y panel icono bajo 1480px)', () => {
+    it('debe compactar el bloque derecho de .md-top-bar (Habitación 3D abreviado, Imán 3D y panel icono bajo 1480px)', () => {
       const topBar = hostEl.querySelector('.md-top-bar') as HTMLElement;
       const buttons = Array.from(topBar.querySelectorAll('button'));
 
@@ -182,16 +173,15 @@ describe('ModuleDesigner & Studio Responsive Laptop Adaptability (FASE 2 y FASE 
       const roomFullSpan = findSpanWithClasses(roomBtn!, ['hidden', '2xl:inline']);
       const roomShortSpan = findSpanWithClasses(roomBtn!, ['2xl:hidden']);
       expect(roomFullSpan?.textContent).toContain(i18n.t('designer.room3d'));
-      expect(roomShortSpan).toBeTruthy();
+      expect(roomShortSpan?.textContent).toContain(i18n.t('designer.room3dShort'));
 
-      const fpsBtn = buttons.find(btn => btn.textContent?.includes(i18n.t('designer.performance60fps')));
-      expect(fpsBtn).toBeTruthy();
-      const fpsLabel = Array.from(fpsBtn!.querySelectorAll('span')).find(sp =>
-        sp.textContent?.includes(i18n.t('designer.performance60fps'))
-      );
-      expect(fpsLabel?.className).toContain('hidden');
-      expect(fpsLabel?.className).toContain('min-[1480px]:inline');
-      expect(fpsBtn?.getAttribute('title')).toBeTruthy();
+      const snapBtn = buttons.find(btn => btn.textContent?.includes('Imán / Colisiones 3D'));
+      expect(snapBtn).toBeTruthy();
+      const snapFullSpan = findSpanWithClasses(snapBtn!, ['hidden', 'md:inline']);
+      const snapShortSpan = findSpanWithClasses(snapBtn!, ['md:hidden']);
+      expect(snapFullSpan?.textContent).toContain('Imán / Colisiones 3D');
+      expect(snapShortSpan?.textContent).toContain('Imán 3D');
+      expect(snapBtn?.getAttribute('title')).toBeTruthy();
 
       const togglePanelBtn = buttons.find(btn =>
         btn.textContent?.includes(i18n.t('designer.hide')) ||
@@ -209,7 +199,9 @@ describe('ModuleDesigner & Studio Responsive Laptop Adaptability (FASE 2 y FASE 
       component.projectService.setWorkspaceMode('room');
       fixture.detectChanges();
 
-      const envBtn = Array.from(topBar.querySelectorAll('button')).find(btn =>
+      const roomButtons = Array.from(topBar.querySelectorAll('button'));
+      expect(roomButtons.length).toBe(4);
+      const envBtn = roomButtons.find(btn =>
         btn.textContent?.includes(i18n.t('designer.environment'))
       );
       expect(envBtn).toBeTruthy();

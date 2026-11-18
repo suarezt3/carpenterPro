@@ -1,16 +1,27 @@
-# Directriz Global: Flujo de Ramas Git, Entornos y Despliegue (`develop` -> `main`)
+# Directriz Global: Flujo Obligatorio de Trabajo y Despliegue (`LOCALHOST` -> `DEVELOP` -> `MAIN`)
 
-Regla permanente e inquebrantable para todas las sesiones de desarrollo en **Piezo3D Studio**. Antes de ejecutar cualquier modificación de código, prueba, commit o despliegue, verifica siempre la rama activa con `git branch --show-current`.
+Regla permanente e inquebrantable para todas las sesiones de desarrollo en **Piezo3D Studio**. Todo cambio debe seguir estrictamente el flujo secuencial **`LOCALHOST` -> `DEVELOP` -> `MAIN`**. Antes de ejecutar cualquier modificación de código, prueba o comando Git, verifica siempre la rama activa con `git branch --show-current` y asegúrate de trabajar sobre `develop`.
 
-## 1. Entorno de Desarrollo y Staging (`develop` -> `*.vercel.app`)
-- **Rama de trabajo por defecto:** Todo nuevo requerimiento, corrección de bugs, refactorización, ajuste visual o configuración debe desarrollarse, probarse, confirmarse (`commit`) y subirse (`git push origin develop`) exclusivamente en la rama `develop`.
-- **Verificación previa al commit/push:** Antes de confirmar o subir cambios a `develop`, valida las comprobaciones correspondientes del proyecto (`tsc`, `eslint`, pruebas unitarias y compilación cuando aplique).
-- **Publicación en Staging/Preview:** Tras confirmar cambios en `develop`, súbelos únicamente a la rama de desarrollo (`git push origin develop`) para su validación en el entorno preview/staging `*.vercel.app`.
+- **Regla fundamental de Git:** **PROHIBIDO ejecutar `git commit` o `git push` automáticamente al terminar una tarea.** Ningún cambio debe confirmarse ni subirse al repositorio remoto sin validación previa en local y confirmación explícita del usuario.
+
+## 1. Entorno Local y Staging (`LOCALHOST` -> `DEVELOP` -> `*.vercel.app`)
+
+### 1.1 Desarrollo y Validación Local (`LOCALHOST` sobre `develop`)
+- **Rama de trabajo por defecto:** Todo nuevo requerimiento, corrección de bugs, refactorización, ajuste visual o configuración debe aplicarse y validarse primero en entorno local exclusivamente sobre la rama `develop` (nunca en `main`).
+- **Validación local obligatoria previa:** Antes de dar por terminada una tarea en local sobre `develop`, ejecuta y valida todas las comprobaciones del proyecto:
+  1. Compilación completa: `npm run build` (sin errores).
+  2. Tests unitarios (y validaciones estáticas cuando apliquen): `npm test` / `npx ng test --watch=false`, junto con `tsc` y `eslint` / `npm run lint`.
+  3. Prueba manual en `localhost` (`npm run dev` o `npm start` verificando el flujo modificado en navegador local).
+- **Detención obligatoria sin commit ni push:** **PROHIBIDO ejecutar `git commit` o `git push` automáticamente al terminar una tarea.** Al finalizar y validar los cambios locales, detente sin hacer `commit` ni `push`, presenta el resumen de pruebas locales y pregunta explícitamente al usuario:
+  > *"¿Quieres subir los cambios a develop?"*
+
+### 1.2 Publicación en Staging / Preview (`DEVELOP` -> `*.vercel.app`)
+- **Subida condicionada a aprobación explícita:** Únicamente después de que el usuario responda afirmativamente a *"¿Quieres subir los cambios a develop?"*, confirma los cambios (`git commit`) y súbelos exclusivamente a la rama de desarrollo (`git push origin develop`) para su validación en el entorno preview/staging `*.vercel.app`.
 - **Estado obligatorio tras finalizar:** Al terminar cualquier tarea de desarrollo o despliegue, la rama local activa debe quedar siempre en `develop` (nunca en `main`).
 
-## 2. Entorno de Producción (`main` -> `https://piezo3d.com`)
+## 2. Entorno de Producción (`DEVELOP` -> `MAIN` -> `https://piezo3d.com`)
 - **Prohibición estricta en `main`:** Queda **TERMINANTEMENTE PROHIBIDO** desarrollar directamente sobre `main`, hacer commits directos en `main` o ejecutar `git push origin main` sin confirmación explícita del usuario.
-- **Compuerta obligatoria de aprobación:** Antes de pasar cualquier cambio de `develop` a `main`, el cambio debe estar validado previamente en `*.vercel.app`, y se debe preguntar siempre o esperar orden explícita del usuario:
+- **Compuerta obligatoria de aprobación:** Solo tras subir y validar los cambios en `develop` (`*.vercel.app`), pregunta explícitamente al usuario si se desea fusionar a `main`:
   > *"¿Deseas fusionar `develop` en `main` para publicar en `piezo3d.com`?"*
 - **Protocolo exacto de publicación en producción (solo tras aprobación explícita y validación previa en `.vercel.app`):**
   1. Verificar que `develop` esté limpia, actualizada y validada en `*.vercel.app`.
